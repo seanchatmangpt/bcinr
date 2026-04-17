@@ -1,6 +1,6 @@
 # bcinr — BranchlessCInRust
 
-Academic-grade Rust library for branchless algorithms, generated and scaffolded with [unrdf](../unrdf).
+Academic-grade Rust library for branchless algorithms, generated and scaffolded with [unrdf](../unrdf). See [docs/bcinr_whitepaper.pdf](./docs/bcinr_whitepaper.pdf) for detailed specifications.
 
 ## 12 Algorithm Families
 

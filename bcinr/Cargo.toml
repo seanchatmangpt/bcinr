@@ -1,0 +1,22 @@
+[package]
+name = "bcinr-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bcinr-api = { path = "../crates/bcinr-api" }
+bcinr-logic = { path = "../crates/bcinr-logic" }
+prettytable-rs = "0.10.0"
+
+[features]
+default = []
+alloc = []
+std = []
+bench = []
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "kernel_bench"
+harness = false

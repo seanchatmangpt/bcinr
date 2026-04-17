@@ -1,0 +1,7 @@
+[package]
+name = "bcinr-api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bcinr-logic = { path = "../bcinr-logic" }

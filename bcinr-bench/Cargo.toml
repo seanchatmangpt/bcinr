@@ -1,0 +1,12 @@
+[package]
+name = "bcinr-bench"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+criterion = "0.5"
+bcinr = { path = "../bcinr" }
+
+[[bench]]
+name = "bcinr_bench"
+harness = false
