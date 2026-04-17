@@ -1,0 +1,13 @@
+@prefix bcinr: <https://example.org/bcinr#> .
+@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+
+bcinr:core a bcinr:Crate ;
+  bcinr:crateName "mock-core" .
+
+bcinr:mask a bcinr:AlgorithmFamily ;
+  rdfs:label "mask" ;
+  bcinr:belongsToCrate bcinr:core ;
+  bcinr:rustModuleFile "mask" ;
+  bcinr:logicModule "mask" ;
+  bcinr:docSummary "Mask primitives." ;
+  bcinr:moduleOrder 10 .

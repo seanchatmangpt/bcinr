@@ -1,0 +1,31 @@
+//! bcinr-core — BranchlessCInRust
+//!
+//! Academic-grade branchless algorithm library with 12 algorithm families
+//! covering mask calculus, integer bitwise, saturation/fixed-point,
+//! compare-exchange networks, bitset algebra, byte/word scanning,
+//! UTF-8 calculus, parsing primitives, table-driven automata,
+//! SWAR reductions, probabilistic sketches, and SIMD primitives.
+//!
+//! # Design Philosophy
+//!
+//! The bcinr library is organized into two layers:
+//!
+//! - **`api/`**: Generated public interface (100% overwritten on sync)
+//! - **`logic/`**: Handwritten implementation (bootstrap-once, hand-editable)
+//!
+//! This separation enables:
+//! - Type-safe API contracts enforced at generation time
+//! - Hot-reload of the public interface without touching hot loops
+//! - Full OTEL instrumentation in the `api/` layer
+//! - Unsafe admission policy + opt-in in the `logic/` layer
+
+#![no_std]
+#![warn(missing_docs)]
+
+pub mod api;
+pub(crate) mod logic;
+
+/// Prelude for convenience imports
+pub mod prelude {
+    pub use crate::api::*;
+}

@@ -1,0 +1,23 @@
+[project]
+name = "mock-core"
+version = "0.1.0"
+
+[ontology]
+source = "ontology/test.ttl"
+format = "turtle"
+
+[generation]
+output_dir = "."
+
+[[generation.rules]]
+name = "logic-mod-entry"
+template = "templates/logic-mod-entry.njk"
+output_file = "mock-src/logic/mod.rs"
+query = "SELECT ?family_file WHERE { ?f a bcinr:AlgorithmFamily ; bcinr:rustModuleFile ?family_file . }"
+
+[[generation.rules]]
+name = "logic-family-once"
+template = "templates/logic-family.njk"
+output_file = "mock-src/logic/{{ family_file }}.rs"
+mode = "skip_existing"
+query = "SELECT ?family_file WHERE { ?f a bcinr:AlgorithmFamily ; bcinr:rustModuleFile ?family_file . }"

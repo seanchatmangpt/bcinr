@@ -1,0 +1,3 @@
+[workspace]
+members = ["bcinr-core"]
+resolver = "2"

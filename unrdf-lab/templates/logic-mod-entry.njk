@@ -1,0 +1,6 @@
+---
+inject: true
+after: "^// ANCHOR$"
+skipIf: "pub\\(crate\\) mod {{ family_file }};"
+---
+pub(crate) mod {{ family_file }};

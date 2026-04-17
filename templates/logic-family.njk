@@ -1,0 +1,49 @@
+//! {{ label }}: {{ description }}
+//!
+//! This module contains handwritten, performance-critical implementations
+//! of all {{ label }} algorithms. These functions are pub(crate) and wrapped
+//! by the public API in `src/api/{{ familyId }}.rs`.
+//!
+//! Bootstrap-once (skip_existing): manually edit this file to add implementations.
+//! When you `unrdf sync`:
+//! 1. First run: Creates this file with stubs
+//! 2. Subsequent runs: Leaves this file untouched
+//! 3. API wrappers regenerate automatically
+
+{% set symbolNames = symbols.split(",") -%}
+{% for symbol in symbolNames -%}
+/// {{ symbol }} implementation
+#[inline(always)]
+pub(crate) fn {{ symbol }}() {
+    // TODO: Implement {{ symbol }}
+    todo!("{{ symbol }} not yet implemented")
+}
+
+{% endfor %}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+{%- for symbol in symbolNames %}
+
+    #[test]
+    fn test_{{ symbol }}_basic() {
+        // TODO: Add basic correctness test for {{ symbol }}
+        let _ = {{ symbol }};
+    }
+{%- endfor %}
+}
+
+#[cfg(feature = "bench")]
+mod benches {
+    use super::*;
+
+{%- for symbol in symbolNames %}
+
+    #[bench]
+    fn bench_{{ symbol }}(b: &mut test::Bencher) {
+        // TODO: Add throughput benchmark for {{ symbol }}
+        b.iter(|| {{ symbol }}());
+    }
+{%- endfor %}
+}
