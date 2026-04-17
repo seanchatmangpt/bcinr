@@ -1,0 +1,144 @@
+abs_i32
+add_sat_u32
+add_sat_u8
+any_bit_set_u64_slice
+api;
+ascii_prefix_len
+bitonic_sort_16u32
+bitonic_sort_32u32
+bitonic_sort_8u32
+bitset;
+bucketize_u32<const N: usize>
+clamp_u32
+clear_bit_u64
+compare_exchange
+const add_sat_u32
+const add_sat_u8
+const bucketize_u32<const N: usize>
+const clamp_u32
+const clear_bit_u64
+const compare_exchange
+const dec_sat_u32
+const dfa_advance
+const inc_sat_u32
+const is_pow2_u32
+const leading_zeros_u32
+const leading_zeros_u64
+const mul_sat_u32
+const murmur3_hash_u64
+const next_power_of_two_u32
+const parity_u32
+const popcount_u32
+const popcount_u64
+const rank_u64
+const reverse_bits_u32
+const reverse_bits_u64
+const saturating_add_i64
+const saturating_mul_i64
+const saturating_sub_i64
+const set_bit_u64
+const sub_sat_u32
+const sub_sat_u8
+const trailing_zeros_u32
+const trailing_zeros_u64
+count_codepoints
+count_nonzero_bytes
+count_zero_bytes
+dec_sat_u32
+dfa_advance
+dfa_is_accepting
+dfa_run
+dfa;
+eq_mask_u32
+exec;
+find_byte
+find_byte_mask
+first_invalid_byte
+first_zero_byte
+fix;
+fnv1a_64
+hamming_u64_slices
+has_less_than_byte_u64
+has_zero_byte_u64
+horizontal_and_u32
+horizontal_max_u8x8
+horizontal_min_u8x8
+horizontal_or_u32
+horizontal_sum_u8x8
+horizontal_xor_u32
+inc_sat_u32
+int;
+intersect_u64_slices
+is_ascii_u64_slice
+is_pow2_u32
+is_zero_mask_u32
+jaccard_u64_slices
+leading_zeros_u32
+leading_zeros_u64
+logic;
+lt_mask_u32
+mask;
+max_u32
+mem;
+min_u32
+movemask_u8x16
+mul_sat_u32
+murmur3_32
+murmur3_hash_u64
+network;
+next_power_of_two_u32
+nonzero_mask_u32
+parity_u32
+parity_u64_slice
+parse_decimal_u64
+parse_hex_u32
+parse;
+popcount_u32
+popcount_u64
+proptests;
+rank_u64
+reduce;
+reverse_bits_u32
+reverse_bits_u64
+saturating_add_i64
+saturating_mul_i64
+saturating_sub_i64
+scan;
+select_bit_u64
+select_u32
+select_u64
+set_bit_u64
+shuffle_u8x16
+simd;
+sketch;
+skip_spaces
+skip_whitespace
+sort3_u32
+sort4_u32
+sort5_u32
+splat_u8x16
+sub_sat_u32
+sub_sat_u8
+swar;
+trailing_zeros_u32
+trailing_zeros_u64
+union_u64_slices
+use bcinr_api as api_crate;
+use bcinr_api::*;
+use bcinr_logic as logic_crate;
+use bcinr_logic::*;
+use bitset::*;
+use dfa::*;
+use fix::*;
+use int::*;
+use mask::*;
+use network::*;
+use parse::*;
+use reduce::*;
+use scan::*;
+use simd::*;
+use sketch::*;
+use utf8::*;
+utf8;
+validate_utf8
+xxhash32

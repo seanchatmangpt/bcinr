@@ -1,0 +1,296 @@
+bcinr-core/src/lib.rs:pub mod api;
+bcinr-core/src/lib.rs:pub mod logic;
+bcinr-core/src/logic/simd.rs:pub fn splat_u8x16(value: u8) -> [u8; 16] {
+bcinr-core/src/logic/simd.rs:pub fn shuffle_u8x16(a: [u8; 16], b: [u8; 16], mask: [u8; 16]) -> [u8; 16] {
+bcinr-core/src/logic/simd.rs:pub fn movemask_u8x16(a: [u8; 16]) -> u16 {
+bcinr-core/src/logic/utf8.rs:pub fn validate_utf8(bytes: &[u8]) -> bool {
+bcinr-core/src/logic/utf8.rs:pub fn count_codepoints(bytes: &[u8]) -> usize {
+bcinr-core/src/logic/utf8.rs:pub fn ascii_prefix_len(bytes: &[u8]) -> usize {
+bcinr-core/src/logic/utf8.rs:pub fn first_invalid_byte(bytes: &[u8]) -> Option<usize> {
+bcinr-core/src/logic/reduce.rs:pub fn horizontal_or_u32(slice: &[u32]) -> u32 {
+bcinr-core/src/logic/reduce.rs:pub fn horizontal_and_u32(slice: &[u32]) -> u32 {
+bcinr-core/src/logic/reduce.rs:pub fn horizontal_xor_u32(slice: &[u32]) -> u32 {
+bcinr-core/src/logic/reduce.rs:pub fn murmur3_hash_u64(mut x: u64) -> u64 {
+bcinr-core/src/logic/reduce.rs:pub fn horizontal_sum_u8x8(slice: &[u8]) -> u64 {
+bcinr-core/src/logic/reduce.rs:pub fn horizontal_max_u8x8(slice: &[u8]) -> u8 {
+bcinr-core/src/logic/reduce.rs:pub fn horizontal_min_u8x8(slice: &[u8]) -> u8 {
+bcinr-core/src/logic/mask.rs:pub fn select_u32(mask: u32, a: u32, b: u32) -> u32 {
+bcinr-core/src/logic/mask.rs:pub fn select_u64(mask: u64, a: u64, b: u64) -> u64 {
+bcinr-core/src/logic/mask.rs:pub fn eq_mask_u32(a: u32, b: u32) -> u32 {
+bcinr-core/src/logic/mask.rs:pub fn is_zero_mask_u32(x: u32) -> u32 {
+bcinr-core/src/logic/mask.rs:pub fn nonzero_mask_u32(x: u32) -> u32 {
+bcinr-core/src/logic/mask.rs:pub fn lt_mask_u32(a: u32, b: u32) -> u32 {
+bcinr-core/src/logic/mask.rs:pub fn min_u32(a: u32, b: u32) -> u32 {
+bcinr-core/src/logic/mask.rs:pub fn max_u32(a: u32, b: u32) -> u32 {
+bcinr-core/src/logic/mask.rs:pub fn abs_i32(x: i32) -> i32 {
+bcinr-core/src/logic/int.rs:pub const fn popcount_u64(x: u64) -> u64 {
+bcinr-core/src/logic/int.rs:pub const fn leading_zeros_u64(x: u64) -> u64 {
+bcinr-core/src/logic/int.rs:pub const fn trailing_zeros_u64(x: u64) -> u64 {
+bcinr-core/src/logic/int.rs:pub const fn reverse_bits_u64(mut x: u64) -> u64 {
+bcinr-core/src/logic/int.rs:pub const fn saturating_add_i64(a: i64, b: i64) -> i64 {
+bcinr-core/src/logic/int.rs:pub const fn saturating_sub_i64(a: i64, b: i64) -> i64 {
+bcinr-core/src/logic/int.rs:pub const fn saturating_mul_i64(a: i64, b: i64) -> i64 {
+bcinr-core/src/logic/int.rs:pub const fn popcount_u32(x: u32) -> u32 {
+bcinr-core/src/logic/int.rs:pub const fn leading_zeros_u32(x: u32) -> u32 {
+bcinr-core/src/logic/int.rs:pub const fn next_power_of_two_u32(mut x: u32) -> u32 {
+bcinr-core/src/logic/int.rs:pub const fn is_pow2_u32(x: u32) -> bool {
+bcinr-core/src/logic/int.rs:pub const fn parity_u32(mut x: u32) -> u32 {
+bcinr-core/src/logic/int.rs:pub const fn reverse_bits_u32(mut x: u32) -> u32 {
+bcinr-core/src/logic/int.rs:pub const fn trailing_zeros_u32(x: u32) -> u32 {
+bcinr-core/src/logic/mod.rs:pub mod bitset;
+bcinr-core/src/logic/mod.rs:pub mod dfa;
+bcinr-core/src/logic/mod.rs:pub mod exec;
+bcinr-core/src/logic/mod.rs:pub mod fix;
+bcinr-core/src/logic/mod.rs:pub mod int;
+bcinr-core/src/logic/mod.rs:pub mod mask;
+bcinr-core/src/logic/mod.rs:pub mod mem;
+bcinr-core/src/logic/mod.rs:pub mod network;
+bcinr-core/src/logic/mod.rs:pub mod parse;
+bcinr-core/src/logic/mod.rs:pub mod proptests;
+bcinr-core/src/logic/mod.rs:pub mod reduce;
+bcinr-core/src/logic/mod.rs:pub mod scan;
+bcinr-core/src/logic/mod.rs:pub mod simd;
+bcinr-core/src/logic/mod.rs:pub mod sketch;
+bcinr-core/src/logic/mod.rs:pub mod swar;
+bcinr-core/src/logic/mod.rs:pub mod utf8;
+bcinr-core/src/logic/sketch.rs:pub fn murmur3_32(data: &[u8], seed: u32) -> u32 {
+bcinr-core/src/logic/sketch.rs:pub fn fnv1a_64(data: &[u8]) -> u64 {
+bcinr-core/src/logic/sketch.rs:pub fn xxhash32(data: &[u8], seed: u32) -> u32 {
+bcinr-core/src/logic/parse.rs:pub fn skip_whitespace(bytes: &[u8]) -> usize {
+bcinr-core/src/logic/parse.rs:pub fn parse_hex_u32(bytes: &[u8]) -> Result<u32, &'static str> {
+bcinr-core/src/logic/parse.rs:pub fn parse_decimal_u64(bytes: &[u8]) -> Result<u64, &'static str> {
+bcinr-core/src/logic/fix.rs:pub const fn add_sat_u8(a: u8, b: u8) -> u8 {
+bcinr-core/src/logic/fix.rs:pub const fn sub_sat_u8(a: u8, b: u8) -> u8 {
+bcinr-core/src/logic/fix.rs:pub const fn add_sat_u32(a: u32, b: u32) -> u32 {
+bcinr-core/src/logic/fix.rs:pub const fn sub_sat_u32(a: u32, b: u32) -> u32 {
+bcinr-core/src/logic/fix.rs:pub const fn mul_sat_u32(a: u32, b: u32) -> u32 {
+bcinr-core/src/logic/fix.rs:pub const fn inc_sat_u32(x: u32) -> u32 {
+bcinr-core/src/logic/fix.rs:pub const fn dec_sat_u32(x: u32) -> u32 {
+bcinr-core/src/logic/fix.rs:pub const fn clamp_u32(x: u32, min: u32, max: u32) -> u32 {
+bcinr-core/src/logic/fix.rs:pub const fn bucketize_u32<const N: usize>(x: u32, buckets: &[u32; N]) -> usize {
+bcinr-core/src/logic/scan.rs:pub fn find_byte_mask(bytes: &[u8], target: u8) -> u64 {
+bcinr-core/src/logic/scan.rs:pub fn count_nonzero_bytes(bytes: &[u8]) -> usize {
+bcinr-core/src/logic/scan.rs:pub fn skip_spaces(bytes: &[u8]) -> usize {
+bcinr-core/src/logic/scan.rs:pub fn first_zero_byte(bytes: &[u8]) -> Option<usize> {
+bcinr-core/src/logic/scan.rs:pub fn count_zero_bytes(bytes: &[u8]) -> usize {
+bcinr-core/src/logic/scan.rs:pub fn find_byte(bytes: &[u8], target: u8) -> Option<usize> {
+bcinr-core/src/logic/scan.rs:pub fn is_ascii_u64_slice(bytes: &[u8]) -> bool {
+bcinr-core/src/logic/dfa.rs:pub const fn dfa_advance(state: usize, input: u8, table: &[usize], alphabet_size: usize) -> usize {
+bcinr-core/src/logic/dfa.rs:pub fn dfa_run(input: &[u8], table: &[usize], alphabet_size: usize, initial_state: usize) -> usize {
+bcinr-core/src/logic/dfa.rs:pub fn dfa_is_accepting(state: usize, accept_states: &[usize]) -> bool {
+bcinr-core/src/logic/network.rs:pub const fn compare_exchange(a: u32, b: u32) -> (u32, u32) {
+bcinr-core/src/logic/network.rs:pub fn bitonic_sort_32u32(arr: &mut [u32; 32]) {
+bcinr-core/src/logic/network.rs:pub fn sort3_u32(arr: &mut [u32; 3]) {
+bcinr-core/src/logic/network.rs:pub fn sort4_u32(arr: &mut [u32; 4]) {
+bcinr-core/src/logic/network.rs:pub fn sort5_u32(arr: &mut [u32; 5]) {
+bcinr-core/src/logic/network.rs:pub fn bitonic_sort_8u32(arr: &mut [u32; 8]) {
+bcinr-core/src/logic/network.rs:pub fn bitonic_sort_16u32(arr: &mut [u32; 16]) {
+bcinr-core/src/logic/swar.rs:pub fn has_zero_byte_u64(x: u64) -> u64 {
+bcinr-core/src/logic/swar.rs:pub fn has_less_than_byte_u64(x: u64, val: u8) -> u64 {
+bcinr-core/src/logic/bitset.rs:pub const fn set_bit_u64(x: u64, pos: usize) -> u64 {
+bcinr-core/src/logic/bitset.rs:pub const fn clear_bit_u64(x: u64, pos: usize) -> u64 {
+bcinr-core/src/logic/bitset.rs:pub const fn rank_u64(x: u64, pos: usize) -> usize {
+bcinr-core/src/logic/bitset.rs:pub fn select_bit_u64(x: u64, nth: usize) -> usize {
+bcinr-core/src/logic/bitset.rs:pub fn parity_u64_slice(a: &[u64]) -> u32 {
+bcinr-core/src/logic/bitset.rs:pub fn jaccard_u64_slices(a: &[u64], b: &[u64]) -> f32 {
+bcinr-core/src/logic/bitset.rs:pub fn hamming_u64_slices(a: &[u64], b: &[u64]) -> u32 {
+bcinr-core/src/logic/bitset.rs:pub fn intersect_u64_slices(a: &[u64], b: &[u64], out: &mut [u64]) {
+bcinr-core/src/logic/bitset.rs:pub fn union_u64_slices(a: &[u64], b: &[u64], out: &mut [u64]) {
+bcinr-core/src/logic/bitset.rs:pub fn any_bit_set_u64_slice(a: &[u64]) -> bool {
+bcinr-core/src/api/simd.rs:pub fn movemask_u8x16(a: [u8; 16]) -> u16 {
+bcinr-core/src/api/simd.rs:pub fn shuffle_u8x16(a: [u8; 16], b: [u8; 16], mask: [u8; 16]) -> [u8; 16] {
+bcinr-core/src/api/simd.rs:pub fn splat_u8x16(value: u8) -> [u8; 16] {
+bcinr-core/src/api/utf8.rs:pub fn ascii_prefix_len(bytes: &[u8]) -> usize {
+bcinr-core/src/api/reduce.rs:pub fn horizontal_and_u32(slice: &[u32]) -> u32 {
+bcinr-core/src/api/reduce.rs:pub fn horizontal_or_u32(slice: &[u32]) -> u32 {
+bcinr-core/src/api/reduce.rs:pub fn horizontal_xor_u32(slice: &[u32]) -> u32 {
+bcinr-core/src/api/mask.rs:pub fn select_u32(mask: u32, a: u32, b: u32) -> u32 {
+bcinr-core/src/api/mask.rs:pub fn select_u64(mask: u64, a: u64, b: u64) -> u64 {
+bcinr-core/src/api/mask.rs:pub fn eq_mask_u32(a: u32, b: u32) -> u32 {
+bcinr-core/src/api/mask.rs:pub fn is_zero_mask_u32(x: u32) -> u32 {
+bcinr-core/src/api/mask.rs:pub fn nonzero_mask_u32(x: u32) -> u32 {
+bcinr-core/src/api/mask.rs:pub fn lt_mask_u32(a: u32, b: u32) -> u32 {
+bcinr-core/src/api/mask.rs:pub fn min_u32(a: u32, b: u32) -> u32 {
+bcinr-core/src/api/mask.rs:pub fn max_u32(a: u32, b: u32) -> u32 {
+bcinr-core/src/api/mask.rs:pub fn abs_i32(x: i32) -> i32 {
+bcinr-core/src/api/int.rs:pub fn next_power_of_two_u32(x: u32) -> u32 {
+bcinr-core/src/api/int.rs:pub fn leading_zeros_u32(x: u32) -> u32 {
+bcinr-core/src/api/int.rs:pub fn popcount_u32(x: u32) -> u32 {
+bcinr-core/src/api/mod.rs:pub mod bitset;
+bcinr-core/src/api/mod.rs:pub mod dfa;
+bcinr-core/src/api/mod.rs:pub mod fix;
+bcinr-core/src/api/mod.rs:pub mod int;
+bcinr-core/src/api/mod.rs:pub mod mask;
+bcinr-core/src/api/mod.rs:pub mod network;
+bcinr-core/src/api/mod.rs:pub mod parse;
+bcinr-core/src/api/mod.rs:pub mod reduce;
+bcinr-core/src/api/mod.rs:pub mod scan;
+bcinr-core/src/api/mod.rs:pub mod simd;
+bcinr-core/src/api/mod.rs:pub mod sketch;
+bcinr-core/src/api/mod.rs:pub mod utf8;
+bcinr-core/src/api/sketch.rs:pub fn fnv1a_64(data: &[u8]) -> u64 {
+bcinr-core/src/api/sketch.rs:pub fn xxhash32(data: &[u8], seed: u32) -> u32 {
+bcinr-core/src/api/sketch.rs:pub fn murmur3_32(data: &[u8], seed: u32) -> u32 {
+bcinr-core/src/api/parse.rs:pub fn skip_whitespace(bytes: &[u8]) -> usize {
+bcinr-core/src/api/parse.rs:pub fn parse_hex_u32(bytes: &[u8]) -> Result<u32, &'static str> {
+bcinr-core/src/api/parse.rs:pub fn parse_decimal_u64(bytes: &[u8]) -> Result<u64, &'static str> {
+bcinr-core/src/api/fix.rs:pub fn clamp_u32(x: u32, min: u32, max: u32) -> u32 {
+bcinr-core/src/api/fix.rs:pub fn sub_sat_u8(a: u8, b: u8) -> u8 {
+bcinr-core/src/api/fix.rs:pub fn add_sat_u8(a: u8, b: u8) -> u8 {
+bcinr-core/src/api/scan.rs:pub fn find_byte(bytes: &[u8], target: u8) -> Option<usize> {
+bcinr-core/src/api/scan.rs:pub fn count_zero_bytes(bytes: &[u8]) -> usize {
+bcinr-core/src/api/scan.rs:pub fn first_zero_byte(bytes: &[u8]) -> Option<usize> {
+bcinr-core/src/api/dfa.rs:pub fn dfa_advance(state: usize, input: u8, table: &[usize], alphabet_size: usize) -> usize {
+bcinr-core/src/api/dfa.rs:pub fn dfa_run(input: &[u8], table: &[usize], alphabet_size: usize, initial_state: usize) -> usize {
+bcinr-core/src/api/dfa.rs:pub fn dfa_is_accepting(state: usize, accept_states: &[usize]) -> bool {
+bcinr-core/src/api/network.rs:pub fn compare_exchange(a: u32, b: u32) -> (u32, u32) {
+bcinr-core/src/api/network.rs:pub fn bitonic_sort_16u32(arr: &mut [u32; 16]) {
+bcinr-core/src/api/network.rs:pub fn bitonic_sort_8u32(arr: &mut [u32; 8]) {
+bcinr-core/src/api/bitset.rs:pub fn select_bit_u64(x: u64, nth: usize) -> usize {
+bcinr-core/src/api/bitset.rs:pub fn rank_u64(x: u64, pos: usize) -> usize {
+bcinr-core/src/api/bitset.rs:pub fn clear_bit_u64(x: u64, pos: usize) -> u64 {
+bcinr-core/src/api/bitset.rs:pub fn set_bit_u64(x: u64, pos: usize) -> u64 {
+bcinr-core/src/api/bitset.rs:pub fn jaccard_u64_slices(a: &[u64], b: &[u64]) -> f32 {
+crates/bcinr-logic/simd.rs:pub fn splat_u8x16(value: u8) -> [u8; 16] {
+crates/bcinr-logic/simd.rs:pub fn shuffle_u8x16(a: [u8; 16], b: [u8; 16], mask: [u8; 16]) -> [u8; 16] {
+crates/bcinr-logic/simd.rs:pub fn movemask_u8x16(a: [u8; 16]) -> u16 {
+crates/bcinr-logic/utf8.rs:pub fn validate_utf8(bytes: &[u8]) -> bool {
+crates/bcinr-logic/utf8.rs:pub fn count_codepoints(bytes: &[u8]) -> usize {
+crates/bcinr-logic/utf8.rs:pub fn ascii_prefix_len(bytes: &[u8]) -> usize {
+crates/bcinr-logic/utf8.rs:pub fn first_invalid_byte(bytes: &[u8]) -> Option<usize> {
+crates/bcinr-logic/reduce.rs:pub fn horizontal_or_u32(slice: &[u32]) -> u32 {
+crates/bcinr-logic/reduce.rs:pub fn horizontal_and_u32(slice: &[u32]) -> u32 {
+crates/bcinr-logic/reduce.rs:pub fn horizontal_xor_u32(slice: &[u32]) -> u32 {
+crates/bcinr-logic/reduce.rs:pub fn murmur3_hash_u64(mut x: u64) -> u64 {
+crates/bcinr-logic/mask.rs:pub fn select_u32(mask: u32, a: u32, b: u32) -> u32 {
+crates/bcinr-logic/mask.rs:pub fn eq_mask_u32(a: u32, b: u32) -> u32 {
+crates/bcinr-logic/mask.rs:pub fn is_zero_mask_u32(x: u32) -> u32 {
+crates/bcinr-logic/mask.rs:pub fn nonzero_mask_u32(x: u32) -> u32 {
+crates/bcinr-logic/mask.rs:pub fn lt_mask_u32(a: u32, b: u32) -> u32 {
+crates/bcinr-logic/mask.rs:pub fn min_u32(a: u32, b: u32) -> u32 {
+crates/bcinr-logic/mask.rs:pub fn max_u32(a: u32, b: u32) -> u32 {
+crates/bcinr-logic/mask.rs:pub fn abs_i32(x: i32) -> i32 {
+crates/bcinr-logic/int.rs:pub fn popcount_u64(x: u64) -> u64 {
+crates/bcinr-logic/int.rs:pub fn leading_zeros_u64(x: u64) -> u64 {
+crates/bcinr-logic/int.rs:pub fn trailing_zeros_u64(x: u64) -> u64 {
+crates/bcinr-logic/int.rs:pub fn reverse_bits_u64(mut x: u64) -> u64 {
+crates/bcinr-logic/int.rs:pub fn saturating_add_i64(a: i64, b: i64) -> i64 {
+crates/bcinr-logic/int.rs:pub fn saturating_sub_i64(a: i64, b: i64) -> i64 {
+crates/bcinr-logic/int.rs:pub fn saturating_mul_i64(a: i64, b: i64) -> i64 {
+crates/bcinr-logic/int.rs:pub fn popcount_u32(x: u32) -> u32 {
+crates/bcinr-logic/int.rs:pub fn leading_zeros_u32(x: u32) -> u32 {
+crates/bcinr-logic/int.rs:pub fn next_power_of_two_u32(mut x: u32) -> u32 {
+crates/bcinr-logic/int.rs:pub fn is_pow2_u32(x: u32) -> bool {
+crates/bcinr-logic/int.rs:pub fn parity_u32(mut x: u32) -> u32 {
+crates/bcinr-logic/int.rs:pub fn reverse_bits_u32(mut x: u32) -> u32 {
+crates/bcinr-logic/int.rs:pub fn trailing_zeros_u32(x: u32) -> u32 {
+crates/bcinr-logic/mod.rs:pub mod bitset;
+crates/bcinr-logic/mod.rs:pub mod dfa;
+crates/bcinr-logic/mod.rs:pub mod exec;
+crates/bcinr-logic/mod.rs:pub mod fix;
+crates/bcinr-logic/mod.rs:pub mod int;
+crates/bcinr-logic/mod.rs:pub mod mask;
+crates/bcinr-logic/mod.rs:pub mod mem;
+crates/bcinr-logic/mod.rs:pub mod network;
+crates/bcinr-logic/mod.rs:pub mod parse;
+crates/bcinr-logic/mod.rs:pub mod reduce;
+crates/bcinr-logic/mod.rs:pub mod scan;
+crates/bcinr-logic/mod.rs:pub mod simd;
+crates/bcinr-logic/mod.rs:pub mod sketch;
+crates/bcinr-logic/mod.rs:pub mod swar;
+crates/bcinr-logic/mod.rs:pub mod utf8;
+crates/bcinr-logic/sketch.rs:pub fn murmur3_32(data: &[u8], seed: u32) -> u32 {
+crates/bcinr-logic/sketch.rs:pub fn fnv1a_64(data: &[u8]) -> u64 {
+crates/bcinr-logic/sketch.rs:pub fn xxhash32(data: &[u8], seed: u32) -> u32 {
+crates/bcinr-logic/parse.rs:pub fn skip_whitespace(bytes: &[u8]) -> usize {
+crates/bcinr-logic/parse.rs:pub fn parse_hex_u32(bytes: &[u8]) -> Result<u32, &'static str> {
+crates/bcinr-logic/parse.rs:pub fn parse_decimal_u64(bytes: &[u8]) -> Result<u64, &'static str> {
+crates/bcinr-logic/fix.rs:pub fn add_sat_u8(a: u8, b: u8) -> u8 {
+crates/bcinr-logic/fix.rs:pub fn sub_sat_u8(a: u8, b: u8) -> u8 {
+crates/bcinr-logic/fix.rs:pub fn add_sat_u32(a: u32, b: u32) -> u32 {
+crates/bcinr-logic/fix.rs:pub fn sub_sat_u32(a: u32, b: u32) -> u32 {
+crates/bcinr-logic/fix.rs:pub fn mul_sat_u32(a: u32, b: u32) -> u32 {
+crates/bcinr-logic/fix.rs:pub fn inc_sat_u32(x: u32) -> u32 {
+crates/bcinr-logic/fix.rs:pub fn dec_sat_u32(x: u32) -> u32 {
+crates/bcinr-logic/fix.rs:pub fn clamp_u32(x: u32, min: u32, max: u32) -> u32 {
+crates/bcinr-logic/fix.rs:pub fn bucketize_u32<const N: usize>(x: u32, buckets: &[u32; N]) -> usize {
+crates/bcinr-logic/scan.rs:pub fn find_byte_mask(bytes: &[u8], target: u8) -> u64 {
+crates/bcinr-logic/scan.rs:pub fn count_nonzero_bytes(bytes: &[u8]) -> usize {
+crates/bcinr-logic/scan.rs:pub fn skip_spaces(bytes: &[u8]) -> usize {
+crates/bcinr-logic/scan.rs:pub fn first_zero_byte(bytes: &[u8]) -> Option<usize> {
+crates/bcinr-logic/scan.rs:pub fn count_zero_bytes(bytes: &[u8]) -> usize {
+crates/bcinr-logic/scan.rs:pub fn find_byte(bytes: &[u8], target: u8) -> Option<usize> {
+crates/bcinr-logic/dfa.rs:pub fn dfa_advance(state: usize, input: u8, table: &[usize], alphabet_size: usize) -> usize {
+crates/bcinr-logic/dfa.rs:pub fn dfa_run(
+crates/bcinr-logic/dfa.rs:pub fn dfa_is_accepting(state: usize, accept_states: &[usize]) -> bool {
+crates/bcinr-logic/network.rs:pub fn compare_exchange(a: u32, b: u32) -> (u32, u32) {
+crates/bcinr-logic/network.rs:pub fn bitonic_sort_32u32(arr: &mut [u32; 32]) {
+crates/bcinr-logic/network.rs:pub fn sort3_u32(arr: &mut [u32; 3]) {
+crates/bcinr-logic/network.rs:pub fn sort4_u32(arr: &mut [u32; 4]) {
+crates/bcinr-logic/network.rs:pub fn sort5_u32(arr: &mut [u32; 5]) {
+crates/bcinr-logic/network.rs:pub fn bitonic_sort_8u32(arr: &mut [u32; 8]) {
+crates/bcinr-logic/network.rs:pub fn bitonic_sort_16u32(arr: &mut [u32; 16]) {
+crates/bcinr-logic/swar.rs:pub fn has_zero_byte_u64(x: u64) -> u64 {
+crates/bcinr-logic/swar.rs:pub fn has_less_than_byte_u64(x: u64, val: u8) -> u64 {
+crates/bcinr-logic/bitset.rs:pub fn set_bit_u64(x: u64, pos: usize) -> u64 {
+crates/bcinr-logic/bitset.rs:pub fn clear_bit_u64(x: u64, pos: usize) -> u64 {
+crates/bcinr-logic/bitset.rs:pub fn rank_u64(x: u64, pos: usize) -> usize {
+crates/bcinr-logic/bitset.rs:pub fn select_bit_u64(x: u64, nth: usize) -> usize {
+crates/bcinr-logic/bitset.rs:pub fn parity_u64_slice(a: &[u64]) -> u32 {
+crates/bcinr-logic/bitset.rs:pub fn jaccard_u64_slices(a: &[u64], b: &[u64]) -> f32 {
+crates/bcinr-logic/bitset.rs:pub fn hamming_u64_slices(a: &[u64], b: &[u64]) -> u32 {
+crates/bcinr-logic/bitset.rs:pub fn intersect_u64_slices(a: &[u64], b: &[u64], out: &mut [u64]) {
+crates/bcinr-logic/bitset.rs:pub fn union_u64_slices(a: &[u64], b: &[u64], out: &mut [u64]) {
+crates/bcinr-logic/bitset.rs:pub fn any_bit_set_u64_slice(a: &[u64]) -> bool {
+crates/bcinr-api/simd.rs:pub fn movemask_u8x16(a: [u8; 16]) -> u16 {
+crates/bcinr-api/simd.rs:pub fn shuffle_u8x16(a: [u8; 16], b: [u8; 16], mask: [u8; 16]) -> [u8; 16] {
+crates/bcinr-api/simd.rs:pub fn splat_u8x16(value: u8) -> [u8; 16] {
+crates/bcinr-api/utf8.rs:pub fn ascii_prefix_len(bytes: &[u8]) -> usize {
+crates/bcinr-api/reduce.rs:pub fn horizontal_and_u32(slice: &[u32]) -> u32 {
+crates/bcinr-api/reduce.rs:pub fn horizontal_or_u32(slice: &[u32]) -> u32 {
+crates/bcinr-api/reduce.rs:pub fn horizontal_xor_u32(slice: &[u32]) -> u32 {
+crates/bcinr-api/mask.rs:pub fn select_u32(mask: u32, a: u32, b: u32) -> u32 {
+crates/bcinr-api/mask.rs:pub fn eq_mask_u32(a: u32, b: u32) -> u32 {
+crates/bcinr-api/mask.rs:pub fn is_zero_mask_u32(x: u32) -> u32 {
+crates/bcinr-api/mask.rs:pub fn nonzero_mask_u32(x: u32) -> u32 {
+crates/bcinr-api/mask.rs:pub fn lt_mask_u32(a: u32, b: u32) -> u32 {
+crates/bcinr-api/mask.rs:pub fn min_u32(a: u32, b: u32) -> u32 {
+crates/bcinr-api/mask.rs:pub fn max_u32(a: u32, b: u32) -> u32 {
+crates/bcinr-api/mask.rs:pub fn abs_i32(x: i32) -> i32 {
+crates/bcinr-api/int.rs:pub fn next_power_of_two_u32(x: u32) -> u32 {
+crates/bcinr-api/int.rs:pub fn leading_zeros_u32(x: u32) -> u32 {
+crates/bcinr-api/int.rs:pub fn popcount_u32(x: u32) -> u32 {
+crates/bcinr-api/mod.rs:pub mod bitset;
+crates/bcinr-api/mod.rs:pub mod dfa;
+crates/bcinr-api/mod.rs:pub mod fix;
+crates/bcinr-api/mod.rs:pub mod int;
+crates/bcinr-api/mod.rs:pub mod mask;
+crates/bcinr-api/mod.rs:pub mod network;
+crates/bcinr-api/mod.rs:pub mod parse;
+crates/bcinr-api/mod.rs:pub mod reduce;
+crates/bcinr-api/mod.rs:pub mod scan;
+crates/bcinr-api/mod.rs:pub mod simd;
+crates/bcinr-api/mod.rs:pub mod sketch;
+crates/bcinr-api/mod.rs:pub mod utf8;
+crates/bcinr-api/sketch.rs:pub fn fnv1a_64(data: &[u8]) -> u64 {
+crates/bcinr-api/sketch.rs:pub fn xxhash32(data: &[u8], seed: u32) -> u32 {
+crates/bcinr-api/sketch.rs:pub fn murmur3_32(data: &[u8], seed: u32) -> u32 {
+crates/bcinr-api/parse.rs:pub fn skip_whitespace(bytes: &[u8]) -> usize {
+crates/bcinr-api/parse.rs:pub fn parse_hex_u32(bytes: &[u8]) -> Result<u32, &'static str> {
+crates/bcinr-api/parse.rs:pub fn parse_decimal_u64(bytes: &[u8]) -> Result<u64, &'static str> {
+crates/bcinr-api/fix.rs:pub fn clamp_u32(x: u32, min: u32, max: u32) -> u32 {
+crates/bcinr-api/fix.rs:pub fn sub_sat_u8(a: u8, b: u8) -> u8 {
+crates/bcinr-api/fix.rs:pub fn add_sat_u8(a: u8, b: u8) -> u8 {
+crates/bcinr-api/scan.rs:pub fn find_byte(bytes: &[u8], target: u8) -> Option<usize> {
+crates/bcinr-api/scan.rs:pub fn count_zero_bytes(bytes: &[u8]) -> usize {
+crates/bcinr-api/scan.rs:pub fn first_zero_byte(bytes: &[u8]) -> Option<usize> {
+crates/bcinr-api/dfa.rs:pub fn dfa_advance(state: usize, input: u8, table: &[usize], alphabet_size: usize) -> usize {
+crates/bcinr-api/dfa.rs:pub fn dfa_run(
+crates/bcinr-api/dfa.rs:pub fn dfa_is_accepting(state: usize, accept_states: &[usize]) -> bool {
+crates/bcinr-api/network.rs:pub fn compare_exchange(a: u32, b: u32) -> (u32, u32) {
+crates/bcinr-api/network.rs:pub fn bitonic_sort_16u32(arr: &mut [u32; 16]) {
+crates/bcinr-api/network.rs:pub fn bitonic_sort_8u32(arr: &mut [u32; 8]) {
+crates/bcinr-api/bitset.rs:pub fn select_bit_u64(x: u64, nth: usize) -> usize {
+crates/bcinr-api/bitset.rs:pub fn rank_u64(x: u64, pos: usize) -> usize {
+crates/bcinr-api/bitset.rs:pub fn clear_bit_u64(x: u64, pos: usize) -> u64 {
+crates/bcinr-api/bitset.rs:pub fn set_bit_u64(x: u64, pos: usize) -> u64 {

@@ -1,0 +1,65 @@
+crates/bcinr-logic/src/simd.rs:/// - If `mask\[i\] & 0x80 == 0`: result\[i\] = a[mask\[i\] & 0x0F] or b[mask\[i\] & 0x0F] if mask\[i\] < 16 selects from a
+crates/bcinr-logic/src/simd.rs:                if mask[i] & 0x10 != 0 {
+crates/bcinr-logic/src/simd.rs:        if m & 0x80 != 0 {
+crates/bcinr-logic/src/simd.rs:            if m & 0x10 != 0 {
+crates/bcinr-logic/src/simd.rs:                if idx < 16 {
+crates/bcinr-logic/src/simd.rs:                if idx < 16 {
+crates/bcinr-logic/src/simd.rs:/// A u16 where bit `i` (0-15) is set if `a[i]` has its sign bit (bit 7) set.
+crates/bcinr-logic/src/simd.rs:        if (a[i] & 0x80) != 0 {
+crates/bcinr-logic/src/utf8.rs:/// Returns true if the provided slice is valid UTF-8.
+crates/bcinr-logic/src/utf8.rs:    match core::str::from_utf8(bytes) {
+crates/bcinr-logic/src/reduce.rs:    if slice.is_empty() { return 0; }
+crates/bcinr-logic/src/reduce.rs:    if slice.len() < 8 {
+crates/bcinr-logic/src/reduce.rs:    if slice.is_empty() {
+crates/bcinr-logic/src/reduce.rs:    if slice.is_empty() {
+crates/bcinr-logic/src/mask.rs:/// Returns an all-ones mask if `a == b`, otherwise all-zeros.
+crates/bcinr-logic/src/mask.rs:    // (x | -x) has the high bit set if x != 0.
+crates/bcinr-logic/src/mask.rs:    // We want all bits set if x == 0.
+crates/bcinr-logic/src/mask.rs:/// Returns an all-ones mask if `x == 0`, otherwise all-zeros.
+crates/bcinr-logic/src/mask.rs:/// Returns an all-ones mask if `x != 0`, otherwise all-zeros.
+crates/bcinr-logic/src/mask.rs:/// Returns an all-ones mask if `a < b`, otherwise all-zeros.
+crates/bcinr-logic/src/int.rs:/// Returns true if `x` is a power of two.
+crates/bcinr-logic/src/int.rs:/// Returns the parity of `x` (1 if number of set bits is odd, else 0).
+crates/bcinr-logic/src/sketch.rs:    while offset + 4 <= data.len() {
+crates/bcinr-logic/src/parse.rs:    while i < bytes.len() && WHITESPACE_LUT[bytes[i] as usize] != 0 {
+crates/bcinr-logic/src/parse.rs:/// Returns an error if input is empty, contains non-hex characters, or exceeds 8 digits (u32 max).
+crates/bcinr-logic/src/parse.rs:    if bytes.is_empty() {
+crates/bcinr-logic/src/parse.rs:    if bytes.len() > 8 {
+crates/bcinr-logic/src/parse.rs:        if digit == 0xFF {
+crates/bcinr-logic/src/parse.rs:        if (result >> 28) != 0 {
+crates/bcinr-logic/src/parse.rs:/// Returns an error if input is empty, contains non-digit characters, or exceeds u64::MAX.
+crates/bcinr-logic/src/parse.rs:/// If `result > threshold` and we have a digit to consume, or if `result == threshold`
+crates/bcinr-logic/src/parse.rs:    if bytes.is_empty() {
+crates/bcinr-logic/src/parse.rs:        if digit == 0xFF {
+crates/bcinr-logic/src/parse.rs:        if result > THRESHOLD || (result == THRESHOLD && (digit as u64) > REMAINDER) {
+crates/bcinr-logic/src/fix.rs:    if sum > max { max } else { sum }
+crates/bcinr-logic/src/fix.rs:    let x = if x < min { min } else { x };
+crates/bcinr-logic/src/fix.rs:    if x > max {
+crates/bcinr-logic/src/fix.rs:        // x < buckets[i] is 1 if true, 0 if false.
+crates/bcinr-logic/src/fix.rs:        // This is branchless if the compiler optimizes the comparison.
+crates/bcinr-logic/src/scan.rs:/// Create a 64-bit mask where each bit represents if the corresponding byte matches the target.
+crates/bcinr-logic/src/scan.rs:        if bytes[i] == target {
+crates/bcinr-logic/src/scan.rs:    while offset < bytes.len() && bytes[offset] == b' ' {
+crates/bcinr-logic/src/scan.rs:/// Check if the byte slice is ASCII using 64-bit SWAR.
+crates/bcinr-logic/src/scan.rs:    while i + 8 <= bytes.len() {
+crates/bcinr-logic/src/scan.rs:        if (val & 0x8080_8080_8080_8080) != 0 {
+crates/bcinr-logic/src/scan.rs:    while i < bytes.len() {
+crates/bcinr-logic/src/scan.rs:        if bytes[i] >= 128 {
+crates/bcinr-logic/src/dfa.rs:/// Panics if the computed table index exceeds the bounds of `table`.
+crates/bcinr-logic/src/dfa.rs:    if index < table.len() {
+crates/bcinr-logic/src/dfa.rs:/// Check if a state is an accepting state
+crates/bcinr-logic/src/dfa.rs:/// `true` if `state` is in `accept_states`, `false` otherwise.
+crates/bcinr-logic/src/network.rs:    let mask = if a > b { !0 } else { 0 };
+crates/bcinr-logic/src/network.rs:            if (i ^ j) == 16 { swap!(i, j); }
+crates/bcinr-logic/src/mem.rs:        if self.offset + size > self.data.len() {
+crates/bcinr-logic/src/mem.rs:    /// Gets the value at the given index, returning default if epoch doesn't match.
+crates/bcinr-logic/src/mem.rs:        if self.epochs[idx] == self.current_epoch {
+crates/bcinr-logic/src/mem.rs:        if self.current_epoch == 0 {
+crates/bcinr-logic/src/mem.rs:        if self.count < N {
+crates/bcinr-logic/src/mem.rs:        if idx >= self.count {
+crates/bcinr-logic/src/bitset.rs:    let mask = if pos == 63 { u64::MAX } else { (1u64 << (pos + 1)) - 1 };
+crates/bcinr-logic/src/bitset.rs:    while left < right {
+crates/bcinr-logic/src/bitset.rs:        let count_at_mid = if mid == 0 { 0 } else { rank_u64(x, mid - 1) };
+crates/bcinr-logic/src/bitset.rs:        if count_at_mid <= nth {
+crates/bcinr-logic/src/bitset.rs:    if union_count == 0 {
+crates/bcinr-logic/src/bitset.rs:/// Check if any bit is set in the bitset slice.

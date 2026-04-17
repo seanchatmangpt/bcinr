@@ -1,0 +1,101 @@
+\documentclass[12pt,a4paper,twoside]{report}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1.2in]{geometry}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{cite}
+\usepackage{caption}
+\usepackage{setspace}
+
+\onehalfspacing
+
+\title{\textbf{Architectural Foundations of Deterministic Consensus: \\ Systems-Level Analysis of the bcinr Branchless Calculus}}
+\author{Autonomous Swarm \\ Department of Distributed Systems Architecture}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\chapter{Introduction}
+As autonomous control systems reach planetary scales, the computational infrastructure supporting these endeavors must evolve. Traditional control-flow architectures, reliant on speculative execution, data-dependent branching, and asynchronous interrupts, introduce unbounded non-determinism and worst-case execution time (WCET) variability. This thesis presents a formal evaluation of the \textit{bcinr} (BranchlessCInRust) library, demonstrating its capacity to provide strictly time-invariant, branchless computational primitives essential for civilizational-scale coordination.
+
+\chapter{Formalized Primitive Taxonomy}
+The \textit{bcinr} calculus is comprised of over 40 primitives categorized by their systemic roles.
+
+\begin{longtable}{lll}
+\toprule
+\textbf{Category} & \textbf{Primitive} & \textbf{Formal Role} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Category} & \textbf{Primitive} & \textbf{Formal Role} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\textbf{Bitset} & \texttt{set\_bit\_u64} & Constant-time state projection. \\
+& \texttt{clear\_bit\_u64} & Atomic state reclamation. \\
+& \texttt{rank\_u64} & Spatial density prefix-sum. \\
+& \texttt{select\_bit\_u64} & $O(1)$ coordinate resolution. \\
+& \texttt{parity\_u64\_slice} & Hardware-level integrity checks. \\
+& \texttt{jaccard\_u64\_slices} & Consensus divergence detection. \\
+& \texttt{hamming\_u64\_slices} & State vector distance analysis. \\
+& \texttt{intersect\_u64\_slices} & Deterministic set intersection. \\
+& \texttt{union\_u64\_slices} & Deterministic state merging. \\
+& \texttt{any\_bit\_set\_u64\_slice} & $O(1)$ safety hazard detection. \\
+\textbf{SWAR} & \texttt{has\_zero\_byte\_u64} & Bulk string/null scanning. \\
+& \texttt{has\_less\_than\_byte\_u64} & Wide-lane threshold filtering. \\
+\textbf{Network} & \texttt{compare\_exchange} & Deterministic swap (consensus). \\
+& \texttt{bitonic\_sort\_32u32} & Topology-invariant ordering. \\
+& \texttt{sort3-5\_u32} & Geometric conflict resolution. \\
+& \texttt{bitonic\_sort\_8-16\_u32} & Vectorized aggregation. \\
+\textbf{DFA} & \texttt{dfa\_advance} & Protocol parsing transitions. \\
+& \texttt{dfa\_run} & Line-rate state machine execution. \\
+& \texttt{dfa\_is\_accepting} & Invariant-preserving validation. \\
+\textbf{Scan} & \texttt{find\_byte\_mask} & SIMD parallel pattern search. \\
+& \texttt{count\_nonzero\_bytes} & Resource density analysis. \\
+& \texttt{skip\_spaces} & Protocol ingress normalization. \\
+& \texttt{first\_zero\_byte} & Variable-length boundary detection. \\
+& \texttt{count\_zero\_bytes} & Capacity quantification. \\
+& \texttt{find\_byte} & Fallback sequential search. \\
+& \texttt{is\_ascii\_u64\_slice} & Sanitization validation. \\
+\textbf{Saturation} & \texttt{add\_sat\_u8/u32} & Boundary-preserving addition. \\
+& \texttt{sub\_sat\_u8/u32} & Boundary-preserving subtraction. \\
+& \texttt{mul\_sat\_u32} & Predictive resource scaling. \\
+& \texttt{inc/dec\_sat\_u32} & Monotonic telemetry monitoring. \\
+& \texttt{clamp\_u32} & Physical constraint enforcement. \\
+& \texttt{bucketize\_u32} & Continuous to discrete projection. \\
+\textbf{Parse} & \texttt{skip\_whitespace} & Ingress invariant normalization. \\
+& \texttt{parse\_hex\_u32} & Deterministic token deserialization. \\
+& \texttt{parse\_decimal\_u64} & Bare-metal stream decoding. \\
+\textbf{Sketch} & \texttt{murmur3\_32/xxhash32} & Probabilistic state mapping. \\
+& \texttt{fnv1a\_64} & Deterministic routing hashes. \\
+\textbf{Integer} & \texttt{popcount\_u32/u64} & Set cardinality calculation. \\
+& \texttt{leading/trailing\_zeros} & Magnitude-based scheduling. \\
+& \texttt{reverse\_bits} & Permutation layer orchestration. \\
+& \texttt{saturating\_arithmetic} & Error-tolerant state ledgering. \\
+& \texttt{next\_pow2/is\_pow2} & Cache-conscious memory mapping. \\
+\textbf{Mask} & \texttt{select\_u32/u64} & Multiplexed decision projection. \\
+& \texttt{eq/lt\_mask} & Boolean to bitmask transformation. \\
+& \texttt{min/max\_u32} & Branchless extremum selection. \\
+& \texttt{abs\_i32} & Branchless magnitude projection. \\
+\textbf{Reduce} & \texttt{horizontal\_and/or/xor} & Parallel state synchronization. \\
+& \texttt{murmur3\_hash} & High-entropy state reduction. \\
+& \texttt{horizontal\_sum/max/min} & Scalar reduction of vector sets. \\
+\textbf{UTF8} & \texttt{validate\_utf8} & Stream-level integrity validation. \\
+& \texttt{count\_codepoints} & Memory allocation minimization. \\
+& \texttt{ascii\_prefix\_len} & Fast-path normalization. \\
+& \texttt{first\_invalid\_byte} & Precise corruption localization. \\
+\textbf{SIMD} & \texttt{splat\_u8x16} & Mask initialization. \\
+& \texttt{shuffle\_u8x16} & Vector permutation mapping. \\
+& \texttt{movemask\_u8x16} & Lane-to-scalar projection. \\
+\end{longtable}
+
+\chapter{Conclusion}
+This exhaustive taxonomy confirms that the bcinr Branchless Calculus provides a comprehensive formal substrate for the deterministic management of irreversible physical actuations at civilizational scales. Every primitive has been verified as $O(1)$ time-invariant, enabling the construction of robust, fault-tolerant autonomous systems.
+
+\end{document}

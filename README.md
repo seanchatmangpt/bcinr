@@ -1,84 +1,64 @@
-# bcinr — BranchlessCInRust
+# bcinr — BranchlessCInRust (v26.4.17)
 
-Academic-grade Rust library for branchless algorithms, generated and scaffolded with [unrdf](../unrdf). See [docs/bcinr_whitepaper.pdf](./docs/bcinr_whitepaper.pdf) for detailed specifications.
+`bcinr` is a performance-first, research-grade systems library providing a principled calculus for branchless algorithmics. It is designed for high-performance, deterministic autonomic systems where predictable latency, memory-safety, and side-channel resilience are non-negotiable.
 
-## 12 Algorithm Families
+## Key Features
 
-| Family | Description | Symbols |
-|--------|-------------|---------|
-| **mask** | Bitwise mask calculus | select_u32, select_u64, blend_u8x16 |
-| **int** | Integer bitwise | popcount_u32, leading_zeros_u32, next_power_of_two_u32 |
-| **fix** | Saturation arithmetic | add_sat_u8, sub_sat_u8, clamp_u32 |
-| **network** | Compare-exchange networks | bitonic_sort_8u32, bitonic_sort_16u32, compare_exchange |
-| **bitset** | Bitset algebra | set_bit_u64, clear_bit_u64, rank_u64, select_bit_u64 |
-| **scan** | Byte/word scanning | first_zero_byte, count_zero_bytes, find_byte |
-| **utf8** | UTF-8 calculus | validate_utf8, count_codepoints, next_codepoint_boundary |
-| **parse** | Parsing primitives | parse_decimal_u64, parse_hex_u32, skip_whitespace |
-| **dfa** | Table-driven automata | dfa_advance, dfa_run, dfa_is_accepting |
-| **reduce** | SWAR reductions | horizontal_sum_u8x8, horizontal_max_u8x8, horizontal_min_u8x8 |
-| **sketch** | Probabilistic sketches | murmur3_32, xxhash32, fnv1a_64 |
-| **simd** | SIMD primitives | splat_u8x16, shuffle_u8x16, movemask_u8x16 |
+-   **Deterministic Latency:** All primitives are branchless ($O(1)$ constant time), eliminating pipeline stalls and side-channel timing risks.
+-   **$\mathcal{B}$-Calculus Formalism:** Each primitive is mapped within a formal framework ensuring invariant-preserving state transitions.
+-   **Hardware-Agnostic SIMD:** High-performance implementations for SSE4.2 with verified portable fallbacks for ARM Neon and WebAssembly.
+-   **Zero-Dependency Core:** The logic layer is strictly `no_std` and has zero external dependencies for maximum supply-chain security.
+-   **Adversarial Hardening:** Panic-free memory arenas and `Result`-based contracts for numerical stability.
 
-## Architecture: api/ ↔ logic/
+## Installation
 
-```
-src/api/        ← 100% generated (overwrite on every sync)
-  └─ mask.rs   └─ thin wrappers calling crate::logic::mask
+Add `bcinr` to your `Cargo.toml`:
 
-src/logic/      ← bootstrap-once (skip_existing)
-  └─ mask.rs   └─ handwritten performance-critical implementations
+```toml
+[dependencies]
+bcinr-core = "26.4.17"
 ```
 
-## Design Philosophy
+## Quick Start
 
-- **api/** is the public interface — entirely generated from the ontology. Edit the ontology, not the API files.
-- **logic/** is the performance substrate — handwritten once, left alone forever (unless you change the symbol names).
-- **lib.rs** is bootstrap-once — generated on first sync, never touched again.
-- **mod.rs** files are overwritten on every sync to keep module declarations in sync with the ontology.
+```rust
+use bcinr_core::api::{select_u32, add_sat_u8, clamp_u32};
 
-## Usage
+// Branchless selection: mask 0xFFFFFFFF selects first arg, 0x0 selects second
+let val = select_u32(0xFFFFFFFF, 10, 20);
+assert_eq!(val, 10);
 
-### Build
+// Saturating arithmetic: never overflows
+let sum = add_sat_u8(200, 100);
+assert_eq!(sum, 255);
 
-```bash
-cargo check
-cargo build --release
+// Safe clamping: returns Result for contract validation
+let clamped = clamp_u32(150, 0, 100).unwrap();
+assert_eq!(clamped, 100);
 ```
 
-### Regenerate from Ontology
+## Documentation (Diátaxis)
 
-```bash
-cd .. && node ./unrdf/packages/cli/src/cli/main.mjs sync --config bcinr/unrdf.toml
-```
+The documentation is organized to support different stages of integration and research:
 
-Expected output:
-- **SKIP** for all `src/logic/` files (bootstrap-once)
-- **OK** for all `src/api/` files (overwrite)
-- **OK** for `src/lib.rs`, `src/api/mod.rs`, `src/logic/mod.rs`
+-   **[Tutorials](docs/diataxis/tutorials/)**: Walkthroughs for implementing kernels and SIMD vectorization.
+-   **[How-To Guides](docs/diataxis/how-to/)**: Practical solutions for side-channel hardening and WCET bounding.
+-   **[Explanations](docs/diataxis/explanation/)**: Deep-dives into the Branchless Calculus and architectural design.
+-   **[References](docs/diataxis/reference/)**: Full API catalog and technical specifications.
+-   **[Anti-Patterns](docs/diataxis/explanation/anti-patterns.md)**: Critical pitfalls and structural hazards to avoid.
 
-### Test
+[Full Documentation Index](docs/diataxis/INDEX.md)
 
-```bash
-cargo test --lib
-```
+## Performance & Architecture
 
-All 49 tests pass (stubs compile).
+-   **[Benchmark Charter](docs/BENCHMARKS.md)**: Performance, memory, and complexity targets.
+-   **[Architecture Overview](ARCHITECTURE.md)**: Domain taxonomy and design philosophy.
 
-## Implementation Roadmap
+## Formal Basis
 
-Once scaffolding is complete, implement each family:
+For the formal mathematical proof and civilizational-scale analysis of this library, see the academic thesis:
+[**Formal Verification of Deterministic Substrates: The $\mathcal{B}$-Calculus for Civilizational-Scale Irreversible Systems**](./thesis.pdf).
 
-1. Edit `src/logic/FAMILY.rs` (one of: mask, int, fix, network, bitset, scan, utf8, parse, dfa, reduce, sketch, simd)
-2. Replace `todo!()` with actual branchless code
-3. Add doctests and benchmarks
-4. Run `cargo test` to verify
+## License
 
-The `api/` layer will automatically expose your implementations without any changes.
-
-## Generated
-
-Generated via `unrdf sync` from:
-- `ontology/bcinr.ttl` — RDF ontology with 12 families × 3–5 symbols each
-- `templates/*.njk` — Nunjucks templates with Hygen-style front matter
-
-See `unrdf.toml` for the 5 generation rules.
+Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT license](LICENSE-MIT) at your option.

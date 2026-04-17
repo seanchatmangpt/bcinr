@@ -1,0 +1,88 @@
+[config]
+# Standardized Rust workspace configuration
+skip_core_tasks = false
+default_to_workspace = true
+
+[env]
+CARGO_INCREMENTAL = "0"
+RUSTFLAGS = "-D warnings"
+
+[tasks.check]
+category = "Build"
+description = "Verify workspace compiles"
+command = "cargo"
+args = ["check", "--workspace", "--all-targets", "--all-features"]
+
+[tasks.build]
+category = "Build"
+description = "Build the workspace in release mode"
+command = "cargo"
+args = ["build", "--workspace", "--release", "--all-features"]
+
+[tasks.test]
+category = "Test"
+description = "Run all workspace tests"
+command = "cargo"
+args = ["test", "--workspace", "--all-features", "--all-targets"]
+
+[tasks.bench]
+category = "Performance"
+description = "Execute workspace-wide benchmarks"
+command = "cargo"
+args = ["bench", "--all-features"]
+
+[tasks.bench-report]
+category = "Performance"
+description = "Generate performance report"
+dependencies = ["bench"]
+script = [
+    "echo \"| Algorithm Family | Primitive | Latency (avg) |\"",
+    "echo \"|---|---|---|\"",
+    "find target/criterion -name estimates.json | xargs grep -h '\"mean\":' | jq -r '\"| \\(.family) | \\(.primitive) | \\(.mean.point_estimate) \\(.mean.unit) |\"' || echo 'Use jq for structured report output'"
+]
+
+[tasks.clippy]
+category = "Lint"
+description = "Run clippy with strict pedantic lints"
+command = "cargo"
+args = ["clippy", "--workspace", "--all-targets", "--all-features", "--", "-D", "warnings"]
+
+[tasks.fmt]
+category = "Lint"
+description = "Check formatting"
+command = "cargo"
+args = ["fmt", "--all", "--", "--check"]
+
+[tasks.audit]
+category = "Security"
+description = "Run cargo audit for vulnerabilities"
+command = "cargo"
+args = ["audit"]
+
+[tasks.deny]
+category = "Security"
+description = "Check licenses and supply chain"
+command = "cargo"
+args = ["deny", "check"]
+
+[tasks.docs]
+category = "Documentation"
+description = "Build all documentation"
+command = "cargo"
+args = ["doc", "--workspace", "--all-features", "--no-deps", "--document-private-items"]
+
+[tasks.clean]
+category = "Cleanup"
+description = "Clean artifacts and criterion results"
+script = [
+    "cargo clean",
+    "rm -rf target/criterion"
+]
+
+[tasks.ci]
+category = "CI"
+description = "Comprehensive CI pipeline"
+dependencies = ["fmt", "check", "clippy", "test", "audit", "deny"]
+
+[tasks.default]
+alias = "ci"

@@ -1,7 +1,0 @@
----
-to: "mock-src/logic/mod.rs"
-inject: true
-after: "^// ANCHOR$"
-skipIf: "/pub\\\\(crate\\\\) mod {{ family_file }};/"
----
-pub(crate) mod {{ family_file }};

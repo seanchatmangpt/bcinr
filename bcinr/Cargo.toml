@@ -1,22 +1,16 @@
 [package]
-name = "bcinr-core"
-version = "0.1.0"
+name = "bcinr"
+version = "26.4.18"
 edition = "2021"
+description = "BranchlessCInRust: Academic-grade branchless algorithm library"
+repository = "https://github.com/example/bcinr"
+license = "MIT OR Apache-2.0"
+readme = "../README.md"
+rust-version = "1.70"
+keywords = ["branchless", "simd", "performance"]
+categories = ["algorithms", "no-std"]
 
 [dependencies]
-bcinr-api = { path = "../crates/bcinr-api" }
-bcinr-logic = { path = "../crates/bcinr-logic" }
-prettytable-rs = "0.10.0"
-
-[features]
-default = []
-alloc = []
-std = []
-bench = []
-
-[dev-dependencies]
-criterion = "0.5"
-
-[[bench]]
-name = "kernel_bench"
-harness = false
+bcinr-api = { version = "26.4.17" }
+bcinr-core = { version = "26.4.17" }
+bcinr-logic = { version = "26.4.17" }

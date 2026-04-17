@@ -1,0 +1,1 @@
+pub use bcinr_logic::int::{popcount_u32, popcount_u64, leading_zeros_u32, leading_zeros_u64, trailing_zeros_u32, trailing_zeros_u64, reverse_bits_u32, reverse_bits_u64, next_power_of_two_u32, is_pow2_u32, parity_u32};

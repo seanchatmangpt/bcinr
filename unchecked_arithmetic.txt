@@ -1,0 +1,728 @@
+crates/bcinr-logic/src/simd.rs://! SIMD Primitives: SIMD vector operations (128-bit)
+crates/bcinr-logic/src/simd.rs://!
+crates/bcinr-logic/src/simd.rs://! This module contains handwritten, performance-critical implementations
+crates/bcinr-logic/src/simd.rs://! of all SIMD Primitives algorithms. These functions are pub(crate) and wrapped
+crates/bcinr-logic/src/simd.rs://! by the public API in `src/api/simd.rs`.
+crates/bcinr-logic/src/simd.rs://!
+crates/bcinr-logic/src/simd.rs://! # Implementation Strategy
+crates/bcinr-logic/src/simd.rs://!
+crates/bcinr-logic/src/simd.rs://! - x86_64: Uses SSE4.2 intrinsics (PSHUFB, PMOVMSKB) when available
+crates/bcinr-logic/src/simd.rs://! - Portable fallback: Used for all other targets (aarch64, ARM, WebAssembly, etc.)
+crates/bcinr-logic/src/simd.rs://! - All implementations verified for correctness: intrinsic output matches portable
+crates/bcinr-logic/src/simd.rs://!
+crates/bcinr-logic/src/simd.rs://! # Feature Gates
+crates/bcinr-logic/src/simd.rs://!
+crates/bcinr-logic/src/simd.rs://! - `x86_64` with SSE4.2: Intrinsic-based implementation
+crates/bcinr-logic/src/simd.rs://! - Other platforms: Portable fallback (no SIMD capability required)
+crates/bcinr-logic/src/simd.rs:// Use portable SIMD for cross-platform compatibility when available
+crates/bcinr-logic/src/simd.rs:/// Broadcast a single u8 value to all 16 lanes of a SIMD vector.
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// # Arguments
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// * `value` - The u8 value to broadcast
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// # Returns
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// An array of 16 u8 elements, all set to `value`.
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// # Implementation
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// - x86_64 (SSE4.2): Uses `_mm_set1_epi8` intrinsic
+crates/bcinr-logic/src/simd.rs:/// - Fallback: Initializes array directly
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// # Examples
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// ```
+crates/bcinr-logic/src/simd.rs:/// # #[path = "../logic/simd.rs"]
+crates/bcinr-logic/src/simd.rs:/// # mod simd;
+crates/bcinr-logic/src/simd.rs:/// let result = simd::splat_u8x16(42);
+crates/bcinr-logic/src/simd.rs:/// assert!(result.iter().all(|&x| x == 42));
+crates/bcinr-logic/src/simd.rs:/// assert_eq!(result.len(), 16);
+crates/bcinr-logic/src/simd.rs:/// ```
+crates/bcinr-logic/src/simd.rs:pub fn splat_u8x16(value: u8) -> [u8; 16] {
+crates/bcinr-logic/src/simd.rs:        // SAFETY: SSE4.2 is guaranteed by target_feature; __m128i fits in array
+crates/bcinr-logic/src/simd.rs:            // Convert to bytes: first cast __m128i to i8 array, then back to u8
+crates/bcinr-logic/src/simd.rs:/// Shuffle elements of two 16-element u8 vectors using a mask.
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// # Arguments
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// * `a` - First 16-element vector
+crates/bcinr-logic/src/simd.rs:/// * `b` - Second 16-element vector
+crates/bcinr-logic/src/simd.rs:/// * `mask` - Shuffle mask (each element selects from a or b)
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// # Returns
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// A new 16-element vector where each position `i` contains the element selected by `mask[i]`.
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// For each lane `i` (0-15):
+crates/bcinr-logic/src/simd.rs:/// - If `mask\[i\] & 0x80 == 0`: result\[i\] = a[mask\[i\] & 0x0F] or b[mask\[i\] & 0x0F] if mask\[i\] < 16 selects from a
+crates/bcinr-logic/src/simd.rs:/// - If `mask\[i\] & 0x80 != 0`: result\[i\] = 0 (zero lane)
+crates/bcinr-logic/src/simd.rs:/// - Standard shuffle semantics: mask values 0-15 index into `a`, 16-31 index into `b`
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// # Implementation
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// - x86_64 (SSE4.2): Uses `_mm_shuffle_epi8` (PSHUFB) intrinsic
+crates/bcinr-logic/src/simd.rs:/// - Fallback: Manual implementation iterating over 16 lanes
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// # Examples
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// ```
+crates/bcinr-logic/src/simd.rs:/// # #[path = "../logic/simd.rs"]
+crates/bcinr-logic/src/simd.rs:/// # mod simd;
+crates/bcinr-logic/src/simd.rs:/// let a = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+crates/bcinr-logic/src/simd.rs:/// let b = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31];
+crates/bcinr-logic/src/simd.rs:/// let mask = [0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15];
+crates/bcinr-logic/src/simd.rs:/// let result = simd::shuffle_u8x16(a, b, mask);
+crates/bcinr-logic/src/simd.rs:/// assert_eq!(result[0], 0);   // mask[0] = 0 → a[0]
+crates/bcinr-logic/src/simd.rs:/// assert_eq!(result[1], 2);   // mask[1] = 2 → a[2]
+crates/bcinr-logic/src/simd.rs:/// ```
+crates/bcinr-logic/src/simd.rs:pub fn shuffle_u8x16(a: [u8; 16], b: [u8; 16], mask: [u8; 16]) -> [u8; 16] {
+crates/bcinr-logic/src/simd.rs:        // SAFETY: SSE4.2 is guaranteed by target_feature
+crates/bcinr-logic/src/simd.rs:            // Convert arrays to __m128i
+crates/bcinr-logic/src/simd.rs:            // PSHUFB: shuffle a based on mask
+crates/bcinr-logic/src/simd.rs:            // If mask[i] has high bit set, result[i] = 0
+crates/bcinr-logic/src/simd.rs:            // Otherwise, result[i] = a[mask[i] & 0x0F]
+crates/bcinr-logic/src/simd.rs:            // To shuffle from both a and b, we use the pattern:
+crates/bcinr-logic/src/simd.rs:            // - Low 4 bits select index
+crates/bcinr-logic/src/simd.rs:            // - Bit 4 selects between a (0) and b (1)
+crates/bcinr-logic/src/simd.rs:            // - High bit (7) zeros the lane
+crates/bcinr-logic/src/simd.rs:            // Now select between shuffled_a and shuffled_b based on bit 4 of mask
+crates/bcinr-logic/src/simd.rs:            // Lanes with bit 4 set should take from b, others from a
+crates/bcinr-logic/src/simd.rs:/// Portable implementation of shuffle for non-SSE4.2 targets.
+crates/bcinr-logic/src/simd.rs:fn portable_shuffle_u8x16(a: [u8; 16], b: [u8; 16], mask: [u8; 16]) -> [u8; 16] {
+crates/bcinr-logic/src/simd.rs:        // High bit set means zero this lane
+crates/bcinr-logic/src/simd.rs:            // Bit 4 selects between vectors: 0 = a, 1 = b
+crates/bcinr-logic/src/simd.rs:/// Extract sign bits from all 16 lanes, pack into a u16 mask.
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// # Arguments
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// * `a` - A 16-element u8 vector
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// # Returns
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// A u16 where bit `i` (0-15) is set if `a[i]` has its sign bit (bit 7) set.
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// # Implementation
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// - x86_64 (SSE4.2): Uses `_mm_movemask_epi8` (PMOVMSKB) intrinsic (1 cycle latency)
+crates/bcinr-logic/src/simd.rs:/// - Fallback: Iterates over 16 lanes, extracting bit 7 into result mask
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// # Examples
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// ```
+crates/bcinr-logic/src/simd.rs:/// # #[path = "../logic/simd.rs"]
+crates/bcinr-logic/src/simd.rs:/// # mod simd;
+crates/bcinr-logic/src/simd.rs:/// let mut input = [0u8; 16];
+crates/bcinr-logic/src/simd.rs:/// input[0] = 0x80;  // Sign bit set
+crates/bcinr-logic/src/simd.rs:/// input[7] = 0xFF;  // Sign bit set
+crates/bcinr-logic/src/simd.rs:/// input[15] = 0x7F; // Sign bit not set
+crates/bcinr-logic/src/simd.rs:///
+crates/bcinr-logic/src/simd.rs:/// let result = simd::movemask_u8x16(input);
+crates/bcinr-logic/src/simd.rs:/// assert_eq!(result & 0x0001, 0x0001); // bit 0 set
+crates/bcinr-logic/src/simd.rs:/// assert_eq!(result & 0x0080, 0x0080); // bit 7 set
+crates/bcinr-logic/src/simd.rs:/// assert_eq!(result & 0x8000, 0x0000); // bit 15 not set
+crates/bcinr-logic/src/simd.rs:/// ```
+crates/bcinr-logic/src/simd.rs:pub fn movemask_u8x16(a: [u8; 16]) -> u16 {
+crates/bcinr-logic/src/simd.rs:        // SAFETY: SSE4.2 is guaranteed by target_feature
+crates/bcinr-logic/src/simd.rs:            // PMOVMSKB: extract sign bit from each byte into a 16-bit mask
+crates/bcinr-logic/src/simd.rs:/// Portable implementation of movemask for non-SSE4.2 targets.
+crates/bcinr-logic/src/simd.rs:fn portable_movemask_u8x16(a: [u8; 16]) -> u16 {
+crates/bcinr-logic/src/simd.rs:        // Extract sign bit (bit 7) from a[i] and place it at position i in result
+crates/bcinr-logic/src/simd.rs:    use super::*;
+crates/bcinr-logic/src/simd.rs:    // ============= SPLAT TESTS =============
+crates/bcinr-logic/src/simd.rs:            assert_eq!(*lane, 99);
+crates/bcinr-logic/src/simd.rs:    // ============= SHUFFLE TESTS =============
+crates/bcinr-logic/src/simd.rs:        let mask = [0x80; 16]; // High bit set = zero lanes
+crates/bcinr-logic/src/simd.rs:    // ============= MOVEMASK TESTS =============
+crates/bcinr-logic/src/simd.rs:        assert_eq!(result, 0x5555); // bits 0,2,4,6,8,10,12,14
+crates/bcinr-logic/src/simd.rs:        // Expected: bits set where sign bit is 1: positions 0,2,4,6,8,9,12,14
+crates/bcinr-logic/src/simd.rs:        // Binary: 0101 0011 0101 0101 = 0x5355
+crates/bcinr-logic/src/simd.rs:    // ============= CROSS-FUNCTION CONSISTENCY =============
+crates/bcinr-logic/src/simd.rs:        // All lanes set to 0xFF should give all bits set in movemask
+crates/bcinr-logic/src/simd.rs:        // All lanes set to 0x00 should give zero
+crates/bcinr-logic/src/simd.rs:        // All values should still be present
+crates/bcinr-logic/src/exec.rs://! Execution Substrate: Staged plans, cells, and resumable stream states.
+crates/bcinr-logic/src/exec.rs:/// A trait for kernels that can be executed as a staged pipeline stage.
+crates/bcinr-logic/src/exec.rs:    /// Input type for the stage.
+crates/bcinr-logic/src/exec.rs:    /// Output type for the stage.
+crates/bcinr-logic/src/exec.rs:    /// State type for the stage.
+crates/bcinr-logic/src/exec.rs:    /// Executes the stage with the given input and state.
+crates/bcinr-logic/src/exec.rs:/// A resumable cell for streaming data processing.
+crates/bcinr-logic/src/exec.rs:    /// The pipeline stage.
+crates/bcinr-logic/src/exec.rs:    /// The persistent state of the stage.
+crates/bcinr-logic/src/exec.rs:    /// Creates a new execution cell with the given stage and state.
+crates/bcinr-logic/src/exec.rs:    pub fn new(stage: S, state: S::State) -> Self {
+crates/bcinr-logic/src/exec.rs:    /// Processes an input and produces an output.
+crates/bcinr-logic/src/exec.rs:/// A simple execution plan for an edge confidence kernel.
+crates/bcinr-logic/src/exec.rs:    /// The number of activities in the system.
+crates/bcinr-logic/src/exec.rs:    type Input = (u16, u16); // (from, to)
+crates/bcinr-logic/src/exec.rs:    type Output = u32;      // new confidence
+crates/bcinr-logic/src/exec.rs:    type State = Vec<u32>;  // dense edge field
+crates/bcinr-logic/src/exec.rs:        let (from, to) = *input;
+crates/bcinr-logic/src/exec.rs:        let idx = (from as usize) * self.activity_count + (to as usize);
+crates/bcinr-logic/src/exec.rs:        *output = state[idx];
+crates/bcinr-logic/src/exec.rs:    use super::*;
+crates/bcinr-logic/src/utf8.rs://! UTF-8 Calculus: Branchless UTF-8 validation and segmentation.
+crates/bcinr-logic/src/utf8.rs:/// Returns true if the provided slice is valid UTF-8.
+crates/bcinr-logic/src/utf8.rs:pub fn validate_utf8(bytes: &[u8]) -> bool {
+crates/bcinr-logic/src/utf8.rs:/// Counts the number of Unicode codepoints in the slice.
+crates/bcinr-logic/src/utf8.rs:pub fn count_codepoints(bytes: &[u8]) -> usize {
+crates/bcinr-logic/src/utf8.rs:        // Codepoints start with bits NOT 10xxxxxx
+crates/bcinr-logic/src/utf8.rs:        count += (b & 0xC0 != 0x80) as usize;
+crates/bcinr-logic/src/utf8.rs:/// Returns the length of the leading ASCII prefix.
+crates/bcinr-logic/src/utf8.rs:pub fn ascii_prefix_len(bytes: &[u8]) -> usize {
+crates/bcinr-logic/src/utf8.rs:/// Finds the index of the first byte that is not valid UTF-8.
+crates/bcinr-logic/src/utf8.rs:pub fn first_invalid_byte(bytes: &[u8]) -> Option<usize> {
+crates/bcinr-logic/src/utf8.rs:    use super::*;
+crates/bcinr-logic/src/reduce.rs://! SWAR Reductions: SIMD Within A Register: horizontal reductions
+crates/bcinr-logic/src/reduce.rs://!
+crates/bcinr-logic/src/reduce.rs://! This module contains handwritten, performance-critical implementations
+crates/bcinr-logic/src/reduce.rs://! of all SWAR Reductions algorithms.
+crates/bcinr-logic/src/reduce.rs:/// Horizontal bitwise OR of u32 slice.
+crates/bcinr-logic/src/reduce.rs:pub fn horizontal_or_u32(slice: &[u32]) -> u32 {
+crates/bcinr-logic/src/reduce.rs:/// Horizontal bitwise AND of u32 slice.
+crates/bcinr-logic/src/reduce.rs:pub fn horizontal_and_u32(slice: &[u32]) -> u32 {
+crates/bcinr-logic/src/reduce.rs:/// Horizontal bitwise XOR of u32 slice.
+crates/bcinr-logic/src/reduce.rs:pub fn horizontal_xor_u32(slice: &[u32]) -> u32 {
+crates/bcinr-logic/src/reduce.rs:/// Branchless Murmur3-like hash for u64.
+crates/bcinr-logic/src/reduce.rs:pub fn murmur3_hash_u64(mut x: u64) -> u64 {
+crates/bcinr-logic/src/reduce.rs:/// Horizontal sum of 8 bytes in a slice (first 8 bytes).
+crates/bcinr-logic/src/reduce.rs:pub fn horizontal_sum_u8x8(slice: &[u8]) -> u64 {
+crates/bcinr-logic/src/reduce.rs:        sum += slice[i] as u64;
+crates/bcinr-logic/src/reduce.rs:/// Horizontal maximum of 8 bytes in a slice (first 8 bytes).
+crates/bcinr-logic/src/reduce.rs:pub fn horizontal_max_u8x8(slice: &[u8]) -> u8 {
+crates/bcinr-logic/src/reduce.rs:/// Horizontal minimum of 8 bytes in a slice (first 8 bytes).
+crates/bcinr-logic/src/reduce.rs:pub fn horizontal_min_u8x8(slice: &[u8]) -> u8 {
+crates/bcinr-logic/src/reduce.rs:    use super::*;
+crates/bcinr-logic/src/lib.rs://! Core algorithmic calculus for bcinr.
+crates/bcinr-logic/src/lib.rs:/// Primitive trait for branchless calculus.
+crates/bcinr-logic/src/lib.rs:pub trait Branchless: Sized + Copy {}
+crates/bcinr-logic/src/mask.rs://! Mask calculus for branchless selection and arithmetic.
+crates/bcinr-logic/src/mask.rs:/// Selects between `a` and `b` based on the provided `mask`.
+crates/bcinr-logic/src/mask.rs:/// If `mask` is all ones, returns `a`. If `mask` is all zeros, returns `b`.
+crates/bcinr-logic/src/mask.rs:pub fn select_u32(mask: u32, a: u32, b: u32) -> u32 {
+crates/bcinr-logic/src/mask.rs:/// Selects between `a` and `b` based on the provided `mask`.
+crates/bcinr-logic/src/mask.rs:/// If `mask` is all ones, returns `a`. If `mask` is all zeros, returns `b`.
+crates/bcinr-logic/src/mask.rs:pub fn select_u64(mask: u64, a: u64, b: u64) -> u64 {
+crates/bcinr-logic/src/mask.rs:/// Returns an all-ones mask if `a == b`, otherwise all-zeros.
+crates/bcinr-logic/src/mask.rs:pub fn eq_mask_u32(a: u32, b: u32) -> u32 {
+crates/bcinr-logic/src/mask.rs:    // (x | -x) has the high bit set if x != 0.
+crates/bcinr-logic/src/mask.rs:    // We want all bits set if x == 0.
+crates/bcinr-logic/src/mask.rs:/// Returns an all-ones mask if `x == 0`, otherwise all-zeros.
+crates/bcinr-logic/src/mask.rs:pub fn is_zero_mask_u32(x: u32) -> u32 {
+crates/bcinr-logic/src/mask.rs:/// Returns an all-ones mask if `x != 0`, otherwise all-zeros.
+crates/bcinr-logic/src/mask.rs:pub fn nonzero_mask_u32(x: u32) -> u32 {
+crates/bcinr-logic/src/mask.rs:/// Returns an all-ones mask if `a < b`, otherwise all-zeros.
+crates/bcinr-logic/src/mask.rs:pub fn lt_mask_u32(a: u32, b: u32) -> u32 {
+crates/bcinr-logic/src/mask.rs:    // (a < b) as u32 produces 0 or 1; wrapping_sub converts to 0x00000000 or 0xFFFFFFFF.
+crates/bcinr-logic/src/mask.rs:    // The compiler emits a branchless SETB + NEG on x86-64 — no branch instruction.
+crates/bcinr-logic/src/mask.rs:/// Returns the minimum of `a` and `b` without branching.
+crates/bcinr-logic/src/mask.rs:pub fn min_u32(a: u32, b: u32) -> u32 {
+crates/bcinr-logic/src/mask.rs:/// Returns the maximum of `a` and `b` without branching.
+crates/bcinr-logic/src/mask.rs:pub fn max_u32(a: u32, b: u32) -> u32 {
+crates/bcinr-logic/src/mask.rs:/// Returns the absolute value of `x` without branching.
+crates/bcinr-logic/src/mask.rs:pub fn abs_i32(x: i32) -> i32 {
+crates/bcinr-logic/src/mask.rs:    use super::*;
+crates/bcinr-logic/src/mask.rs:        assert_eq!(abs_i32(-5), 5);
+crates/bcinr-logic/src/mask.rs:        assert_eq!(abs_i32(i32::MIN + 1), i32::MAX);
+crates/bcinr-logic/src/int.rs://! Integer Bitwise: Integer bit manipulation without branches
+crates/bcinr-logic/src/int.rs://!
+crates/bcinr-logic/src/int.rs://! This module contains handwritten, performance-critical implementations
+crates/bcinr-logic/src/int.rs://! of all Integer Bitwise algorithms.
+crates/bcinr-logic/src/int.rs:/// Counts the number of set bits (population count) in a `u64`.
+crates/bcinr-logic/src/int.rs:pub const fn popcount_u64(x: u64) -> u64 {
+crates/bcinr-logic/src/int.rs:/// Counts the number of leading zeros in a `u64` (from MSB).
+crates/bcinr-logic/src/int.rs:pub const fn leading_zeros_u64(x: u64) -> u64 {
+crates/bcinr-logic/src/int.rs:/// Counts the number of trailing zeros in a `u64` (from LSB).
+crates/bcinr-logic/src/int.rs:pub const fn trailing_zeros_u64(x: u64) -> u64 {
+crates/bcinr-logic/src/int.rs:/// Reverses the bits of a `u64`.
+crates/bcinr-logic/src/int.rs:pub const fn reverse_bits_u64(mut x: u64) -> u64 {
+crates/bcinr-logic/src/int.rs:/// Counts the number of set bits (population count) in a `u32`.
+crates/bcinr-logic/src/int.rs:pub const fn popcount_u32(x: u32) -> u32 {
+crates/bcinr-logic/src/int.rs:/// Counts the number of leading zeros in a `u32` (from MSB).
+crates/bcinr-logic/src/int.rs:pub const fn leading_zeros_u32(x: u32) -> u32 {
+crates/bcinr-logic/src/int.rs:/// Rounds up to the next power of two in a branchless, constant-time manner.
+crates/bcinr-logic/src/int.rs:pub const fn next_power_of_two_u32(mut x: u32) -> u32 {
+crates/bcinr-logic/src/int.rs:/// Returns true if `x` is a power of two.
+crates/bcinr-logic/src/int.rs:pub const fn is_pow2_u32(x: u32) -> bool {
+crates/bcinr-logic/src/int.rs:/// Returns the parity of `x` (1 if number of set bits is odd, else 0).
+crates/bcinr-logic/src/int.rs:pub const fn parity_u32(mut x: u32) -> u32 {
+crates/bcinr-logic/src/int.rs:/// Reverses the bits of a `u32`.
+crates/bcinr-logic/src/int.rs:pub const fn reverse_bits_u32(mut x: u32) -> u32 {
+crates/bcinr-logic/src/int.rs:/// Counts the number of trailing zeros in a `u32`.
+crates/bcinr-logic/src/int.rs:pub const fn trailing_zeros_u32(x: u32) -> u32 {
+crates/bcinr-logic/src/int.rs:    use super::*;
+crates/bcinr-logic/src/sketch.rs://! Probabilistic Sketches: Hashing and probabilistic data structures
+crates/bcinr-logic/src/sketch.rs://!
+crates/bcinr-logic/src/sketch.rs://! This module contains handwritten, production-quality implementations
+crates/bcinr-logic/src/sketch.rs://! of high-performance hash algorithms.
+crates/bcinr-logic/src/sketch.rs:/// Rotate a 32-bit integer left by n bits.
+crates/bcinr-logic/src/sketch.rs:const fn rotl32(x: u32, n: u32) -> u32 {
+crates/bcinr-logic/src/sketch.rs:/// Murmur3 32-bit implementation.
+crates/bcinr-logic/src/sketch.rs:pub fn murmur3_32(data: &[u8], seed: u32) -> u32 {
+crates/bcinr-logic/src/sketch.rs:    while offset + 4 <= data.len() {
+crates/bcinr-logic/src/sketch.rs:        let mut k = u32::from_le_bytes([data[offset], data[offset+1], data[offset+2], data[offset+3]]);
+crates/bcinr-logic/src/sketch.rs:        offset += 4;
+crates/bcinr-logic/src/sketch.rs:/// FNV-1a 64-bit hash.
+crates/bcinr-logic/src/sketch.rs:pub fn fnv1a_64(data: &[u8]) -> u64 {
+crates/bcinr-logic/src/sketch.rs:/// xxHash 32-bit.
+crates/bcinr-logic/src/sketch.rs:pub fn xxhash32(data: &[u8], seed: u32) -> u32 {
+crates/bcinr-logic/src/sketch.rs:    // Finalize
+crates/bcinr-logic/src/sketch.rs:    use super::*;
+crates/bcinr-logic/src/parse.rs://! Parsing Primitives: Number parsing and format recognition
+crates/bcinr-logic/src/parse.rs://!
+crates/bcinr-logic/src/parse.rs://! This module contains handwritten, performance-critical implementations
+crates/bcinr-logic/src/parse.rs://! of all Parsing Primitives algorithms. These functions are pub(crate) and wrapped
+crates/bcinr-logic/src/parse.rs://! by the public API in `src/api/parse.rs`.
+crates/bcinr-logic/src/parse.rs://!
+crates/bcinr-logic/src/parse.rs://! Bootstrap-once (skip_existing): manually edit this file to add implementations.
+crates/bcinr-logic/src/parse.rs://! When you `unrdf sync`:
+crates/bcinr-logic/src/parse.rs://! 1. First run: Creates this file with stubs
+crates/bcinr-logic/src/parse.rs://! 2. Subsequent runs: Leaves this file untouched
+crates/bcinr-logic/src/parse.rs://! 3. API wrappers regenerate automatically
+crates/bcinr-logic/src/parse.rs:/// Lookup table for whitespace detection.
+crates/bcinr-logic/src/parse.rs:/// Bit set indicates the byte is whitespace: space (0x20), tab (0x09), LF (0x0A), CR (0x0D).
+crates/bcinr-logic/src/parse.rs:    lut[0x09] = 1; // tab
+crates/bcinr-logic/src/parse.rs:    lut[0x0A] = 1; // LF
+crates/bcinr-logic/src/parse.rs:    lut[0x0D] = 1; // CR
+crates/bcinr-logic/src/parse.rs:    lut[0x20] = 1; // space
+crates/bcinr-logic/src/parse.rs:/// Lookup table for hex digit validation and decoding.
+crates/bcinr-logic/src/parse.rs:/// Maps 0..255 to 0xFF (invalid) or the decoded hex value (0..15).
+crates/bcinr-logic/src/parse.rs:    // 0-9
+crates/bcinr-logic/src/parse.rs:    // a-f
+crates/bcinr-logic/src/parse.rs:    // A-F
+crates/bcinr-logic/src/parse.rs:/// Lookup table for decimal digit validation and decoding.
+crates/bcinr-logic/src/parse.rs:/// Maps 0..255 to 0xFF (invalid) or the decoded decimal value (0..9).
+crates/bcinr-logic/src/parse.rs:/// Skip whitespace bytes and return the index of the first non-whitespace byte.
+crates/bcinr-logic/src/parse.rs:///
+crates/bcinr-logic/src/parse.rs:/// Uses a lookup table for fast, branchless classification. Handles space, tab, LF, and CR.
+crates/bcinr-logic/src/parse.rs:///
+crates/bcinr-logic/src/parse.rs:/// # Examples
+crates/bcinr-logic/src/parse.rs:///
+crates/bcinr-logic/src/parse.rs:/// ```
+crates/bcinr-logic/src/parse.rs:/// # use bcinr_core::api::skip_whitespace;
+crates/bcinr-logic/src/parse.rs:/// assert_eq!(skip_whitespace(b"   hello"), 3);
+crates/bcinr-logic/src/parse.rs:/// assert_eq!(skip_whitespace(b"\t\n world"), 3);
+crates/bcinr-logic/src/parse.rs:/// assert_eq!(skip_whitespace(b"no-space"), 0);
+crates/bcinr-logic/src/parse.rs:/// assert_eq!(skip_whitespace(b"   "), 3);
+crates/bcinr-logic/src/parse.rs:/// ```
+crates/bcinr-logic/src/parse.rs:pub fn skip_whitespace(bytes: &[u8]) -> usize {
+crates/bcinr-logic/src/parse.rs:        i += 1;
+crates/bcinr-logic/src/parse.rs:/// Parse a hexadecimal number from bytes into u32.
+crates/bcinr-logic/src/parse.rs:///
+crates/bcinr-logic/src/parse.rs:/// Accepts 0-8 hex digits (case-insensitive). Uses a lookup table for branchless digit validation.
+crates/bcinr-logic/src/parse.rs:/// Returns an error if input is empty, contains non-hex characters, or exceeds 8 digits (u32 max).
+crates/bcinr-logic/src/parse.rs:///
+crates/bcinr-logic/src/parse.rs:/// # Examples
+crates/bcinr-logic/src/parse.rs:///
+crates/bcinr-logic/src/parse.rs:/// ```
+crates/bcinr-logic/src/parse.rs:/// # use bcinr_core::api::parse_hex_u32;
+crates/bcinr-logic/src/parse.rs:/// assert_eq!(parse_hex_u32(b"deadbeef"), Ok(0xDEADBEEF));
+crates/bcinr-logic/src/parse.rs:/// assert_eq!(parse_hex_u32(b"0"), Ok(0x0));
+crates/bcinr-logic/src/parse.rs:/// assert_eq!(parse_hex_u32(b"FF"), Ok(0xFF));
+crates/bcinr-logic/src/parse.rs:/// assert_eq!(parse_hex_u32(b"ffffffff"), Ok(0xFFFFFFFF));
+crates/bcinr-logic/src/parse.rs:/// assert!(parse_hex_u32(b"").is_err());
+crates/bcinr-logic/src/parse.rs:/// assert!(parse_hex_u32(b"gg").is_err());
+crates/bcinr-logic/src/parse.rs:/// assert!(parse_hex_u32(b"100000000").is_err()); // 9 digits
+crates/bcinr-logic/src/parse.rs:/// ```
+crates/bcinr-logic/src/parse.rs:pub fn parse_hex_u32(bytes: &[u8]) -> Result<u32, &'static str> {
+crates/bcinr-logic/src/parse.rs:        // result = result * 16 + digit
+crates/bcinr-logic/src/parse.rs:        // Detect overflow: (result >> 28) != 0 means we'd shift out bits
+crates/bcinr-logic/src/parse.rs:/// Parse a decimal number from bytes into u64.
+crates/bcinr-logic/src/parse.rs:///
+crates/bcinr-logic/src/parse.rs:/// Accepts 0-20 decimal digits. Uses branchless overflow detection: maintains two values
+crates/bcinr-logic/src/parse.rs:/// (checked and result) to detect when multiplication overflows without branching.
+crates/bcinr-logic/src/parse.rs:/// Returns an error if input is empty, contains non-digit characters, or exceeds u64::MAX.
+crates/bcinr-logic/src/parse.rs:///
+crates/bcinr-logic/src/parse.rs:/// # Overflow Detection Strategy
+crates/bcinr-logic/src/parse.rs:///
+crates/bcinr-logic/src/parse.rs:/// For each digit, we check: `result > (u64::MAX - digit) / 10`.
+crates/bcinr-logic/src/parse.rs:/// To avoid division, we precompute the threshold as `u64::MAX / 10`.
+crates/bcinr-logic/src/parse.rs:/// If `result > threshold` and we have a digit to consume, or if `result == threshold`
+crates/bcinr-logic/src/parse.rs:/// and the digit > (u64::MAX % 10), then overflow is detected.
+crates/bcinr-logic/src/parse.rs:///
+crates/bcinr-logic/src/parse.rs:/// # Examples
+crates/bcinr-logic/src/parse.rs:///
+crates/bcinr-logic/src/parse.rs:/// ```
+crates/bcinr-logic/src/parse.rs:/// # use bcinr_core::api::parse_decimal_u64;
+crates/bcinr-logic/src/parse.rs:/// assert_eq!(parse_decimal_u64(b"123"), Ok(123));
+crates/bcinr-logic/src/parse.rs:/// assert_eq!(parse_decimal_u64(b"0"), Ok(0));
+crates/bcinr-logic/src/parse.rs:/// assert_eq!(parse_decimal_u64(b"18446744073709551615"), Ok(u64::MAX));
+crates/bcinr-logic/src/parse.rs:/// assert!(parse_decimal_u64(b"").is_err());
+crates/bcinr-logic/src/parse.rs:/// assert!(parse_decimal_u64(b"abc").is_err());
+crates/bcinr-logic/src/parse.rs:/// assert!(parse_decimal_u64(b"18446744073709551616").is_err()); // u64::MAX + 1
+crates/bcinr-logic/src/parse.rs:/// ```
+crates/bcinr-logic/src/parse.rs:pub fn parse_decimal_u64(bytes: &[u8]) -> Result<u64, &'static str> {
+crates/bcinr-logic/src/parse.rs:    // u64::MAX = 18_446_744_073_709_551_615
+crates/bcinr-logic/src/parse.rs:    // u64::MAX / 10 = 1_844_674_407_370_955_161
+crates/bcinr-logic/src/parse.rs:    // u64::MAX % 10 = 5
+crates/bcinr-logic/src/parse.rs:    const THRESHOLD: u64 = u64::MAX / 10;
+crates/bcinr-logic/src/parse.rs:        // Check overflow: result * 10 + digit > u64::MAX
+crates/bcinr-logic/src/parse.rs:        // Equivalently: result > (u64::MAX - digit) / 10
+crates/bcinr-logic/src/parse.rs:        // Which is: result > THRESHOLD || (result == THRESHOLD && digit > REMAINDER)
+crates/bcinr-logic/src/parse.rs:        result = result * 10 + (digit as u64);
+crates/bcinr-logic/src/parse.rs:    use super::*;
+crates/bcinr-logic/src/parse.rs:        assert_eq!(skip_whitespace(b"no-space"), 0);
+crates/bcinr-logic/src/parse.rs:        assert!(parse_hex_u32(b"100000000").is_err()); // 9 digits
+crates/bcinr-logic/src/parse.rs:        assert!(parse_decimal_u64(b"18446744073709551616").is_err()); // MAX + 1
+crates/bcinr-logic/src/parse.rs:        // Test near the threshold: u64::MAX / 10 = 1_844_674_407_370_955_161
+crates/bcinr-logic/src/parse.rs:        // Digits starting with 18... that are > MAX are rejected
+crates/bcinr-logic/src/parse.rs:// Logic modules for parsing...
+crates/bcinr-logic/src/fix.rs://! Saturation Arithmetic: Fixed-point and saturation arithmetic
+crates/bcinr-logic/src/fix.rs://!
+crates/bcinr-logic/src/fix.rs://! This module contains handwritten, production-quality implementations
+crates/bcinr-logic/src/fix.rs://! of saturation arithmetic algorithms. These functions are pub(crate) and wrapped
+crates/bcinr-logic/src/fix.rs://! by the public API in `src/api/fix.rs`.
+crates/bcinr-logic/src/fix.rs://!
+crates/bcinr-logic/src/fix.rs://! # Algorithm Documentation
+crates/bcinr-logic/src/fix.rs://!
+crates/bcinr-logic/src/fix.rs://! ## add_sat_u8: Saturating Addition
+crates/bcinr-logic/src/fix.rs://! instructions when available (x86_64 PADDSB/PADDUSB via LLVM codegen).
+crates/bcinr-logic/src/fix.rs://! Branchless and constant-time.
+crates/bcinr-logic/src/fix.rs://!
+crates/bcinr-logic/src/fix.rs://! ## sub_sat_u8: Saturating Subtraction
+crates/bcinr-logic/src/fix.rs://! instructions when available (x86_64 PSUBSB/PSUBUSB via LLVM codegen).
+crates/bcinr-logic/src/fix.rs://! Branchless and constant-time.
+crates/bcinr-logic/src/fix.rs://!
+crates/bcinr-logic/src/fix.rs://! ## clamp_u32: Min-Max Clamping
+crates/bcinr-logic/src/fix.rs://! Branchless implementation using `Ord::min()` and `Ord::max()` which
+crates/bcinr-logic/src/fix.rs://! compile to efficient conditional moves on modern architectures.
+crates/bcinr-logic/src/fix.rs://! No branching overhead.
+crates/bcinr-logic/src/fix.rs:/// Saturating addition for generic types.
+crates/bcinr-logic/src/fix.rs:pub fn add_sat<T: Branchless + Add<Output = T> + PartialOrd + Copy>(a: T, b: T, max: T) -> T {
+crates/bcinr-logic/src/fix.rs:    let sum = a + b;
+crates/bcinr-logic/src/fix.rs:/// Saturating addition for u8.
+crates/bcinr-logic/src/fix.rs:pub const fn add_sat_u8(a: u8, b: u8) -> u8 {
+crates/bcinr-logic/src/fix.rs:/// Saturating subtraction for u8.
+crates/bcinr-logic/src/fix.rs:pub const fn sub_sat_u8(a: u8, b: u8) -> u8 {
+crates/bcinr-logic/src/fix.rs:/// Saturating addition for `u32`.
+crates/bcinr-logic/src/fix.rs:pub const fn add_sat_u32(a: u32, b: u32) -> u32 {
+crates/bcinr-logic/src/fix.rs:/// Saturating subtraction for `u32`.
+crates/bcinr-logic/src/fix.rs:pub const fn sub_sat_u32(a: u32, b: u32) -> u32 {
+crates/bcinr-logic/src/fix.rs:/// Saturating multiplication for `u32`.
+crates/bcinr-logic/src/fix.rs:pub const fn mul_sat_u32(a: u32, b: u32) -> u32 {
+crates/bcinr-logic/src/fix.rs:/// Saturating increment for `u32`.
+crates/bcinr-logic/src/fix.rs:pub const fn inc_sat_u32(x: u32) -> u32 {
+crates/bcinr-logic/src/fix.rs:/// Saturating decrement for `u32`.
+crates/bcinr-logic/src/fix.rs:pub const fn dec_sat_u32(x: u32) -> u32 {
+crates/bcinr-logic/src/fix.rs:/// Clamps a `u32` value to the range `[min, max]`.
+crates/bcinr-logic/src/fix.rs:pub const fn clamp_u32(x: u32, min: u32, max: u32) -> u32 {
+crates/bcinr-logic/src/fix.rs:    // const fn can't use .max()/.min() yet in all versions, let's use manual
+crates/bcinr-logic/src/fix.rs:/// Branchless bucketization. Returns the index of the first bucket such that `x < buckets[index]`.
+crates/bcinr-logic/src/fix.rs:/// `buckets` must be sorted.
+crates/bcinr-logic/src/fix.rs:pub fn bucketize_u32<const N: usize>(x: u32, buckets: &[u32; N]) -> usize {
+crates/bcinr-logic/src/fix.rs:        // x < buckets[i] is 1 if true, 0 if false.
+crates/bcinr-logic/src/fix.rs:        // We sum these up to find the bucket index.
+crates/bcinr-logic/src/fix.rs:        // This is branchless if the compiler optimizes the comparison.
+crates/bcinr-logic/src/fix.rs:        index += (x >= bucket) as usize;
+crates/bcinr-logic/src/fix.rs:    use super::*;
+crates/bcinr-logic/src/fix.rs:    // ========== add_sat_u8 Tests ==========
+crates/bcinr-logic/src/fix.rs:        // u8 addition can never underflow since both operands are non-negative
+crates/bcinr-logic/src/fix.rs:    // ========== sub_sat_u8 Tests ==========
+crates/bcinr-logic/src/fix.rs:        // u8 subtraction can never overflow since the result is always >= 0
+crates/bcinr-logic/src/fix.rs:        // Verify sub is not commutative
+crates/bcinr-logic/src/fix.rs:    // ========== clamp_u32 Tests ==========
+crates/bcinr-logic/src/fix.rs:        // When min is 0 and max is u32::MAX, clamp should return the input
+crates/bcinr-logic/src/fix.rs:        // Test with different range sizes
+crates/bcinr-logic/src/fix.rs:        // Tight ranges
+crates/bcinr-logic/src/fix.rs:        // Clamping twice should equal clamping once
+crates/bcinr-logic/src/fix.rs:    // ========== Cross-function Property Tests ==========
+crates/bcinr-logic/src/fix.rs:        // If a + b doesn't overflow, then (a + b) - b should equal a
+crates/bcinr-logic/src/fix.rs:        // Verify saturation is consistent across families
+crates/bcinr-logic/src/fix.rs:        assert_eq!(sum, 255); // Saturates to max
+crates/bcinr-logic/src/fix.rs:        assert_eq!(clamped, 50); // Within range
+crates/bcinr-logic/src/fix.rs:    use super::*;
+crates/bcinr-logic/src/fix.rs:        let ns_per_op = elapsed.as_nanos() / iterations as u128;
+crates/bcinr-logic/src/fix.rs:            "add_sat_u8: {:.2} ns/op ({:.2} ops/µs)",
+crates/bcinr-logic/src/fix.rs:            1_000.0 / ns_per_op as f64
+crates/bcinr-logic/src/fix.rs:        let ns_per_op = elapsed.as_nanos() / iterations as u128;
+crates/bcinr-logic/src/fix.rs:            "sub_sat_u8: {:.2} ns/op ({:.2} ops/µs)",
+crates/bcinr-logic/src/fix.rs:            1_000.0 / ns_per_op as f64
+crates/bcinr-logic/src/fix.rs:        let ns_per_op = elapsed.as_nanos() / iterations as u128;
+crates/bcinr-logic/src/fix.rs:            "clamp_u32: {:.2} ns/op ({:.2} ops/µs)",
+crates/bcinr-logic/src/fix.rs:            1_000.0 / ns_per_op as f64
+crates/bcinr-logic/src/scan.rs://! Byte/Word Scanning: Scanning and searching within byte/word sequences
+crates/bcinr-logic/src/scan.rs://!
+crates/bcinr-logic/src/scan.rs://! This module contains handwritten, performance-critical implementations
+crates/bcinr-logic/src/scan.rs://! of all Byte/Word Scanning algorithms.
+crates/bcinr-logic/src/scan.rs:/// Create a 64-bit mask where each bit represents if the corresponding byte matches the target.
+crates/bcinr-logic/src/scan.rs:pub fn find_byte_mask(bytes: &[u8], target: u8) -> u64 {
+crates/bcinr-logic/src/scan.rs:/// Count the number of non-zero bytes in the slice.
+crates/bcinr-logic/src/scan.rs:pub fn count_nonzero_bytes(bytes: &[u8]) -> usize {
+crates/bcinr-logic/src/scan.rs:/// Skip leading space characters (ASCII 32) and return the offset.
+crates/bcinr-logic/src/scan.rs:pub fn skip_spaces(bytes: &[u8]) -> usize {
+crates/bcinr-logic/src/scan.rs:        offset += 1;
+crates/bcinr-logic/src/scan.rs:/// Check if the byte slice is ASCII using 64-bit SWAR.
+crates/bcinr-logic/src/scan.rs:pub fn is_ascii_u64_slice(bytes: &[u8]) -> bool {
+crates/bcinr-logic/src/scan.rs:    while i + 8 <= bytes.len() {
+crates/bcinr-logic/src/scan.rs:        // SAFETY: We checked the bounds.
+crates/bcinr-logic/src/scan.rs:        let val = unsafe { (bytes.as_ptr().add(i) as *const u64).read_unaligned() };
+crates/bcinr-logic/src/scan.rs:        i += 8;
+crates/bcinr-logic/src/scan.rs:        i += 1;
+crates/bcinr-logic/src/scan.rs:/// Find the index of the first zero byte in the slice.
+crates/bcinr-logic/src/scan.rs:pub fn first_zero_byte(bytes: &[u8]) -> Option<usize> {
+crates/bcinr-logic/src/scan.rs:/// Count the number of zero bytes in the slice.
+crates/bcinr-logic/src/scan.rs:pub fn count_zero_bytes(bytes: &[u8]) -> usize {
+crates/bcinr-logic/src/scan.rs:/// Find the index of the first occurrence of the target byte.
+crates/bcinr-logic/src/scan.rs:pub fn find_byte(bytes: &[u8], target: u8) -> Option<usize> {
+crates/bcinr-logic/src/scan.rs:    use super::*;
+crates/bcinr-logic/src/scan.rs:        assert_eq!(find_byte_mask(b, b' '), 0b101010); // spaces at 1, 3, 5
+crates/bcinr-logic/src/dfa.rs://! # Table Layout
+crates/bcinr-logic/src/dfa.rs://!
+crates/bcinr-logic/src/dfa.rs://! The DFA transition table is laid out as a flat array of states indexed by:
+crates/bcinr-logic/src/dfa.rs://! `table[state * alphabet_size + input] = next_state`
+crates/bcinr-logic/src/dfa.rs://!
+crates/bcinr-logic/src/dfa.rs://! This layout ensures cache-friendly sequential access and minimal branching.
+crates/bcinr-logic/src/dfa.rs://!
+crates/bcinr-logic/src/dfa.rs://! # State Numbering Convention
+crates/bcinr-logic/src/dfa.rs://!
+crates/bcinr-logic/src/dfa.rs://! States are numbered starting from 0. The initial state is always 0.
+crates/bcinr-logic/src/dfa.rs://! Accepting states are indicated by providing a separate `accept_states` slice.
+crates/bcinr-logic/src/dfa.rs://!
+crates/bcinr-logic/src/dfa.rs://! Bootstrap-once (skip_existing): manually edit this file to add implementations.
+crates/bcinr-logic/src/dfa.rs://! When you `unrdf sync`:
+crates/bcinr-logic/src/dfa.rs://! 1. First run: Creates this file with stubs
+crates/bcinr-logic/src/dfa.rs://! 2. Subsequent runs: Leaves this file untouched
+crates/bcinr-logic/src/dfa.rs://! 3. API wrappers regenerate automatically
+crates/bcinr-logic/src/dfa.rs:/// A cache-line aligned wrapper for DFA transition tables.
+crates/bcinr-logic/src/dfa.rs:    /// The flat transition table array.
+crates/bcinr-logic/src/dfa.rs:    /// Creates a new, aligned transition table wrapper.
+crates/bcinr-logic/src/dfa.rs:    pub const fn new(data: &'static [usize]) -> Self {
+crates/bcinr-logic/src/dfa.rs:/// Single DFA state transition via lookup table
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// Performs one state transition using the transition table. The table
+crates/bcinr-logic/src/dfa.rs:/// layout assumes row-major indexing: `table[state * alphabet_size + input]`.
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// # Arguments
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// * `state` - Current state number (0 for initial state)
+crates/bcinr-logic/src/dfa.rs:/// * `input` - Input symbol (typically a byte value 0-255)
+crates/bcinr-logic/src/dfa.rs:/// * `table` - Flat transition table organized as `state * alphabet_size + input`
+crates/bcinr-logic/src/dfa.rs:/// * `alphabet_size` - Size of the input alphabet (typically 256 for bytes)
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// # Returns
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// Next state after consuming the input symbol.
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// # Panics
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// Panics if the computed table index exceeds the bounds of `table`.
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// # Examples
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// ```
+crates/bcinr-logic/src/dfa.rs:/// # use bcinr_core::api::dfa_advance;
+crates/bcinr-logic/src/dfa.rs:/// // Simple DFA: accept strings matching [a-z]+
+crates/bcinr-logic/src/dfa.rs:/// // States: 0 (initial/non-accepting), 1 (accepting)
+crates/bcinr-logic/src/dfa.rs:/// // Alphabet: 256 (all bytes)
+crates/bcinr-logic/src/dfa.rs:/// let mut table = vec![0; 2 * 256];
+crates/bcinr-logic/src/dfa.rs:/// // From state 0, on input 'a'-'z', go to state 1
+crates/bcinr-logic/src/dfa.rs:/// for c in b'a'..=b'z' {
+crates/bcinr-logic/src/dfa.rs:///     table[0 * 256 + c as usize] = 1;
+crates/bcinr-logic/src/dfa.rs:/// }
+crates/bcinr-logic/src/dfa.rs:/// // From state 1, stay in state 1 on 'a'-'z', go to 0 on anything else
+crates/bcinr-logic/src/dfa.rs:/// for c in b'a'..=b'z' {
+crates/bcinr-logic/src/dfa.rs:///     table[1 * 256 + c as usize] = 1;
+crates/bcinr-logic/src/dfa.rs:/// }
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// let next = dfa_advance(0, b'a', &table, 256);
+crates/bcinr-logic/src/dfa.rs:/// assert_eq!(next, 1);
+crates/bcinr-logic/src/dfa.rs:/// ```
+crates/bcinr-logic/src/dfa.rs:pub fn dfa_advance(state: usize, input: u8, table: &[usize], alphabet_size: usize) -> usize {
+crates/bcinr-logic/src/dfa.rs:/// Run DFA to completion and return the final state
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// Processes all input symbols in sequence, advancing through states
+crates/bcinr-logic/src/dfa.rs:/// according to the transition table. Returns the state after consuming
+crates/bcinr-logic/src/dfa.rs:/// all input.
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// # Arguments
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// * `input` - Slice of input symbols to process
+crates/bcinr-logic/src/dfa.rs:/// * `table` - Flat transition table
+crates/bcinr-logic/src/dfa.rs:/// * `alphabet_size` - Size of the input alphabet (typically 256 for bytes)
+crates/bcinr-logic/src/dfa.rs:/// * `initial_state` - Starting state (typically 0)
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// # Returns
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// Final state after processing all input symbols.
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// # Examples
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// ```
+crates/bcinr-logic/src/dfa.rs:/// # use bcinr_core::api::{dfa_run, dfa_advance};
+crates/bcinr-logic/src/dfa.rs:/// // Simple DFA accepting strings of 'a' characters
+crates/bcinr-logic/src/dfa.rs:/// let mut table = vec![0; 2 * 256];
+crates/bcinr-logic/src/dfa.rs:/// for c in b'a'..=b'a' {
+crates/bcinr-logic/src/dfa.rs:///     table[0 * 256 + c as usize] = 1;
+crates/bcinr-logic/src/dfa.rs:///     table[1 * 256 + c as usize] = 1;
+crates/bcinr-logic/src/dfa.rs:/// }
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// let input = b"aaa";
+crates/bcinr-logic/src/dfa.rs:/// let final_state = dfa_run(input, &table, 256, 0);
+crates/bcinr-logic/src/dfa.rs:/// assert_eq!(final_state, 1);
+crates/bcinr-logic/src/dfa.rs:/// ```
+crates/bcinr-logic/src/dfa.rs:) -> usize {
+crates/bcinr-logic/src/dfa.rs:/// Check if a state is an accepting state
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// Determines whether the given state is in the set of accepting states.
+crates/bcinr-logic/src/dfa.rs:/// Performs a binary search (O(log n)). For O(1) lookup with large accept sets,
+crates/bcinr-logic/src/dfa.rs:/// consider a bitset indexed by state number.
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// # Arguments
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// * `state` - State number to check
+crates/bcinr-logic/src/dfa.rs:/// * `accept_states` - Slice of accepting state numbers, **must be sorted in ascending order**.
+crates/bcinr-logic/src/dfa.rs:///   Passing an unsorted slice produces unspecified (but safe) results.
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// # Returns
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// `true` if `state` is in `accept_states`, `false` otherwise.
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// # Examples
+crates/bcinr-logic/src/dfa.rs:///
+crates/bcinr-logic/src/dfa.rs:/// ```
+crates/bcinr-logic/src/dfa.rs:/// # use bcinr_core::api::dfa_is_accepting;
+crates/bcinr-logic/src/dfa.rs:/// let accept_states = [1, 2];
+crates/bcinr-logic/src/dfa.rs:/// assert!(dfa_is_accepting(1, &accept_states));
+crates/bcinr-logic/src/dfa.rs:/// assert!(dfa_is_accepting(2, &accept_states));
+crates/bcinr-logic/src/dfa.rs:/// assert!(!dfa_is_accepting(0, &accept_states));
+crates/bcinr-logic/src/dfa.rs:/// ```
+crates/bcinr-logic/src/dfa.rs:pub fn dfa_is_accepting(state: usize, accept_states: &[usize]) -> bool {
+crates/bcinr-logic/src/dfa.rs:    use super::*;
+crates/bcinr-logic/src/dfa.rs:    // ============================================================================
+crates/bcinr-logic/src/dfa.rs:    // ============================================================================
+crates/bcinr-logic/src/dfa.rs:        let mut table = [0usize; 2 * 256];
+crates/bcinr-logic/src/dfa.rs:        table[0 * 256 + b'a' as usize] = 1;
+crates/bcinr-logic/src/dfa.rs:        let mut table = [0usize; 2 * 256];
+crates/bcinr-logic/src/dfa.rs:        table[1 * 256 + b'x' as usize] = 1;
+crates/bcinr-logic/src/dfa.rs:        let table = [0usize; 2 * 256];
+crates/bcinr-logic/src/dfa.rs:        let table = [0usize; 1]; // Very small table
+crates/bcinr-logic/src/dfa.rs:        let mut table = [0usize; 3 * 256];
+crates/bcinr-logic/src/dfa.rs:        table[0 * 256 + b'a' as usize] = 1;
+crates/bcinr-logic/src/dfa.rs:        table[1 * 256 + b'b' as usize] = 2;
+crates/bcinr-logic/src/dfa.rs:    // ============================================================================
+crates/bcinr-logic/src/dfa.rs:    // ============================================================================
+crates/bcinr-logic/src/dfa.rs:        let table = [0usize; 2 * 256];
+crates/bcinr-logic/src/dfa.rs:        let mut table = [0usize; 2 * 256];
+crates/bcinr-logic/src/dfa.rs:        table[0 * 256 + b'a' as usize] = 1;
+crates/bcinr-logic/src/dfa.rs:        let mut table = [0usize; 3 * 256];
+crates/bcinr-logic/src/dfa.rs:        table[0 * 256 + b'a' as usize] = 1;
+crates/bcinr-logic/src/dfa.rs:        table[1 * 256 + b'b' as usize] = 2;
+crates/bcinr-logic/src/dfa.rs:        table[2 * 256 + b'c' as usize] = 2;
+crates/bcinr-logic/src/dfa.rs:        let mut table = [0usize; 2 * 256];
+crates/bcinr-logic/src/dfa.rs:        table[1 * 256 + b'a' as usize] = 1;
+crates/bcinr-logic/src/dfa.rs:        let table = [0usize; 2 * 256]; // All transitions go to 0
+crates/bcinr-logic/src/dfa.rs:    // ============================================================================
+crates/bcinr-logic/src/dfa.rs:    // ============================================================================
+crates/bcinr-logic/src/dfa.rs:        // Unsorted accept_states violates the precondition; debug_assert! fires.
+crates/bcinr-logic/src/dfa.rs:    // ============================================================================
+crates/bcinr-logic/src/dfa.rs:    // ============================================================================
+crates/bcinr-logic/src/dfa.rs:        // DFA that accepts "aa"
+crates/bcinr-logic/src/dfa.rs:        let mut table = [0usize; 3 * 256];
+crates/bcinr-logic/src/dfa.rs:        table[0 * 256 + b'a' as usize] = 1;
+crates/bcinr-logic/src/dfa.rs:        table[1 * 256 + b'a' as usize] = 2;
+crates/bcinr-logic/src/dfa.rs:        let mut table = [0usize; 3 * 256];
+crates/bcinr-logic/src/dfa.rs:        table[0 * 256 + b'a' as usize] = 1;
+crates/bcinr-logic/src/dfa.rs:        table[1 * 256 + b'a' as usize] = 2;
+crates/bcinr-logic/src/dfa.rs:        // Test with smaller alphabet
+crates/bcinr-logic/src/dfa.rs:        let mut table = [0usize; 2 * 10]; // alphabet_size = 10
+crates/bcinr-logic/src/dfa.rs:        table[0 * 10 + 5] = 1;
+crates/bcinr-logic/src/dfa.rs:// Logic modules for DFA...
+crates/bcinr-logic/src/network.rs://! Compare-Exchange Networks: Sorting and selection networks.
+crates/bcinr-logic/src/network.rs:/// Bitwise branchless compare-exchange operation.
+crates/bcinr-logic/src/network.rs:/// Returns (min, max) in ascending order.
+crates/bcinr-logic/src/network.rs:pub fn compare_exchange(a: u32, b: u32) -> (u32, u32) {
+crates/bcinr-logic/src/network.rs:/// Bitonic sort network for 32 u32 values.
+crates/bcinr-logic/src/network.rs:    // Using a recursive definition logic, simplified for N=32
+crates/bcinr-logic/src/network.rs:    // Sorting 16-size chunks
+crates/bcinr-logic/src/network.rs:    // Merge two 16-element chunks
+crates/bcinr-logic/src/network.rs:    for i in 0..16 { arr[i] = chunk1[i]; arr[i+16] = chunk2[i]; }
+crates/bcinr-logic/src/network.rs:    // Complete the 32-element network
+crates/bcinr-logic/src/network.rs:    for i in 0..16 { swap!(i, i + 16); }
+crates/bcinr-logic/src/network.rs:    // ... further stages would be needed here for a full bitonic network ...
+crates/bcinr-logic/src/network.rs:    // For now, implementing as a simple bitonic merge block
+crates/bcinr-logic/src/network.rs:    // Simplified 32-merger for branchless network
+crates/bcinr-logic/src/network.rs:/// Sorts 3 elements using a optimal comparison network (3 comparisons).
+crates/bcinr-logic/src/network.rs:/// Sorts 4 elements using a optimal comparison network (5 comparisons).
+crates/bcinr-logic/src/network.rs:/// Sorts 5 elements using a optimal comparison network (9 comparisons).
+crates/bcinr-logic/src/network.rs:/// Bitonic sort network for 8 u32 values.
+crates/bcinr-logic/src/network.rs:/// This uses the Bose-Nelson algorithm for N=8 (19 comparisons).
+crates/bcinr-logic/src/network.rs:/// Bitonic sort network for 16 u32 values.
+crates/bcinr-logic/src/network.rs:    use super::*;
+crates/bcinr-logic/src/network.rs:        for i in 0..32 { arr[i] = 31 - i as u32; }
+crates/bcinr-logic/src/swar.rs://! SWAR (SIMD Within A Register) primitives for byte-parallel operations.
+crates/bcinr-logic/src/swar.rs:/// Returns a mask with the high bit set for each byte that is zero.
+crates/bcinr-logic/src/swar.rs:pub fn has_zero_byte_u64(x: u64) -> u64 {
+crates/bcinr-logic/src/swar.rs:/// Returns a mask with the high bit set for each byte that is less than `val`.
+crates/bcinr-logic/src/swar.rs:pub fn has_less_than_byte_u64(x: u64, val: u8) -> u64 {
+crates/bcinr-logic/src/swar.rs:    let broadcast = val as u64 * 0x0101_0101_0101_0101;
+crates/bcinr-logic/src/mem.rs://! Memory Substrate: Arenas, rings, slabs, and epochs for zero-alloc execution.
+crates/bcinr-logic/src/mem.rs:/// A simple bump-style scratch arena for reusable temporary storage.
+crates/bcinr-logic/src/mem.rs:    /// Creates a new scratch arena with the given capacity.
+crates/bcinr-logic/src/mem.rs:    pub fn new(capacity: usize) -> Self {
+crates/bcinr-logic/src/mem.rs:    /// Allocates `size` bytes from the arena.
+crates/bcinr-logic/src/mem.rs:    pub fn alloc(&mut self, size: usize) -> Option<&mut [u8]> {
+crates/bcinr-logic/src/mem.rs:        if self.offset + size > self.data.len() {
+crates/bcinr-logic/src/mem.rs:        self.offset += size;
+crates/bcinr-logic/src/mem.rs:    /// Resets the arena offset to zero.
+crates/bcinr-logic/src/mem.rs:/// An array that uses an epoch to track whether a slot has been "cleared".
+crates/bcinr-logic/src/mem.rs:pub(crate) struct EpochArray<T: Copy + Default> {
+crates/bcinr-logic/src/mem.rs:impl<T: Copy + Default> EpochArray<T> {
+crates/bcinr-logic/src/mem.rs:    /// Creates a new epoch array with the given size.
+crates/bcinr-logic/src/mem.rs:    pub fn new(size: usize) -> Self {
+crates/bcinr-logic/src/mem.rs:    /// Gets the value at the given index, returning default if epoch doesn't match.
+crates/bcinr-logic/src/mem.rs:    pub fn get(&self, idx: usize) -> T {
+crates/bcinr-logic/src/mem.rs:    /// Sets the value at the given index and updates its epoch.
+crates/bcinr-logic/src/mem.rs:    /// Increment current epoch, effectively clearing the array.
+crates/bcinr-logic/src/mem.rs:            // Rare: reset all epochs on wrap
+crates/bcinr-logic/src/mem.rs:/// A fixed-capacity ring buffer.
+crates/bcinr-logic/src/mem.rs:impl<T: Copy + Default, const N: usize> RingBuffer<T, N> {
+crates/bcinr-logic/src/mem.rs:    /// Creates a new empty ring buffer.
+crates/bcinr-logic/src/mem.rs:    pub fn new() -> Self {
+crates/bcinr-logic/src/mem.rs:    /// Pushes a value onto the ring buffer.
+crates/bcinr-logic/src/mem.rs:        let idx = (self.head + self.count) % N;
+crates/bcinr-logic/src/mem.rs:            self.count += 1;
+crates/bcinr-logic/src/mem.rs:            self.head = (self.head + 1) % N;
+crates/bcinr-logic/src/mem.rs:    /// Gets the value at the given index.
+crates/bcinr-logic/src/mem.rs:    pub fn get(&self, idx: usize) -> Option<T> {
+crates/bcinr-logic/src/mem.rs:        Some(self.data[(self.head + idx) % N])
+crates/bcinr-logic/src/mem.rs:    /// Returns the number of elements in the ring buffer.
+crates/bcinr-logic/src/mem.rs:    pub fn len(&self) -> usize {
+crates/bcinr-logic/src/mem.rs:    use super::*;
+crates/bcinr-logic/src/bitset.rs://! Bitset Algebra: Bitset operations: rank, select, set, clear
+crates/bcinr-logic/src/bitset.rs://!
+crates/bcinr-logic/src/bitset.rs://! This module contains handwritten, performance-critical implementations
+crates/bcinr-logic/src/bitset.rs://! of all Bitset Algebra algorithms.
+crates/bcinr-logic/src/bitset.rs:/// Set bit at position in `u64` value.
+crates/bcinr-logic/src/bitset.rs:pub const fn set_bit_u64(x: u64, pos: usize) -> u64 {
+crates/bcinr-logic/src/bitset.rs:/// Clear bit at position in `u64` value.
+crates/bcinr-logic/src/bitset.rs:pub const fn clear_bit_u64(x: u64, pos: usize) -> u64 {
+crates/bcinr-logic/src/bitset.rs:/// Count set bits (population count) up to and including position.
+crates/bcinr-logic/src/bitset.rs:pub const fn rank_u64(x: u64, pos: usize) -> usize {
+crates/bcinr-logic/src/bitset.rs:    let mask = if pos == 63 { u64::MAX } else { (1u64 << (pos + 1)) - 1 };
+crates/bcinr-logic/src/bitset.rs:/// Find the position of the nth set bit (0-indexed).
+crates/bcinr-logic/src/bitset.rs:pub const fn select_bit_u64(x: u64, nth: usize) -> usize {
+crates/bcinr-logic/src/bitset.rs:        let mid = (left + right) / 2;
+crates/bcinr-logic/src/bitset.rs:        let count_at_mid = if mid == 0 { 0 } else { rank_u64(x, mid - 1) };
+crates/bcinr-logic/src/bitset.rs:            left = mid + 1;
+crates/bcinr-logic/src/bitset.rs:    left - 1
+crates/bcinr-logic/src/bitset.rs:/// Computes the parity of the bitset slice.
+crates/bcinr-logic/src/bitset.rs:pub fn parity_u64_slice(a: &[u64]) -> u32 {
+crates/bcinr-logic/src/bitset.rs:/// Jaccard similarity, Hamming distance, intersection, union, `any_bit_set` implemented as before
+crates/bcinr-logic/src/bitset.rs:pub fn jaccard_u64_slices(a: &[u64], b: &[u64]) -> f32 {
+crates/bcinr-logic/src/bitset.rs:        intersection_count += (va & vb).count_ones();
+crates/bcinr-logic/src/bitset.rs:        union_count += (va | vb).count_ones();
+crates/bcinr-logic/src/bitset.rs:        intersection_count as f32 / union_count as f32
+crates/bcinr-logic/src/bitset.rs:/// Compute the Hamming distance between two bitset slices.
+crates/bcinr-logic/src/bitset.rs:pub fn hamming_u64_slices(a: &[u64], b: &[u64]) -> u32 {
+crates/bcinr-logic/src/bitset.rs:        distance += (va ^ vb).count_ones();
+crates/bcinr-logic/src/bitset.rs:/// Compute the intersection of two bitset slices.
+crates/bcinr-logic/src/bitset.rs:        *vout = va & vb;
+crates/bcinr-logic/src/bitset.rs:/// Compute the union of two bitset slices.
+crates/bcinr-logic/src/bitset.rs:        *vout = va | vb;
+crates/bcinr-logic/src/bitset.rs:/// Check if any bit is set in the bitset slice.
+crates/bcinr-logic/src/bitset.rs:pub fn any_bit_set_u64_slice(a: &[u64]) -> bool {
+crates/bcinr-logic/src/bitset.rs:    use super::*;
+crates/bcinr-logic/src/bitset.rs:        // popcount(0b101) = 2, popcount(0b100) = 1. Total = 3. Parity = 1.
+crates/bcinr-logic/src/bitset.rs:        // popcount(0b101) = 2, popcount(0b001) = 1. Total = 3. Parity = 1.
+crates/bcinr-logic/src/bitset.rs:        // popcount(0b11) = 2, popcount(0b11) = 2. Total = 4. Parity = 0.
