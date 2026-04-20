@@ -65,8 +65,18 @@ name = "bcinr-bench"
 version = "26.4.17"
 dependencies = [
  "bcinr-core 26.4.17",
+ "bcinr-logic 26.4.17",
  "criterion",
  "prettytable-rs",
+]
+
+[[package]]
+name = "bcinr-contract-gate"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn",
+ "walkdir",
 ]
 
 [[package]]
@@ -92,12 +102,26 @@ dependencies = [
 [[package]]
 name = "bcinr-logic"
 version = "26.4.17"
+dependencies = [
+ "criterion",
+ "proptest",
+]
 
 [[package]]
 name = "bcinr-logic"
 version = "26.4.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf27c5561e5eacfe587768169a5e469929034a4088b3a0524ed25d0975e17bc1"
+
+[[package]]
+name = "bcinr-reporter"
+version = "0.1.0"
+dependencies = [
+ "prettytable-rs",
+ "regex",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "bit-set"

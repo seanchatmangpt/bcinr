@@ -1,5 +1,5 @@
 [workspace]
-members = ["bcinr", "bcinr-core", "bcinr-bench", "crates/bcinr-api", "crates/bcinr-logic"]
+members = ["bcinr", "bcinr-core", "bcinr-bench", "crates/bcinr-api", "crates/bcinr-logic", "tools/bcinr-reporter", "tools/bcinr-contract-gate"]
 resolver = "2"
 
 [profile.release]

@@ -13,11 +13,21 @@ publish = false
 [dependencies]
 criterion = "0.5"
 bcinr-core = { path = "../bcinr-core", version = "26.4.17" }
+bcinr-logic = { path = "../crates/bcinr-logic", version = "26.4.17", features = ["bench"] }
 prettytable-rs = "0.10.0"
+
+[features]
+alloc = []
+bench = ["bcinr-logic/bench"]
 
 [[bench]]
 name = "bcinr_bench"
 harness = false
 
-[features]
-alloc = []
+[[bench]]
+name = "all_300_bench"
+harness = false
+
+[[bench]]
+name = "algorithms_101_200"
+harness = false
