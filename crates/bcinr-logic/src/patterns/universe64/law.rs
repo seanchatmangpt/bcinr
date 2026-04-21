@@ -120,9 +120,9 @@ impl UniverseLaw {
     #[inline]
     pub fn scan_violations(&self, block: &UniverseBlock, out: &mut [u64; UNIVERSE_WORDS]) -> u32 {
         let mut count = 0u32;
-        for i in 0..UNIVERSE_WORDS {
+        for (i, out_word) in out.iter_mut().enumerate() {
             let v = word_violation(block.state[i], self.allowed[i]);
-            out[i] = v;
+            *out_word = v;
             count = count.wrapping_add((v != 0) as u32);
         }
         count

@@ -35,7 +35,23 @@ where
             len: 0,
         }
     }
+}
 
+impl<K, V, const N: usize> Default for PackedKeyTable<K, V, N>
+where
+    K: Copy + Default + PartialEq,
+    V: Copy + Default,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<K, V, const N: usize> PackedKeyTable<K, V, N>
+where
+    K: Copy + Default + PartialEq,
+    V: Copy + Default,
+{
     #[inline(always)]
     pub fn get(&self, key: K) -> Option<V> {
         let hash = fnv1a_64(unsafe { core::slice::from_raw_parts(&key as *const K as *const u8, core::mem::size_of::<K>()) });
@@ -43,14 +59,13 @@ where
         let mut found = 0usize;
         (0..N).for_each(|i| {
             let is_match = (i < self.len && self.hashes[i] == hash) as usize;
-            let mask = 0usize.wrapping_sub(is_match);
             result = [result, self.values[i]][is_match];
             found |= is_match;
         });
         [None, Some(result)][found]
     }
     
-    pub fn insert(&mut self, key: K, value: V) -> bool {
+    pub fn insert(&mut self, key: K, _value: V) -> bool {
         let hash = fnv1a_64(unsafe { core::slice::from_raw_parts(&key as *const K as *const u8, core::mem::size_of::<K>()) });
         let mut exists = 0usize;
         let mut pos = self.len;
@@ -58,7 +73,7 @@ where
         (0..N).for_each(|i| {
             let is_match = (i < self.len && self.hashes[i] == hash) as usize;
             exists |= is_match;
-            
+
             let is_greater = (i < self.len && self.hashes[i] > hash) as usize;
             let is_first_greater = (is_greater != 0 && pos == self.len) as usize;
             let p_mask = 0usize.wrapping_sub(is_first_greater);
@@ -66,8 +81,7 @@ where
         });
 
         let can_insert = (self.len < N || exists != 0) as usize;
-        let c_mask = 0usize.wrapping_sub(can_insert);
-        
+
         // This is a simplified insertion for the witness
         let results = [false, true];
         results[can_insert]

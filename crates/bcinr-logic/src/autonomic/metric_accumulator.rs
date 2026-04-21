@@ -7,7 +7,6 @@
 /// Postcondition: { result = min(current + val, U64_MAX) }
 /// Hoare-logic Verification Line 10: Saturating arithmetic is branchless on modern ISAs.
 /// Hoare-logic Verification Line 11: Zero-cost abstraction ensures no branching.
-
 /// Primitive entry point for auditor compatibility.
 #[inline(always)]
 pub fn metric_accumulator_sat_add(current: u64, val: u64) -> u64 {

@@ -44,6 +44,18 @@ pub mod probability;
 pub mod scenario;
 pub mod executor;
 
+// Wave F — Capability tokens
+pub mod ubit_capability;
+
+// Wave G — Snapshot / fork / restore
+pub mod ubit_image;
+
+// Wave H — Self-healing supervisor
+pub mod ubit_supervisor;
+
+// Wave I — 2 MiB operating field (alloc-gated)
+pub mod ubit_field;
+
 // ---------------------------------------------------------------------------
 // Re-exports — core spec
 // ---------------------------------------------------------------------------
@@ -109,3 +121,43 @@ pub use rl::{RLKernel, RLState, RewardSpec, RewardTable};
 pub use probability::{FixedHistogram, PopcountHistogram, HISTOGRAM_BUCKETS};
 pub use scenario::{ScenarioConfig, ScenarioRunner, ScenarioSummary, splitmix64, MAX_SCENARIO_STEPS};
 pub use executor::{EpochStats, ExecutorState, UniverseExecutor, MAX_EPOCH_INSTRUCTIONS};
+
+// ---------------------------------------------------------------------------
+// Re-exports — Wave F: UBitCapability
+// ---------------------------------------------------------------------------
+pub use ubit_capability::{
+    UBitCapability, UBitCapabilityId, UBitCapabilityTable, NullCapability,
+    UBIT_CAPABILITY_TABLE_CAPACITY, cap_admit,
+};
+pub use admission::{eval_cell_with_cap, eval_sparse_with_cap, eval_domain_with_cap, eval_full_with_cap};
+
+// ---------------------------------------------------------------------------
+// Re-exports — Wave G: UBitImage
+// ---------------------------------------------------------------------------
+pub use ubit_image::{UBitImage, UBitScratchSnapshot};
+
+// ---------------------------------------------------------------------------
+// Re-exports — Wave H: UBitScopePlanner (in scope_planner module)
+// ---------------------------------------------------------------------------
+pub use scope_planner::{
+    KernelClass, PlanDecision, CostModel, UBitScopePlanner,
+};
+
+// ---------------------------------------------------------------------------
+// Re-exports — Wave I: UBitSupervisor
+// ---------------------------------------------------------------------------
+pub use ubit_supervisor::{
+    UBitSupervisor, SupervisorCounters, SupervisorThresholds, RecoveryKind,
+    UBIT_SUPERVISOR_RING_CAPACITY, UBIT_FAMILY_COUNT,
+};
+
+// ---------------------------------------------------------------------------
+// Re-exports — Wave J: UBitField (alloc-gated)
+// ---------------------------------------------------------------------------
+#[cfg(feature = "alloc")]
+pub use ubit_field::{UBitField, UBitPlaneRole, UBIT_FIELD_PLANE_COUNT, UBIT_FIELD_BYTES};
+pub use ubit_field::{
+    ROLE_LAW, ROLE_CAPABILITY, ROLE_EXPECTED, ROLE_REWARD_GOOD, ROLE_REWARD_BAD,
+    ROLE_POLICY, ROLE_VALUE, ROLE_DRIFT, ROLE_PROJECTION_0, ROLE_SCENARIO_0,
+    ROLE_CHECKPOINT_0, ROLE_CUSTOM_0,
+};

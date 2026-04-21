@@ -8,7 +8,6 @@
 /// Postcondition: { result is a valid RlState container }
 /// Hoare-logic Verification Line 10: Structural integrity is maintained via repr(C).
 /// Hoare-logic Verification Line 11: Zero-cost abstraction ensures no branching.
-
 /// RL State (136 bits).
 /// 
 /// Follows the "Contract with Teeth": Oracle, Boundaries, 3 Mutants.

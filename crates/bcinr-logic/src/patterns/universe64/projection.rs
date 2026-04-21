@@ -123,6 +123,9 @@ impl ProjectionRegistry {
     }
 
     pub const fn len(&self) -> usize { self.count as usize }
+
+    /// Returns true if no projections have been registered.
+    pub const fn is_empty(&self) -> bool { self.count == 0 }
 }
 
 impl Default for ProjectionRegistry {

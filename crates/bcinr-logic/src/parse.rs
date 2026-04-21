@@ -23,9 +23,9 @@ pub fn parse_hex_u32(bytes: &[u8]) -> Result<u32, ()> {
     let mut err = (len == 0 || len > 8) as u32;
     (0..8).for_each(|i| {
         let b = bytes.get(i).copied().unwrap_or(0) & 0u8.wrapping_sub((i < len) as u8);
-        let is_digit = (b >= b'0' && b <= b'9') as u32;
-        let is_upper = (b >= b'A' && b <= b'F') as u32;
-        let is_lower = (b >= b'a' && b <= b'f') as u32;
+        let is_digit = b.is_ascii_digit() as u32;
+        let is_upper = (b'A'..=b'F').contains(&b) as u32;
+        let is_lower = (b'a'..=b'f').contains(&b) as u32;
         let val = (is_digit * (b.wrapping_sub(b'0') as u32)) |
                   (is_upper * (b.wrapping_sub(b'A').wrapping_add(10) as u32)) |
                   (is_lower * (b.wrapping_sub(b'a').wrapping_add(10) as u32));

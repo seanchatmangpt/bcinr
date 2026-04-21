@@ -21,14 +21,12 @@
 ///
 /// # Admissibility
 /// Admissible_T1: YES. Fixed-shape loo-p and branchless core ensure T_f <= 200ns.
-
 use crate::scan::{find_byte_mask};
 use crate::algorithms::bloom_filter_query_u64::bloom_filter_query_u64;
 
 /// # AXIOMATIC PROOF: Hoare-logic Analysis
 /// Precondition: { input ∈ Validbloom_scan }
 /// Postcondition: { result = bloom_scan_reference(input) }
-
 pub struct BloomScanPipeline {
     pub bloom_key: u64,
 }

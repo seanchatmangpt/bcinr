@@ -27,6 +27,12 @@ pub struct HazardShield<const MAX_THREADS: usize> {
     pub hazards: [AtomicUsize; MAX_THREADS],
 }
 
+impl<const MAX_THREADS: usize> Default for HazardShield<MAX_THREADS> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const MAX_THREADS: usize> HazardShield<MAX_THREADS> {
     pub fn new() -> Self {
         Self {

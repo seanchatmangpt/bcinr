@@ -27,6 +27,12 @@ pub struct BitonicPriorityQueue8 {
     pub data: [u32; 8],
 }
 
+impl Default for BitonicPriorityQueue8 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BitonicPriorityQueue8 {
     pub const fn new() -> Self {
         Self { data: [u32::MAX; 8] }

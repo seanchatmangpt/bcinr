@@ -26,6 +26,16 @@ where
     pub state: RlState,
 }
 
+impl<K, V, const N: usize> Default for AutonomicSubstrate<K, V, N>
+where
+    K: Copy + Default + PartialEq,
+    V: Copy + Default,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<K, V, const N: usize> AutonomicSubstrate<K, V, N>
 where
     K: Copy + Default + PartialEq,

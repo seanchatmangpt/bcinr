@@ -15,6 +15,12 @@ pub struct SpscRingState {
     pub mask: u32,
 }
 
+impl Default for SpscRingState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SpscRingState {
     /// Creates a new ring state with capacity 16 (mask 15).
     pub const fn new() -> Self {

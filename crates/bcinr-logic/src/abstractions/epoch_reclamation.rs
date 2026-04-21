@@ -13,6 +13,12 @@ pub struct EpochState {
     pub epoch: u32,
 }
 
+impl Default for EpochState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EpochState {
     pub const fn new() -> Self {
         Self { epoch: 0 }

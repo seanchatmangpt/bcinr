@@ -28,6 +28,12 @@ pub struct RadixTrieNode<const N: usize> {
     pub children: [u32; N],
 }
 
+impl<const N: usize> Default for RadixTrieNode<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const N: usize> RadixTrieNode<N> {
     pub const fn new() -> Self {
         Self {

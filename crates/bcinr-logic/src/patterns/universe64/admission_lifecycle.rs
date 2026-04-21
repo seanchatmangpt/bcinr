@@ -120,6 +120,10 @@ impl MaskBank {
     /// Number of admitted masks.
     #[inline(always)]
     pub const fn len(&self) -> usize { self.count as usize }
+
+    /// Returns true if no masks have been admitted.
+    #[inline(always)]
+    pub const fn is_empty(&self) -> bool { self.count == 0 }
 }
 
 impl Default for MaskBank {
@@ -221,6 +225,10 @@ impl TransitionRegistry {
 
     #[inline(always)]
     pub const fn len(&self) -> usize { self.count as usize }
+
+    /// Returns true if no transitions have been admitted.
+    #[inline(always)]
+    pub const fn is_empty(&self) -> bool { self.count == 0 }
 }
 
 impl Default for TransitionRegistry {

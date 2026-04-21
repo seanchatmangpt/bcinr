@@ -17,6 +17,12 @@ pub struct LockFreeSlab<const N: usize> {
     pub next_indices: [u32; N],
 }
 
+impl<const N: usize> Default for LockFreeSlab<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const N: usize> LockFreeSlab<N> {
     pub const fn new() -> Self {
         Self {

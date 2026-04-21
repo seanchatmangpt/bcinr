@@ -18,14 +18,18 @@
 ///
 /// # Admissibility
 /// Admissible_T1: YES. Extreme performance headroom for substrate witnessing.
-
 /// # AXIOMATIC PROOF: Hoare-logic Analysis
 /// Precondition: { input ∈ Validintegrity_receipt }
 /// Postcondition: { result = integrity_receipt_reference(input) }
-
 pub struct DeterministicSubstrateReceipt {
     pub current_hash: u64,
     pub steps: u64,
+}
+
+impl Default for DeterministicSubstrateReceipt {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DeterministicSubstrateReceipt {

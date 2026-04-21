@@ -52,8 +52,8 @@ impl ConformanceKernel {
     /// Call once at boot; use `update_delta` thereafter.
     pub fn initialize(block: &UniverseBlock, law: &[u64; UNIVERSE_WORDS]) -> ConformanceState {
         let mut total = 0u32;
-        for i in 0..UNIVERSE_WORDS {
-            total = total.wrapping_add(word_violation(block.state[i], law[i]).count_ones());
+        for (i, &law_word) in law.iter().enumerate() {
+            total = total.wrapping_add(word_violation(block.state[i], law_word).count_ones());
         }
         ConformanceState { violation_bits: total, sequence: 0 }
     }
@@ -92,8 +92,8 @@ impl ConformanceKernel {
     /// Full recompute (expensive; use only for verification/boot).
     pub fn recompute(block: &UniverseBlock, law: &[u64; UNIVERSE_WORDS]) -> u32 {
         let mut total = 0u32;
-        for i in 0..UNIVERSE_WORDS {
-            total = total.wrapping_add(word_violation(block.state[i], law[i]).count_ones());
+        for (i, &law_word) in law.iter().enumerate() {
+            total = total.wrapping_add(word_violation(block.state[i], law_word).count_ones());
         }
         total
     }

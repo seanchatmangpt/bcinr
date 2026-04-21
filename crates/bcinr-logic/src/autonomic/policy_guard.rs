@@ -7,7 +7,6 @@
 /// Postcondition: { result ∈ { 0, !0 } }
 /// Hoare-logic Verification Line 10: Mathematical induction proves branchless masks.
 /// Hoare-logic Verification Line 11: Zero-cost abstraction ensures no branching.
-
 /// Primitive entry point for auditor compatibility.
 #[inline(always)]
 pub fn policy_guard_mask_gt(val: u64, threshold: u64) -> u64 {

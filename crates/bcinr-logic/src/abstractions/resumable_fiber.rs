@@ -13,6 +13,12 @@ pub struct FiberState {
     pub state: u32,
 }
 
+impl Default for FiberState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FiberState {
     pub const fn new() -> Self {
         Self { state: 0 }

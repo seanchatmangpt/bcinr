@@ -28,6 +28,12 @@ pub struct TimeWheel<const N: usize> {
     pub mask: usize,
 }
 
+impl<const N: usize> Default for TimeWheel<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const N: usize> TimeWheel<N> {
     pub const fn new() -> Self {
         // N must be power of two

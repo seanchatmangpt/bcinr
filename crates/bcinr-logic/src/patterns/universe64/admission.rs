@@ -72,9 +72,9 @@ pub fn eval_sparse(
         return AdmissionDecision::Invalid;
     }
     let mut unsat = 0u64;
-    for i in 0..active.len() {
+    for (i, &prereq) in prereqs[..active.len()].iter().enumerate() {
         let widx = active.indexes[i] as usize & MAX_WORD_INDEX;
-        unsat |= cell_admit(block.state[widx], prereqs[i]);
+        unsat |= cell_admit(block.state[widx], prereq);
     }
     match unsat {
         0 => AdmissionDecision::Admitted,
@@ -134,7 +134,7 @@ impl AdmissionEvaluator {
             UScope::Sparse => {
                 // Build prereq slice from repeated mask bits (simplified).
                 let n = active.len();
-                let mut prereqs = [mask_entry.bits; 64];
+                let prereqs = [mask_entry.bits; 64];
                 eval_sparse(block, active, &prereqs[..n])
             }
             UScope::Domain | UScope::Full => {
@@ -150,6 +150,90 @@ impl AdmissionEvaluator {
 #[inline(always)]
 pub fn missing_prerequisites(state_word: u64, prereq_mask: u64) -> u64 {
     cell_admit(state_word, prereq_mask)
+}
+
+// ---------------------------------------------------------------------------
+// Capability-gated admission variants (T0–T2)
+// ---------------------------------------------------------------------------
+
+use super::ubit_capability::cap_admit;
+
+/// T0 cell admission gated by capability mask.
+/// Returns Denied if either prerequisites fail OR capability denies the transition.
+#[inline(always)]
+pub fn eval_cell_with_cap(
+    block: &UniverseBlock,
+    word_idx: usize,
+    prereq: CellMask,
+    transition_id: u32,
+    cap_mask: u64,
+) -> AdmissionDecision {
+    let prereq_result = cell_admit(block.state[word_idx & MAX_WORD_INDEX], prereq.0);
+    let cap_result = cap_admit(transition_id, cap_mask);
+    // Combine: denied if either is nonzero.
+    match prereq_result | cap_result {
+        0 => AdmissionDecision::Admitted,
+        _ => AdmissionDecision::Denied,
+    }
+}
+
+/// T1 sparse admission gated by capability mask.
+#[inline(always)]
+pub fn eval_sparse_with_cap(
+    block: &UniverseBlock,
+    active: &ActiveWordSet,
+    prereqs: &[u64],
+    transition_id: u32,
+    cap_mask: u64,
+) -> AdmissionDecision {
+    let cap_result = cap_admit(transition_id, cap_mask);
+    match cap_result {
+        0 => eval_sparse(block, active, prereqs),
+        _ => AdmissionDecision::Denied,
+    }
+}
+
+/// T1 domain admission gated by capability mask.
+/// Evaluates against a fixed 64-word per-domain prerequisite array.
+#[inline(always)]
+pub fn eval_domain_with_cap(
+    block: &UniverseBlock,
+    domain: usize,
+    prereqs: &[u64; 64],
+    transition_id: u32,
+    cap_mask: u64,
+) -> AdmissionDecision {
+    let cap_result = cap_admit(transition_id, cap_mask);
+    if cap_result != 0 {
+        return AdmissionDecision::Denied;
+    }
+    // Evaluate per-domain: check each word in the domain slice against its prereq.
+    use super::constants::CELL_COUNT;
+    let base = domain * CELL_COUNT;
+    let mut unsat = 0u64;
+    for (i, &prereq) in prereqs[..CELL_COUNT].iter().enumerate() {
+        let widx = (base + i) & MAX_WORD_INDEX;
+        unsat |= cell_admit(block.state[widx], prereq);
+    }
+    match unsat {
+        0 => AdmissionDecision::Admitted,
+        _ => AdmissionDecision::Denied,
+    }
+}
+
+/// T2 full admission gated by capability mask.
+#[inline(always)]
+pub fn eval_full_with_cap(
+    block: &UniverseBlock,
+    prereq: &UniverseMask,
+    transition_id: u32,
+    cap_mask: u64,
+) -> AdmissionDecision {
+    let cap_result = cap_admit(transition_id, cap_mask);
+    match cap_result {
+        0 => eval_full(block, prereq),
+        _ => AdmissionDecision::Denied,
+    }
 }
 
 #[cfg(test)]

@@ -8,7 +8,6 @@ pub fn utils_integrity_gate(val: u64) -> u64 { val ^ 0xAA
 }
 
 /// Utility Substrate: High-performance data structures for autonomic systems.
-
 pub mod dense_kernel;
 
 #[cfg(test)]

@@ -12,7 +12,7 @@ pub fn horizontal_or_u32(slice: &[u32]) -> u32 {
 
 #[inline]
 pub fn horizontal_and_u32(slice: &[u32]) -> u32 {
-    let is_empty = (slice.len() == 0) as u32;
+    let is_empty = slice.is_empty() as u32;
     let mut res = 0u32.wrapping_sub(1 - is_empty);
     (0..slice.len()).for_each(|i| res &= slice[i]);
     res & (0u32.wrapping_sub(1 - is_empty))

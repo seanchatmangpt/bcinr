@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [26.4.22] - 2026-04-21
+
+> **UniverseOS UBit Completion: authority · persistence · dispatch · supervision · context**
+
+### Added
+- **UBitCapability** — bounded authority tokens for the U_{1,262144} substrate. `cap_admit(transition_id, cap_mask)` uses same admission polarity as `cell_admit` (0 = admitted, nonzero = denied). `UBitCapabilityTable` holds up to 64 capabilities.
+- **UBitImage** — first-class snapshot/restore/fork of the active U_{1,262144} universe. Branchless checkpoint/restore/fork on `UniverseExecutor`. Size-asserted ≤ 33 KiB.
+- **UBitScopePlanner** — branchless kernel dispatcher: Cell (1 word / T0), Sparse (2–16 / T1), Domain (17–64 / T1), Full (65+ / T2). Full is always T2 — never T1.
+- **UBitSupervisor** — self-healing kernel. Observes `UDelta` emissions, detects repeated family failures / drift spikes / denial storms, emits `UInstruction::Recovery` (kind = 9) as lawful motion. 16-slot fixed-capacity ring, no heap.
+- **UBitField** (`feature = "alloc"`) — the U_{1,16777216} / 2 MiB L2 operating field: 64 aligned U_{1,262144} planes. Plane roles: law (0), capability (1), expected (2), reward_good (3), reward_bad (4), policy (5), value (6), drift (7), projections (8–15), scenarios (16–31), checkpoints (48–55), custom (56–63).
+- **Capability-gated admission variants**: `eval_cell_with_cap`, `eval_sparse_with_cap`, `eval_domain_with_cap`, `eval_full_with_cap`.
+- **`UInstruction::Recovery`** (`UInstrKind::Recovery = 9`) — supervisor-emitted recovery instruction, does not propose state motion.
+- **`UniverseExecutor` OS integration**: `execute_one_authorized`, `checkpoint`, `restore`, `fork`, `boot_with_registry`, `drain_recovery`.
+- **OS-completion smoke test**: `universe_os_completes_authority_image_planner_supervisor_field` — proves the full `UInstruction → UBitScopePlanner → UBitCapability → transition → UDelta → receipt → UBitSupervisor → UBitImage fork/restore` loop.
+
+### Changed
+- Bumped `bcinr`, `bcinr-core`, `bcinr-logic`, `bcinr-api`, `bcinr-bench` to `26.4.22`.
+
+### Notes
+- **Naming constitution**: `UBit` prefix for all new public runtime types. Formal docs use $U_{1,n}$ notation. Existing committed names (`UniverseBlock`, `UniverseExecutor`, `UniverseScratch`, `UCoord`, `UDelta`, `UInstruction`, `TransitionReceipt`, `ActiveWordSet`, `DeltaTape`, `TransitionRegistry`) are unchanged.
+- **OS seam complete**: authority (UBitCapability) + persistence (UBitImage) + dispatch (UBitScopePlanner) + supervision (UBitSupervisor) + context (UBitField).
+
 ## [26.4.21] - 2026-04-21
 
 > **Bits, not bytes. Truth, not data. One atom, `n` lawful worlds.**

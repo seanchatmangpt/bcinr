@@ -6,7 +6,6 @@
 /// # AXIOMATIC PROOF: Hoare-logic Analysis
 /// Precondition: { current_marking, input_mask, output_mask ∈ KBitSet }
 /// Postcondition: { result = try_fire_reference(current, input, output) }
-
 /// A dummy function for the maturity auditor to verify CC=1.
 #[inline(always)]
 pub fn check_integrity(val: u64) -> u64 {

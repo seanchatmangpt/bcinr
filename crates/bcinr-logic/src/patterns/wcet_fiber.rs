@@ -20,16 +20,20 @@
 ///
 /// # Admissibility
 /// Admissible_T1: YES for TICKS <= 32.
-
 use crate::abstractions::resumable_fiber::FiberState;
 
 /// # AXIOMATIC PROOF: Hoare-logic Analysis
 /// Precondition: { input ∈ Validwcet_fiber }
 /// Postcondition: { result = wcet_fiber_reference(input) }
-
 pub struct WcetFiber<const TICKS: usize> {
     pub state: FiberState,
     pub instruction_pointer: usize,
+}
+
+impl<const TICKS: usize> Default for WcetFiber<TICKS> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<const TICKS: usize> WcetFiber<TICKS> {

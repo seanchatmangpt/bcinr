@@ -16,7 +16,6 @@
 //! Admissible_T1: YES. SWAR-based parallel scanning replaces linear search.
 //! CC=1: Absolute branchless logic.
 
-use crate::mask::eq_mask_u32;
 
 /// Integrity gate for SwarQuotient
 pub fn swar_quotient_phd_gate(val: u64) -> u64 {
@@ -26,6 +25,12 @@ pub fn swar_quotient_phd_gate(val: u64) -> u64 {
 pub struct SwarQuotientFilter<const N: usize> {
     /// Each u64 packs 8x 8-bit fingerprints.
     pub table: [u64; N],
+}
+
+impl<const N: usize> Default for SwarQuotientFilter<N> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<const N: usize> SwarQuotientFilter<N> {
@@ -41,8 +46,7 @@ impl<const N: usize> SwarQuotientFilter<N> {
         let tag_v = (tag as u64) * 0x0101010101010101u64;
         // Match lanes
         let diff = word ^ tag_v;
-        let matched = (diff.wrapping_sub(0x0101010101010101u64) & !diff & 0x8080808080808080u64) != 0;
-        matched
+        (diff.wrapping_sub(0x0101010101010101u64) & !diff & 0x8080808080808080u64) != 0
     }
 
     /// Inserts an 8-bit tag into the first empty slot at `idx` branchlessly.
@@ -51,7 +55,7 @@ impl<const N: usize> SwarQuotientFilter<N> {
         let mut word = self.table[idx & (N - 1)];
         
         // Find empty slots (tag == 0)
-        let diff = word ^ 0;
+        let diff = word;
         let empty_mask = diff.wrapping_sub(0x0101010101010101u64) & !diff & 0x8080808080808080u64;
         
         let has_space = empty_mask != 0;

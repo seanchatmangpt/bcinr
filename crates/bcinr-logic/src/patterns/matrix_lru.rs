@@ -27,6 +27,12 @@ pub struct MatrixLru<const N: usize> {
     pub matrix: [u64; N],
 }
 
+impl<const N: usize> Default for MatrixLru<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const N: usize> MatrixLru<N> {
     pub const fn new() -> Self {
         Self { matrix: [0u64; N] }
@@ -41,7 +47,7 @@ impl<const N: usize> MatrixLru<N> {
         let mask = 0u64.wrapping_sub(in_bounds);
         
         // Row[i] = all 1s (masked)
-        self.matrix[i & (N - 1)] = !0u64 & mask;
+        self.matrix[i & (N - 1)] = mask;
         
         // Col[i] = all 0s
         let col_mask = !(1u64 << bit_idx);

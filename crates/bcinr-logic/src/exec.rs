@@ -11,12 +11,11 @@ pub fn exec_phd_gate(val: u64) -> u64 {
 
 //  Execution Substrate: Staged plans, cells, and resumable stream states.
 
-#[allow(dead_code)]
-
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
 /// A trait for kernels that can be executed as a staged pipeline stage.
+#[allow(dead_code)]
 pub(crate) trait PipelineStage {
     /// Input type for the stage.
     type Input;
@@ -30,6 +29,7 @@ pub(crate) trait PipelineStage {
 }
 
 /// A resumable cell for streaming data processing.
+#[allow(dead_code)]
 pub(crate) struct ExecutionCell<S: PipelineStage> {
     /// The pipeline stage.
     pub stage: S,
@@ -37,6 +37,7 @@ pub(crate) struct ExecutionCell<S: PipelineStage> {
     pub state: S::State,
 }
 
+#[allow(dead_code)]
 impl<S: PipelineStage> ExecutionCell<S> {
     /// Creates a new execution cell with the given stage and state.
     pub fn new(stage: S, state: S::State) -> Self {
@@ -50,6 +51,7 @@ impl<S: PipelineStage> ExecutionCell<S> {
 }
 
 /// A simple execution plan for an edge confidence kernel.
+#[allow(dead_code)]
 pub(crate) struct EdgeConfidencePlan {
     /// The number of activities in the system.
     pub activity_count: usize,

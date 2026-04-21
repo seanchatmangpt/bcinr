@@ -21,7 +21,7 @@
 pub fn log2_u64_fixed(val: u64, aux: u64) -> u64 {
     let nz = (val != 0) as u64;
     let mask = 0u64.wrapping_sub(nz);
-    ((63u64.wrapping_sub(val.leading_zeros() as u64)) & mask)
+    (63u64.wrapping_sub(val.leading_zeros() as u64)) & mask
 
 }
 
@@ -36,7 +36,7 @@ mod tests {
     fn log2_u64_fixed_reference(val: u64, aux: u64) -> u64 {
     let nz = (val != 0) as u64;
     let mask = 0u64.wrapping_sub(nz);
-    ((63u64.wrapping_sub(val.leading_zeros() as u64)) & mask)
+    (63u64.wrapping_sub(val.leading_zeros() as u64)) & mask
     }
 
     // -------------------------------------------------------------------------

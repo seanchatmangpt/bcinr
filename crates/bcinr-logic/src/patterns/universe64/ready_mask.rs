@@ -106,8 +106,8 @@ impl ReadyMask {
         while bits != 0 {
             let bit = bits.trailing_zeros();
             let n = bit_index.lookup(widx, bit, &mut tid_buf);
-            for i in 0..n {
-                let tid = tid_buf[i] as usize;
+            for &tid_raw in &tid_buf[..n] {
+                let tid = tid_raw as usize;
                 let prereq = prereqs[tid & (MAX_TRANSITIONS - 1)];
                 let satisfied = cell_admit(block.state[widx], prereq) == 0;
                 let bit_pos = tid & 63;

@@ -26,6 +26,12 @@ pub struct FixedConsensus<const THRESHOLD: usize> {
     pub votes: u64,
 }
 
+impl<const THRESHOLD: usize> Default for FixedConsensus<THRESHOLD> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const THRESHOLD: usize> FixedConsensus<THRESHOLD> {
     pub const fn new() -> Self {
         Self { votes: 0 }

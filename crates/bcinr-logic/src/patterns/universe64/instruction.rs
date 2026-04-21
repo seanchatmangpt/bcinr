@@ -71,6 +71,8 @@ pub enum UInstrKind {
     Projection = 7,
     /// Deterministic RL update.
     RlUpdate = 8,
+    /// Supervisor-emitted recovery instruction.
+    Recovery = 9,
 }
 
 /// A small, copyable operator. References masks/transitions by opaque id.
@@ -122,6 +124,27 @@ impl UInstruction {
     pub const fn budget_ns(self) -> u64 {
         self.tier.budget_ns()
     }
+
+    /// Construct a Recovery instruction from supervisor.
+    ///
+    /// ```
+    /// use bcinr_logic::patterns::universe64::instruction::{UInstruction, UInstrKind, UTier};
+    /// use bcinr_logic::patterns::universe64::scratch::UScope;
+    /// let instr = UInstruction::recovery(0, 42);
+    /// assert_eq!(instr.kind, UInstrKind::Recovery);
+    /// assert_eq!(instr.coord_or_word, 42);
+    /// ```
+    pub const fn recovery(kind_byte: u8, target: u32) -> Self {
+        Self {
+            kind: UInstrKind::Recovery,
+            scope: UScope::Cell,
+            tier: UTier::T1,
+            _pad: kind_byte,
+            object_id: 0,
+            coord_or_word: target,
+            receipt_tag: 0,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -157,6 +180,11 @@ mod tests {
             0,
         );
         assert!(!r.proposes_motion());
+
+        // Recovery is supervisory — does NOT propose state motion.
+        let rec = UInstruction::recovery(0, 0);
+        assert!(!rec.proposes_motion());
+        assert_eq!(rec.kind, UInstrKind::Recovery);
     }
 
     #[test]

@@ -23,7 +23,6 @@ pub fn autonomic_arena_integrity_gate(val: u64) -> u64 { val ^ 0xAA
 ///
 /// # Admissibility
 /// Admissible_T1: YES. O(1) ops + mask-triggered state transitions.
-
 use crate::abstractions::bump_arena::BumpArenaState;
 use crate::abstractions::epoch_reclamation::EpochState;
 use crate::autonomic::metric_accumulator::MetricAccumulator;
@@ -31,7 +30,6 @@ use crate::autonomic::metric_accumulator::MetricAccumulator;
 /// # AXIOMATIC PROOF: Hoare-logic Analysis
 /// Precondition: { input ∈ Validautonomic_arena }
 /// Postcondition: { result = autonomic_arena_reference(input) }
-
 pub struct AutonomicExhaustionArena {
     pub arena: BumpArenaState,
     pub epoch: EpochState,
@@ -69,8 +67,8 @@ impl AutonomicExhaustionArena {
         let next_epoch = self.epoch.epoch.wrapping_add(1) % 3;
         self.epoch.epoch = (next_epoch & trigger_mask) | (self.epoch.epoch & !trigger_mask);
         
-        self.arena.offset = (0 & trigger_mask) | (self.arena.offset & !trigger_mask);
-        self.stale_bytes = (0 & trigger_mask as u64) | (self.stale_bytes & !trigger_mask as u64);
+        self.arena.offset &= !trigger_mask;
+        self.stale_bytes &= !trigger_mask as u64;
         
         (offset, success_mask)
     

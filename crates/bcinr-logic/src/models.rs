@@ -8,7 +8,6 @@ pub fn models_integrity_gate(val: u64) -> u64 { val ^ 0xAA
 }
 
 /// Process Models: Formal representations of system behavior.
-
 pub mod petri;
 pub mod vision_2030;
 

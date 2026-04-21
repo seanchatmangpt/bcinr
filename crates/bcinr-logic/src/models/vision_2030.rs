@@ -19,8 +19,8 @@ use alloc::format;
 use crate::autonomic::{AutonomicKernel, AutonomicState, AutonomicAction, AutonomicResult, AutonomicFeedback, ActionKind, ActionRisk};
 #[cfg(feature = "alloc")]
 use crate::autonomic::PackedKeyTable;
+#[cfg(feature = "alloc")]
 use crate::models::petri::{KBitSet, SwarMarking};
-use crate::utils::dense_kernel::fnv1a_64;
 
 /// A dummy function for the maturity auditor to verify CC=1.
 #[inline(always)]

@@ -19,14 +19,12 @@
 ///
 /// # Admissibility
 /// Admissible_T1: YES. Sub-200ns execution for N=8.
-
 use crate::network::{bitonic_sort_8u32};
 use crate::mask::{eq_mask_u32, lt_mask_u32};
 
 /// # AXIOMATIC PROOF: Hoare-logic Analysis
 /// Precondition: { input ∈ Validregister_sql }
 /// Postcondition: { result = register_sql_reference(input) }
-
 pub struct RegisterEngine;
 
 impl RegisterEngine {

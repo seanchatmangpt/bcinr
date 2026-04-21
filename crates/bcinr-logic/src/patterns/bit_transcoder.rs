@@ -18,14 +18,12 @@
 ///
 /// # Admissibility
 /// Admissible_T1: YES. Pure bitwise polynomial.
-
 use crate::algorithms::parallel_bits_extract_u64::parallel_bits_extract_u64;
 use crate::algorithms::parallel_bits_deposit_u64::parallel_bits_deposit_u64;
 
 /// # AXIOMATIC PROOF: Hoare-logic Analysis
 /// Precondition: { input ∈ Validbit_transcoder }
 /// Postcondition: { result = bit_transcoder_reference(input) }
-
 pub struct BitTranscoder {
     pub extract_mask: u64,
     pub deposit_mask: u64,
