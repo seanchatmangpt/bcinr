@@ -27,8 +27,8 @@ Welcome to the comprehensive documentation suite for the bcinr library. This ind
 - [How-To 10: Optimizing 10](how-to/guide-10.md)
 
 ## Explanations: Deep-Dive Theory
-- [Theory 1: Deep-dive 1](explanation/theory-1.md)
-- [Theory 2: Deep-dive 2](explanation/theory-2.md)
+- [UniverseOS Vision 2030](explanation/universeOS_vision_2030.md)
+- [Rust as a Syntactic Metalanguage](explanation/rust-substrate-mapping.md)
 - [Theory 3: Deep-dive 3](explanation/theory-3.md)
 - [Theory 4: Deep-dive 4](explanation/theory-4.md)
 - [Theory 5: Deep-dive 5](explanation/theory-5.md)
