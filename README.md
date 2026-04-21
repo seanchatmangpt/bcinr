@@ -1,184 +1,92 @@
-# unibit POC
+# bcinr — BranchlessCInRust (v26.4.21)
 
-`unibit` is a private Rust proof-of-concept for a pinned, bit-native execution substrate.
-
-The POC has one job:
-
-> Prove that a nightly Rust program can allocate, pin, validate, lock, and execute over a fixed L1 region while preserving a strict hot-path contract.
-
-No ontology generation yet.  
-No public API polish yet.  
-No process intelligence yet.  
-No `unios` yet.  
-No `dteam` yet.
-
-First: build the machine-shaped fact.
+> **NOTICE: Final `bcinr` Release and Transition to `unibit`**
+>
+> `bcinr` v26.4.21 is the final release of this deterministic process-discovery engine architecture. The project has successfully proven the $CC=1$ Radon Law, the Zero-Allocation Boundary, and the K-Tier timing constitution ($T_1 \le 200 \text{ns}$).
+>
+> We are now transitioning this physics engine into a full bit-native operating substrate called **`unibit`**. 
+>
+> For details on the transition, the future of the `dteam` architecture, and what `unibit` entails, please see:
+> [**bcinr to unibit: The Final Transition**](docs/bcinr/FINAL.md)
 
 ---
 
-## Status
+`bcinr` is a performance-first, research-grade systems library providing a principled calculus for branchless algorithmics. It is designed for high-performance, deterministic autonomic systems where predictable latency, memory-safety, and side-channel resilience are non-negotiable.
 
-Current phase:
+## Key Features
 
-```text
-Phase 0: nightly smoke
+-   **Deterministic Latency:** All primitives are branchless ($O(1)$ constant time), eliminating pipeline stalls and side-channel timing risks.
+-   **$\mathcal{B}$-Calculus Formalism:** Each primitive is mapped within a formal framework ensuring invariant-preserving state transitions.
+-   **Hardware-Agnostic SIMD:** High-performance implementations for SSE4.2 with verified portable fallbacks for ARM Neon and WebAssembly.
+-   **Zero-Dependency Core:** The logic layer is strictly `no_std` and has zero external dependencies for maximum supply-chain security.
+-   **Adversarial Hardening:** Panic-free memory arenas and `Result`-based contracts for numerical stability.
+-   **Universe1_n — Bit-Native Substrate:** `U_{1,n} = 𝔹ⁿ`. One Boolean truth atom × `n`. The atomic unit is a bit, not a byte. Bytes are a consequence (`n/8`), not a primitive.
 
-Target green bar:
+## Universe1_n Substrate
 
-nightly compiles
-generic const arithmetic compiles
-L1 region validates
-truth region position validates
-scratch region position validates
-pinning validates
-OS lock attempt exists
-inline assembly smoke passes
-assembly emission works
-lexicon check passes
+The operating substrate is parametric in `n`. One kernel law, many profiles. `n` is the count of one-bit truth atoms; the byte footprint is always `n/8`.
+
+| Type         | Formal       | Atoms (n)    | Bytes   | Role                                      |
+|--------------|--------------|--------------|---------|-------------------------------------------|
+| `U1_8`       | `U_{1,8}`    | 8            | 1       | Place atom (alias for `u8`)               |
+| `U1_64`      | `U_{1,64}`   | 64           | 8       | Cell — one `u64` register                 |
+| `U1_512`     | `U_{1,512}`  | 512          | 64      | Block — one L1 cache line                 |
+| `U1_4096`    | `U_{1,4096}` | 4096         | 512     | Domain — half of a 4 KiB page             |
+| `UniverseBlock` | `U_{1,64³}` | 262,144   | 32 KiB  | attention × truth field (L1 Data Plane)   |
+| (conceptual) | `U_{1,64⁴}`  | 16,777,216   | 2 MiB   | meaning field (L2 plane stack)            |
+
+**`U1_n` is not a bit-width integer type.** It is a substrate where the atomic unit is one Boolean truth coordinate. `n` is the atom count.
+
+## Installation
+
+Add `bcinr` to your `Cargo.toml`:
+
+```toml
+[dependencies]
+bcinr-core = "26.4.21"
 ```
 
-## Core law
+## Quick Start
 
-The POC is built around one resident L1 pair:
+```rust
+use bcinr_core::api::{select_u32, add_sat_u8, clamp_u32};
 
-```text
-truth  = current operational state
-scratch = bounded motion workspace
+// Branchless selection: mask 0xFFFFFFFF selects first arg, 0x0 selects second
+let val = select_u32(0xFFFFFFFF, 10, 20);
+assert_eq!(val, 10);
+
+// Saturating arithmetic: never overflows
+let sum = add_sat_u8(200, 100);
+assert_eq!(sum, 255);
+
+// Safe clamping: returns Result for contract validation
+let clamped = clamp_u32(150, 0, 100).unwrap();
+assert_eq!(clamped, 100);
 ```
 
-The active truth region is:
+## Documentation (Diátaxis)
 
-```text
-U_{1,262144}
-262,144 bits
-[u64; 4096]
-```
+The documentation is organized to support different stages of integration and research:
 
-The scratch region is the same shape:
+-   **[bcinr to unibit: The Final Transition](docs/bcinr/FINAL.md)**: Details on the successor to `bcinr`.
+-   **[Tutorials](docs/diataxis/tutorials/)**: Walkthroughs for implementing kernels and SIMD vectorization.
+-   **[How-To Guides](docs/diataxis/how-to/)**: Practical solutions for side-channel hardening and WCET bounding.
+-   **[Explanations](docs/diataxis/explanation/)**: Deep-dives into the Branchless Calculus and architectural design.
+-   **[References](docs/diataxis/reference/)**: Full API catalog and technical specifications.
+-   **[Anti-Patterns](docs/diataxis/explanation/anti-patterns.md)**: Critical pitfalls and structural hazards to avoid.
 
-```text
-U_{1,262144}
-262,144 bits
-[u64; 4096]
-```
+[Full Documentation Index](docs/diataxis/INDEX.md)
 
-The contract:
+## Performance & Architecture
 
-```text
-truth stays resident
-motion happens in scratch
-```
+-   **[Benchmark Charter](docs/BENCHMARKS.md)**: Performance, memory, and complexity targets.
+-   **[Architecture Overview](ARCHITECTURE.md)**: Domain taxonomy and design philosophy.
 
-Hot execution receives:
+## Formal Basis
 
-```text
-pinned truth
-pinned scratch
-compiled masks
-raw kernel
-```
+For the formal mathematical proof and civilizational-scale analysis of this library, see the academic thesis:
+[**Formal Verification of Deterministic Substrates: The $\mathcal{B}$-Calculus for Civilizational-Scale Irreversible Systems**](./thesis.pdf).
 
-Hot execution does not receive:
+## License
 
-```text
-planner
-policy engine
-allocator
-parser
-graph walker
-dashboard state
-process model interpreter
-logging framework
-```
-
-## Work and memory
-
-unibit separates kinetic work from resident memory.
-
-```text
-work   = 8^n
-memory = 64^n
-```
-
-Work tiers:
-
-| Tier | Bits | Role | Target |
-|---|---|---|---|
-| `8^1` | 8 | local flag atom | 2 ns |
-| `8^2` | 64 | word atom | 10 ns |
-| `8^3` | 512 | semantic cache line | 100 ns |
-| `8^4` | 4,096 | attention block | 200 ns |
-| `8^5` | 32,768 | active tile | 500 ns |
-
-Memory tiers:
-
-| Tier | Bits | Role |
-|---|---|---|
-| `64^1` | 64 | word memory |
-| `64^2` | 4,096 | attention memory |
-| `64^3` | 262,144 | active universe |
-| `64^4` | 16,777,216 | meaning field |
-
-Rule:
-
-> the planner chooses the smallest `8^n` work tier inside the required `64^n` memory tier
-
-## Lexicon law
-
-Documentation and abstractions must remain bit-native.
-
-Allowed forms:
-
-- `8^n`
-- `64^n`
-- `U_{1,n}`
-- exact bit counts
-
-Examples:
-
-```text
-U_{1,64}
-U_{1,512}
-U_{1,4096}
-U_{1,32768}
-U_{1,262144}
-U_{1,16777216}
-```
-
-The forbidden ordinary storage noun is not allowed anywhere in source, docs, comments, tests, scripts, or generated output.
-
-The lexicon checker fails the build if it appears.
-
-```bash
-node bin/check-lexicon.mjs
-```
-
-This is intentional.
-
-If a code agent writes that word, it has likely left the unibit ontology and started using the wrong abstraction.
-
-## Quickstart
-
-Install nightly:
-
-```bash
-rustup toolchain install nightly
-```
-
-Run the smoke:
-
-```bash
-cargo +nightly run
-```
-
-Expected shape:
-
-```text
-nightly hello world passed
-generic_const_exprs passed
-pinned L1 position validated
-inline asm smoke passed
-base    = 0x...
-truth   = 0x... offset=0
-scratch = 0x... offset=32768
-```
+Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT license](LICENSE-MIT) at your option.
