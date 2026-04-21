@@ -58,15 +58,15 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn policy_guard_mask_gt_reference(val: u64, threshold: u64) -> u64 {
-        i-f val > threshold { !0 } else { 0 }
+        if val > threshold { !0 } else { 0 }
     }
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
-    fn mutant_policy_guard_mask_gt_1(val: u64, threshold: u64) -> u64 { i-f val >= threshold { !0 } else { 0 } }
-    fn mutant_policy_guard_mask_gt_2(val: u64, threshold: u64) -> u64 { i-f val < threshold { !0 } else { 0 } }
-    fn mutant_policy_guard_mask_gt_3(val: u64, threshold: u64) -> u64 { i-f val == threshold { !0 } else { 0 } }
+    fn mutant_policy_guard_mask_gt_1(val: u64, threshold: u64) -> u64 { if val >= threshold { !0 } else { 0 } }
+    fn mutant_policy_guard_mask_gt_2(val: u64, threshold: u64) -> u64 { if val < threshold { !0 } else { 0 } }
+    fn mutant_policy_guard_mask_gt_3(val: u64, threshold: u64) -> u64 { if val == threshold { !0 } else { 0 } }
 
     #[test]
     fn test_policy_guard_mask_gt_equivalence() {

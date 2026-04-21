@@ -1,4 +1,4 @@
-# bcinr — BranchlessCInRust (v26.4.17)
+# bcinr — BranchlessCInRust (v26.4.21)
 
 `bcinr` is a performance-first, research-grade systems library providing a principled calculus for branchless algorithmics. It is designed for high-performance, deterministic autonomic systems where predictable latency, memory-safety, and side-channel resilience are non-negotiable.
 
@@ -9,6 +9,22 @@
 -   **Hardware-Agnostic SIMD:** High-performance implementations for SSE4.2 with verified portable fallbacks for ARM Neon and WebAssembly.
 -   **Zero-Dependency Core:** The logic layer is strictly `no_std` and has zero external dependencies for maximum supply-chain security.
 -   **Adversarial Hardening:** Panic-free memory arenas and `Result`-based contracts for numerical stability.
+-   **Universe1_n — Bit-Native Substrate:** `U_{1,n} = 𝔹ⁿ`. One Boolean truth atom × `n`. The atomic unit is a bit, not a byte. Bytes are a consequence (`n/8`), not a primitive.
+
+## Universe1_n Substrate
+
+The operating substrate is parametric in `n`. One kernel law, many profiles. `n` is the count of one-bit truth atoms; the byte footprint is always `n/8`.
+
+| Type         | Formal       | Atoms (n)    | Bytes   | Role                                      |
+|--------------|--------------|--------------|---------|-------------------------------------------|
+| `U1_8`       | `U_{1,8}`    | 8            | 1       | Place atom (alias for `u8`)               |
+| `U1_64`      | `U_{1,64}`   | 64           | 8       | Cell — one `u64` register                 |
+| `U1_512`     | `U_{1,512}`  | 512          | 64      | Block — one L1 cache line                 |
+| `U1_4096`    | `U_{1,4096}` | 4096         | 512     | Domain — half of a 4 KiB page             |
+| `UniverseBlock` | `U_{1,64³}` | 262,144   | 32 KiB  | attention × truth field (L1 Data Plane)   |
+| (conceptual) | `U_{1,64⁴}`  | 16,777,216   | 2 MiB   | meaning field (L2 plane stack)            |
+
+**`U1_n` is not a bit-width integer type.** It is a substrate where the atomic unit is one Boolean truth coordinate. `n` is the atom count.
 
 ## Installation
 
@@ -16,7 +32,7 @@ Add `bcinr` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-bcinr-core = "26.4.17"
+bcinr-core = "26.4.21"
 ```
 
 ## Quick Start

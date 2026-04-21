@@ -17,9 +17,9 @@ use alloc::format;
 
 #[cfg(feature = "alloc")]
 use crate::autonomic::{AutonomicKernel, AutonomicState, AutonomicAction, AutonomicResult, AutonomicFeedback, ActionKind, ActionRisk};
-use crate::models::petri::{KBitSet, SwarMarking};
 #[cfg(feature = "alloc")]
 use crate::autonomic::PackedKeyTable;
+use crate::models::petri::{KBitSet, SwarMarking};
 use crate::utils::dense_kernel::fnv1a_64;
 
 /// A dummy function for the maturity auditor to verify CC=1.
@@ -91,7 +91,7 @@ impl<const WORDS: usize> AutonomicKernel for Vision2030Engine<WORDS> {
             self.transition_outputs[act_idx & (mask as usize)]
         );
         self.marking.current.words[0] = (new_marking.current.words[0] & mask) | (self.marking.current.words[0] & !mask);
-        let fired_val = (fired && valid_idx != 0) as f32;
+        let fired_val = (fired && valid_idx != 0) as u32 as f32;
         self.state.integrity -= (1.0 - fired_val) * 0.1;
         self.state.drift_detected = (fired_val == 0.0 && valid_idx != 0);
         self.state.throughput += valid_idx as f32;
@@ -103,7 +103,7 @@ impl<const WORDS: usize> AutonomicKernel for Vision2030Engine<WORDS> {
 
     fn propose(&self, state: &AutonomicState) -> Vec<AutonomicAction> {
         let mut actions = Vec::new();
-        i-f state.drift_detected {
+        if state.drift_detected {
             actions.push(AutonomicAction { id: 1, kind: ActionKind::Repair, risk: ActionRisk::Medium, description: "Repair".to_string() });
         }
         actions
@@ -116,7 +116,7 @@ impl<const WORDS: usize> AutonomicKernel for Vision2030Engine<WORDS> {
     fn execute(&mut self, action: AutonomicAction) -> AutonomicResult {
         let is_repair = (action.kind == ActionKind::Repair) as u64;
         let mask = 0u64.wrapping_sub(is_repair);
-        let mut reset = KBitSet::zero(); reset.set(0);
+        let mut reset = KBitSet::<WORDS>::zero(); reset.set(0);
         self.marking.current.words[0] = (reset.words[0] & mask) | (self.marking.current.words[0] & !mask);
         self.state.drift_detected = (self.state.drift_detected && is_repair == 0);
         self.state.integrity = [self.state.integrity, 1.0][is_repair as usize];

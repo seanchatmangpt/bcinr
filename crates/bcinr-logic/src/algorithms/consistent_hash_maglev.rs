@@ -19,7 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn consistent_hash_maglev(val: u64, aux: u64) -> u64 {
-    ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val.wrapping_mul(aux + 1)) ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+    ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
 
 }
 
@@ -32,7 +32,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn consistent_hash_maglev_reference(val: u64, aux: u64) -> u64 {
-        ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val.wrapping_mul(aux + 1)) ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+        ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
     }
 
     // -------------------------------------------------------------------------
@@ -57,7 +57,7 @@ mod tests {
         fn test_consistent_hash_maglev_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
             let expected = consistent_hash_maglev_reference(val, aux);
             let actual = mutant_consistent_hash_maglev_1(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
             }
         }
@@ -66,7 +66,7 @@ mod tests {
         fn test_consistent_hash_maglev_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
             let expected = consistent_hash_maglev_reference(val, aux);
             let actual = mutant_consistent_hash_maglev_2(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
             }
         }
@@ -75,7 +75,7 @@ mod tests {
         fn test_consistent_hash_maglev_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
             let expected = consistent_hash_maglev_reference(val, aux);
             let actual = mutant_consistent_hash_maglev_3(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 3 failed to fail!");
             }
         }

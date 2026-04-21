@@ -37,37 +37,36 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "bcinr"
-version = "26.4.18"
+version = "26.4.21"
 dependencies = [
- "bcinr-api 26.4.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "bcinr-core 26.4.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "bcinr-logic 26.4.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bcinr-api",
+ "bcinr-core",
+ "bcinr-logic",
 ]
 
 [[package]]
 name = "bcinr-api"
-version = "26.4.17"
+version = "26.4.21"
 dependencies = [
- "bcinr-logic 26.4.17",
-]
-
-[[package]]
-name = "bcinr-api"
-version = "26.4.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2201188bb54101d036e0adc819efff8dd4dc324ba5858541156765e697ab47eb"
-dependencies = [
- "bcinr-logic 26.4.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bcinr-logic",
 ]
 
 [[package]]
 name = "bcinr-bench"
-version = "26.4.17"
+version = "26.4.21"
 dependencies = [
- "bcinr-core 26.4.17",
- "bcinr-logic 26.4.17",
+ "bcinr-core",
+ "bcinr-logic",
  "criterion",
  "prettytable-rs",
+]
+
+[[package]]
+name = "bcinr-bench-auditor"
+version = "0.1.0"
+dependencies = [
+ "syn",
+ "walkdir",
 ]
 
 [[package]]
@@ -81,37 +80,21 @@ dependencies = [
 
 [[package]]
 name = "bcinr-core"
-version = "26.4.17"
+version = "26.4.21"
 dependencies = [
- "bcinr-api 26.4.17",
- "bcinr-logic 26.4.17",
- "criterion",
- "proptest",
-]
-
-[[package]]
-name = "bcinr-core"
-version = "26.4.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3cf60679fd19054b7f9a5f865c55dc1b2ac02382c4b93801ed9ff3e67339816f"
-dependencies = [
- "bcinr-api 26.4.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "bcinr-logic 26.4.17 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "bcinr-logic"
-version = "26.4.17"
-dependencies = [
+ "bcinr-api",
+ "bcinr-logic",
  "criterion",
  "proptest",
 ]
 
 [[package]]
 name = "bcinr-logic"
-version = "26.4.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf27c5561e5eacfe587768169a5e469929034a4088b3a0524ed25d0975e17bc1"
+version = "26.4.21"
+dependencies = [
+ "criterion",
+ "proptest",
+]
 
 [[package]]
 name = "bcinr-reporter"

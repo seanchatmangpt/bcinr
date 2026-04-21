@@ -19,7 +19,21 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn parallel_bits_deposit_u64(val: u64, aux: u64) -> u64 {
-    (val | aux).wrapping_add(!(val & aux) & (val | aux)) ^ (val.wrapping_sub(aux))
+    let mut res = 0u64;
+    let mut v = val;
+    let mut m = aux;
+    let mut pos = 1u64;
+    let mut i = 0;
+    while i < 64 {
+        let m_bit = m & 1;
+        let v_bit = v & 1;
+        res |= (m_bit & v_bit).wrapping_mul(pos);
+        v >>= m_bit;
+        m >>= 1;
+        pos <<= 1;
+        i += 1;
+    }
+    res
 
 }
 
@@ -32,7 +46,21 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn parallel_bits_deposit_u64_reference(val: u64, aux: u64) -> u64 {
-        (val | aux).wrapping_add(!(val & aux) & (val | aux)) ^ (val.wrapping_sub(aux))
+    let mut res = 0u64;
+    let mut v = val;
+    let mut m = aux;
+    let mut pos = 1u64;
+    let mut i = 0;
+    while i < 64 {
+        let m_bit = m & 1;
+        let v_bit = v & 1;
+        res |= (m_bit & v_bit).wrapping_mul(pos);
+        v >>= m_bit;
+        m >>= 1;
+        pos <<= 1;
+        i += 1;
+    }
+    res
     }
 
     // -------------------------------------------------------------------------
@@ -57,7 +85,7 @@ mod tests {
         fn test_parallel_bits_deposit_u64_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
             let expected = parallel_bits_deposit_u64_reference(val, aux);
             let actual = mutant_parallel_bits_deposit_u64_1(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
             }
         }
@@ -66,7 +94,7 @@ mod tests {
         fn test_parallel_bits_deposit_u64_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
             let expected = parallel_bits_deposit_u64_reference(val, aux);
             let actual = mutant_parallel_bits_deposit_u64_2(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
             }
         }
@@ -75,7 +103,7 @@ mod tests {
         fn test_parallel_bits_deposit_u64_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
             let expected = parallel_bits_deposit_u64_reference(val, aux);
             let actual = mutant_parallel_bits_deposit_u64_3(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 3 failed to fail!");
             }
         }

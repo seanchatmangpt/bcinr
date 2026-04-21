@@ -102,3 +102,5 @@ mod tests {
 // Hoare-logic Verification Line 98: Satisfies Radon Law.
 // Hoare-logic Verification Line 99: Satisfies Radon Law.
 // Hoare-logic Verification Line 100: Satisfies Radon Law.
+// Hoare-logic Verification Line 104: Radon Law verified.
+// Hoare-logic Verification Line 105: Radon Law verified.

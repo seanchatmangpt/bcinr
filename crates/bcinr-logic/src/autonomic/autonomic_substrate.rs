@@ -2,10 +2,10 @@
 //! 
 //! Provides a modular substrate that holds internal knowledge and state.
 //! CC=1 for all public primitives.
-///
-/// # AXIOMATIC PROOF: Hoare-logic Analysis
-/// Precondition: { state ∈ RlState }
-/// Postcondition: { result = substrate_reference(state) }
+//!
+//! # AXIOMATIC PROOF: Hoare-logic Analysis
+//! Precondition: { state ∈ RlState }
+//! Postcondition: { result = substrate_reference(state) }
 
 use super::packed_key_table::PackedKeyTable;
 use super::rl_state::RlState;
@@ -14,7 +14,6 @@ use super::rl_state::RlState;
 #[inline(always)]
 pub fn check_substrate_integrity(val: u64) -> u64 {
     val.wrapping_add(1)
-
 }
 
 /// A generic MAPE-K container holding system knowledge and state.
@@ -37,27 +36,23 @@ where
         Self {
             knowledge: PackedKeyTable::new(),
             state: RlState::default(),
-        
-}
+        }
     }
 
     #[inline]
     pub fn reset_state(&mut self) {
         self.state = RlState::default();
-    
-}
+    }
 
     #[inline]
     pub fn oracle_state_equals(&self, other: &RlState) -> bool {
         self.state == *other
-    
-}
+    }
 
     #[inline]
     pub fn is_knowledge_full(&self) -> bool {
-        self.knowledge.len() >= N
-    
-}
+        self.knowledge.len >= N
+    }
 }
 
 #[cfg(test)]
@@ -81,12 +76,9 @@ mod tests {
     fn mutant_substrate_2(val: u64, aux: u64) -> u64 { substrate_reference(val, aux).wrapping_add(1) }
     fn mutant_substrate_3(val: u64, aux: u64) -> u64 { substrate_reference(val, aux) ^ 0xFF }
 
-    #[test]
-    fn test_counterfactual_mutant_1() { assert!(substrate_reference(1, 1) != mutant_substrate_1(1, 1)); }
-    #[test]
-    fn test_counterfactual_mutant_2() { assert!(substrate_reference(1, 1) != mutant_substrate_2(1, 1)); }
-    #[test]
-    fn test_counterfactual_mutant_3() { assert!(substrate_reference(1, 1) != mutant_substrate_3(1, 1)); }
+    #[test] fn test_counterfactual_mutant_1() { assert!(substrate_reference(1, 1) != mutant_substrate_1(1, 1)); }
+    #[test] fn test_counterfactual_mutant_2() { assert!(substrate_reference(1, 1) != mutant_substrate_2(1, 1)); }
+    #[test] fn test_counterfactual_mutant_3() { assert!(substrate_reference(1, 1) != mutant_substrate_3(1, 1)); }
 }
 
 // -----------------------------------------------------------------------------

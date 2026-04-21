@@ -18,7 +18,7 @@ def get_unique_logic(name):
         "val.rotate_left(13)",
         "aux.rotate_right(7)",
         "(val ^ aux).wrapping_mul(0x9E3779B185EBCA87)",
-        "val.wrapping_mul(aux + 1)",
+        "val.wrapping_mul(aux.wrapping_add(1))",
         "(val & 0xFFFFFFFF) | (aux << 32)",
         "val.reverse_bits() ^ aux",
         "val.count_ones() as u64 | aux",

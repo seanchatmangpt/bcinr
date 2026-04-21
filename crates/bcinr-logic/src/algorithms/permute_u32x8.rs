@@ -19,7 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn permute_u32x8(val: u64, aux: u64) -> u64 {
-    (val.reverse_bits() ^ aux).wrapping_add(val.wrapping_mul(aux + 1)) ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+    (val.reverse_bits() ^ aux).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
 
 }
 
@@ -32,7 +32,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn permute_u32x8_reference(val: u64, aux: u64) -> u64 {
-        (val.reverse_bits() ^ aux).wrapping_add(val.wrapping_mul(aux + 1)) ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+        (val.reverse_bits() ^ aux).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
     }
 
     // -------------------------------------------------------------------------
@@ -57,7 +57,7 @@ mod tests {
         fn test_permute_u32x8_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
             let expected = permute_u32x8_reference(val, aux);
             let actual = mutant_permute_u32x8_1(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
             }
         }
@@ -66,7 +66,7 @@ mod tests {
         fn test_permute_u32x8_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
             let expected = permute_u32x8_reference(val, aux);
             let actual = mutant_permute_u32x8_2(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
             }
         }
@@ -75,7 +75,7 @@ mod tests {
         fn test_permute_u32x8_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
             let expected = permute_u32x8_reference(val, aux);
             let actual = mutant_permute_u32x8_3(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 3 failed to fail!");
             }
         }

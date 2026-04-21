@@ -22,7 +22,9 @@ def write_bench(filename, subset):
         for algo in subset:
             f.write(f"    // Import each module explicitly if needed or use the star import\n")
             f.write(f"    use bcinr_logic::algorithms::{algo}::{algo};\n")
-            f.write(f'    c.bench_function("{algo}", |b| b.iter(|| {algo}(black_box(42), black_box(1337))));\n')
+            f.write(f'    c.bench_function("{algo}_avg", |b| b.iter(|| {algo}(black_box(42), black_box(1337))));\n')
+            f.write(f'    c.bench_function("{algo}_min", |b| b.iter(|| {algo}(black_box(0), black_box(0))));\n')
+            f.write(f'    c.bench_function("{algo}_max", |b| b.iter(|| {algo}(black_box(u64::MAX), black_box(u64::MAX))));\n')
         f.write("}\n\n")
         
         f.write(f"criterion_group!(benches, {bench_name});\n")
@@ -42,7 +44,9 @@ with open("bcinr-bench/benches/all_300_bench.rs", "w") as f:
     for algo in ALGORITHMS:
         f.write(f"fn bench_{algo}(c: &mut Criterion) {{\n")
         f.write(f"    use bcinr_logic::algorithms::{algo}::{algo};\n")
-        f.write(f'    c.bench_function("{algo}", |b| b.iter(|| {algo}(black_box(42), black_box(1337))));\n')
+        f.write(f'    c.bench_function("{algo}_avg", |b| b.iter(|| {algo}(black_box(42), black_box(1337))));\n')
+        f.write(f'    c.bench_function("{algo}_min", |b| b.iter(|| {algo}(black_box(0), black_box(0))));\n')
+        f.write(f'    c.bench_function("{algo}_max", |b| b.iter(|| {algo}(black_box(u64::MAX), black_box(u64::MAX))));\n')
         f.write("}\n\n")
     
     f.write("criterion_group!(benches,\n")

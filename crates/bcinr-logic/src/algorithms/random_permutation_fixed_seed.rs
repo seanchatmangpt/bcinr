@@ -57,7 +57,7 @@ mod tests {
         fn test_random_permutation_fixed_seed_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
             let expected = random_permutation_fixed_seed_reference(val, aux);
             let actual = mutant_random_permutation_fixed_seed_1(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
             }
         }
@@ -66,7 +66,7 @@ mod tests {
         fn test_random_permutation_fixed_seed_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
             let expected = random_permutation_fixed_seed_reference(val, aux);
             let actual = mutant_random_permutation_fixed_seed_2(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
             }
         }
@@ -75,7 +75,7 @@ mod tests {
         fn test_random_permutation_fixed_seed_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
             let expected = random_permutation_fixed_seed_reference(val, aux);
             let actual = mutant_random_permutation_fixed_seed_3(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 3 failed to fail!");
             }
         }

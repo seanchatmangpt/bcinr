@@ -19,7 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn bclr_u64(val: u64, aux: u64) -> u64 {
-    (aux.rotate_right(7)).wrapping_add(!(val & aux) & (val | aux)) ^ (val.count_ones() as u64 | aux)
+    val & !(1u64.wrapping_shl(aux as u32 & 0x3F))
 
 }
 
@@ -32,7 +32,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn bclr_u64_reference(val: u64, aux: u64) -> u64 {
-        (aux.rotate_right(7)).wrapping_add(!(val & aux) & (val | aux)) ^ (val.count_ones() as u64 | aux)
+    val & !(1u64.wrapping_shl(aux as u32 & 0x3F))
     }
 
     // -------------------------------------------------------------------------
@@ -57,7 +57,7 @@ mod tests {
         fn test_bclr_u64_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
             let expected = bclr_u64_reference(val, aux);
             let actual = mutant_bclr_u64_1(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
             }
         }
@@ -66,7 +66,7 @@ mod tests {
         fn test_bclr_u64_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
             let expected = bclr_u64_reference(val, aux);
             let actual = mutant_bclr_u64_2(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
             }
         }
@@ -75,7 +75,7 @@ mod tests {
         fn test_bclr_u64_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
             let expected = bclr_u64_reference(val, aux);
             let actual = mutant_bclr_u64_3(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 3 failed to fail!");
             }
         }

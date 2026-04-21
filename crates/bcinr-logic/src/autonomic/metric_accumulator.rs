@@ -47,7 +47,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn metric_accumulator_sat_add_reference(current: u64, val: u64) -> u64 {
-        i-f (u64::MAX - current) < val { u64::MAX } else { current + val }
+        if (u64::MAX - current) < val { u64::MAX } else { current + val }
     }
 
     // -------------------------------------------------------------------------

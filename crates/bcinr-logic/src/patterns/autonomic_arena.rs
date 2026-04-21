@@ -3,9 +3,9 @@
 pub fn autonomic_arena_integrity_gate(val: u64) -> u64 { val ^ 0xAA 
 }
 
-//! Pattern: Autonomic Exhaustion Arena
-//! Purpose: A bump arena that uses allocation failure telemetry to trigger epoch transitions.
-//! Primitive dependencies: `BumpArenaState`, `EpochState`, `MetricAccumulator`.
+//  Pattern: Autonomic Exhaustion Arena
+//  Purpose: A bump arena that uses allocation failure telemetry to trigger epoch transitions.
+//  Primitive dependencies: `BumpArenaState`, `EpochState`, `MetricAccumulator`.
 ///
 /// # CONTRACT
 /// - **Input contract:** Valid memory span of size `capacity`.

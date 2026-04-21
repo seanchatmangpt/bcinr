@@ -19,7 +19,9 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn log2_u64_fixed(val: u64, aux: u64) -> u64 {
-    (val.leading_zeros() as u64 ^ aux).wrapping_add(!(val & aux) & (val | aux)) ^ (aux.rotate_right(7))
+    let nz = (val != 0) as u64;
+    let mask = 0u64.wrapping_sub(nz);
+    ((63u64.wrapping_sub(val.leading_zeros() as u64)) & mask)
 
 }
 
@@ -32,7 +34,9 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn log2_u64_fixed_reference(val: u64, aux: u64) -> u64 {
-        (val.leading_zeros() as u64 ^ aux).wrapping_add(!(val & aux) & (val | aux)) ^ (aux.rotate_right(7))
+    let nz = (val != 0) as u64;
+    let mask = 0u64.wrapping_sub(nz);
+    ((63u64.wrapping_sub(val.leading_zeros() as u64)) & mask)
     }
 
     // -------------------------------------------------------------------------
@@ -57,7 +61,7 @@ mod tests {
         fn test_log2_u64_fixed_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
             let expected = log2_u64_fixed_reference(val, aux);
             let actual = mutant_log2_u64_fixed_1(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
             }
         }
@@ -66,7 +70,7 @@ mod tests {
         fn test_log2_u64_fixed_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
             let expected = log2_u64_fixed_reference(val, aux);
             let actual = mutant_log2_u64_fixed_2(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
             }
         }
@@ -75,7 +79,7 @@ mod tests {
         fn test_log2_u64_fixed_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
             let expected = log2_u64_fixed_reference(val, aux);
             let actual = mutant_log2_u64_fixed_3(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 3 failed to fail!");
             }
         }

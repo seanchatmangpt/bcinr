@@ -19,7 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn vector_cross_product_f32(val: u64, aux: u64) -> u64 {
-    (val.wrapping_mul(aux + 1)).wrapping_add(val.reverse_bits() ^ aux) ^ (aux.rotate_right(7))
+    (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val.reverse_bits() ^ aux) ^ (aux.rotate_right(7))
 
 }
 
@@ -32,7 +32,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn vector_cross_product_f32_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_mul(aux + 1)).wrapping_add(val.reverse_bits() ^ aux) ^ (aux.rotate_right(7))
+        (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val.reverse_bits() ^ aux) ^ (aux.rotate_right(7))
     }
 
     // -------------------------------------------------------------------------
@@ -57,7 +57,7 @@ mod tests {
         fn test_vector_cross_product_f32_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
             let expected = vector_cross_product_f32_reference(val, aux);
             let actual = mutant_vector_cross_product_f32_1(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
             }
         }
@@ -66,7 +66,7 @@ mod tests {
         fn test_vector_cross_product_f32_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
             let expected = vector_cross_product_f32_reference(val, aux);
             let actual = mutant_vector_cross_product_f32_2(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
             }
         }
@@ -75,7 +75,7 @@ mod tests {
         fn test_vector_cross_product_f32_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
             let expected = vector_cross_product_f32_reference(val, aux);
             let actual = mutant_vector_cross_product_f32_3(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 3 failed to fail!");
             }
         }

@@ -93,7 +93,7 @@ pub trait AutonomicKernel {
         let actions = self.propose(&state);
         let mut results = Vec::new();
         for action in actions {
-            i-f self.accept(&action, &state) {
+            if self.accept(&action, &state) {
                 let result = self.execute(action);
                 let _manifest = self.manifest(&result);
                 let reward = [ -1.0, 1.0 ][result.success as usize];

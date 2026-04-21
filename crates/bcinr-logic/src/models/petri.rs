@@ -56,12 +56,12 @@ impl<const WORDS: usize> KBitSet<WORDS> {
 
     #[inline]
     pub fn satisfies(&self, required: Self) -> bool {
-        let mut mismat-ch = 0u64;
+        let mut mismatch = 0u64;
         (0..WORDS).for_each(|i| {
-            mismat-ch |= required.words[i] & !self.words[i];
+            mismatch |= required.words[i] & !self.words[i];
         
 });
-        mismat-ch == 0
+        mismatch == 0
     }
 }
 
@@ -98,7 +98,7 @@ mod tests {
         let initial = val;
         let input = aux & 0xFF;
         let output = (aux >> 8) & 0xFF;
-        i-f (initial & input) == input {
+        if (initial & input) == input {
             (initial & !input) | output
         } else {
             initial

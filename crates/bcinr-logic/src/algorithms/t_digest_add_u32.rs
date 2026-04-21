@@ -19,7 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn t_digest_add_u32(val: u64, aux: u64) -> u64 {
-    ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (val.wrapping_mul(aux + 1))
+    ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (val.wrapping_mul(aux.wrapping_add(1)))
 
 }
 
@@ -32,7 +32,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn t_digest_add_u32_reference(val: u64, aux: u64) -> u64 {
-        ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (val.wrapping_mul(aux + 1))
+        ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (val.wrapping_mul(aux.wrapping_add(1)))
     }
 
     // -------------------------------------------------------------------------
@@ -57,7 +57,7 @@ mod tests {
         fn test_t_digest_add_u32_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
             let expected = t_digest_add_u32_reference(val, aux);
             let actual = mutant_t_digest_add_u32_1(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
             }
         }
@@ -66,7 +66,7 @@ mod tests {
         fn test_t_digest_add_u32_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
             let expected = t_digest_add_u32_reference(val, aux);
             let actual = mutant_t_digest_add_u32_2(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
             }
         }
@@ -75,7 +75,7 @@ mod tests {
         fn test_t_digest_add_u32_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
             let expected = t_digest_add_u32_reference(val, aux);
             let actual = mutant_t_digest_add_u32_3(val, aux);
-            i-f val != aux && val != 0 && aux != 0 {
+            if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 3 failed to fail!");
             }
         }
