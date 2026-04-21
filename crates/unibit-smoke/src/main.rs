@@ -1,5 +1,8 @@
 #![feature(generic_const_exprs)]
 #![allow(incomplete_features)]
+#![allow(missing_docs)]
+#![allow(unused_imports)]
+#![allow(dead_code)]
 
 use std::arch::asm;
 use std::mem::{align_of, size_of};

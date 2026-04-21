@@ -1,9 +1,13 @@
 [package]
 name = "bcinr-reporter"
-version = "0.1.0"
+version = "26.4.21"
 edition = "2021"
 publish = false
 
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/seanchatmangpt/bcinr"
+description = "Deterministic branchless substrate for autonomic AGI."
+readme = "../../README.md"
 [dependencies]
 prettytable-rs = "0.10.0"
 serde = { version = "1.0", features = ["derive"] }

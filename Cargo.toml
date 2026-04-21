@@ -1,21 +1,8 @@
 [workspace]
+members = ["bcinr", "bcinr-core", "bcinr-bench", "crates/bcinr-api", "crates/bcinr-logic", "tools/bcinr-reporter", "tools/bcinr-contract-gate", "tools/bcinr-bench-auditor"]
 resolver = "2"
-members = [
-    "crates/*"
-]
 
-[workspace.package]
-edition = "2024"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/seanchatmangpt/unibit"
-rust-version = "1.82"
-
-[workspace.lints.rust]
-unsafe_op_in_unsafe_fn = "deny"
-
-[workspace.lints.clippy]
-unwrap_used = "deny"
-expect_used = "deny"
-panic = "deny"
-alloc_instead_of_core = "warn"
-std_instead_of_core = "warn"
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"

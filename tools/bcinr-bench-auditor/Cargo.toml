@@ -1,8 +1,12 @@
 [package]
 name = "bcinr-bench-auditor"
-version = "0.1.0"
+version = "26.4.21"
 edition = "2021"
 
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/seanchatmangpt/bcinr"
+description = "Deterministic branchless substrate for autonomic AGI."
+readme = "../../README.md"
 [dependencies]
 syn = { version = "2.0.117", features = ["full", "visit"] }
 walkdir = "2.5.0"

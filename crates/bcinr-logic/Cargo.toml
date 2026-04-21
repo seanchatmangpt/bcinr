@@ -1,6 +1,6 @@
 [package]
 name = "bcinr-logic"
-version = "26.4.22"
+version = "26.4.21"
 edition = "2021"
 description = "BranchlessCInRust: Academic-grade branchless algorithm library"
 repository = "https://github.com/example/bcinr"
@@ -9,6 +9,7 @@ rust-version = "1.70"
 keywords = ["branchless", "simd", "performance"]
 categories = ["algorithms", "no-std"]
 
+readme = "../../README.md"
 [dependencies]
 criterion = { version = "0.5", optional = true }
 
