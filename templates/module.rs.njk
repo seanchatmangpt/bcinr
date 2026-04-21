@@ -1,0 +1,8 @@
+---
+to: "{{ module_path }}"
+---
+{% if template %}
+{% include template %}
+{% else %}
+// Template variable is undefined!
+{% endif %}

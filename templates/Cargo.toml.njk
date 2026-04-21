@@ -1,3 +1,6 @@
+---
+to: "Cargo.toml"
+---
 [workspace]
 resolver = "2"
 members = [
@@ -5,7 +8,7 @@ members = [
 ]
 
 [workspace.package]
-edition = "2024"
+edition = "{{ edition }}"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/seanchatmangpt/unibit"
 rust-version = "1.82"
