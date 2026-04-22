@@ -58,7 +58,7 @@ pub struct EpochStats {
 /// Maximum instructions per epoch (bounded).
 pub const MAX_EPOCH_INSTRUCTIONS: usize = 4096;
 
-/// The full UniverseOS executor: owns all planes and subsystems.
+/// The full executor: owns all planes and subsystems.
 pub struct UniverseExecutor {
     // Planes
     pub block: UniverseBlock,

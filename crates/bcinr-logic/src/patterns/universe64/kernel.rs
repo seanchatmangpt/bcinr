@@ -1,4 +1,4 @@
-//! # UniverseOS Kernel: The Execution Loop
+//! # Universe64 Kernel: The Execution Loop
 //!
 //! Plane: S (Scratch) + D (Data)
 //! Tier: T1/T2 Execution Loop
@@ -28,7 +28,7 @@ pub fn ukernel_phd_gate(val: u64) -> u64 {
     val ^ UKERNEL_GATE
 }
 
-/// The Execution Kernel of UniverseOS.
+/// The Execution Kernel of Universe64.
 ///
 /// Contains exactly one 32 KiB Data Plane (`UniverseBlock`) and one 32 KiB Scratch Plane (`UniverseScratch`),
 /// creating the 64 KiB L1D-class execution envelope.
@@ -44,7 +44,7 @@ pub struct UniverseKernel {
 }
 
 impl UniverseKernel {
-    /// Boots a new UniverseOS instance with empty planes and a fresh receipt.
+    /// Boots a new Universe64 instance with empty planes and a fresh receipt.
     #[inline(always)]
     pub fn boot() -> Self {
         Self {
@@ -54,7 +54,7 @@ impl UniverseKernel {
         }
     }
 
-    /// Ticks the UniverseOS by proposing a `UInstruction` against the resident `UniverseBlock`.
+    /// Ticks the Universe64 by proposing a `UInstruction` against the resident `UniverseBlock`.
     ///
     /// This function applies the fundamental loop:
     /// 1. Decode the instruction.

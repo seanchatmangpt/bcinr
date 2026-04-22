@@ -1,4 +1,4 @@
-//! Universe64 — UniverseOS Petri64³ Institutional State Geometry
+//! Universe64 — Petri64³ Institutional State Geometry
 //!
 //! Representing institutional workflow reality as a fixed 32 KiB
 //! executable Boolean universe, executed under the Dual-Plane model:

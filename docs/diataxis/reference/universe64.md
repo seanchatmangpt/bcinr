@@ -1,6 +1,6 @@
 # Universe64 Reference
 
-**Universe64** is the deterministic state geometry architecture for UniverseOS. It represents institutional, workflow, supply-chain, and autonomic-control reality as a fixed 32 KiB executable Boolean universe ($U_t \in \mathbb{B}^{64^3}$).
+**Universe64** is the deterministic state geometry architecture for civilizational-scale process control. It represents institutional, workflow, supply-chain, and autonomic-control reality as a fixed 32 KiB executable Boolean universe ($U_t \in \mathbb{B}^{64^3}$).
 
 ## Dual-Plane L1 Execution Model
 Universe64 executes within a strict 64 KiB L1D-class cache envelope using a dual-plane model:

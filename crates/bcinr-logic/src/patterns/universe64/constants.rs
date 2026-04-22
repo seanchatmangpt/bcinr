@@ -77,7 +77,7 @@ pub const T1_BUDGET_NS: u64 = 200;
 /// T2 full-universe tier budget: 4096-word scans.
 pub const T2_BUDGET_NS: u64 = 5_000;
 
-/// T3 control-epoch tier budget (UniverseOS scheduling boundary).
+/// T3 control-epoch tier budget (scheduling boundary).
 pub const T3_BUDGET_NS: u64 = 10_000;
 
 /// T4 sentinel: external boundary (human / API / dashboard). No internal budget.

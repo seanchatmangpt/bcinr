@@ -1,6 +1,6 @@
-# UniverseOS: The Deterministic State Layer
+# Universe64: The Deterministic State Layer
 
-UniverseOS implements the $64^2 / 64^3 / 64^4$ deterministic operating field for civilizational-scale process control.
+Universe64 implements the $64^2 / 64^3 / 64^4$ deterministic operating field for civilizational-scale process control.
 
 ## The Hierarchy of Truth
 - **$64^2$ (The Attention Field)**: Tells the system *where to act*. 
@@ -16,5 +16,5 @@ UniverseOS implements the $64^2 / 64^3 / 64^4$ deterministic operating field for
 - `UReceipt`: The rolling cryptographic proof of state trajectory.
 
 ## The Admissibility Law
-To maintain fractal determinism, UniverseOS strictly obeys the BCINR timing constitution:
+To maintain fractal determinism, Universe64 strictly obeys the BCINR timing constitution:
 $T_f \le 200\text{ ns}$ for all $T_1$ microkernels. 
