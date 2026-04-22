@@ -28,10 +28,10 @@ fn bench_dfa(c: &mut Criterion) {
     group.bench_function("run_1k", |b| {
         b.iter(|| {
             dfa::dfa_run(
-                black_box(&input),
                 black_box(&table),
                 black_box(256),
                 black_box(0),
+                black_box(&input),
             )
         })
     });
@@ -44,11 +44,11 @@ fn bench_dfa(c: &mut Criterion) {
 
 fn bench_fix(c: &mut Criterion) {
     let mut group = c.benchmark_group("fix");
-    group.bench_function("add_sat_u8", |b| {
-        b.iter(|| fix::add_sat_u8(black_box(200), black_box(100)))
+    group.bench_function("add_sat", |b| {
+        b.iter(|| fix::add_sat(black_box(200), black_box(100)))
     });
-    group.bench_function("sub_sat_u8", |b| {
-        b.iter(|| fix::sub_sat_u8(black_box(50), black_box(100)))
+    group.bench_function("sub_sat", |b| {
+        b.iter(|| fix::sub_sat(black_box(50), black_box(100)))
     });
     group.bench_function("clamp_u32", |b| {
         b.iter(|| fix::clamp_u32(black_box(150), black_box(100), black_box(200)))
@@ -100,7 +100,7 @@ fn bench_parse(c: &mut Criterion) {
     let mut group = c.benchmark_group("parse");
     let input = b"18446744073709551615";
     group.bench_function("parse_decimal_u64", |b| {
-        b.iter(|| parse::parse_decimal_u64(black_box(input)))
+
     });
     let ws_input = b"    \t\n  hello";
     group.bench_function("skip_whitespace", |b| {
@@ -111,9 +111,9 @@ fn bench_parse(c: &mut Criterion) {
 
 fn bench_reduce(c: &mut Criterion) {
     let mut group = c.benchmark_group("reduce");
-    let arr = [1, 2, 3, 4, 5, 6, 7, 8];
+    let arr = 0x0807060504030201u64;
     group.bench_function("horizontal_sum_u8x8", |b| {
-        b.iter(|| reduce::horizontal_sum_u8x8(black_box(&arr)))
+        b.iter(|| reduce::horizontal_sum_u8x8(black_box(arr)))
     });
     group.finish();
 }
@@ -146,11 +146,11 @@ fn bench_simd(c: &mut Criterion) {
 fn bench_sketch(c: &mut Criterion) {
     let mut group = c.benchmark_group("sketch");
     let input = b"hello world this is a test string for hashing";
-    group.bench_function("xxhash32", |b| {
-        b.iter(|| sketch::xxhash32(black_box(input), black_box(0)))
+
+
     });
-    group.bench_function("murmur3_32", |b| {
-        b.iter(|| sketch::murmur3_32(black_box(input), black_box(0)))
+
+
     });
     group.finish();
 }

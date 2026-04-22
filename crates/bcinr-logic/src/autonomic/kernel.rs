@@ -2,10 +2,9 @@
 //! 
 //! Follows the MAPE-K (Monitor-Analyze-Plan-Execute) autonomic loop.
 //! CC=1 for all public primitives.
-///
-/// # AXIOMATIC PROOF: Hoare-logic Analysis
-/// Precondition: { state ∈ ValidState }
-/// Postcondition: { result = kernel_reference(state) }
+//! # AXIOMATIC PROOF: Hoare-logic Analysis
+//! Precondition: { state ∈ ValidState }
+//! Postcondition: { result = kernel_reference(state) }
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;

@@ -82,8 +82,7 @@ impl<'ast> Visit<'ast> for GateVisitor {
         }
 
         if matches!(i.vis, Visibility::Public(_)) {
-            let mut cv = ComplexityVisitor::default();
-            cv.complexity = 1;
+            let mut cv = ComplexityVisitor { complexity: 1, ..Default::default() };
             cv.visit_item_fn(i);
 
             if cv.complexity > 1 {

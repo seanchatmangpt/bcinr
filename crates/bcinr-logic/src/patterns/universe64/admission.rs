@@ -134,7 +134,7 @@ impl AdmissionEvaluator {
             UScope::Sparse => {
                 // Build prereq slice from repeated mask bits (simplified).
                 let n = active.len();
-                let mut prereqs = [mask_entry.bits; 64];
+                let prereqs = [mask_entry.bits; 64];
                 eval_sparse(block, active, &prereqs[..n])
             }
             UScope::Domain | UScope::Full => {

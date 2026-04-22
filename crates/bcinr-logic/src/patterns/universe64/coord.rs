@@ -131,14 +131,14 @@ mod tests {
     #[test]
     fn test_boundaries() {
         let coord = UCoord::new(64, 65, 66);
-        assert_eq!(coord.word_index(), 0 * CELL_COUNT + 1);
+        assert_eq!(coord.word_index(), 1);
         assert_eq!(coord.place_bit(), 2);
     }
 
     #[test]
     fn test_equivalence() {
         let coord = UCoord::new(1, 2, 3);
-        assert_eq!(coord.word_index(), 1 * CELL_COUNT + 2);
+        assert_eq!(coord.word_index(), CELL_COUNT + 2);
         assert_eq!(coord.place_bit(), 3);
         assert_eq!(coord.domain(), 1);
         assert_eq!(coord.cell(), 2);

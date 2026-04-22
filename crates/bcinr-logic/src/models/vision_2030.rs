@@ -3,11 +3,12 @@
 //! Demonstrates the use of branchless bitset algebra (KBitSet) and 
 //! SwarMarking to build a high-performance control plane.
 //! CC=1 for all public primitives.
-///
-/// # AXIOMATIC PROOF: Hoare-logic Analysis
-/// Precondition: { marking ∈ ValidMarking }
-/// Postcondition: { result = vision_reference(marking) }
+//! # AXIOMATIC PROOF: Hoare-logic Analysis
+//! Precondition: { marking ∈ ValidMarking }
+//! Postcondition: { result = vision_reference(marking) }
 
+#[cfg(feature = "alloc")]
+use crate::utils::dense_kernel::fnv1a_64;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 #[cfg(feature = "alloc")]
@@ -93,7 +94,7 @@ impl<const WORDS: usize> AutonomicKernel for Vision2030Engine<WORDS> {
         self.marking.current.words[0] = (new_marking.current.words[0] & mask) | (self.marking.current.words[0] & !mask);
         let fired_val = (fired && valid_idx != 0) as u32 as f32;
         self.state.integrity -= (1.0 - fired_val) * 0.1;
-        self.state.drift_detected = (fired_val == 0.0 && valid_idx != 0);
+        self.state.drift_detected = fired_val == 0.0 && valid_idx != 0;
         self.state.throughput += valid_idx as f32;
         self.state.health = self.state.health.clamp(0.0, 1.0);
         self.state.integrity = self.state.integrity.clamp(0.0, 1.0);
@@ -118,7 +119,7 @@ impl<const WORDS: usize> AutonomicKernel for Vision2030Engine<WORDS> {
         let mask = 0u64.wrapping_sub(is_repair);
         let mut reset = KBitSet::<WORDS>::zero(); reset.set(0);
         self.marking.current.words[0] = (reset.words[0] & mask) | (self.marking.current.words[0] & !mask);
-        self.state.drift_detected = (self.state.drift_detected && is_repair == 0);
+        self.state.drift_detected = self.state.drift_detected && is_repair == 0;
         self.state.integrity = [self.state.integrity, 1.0][is_repair as usize];
         AutonomicResult { success: true, latency_cycles: 100, manifest_hash: 0xABC }
     }
