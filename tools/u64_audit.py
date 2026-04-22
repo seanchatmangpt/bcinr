@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-Phase 3: Universe64 algorithm audit.
+Phase 3: Branchless algorithm audit.
 
 For each of the 307 algorithm files in crates/bcinr-logic/src/algorithms/,
 perform four targeted replacements:
 
   Target A — replace generic CONTRACT doc clause (lines 10-12) with a
-             category-specific Universe64 contract summary.
+             category-specific Branchless contract summary.
   Target B — replace tautological _reference body with an independent
              oracle expression keyed to the algorithm's domain category.
   Target C — replace AXIOMATIC PROOF / Hoare-logic block (lines 95-130
-             approx) with a UNIVERSE64 CONTRACT geometry binding block.
+             approx) with a BRANCHLESS CONTRACT geometry binding block.
   Target D — replace PADDING ENSURING FILE LENGTH block (lines 148-186
-             approx) with a UNIVERSE64 GEOMETRY ANNOTATION block.
+             approx) with a BRANCHLESS GEOMETRY ANNOTATION block.
 
 Categories are inferred from the filename stem.
 """
@@ -326,7 +326,6 @@ VAL_SEMANTICS = {
     "C": "domain word / SIMD lane",
     "D": "flat word index or spatial coordinate",
     "E": "cell word being fingerprinted",
-    "F": "universe word being observed",
     "G": "PRNG state word",
     "H": "packed byte cell word (8 bytes)",
     "I": "adjacency bitset / node word",
@@ -379,7 +378,7 @@ def build_target_a(name: str, cat: str) -> str:
     tier = TIER_BY_CAT[cat]
     plane = PLANE_BY_CAT[cat]
     return (
-        f"/// # Universe64 Contract\n"
+        f"/// # Branchless Contract\n"
         f"/// **Category:** {cat} — {cat_name}\n"
         f"/// **Plane:** {plane}\n"
         f"/// **Tier:** {tier}\n"
@@ -406,15 +405,13 @@ def build_target_c(name: str, cat: str) -> list[str]:
     plane = PLANE_BY_CAT[cat]
     lines = [
         "    // -------------------------------------------------------------------------\n",
-        f"    // UNIVERSE64 CONTRACT: {name}\n",
+        f"    // BRANCHLESS CONTRACT: {name}\n",
         "    // -------------------------------------------------------------------------\n",
         f"    // Category : {cat} — {cat_name}\n",
         f"    // Plane    : {plane}\n",
         f"    // Tier     : {tier}\n",
         f"    // Inputs   : val = {VAL_SEMANTICS[cat]}\n",
         f"    //            aux = {AUX_SEMANTICS[cat]}\n",
-        "    // Geometry : Operates on a u64 word inside the resident UniverseBlock\n",
-        "    //            ([u64; UNIVERSE_WORDS]) staged through the Scratch Plane.\n",
         "    // Admissibility:\n",
         "    //   - Branchless control flow (CC = 1).\n",
         "    //   - Zero heap allocations.\n",
@@ -452,17 +449,14 @@ def build_target_d(name: str, cat: str) -> list[str]:
     plane = PLANE_BY_CAT[cat]
     lines = [
         "// -----------------------------------------------------------------------------\n",
-        f"// UNIVERSE64 GEOMETRY ANNOTATION: {name}\n",
+        f"// BRANCHLESS GEOMETRY ANNOTATION: {name}\n",
         "// -----------------------------------------------------------------------------\n",
         "// Resident state object:\n",
-        "//   UniverseBlock = [u64; UNIVERSE_WORDS]   // 4096 words = 32 KiB\n",
         "// Coordinate algebra:\n",
         "//   UCoord(domain:u6, cell:u6, place:u6) packed in u32.\n",
         "//   word_index = domain * CELL_COUNT + cell  ∈ [0, MAX_WORD_INDEX].\n",
         "//   bit_index  = place                       ∈ [0, PLACE_COUNT).\n",
         "// Dual-Plane execution envelope:\n",
-        "//   Plane_D = 32 KiB resident UniverseBlock (canonical truth).\n",
-        "//   Plane_S = 32 KiB UniverseScratch (bounded motion workspace).\n",
         "//   L1_ENVELOPE_BYTES = 65 536  (D + S).\n",
         f"// Domain category for this primitive: {cat} — {cat_name}.\n",
         f"// Plane interaction: {plane}.\n",
@@ -470,7 +464,6 @@ def build_target_d(name: str, cat: str) -> list[str]:
         "//   Cell    — single u64 word commit (T0).\n",
         "//   Sparse  — bounded ActiveWordSet (capacity 64) commit (T1).\n",
         "//   Domain  — full 64-cell domain SWAR (T1).\n",
-        "//   Full    — UNIVERSE_WORDS scan (T2).\n",
         "// Receipt invariants (FNV-1a 64):\n",
         "//   offset_basis = 0xcbf29ce484222325\n",
         "//   prime        = 0x100000001b3\n",
@@ -487,7 +480,6 @@ def build_target_d(name: str, cat: str) -> list[str]:
         "// Replay contract:\n",
         "//   Pure function ⇒ deterministic across runs ⇒ replayable from receipt chain.\n",
         "// Cross-references:\n",
-        "//   patterns/universe64/{constants,coord,scratch,instruction,transition}.rs\n",
         "// -----------------------------------------------------------------------------\n",
         "\n",
     ]

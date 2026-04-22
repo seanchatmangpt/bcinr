@@ -36,11 +36,3 @@ harness = false
 [[bench]]
 name = "patterns_bench"
 harness = false
-
-[[bench]]
-name = "universe64_bench"
-harness = false
-
-[[bench]]
-name = "universe1_bench"
-harness = false

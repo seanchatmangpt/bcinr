@@ -95,9 +95,9 @@ impl<'ast> Visit<'ast> for GateVisitor {
                     name, self.current_path.display(), cv.forbidden_ops));
             }
 
-            // Universe64 contract detection: function-level doc OR file-level doc.
+            // Branchless contract detection: function-level doc OR file-level doc.
             let fn_doc = doc_text(&i.attrs);
-            let has_u64 = fn_doc.contains("Universe64 Contract") || self.file_doc_has_u64_contract;
+            let has_u64 = fn_doc.contains("Branchless Contract") || self.file_doc_has_u64_contract;
 
             self.public_functions.push(PublicFunction {
                 name,
@@ -136,9 +136,9 @@ fn main() {
             let content = fs::read_to_string(path).unwrap();
             // A file is U64-contracted if its inner doc declares it OR any
             // function/comment block in the file declares the contract.
-            visitor.file_doc_has_u64_contract = file_inner_doc(&content).contains("Universe64 Contract")
-                || content.contains("UNIVERSE64 CONTRACT")
-                || content.contains("Universe64 Contract");
+            visitor.file_doc_has_u64_contract = file_inner_doc(&content).contains("Branchless Contract")
+                || content.contains("BRANCHLESS CONTRACT")
+                || content.contains("Branchless Contract");
             match syn::parse_file(&content) {
                 Ok(syntax) => {
                     visitor.current_path = path.to_path_buf();
@@ -156,12 +156,10 @@ fn main() {
         eprintln!("{}", w);
     }
 
-    // Universe64 contract requirement is restricted to `algorithms/` and `patterns/universe64/`.
     let mut missing_u64: Vec<&PublicFunction> = visitor.public_functions.iter()
         .filter(|f| {
             let p = f.path.to_string_lossy();
-            (p.contains("/algorithms/") || p.contains("/patterns/universe64/"))
-                && !p.ends_with("/mod.rs")
+                !p.ends_with("/mod.rs")
                 && !f.has_u64_contract
         })
         .collect();
@@ -184,8 +182,8 @@ fn main() {
 
     let total = visitor.public_functions.len();
     let with_u64 = visitor.public_functions.iter().filter(|f| f.has_u64_contract).count();
-    println!("--- BCINR INTEGRITY AUDIT (Complexity + Construction + Universe64) ---");
+    println!("--- BCINR INTEGRITY AUDIT (Complexity + Construction + Branchless) ---");
     println!("Verified {} public primitives ✅", total);
-    println!("Universe64-contracted: {}/{}", with_u64, total);
+    println!("Branchless-contracted: {}/{}", with_u64, total);
     println!("No bluffs, no hidden branches, no missing U64 contracts.");
 }

@@ -47,9 +47,6 @@ fn bench_fix(c: &mut Criterion) {
     group.bench_function("add_sat", |b| {
         b.iter(|| fix::add_sat(black_box(200), black_box(100)))
     });
-    group.bench_function("sub_sat", |b| {
-        b.iter(|| fix::sub_sat(black_box(50), black_box(100)))
-    });
     group.bench_function("clamp_u32", |b| {
         b.iter(|| fix::clamp_u32(black_box(150), black_box(100), black_box(200)))
     });
@@ -147,11 +144,6 @@ fn bench_sketch(c: &mut Criterion) {
     let mut group = c.benchmark_group("sketch");
     let input = b"hello world this is a test string for hashing";
 
-
-    });
-
-
-    });
     group.finish();
 }
 

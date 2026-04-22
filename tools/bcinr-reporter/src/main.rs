@@ -6,16 +6,13 @@ use std::path::Path;
 use std::process::Command;
 
 fn module_has_u64_contract(module: &str) -> bool {
-    // Search both algorithms/ and patterns/universe64/ for the module file.
     let candidates = [
         format!("crates/bcinr-logic/src/algorithms/{}.rs", module),
-        format!("crates/bcinr-logic/src/patterns/universe64/{}.rs", module),
         format!("crates/bcinr-logic/src/abstractions/{}.rs", module),
     ];
     for c in &candidates {
         if Path::new(c).exists() {
             if let Ok(s) = fs::read_to_string(c) {
-                return s.contains("Universe64 Contract");
             }
         }
     }

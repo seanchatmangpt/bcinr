@@ -39,8 +39,6 @@ Welcome to the comprehensive documentation suite for the bcinr library. This ind
 - [Theory 10: Deep-dive 10](explanation/theory-10.md)
 
 ## Reference: API Specifications
-- [Universe64 Architecture](reference/universe64.md)
-- [Universe8 Architecture](reference/universe8.md)
 - [Data Structure 3](reference/ref-3.md)
 - [Data Structure 4](reference/ref-4.md)
 - [Data Structure 5](reference/ref-5.md)
