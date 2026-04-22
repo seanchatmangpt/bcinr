@@ -1,4 +1,4 @@
-use bcinr_core::logic::{bitset, dfa, fix, int, mask, network, parse, reduce, scan, simd, sketch, utf8};
+use bcinr_core::logic::{bitset, dfa, fix, int, mask, network, parse, reduce, scan, simd, utf8};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn bench_bitset(c: &mut Criterion) {
@@ -95,8 +95,8 @@ fn bench_network(c: &mut Criterion) {
 
 fn bench_parse(c: &mut Criterion) {
     let mut group = c.benchmark_group("parse");
-    let input = b"18446744073709551615";
-    group.bench_function("parse_decimal_u64", |b| {
+    let _input = b"18446744073709551615";
+    group.bench_function("parse_decimal_u64", |_b| {
 
     });
     let ws_input = b"    \t\n  hello";
@@ -141,8 +141,8 @@ fn bench_simd(c: &mut Criterion) {
 }
 
 fn bench_sketch(c: &mut Criterion) {
-    let mut group = c.benchmark_group("sketch");
-    let input = b"hello world this is a test string for hashing";
+    let group = c.benchmark_group("sketch");
+    let _input = b"hello world this is a test string for hashing";
 
     group.finish();
 }

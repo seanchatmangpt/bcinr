@@ -75,7 +75,7 @@ impl<const CONSUMERS: usize> BoundedSpscMulticast<CONSUMERS> {
 
 #[cfg(test)]
 mod tests_multicast {
-    use super::*;
+    
     fn multicast_reference(val: u64, aux: u64) -> u64 { val ^ aux }
     #[test] fn test_equivalence() { assert_eq!(multicast_reference(1, 0), 1); }
     #[test] fn test_boundaries() { }

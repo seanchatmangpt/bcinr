@@ -91,7 +91,7 @@ impl<const WORDS: usize> SwarMarking<WORDS> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
 
     fn petri_reference(val: u64, aux: u64) -> u64 {
         let initial = val;

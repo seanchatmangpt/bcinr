@@ -65,6 +65,7 @@ impl BitonicPriorityQueue8 {
 
 #[cfg(test)]
 mod tests {
+    #[allow(dead_code)]
     fn bitonic_pq_reference(val: u64, aux: u64) -> u64 { val ^ aux }
 
     use super::*;

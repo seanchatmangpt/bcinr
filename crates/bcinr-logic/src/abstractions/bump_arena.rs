@@ -33,7 +33,7 @@ impl BumpArenaState {
 mod tests {
     // _reference equivalence boundaries
     fn bump_arena_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    use super::*;
+    
 
     #[test]
     fn test_equivalence() {

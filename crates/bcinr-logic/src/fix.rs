@@ -31,7 +31,7 @@ pub fn bucketize_u32(val: u32, step: u32) -> u32 {
 mod tests {
     // _reference equivalence boundaries
     fn fix_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    use super::*;
+    
 
     #[test]
     fn test_equivalence() {

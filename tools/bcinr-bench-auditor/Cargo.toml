@@ -7,6 +7,9 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/seanchatmangpt/bcinr"
 description = "Deterministic branchless substrate for autonomic AGI."
 readme = "../../README.md"
+categories = ["algorithms", "no-std"]
+keywords = ["branchless", "simd", "performance"]
+
 [dependencies]
 syn = { version = "2.0.117", features = ["full", "visit"] }
 walkdir = "2.5.0"

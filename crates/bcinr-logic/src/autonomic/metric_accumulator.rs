@@ -54,7 +54,7 @@ mod tests {
     // -------------------------------------------------------------------------
     fn mutant_metric_accumulator_sat_add_1(current: u64, val: u64) -> u64 { current.wrapping_add(val) }
     fn mutant_metric_accumulator_sat_add_2(current: u64, val: u64) -> u64 { current.saturating_sub(val) }
-    fn mutant_metric_accumulator_sat_add_3(current: u64, val: u64) -> u64 { current }
+    fn mutant_metric_accumulator_sat_add_3(current: u64, _val: u64) -> u64 { current }
 
     #[test]
     fn test_metric_accumulator_sat_add_equivalence() {

@@ -70,6 +70,7 @@ impl<const MAX_THREADS: usize> HazardShield<MAX_THREADS> {
 
 #[cfg(test)]
 mod tests {
+    #[allow(dead_code)]
     fn hazard_shield_reference(val: u64, aux: u64) -> u64 { val ^ aux }
 
     use super::*;

@@ -1,4 +1,3 @@
-use bcinr_logic::algorithms::*;
 use criterion::{criterion_group, criterion_main, Criterion, black_box};
 
 fn bench_parallel_bits_deposit_u64(c: &mut Criterion) {

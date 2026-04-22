@@ -17,7 +17,7 @@ pub fn count_min_sketch_update(table: &mut [u32], hash: u64, depth: usize, width
 mod tests {
     // _reference equivalence boundaries
     fn sketch_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    use super::*;
+    
 
     #[test]
     fn test_equivalence() {

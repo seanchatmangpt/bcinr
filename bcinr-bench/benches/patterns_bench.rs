@@ -1,6 +1,5 @@
 use bcinr_logic::patterns::*;
 use bcinr_logic::models::petri::KBitSet;
-use bcinr_logic::abstractions::resumable_fiber::FiberState;
 use criterion::{criterion_group, criterion_main, Criterion, black_box};
 
 fn bench_bloom_scan_pipeline(c: &mut Criterion) {

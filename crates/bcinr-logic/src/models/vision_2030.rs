@@ -41,6 +41,12 @@ pub struct Vision2030Engine<const WORDS: usize> {
 }
 
 #[cfg(feature = "alloc")]
+impl<const WORDS: usize> Default for Vision2030Engine<WORDS> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const WORDS: usize> Vision2030Engine<WORDS> {
     pub fn new() -> Self {
         let mut activity_table = PackedKeyTable::new();

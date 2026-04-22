@@ -39,7 +39,7 @@ pub fn parse_hex_u32(bytes: &[u8]) -> Result<u32, ()> {
 mod tests {
     // _reference equivalence boundaries
     fn parse_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    use super::*;
+    
 
     #[test]
     fn test_equivalence() {

@@ -1,4 +1,5 @@
 //! Integration tests for Refined Aggregate Patterns.
+#![allow(clippy::module_inception)]
 
 #[cfg(test)]
 mod tests {

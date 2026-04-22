@@ -153,7 +153,7 @@ mod tests {
 }
 #[cfg(test)]
 mod tests_phd_int {
-    use super::*;
+    
     fn int_reference(val: u64, aux: u64) -> u64 { val ^ aux }
     #[test] fn test_phd_equivalence() { assert_eq!(int_reference(1, 2), 3); }
     #[test] fn test_phd_boundaries() { assert_eq!(int_reference(0, 0), 0); }

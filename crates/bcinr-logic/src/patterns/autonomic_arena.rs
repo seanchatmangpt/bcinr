@@ -77,7 +77,7 @@ impl AutonomicExhaustionArena {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
 
     fn autonomic_arena_reference(val: u64, _aux: u64) -> u64 { val }
 

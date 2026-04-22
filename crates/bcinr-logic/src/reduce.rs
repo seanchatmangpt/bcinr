@@ -63,7 +63,7 @@ pub fn horizontal_min_u8x8(v: u64) -> u8 {
 
 #[cfg(test)]
 mod tests_phd_reduce {
-    use super::*;
+    
     fn reduce_reference(val: u64, aux: u64) -> u64 { val ^ aux }
     #[test] fn test_equivalence() { assert_eq!(reduce_reference(1, 0), 1); }
     #[test] fn test_boundaries() { }

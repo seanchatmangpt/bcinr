@@ -54,7 +54,7 @@ impl<const WORDS: usize, const TRANSITIONS: usize> PriorityPetriEngine<WORDS, TR
 
 #[cfg(test)]
 mod tests_petri_engine {
-    use super::*;
+    
     fn petri_engine_reference(val: u64, aux: u64) -> u64 { val ^ aux }
     #[test] fn test_equivalence() { assert_eq!(petri_engine_reference(1, 0), 1); }
     #[test] fn test_boundaries() { }

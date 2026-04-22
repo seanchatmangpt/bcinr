@@ -77,7 +77,7 @@ pub fn movemask_u8x16(a: [u8; 16]) -> u16 {
 
 #[cfg(test)]
 mod tests_phd_simd {
-    use super::*;
+    
     fn simd_reference(val: u64, aux: u64) -> u64 { val ^ aux }
     #[test] fn test_simd_phd_equivalence() { assert_eq!(simd_reference(1, 2), 3); }
     #[test] fn test_simd_phd_boundaries() { assert_eq!(simd_reference(0, 0), 0); }

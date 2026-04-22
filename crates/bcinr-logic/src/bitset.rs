@@ -122,7 +122,7 @@ pub fn any_bit_set_u64_slice(a: &[u64]) -> bool {
 
 #[cfg(test)]
 mod tests_phd_bitset {
-    use super::*;
+    
     fn bitset_reference(val: u64, aux: u64) -> u64 { val ^ aux }
     #[test] fn test_phd_equivalence() { assert_eq!(bitset_reference(1, 0), 1); }
     #[test] fn test_phd_boundaries() { }

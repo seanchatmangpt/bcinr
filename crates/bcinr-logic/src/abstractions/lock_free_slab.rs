@@ -64,7 +64,7 @@ impl<const N: usize> LockFreeSlab<N> {
 
 #[cfg(test)]
 mod tests_slab {
-    use super::*;
+    
     fn slab_reference(val: u64, aux: u64) -> u64 { val ^ aux }
     #[test] fn test_equivalence() { assert_eq!(slab_reference(1, 0), 1); }
     #[test] fn test_boundaries() { }

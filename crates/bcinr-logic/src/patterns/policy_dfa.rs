@@ -45,7 +45,7 @@ impl ConstantShapePolicyDfa {
         let next = dfa_advance(current_state, input, self.table, self.alphabet_size);
         let state_bit = 1u64.wrapping_shl((next as u32) & 0x3F);
         let blacklisted = self.blacklisted_states_mask & state_bit;
-        let allowed_mask = PolicyGuard::mask_eq(blacklisted as u64, 0);
+        let allowed_mask = PolicyGuard::mask_eq(blacklisted, 0);
         let gated_state = ((next as u64 & allowed_mask) | (self.error_state as u64 & !allowed_mask)) as usize;
         (gated_state, allowed_mask)
     }
@@ -65,7 +65,7 @@ impl ConstantShapePolicyDfa {
 
 #[cfg(test)]
 mod tests_policy_dfa {
-    use super::*;
+    
     fn policy_dfa_reference(val: u64, aux: u64) -> u64 { val ^ aux }
     #[test] fn test_equivalence() { assert_eq!(policy_dfa_reference(1, 0), 1); }
     #[test] fn test_boundaries() { }

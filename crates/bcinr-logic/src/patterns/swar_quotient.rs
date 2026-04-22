@@ -72,6 +72,7 @@ impl<const N: usize> SwarQuotientFilter<N> {
 
 #[cfg(test)]
 mod tests {
+    #[allow(dead_code)]
     fn swar_quotient_reference(val: u64, aux: u64) -> u64 { val ^ aux }
 
     use super::*;

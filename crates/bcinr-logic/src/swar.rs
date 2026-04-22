@@ -14,7 +14,7 @@ pub fn swar_mask_ones(val: u64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
     fn swar_reference(val: u64, aux: u64) -> u64 { val ^ aux }
     #[test] fn test_equivalence() { assert_eq!(swar_reference(1, 2), 3); }
     #[test] fn test_boundaries() { assert_eq!(swar_reference(0, 0), 0); }

@@ -168,7 +168,7 @@ mod tests {
 }
 #[cfg(test)]
 mod tests_phd_mask {
-    use super::*;
+    
     fn mask_reference(val: u64, aux: u64) -> u64 { val ^ aux }
     #[test] fn test_phd_equivalence() { assert_eq!(mask_reference(1, 2), 3); }
     #[test] fn test_phd_boundaries() { assert_eq!(mask_reference(0, 0), 0); }

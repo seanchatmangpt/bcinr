@@ -13,7 +13,7 @@ pub mod vision_2030;
 
 #[cfg(test)]
 mod tests_models {
-    use super::*;
+    
     fn models_reference(val: u64, _aux: u64) -> u64 { val }
     #[test] fn test_models_equivalence() { assert_eq!(models_reference(1, 0), 1); }
     #[test] fn test_models_boundaries() { }

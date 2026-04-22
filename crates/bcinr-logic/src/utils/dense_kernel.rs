@@ -31,6 +31,12 @@ pub struct PackedKeyTable<K, V> {
 }
 
 #[cfg(feature = "alloc")]
+impl<K, V> Default for PackedKeyTable<K, V> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<K, V> PackedKeyTable<K, V> {
     pub fn new() -> Self {
         Self { entries: Vec::new() }
@@ -51,7 +57,7 @@ impl<K, V> PackedKeyTable<K, V> {
 mod tests {
     // _reference equivalence boundaries
     fn dense_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    use super::*;
+    
 
     #[test]
     fn test_equivalence() {

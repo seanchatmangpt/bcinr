@@ -1,4 +1,3 @@
-use bcinr_logic::algorithms::*;
 use criterion::{criterion_group, criterion_main, Criterion, black_box};
 
 fn algorithms_301_307(c: &mut Criterion) {

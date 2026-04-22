@@ -58,7 +58,7 @@ impl BitTranscoder {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
 
     fn bit_transcoder_reference(val: u64, _aux: u64) -> u64 { val }
 

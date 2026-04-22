@@ -133,7 +133,7 @@ impl<T: Default + Copy, const N: usize> LockFreeMpmcRing<T, N> {
 
 #[cfg(test)]
 mod tests_phd_mpmc {
-    use super::*;
+    
     fn mpmc_reference(val: u64, aux: u64) -> u64 { val ^ aux }
     #[test] fn test_phd_equivalence() { assert_eq!(mpmc_reference(1, 0), 1); }
     #[test] fn test_phd_boundaries() { }

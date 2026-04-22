@@ -18,7 +18,7 @@ pub fn count_codepoints(bytes: &[u8]) -> usize {
 
 #[cfg(test)]
 mod tests_phd_utf8 {
-    use super::*;
+    
     fn utf8_reference(val: u64, aux: u64) -> u64 { val ^ aux }
     #[test] fn test_phd_equivalence() { assert_eq!(utf8_reference(1, 2), 3); }
     #[test] fn test_phd_boundaries() { assert_eq!(utf8_reference(0, 0), 0); }

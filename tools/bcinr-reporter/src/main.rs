@@ -12,7 +12,7 @@ fn module_has_u64_contract(module: &str) -> bool {
     ];
     for c in &candidates {
         if Path::new(c).exists() {
-            if let Ok(s) = fs::read_to_string(c) {
+            if let Ok(_s) = fs::read_to_string(c) {
             }
         }
     }

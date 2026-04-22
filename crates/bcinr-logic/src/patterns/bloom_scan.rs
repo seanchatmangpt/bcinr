@@ -71,7 +71,7 @@ impl BloomScanPipeline {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
 
     fn bloom_scan_reference(val: u64, _aux: u64) -> u64 { val }
 

@@ -62,6 +62,7 @@ impl<const THRESHOLD: usize> FixedConsensus<THRESHOLD> {
 
 #[cfg(test)]
 mod tests {
+    #[allow(dead_code)]
     fn consensus_bft_reference(val: u64, aux: u64) -> u64 { val ^ aux }
 
     use super::*;

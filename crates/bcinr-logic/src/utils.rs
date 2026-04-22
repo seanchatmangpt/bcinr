@@ -12,7 +12,7 @@ pub mod dense_kernel;
 
 #[cfg(test)]
 mod tests_utils {
-    use super::*;
+    
     fn utils_reference(val: u64, _aux: u64) -> u64 { val }
     #[test] fn test_utils_equivalence() { assert_eq!(utils_reference(1, 0), 1); }
     #[test] fn test_utils_boundaries() { }

@@ -94,7 +94,7 @@ mod tests {
 }
 #[cfg(test)]
 mod tests_phd_exec {
-    use super::*;
+    
     fn exec_reference(val: u64, aux: u64) -> u64 { val ^ aux }
     #[test] fn test_phd_equivalence() { assert_eq!(exec_reference(1, 2), 3); }
     #[test] fn test_phd_boundaries() { assert_eq!(exec_reference(0, 0), 0); }

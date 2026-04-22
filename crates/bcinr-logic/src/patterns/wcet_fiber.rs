@@ -75,7 +75,7 @@ impl<const TICKS: usize> WcetFiber<TICKS> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
 
     fn wcet_fiber_reference(val: u64, _aux: u64) -> u64 { val }
 

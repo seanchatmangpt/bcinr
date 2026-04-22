@@ -72,6 +72,7 @@ impl<const N: usize> RadixTrieNode<N> {
 
 #[cfg(test)]
 mod tests {
+    #[allow(dead_code)]
     fn radix_trie_reference(val: u64, aux: u64) -> u64 { val ^ aux }
 
     use super::*;

@@ -57,7 +57,7 @@ pub fn bitonic_sort_16u32(a: &mut [u32; 16]) {
 mod tests {
     // _reference equivalence boundaries
     fn network_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    use super::*;
+    
 
     #[test]
     fn test_equivalence() {

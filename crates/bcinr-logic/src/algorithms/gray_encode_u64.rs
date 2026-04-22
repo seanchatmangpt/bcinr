@@ -31,6 +31,7 @@ mod tests {
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
+    #[allow(unused_variables)]
     fn gray_encode_u64_reference(val: u64, aux: u64) -> u64 {
     val ^ (val >> 1)
     }

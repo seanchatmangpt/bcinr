@@ -1,4 +1,4 @@
-//! BranchlessCInRust: Academic-grade branchless algorithm library
+//! `BranchlessCInRust`: Academic-grade branchless algorithm library
 //!
 //! This crate is a facade that re-exports the `bcinr-api` and `bcinr-logic` crates.
 

@@ -65,7 +65,7 @@ impl RegisterEngine {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
 
     fn register_sql_reference(val: u64, _aux: u64) -> u64 { val }
 
