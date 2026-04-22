@@ -1,16 +1,5 @@
 # bcinr — BranchlessCInRust (v26.4.21)
 
-> **NOTICE: Final `bcinr` Release and Transition to `unibit`**
->
-> `bcinr` v26.4.21 is the final release of this deterministic process-discovery engine architecture. The project has successfully proven the $CC=1$ Radon Law, the Zero-Allocation Boundary, and the K-Tier timing constitution ($T_1 \le 200 \text{ns}$).
->
-> We are now transitioning this physics engine into a full bit-native operating substrate called **`unibit`**. 
->
-> For details on the transition, the future of the `dteam` architecture, and what `unibit` entails, please see:
-> [**bcinr to unibit: The Final Transition**](docs/bcinr/FINAL.md)
-
----
-
 `bcinr` is a performance-first, research-grade systems library providing a principled calculus for branchless algorithmics. It is designed for high-performance, deterministic autonomic systems where predictable latency, memory-safety, and side-channel resilience are non-negotiable.
 
 ## Key Features
@@ -68,7 +57,6 @@ assert_eq!(clamped, 100);
 
 The documentation is organized to support different stages of integration and research:
 
--   **[bcinr to unibit: The Final Transition](docs/bcinr/FINAL.md)**: Details on the successor to `bcinr`.
 -   **[Tutorials](docs/diataxis/tutorials/)**: Walkthroughs for implementing kernels and SIMD vectorization.
 -   **[How-To Guides](docs/diataxis/how-to/)**: Practical solutions for side-channel hardening and WCET bounding.
 -   **[Explanations](docs/diataxis/explanation/)**: Deep-dives into the Branchless Calculus and architectural design.

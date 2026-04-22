@@ -2,13 +2,6 @@
 
 Welcome to the comprehensive documentation suite for the bcinr library. This index maps our full Diátaxis documentation, categorized by intent.
 
-> **NOTICE: Final `bcinr` Release and Transition to `unibit`**
->
-> `bcinr` v26.4.21 is the final release of this deterministic process-discovery engine architecture. The project is transitioning into a full bit-native operating substrate called **`unibit`**. 
->
-> For details on the transition, please see:
-> [**bcinr to unibit: The Final Transition**](../bcinr/FINAL.md)
-
 ## Tutorials: Learning by Doing
 - [Tutorial 1: Advanced Pattern 1](tutorials/tutorial-1.md)
 - [Tutorial 2: Advanced Pattern 2](tutorials/tutorial-2.md)
