@@ -1,6 +1,6 @@
 [package]
 name = "bcinr-bench"
-version = "26.4.21"
+version = "26.4.22"
 edition = "2021"
 description = "BranchlessCInRust: Academic-grade branchless algorithm library"
 repository = "https://github.com/example/bcinr"
@@ -13,8 +13,8 @@ publish = false
 readme = "../README.md"
 [dependencies]
 criterion = "0.5"
-bcinr-core = { path = "../bcinr-core", version = "26.4.21" }
-bcinr-logic = { path = "../crates/bcinr-logic", version = "26.4.21", features = ["bench"] }
+bcinr-core = { path = "../bcinr-core", version = "26.4.22" }
+bcinr-logic = { path = "../crates/bcinr-logic", version = "26.4.22", features = ["bench"] }
 prettytable-rs = "0.10.0"
 
 [features]

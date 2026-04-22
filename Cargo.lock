@@ -37,7 +37,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "bcinr"
-version = "26.4.21"
+version = "26.4.22"
 dependencies = [
  "bcinr-api",
  "bcinr-core",
@@ -46,14 +46,14 @@ dependencies = [
 
 [[package]]
 name = "bcinr-api"
-version = "26.4.21"
+version = "26.4.22"
 dependencies = [
  "bcinr-logic",
 ]
 
 [[package]]
 name = "bcinr-bench"
-version = "26.4.21"
+version = "26.4.22"
 dependencies = [
  "bcinr-core",
  "bcinr-logic",
@@ -63,7 +63,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-bench-auditor"
-version = "26.4.21"
+version = "26.4.22"
 dependencies = [
  "syn",
  "walkdir",
@@ -71,7 +71,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-contract-gate"
-version = "26.4.21"
+version = "26.4.22"
 dependencies = [
  "quote",
  "syn",
@@ -80,7 +80,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-core"
-version = "26.4.21"
+version = "26.4.22"
 dependencies = [
  "bcinr-api",
  "bcinr-logic",
@@ -90,7 +90,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-logic"
-version = "26.4.21"
+version = "26.4.22"
 dependencies = [
  "criterion",
  "proptest",
@@ -98,7 +98,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-reporter"
-version = "26.4.21"
+version = "26.4.22"
 dependencies = [
  "prettytable-rs",
  "regex",

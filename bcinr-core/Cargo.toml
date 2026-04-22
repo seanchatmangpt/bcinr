@@ -1,6 +1,6 @@
 [package]
 name = "bcinr-core"
-version = "26.4.21"
+version = "26.4.22"
 edition = "2021"
 description = "BranchlessCInRust: Academic-grade branchless algorithm library"
 repository = "https://github.com/example/bcinr"
@@ -11,8 +11,8 @@ categories = ["algorithms", "no-std"]
 
 readme = "../README.md"
 [dependencies]
-bcinr-api = { path = "../crates/bcinr-api", version = "26.4.21" }
-bcinr-logic = { path = "../crates/bcinr-logic", version = "26.4.21" }
+bcinr-api = { path = "../crates/bcinr-api", version = "26.4.22" }
+bcinr-logic = { path = "../crates/bcinr-logic", version = "26.4.22" }
 
 [features]
 default = []
