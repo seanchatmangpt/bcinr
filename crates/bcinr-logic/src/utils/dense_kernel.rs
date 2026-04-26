@@ -37,6 +37,7 @@ impl<K, V> Default for PackedKeyTable<K, V> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<K, V> PackedKeyTable<K, V> {
     pub fn new() -> Self {
         Self { entries: Vec::new() }
