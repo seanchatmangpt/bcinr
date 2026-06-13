@@ -1,0 +1,8 @@
+[package]
+name = "bcinr-cheat-scanner"
+version = "26.4.22"
+edition = "2021"
+
+[dependencies]
+walkdir = "2"
+syn = { version = "2", features = ["full", "visit", "extra-traits"] }

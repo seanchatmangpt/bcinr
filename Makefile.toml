@@ -79,10 +79,24 @@ script = [
     "rm -rf target/criterion"
 ]
 
+[tasks.scan-cheats]
+category = "Lint"
+description = "Scan for algorithmic cheats and anti-patterns"
+workspace = false
+command = "cargo"
+args = ["run", "--manifest-path", "tools/bcinr-cheat-scanner/Cargo.toml", "--release", "--quiet"]
+
+[tasks.contract-gate]
+category = "Lint"
+description = "Validate branchless contract compliance"
+workspace = false
+command = "cargo"
+args = ["run", "--manifest-path", "tools/bcinr-contract-gate/Cargo.toml", "--release", "--quiet"]
+
 [tasks.ci]
 category = "CI"
 description = "Comprehensive CI pipeline"
-dependencies = ["fmt", "check", "clippy", "test", "audit", "deny"]
+dependencies = ["fmt", "check", "clippy", "scan-cheats", "contract-gate", "test", "audit", "deny"]
 
 [tasks.default]
 alias = "ci"

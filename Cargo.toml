@@ -1,5 +1,5 @@
 [workspace]
-members = ["bcinr", "bcinr-core", "bcinr-bench", "crates/bcinr-api", "crates/bcinr-logic", "tools/bcinr-reporter", "tools/bcinr-contract-gate", "tools/bcinr-bench-auditor", "tools/rust_audit", "crates/encode_unicode_patch"]
+members = ["bcinr", "bcinr-core", "bcinr-bench", "crates/bcinr-api", "crates/bcinr-logic", "tools/bcinr-reporter", "tools/bcinr-contract-gate", "tools/bcinr-bench-auditor", "tools/bcinr-cheat-scanner", "tools/rust_audit", "crates/encode_unicode_patch"]
 resolver = "2"
 
 [profile.release]
