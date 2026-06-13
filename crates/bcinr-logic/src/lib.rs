@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(unused_attributes)]
 #[cfg(feature = "alloc")]
 extern crate alloc;
 #[cfg(all(test, feature = "std"))]

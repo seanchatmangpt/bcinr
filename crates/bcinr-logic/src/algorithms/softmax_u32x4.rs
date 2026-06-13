@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,12 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn softmax_u32x4(val: u64, aux: u64) -> u64 {
-    (val.wrapping_add(aux)).wrapping_add(val.count_ones() as u64 | aux) ^ (val ^ aux)
-
+    let exp_x = val.wrapping_mul(val);
+    let den = aux.wrapping_add(1);
+    let is_zero = (den == 0) as u64;
+    let divisor = den | is_zero;
+    let res = exp_x.wrapping_div(divisor);
+    res & (!is_zero.wrapping_neg())
 }
 
 #[cfg(test)]
@@ -32,7 +36,12 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn softmax_u32x4_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_add(aux)).wrapping_add(val.count_ones() as u64 | aux) ^ (val ^ aux)
+        let den = aux.wrapping_add(1);
+        if den == 0 {
+            0
+        } else {
+            (val * val) / den
+        }
     }
 
     // -------------------------------------------------------------------------

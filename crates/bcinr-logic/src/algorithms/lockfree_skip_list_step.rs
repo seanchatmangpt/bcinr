@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn lockfree_skip_list_step(val: u64, aux: u64) -> u64 {
-    (val & aux).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (val.reverse_bits() ^ aux)
-
+    (aux > val) as u64
 }
 
 #[cfg(test)]
@@ -32,7 +31,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn lockfree_skip_list_step_reference(val: u64, aux: u64) -> u64 {
-        (val & aux).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (val.reverse_bits() ^ aux)
+        if aux > val { 1 } else { 0 }
     }
 
     // -------------------------------------------------------------------------

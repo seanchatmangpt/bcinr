@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,12 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn next_lexicographic_permutation_u64(val: u64, aux: u64) -> u64 {
-    (val.wrapping_sub(aux)).wrapping_add(val ^ aux) ^ (val.leading_zeros() as u64 ^ aux)
-
+    let t = val | val.wrapping_sub(1);
+    let c = !t & t.wrapping_add(1);
+    let tz = val.trailing_zeros();
+    let shift = tz.wrapping_add(1) & 0x3F;
+    let o = (c.wrapping_sub(1)).wrapping_shr(shift);
+    (t.wrapping_add(1) | o) * (val != 0) as u64
 }
 
 #[cfg(test)]
@@ -32,10 +36,16 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn next_lexicographic_permutation_u64_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_sub(aux)).wrapping_add(val ^ aux) ^ (val.leading_zeros() as u64 ^ aux)
+        if val == 0 {
+            0
+        } else {
+            let t = val | val.wrapping_sub(1);
+            let next = t.wrapping_add(1);
+            let ones = ((!t & next).wrapping_sub(1)).wrapping_shr(val.trailing_zeros() + 1);
+            next | ones
+        }
     }
 
-    // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]

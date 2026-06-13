@@ -14,3 +14,6 @@ categories = ["algorithms", "no-std"]
 bcinr-api = { path = "../crates/bcinr-api", version = "26.4.22" }
 bcinr-core = { path = "../bcinr-core", version = "26.4.22" }
 bcinr-logic = { path = "../crates/bcinr-logic", version = "26.4.22" }
+
+[dev-dependencies]
+tempfile = "3.27"

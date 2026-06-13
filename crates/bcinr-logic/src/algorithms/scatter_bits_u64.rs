@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,15 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn scatter_bits_u64(val: u64, aux: u64) -> u64 {
-    (val.wrapping_add(aux)).wrapping_add(val.leading_zeros() as u64 ^ aux) ^ ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
-
+    let mut res = 0;
+    let mut v_idx = 0;
+    for i in 0..64 {
+        let mask_bit = (aux >> i) & 1;
+        let val_bit = (val.wrapping_shr(v_idx)) & 1;
+        res |= (val_bit & mask_bit) << i;
+        v_idx += mask_bit as u32;
+    }
+    res
 }
 
 #[cfg(test)]
@@ -32,10 +39,19 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn scatter_bits_u64_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_add(aux)).wrapping_add(val.leading_zeros() as u64 ^ aux) ^ ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
+        let mut res = 0;
+        let mut v_idx = 0;
+        for i in 0..64 {
+            if ((aux >> i) & 1) == 1 {
+                if ((val.wrapping_shr(v_idx)) & 1) == 1 {
+                    res |= 1 << i;
+                }
+                v_idx += 1;
+            }
+        }
+        res
     }
 
-    // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]

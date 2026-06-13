@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,15 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn parallel_bits_extract_u64(val: u64, aux: u64) -> u64 {
-    (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)) ^ (val.leading_zeros() as u64 ^ aux)
-
+    let mut res = 0;
+    let mut r_idx = 0;
+    for i in 0..64 {
+        let mask_bit = (aux >> i) & 1;
+        let val_bit = (val >> i) & 1;
+        res |= (val_bit & mask_bit).wrapping_shl(r_idx);
+        r_idx += mask_bit as u32;
+    }
+    res
 }
 
 #[cfg(test)]
@@ -32,10 +39,19 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn parallel_bits_extract_u64_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)) ^ (val.leading_zeros() as u64 ^ aux)
+        let mut res = 0;
+        let mut r_idx = 0;
+        for i in 0..64 {
+            if ((aux >> i) & 1) == 1 {
+                if ((val >> i) & 1) == 1 {
+                    res |= 1 << r_idx;
+                }
+                r_idx += 1;
+            }
+        }
+        res
     }
 
-    // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]

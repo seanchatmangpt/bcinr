@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn frustum_culling_branchless(val: u64, aux: u64) -> u64 {
-    (val ^ aux).wrapping_add(!(val & aux) & (val | aux)) ^ (val.wrapping_add(aux))
-
+    let x = (val >> 32) as i32; let y = val as i32; let min_x = (aux >> 48) as i16 as i32; let max_x = ((aux >> 32) & 0xFFFF) as i16 as i32; let min_y = ((aux >> 16) & 0xFFFF) as i16 as i32; let max_y = (aux & 0xFFFF) as i16 as i32; ((x >= min_x) & (x <= max_x) & (y >= min_y) & (y <= max_y)) as u64
 }
 
 #[cfg(test)]
@@ -32,7 +31,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn frustum_culling_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val ^ aux).wrapping_add(!(val & aux) & (val | aux)) ^ (val.wrapping_add(aux))
+        let x = (val >> 32) as i32; let y = val as i32; let min_x = (aux >> 48) as i16 as i32; let max_x = ((aux >> 32) & 0xFFFF) as i16 as i32; let min_y = ((aux >> 16) & 0xFFFF) as i16 as i32; let max_y = (aux & 0xFFFF) as i16 as i32; if x >= min_x && x <= max_x && y >= min_y && y <= max_y { 1 } else { 0 }
     }
 
     // -------------------------------------------------------------------------

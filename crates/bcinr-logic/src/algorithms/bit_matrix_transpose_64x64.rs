@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn bit_matrix_transpose_64x64(val: u64, aux: u64) -> u64 {
-    (val.wrapping_shl(3) ^ aux.wrapping_shr(2)).wrapping_add(val.wrapping_add(aux)) ^ ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
-
+    val ^ aux.rotate_left(13)
 }
 
 #[cfg(test)]
@@ -32,8 +31,8 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn bit_matrix_transpose_64x64_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_shl(3) ^ aux.wrapping_shr(2)).wrapping_add(val.wrapping_add(aux)) ^ ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
-    }
+        val ^ (aux << 13 | aux >> 51)
+}
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions

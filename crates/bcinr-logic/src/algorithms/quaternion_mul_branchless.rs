@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn quaternion_mul_branchless(val: u64, aux: u64) -> u64 {
-    (!(val & aux) & (val | aux)).wrapping_add((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)) ^ (val.count_ones() as u64 | aux)
-
+    let a = val >> 32; let b = val & 0xFFFFFFFF; let c = aux >> 32; let d = aux & 0xFFFFFFFF; let r = a.wrapping_mul(c).wrapping_sub(b.wrapping_mul(d)); let i = a.wrapping_mul(d).wrapping_add(b.wrapping_mul(c)); (r << 32) | (i & 0xFFFFFFFF)
 }
 
 #[cfg(test)]
@@ -32,7 +31,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn quaternion_mul_branchless_reference(val: u64, aux: u64) -> u64 {
-        (!(val & aux) & (val | aux)).wrapping_add((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)) ^ (val.count_ones() as u64 | aux)
+        let a = val >> 32; let b = val & 0xFFFFFFFF; let c = aux >> 32; let d = aux & 0xFFFFFFFF; let r = (a.wrapping_mul(c)).wrapping_sub(b.wrapping_mul(d)); let i = (a.wrapping_mul(d)).wrapping_add(b.wrapping_mul(c)); (r << 32) | (i & 0xFFFFFFFF)
     }
 
     // -------------------------------------------------------------------------

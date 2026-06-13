@@ -19,7 +19,10 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn next_combination_u64(val: u64, aux: u64) -> u64 {
-    (val & aux).wrapping_add(!(val & aux) & (val | aux)) ^ (val.reverse_bits() ^ aux)
+    let v = val;
+    let t = v | v.wrapping_sub(1);
+    let w = (t.wrapping_add(1)) | (((!t & (t.wrapping_add(1))).wrapping_sub(1)) >> (v.trailing_zeros().wrapping_add(1)));
+    w
 
 }
 
@@ -32,7 +35,11 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn next_combination_u64_reference(val: u64, aux: u64) -> u64 {
-        (val & aux).wrapping_add(!(val & aux) & (val | aux)) ^ (val.reverse_bits() ^ aux)
+    let v = val;
+    if v == 0 { return 0; }
+    let t = v | (v - 1);
+    let w = (t + 1) | (((!t & (t + 1)) - 1) >> (v.trailing_zeros() + 1));
+    w
     }
 
     // -------------------------------------------------------------------------

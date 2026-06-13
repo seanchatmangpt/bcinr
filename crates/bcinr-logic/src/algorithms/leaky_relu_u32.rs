@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,11 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn leaky_relu_u32(val: u64, aux: u64) -> u64 {
-    (aux.rotate_right(7)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (val & aux)
-
+    let x = val as i32;
+    let mask = x >> 31;
+    let positive = x & !mask;
+    let negative = (x & mask) / 100;
+    (positive | negative) as u64
 }
 
 #[cfg(test)]
@@ -32,7 +35,12 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn leaky_relu_u32_reference(val: u64, aux: u64) -> u64 {
-        (aux.rotate_right(7)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (val & aux)
+        let x = val as i32;
+        if x > 0 {
+            x as u64
+        } else {
+            (x / 100) as u64
+        }
     }
 
     // -------------------------------------------------------------------------

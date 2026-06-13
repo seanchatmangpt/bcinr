@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,21 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn fp_sqrt_u32_q16(val: u64, aux: u64) -> u64 {
-    (val.wrapping_sub(aux)).wrapping_add(val.leading_zeros() as u64 ^ aux) ^ ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
-
+    let mut x = (val as u128) << 16;
+    let mut res = 0u128;
+    let mut bit = 1u128 << 62;
+    for _ in 0..32 {
+        let mask = ((bit > x) as u128).wrapping_neg();
+        bit = (bit & mask) | ((bit >> 2) & !mask);
+    }
+    for _ in 0..64 {
+        let cond = x >= res + bit;
+        let m = (cond as u128).wrapping_neg();
+        x -= (res + bit) & m;
+        res = (res >> 1) + (bit & m);
+        bit >>= 2;
+    }
+    res as u64
 }
 
 #[cfg(test)]
@@ -32,7 +45,17 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn fp_sqrt_u32_q16_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_sub(aux)).wrapping_add(val.leading_zeros() as u64 ^ aux) ^ ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
+        let val_scaled = (val as u128) << 16;
+        if val_scaled == 0 { return 0; }
+        let mut r = val_scaled;
+        loop {
+            let next = (r + val_scaled / r) / 2;
+            if next >= r {
+                break;
+            }
+            r = next;
+        }
+        r as u64
     }
 
     // -------------------------------------------------------------------------

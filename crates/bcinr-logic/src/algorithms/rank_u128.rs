@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,13 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn rank_u128(val: u64, aux: u64) -> u64 {
-    (val.wrapping_add(aux)).wrapping_add(val.rotate_left(13)) ^ (!(val & aux) & (val | aux))
-
+    let limit = (aux & 0x7F) as u32;
+    let mut count = 0u64;
+    for i in 0..64 {
+        let mask = (i < limit) as u64;
+        count += (val >> i) & mask;
+    }
+    count
 }
 
 #[cfg(test)]
@@ -32,8 +37,15 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn rank_u128_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_add(aux)).wrapping_add(val.rotate_left(13)) ^ (!(val & aux) & (val | aux))
-    }
+        let limit = aux & 0x7F;
+        let mut c = 0;
+        for i in 0..limit {
+            if i < 64 && ((val >> i) & 1) != 0 {
+                c += 1;
+            }
+        }
+        c
+}
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions

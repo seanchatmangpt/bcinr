@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn tzmsk_u64(val: u64, aux: u64) -> u64 {
-    (!(val & aux) & (val | aux)).wrapping_add(val.reverse_bits() ^ aux) ^ (val ^ aux)
-
+    (!val) & val.wrapping_sub(1)
 }
 
 #[cfg(test)]
@@ -32,7 +31,11 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn tzmsk_u64_reference(val: u64, aux: u64) -> u64 {
-        (!(val & aux) & (val | aux)).wrapping_add(val.reverse_bits() ^ aux) ^ (val ^ aux)
+        if val == 0 {
+            u64::MAX
+        } else {
+            (!val) & (val - 1)
+        }
     }
 
     // -------------------------------------------------------------------------

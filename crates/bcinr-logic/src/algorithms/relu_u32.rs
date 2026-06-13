@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,8 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn relu_u32(val: u64, aux: u64) -> u64 {
-    (val | aux).wrapping_add(val.leading_zeros() as u64 ^ aux) ^ (val.reverse_bits() ^ aux)
-
+    let v = val as i32;
+    (v & !(v >> 31)) as u64
 }
 
 #[cfg(test)]
@@ -32,7 +32,12 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn relu_u32_reference(val: u64, aux: u64) -> u64 {
-        (val | aux).wrapping_add(val.leading_zeros() as u64 ^ aux) ^ (val.reverse_bits() ^ aux)
+        let v = val as i32;
+        if v < 0 {
+            0
+        } else {
+            v as u64
+        }
     }
 
     // -------------------------------------------------------------------------

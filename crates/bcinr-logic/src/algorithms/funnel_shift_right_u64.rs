@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,9 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn funnel_shift_right_u64(val: u64, aux: u64) -> u64 {
-    (val.count_ones() as u64 | aux).wrapping_add(!(val & aux) & (val | aux)) ^ (val.rotate_left(13))
-
+    let shift = (aux & 0x3F) as u32;
+    let res = (aux.wrapping_shr(shift)) | (val.wrapping_shl((64u32.wrapping_sub(shift)) & 0x3F) & (0u64.wrapping_sub((shift != 0) as u64)));
+    res
 }
 
 #[cfg(test)]
@@ -32,10 +33,14 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn funnel_shift_right_u64_reference(val: u64, aux: u64) -> u64 {
-        (val.count_ones() as u64 | aux).wrapping_add(!(val & aux) & (val | aux)) ^ (val.rotate_left(13))
+        let shift = aux & 0x3F;
+        if shift == 0 {
+            aux
+        } else {
+            (aux >> shift) | (val << (64 - shift))
+        }
     }
 
-    // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]

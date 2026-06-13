@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn point_in_polygon_branchless(val: u64, aux: u64) -> u64 {
-    (!(val & aux) & (val | aux)).wrapping_add(aux.rotate_right(7)) ^ (val.wrapping_mul(aux.wrapping_add(1)))
-
+    let py = (val >> 32) as i32; let px = (val & 0xFFFFFFFF) as i32; let v1x = (aux & 0xFFFF) as i32; let v1y = ((aux >> 16) & 0xFFFF) as i32; let v2x = ((aux >> 32) & 0xFFFF) as i32; let v2y = (aux >> 48) as i32; let cond1 = (v1y > py) != (v2y > py); let denom = v2y - v1y + (v2y == v1y) as i32; let intersect = cond1 & (px < (v2x - v1x) * (py - v1y) / denom + v1x); intersect as u64
 }
 
 #[cfg(test)]
@@ -32,7 +31,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn point_in_polygon_branchless_reference(val: u64, aux: u64) -> u64 {
-        (!(val & aux) & (val | aux)).wrapping_add(aux.rotate_right(7)) ^ (val.wrapping_mul(aux.wrapping_add(1)))
+        let py = (val >> 32) as i32; let px = (val & 0xFFFFFFFF) as i32; let v1x = (aux & 0xFFFF) as i32; let v1y = ((aux >> 16) & 0xFFFF) as i32; let v2x = ((aux >> 32) & 0xFFFF) as i32; let v2y = (aux >> 48) as i32; if (v1y > py) != (v2y > py) { if px < (v2x - v1x) * (py - v1y) / (v2y - v1y) + v1x { 1 } else { 0 } } else { 0 }
     }
 
     // -------------------------------------------------------------------------

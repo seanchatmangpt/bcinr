@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn euclidean_dist_sq_u32x2(val: u64, aux: u64) -> u64 {
-    (val ^ aux).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ ((val & 0xFFFFFFFF) | (aux << 32))
-
+    let dx = (val as u32 as i64).wrapping_sub(aux as u32 as i64); let dy = ((val >> 32) as i64).wrapping_sub((aux >> 32) as i64); (dx*dx + dy*dy) as u64
 }
 
 #[cfg(test)]
@@ -32,7 +31,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn euclidean_dist_sq_u32x2_reference(val: u64, aux: u64) -> u64 {
-        (val ^ aux).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ ((val & 0xFFFFFFFF) | (aux << 32))
+        let dx = (val as u32 as i64).wrapping_sub(aux as u32 as i64); let dy = ((val >> 32) as i64).wrapping_sub((aux >> 32) as i64); (dx*dx + dy*dy) as u64
     }
 
     // -------------------------------------------------------------------------

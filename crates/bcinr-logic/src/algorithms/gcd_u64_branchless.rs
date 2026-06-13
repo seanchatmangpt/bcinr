@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,38 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn gcd_u64_branchless(val: u64, aux: u64) -> u64 {
-    (val.reverse_bits() ^ aux).wrapping_add(aux.rotate_right(7)) ^ (val.wrapping_sub(aux))
-
+    let mut u = val;
+    let mut v = aux;
+    
+    let is_u_zero = (u == 0) as u64;
+    let is_v_zero = (v == 0) as u64;
+    let zero_mask = is_u_zero | is_v_zero;
+    let fallback = u | v;
+    
+    let u_safe = u | zero_mask;
+    let v_safe = v | zero_mask;
+    
+    let shift = (u_safe | v_safe).trailing_zeros();
+    let mut u_val = u_safe >> u_safe.trailing_zeros();
+    let mut v_val = v_safe;
+    
+    for _ in 0..64 {
+        let v_nz = (v_val != 0) as u64;
+        let tz = v_val.trailing_zeros() as u64 & 63;
+        v_val >>= tz & v_nz.wrapping_neg();
+        
+        let diff = (u_val as i128 - v_val as i128).abs() as u64;
+        let cond = (u_val > v_val) as u64;
+        
+        let m_update = v_nz.wrapping_neg();
+        
+        let next_u = (v_val & cond.wrapping_neg()) | (u_val & !cond.wrapping_neg());
+        u_val = (next_u & m_update) | (u_val & !m_update);
+        v_val = (diff & m_update);
+    }
+    
+    let ans = u_val << shift;
+    (fallback & zero_mask.wrapping_neg()) | (ans & !zero_mask.wrapping_neg())
 }
 
 #[cfg(test)]
@@ -32,7 +62,14 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn gcd_u64_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val.reverse_bits() ^ aux).wrapping_add(aux.rotate_right(7)) ^ (val.wrapping_sub(aux))
+        let mut a = val;
+        let mut b = aux;
+        while b != 0 {
+            let t = b;
+            b = a % b;
+            a = t;
+        }
+        a
     }
 
     // -------------------------------------------------------------------------

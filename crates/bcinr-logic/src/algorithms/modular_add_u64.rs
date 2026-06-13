@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,13 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn modular_add_u64(val: u64, aux: u64) -> u64 {
-    (val | aux).wrapping_add(val.wrapping_add(aux)) ^ (val.wrapping_add(aux))
-
+    let m = 0xFFFFFFFFFFFFFFC5u64;
+    let val_m = (val % m) as u128;
+    let aux_m = (aux % m) as u128;
+    let sum = val_m + aux_m;
+    let ge_m = (sum >= m as u128) as u128;
+    let ans = sum - (m as u128 * ge_m);
+    ans as u64
 }
 
 #[cfg(test)]
@@ -32,7 +37,8 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn modular_add_u64_reference(val: u64, aux: u64) -> u64 {
-        (val | aux).wrapping_add(val.wrapping_add(aux)) ^ (val.wrapping_add(aux))
+        let m = 0xFFFFFFFFFFFFFFC5u128;
+        ((val as u128 + aux as u128) % m) as u64
     }
 
     // -------------------------------------------------------------------------

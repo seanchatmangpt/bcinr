@@ -19,7 +19,17 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn halton_sequence_u32(val: u64, aux: u64) -> u64 {
-    (val.wrapping_sub(aux)).wrapping_add(val.wrapping_add(aux)) ^ (val.rotate_left(13))
+    let mut f = 1.0f64;
+    let mut r = 0.0f64;
+    let mut i = val;
+    let base = 3.0;
+    for _ in 0..40 {
+        let m = (i > 0) as u64;
+        f = f / 3.0;
+        r = r + (f * (i % 3) as f64) * m as f64;
+        i = i / 3;
+    }
+    (r * u64::MAX as f64) as u64
 
 }
 
@@ -32,7 +42,18 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn halton_sequence_u32_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_sub(aux)).wrapping_add(val.wrapping_add(aux)) ^ (val.rotate_left(13))
+    let mut f = 1.0f64;
+    let mut r = 0.0f64;
+    let mut i = val;
+    let base = 3.0;
+    for _ in 0..40 {
+        let m = (i > 0) as u64;
+        f = f / 3.0;
+        r = r + (f * (i % 3) as f64) * m as f64;
+        i = i / 3;
+    }
+    (r * u64::MAX as f64) as u64
+
     }
 
     // -------------------------------------------------------------------------

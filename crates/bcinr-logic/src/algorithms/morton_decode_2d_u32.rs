@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,19 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn morton_decode_2d_u32(val: u64, aux: u64) -> u64 {
-    ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val.leading_zeros() as u64 ^ aux) ^ (val ^ aux)
-
+    let mut x = val & 0x5555555555555555u64;
+    x = (x | (x >> 1)) & 0x3333333333333333u64;
+    x = (x | (x >> 2)) & 0x0F0F0F0F0F0F0F0Fu64;
+    x = (x | (x >> 4)) & 0x00FF00FF00FF00FFu64;
+    x = (x | (x >> 8)) & 0x0000FFFF0000FFFFu64;
+    x = (x | (x >> 16)) & 0x00000000FFFFFFFFu64;
+    let mut y = (val >> 1) & 0x5555555555555555u64;
+    y = (y | (y >> 1)) & 0x3333333333333333u64;
+    y = (y | (y >> 2)) & 0x0F0F0F0F0F0F0F0Fu64;
+    y = (y | (y >> 4)) & 0x00FF00FF00FF00FFu64;
+    y = (y | (y >> 8)) & 0x0000FFFF0000FFFFu64;
+    y = (y | (y >> 16)) & 0x00000000FFFFFFFFu64;
+    x | (y << 32)
 }
 
 #[cfg(test)]
@@ -32,10 +43,19 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn morton_decode_2d_u32_reference(val: u64, aux: u64) -> u64 {
-        ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val.leading_zeros() as u64 ^ aux) ^ (val ^ aux)
+        let mut x = 0u32;
+        let mut y = 0u32;
+        for i in 0..32 {
+            if ((val >> (2 * i)) & 1) == 1 {
+                x |= 1 << i;
+            }
+            if ((val >> (2 * i + 1)) & 1) == 1 {
+                y |= 1 << i;
+            }
+        }
+        (x as u64) | ((y as u64) << 32)
     }
 
-    // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]

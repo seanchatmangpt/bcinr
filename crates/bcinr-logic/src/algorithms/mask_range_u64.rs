@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,12 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn mask_range_u64(val: u64, aux: u64) -> u64 {
-    ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (val.count_ones() as u64 | aux)
-
+    let start = val % 65;
+    let end = aux % 65;
+    let valid = (start < end) as u64;
+    let m1 = 0u64.wrapping_sub((end == 64) as u64) | (((1u64.wrapping_shl(end as u32 & 0x3F)).wrapping_sub(1)) & 0u64.wrapping_sub((end < 64) as u64));
+    let m2 = 0u64.wrapping_sub((start == 64) as u64) | (((1u64.wrapping_shl(start as u32 & 0x3F)).wrapping_sub(1)) & 0u64.wrapping_sub((start < 64) as u64));
+    (m1 ^ m2) & 0u64.wrapping_sub(valid)
 }
 
 #[cfg(test)]
@@ -32,10 +36,19 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn mask_range_u64_reference(val: u64, aux: u64) -> u64 {
-        ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (val.count_ones() as u64 | aux)
+        let start = val % 65;
+        let end = aux % 65;
+        let mut res = 0u64;
+        if start < end {
+            for i in start..end {
+                if i < 64 {
+                    res |= 1 << i;
+                }
+            }
+        }
+        res
     }
 
-    // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]

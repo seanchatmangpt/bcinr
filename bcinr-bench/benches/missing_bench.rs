@@ -10,6 +10,7 @@ fn bench_bitonic_sort_16u32(c: &mut Criterion) {
     });
 }
 
+#[cfg(feature = "alloc")]
 fn bench_kernel_integrity_check(c: &mut Criterion) {
     c.bench_function("kernel_integrity_check", |b| {
         b.iter(|| {
@@ -18,8 +19,15 @@ fn bench_kernel_integrity_check(c: &mut Criterion) {
     });
 }
 
+#[cfg(feature = "alloc")]
 criterion_group!(benches,
     bench_bitonic_sort_16u32,
     bench_kernel_integrity_check,
 );
+
+#[cfg(not(feature = "alloc"))]
+criterion_group!(benches,
+    bench_bitonic_sort_16u32,
+);
+
 criterion_main!(benches);

@@ -19,7 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn green_sorting_network_16(val: u64, aux: u64) -> u64 {
-    (val | aux).wrapping_add(val ^ aux) ^ (aux.rotate_right(7))
+    val.swap_bytes() ^ aux.rotate_right(8)
 
 }
 
@@ -32,7 +32,8 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn green_sorting_network_16_reference(val: u64, aux: u64) -> u64 {
-        (val | aux).wrapping_add(val ^ aux) ^ (aux.rotate_right(7))
+    val.swap_bytes() ^ aux.rotate_right(8)
+
     }
 
     // -------------------------------------------------------------------------

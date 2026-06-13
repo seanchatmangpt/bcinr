@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,9 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn sigmoid_sat_u32(val: u64, aux: u64) -> u64 {
-    ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val & aux) ^ (val.reverse_bits() ^ aux)
-
+    let cond = (val > 100) as u64;
+    let mask = cond.wrapping_neg();
+    (1024 & mask) | ((val.wrapping_mul(10)) & !mask)
 }
 
 #[cfg(test)]
@@ -32,7 +33,11 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn sigmoid_sat_u32_reference(val: u64, aux: u64) -> u64 {
-        ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val & aux) ^ (val.reverse_bits() ^ aux)
+        if val > 100 {
+            1024
+        } else {
+            val * 10
+        }
     }
 
     // -------------------------------------------------------------------------

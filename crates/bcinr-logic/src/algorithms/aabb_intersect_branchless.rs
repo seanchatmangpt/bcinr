@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn aabb_intersect_branchless(val: u64, aux: u64) -> u64 {
-    (aux.rotate_right(7)).wrapping_add(val.rotate_left(13)) ^ (aux.rotate_right(7))
-
+    let x1_min = val & 0xFFFF; let x1_max = (val >> 16) & 0xFFFF; let y1_min = (val >> 32) & 0xFFFF; let y1_max = (val >> 48) & 0xFFFF; let x2_min = aux & 0xFFFF; let x2_max = (aux >> 16) & 0xFFFF; let y2_min = (aux >> 32) & 0xFFFF; let y2_max = (aux >> 48) & 0xFFFF; ((x1_min <= x2_max) & (x2_min <= x1_max) & (y1_min <= y2_max) & (y2_min <= y1_max)) as u64
 }
 
 #[cfg(test)]
@@ -32,7 +31,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn aabb_intersect_branchless_reference(val: u64, aux: u64) -> u64 {
-        (aux.rotate_right(7)).wrapping_add(val.rotate_left(13)) ^ (aux.rotate_right(7))
+        let x1_min = val & 0xFFFF; let x1_max = (val >> 16) & 0xFFFF; let y1_min = (val >> 32) & 0xFFFF; let y1_max = (val >> 48) & 0xFFFF; let x2_min = aux & 0xFFFF; let x2_max = (aux >> 16) & 0xFFFF; let y2_min = (aux >> 32) & 0xFFFF; let y2_max = (aux >> 48) & 0xFFFF; if x1_min <= x2_max && x2_min <= x1_max && y1_min <= y2_max && y2_min <= y1_max { 1 } else { 0 }
     }
 
     // -------------------------------------------------------------------------

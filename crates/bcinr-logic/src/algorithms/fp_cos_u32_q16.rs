@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,11 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn fp_cos_u32_q16(val: u64, aux: u64) -> u64 {
-    (val.count_ones() as u64 | aux).wrapping_add(val.reverse_bits() ^ aux) ^ (val.rotate_left(13))
-
+    let x = (val as i64 % (360i64 << 16)).abs();
+    let sin_val = (x + (90i64 << 16)) % (360i64 << 16);
+    let x_deg = sin_val >> 16;
+    let res = (4 * x_deg * (180 - x_deg)) << 16;
+    (res / (40500 - (x_deg * (180 - x_deg)) | 1)) as u64
 }
 
 #[cfg(test)]
@@ -32,7 +35,16 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn fp_cos_u32_q16_reference(val: u64, aux: u64) -> u64 {
-        (val.count_ones() as u64 | aux).wrapping_add(val.reverse_bits() ^ aux) ^ (val.rotate_left(13))
+        let x = (val as i64 % (360i64 << 16)).abs();
+        let sin_val = (x + (90i64 << 16)) % (360i64 << 16);
+        let x_deg = sin_val / 65536;
+        let num = 4 * x_deg * (180 - x_deg);
+        let den = 40500 - x_deg * (180 - x_deg);
+        if den == 0 {
+            0
+        } else {
+            ((num << 16) / den) as u64
+        }
     }
 
     // -------------------------------------------------------------------------

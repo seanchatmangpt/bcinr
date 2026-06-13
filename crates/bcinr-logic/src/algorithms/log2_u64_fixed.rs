@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -22,7 +22,6 @@ pub fn log2_u64_fixed(val: u64, aux: u64) -> u64 {
     let nz = (val != 0) as u64;
     let mask = 0u64.wrapping_sub(nz);
     (63u64.wrapping_sub(val.leading_zeros() as u64)) & mask
-
 }
 
 #[cfg(test)]
@@ -33,11 +32,17 @@ mod tests {
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
-    #[allow(unused_variables)]
     fn log2_u64_fixed_reference(val: u64, aux: u64) -> u64 {
-    let nz = (val != 0) as u64;
-    let mask = 0u64.wrapping_sub(nz);
-    (63u64.wrapping_sub(val.leading_zeros() as u64)) & mask
+        if val == 0 {
+            return 0;
+        }
+        let mut temp = val;
+        let mut count = 0;
+        while temp > 1 {
+            temp /= 2;
+            count += 1;
+        }
+        count
     }
 
     // -------------------------------------------------------------------------

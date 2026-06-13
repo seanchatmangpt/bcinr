@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn reverse_bits_u128(val: u64, aux: u64) -> u64 {
-    ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(!(val & aux) & (val | aux)) ^ ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
-
+    val.reverse_bits() ^ aux.reverse_bits()
 }
 
 #[cfg(test)]
@@ -32,10 +31,19 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn reverse_bits_u128_reference(val: u64, aux: u64) -> u64 {
-        ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(!(val & aux) & (val | aux)) ^ ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
+        let mut r_val = 0u64;
+        let mut r_aux = 0u64;
+        for i in 0..64 {
+            if ((val >> i) & 1) == 1 {
+                r_val |= 1u64 << (63 - i);
+            }
+            if ((aux >> i) & 1) == 1 {
+                r_aux |= 1u64 << (63 - i);
+            }
+        }
+        r_val ^ r_aux
     }
 
-    // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]

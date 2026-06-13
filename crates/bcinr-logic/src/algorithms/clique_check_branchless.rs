@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn clique_check_branchless(val: u64, aux: u64) -> u64 {
-    (val ^ aux).wrapping_add(val.wrapping_sub(aux)) ^ (val.leading_zeros() as u64 ^ aux)
-
+    ((val & aux) == val) as u64
 }
 
 #[cfg(test)]
@@ -32,7 +31,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn clique_check_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val ^ aux).wrapping_add(val.wrapping_sub(aux)) ^ (val.leading_zeros() as u64 ^ aux)
+        if (val & aux) == val { 1 } else { 0 }
     }
 
     // -------------------------------------------------------------------------

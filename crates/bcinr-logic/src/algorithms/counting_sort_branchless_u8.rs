@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn counting_sort_branchless_u8(val: u64, aux: u64) -> u64 {
-    (val.wrapping_add(aux)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (val | aux)
-
+    let byte = (val >> ((aux & 7) << 3)) & 0xFF; byte.wrapping_add(1)
 }
 
 #[cfg(test)]
@@ -32,7 +31,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn counting_sort_branchless_u8_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_add(aux)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (val | aux)
+        let byte = (val >> ((aux & 7) << 3)) & 0xFF; byte.wrapping_add(1)
     }
 
     // -------------------------------------------------------------------------

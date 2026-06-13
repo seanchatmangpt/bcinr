@@ -73,6 +73,7 @@ impl PipelineStage for EdgeConfidencePlan {
 }
 
 #[cfg(test)]
+#[cfg(feature = "alloc")]
 mod tests {
     use super::*;
     #[cfg(feature = "alloc")]

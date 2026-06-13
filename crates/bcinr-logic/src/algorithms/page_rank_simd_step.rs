@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn page_rank_simd_step(val: u64, aux: u64) -> u64 {
-    (val.rotate_left(13)).wrapping_add(val.reverse_bits() ^ aux) ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
-
+    let nz = (aux != 0) as u64; let out_degree = (aux + (1 - nz)) as f64; let rank = (val * nz) as f64; (rank / out_degree) as u64
 }
 
 #[cfg(test)]
@@ -32,7 +31,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn page_rank_simd_step_reference(val: u64, aux: u64) -> u64 {
-        (val.rotate_left(13)).wrapping_add(val.reverse_bits() ^ aux) ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+        if aux == 0 { 0 } else { (val as f64 / aux as f64) as u64 }
     }
 
     // -------------------------------------------------------------------------

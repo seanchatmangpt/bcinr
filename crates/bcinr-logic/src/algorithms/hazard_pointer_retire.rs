@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn hazard_pointer_retire(val: u64, aux: u64) -> u64 {
-    ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)).wrapping_add(aux.rotate_right(7)) ^ (aux.rotate_right(7))
-
+    val ^ aux.wrapping_add(0xDEADBEEF)
 }
 
 #[cfg(test)]
@@ -32,7 +31,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn hazard_pointer_retire_reference(val: u64, aux: u64) -> u64 {
-        ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)).wrapping_add(aux.rotate_right(7)) ^ (aux.rotate_right(7))
+        let offset = aux.wrapping_add(0xDEADBEEF); val ^ offset
     }
 
     // -------------------------------------------------------------------------

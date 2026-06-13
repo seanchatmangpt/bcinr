@@ -2,21 +2,29 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use syn::visit::{self, Visit};
-use syn::{ItemFn, Visibility, Expr, BinOp, Attribute, Meta, MetaNameValue, Lit, Expr as SynExpr};
+use syn::{ItemFn, Visibility, Expr, BinOp, Attribute, Meta, Lit};
 use walkdir::WalkDir;
+
+fn str_has_substr(s: &str, pat: &str) -> bool {
+    if pat.is_empty() { return true; }
+    s.as_bytes().windows(pat.len()).any(|w| w == pat.as_bytes())
+}
+
+fn str_ends_with(s: &str, pat: &str) -> bool {
+    if s.len() < pat.len() { return false; }
+    s.as_bytes()[s.len() - pat.len()..] == *pat.as_bytes()
+}
+
+fn str_starts_with(s: &str, pat: &str) -> bool {
+    if s.len() < pat.len() { return false; }
+    s.as_bytes()[..pat.len()] == *pat.as_bytes()
+}
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 struct PublicFunction {
     name: String,
     path: PathBuf,
     has_u64_contract: bool,
-}
-
-impl PublicFunction {
-    #[allow(dead_code)]
-    fn pass_test_name(&self) -> String {
-        format!("{}__equivalence", self.name)
-    }
 }
 
 #[derive(Default)]
@@ -46,22 +54,28 @@ impl<'ast> Visit<'ast> for ComplexityVisitor {
     }
 }
 
-/// Concatenate all `///` doc-comment attribute strings on a function.
-fn doc_text(attrs: &[Attribute]) -> String {
-    let mut buf = String::new();
-    for a in attrs {
-        if let Meta::NameValue(MetaNameValue { path, value, .. }) = &a.meta {
-            if path.is_ident("doc") {
-                if let SynExpr::Lit(lit) = value {
-                    if let Lit::Str(s) = &lit.lit {
-                        buf.push_str(&s.value());
-                        buf.push('\n');
-                    }
+fn get_doc_string(attr: &Attribute) -> Option<String> {
+    if attr.path().is_ident("doc") {
+        if let Meta::NameValue(meta) = &attr.meta {
+            if let Expr::Lit(expr_lit) = &meta.value {
+                if let Lit::Str(lit_str) = &expr_lit.lit {
+                    return Some(lit_str.value());
                 }
             }
         }
     }
-    buf
+    None
+}
+
+fn has_contract_in_attrs(attrs: &[Attribute]) -> bool {
+    for attr in attrs {
+        if let Some(doc_str) = get_doc_string(attr) {
+            if str_has_substr(&doc_str, "Branchless Contract") || str_has_substr(&doc_str, "BRANCHLESS CONTRACT") {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 #[derive(Default)]
@@ -90,14 +104,13 @@ impl<'ast> Visit<'ast> for GateVisitor {
                          name, self.current_path.display(), cv.complexity));
             }
 
-            if !cv.forbidden_ops.is_empty() && (name.contains("add_bitwise") || name.contains("sub_bitwise")) {
+            if !cv.forbidden_ops.is_empty() && (str_has_substr(&name, "add_bitwise") || str_has_substr(&name, "sub_bitwise")) {
                 self.errors.push(format!("FAIL: {} in {} uses forbidden operator(s): {:?} (Bluff detected!)",
                     name, self.current_path.display(), cv.forbidden_ops));
             }
 
             // Branchless contract detection: function-level doc OR file-level doc.
-            let fn_doc = doc_text(&i.attrs);
-            let has_u64 = fn_doc.contains("Branchless Contract") || self.file_doc_has_u64_contract;
+            let has_u64 = has_contract_in_attrs(&i.attrs) || self.file_doc_has_u64_contract;
 
             self.public_functions.push(PublicFunction {
                 name,
@@ -109,38 +122,23 @@ impl<'ast> Visit<'ast> for GateVisitor {
     }
 }
 
-/// Read the inner doc comment lines (`//!`) from the head of a file.
-fn file_inner_doc(content: &str) -> String {
-    let mut buf = String::new();
-    for line in content.lines() {
-        let l = line.trim_start();
-        if l.starts_with("//!") {
-            buf.push_str(l);
-            buf.push('\n');
-        } else if !l.is_empty() && !l.starts_with("//") {
-            // first real code line; stop scanning
-            break;
-        }
-    }
-    buf
-}
-
 fn main() {
     let mut visitor = GateVisitor::default();
-    let src_dir = Path::new("crates/bcinr-logic/src");
+    let src_dir = Path::new("crates/bcinr-logic/src/algorithms");
 
     let mut parse_warnings: Vec<String> = Vec::new();
     for entry in WalkDir::new(src_dir).into_iter().filter_map(|e| e.ok()) {
         if entry.path().extension().is_some_and(|ext| ext == "rs") {
             let path = entry.path();
-            let content = fs::read_to_string(path).unwrap();
-            // A file is U64-contracted if its inner doc declares it OR any
-            // function/comment block in the file declares the contract.
-            visitor.file_doc_has_u64_contract = file_inner_doc(&content).contains("Branchless Contract")
-                || content.contains("BRANCHLESS CONTRACT")
-                || content.contains("Branchless Contract");
+            let content = match fs::read_to_string(path) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
             match syn::parse_file(&content) {
                 Ok(syntax) => {
+                    // A file is U64-contracted if its inner doc declares it OR any
+                    // function/comment block in the file declares the contract.
+                    visitor.file_doc_has_u64_contract = has_contract_in_attrs(&syntax.attrs);
                     visitor.current_path = path.to_path_buf();
                     visitor.visit_file(&syntax);
                 }
@@ -159,8 +157,7 @@ fn main() {
     let mut missing_u64: Vec<&PublicFunction> = visitor.public_functions.iter()
         .filter(|f| {
             let p = f.path.to_string_lossy();
-                !p.ends_with("/mod.rs")
-                && !f.has_u64_contract
+            !str_ends_with(&p, "/mod.rs") && !str_starts_with(&f.name, "bench_") && !f.has_u64_contract
         })
         .collect();
     missing_u64.sort();

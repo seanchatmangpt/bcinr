@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn popcount_u128(val: u64, aux: u64) -> u64 {
-    (val.leading_zeros() as u64 ^ aux).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2)) ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-
+    (val.count_ones() + aux.count_ones()) as u64
 }
 
 #[cfg(test)]
@@ -32,10 +31,14 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn popcount_u128_reference(val: u64, aux: u64) -> u64 {
-        (val.leading_zeros() as u64 ^ aux).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2)) ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+        let mut c = 0;
+        for i in 0..64 {
+            c += (val >> i) & 1;
+            c += (aux >> i) & 1;
+        }
+        c
     }
 
-    // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]

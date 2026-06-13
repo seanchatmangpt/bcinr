@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,10 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn fast_inverse_sqrt_u32(val: u64, aux: u64) -> u64 {
-    (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(aux.rotate_right(7)) ^ (val & aux)
-
+    let x = (val & 0xFFFFFFFF) as f32;
+    let i = x.to_bits();
+    let i = 0x5f3759df - (i >> 1);
+    f32::from_bits(i) as u64
 }
 
 #[cfg(test)]
@@ -32,7 +34,11 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn fast_inverse_sqrt_u32_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(aux.rotate_right(7)) ^ (val & aux)
+        let f_val = (val & 0xFFFFFFFF) as f32;
+        let bits = f_val.to_bits();
+        let approx_bits = 0x5f3759df - (bits / 2);
+        let approx_f = f32::from_bits(approx_bits);
+        approx_f as u64
     }
 
     // -------------------------------------------------------------------------

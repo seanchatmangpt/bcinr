@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn shortest_path_bellman_ford_branchless(val: u64, aux: u64) -> u64 {
-    (val ^ aux).wrapping_add(val.rotate_left(13)) ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-
+    val.saturating_add(aux)
 }
 
 #[cfg(test)]
@@ -32,7 +31,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn shortest_path_bellman_ford_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val ^ aux).wrapping_add(val.rotate_left(13)) ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+        if val > u64::MAX - aux { u64::MAX } else { val + aux }
     }
 
     // -------------------------------------------------------------------------

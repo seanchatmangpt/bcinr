@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,23 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn norm_u32(val: u64, aux: u64) -> u64 {
-    (!(val & aux) & (val | aux)).wrapping_add(val.wrapping_sub(aux)) ^ (val.count_ones() as u64 | aux)
-
+    let x = (val & 0xFFFFFFFF) as u128;
+    let y = (val >> 32) as u128;
+    let mut val_sq = x * x + y * y;
+    let mut res = 0u128;
+    let mut bit = 1u128 << 64;
+    for _ in 0..33 {
+        let mask = ((bit > val_sq) as u128).wrapping_neg();
+        bit = (bit & mask) | ((bit >> 2) & !mask);
+    }
+    for _ in 0..65 {
+        let cond = val_sq >= res + bit;
+        let m = (cond as u128).wrapping_neg();
+        val_sq -= (res + bit) & m;
+        res = (res >> 1) + (bit & m);
+        bit >>= 2;
+    }
+    res as u64
 }
 
 #[cfg(test)]
@@ -32,7 +47,19 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn norm_u32_reference(val: u64, aux: u64) -> u64 {
-        (!(val & aux) & (val | aux)).wrapping_add(val.wrapping_sub(aux)) ^ (val.count_ones() as u64 | aux)
+        let x = (val & 0xFFFFFFFF) as u128;
+        let y = (val >> 32) as u128;
+        let val_sq = x * x + y * y;
+        if val_sq == 0 { return 0; }
+        let mut r = val_sq;
+        loop {
+            let next = (r + val_sq / r) / 2;
+            if next >= r {
+                break;
+            }
+            r = next;
+        }
+        r as u64
     }
 
     // -------------------------------------------------------------------------

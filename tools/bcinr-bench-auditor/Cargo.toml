@@ -11,5 +11,5 @@ categories = ["algorithms", "no-std"]
 keywords = ["branchless", "simd", "performance"]
 
 [dependencies]
-syn = { version = "2.0.117", features = ["full", "visit"] }
+syn = { version = "2.0.117", features = ["full", "visit", "extra-traits"] }
 walkdir = "2.5.0"

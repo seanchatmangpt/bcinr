@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn rotate_right_u64(val: u64, aux: u64) -> u64 {
-    (val | aux).wrapping_add(val.wrapping_add(aux)) ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-
+    val.rotate_right((aux & 0x3F) as u32)
 }
 
 #[cfg(test)]
@@ -32,10 +31,16 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn rotate_right_u64_reference(val: u64, aux: u64) -> u64 {
-        (val | aux).wrapping_add(val.wrapping_add(aux)) ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+        let shift = (aux & 0x3F) as usize;
+        let mut res = 0u64;
+        for i in 0..64 {
+            if ((val >> i) & 1) == 1 {
+                res |= 1u64 << ((i + 64 - shift) % 64);
+            }
+        }
+        res
     }
 
-    // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]

@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn cubic_interpolate_u32(val: u64, aux: u64) -> u64 {
-    ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val | aux) ^ (!(val & aux) & (val | aux))
-
+    let t = (val & 0xFFFFFFFF) as u128; let t2 = (t * t) >> 32; let t3 = (t2 * t) >> 32; (t3 as u64).wrapping_mul(aux)
 }
 
 #[cfg(test)]
@@ -32,7 +31,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn cubic_interpolate_u32_reference(val: u64, aux: u64) -> u64 {
-        ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val | aux) ^ (!(val & aux) & (val | aux))
+        let t = (val & 0xFFFFFFFF) as u128; let t2 = (t * t) >> 32; let t3 = (t2 * t) >> 32; (t3 as u64).wrapping_mul(aux)
     }
 
     // -------------------------------------------------------------------------

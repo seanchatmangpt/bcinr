@@ -326,6 +326,7 @@ VAL_SEMANTICS = {
     "C": "domain word / SIMD lane",
     "D": "flat word index or spatial coordinate",
     "E": "cell word being fingerprinted",
+    "F": "value to insert or query in sketch",
     "G": "PRNG state word",
     "H": "packed byte cell word (8 bytes)",
     "I": "adjacency bitset / node word",
@@ -439,7 +440,7 @@ def build_target_c(name: str, cat: str) -> list[str]:
         "    //   { result ∈ U64 ∧ runtime ∈ admissible_T1 }\n",
         "    // -------------------------------------------------------------------------\n",
     ]
-    assert len(lines) == 36, f"Target C must be 36 lines, got {len(lines)}"
+    assert len(lines) == 34, f"Target C must be 34 lines, got {len(lines)}"
     return lines
 
 
@@ -483,7 +484,7 @@ def build_target_d(name: str, cat: str) -> list[str]:
         "// -----------------------------------------------------------------------------\n",
         "\n",
     ]
-    assert len(lines) == 39, f"Target D must be 39 lines, got {len(lines)}"
+    assert len(lines) == 34, f"Target D must be 34 lines, got {len(lines)}"
     return lines
 
 

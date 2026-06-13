@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn disjoint_set_union_branchless(val: u64, aux: u64) -> u64 {
-    (val.reverse_bits() ^ aux).wrapping_add(val & aux) ^ (!(val & aux) & (val | aux))
-
+    let is_root = (val == aux) as u64; (is_root.wrapping_neg() & val) | ((!is_root.wrapping_neg()) & aux)
 }
 
 #[cfg(test)]
@@ -32,7 +31,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn disjoint_set_union_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val.reverse_bits() ^ aux).wrapping_add(val & aux) ^ (!(val & aux) & (val | aux))
+        if val == aux { val } else { aux }
     }
 
     // -------------------------------------------------------------------------

@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn ray_triangle_intersect_branchless(val: u64, aux: u64) -> u64 {
-    (!(val & aux) & (val | aux)).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2)) ^ (!(val & aux) & (val | aux))
-
+    let det = val.wrapping_mul(aux); let inv_det = 1u64.wrapping_div(det | (det == 0) as u64); inv_det * (det != 0) as u64
 }
 
 #[cfg(test)]
@@ -32,7 +31,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn ray_triangle_intersect_branchless_reference(val: u64, aux: u64) -> u64 {
-        (!(val & aux) & (val | aux)).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2)) ^ (!(val & aux) & (val | aux))
+        let det = val.wrapping_mul(aux); if det == 0 { 0 } else { 1u64.wrapping_div(det) }
     }
 
     // -------------------------------------------------------------------------

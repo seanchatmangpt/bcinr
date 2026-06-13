@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,11 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn bit_matrix_transpose_8x8(val: u64, aux: u64) -> u64 {
-    (val ^ aux).wrapping_add(aux.rotate_right(7)) ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
-
+    let mut x = val;
+    let t = (x ^ (x >> 7)) & 0x00AA00AA00AA00AAu64; x = x ^ t ^ (t << 7);
+    let t = (x ^ (x >> 14)) & 0x0000CCCC0000CCCCu64; x = x ^ t ^ (t << 14);
+    let t = (x ^ (x >> 28)) & 0x00000000F0F0F0F0u64; x = x ^ t ^ (t << 28);
+    x
 }
 
 #[cfg(test)]
@@ -32,8 +35,16 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn bit_matrix_transpose_8x8_reference(val: u64, aux: u64) -> u64 {
-        (val ^ aux).wrapping_add(aux.rotate_right(7)) ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
-    }
+        let mut res = 0u64;
+        for i in 0..8 {
+            for j in 0..8 {
+                if (val >> (i * 8 + j)) & 1 != 0 {
+                    res |= 1 << (j * 8 + i);
+                }
+            }
+        }
+        res
+}
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions

@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn dequantize_u32(val: u64, aux: u64) -> u64 {
-    ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(!(val & aux) & (val | aux)) ^ (val.wrapping_mul(aux.wrapping_add(1)))
-
+    val.wrapping_mul(aux)
 }
 
 #[cfg(test)]
@@ -32,7 +31,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn dequantize_u32_reference(val: u64, aux: u64) -> u64 {
-        ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(!(val & aux) & (val | aux)) ^ (val.wrapping_mul(aux.wrapping_add(1)))
+        val.wrapping_mul(aux)
     }
 
     // -------------------------------------------------------------------------

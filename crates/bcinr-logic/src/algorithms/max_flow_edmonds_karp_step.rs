@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn max_flow_edmonds_karp_step(val: u64, aux: u64) -> u64 {
-    (val.wrapping_sub(aux)).wrapping_add(val | aux) ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
-
+    let cap = val; let flow = aux; let valid = (cap >= flow) as u64; (cap.wrapping_sub(flow)) * valid
 }
 
 #[cfg(test)]
@@ -32,7 +31,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn max_flow_edmonds_karp_step_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_sub(aux)).wrapping_add(val | aux) ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+        if val >= aux { val - aux } else { 0 }
     }
 
     // -------------------------------------------------------------------------

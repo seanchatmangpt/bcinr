@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,29 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn fp_atan2_u32_q16(val: u64, aux: u64) -> u64 {
-    (!(val & aux) & (val | aux)).wrapping_add(val & aux) ^ (val & aux)
-
+    let y = val as i64;
+    let x = aux as i64;
+    let abs_y = y.abs();
+    let abs_x = x.abs();
+    
+    let mut angle: i64;
+    let cond = abs_x > abs_y;
+    let m_cond = (cond as i64).wrapping_neg();
+    
+    let n = (abs_x.min(abs_y) << 16) / (abs_x.max(abs_y) | 1);
+    let n2 = (n * n) >> 16;
+    
+    angle = (n * 0x00010000) >> 16;
+    angle = (angle - ((n * n2) >> 16) / 3);
+    
+    let off = (90i64 << 16);
+    angle = (angle & m_cond) | ((off - angle) & !m_cond);
+    
+    let sign_y = ((y >= 0) as i64).wrapping_neg() | 1;
+    angle = angle * sign_y;
+    
+    let q_adj = ((x < 0) as i64).wrapping_neg() & ((180i64 << 16).wrapping_mul(sign_y));
+    (angle + q_adj) as u64
 }
 
 #[cfg(test)]
@@ -32,7 +53,38 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn fp_atan2_u32_q16_reference(val: u64, aux: u64) -> u64 {
-        (!(val & aux) & (val | aux)).wrapping_add(val & aux) ^ (val & aux)
+        let y = val as i64;
+        let x = aux as i64;
+        let abs_y = y.abs();
+        let abs_x = x.abs();
+        
+        let n = if abs_x > abs_y {
+            (abs_y << 16) / (abs_x | 1)
+        } else {
+            (abs_x << 16) / (abs_y | 1)
+        };
+        
+        let n2 = (n * n) >> 16;
+        let mut angle = n - (n * n2 >> 16) / 3;
+        
+        if abs_x > abs_y {
+            // angle is correct
+        } else {
+            angle = (90i64 << 16) - angle;
+        }
+        
+        if y < 0 {
+            angle = -angle;
+        }
+        
+        if x < 0 {
+            if y >= 0 {
+                angle += 180i64 << 16;
+            } else {
+                angle -= 180i64 << 16;
+            }
+        }
+        angle as u64
     }
 
     // -------------------------------------------------------------------------

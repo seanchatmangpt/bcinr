@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,14 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn count_consecutive_set_bits_u64(val: u64, aux: u64) -> u64 {
-    (val & aux).wrapping_add(val.rotate_left(13)) ^ ((val & 0xFFFFFFFF) | (aux << 32))
-
+    let mut count = 0;
+    let mut v = val;
+    for _ in 0..64 {
+        let mask = 0u64.wrapping_sub((v != 0) as u64);
+        count += 1 & mask;
+        v &= v << 1;
+    }
+    count
 }
 
 #[cfg(test)]
@@ -32,10 +38,21 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn count_consecutive_set_bits_u64_reference(val: u64, aux: u64) -> u64 {
-        (val & aux).wrapping_add(val.rotate_left(13)) ^ ((val & 0xFFFFFFFF) | (aux << 32))
+        let mut max_c = 0;
+        let mut cur_c = 0;
+        for i in 0..64 {
+            if ((val >> i) & 1) == 1 {
+                cur_c += 1;
+                if cur_c > max_c {
+                    max_c = cur_c;
+                }
+            } else {
+                cur_c = 0;
+            }
+        }
+        max_c
     }
 
-    // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]

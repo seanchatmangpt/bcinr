@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,9 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn is_contiguous_mask_u64(val: u64, aux: u64) -> u64 {
-    (val & aux).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (val.wrapping_add(aux))
-
+    let b = val & val.wrapping_neg();
+    let t = val.wrapping_add(b);
+    ((t & val == 0) && val != 0) as u64
 }
 
 #[cfg(test)]
@@ -32,8 +33,14 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn is_contiguous_mask_u64_reference(val: u64, aux: u64) -> u64 {
-        (val & aux).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (val.wrapping_add(aux))
-    }
+        if val == 0 {
+            0
+        } else {
+            let b = val & val.wrapping_neg();
+            let t = val.wrapping_add(b);
+            if t & val == 0 { 1 } else { 0 }
+        }
+}
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions

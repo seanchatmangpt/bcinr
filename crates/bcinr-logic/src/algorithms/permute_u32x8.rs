@@ -19,7 +19,9 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn permute_u32x8(val: u64, aux: u64) -> u64 {
-    (val.reverse_bits() ^ aux).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+    let x = val;
+    let y = aux;
+    (x.rotate_left(32) & 0xFFFFFFFF00000000u64) | (y & 0x00000000FFFFFFFFu64)
 
 }
 
@@ -32,7 +34,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn permute_u32x8_reference(val: u64, aux: u64) -> u64 {
-        (val.reverse_bits() ^ aux).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+    (val & 0xFFFFFFFF00000000u64) | (aux & 0x00000000FFFFFFFFu64)
     }
 
     // -------------------------------------------------------------------------

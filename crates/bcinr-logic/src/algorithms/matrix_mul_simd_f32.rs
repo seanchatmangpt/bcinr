@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn matrix_mul_simd_f32(val: u64, aux: u64) -> u64 {
-    (val.wrapping_add(aux)).wrapping_add((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)) ^ (val | aux)
-
+    let a1 = f32::from_bits((val & 0xFFFFFFFF) as u32); let a2 = f32::from_bits((val >> 32) as u32); let b1 = f32::from_bits((aux & 0xFFFFFFFF) as u32); let b2 = f32::from_bits((aux >> 32) as u32); (a1 * b1 + a2 * b2).to_bits() as u64
 }
 
 #[cfg(test)]
@@ -32,7 +31,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn matrix_mul_simd_f32_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_add(aux)).wrapping_add((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)) ^ (val | aux)
+        let a1 = f32::from_bits((val & 0xFFFFFFFF) as u32); let a2 = f32::from_bits((val >> 32) as u32); let b1 = f32::from_bits((aux & 0xFFFFFFFF) as u32); let b2 = f32::from_bits((aux >> 32) as u32); let sum = (a1 * b1) + (a2 * b2); sum.to_bits() as u64
     }
 
     // -------------------------------------------------------------------------

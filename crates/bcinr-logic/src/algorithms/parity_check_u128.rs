@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn parity_check_u128(val: u64, aux: u64) -> u64 {
-    (val.leading_zeros() as u64 ^ aux).wrapping_add(!(val & aux) & (val | aux)) ^ (val.wrapping_mul(aux.wrapping_add(1)))
-
+    ((val.count_ones() + aux.count_ones()) & 1) as u64
 }
 
 #[cfg(test)]
@@ -32,10 +31,18 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn parity_check_u128_reference(val: u64, aux: u64) -> u64 {
-        (val.leading_zeros() as u64 ^ aux).wrapping_add(!(val & aux) & (val | aux)) ^ (val.wrapping_mul(aux.wrapping_add(1)))
+        let mut count = 0;
+        for i in 0..64 {
+            if ((val >> i) & 1) == 1 {
+                count += 1;
+            }
+            if ((aux >> i) & 1) == 1 {
+                count += 1;
+            }
+        }
+        (count & 1) as u64
     }
 
-    // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]

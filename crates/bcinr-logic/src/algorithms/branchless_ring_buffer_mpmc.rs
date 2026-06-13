@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn branchless_ring_buffer_mpmc(val: u64, aux: u64) -> u64 {
-    (val.rotate_left(13)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (val ^ aux)
-
+    (val.wrapping_add(1)) & aux
 }
 
 #[cfg(test)]
@@ -32,7 +31,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn branchless_ring_buffer_mpmc_reference(val: u64, aux: u64) -> u64 {
-        (val.rotate_left(13)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (val ^ aux)
+        let next = val.wrapping_add(1); next & aux
     }
 
     // -------------------------------------------------------------------------

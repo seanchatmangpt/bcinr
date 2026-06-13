@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn get_mask_boundary_low_u64(val: u64, aux: u64) -> u64 {
-    ((val & 0xFFFFFFFF) | (aux << 32)).wrapping_add(val.wrapping_add(aux)) ^ (val.wrapping_add(aux))
-
+    val & val.wrapping_neg()
 }
 
 #[cfg(test)]
@@ -32,8 +31,15 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn get_mask_boundary_low_u64_reference(val: u64, aux: u64) -> u64 {
-        ((val & 0xFFFFFFFF) | (aux << 32)).wrapping_add(val.wrapping_add(aux)) ^ (val.wrapping_add(aux))
-    }
+        let mut res = 0;
+        for i in 0..64 {
+            if (val & (1 << i)) != 0 {
+                res = 1 << i;
+                break;
+            }
+        }
+        res
+}
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions

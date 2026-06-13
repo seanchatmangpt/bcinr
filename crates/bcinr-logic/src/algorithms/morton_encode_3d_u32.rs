@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -19,8 +19,13 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn morton_encode_3d_u32(val: u64, aux: u64) -> u64 {
-    (val.reverse_bits() ^ aux).wrapping_add(!(val & aux) & (val | aux)) ^ (val ^ aux)
-
+    let mut x = val & 0x1FFFFFu64;
+    x = (x | (x << 32)) & 0x1F00000000FFFFu64;
+    x = (x | (x << 16)) & 0x1F0000FF0000FFu64;
+    x = (x | (x << 8)) & 0x100F00F00F00F00Fu64;
+    x = (x | (x << 4)) & 0x10c30c30c30c30c3u64;
+    x = (x | (x << 2)) & 0x1249249249249249u64;
+    x
 }
 
 #[cfg(test)]
@@ -32,10 +37,16 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn morton_encode_3d_u32_reference(val: u64, aux: u64) -> u64 {
-        (val.reverse_bits() ^ aux).wrapping_add(!(val & aux) & (val | aux)) ^ (val ^ aux)
+        let x = val as u32 & 0x1FFFFF;
+        let mut res = 0u64;
+        for i in 0..21 {
+            if ((x >> i) & 1) == 1 {
+                res |= 1u64 << (3 * i);
+            }
+        }
+        res
     }
 
-    // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
