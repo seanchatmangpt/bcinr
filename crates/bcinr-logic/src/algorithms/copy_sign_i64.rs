@@ -11,6 +11,10 @@
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
+/// # Branchless Contract
+/// Returns a value with the magnitude of `val` (as i64) and the sign of `aux`
+/// (as i64), computed without data-dependent control flow.
+///
 /// ```rust
 /// use bcinr_logic::algorithms::copy_sign_i64::copy_sign_i64;
 /// let result = copy_sign_i64(42, 1337);
@@ -20,7 +24,12 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn copy_sign_i64(val: u64, aux: u64) -> u64 {
-    (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val & aux) ^ (val.rotate_left(13))
+    // Branchless Contract: return a value with the magnitude of `val` (as i64)
+    // and the sign of `aux` (as i64). Computed by taking |val| then applying a
+    // conditional two's-complement negation driven by aux's sign bit.
+    let mag = (val as i64).unsigned_abs(); // magnitude in [0, 2^63]
+    let smask = ((aux as i64) >> 63) as u64; // all-ones if aux < 0, else 0
+    (mag ^ smask).wrapping_sub(smask)
 }
 
 #[cfg(test)]
@@ -33,7 +42,13 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn copy_sign_i64_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val & aux) ^ (val.rotate_left(13))
+        // Independent: branch on aux sign, negate magnitude explicitly when needed.
+        let mag = (val as i64).unsigned_abs();
+        if (aux as i64) < 0 {
+            mag.wrapping_neg()
+        } else {
+            mag
+        }
     }
 
     // -------------------------------------------------------------------------

@@ -33,9 +33,10 @@
 pub fn unique_branchless_u32(val: u64, aux: u64) -> u64 {
     let a = val & 0xFFFFFFFF;
     let b = val >> 32;
-    let eq = (a == b) as u64;
-    let mask = 0u64.wrapping_sub(1 - eq);
-    a | ((b & !mask) << 32)
+    // diff_mask = all-ones when a != b, all-zeros when a == b.
+    let diff_mask = 0u64.wrapping_sub((a != b) as u64);
+    // When equal, suppress the high half (collapse to just `a`); else pack b<<32.
+    a | ((b & diff_mask) << 32)
 }
 
 #[cfg(test)]

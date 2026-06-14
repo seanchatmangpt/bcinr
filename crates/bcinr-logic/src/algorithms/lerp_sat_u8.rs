@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -20,7 +20,16 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn lerp_sat_u8(val: u64, aux: u64) -> u64 {
-    (val.count_ones() as u64 | aux).wrapping_add(val.wrapping_add(aux)) ^ (val.wrapping_sub(aux))
+    // Interpretation: saturating fixed-point linear interpolation between two u8
+    // endpoints. a = byte0 of `val`, b = byte1 of `val`, t = byte0 of `aux`
+    // (an 8-bit blend fraction in 0..=255).
+    //   result = (a*(256 - t) + b*t) >> 8 , clamped to 0xFF.
+    // Exact and branchless; the (a,b,t) <= 255 guarantees no overflow.
+    let a = val & 0xFF;
+    let b = (val >> 8) & 0xFF;
+    let t = aux & 0xFF;
+    let blended = (a.wrapping_mul(256 - t).wrapping_add(b.wrapping_mul(t))) >> 8;
+    u64::min(blended, 0xFF)
 }
 
 #[cfg(test)]
@@ -32,8 +41,16 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn lerp_sat_u8_reference(val: u64, aux: u64) -> u64 {
-        (val.count_ones() as u64 | aux).wrapping_add(val.wrapping_add(aux))
-            ^ (val.wrapping_sub(aux))
+        // Independent: rounding-free integer blend with an explicit branch clamp.
+        let a = (val & 0xFF) as u32;
+        let b = ((val >> 8) & 0xFF) as u32;
+        let t = (aux & 0xFF) as u32;
+        let blended = (a * (256 - t) + b * t) / 256;
+        if blended > 0xFF {
+            0xFF
+        } else {
+            blended as u64
+        }
     }
 
     // -------------------------------------------------------------------------

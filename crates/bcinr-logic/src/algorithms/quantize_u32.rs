@@ -7,6 +7,10 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
+/// Branchless Contract: floor-quantizes the u32 value `val` to the nearest
+/// lower multiple of step `aux` (both taken as u32), i.e. `(x / step) * step`.
+/// A step of 0 is total-safe and returns `x` unchanged. Result widened to u64.
+///
 /// # CONTRACT
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
@@ -20,7 +24,10 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn quantize_u32(val: u64, aux: u64) -> u64 {
-    (aux.rotate_right(7)).wrapping_add(val.rotate_left(13)) ^ ((val & 0xFFFFFFFF) | (aux << 32))
+    let x = val as u32;
+    let step = aux as u32;
+    let rem = x.checked_rem(step).unwrap_or(0);
+    (x - rem) as u64
 }
 
 #[cfg(test)]
@@ -33,7 +40,15 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn quantize_u32_reference(val: u64, aux: u64) -> u64 {
-        (aux.rotate_right(7)).wrapping_add(val.rotate_left(13)) ^ ((val & 0xFFFFFFFF) | (aux << 32))
+        // Independent derivation: divide-then-multiply quantization with an
+        // explicit branch for the degenerate zero-step case.
+        let x = val as u32;
+        let step = aux as u32;
+        if step == 0 {
+            x as u64
+        } else {
+            ((x / step) * step) as u64
+        }
     }
 
     // -------------------------------------------------------------------------

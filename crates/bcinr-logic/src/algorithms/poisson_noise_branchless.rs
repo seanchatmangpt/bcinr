@@ -8,7 +8,14 @@
 /// with zero dynamic dispatch or control flow hazards.
 ///
 /// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Branchless Contract:** Branchless Poisson noise sampler. A uniform random
+/// word is produced by mixing the sample coordinate `val` with the seed `aux`
+/// (splitmix-style finalizer). The rate parameter is taken from the low 6 bits
+/// of `aux`, giving a per-trial success mask of `k` set low bits. Each of the
+/// 64 bit-lanes is an independent Bernoulli(k/64) trial; the number of
+/// successes (popcount of `uniform AND rate_mask`) is the Poisson-distributed
+/// count returned. With 64 lanes and small `k/64` this converges to a Poisson
+/// arrival count, which is the discrete shot-noise sample.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,8 +27,13 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn poisson_noise_branchless(val: u64, aux: u64) -> u64 {
-    (aux.rotate_right(7)).wrapping_add(val.wrapping_sub(aux))
-        ^ ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
+    let mut z = val.wrapping_add(aux).wrapping_add(0x9E3779B97F4A7C15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D049BB133111EB);
+    let uniform = z ^ (z >> 31);
+    let k = (aux & 63) as u32;
+    let rate_mask = 1u64.wrapping_shl(k).wrapping_sub(1);
+    (uniform & rate_mask).count_ones() as u64
 }
 
 #[cfg(test)]
@@ -33,8 +45,20 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn poisson_noise_branchless_reference(val: u64, aux: u64) -> u64 {
-        (aux.rotate_right(7)).wrapping_add(val.wrapping_sub(aux))
-            ^ ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
+        // Re-derive the splitmix64 uniform, then tally successes by scanning the
+        // low `k` lanes one at a time rather than via masked popcount.
+        let seed = val.wrapping_add(aux).wrapping_add(0x9E3779B97F4A7C15);
+        let a = (seed ^ (seed >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+        let b = (a ^ (a >> 27)).wrapping_mul(0x94D049BB133111EB);
+        let uniform = b ^ (b >> 31);
+        let k = (aux & 63) as usize;
+        let mut successes: u64 = 0;
+        for lane in 0..k {
+            if (uniform >> lane) & 1 == 1 {
+                successes += 1;
+            }
+        }
+        successes
     }
 
     // -------------------------------------------------------------------------

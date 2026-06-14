@@ -16,12 +16,21 @@
 /// let result = count_min_sketch_add(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn count_min_sketch_add(val: u64, aux: u64) -> u64 {
-    ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val.rotate_left(13))
-        ^ (val.count_ones() as u64 | aux)
+    // Branchless Contract: a single count-min sketch update. `val` packs four
+    // 16-bit counter cells; element `aux` is hashed (golden-ratio mix) to pick
+    // one cell, which is incremented by 1 with saturation at u16::MAX. The
+    // updated 64-bit register of four counters is returned.
+    let h = (aux.wrapping_mul(0x9E3779B97F4A7C15) >> 62) & 3;
+    let shift = (h * 16) as u32;
+    let cur = (val >> shift) & 0xFFFF;
+    let next = (cur + 1).min(0xFFFF);
+    let cleared = val & !(0xFFFFu64 << shift);
+    cleared | (next << shift)
 }
 
 #[cfg(test)]
@@ -33,8 +42,20 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn count_min_sketch_add_reference(val: u64, aux: u64) -> u64 {
-        ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val.rotate_left(13))
-            ^ (val.count_ones() as u64 | aux)
+        // Independent: materialize the four u16 lanes, bump the chosen one with
+        // saturating_add, then repack the array.
+        let h = ((aux.wrapping_mul(0x9E3779B97F4A7C15) >> 62) & 3) as usize;
+        let mut lanes = [
+            (val & 0xFFFF) as u16,
+            ((val >> 16) & 0xFFFF) as u16,
+            ((val >> 32) & 0xFFFF) as u16,
+            ((val >> 48) & 0xFFFF) as u16,
+        ];
+        lanes[h] = lanes[h].saturating_add(1);
+        (lanes[0] as u64)
+            | ((lanes[1] as u64) << 16)
+            | ((lanes[2] as u64) << 32)
+            | ((lanes[3] as u64) << 48)
     }
 
     // -------------------------------------------------------------------------

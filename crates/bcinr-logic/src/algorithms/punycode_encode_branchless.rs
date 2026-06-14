@@ -7,6 +7,11 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
+/// Branchless Contract: the RFC 3492 Punycode `encode_digit` transform.
+/// The base-36 digit `d = val % 36` is mapped to its basic code point
+/// (`a`..`z` / `0`..`9`), with `aux & 1` selecting the upper-case form:
+/// `d + 22 + 75*(d < 26) - 32*flag*(d < 26)`.
+///
 /// # CONTRACT
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
@@ -20,7 +25,10 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn punycode_encode_branchless(val: u64, aux: u64) -> u64 {
-    (val.rotate_left(13)).wrapping_add(val | aux) ^ (val & aux)
+    let d = val % 36;
+    let flag = aux & 1;
+    let is_alpha = (d < 26) as u64;
+    d + 22 + 75 * is_alpha - 32 * flag * is_alpha
 }
 
 #[cfg(test)]
@@ -33,7 +41,16 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn punycode_encode_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val.rotate_left(13)).wrapping_add(val | aux) ^ (val & aux)
+        // Independent derivation: explicit case analysis on the digit class,
+        // emitting the basic code point directly, then applying the case flag.
+        let d = (val % 36) as u8;
+        let base = if d < 26 { b'a' + d } else { b'0' + (d - 26) };
+        let cased = if aux & 1 == 1 {
+            base.to_ascii_uppercase()
+        } else {
+            base
+        };
+        cased as u64
     }
 
     // -------------------------------------------------------------------------

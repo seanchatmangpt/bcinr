@@ -16,11 +16,18 @@
 /// let result = branchless_signum_i64(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn branchless_signum_i64(val: u64, aux: u64) -> u64 {
-    (!(val & aux) & (val | aux)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (val & aux)
+    // Branchless Contract: signum of (val + aux) interpreted as i64, returning
+    // -1, 0, or 1 as a two's-complement u64 bit pattern. Computed via two
+    // arithmetic shifts: the sign bit OR'd with the negated-sign indicator.
+    let v = (val.wrapping_add(aux)) as i64;
+    let neg = (v >> 63) as u64; // all-ones if v < 0, else 0
+    let pos = (v.wrapping_neg() >> 63) as u64 & 1; // 1 if v > 0, else 0
+    neg | pos
 }
 
 #[cfg(test)]
@@ -32,8 +39,13 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn branchless_signum_i64_reference(val: u64, aux: u64) -> u64 {
-        (!(val & aux) & (val | aux)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1)))
-            ^ (val & aux)
+        // Independent: explicit comparison-based signum using std i64::signum.
+        let v = val.wrapping_add(aux) as i64;
+        match v.cmp(&0) {
+            core::cmp::Ordering::Less => (-1i64) as u64,
+            core::cmp::Ordering::Equal => 0,
+            core::cmp::Ordering::Greater => 1,
+        }
     }
 
     // -------------------------------------------------------------------------

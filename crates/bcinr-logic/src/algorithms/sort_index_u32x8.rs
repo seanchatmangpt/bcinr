@@ -7,21 +7,38 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
-/// **Invariant:** Execution path is independent of input data values (Branchless).
-///
-/// ```rust
-/// use bcinr_logic::algorithms::sort_index_u32x8::sort_index_u32x8;
-/// let result = sort_index_u32x8(42, 1337);
-/// assert!(result <= u64::MAX);
-/// ```
+/// # Branchless Contract
+/// Argsort (sort-index) of the four u16 lanes of `val`. Produces the stable
+/// permutation that sorts the lanes ascending: nibble `p` of the result holds
+/// the original lane index whose value occupies sorted position `p`. `aux` is
+/// ignored. Stable ranks are computed branchlessly with no control flow.
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn sort_index_u32x8(val: u64, aux: u64) -> u64 {
-    (val.wrapping_shl(3) ^ aux.wrapping_shr(2)).wrapping_add(val.count_ones() as u64 | aux)
-        ^ ((val & 0xFFFFFFFF) | (aux << 32))
+    let v = [
+        val & 0xFFFF,
+        (val >> 16) & 0xFFFF,
+        (val >> 32) & 0xFFFF,
+        (val >> 48) & 0xFFFF,
+    ];
+    let lt = |x: u64, y: u64| -> u64 { (x < y) as u64 };
+    let eqe = |j: usize, i: usize, x: u64, y: u64| -> u64 { ((x == y) as u64) & ((j < i) as u64) };
+    let rank = |i: usize| -> u64 {
+        lt(v[0], v[i])
+            + lt(v[1], v[i])
+            + lt(v[2], v[i])
+            + lt(v[3], v[i])
+            + eqe(0, i, v[0], v[i])
+            + eqe(1, i, v[1], v[i])
+            + eqe(2, i, v[2], v[i])
+            + eqe(3, i, v[3], v[i])
+    };
+    // nibble at position rank(i) holds index i
+    ((0u64) << (rank(0) * 4))
+        | ((1u64) << (rank(1) * 4))
+        | ((2u64) << (rank(2) * 4))
+        | ((3u64) << (rank(3) * 4))
 }
 
 #[cfg(test)]
@@ -32,9 +49,23 @@ mod tests {
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
-    fn sort_index_u32x8_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_shl(3) ^ aux.wrapping_shr(2)).wrapping_add(val.count_ones() as u64 | aux)
-            ^ ((val & 0xFFFFFFFF) | (aux << 32))
+    fn sort_index_u32x8_reference(val: u64, _aux: u64) -> u64 {
+        // Independent oracle: build (value, index) pairs and stable-sort them
+        // by value, then place each pair's original index into its nibble.
+        let mut pairs: [(u64, u64); 4] = [
+            (val & 0xFFFF, 0),
+            ((val >> 16) & 0xFFFF, 1),
+            ((val >> 32) & 0xFFFF, 2),
+            ((val >> 48) & 0xFFFF, 3),
+        ];
+        pairs.sort_by(|a, b| a.0.cmp(&b.0));
+        let mut out = 0u64;
+        let mut p = 0u64;
+        for (_, idx) in pairs.iter() {
+            out |= idx << (p * 4);
+            p += 1;
+        }
+        out
     }
 
     // -------------------------------------------------------------------------

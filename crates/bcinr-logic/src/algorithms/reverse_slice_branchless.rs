@@ -16,11 +16,18 @@
 /// let result = reverse_slice_branchless(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+///
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn reverse_slice_branchless(val: u64, aux: u64) -> u64 {
-    (val.wrapping_sub(aux)).wrapping_add(val | aux) ^ (val.wrapping_mul(aux.wrapping_add(1)))
+    // Branchless Contract: reverse the bit order of `val` within the low
+    // `width = (aux & 63) + 1` bits, leaving the higher bits cleared. This is the
+    // in-place slice reversal of a bit-slice of the requested width.
+    let width = ((aux & 63) + 1) as u32;
+    let full = val.reverse_bits();
+    full >> (64 - width)
 }
 
 #[cfg(test)]
@@ -33,7 +40,17 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn reverse_slice_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_sub(aux)).wrapping_add(val | aux) ^ (val.wrapping_mul(aux.wrapping_add(1)))
+        // Independent derivation: build the reversed slice bit by bit with an
+        // explicit loop (test-only), placing source bit i at mirror position.
+        let width = ((aux % 64) + 1) as u32;
+        let mut out: u64 = 0;
+        let mut i: u32 = 0;
+        while i < width {
+            let bit = (val >> i) & 1;
+            out |= bit << (width - 1 - i);
+            i += 1;
+        }
+        out
     }
 
     // -------------------------------------------------------------------------

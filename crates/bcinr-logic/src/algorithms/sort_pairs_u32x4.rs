@@ -7,22 +7,26 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
-/// **Invariant:** Execution path is independent of input data values (Branchless).
-///
-/// ```rust
-/// use bcinr_logic::algorithms::sort_pairs_u32x4::sort_pairs_u32x4;
-/// let result = sort_pairs_u32x4(42, 1337);
-/// assert!(result <= u64::MAX);
-/// ```
+/// # Branchless Contract
+/// Sorts the two adjacent pairs of the four u16 lanes of `val`: the pair
+/// (lane0, lane1) and the pair (lane2, lane3) are each ordered ascending with
+/// a branchless min/max compare-exchange. `aux` is ignored; lanes pack
+/// low-to-high.
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn sort_pairs_u32x4(val: u64, aux: u64) -> u64 {
-    ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-        .wrapping_add((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-        ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+    let l0 = val & 0xFFFF;
+    let l1 = (val >> 16) & 0xFFFF;
+    let l2 = (val >> 32) & 0xFFFF;
+    let l3 = (val >> 48) & 0xFFFF;
+
+    let p0 = u64::min(l0, l1);
+    let p1 = u64::max(l0, l1);
+    let p2 = u64::min(l2, l3);
+    let p3 = u64::max(l2, l3);
+
+    p0 | (p1 << 16) | (p2 << 32) | (p3 << 48)
 }
 
 #[cfg(test)]
@@ -33,10 +37,14 @@ mod tests {
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
-    fn sort_pairs_u32x4_reference(val: u64, aux: u64) -> u64 {
-        ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-            .wrapping_add((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-            ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+    fn sort_pairs_u32x4_reference(val: u64, _aux: u64) -> u64 {
+        // Independent oracle: sort each two-element pair with the standard
+        // library, then repack the four lanes.
+        let mut a = [val & 0xFFFF, (val >> 16) & 0xFFFF];
+        let mut b = [(val >> 32) & 0xFFFF, (val >> 48) & 0xFFFF];
+        a.sort();
+        b.sort();
+        a[0] | (a[1] << 16) | (b[0] << 32) | (b[1] << 48)
     }
 
     // -------------------------------------------------------------------------

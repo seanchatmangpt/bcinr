@@ -7,8 +7,13 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Interpretation:** The RFC 1071 Internet checksum over the four 16-bit words
+/// packed (little-endian) in `val`, seeded by `aux & 0xFFFF`. All words are added
+/// into a wide accumulator; the end-around carry is folded twice
+/// (`sum = (sum & 0xFFFF) + (sum >> 16)`) so all carries are absorbed, and the
+/// one's-complement (bitwise NOT, masked to 16 bits) is returned. Branchless O(1).
+/// **Ensures:** Result matches the independent reference for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,8 +25,14 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn internet_checksum_u16(val: u64, aux: u64) -> u64 {
-    (!(val & aux) & (val | aux)).wrapping_add(val.reverse_bits() ^ aux)
-        ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+    let mut sum = (aux & 0xFFFF)
+        + (val & 0xFFFF)
+        + ((val >> 16) & 0xFFFF)
+        + ((val >> 32) & 0xFFFF)
+        + ((val >> 48) & 0xFFFF);
+    sum = (sum & 0xFFFF) + (sum >> 16);
+    sum = (sum & 0xFFFF) + (sum >> 16);
+    (!sum) & 0xFFFF
 }
 
 #[cfg(test)]
@@ -33,8 +44,15 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn internet_checksum_u16_reference(val: u64, aux: u64) -> u64 {
-        (!(val & aux) & (val | aux)).wrapping_add(val.reverse_bits() ^ aux)
-            ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+        // Independent: loop add with explicit carry-folding while-style reduction.
+        let mut sum: u64 = aux & 0xFFFF;
+        for k in 0..4u32 {
+            sum += (val >> (16 * k)) & 0xFFFF;
+        }
+        while sum >> 16 != 0 {
+            sum = (sum & 0xFFFF) + (sum >> 16);
+        }
+        (sum ^ 0xFFFF) & 0xFFFF
     }
 
     // -------------------------------------------------------------------------

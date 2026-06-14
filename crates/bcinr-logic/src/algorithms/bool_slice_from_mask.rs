@@ -16,13 +16,15 @@
 /// let result = bool_slice_from_mask(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn bool_slice_from_mask(val: u64, aux: u64) -> u64 {
-    ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-        .wrapping_add(val.count_ones() as u64 | aux)
-        ^ (val.wrapping_add(aux))
+    // Branchless Contract: decode the boolean (0 or 1) stored at lane index
+    // `aux & 63` of the packed bit-mask `val`. This materializes one element of
+    // a bool slice from a mask word: result == 1 iff that bit is set.
+    (val >> (aux & 63)) & 1
 }
 
 #[cfg(test)]
@@ -34,9 +36,15 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn bool_slice_from_mask_reference(val: u64, aux: u64) -> u64 {
-        ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-            .wrapping_add(val.count_ones() as u64 | aux)
-            ^ (val.wrapping_add(aux))
+        // Independent derivation: build a single-bit selector mask, AND it with
+        // `val`, then test for non-zero via a control-flow branch (test-only).
+        let idx = (aux % 64) as u32;
+        let selector: u64 = 1u64 << idx;
+        if (val & selector) != 0 {
+            1
+        } else {
+            0
+        }
     }
 
     // -------------------------------------------------------------------------

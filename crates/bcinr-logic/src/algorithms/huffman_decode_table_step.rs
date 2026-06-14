@@ -7,8 +7,12 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** One step of canonical-Huffman table-driven decoding. `val` is the
+/// bit-reservoir; `aux` is the looked-up table entry packed as `[symbol:bits 8..16]
+/// [code_len:bits 0..6]`. The step consumes `code_len` bits from the reservoir and
+/// returns the decoded symbol in the top byte over the advanced reservoir:
+/// `(symbol << 56) | (val >> code_len)`.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,8 +24,9 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn huffman_decode_table_step(val: u64, aux: u64) -> u64 {
-    ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val.rotate_left(13))
-        ^ ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
+    let code_len = (aux & 0x3F) as u32;
+    let symbol = (aux >> 8) & 0xFF;
+    (symbol << 56) | (val >> code_len)
 }
 
 #[cfg(test)]
@@ -33,8 +38,16 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn huffman_decode_table_step_reference(val: u64, aux: u64) -> u64 {
-        ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val.rotate_left(13))
-            ^ ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
+        // Independent derivation: unpack the table entry fields with explicit byte
+        // extraction and assemble the result by adding the symbol's contribution to
+        // the shifted reservoir using a logical-or via wrapping addition on disjoint
+        // ranges is unsafe, so reconstruct with bit-or after computing each part.
+        let len = (aux as u32) & 0x3F;
+        let entry_bytes = aux.to_le_bytes();
+        let symbol = entry_bytes[1] as u64; // bits 8..16
+        let advanced = val.checked_shr(len).unwrap_or(0);
+        let top = symbol.rotate_right(8); // places symbol into bits 56..64
+        top | advanced
     }
 
     // -------------------------------------------------------------------------

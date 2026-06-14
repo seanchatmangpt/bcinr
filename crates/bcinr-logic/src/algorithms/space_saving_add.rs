@@ -7,9 +7,14 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: the Space-Saving stream-summary `add` operation credits a
+/// monitored item's counter (`val`) by an observed weight (`aux`). The counter
+/// is monotone and must never overflow its fixed-width slot, so the update is a
+/// saturating addition that clamps at `u64::MAX`.
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::space_saving_add::space_saving_add;
@@ -20,9 +25,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn space_saving_add(val: u64, aux: u64) -> u64 {
-    (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
-        .wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2))
-        ^ (!(val & aux) & (val | aux))
+    val.saturating_add(aux)
 }
 
 #[cfg(test)]
@@ -34,9 +37,12 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn space_saving_add_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
-            .wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2))
-            ^ (!(val & aux) & (val | aux))
+        // Independent structure: detect overflow explicitly via checked_add and
+        // clamp to MAX, rather than calling saturating_add.
+        match val.checked_add(aux) {
+            Some(sum) => sum,
+            None => u64::MAX,
+        }
     }
 
     // -------------------------------------------------------------------------

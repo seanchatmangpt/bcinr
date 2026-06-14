@@ -7,9 +7,15 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Maps the order-16 Hilbert distance `d = val & 0xFFFF_FFFF` back to
+/// its 2-D point `(x, y)`, returning them packed as `x | (y << 16)` (`x` in the
+/// low 16 bits, `y` in the next 16). This is the inverse of the encoder
+/// (`d2xy`). `aux` is unused.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: the textbook Hilbert `d2xy` for a 16-bit grid, fully unrolled.
+/// The conditional rotation/reflection uses selection masks instead of branches.
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::hilbert_curve_decode_u32::hilbert_curve_decode_u32;
@@ -20,7 +26,40 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn hilbert_curve_decode_u32(val: u64, aux: u64) -> u64 {
-    (aux.rotate_right(7)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (aux.rotate_right(7))
+    let mut t = val & 0xFFFF_FFFF;
+    let mut x: u64 = 0;
+    let mut y: u64 = 0;
+    let mut step = |x: &mut u64, y: &mut u64, s: u64| {
+        let rx = 1 & (t >> 1);
+        let ry = 1 & (t ^ rx);
+        let ry0 = ry.wrapping_sub(1); // all-ones iff ry==0
+        let reflect = ry0 & 0u64.wrapping_sub(rx); // ry==0 && rx==1
+        let nx = ((s.wrapping_sub(1).wrapping_sub(*x)) & reflect) | (*x & !reflect);
+        let ny = ((s.wrapping_sub(1).wrapping_sub(*y)) & reflect) | (*y & !reflect);
+        let swap = ry0;
+        let ox = (ny & swap) | (nx & !swap);
+        let oy = (nx & swap) | (ny & !swap);
+        *x = ox.wrapping_add(s.wrapping_mul(rx));
+        *y = oy.wrapping_add(s.wrapping_mul(ry));
+        t >>= 2;
+    };
+    step(&mut x, &mut y, 1);
+    step(&mut x, &mut y, 1 << 1);
+    step(&mut x, &mut y, 1 << 2);
+    step(&mut x, &mut y, 1 << 3);
+    step(&mut x, &mut y, 1 << 4);
+    step(&mut x, &mut y, 1 << 5);
+    step(&mut x, &mut y, 1 << 6);
+    step(&mut x, &mut y, 1 << 7);
+    step(&mut x, &mut y, 1 << 8);
+    step(&mut x, &mut y, 1 << 9);
+    step(&mut x, &mut y, 1 << 10);
+    step(&mut x, &mut y, 1 << 11);
+    step(&mut x, &mut y, 1 << 12);
+    step(&mut x, &mut y, 1 << 13);
+    step(&mut x, &mut y, 1 << 14);
+    step(&mut x, &mut y, 1 << 15);
+    (x & 0xFFFF) | ((y & 0xFFFF) << 16)
 }
 
 #[cfg(test)]
@@ -32,8 +71,33 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
+    #[allow(unused_variables)]
     fn hilbert_curve_decode_u32_reference(val: u64, aux: u64) -> u64 {
-        (aux.rotate_right(7)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (aux.rotate_right(7))
+        // Independent structure: canonical Wikipedia d2xy with real branches and
+        // a tuple swap, scanning s from low to high.
+        let mut t = (val & 0xFFFF_FFFF) as i64;
+        let n: i64 = 1 << 16;
+        let mut x: i64 = 0;
+        let mut y: i64 = 0;
+        let mut s: i64 = 1;
+        while s < n {
+            let rx = 1 & (t / 2);
+            let ry = 1 & (t ^ rx);
+            if ry == 0 {
+                if rx == 1 {
+                    x = s - 1 - x;
+                    y = s - 1 - y;
+                }
+                let tmp = x;
+                x = y;
+                y = tmp;
+            }
+            x += s * rx;
+            y += s * ry;
+            t /= 4;
+            s *= 2;
+        }
+        ((x as u64) & 0xFFFF) | (((y as u64) & 0xFFFF) << 16)
     }
 
     // -------------------------------------------------------------------------

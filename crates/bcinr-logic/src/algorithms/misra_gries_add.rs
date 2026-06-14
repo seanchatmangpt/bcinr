@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -20,8 +20,16 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn misra_gries_add(val: u64, aux: u64) -> u64 {
-    (aux.rotate_right(7)).wrapping_add(aux.rotate_right(7))
-        ^ (val.wrapping_mul(aux.wrapping_add(1)))
+    // Interpretation: one counter update of the Misra-Gries heavy-hitters sketch.
+    // `val` is a monitored counter; `aux` is the match signal for the incoming
+    // item. If the item matches this counter (aux != 0) the counter is
+    // incremented; otherwise the counter is decremented toward zero (the
+    // "decrement all" step). Saturating to stay in range. Branchless select.
+    let inc = val.saturating_add(1);
+    let dec = val.saturating_sub(1);
+    let nz = (aux | aux.wrapping_neg()) >> 63; // 1 iff aux != 0
+    let mask = nz.wrapping_neg(); // all-ones iff aux != 0
+    (inc & mask) | (dec & !mask)
 }
 
 #[cfg(test)]
@@ -33,8 +41,14 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn misra_gries_add_reference(val: u64, aux: u64) -> u64 {
-        (aux.rotate_right(7)).wrapping_add(aux.rotate_right(7))
-            ^ (val.wrapping_mul(aux.wrapping_add(1)))
+        // Independent: ordinary branch on the match signal with checked arithmetic.
+        if aux != 0 {
+            val.checked_add(1).unwrap_or(u64::MAX)
+        } else if val == 0 {
+            0
+        } else {
+            val - 1
+        }
     }
 
     // -------------------------------------------------------------------------

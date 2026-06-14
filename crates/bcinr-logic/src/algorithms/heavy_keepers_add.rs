@@ -7,8 +7,10 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** HeavyKeepers counter update: increments the current stored count
+/// `aux` by the incoming item weight `val`, saturating at `u64::MAX` so a counter
+/// never wraps around (which would corrupt the heavy-hitter estimate).
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,7 +22,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn heavy_keepers_add(val: u64, aux: u64) -> u64 {
-    (val.wrapping_add(aux)).wrapping_add(val.rotate_left(13)) ^ (val ^ aux)
+    aux.saturating_add(val)
 }
 
 #[cfg(test)]
@@ -33,7 +35,12 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn heavy_keepers_add_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_add(aux)).wrapping_add(val.rotate_left(13)) ^ (val ^ aux)
+        // Independent derivation: compute the full-width sum and clamp explicitly on
+        // overflow, instead of using saturating_add.
+        match aux.checked_add(val) {
+            Some(sum) => sum,
+            None => u64::MAX,
+        }
     }
 
     // -------------------------------------------------------------------------

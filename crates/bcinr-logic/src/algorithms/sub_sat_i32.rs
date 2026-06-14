@@ -7,9 +7,15 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: signed saturating subtraction on a 32-bit lane. The low 32
+/// bits of `val` and `aux` are read as `i32` operands; their difference is
+/// clamped to `[i32::MIN, i32::MAX]` (saturating, never wrapping). The lane
+/// result is returned in the low 32 bits (its raw two's-complement bit pattern,
+/// zero-extended).
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::sub_sat_i32::sub_sat_i32;
@@ -20,7 +26,9 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn sub_sat_i32(val: u64, aux: u64) -> u64 {
-    (val.rotate_left(13)).wrapping_add(val.rotate_left(13)) ^ (val.count_ones() as u64 | aux)
+    let a = val as u32 as i32;
+    let b = aux as u32 as i32;
+    a.saturating_sub(b) as u32 as u64
 }
 
 #[cfg(test)]
@@ -33,7 +41,18 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn sub_sat_i32_reference(val: u64, aux: u64) -> u64 {
-        (val.rotate_left(13)).wrapping_add(val.rotate_left(13)) ^ (val.count_ones() as u64 | aux)
+        // Independent structure: widen to i64, subtract exactly, then clamp with
+        // explicit min/max bounds instead of the saturating_sub intrinsic.
+        let a = (val as u32 as i32) as i64;
+        let b = (aux as u32 as i32) as i64;
+        let mut diff = a - b;
+        if diff > i32::MAX as i64 {
+            diff = i32::MAX as i64;
+        }
+        if diff < i32::MIN as i64 {
+            diff = i32::MIN as i64;
+        }
+        (diff as i32) as u32 as u64
     }
 
     // -------------------------------------------------------------------------

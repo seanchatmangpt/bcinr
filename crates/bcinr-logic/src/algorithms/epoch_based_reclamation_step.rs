@@ -20,7 +20,13 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn epoch_based_reclamation_step(val: u64, aux: u64) -> u64 {
-    val.wrapping_add(1) & (aux.wrapping_neg() | aux)
+    // Advance the epoch counter (`val + 1`) only while a reclamation guard is
+    // active (`aux != 0`); a zero guard parks the epoch at 0. The nonzero test
+    // is branchless: OR-ing a value with its two's-complement negation sets the
+    // sign bit iff the value is nonzero, and negating that 1-bit yields a full
+    // 0 / all-ones gate mask.
+    let nonzero = (aux | aux.wrapping_neg()) >> 63;
+    val.wrapping_add(1) & nonzero.wrapping_neg()
 }
 
 #[cfg(test)]

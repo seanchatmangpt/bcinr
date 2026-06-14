@@ -20,10 +20,19 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn ray_sphere_intersect_branchless(val: u64, aux: u64) -> u64 {
+    // Ray-sphere hit test reduced to the sign of the quadratic discriminant
+    // `Δ = b² - 4c` (the unit-direction case where a = 1). `val` carries the
+    // signed coefficient `b`, `aux` the signed coefficient `c`. A real root —
+    // i.e. the ray meets the sphere — exists iff Δ >= 0.
+    //
+    // # Branchless Contract
+    // Δ is formed with wrapping two's-complement arithmetic; its sign lives in
+    // bit 63. Extracting that bit and XOR-ing with 1 yields 1 for Δ >= 0 (hit)
+    // and 0 for Δ < 0 (miss), with no comparison branch.
     let b = val;
     let c = aux;
     let disc = b.wrapping_mul(b).wrapping_sub(4u64.wrapping_mul(c));
-    (disc.leading_zeros() == 0) as u64
+    (disc >> 63) ^ 1
 }
 
 #[cfg(test)]

@@ -4,8 +4,15 @@
 
 /// z_order_curve_2d_u32
 ///
-/// Branchless implementation guaranteed to execute in constant time
-/// with zero dynamic dispatch or control flow hazards.
+/// Morton (Z-order) encoding of two 32-bit coordinates `x = val as u32` and
+/// `y = aux as u32` into a single 64-bit index. Each coordinate's bits are
+/// "spread" so bit `i` of `x` lands at position `2i` and bit `i` of `y`
+/// lands at position `2i + 1`; the interleaved result is `spread(x) |
+/// (spread(y) << 1)`.
+///
+/// # Branchless Contract
+/// Bit spreading uses the standard fixed mask/shift dilation cascade, a
+/// constant sequence of shifts and ANDs with no data-dependent control flow.
 ///
 /// # CONTRACT
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
@@ -20,9 +27,16 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn z_order_curve_2d_u32(val: u64, aux: u64) -> u64 {
-    ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-        .wrapping_add(val.wrapping_mul(aux.wrapping_add(1)))
-        ^ (val ^ aux)
+    // Spread the low 32 bits of `c` so each bit i moves to position 2i.
+    fn spread(c: u64) -> u64 {
+        let mut x = c & 0x0000_0000_FFFF_FFFF;
+        x = (x | (x << 16)) & 0x0000_FFFF_0000_FFFF;
+        x = (x | (x << 8)) & 0x00FF_00FF_00FF_00FF;
+        x = (x | (x << 4)) & 0x0F0F_0F0F_0F0F_0F0F;
+        x = (x | (x << 2)) & 0x3333_3333_3333_3333;
+        (x | (x << 1)) & 0x5555_5555_5555_5555
+    }
+    spread(val) | (spread(aux) << 1)
 }
 
 #[cfg(test)]
@@ -34,9 +48,17 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn z_order_curve_2d_u32_reference(val: u64, aux: u64) -> u64 {
-        ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-            .wrapping_add(val.wrapping_mul(aux.wrapping_add(1)))
-            ^ (val ^ aux)
+        // Independent derivation: explicit per-bit interleave loop.
+        let x = val & 0xFFFF_FFFF;
+        let y = aux & 0xFFFF_FFFF;
+        let mut out: u64 = 0;
+        for i in 0..32u32 {
+            let xb = (x >> i) & 1;
+            let yb = (y >> i) & 1;
+            out |= xb << (2 * i);
+            out |= yb << (2 * i + 1);
+        }
+        out
     }
 
     // -------------------------------------------------------------------------

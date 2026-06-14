@@ -7,8 +7,11 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Fixed-point binary logarithm of `val`. The integer part is
+/// `floor(log2(val)) = 63 - clz(val)`; the fractional part is the `fb = aux & 63`
+/// high mantissa bits after the implicit leading one. The result is
+/// `(ip << fb) + frac`, an unsigned Qx.fb estimate. `val == 0` maps to `0`.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,8 +23,17 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn fixed_point_log2(val: u64, aux: u64) -> u64 {
-    ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(!(val & aux) & (val | aux))
-        ^ ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
+    let lz = val.leading_zeros(); // 64 when val == 0
+    let nz = ((val | val.wrapping_neg()) >> 63) & 1; // 1 iff val != 0
+    let ip = 63u64.wrapping_sub(lz as u64) & nz.wrapping_neg(); // 0 when val == 0
+    let fb = (aux & 63) as u32;
+    // Drop the implicit leading one, then keep the top `fb` mantissa bits.
+    // `wrapping_shl(lz+1)` of a nonzero val removes the leading set bit; for val==0
+    // mantissa is 0 so frac is 0 regardless.
+    let mantissa = val.wrapping_shl(lz.wrapping_add(1));
+    // frac = top `fb` bits of mantissa; checked_shr(64) for fb==0 yields 0.
+    let frac = mantissa.checked_shr(64 - fb).unwrap_or(0);
+    ip.wrapping_shl(fb).wrapping_add(frac)
 }
 
 #[cfg(test)]
@@ -33,8 +45,26 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn fixed_point_log2_reference(val: u64, aux: u64) -> u64 {
-        ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(!(val & aux) & (val | aux))
-            ^ ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
+        // Independent derivation: handle val==0 explicitly, find the integer part by
+        // scanning for the highest set bit position, and extract the fractional bits
+        // by isolating the bits strictly below the leading one.
+        if val == 0 {
+            return 0;
+        }
+        let fb = (aux % 64) as u32;
+        // highest set bit index = position of MSB.
+        let msb = 63 - val.leading_zeros();
+        let ip = msb as u64;
+        // bits below the leading one:
+        let below = val & ((1u64 << msb) - 1); // exactly the mantissa tail
+                                               // left-justify the tail to bit 63, then take the top `fb` bits.
+        let justified = if msb == 0 { 0u64 } else { below << (64 - msb) };
+        let frac = if fb == 0 {
+            0u64
+        } else {
+            justified >> (64 - fb)
+        };
+        (ip << fb).wrapping_add(frac)
     }
 
     // -------------------------------------------------------------------------

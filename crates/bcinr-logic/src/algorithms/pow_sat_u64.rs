@@ -7,6 +7,10 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
+/// Branchless Contract: saturating exponentiation `val^(aux & 0xFF)` in u64,
+/// clamping to `u64::MAX` on overflow. The exponent is taken modulo 256 so
+/// the operation is total over all inputs.
+///
 /// # CONTRACT
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
@@ -20,8 +24,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn pow_sat_u64(val: u64, aux: u64) -> u64 {
-    (!(val & aux) & (val | aux)).wrapping_add(!(val & aux) & (val | aux))
-        ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+    val.saturating_pow((aux & 0xFF) as u32)
 }
 
 #[cfg(test)]
@@ -33,8 +36,17 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn pow_sat_u64_reference(val: u64, aux: u64) -> u64 {
-        (!(val & aux) & (val | aux)).wrapping_add(!(val & aux) & (val | aux))
-            ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+        // Independent derivation: iterative repeated multiplication that
+        // clamps to u64::MAX the moment a checked multiply overflows.
+        let exp = (aux & 0xFF) as u32;
+        let mut acc: u64 = 1;
+        for _ in 0..exp {
+            match acc.checked_mul(val) {
+                Some(p) => acc = p,
+                None => return u64::MAX,
+            }
+        }
+        acc
     }
 
     // -------------------------------------------------------------------------

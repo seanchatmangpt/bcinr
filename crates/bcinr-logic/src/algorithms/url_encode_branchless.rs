@@ -4,8 +4,16 @@
 
 /// url_encode_branchless
 ///
-/// Branchless implementation guaranteed to execute in constant time
-/// with zero dynamic dispatch or control flow hazards.
+/// Branchless URL percent-encoding of a single byte. The byte
+/// `b = (val + aux) & 0xFF` is rendered as the three-character escape
+/// `%HL` where `H` and `L` are the uppercase ASCII hex digits of the high and
+/// low nibbles. The result packs the three bytes little-endian:
+/// `b'%' | (H << 8) | (L << 16)`.
+///
+/// # Branchless Contract
+/// Each nibble is converted to its ASCII hex digit with an arithmetic
+/// select (`'0'+n` vs `'A'+n-10`) driven by a comparison mask, never a
+/// branch.
 ///
 /// # CONTRACT
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
@@ -20,8 +28,17 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn url_encode_branchless(val: u64, aux: u64) -> u64 {
-    (val.wrapping_add(aux)).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2))
-        ^ (val.wrapping_sub(aux))
+    fn hex(nibble: u64) -> u64 {
+        let n = nibble & 0xF;
+        // mask = 1 iff n > 9 (i.e. needs 'A'..'F')
+        let alpha = (9u64.wrapping_sub(n) >> 63) & 1;
+        // '0' + n, plus 7 to jump from '9'+1 to 'A' for n >= 10
+        (b'0' as u64) + n + alpha.wrapping_mul(7)
+    }
+    let b = val.wrapping_add(aux) & 0xFF;
+    let hi = hex(b >> 4);
+    let lo = hex(b & 0xF);
+    (b'%' as u64) | (hi << 8) | (lo << 16)
 }
 
 #[cfg(test)]
@@ -33,8 +50,12 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn url_encode_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_add(aux)).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2))
-            ^ (val.wrapping_sub(aux))
+        // Independent derivation: index a literal hex-digit table.
+        const HEX: &[u8; 16] = b"0123456789ABCDEF";
+        let b = (val.wrapping_add(aux) & 0xFF) as usize;
+        let hi = HEX[b >> 4] as u64;
+        let lo = HEX[b & 0xF] as u64;
+        (b'%' as u64) + (hi << 8) + (lo << 16)
     }
 
     // -------------------------------------------------------------------------

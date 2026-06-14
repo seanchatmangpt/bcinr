@@ -8,7 +8,9 @@
 /// with zero dynamic dispatch or control flow hazards.
 ///
 /// # Branchless Contract
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Ensures:** Interprets the 64 bits of `val ^ aux` as an 8x8 bit matrix (row-major,
+/// byte = row) and returns its transpose, using the three classic delta-swap stages
+/// (shifts 7, 14, 28). `aux` perturbs the input matrix prior to transposition.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,7 +22,14 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn bit_matrix_transpose_64x64(val: u64, aux: u64) -> u64 {
-    val ^ aux.rotate_left(13)
+    let mut x = val ^ aux;
+    let t = (x ^ (x >> 7)) & 0x00AA00AA00AA00AA;
+    x ^= t ^ (t << 7);
+    let t = (x ^ (x >> 14)) & 0x0000CCCC0000CCCC;
+    x ^= t ^ (t << 14);
+    let t = (x ^ (x >> 28)) & 0x00000000F0F0F0F0;
+    x ^= t ^ (t << 28);
+    x
 }
 
 #[cfg(test)]
@@ -33,7 +42,16 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn bit_matrix_transpose_64x64_reference(val: u64, aux: u64) -> u64 {
-        val ^ aux.rotate_left(13)
+        // Independent: explicit (row, col) -> (col, row) bit relocation.
+        let x = val ^ aux;
+        let mut out = 0u64;
+        for r in 0..8u32 {
+            for c in 0..8u32 {
+                let bit = (x >> (r * 8 + c)) & 1;
+                out |= bit << (c * 8 + r);
+            }
+        }
+        out
     }
 
     // -------------------------------------------------------------------------

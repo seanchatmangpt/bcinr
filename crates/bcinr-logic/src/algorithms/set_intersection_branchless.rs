@@ -40,11 +40,20 @@ mod tests {
     use proptest::prelude::*;
 
     // -------------------------------------------------------------------------
-    // POSITIVE ORACLE: Reference implementation
-    // NOTE: Identical to main implementation (no simpler correct variant exists).
+    // POSITIVE ORACLE: Reference implementation (independent structure).
+    // Set intersection of two bitset words = membership-AND per bit, here
+    // re-derived bit-by-bit via a loop and De Morgan's identity.
     // -------------------------------------------------------------------------
     fn set_intersection_branchless_reference(val: u64, aux: u64) -> u64 {
-        val & aux
+        let mut out: u64 = 0;
+        for i in 0..64 {
+            let a = (val >> i) & 1;
+            let b = (aux >> i) & 1;
+            // a AND b expressed as NOT(NOT a OR NOT b).
+            let bit = 1 - ((1 - a) | (1 - b));
+            out |= bit << i;
+        }
+        out
     }
 
     // -------------------------------------------------------------------------

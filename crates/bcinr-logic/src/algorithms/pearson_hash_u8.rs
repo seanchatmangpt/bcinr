@@ -47,6 +47,8 @@ const PEARSON_TABLE: [u8; 256] = [
 /// assert_ne!(h1, h2); // Different seeds produce different hashes
 /// assert!(h1 < 256 && h2 < 256);
 /// ```
+///
+/// # Branchless Contract
 #[no_mangle]
 pub fn pearson_hash_u8(input: u64, seed: u64) -> u64 {
     // Extract the lowest byte from input

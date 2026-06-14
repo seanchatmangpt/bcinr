@@ -16,11 +16,20 @@
 /// let result = spatial_hash_u32(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+///
+/// # Branchless Contract
+/// Interpretation: Teschner's spatial hash for a 2-D grid cell. `val` is the X
+/// coordinate, `aux` is the Y coordinate. Each coordinate is multiplied by a large
+/// distinct prime (73856093 and 19349663, the canonical Teschner constants) and the
+/// products are XOR-combined into a single 64-bit bucket hash. The caller masks the
+/// low bits to the hash-table size.
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn spatial_hash_u32(val: u64, aux: u64) -> u64 {
-    (!(val & aux) & (val | aux)).wrapping_add(aux.rotate_right(7)) ^ (val.reverse_bits() ^ aux)
+    let hx = val.wrapping_mul(73856093);
+    let hy = aux.wrapping_mul(19349663);
+    hx ^ hy
 }
 
 #[cfg(test)]
@@ -33,7 +42,14 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn spatial_hash_u32_reference(val: u64, aux: u64) -> u64 {
-        (!(val & aux) & (val | aux)).wrapping_add(aux.rotate_right(7)) ^ (val.reverse_bits() ^ aux)
+        // Re-derive the Teschner spatial hash with the prime products built up
+        // through a fold over a coordinate/prime table and combined by XOR.
+        let coords: [(u64, u64); 2] = [(val, 73856093), (aux, 19349663)];
+        let mut acc: u64 = 0;
+        for (c, prime) in coords {
+            acc ^= c.wrapping_mul(prime);
+        }
+        acc
     }
 
     // -------------------------------------------------------------------------

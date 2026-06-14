@@ -7,9 +7,15 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: one step of Kahn's topological-sort frontier update over a
+/// 64-node bitset. `val` is the ready-set (nodes whose in-degree has reached
+/// zero); `aux` is the set of nodes already emitted in previous steps. The
+/// nodes emittable now are exactly those that are ready and not yet emitted —
+/// the branchless set difference `val & !aux`.
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::topological_sort_step_branchless::topological_sort_step_branchless;
@@ -20,8 +26,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn topological_sort_step_branchless(val: u64, aux: u64) -> u64 {
-    (!(val & aux) & (val | aux)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32))
-        ^ (!(val & aux) & (val | aux))
+    val & !aux
 }
 
 #[cfg(test)]
@@ -33,8 +38,10 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn topological_sort_step_branchless_reference(val: u64, aux: u64) -> u64 {
-        (!(val & aux) & (val | aux)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32))
-            ^ (!(val & aux) & (val | aux))
+        // Independent structure: set difference expressed as removing the shared
+        // (already-emitted) members from the ready-set via XOR, rather than the
+        // and-not form.
+        val ^ (val & aux)
     }
 
     // -------------------------------------------------------------------------

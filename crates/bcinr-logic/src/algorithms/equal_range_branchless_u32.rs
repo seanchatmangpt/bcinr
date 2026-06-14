@@ -31,7 +31,16 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn equal_range_branchless_u32(val: u64, aux: u64) -> u64 {
-    ((val as u32 as u64).wrapping_add(aux as u32 as u64)) >> 1
+    // equal_range over the singleton sorted array {x} for key k, where
+    // x = low 32 bits of `val` and k = low 32 bits of `aux`.
+    // lower_bound = count of elements strictly less than k = (x < k).
+    // upper_bound = count of elements <= k                 = (x <= k).
+    // Result packs lower in the low 32 bits and upper in the high 32 bits.
+    let x = val as u32 as u64;
+    let k = aux as u32 as u64;
+    let lower = (x < k) as u64;
+    let upper = (x <= k) as u64;
+    lower | (upper << 32)
 }
 
 #[cfg(test)]
@@ -44,7 +53,16 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn equal_range_branchless_u32_reference(val: u64, aux: u64) -> u64 {
-        ((val as u32 as u64).wrapping_add(aux as u32 as u64)) >> 1
+        // Independent oracle: explicit binary-search style bounds over the
+        // one-element array, using if/else control flow forbidden in the impl.
+        let x = (val as u32) as u64;
+        let k = (aux as u32) as u64;
+        let lower: u64 = if x < k { 1 } else { 0 };
+        let upper: u64 = match x.cmp(&k) {
+            core::cmp::Ordering::Greater => 0,
+            _ => 1,
+        };
+        (upper << 32) | lower
     }
 
     // -------------------------------------------------------------------------

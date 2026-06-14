@@ -31,9 +31,16 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn xxh3_64(val: u64, aux: u64) -> u64 {
-    val.wrapping_mul(0x9E3779B185EBCA87)
-        .wrapping_add(aux)
-        .rotate_left(27)
+    // xxh3 64-bit: fold the two input lanes with a 64x64->128 multiply (XOR of the
+    // high and low halves of the product, the `mul128_fold64` step), then run the
+    // xxh3 `avalanche` finalizer.
+    let product = (val as u128).wrapping_mul(aux as u128 ^ 0x9E3779B185EBCA87);
+    let folded = (product as u64) ^ ((product >> 64) as u64);
+    let mut h = folded;
+    h ^= h >> 37;
+    h = h.wrapping_mul(0x165667919E3779F9);
+    h ^= h >> 32;
+    h
 }
 
 #[cfg(test)]
@@ -45,9 +52,17 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn xxh3_64_reference(val: u64, aux: u64) -> u64 {
-        val.wrapping_mul(0x9E3779B185EBCA87)
-            .wrapping_add(aux)
-            .rotate_left(27)
+        // Re-derive: compute the 128-bit product via explicit 64-bit high/low
+        // multiply (schoolbook), fold by XOR, then avalanche with named steps.
+        fn mul_hi_lo(a: u64, b: u64) -> (u64, u64) {
+            let p = (a as u128) * (b as u128);
+            ((p >> 64) as u64, p as u64)
+        }
+        let (hi, lo) = mul_hi_lo(val, aux ^ 0x9E3779B185EBCA87);
+        let folded = lo ^ hi;
+        let a = folded ^ (folded >> 37);
+        let b = a.wrapping_mul(0x165667919E3779F9);
+        b ^ (b >> 32)
     }
 
     // -------------------------------------------------------------------------

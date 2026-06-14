@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -20,7 +20,31 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn json_find_structural_simd(val: u64, aux: u64) -> u64 {
-    (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val & aux) ^ (val.reverse_bits() ^ aux)
+    // Interpretation: SIMD scan of the 8 bytes of `val` for JSON structural
+    // characters  { } [ ] : ,  (as in simdjson's stage-1). For each lane whose
+    // byte is structural we emit that byte's most-significant bit, AND-gated by
+    // the per-lane active mask in `aux` (lane active iff its byte is non-zero).
+    // Branchless via unrolled per-lane byte-equality.
+    // Per-lane branchless scalar equality (single-byte values, carry-free).
+    let eq = |b: u64, c: u64| 1 - ((((b ^ c) + 255) >> 8) & 1); // 1 iff b == c
+    let lane = |b: u64, a: u64| -> u64 {
+        let s = eq(b, 0x7B) | eq(b, 0x7D) | eq(b, 0x5B) | eq(b, 0x5D) | eq(b, 0x3A) | eq(b, 0x2C);
+        let active = (a + 255) >> 8 & 1; // 1 iff a != 0
+        (s & active) << 7
+    };
+    let v = val.to_le_bytes();
+    let a = aux.to_le_bytes();
+    let out = [
+        lane(v[0] as u64, a[0] as u64) as u8,
+        lane(v[1] as u64, a[1] as u64) as u8,
+        lane(v[2] as u64, a[2] as u64) as u8,
+        lane(v[3] as u64, a[3] as u64) as u8,
+        lane(v[4] as u64, a[4] as u64) as u8,
+        lane(v[5] as u64, a[5] as u64) as u8,
+        lane(v[6] as u64, a[6] as u64) as u8,
+        lane(v[7] as u64, a[7] as u64) as u8,
+    ];
+    u64::from_le_bytes(out)
 }
 
 #[cfg(test)]
@@ -33,7 +57,17 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn json_find_structural_simd_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val & aux) ^ (val.reverse_bits() ^ aux)
+        // Independent: explicit per-byte membership scan.
+        let v = val.to_le_bytes();
+        let a = aux.to_le_bytes();
+        let mut out = [0u8; 8];
+        for i in 0..8 {
+            let s = matches!(v[i], b'{' | b'}' | b'[' | b']' | b':' | b',');
+            if a[i] != 0 && s {
+                out[i] = 0x80;
+            }
+        }
+        u64::from_le_bytes(out)
     }
 
     // -------------------------------------------------------------------------

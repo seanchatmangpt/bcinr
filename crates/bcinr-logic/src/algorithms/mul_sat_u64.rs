@@ -5,6 +5,8 @@
 
 /// mul_sat_u64 — Saturating multiplication for u64
 ///
+/// # Branchless Contract
+///
 /// Multiplies two u64 values with saturation on overflow.
 /// If a × b would exceed u64::MAX, returns u64::MAX.
 /// Branchless: uses conditional arithmetic (no if-statements).
@@ -127,10 +129,10 @@ mod tests {
         // Large but non-overflow: (2^32) * (2^32) = 2^64 (overflow)
         assert_eq!(mul_sat_u64(0x100000000, 0x100000000), u64::MAX);
 
-        // Just below overflow threshold
+        // Just below overflow threshold: 0xFFFFFFFF^2 = 0xFFFFFFFE00000001 < 2^64
         let sqrt_max = 0xFFFFFFFF_u64; // floor(sqrt(2^64 - 1))
         let product = mul_sat_u64(sqrt_max, sqrt_max);
-        assert_eq!(product, u64::MAX); // Overflows
+        assert_eq!(product, 0xFFFFFFFE00000001); // Does not overflow
     }
 
     // -------------------------------------------------------------------------

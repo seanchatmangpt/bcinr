@@ -16,11 +16,21 @@
 /// let result = minhash_u64_k(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+///
+/// # Branchless Contract
+/// Interpretation: a single MinHash slot update. The element `val` is permuted by
+/// a splitmix64 finalizer keyed by `aux`, then combined with the running minimum
+/// (the `aux`-derived slot seed) via `u64::min`. This is the canonical MinHash
+/// rule: retain the smallest permuted value seen so far.
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn minhash_u64_k(val: u64, aux: u64) -> u64 {
-    (val.reverse_bits() ^ aux).wrapping_add(aux.rotate_right(7)) ^ (val.wrapping_sub(aux))
+    let mut z = val.wrapping_add(aux).wrapping_add(0x9E3779B97F4A7C15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D049BB133111EB);
+    let permuted = z ^ (z >> 31);
+    u64::min(permuted, aux.rotate_right(7))
 }
 
 #[cfg(test)]
@@ -33,7 +43,24 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn minhash_u64_k_reference(val: u64, aux: u64) -> u64 {
-        (val.reverse_bits() ^ aux).wrapping_add(aux.rotate_right(7)) ^ (val.wrapping_sub(aux))
+        // Re-derive the splitmix64 finalizer as a table-driven loop over the
+        // (shift, multiplier) rounds, then pick the minimum with an explicit if.
+        let rounds: [(u32, u64); 3] = [
+            (30, 0xBF58476D1CE4E5B9),
+            (27, 0x94D049BB133111EB),
+            (31, 1), // final xorshift only; multiplier 1 is a no-op
+        ];
+        let mut z = val.wrapping_add(aux).wrapping_add(0x9E3779B97F4A7C15);
+        for (sh, mul) in rounds {
+            z = (z ^ (z >> sh)).wrapping_mul(mul);
+        }
+        let permuted = z;
+        let seed = aux.rotate_right(7);
+        if permuted < seed {
+            permuted
+        } else {
+            seed
+        }
     }
 
     // -------------------------------------------------------------------------

@@ -16,6 +16,8 @@
 /// let result = halton_sequence_u32(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+///
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]

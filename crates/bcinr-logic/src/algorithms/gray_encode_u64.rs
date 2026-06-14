@@ -7,8 +7,9 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Returns the reflected binary Gray code of `val`, i.e.
+/// `val ^ (val >> 1)`. `aux` is unused. This is invertible by `gray_decode_u64`.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -34,7 +35,15 @@ mod tests {
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
     fn gray_encode_u64_reference(val: u64, aux: u64) -> u64 {
-        val ^ (val >> 1)
+        // Independent structure: build the Gray code bit-by-bit, where bit i is
+        // the XOR of binary bits i and i+1.
+        let mut out: u64 = 0;
+        for i in 0..64 {
+            let b = (val >> i) & 1;
+            let nb = if i < 63 { (val >> (i + 1)) & 1 } else { 0 };
+            out |= (b ^ nb) << i;
+        }
+        out
     }
 
     // -------------------------------------------------------------------------

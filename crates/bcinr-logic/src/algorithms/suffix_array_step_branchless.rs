@@ -4,11 +4,15 @@
 
 /// suffix_array_step_branchless
 ///
-/// Branchless implementation guaranteed to execute in constant time
-/// with zero dynamic dispatch or control flow hazards.
+/// Interpretation: one step of suffix-array construction by prefix doubling.
+/// At each doubling step a suffix's composite sort key is formed from its
+/// current rank `val` and the rank of the suffix `k` positions later, `aux`.
+/// The key packs the primary rank into the high 32 bits and the secondary
+/// rank into the low 32 bits: `(val_lo32 << 32) | aux_lo32`, so lexicographic
+/// comparison of keys yields the doubled-order ranking.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Result equals ((val & 0xFFFFFFFF) << 32) | (aux & 0xFFFFFFFF).
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,7 +24,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn suffix_array_step_branchless(val: u64, aux: u64) -> u64 {
-    (val ^ aux).wrapping_add(val.rotate_left(13)) ^ (val.wrapping_add(aux))
+    ((val & 0xFFFF_FFFF) << 32) | (aux & 0xFFFF_FFFF)
 }
 
 #[cfg(test)]
@@ -33,7 +37,17 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn suffix_array_step_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val ^ aux).wrapping_add(val.rotate_left(13)) ^ (val.wrapping_add(aux))
+        // Independent structure: assemble the 64-bit key from its 8 bytes,
+        // taking the low 4 bytes of val as the high half and the low 4 bytes
+        // of aux as the low half.
+        let primary = val.to_le_bytes();
+        let secondary = aux.to_le_bytes();
+        let mut bytes = [0u8; 8];
+        for i in 0..4 {
+            bytes[i] = secondary[i]; // low 32 bits = aux
+            bytes[i + 4] = primary[i]; // high 32 bits = val
+        }
+        u64::from_le_bytes(bytes)
     }
 
     // -------------------------------------------------------------------------

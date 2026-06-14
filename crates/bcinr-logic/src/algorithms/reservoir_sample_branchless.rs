@@ -8,7 +8,12 @@
 /// with zero dynamic dispatch or control flow hazards.
 ///
 /// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Branchless Contract:** Algorithm R reservoir sampling decision for a
+/// single-slot reservoir (k = 1). At stream position `i = val | 1` (forced
+/// non-zero, 1-based) the incoming element replaces the held sample with
+/// probability `1/i`. Given uniform random draw `aux`, the replacement event is
+/// `aux mod i == 0`. Returns 1 if the new element is accepted into the
+/// reservoir, 0 if the existing sample is retained.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,8 +25,8 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn reservoir_sample_branchless(val: u64, aux: u64) -> u64 {
-    (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2))
-        ^ (val.leading_zeros() as u64 ^ aux)
+    let i = val | 1;
+    ((aux % i) == 0) as u64
 }
 
 #[cfg(test)]
@@ -33,9 +38,16 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn reservoir_sample_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_mul(aux.wrapping_add(1)))
-            .wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2))
-            ^ (val.leading_zeros() as u64 ^ aux)
+        // 1-based stream index, then test divisibility by reconstructing the
+        // remainder as aux - floor(aux/i)*i and branching on whether it is zero.
+        let i = val | 1;
+        let quotient = aux / i;
+        let remainder = aux - quotient * i;
+        if remainder == 0 {
+            1
+        } else {
+            0
+        }
     }
 
     // -------------------------------------------------------------------------

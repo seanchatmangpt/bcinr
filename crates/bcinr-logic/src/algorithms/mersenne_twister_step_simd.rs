@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -20,8 +20,16 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn mersenne_twister_step_simd(val: u64, aux: u64) -> u64 {
-    (val.count_ones() as u64 | aux).wrapping_add(val.rotate_left(13))
-        ^ (val.count_ones() as u64 | aux)
+    // Interpretation: the MT19937-64 tempering transform applied to the mixed
+    // state word `x = val ^ aux` (the recurrence combines two state words before
+    // tempering). This is the canonical 64-bit MT output whitening, fully
+    // branchless via shifts and AND-masks.
+    let mut y = val ^ aux;
+    y ^= (y >> 29) & 0x5555_5555_5555_5555;
+    y ^= (y << 17) & 0x71D6_7FFF_EDA6_0000;
+    y ^= (y << 37) & 0xFFF7_EEE0_0000_0000;
+    y ^= y >> 43;
+    y
 }
 
 #[cfg(test)]
@@ -33,8 +41,23 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn mersenne_twister_step_simd_reference(val: u64, aux: u64) -> u64 {
-        (val.count_ones() as u64 | aux).wrapping_add(val.rotate_left(13))
-            ^ (val.count_ones() as u64 | aux)
+        // Independent: same MT19937-64 tempering written as a fold over a table
+        // of (shift, direction, mask) stages instead of straight-line code.
+        let x = val ^ aux;
+        // (shift, is_left, mask); mask 0 means a plain unmasked shift.
+        let stages: [(u32, bool, u64); 4] = [
+            (29, false, 0x5555_5555_5555_5555),
+            (17, true, 0x71D6_7FFF_EDA6_0000),
+            (37, true, 0xFFF7_EEE0_0000_0000),
+            (43, false, 0),
+        ];
+        let mut acc = x;
+        for (sh, left, mask) in stages.iter().copied() {
+            let shifted = if left { acc << sh } else { acc >> sh };
+            let term = if mask == 0 { shifted } else { shifted & mask };
+            acc ^= term;
+        }
+        acc
     }
 
     // -------------------------------------------------------------------------

@@ -7,8 +7,11 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Sorts the eight byte-lanes of `val` using a 19-comparator Batcher
+/// odd-even mergesort network. Lane 0 is the least-significant byte. The direction is
+/// chosen by the low bit of `aux`: ascending when even, descending when odd.
+/// Each comparator is a branchless compare-exchange (min/max + masked select).
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,8 +23,57 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn bit_parallel_sort8_u32(val: u64, aux: u64) -> u64 {
-    (aux.rotate_right(7)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1)))
-        ^ (val.wrapping_add(aux))
+    // dirm = all-ones for descending, zero for ascending.
+    let dirm = 0u64.wrapping_sub(aux & 1);
+    let mut b = [
+        val & 0xFF,
+        (val >> 8) & 0xFF,
+        (val >> 16) & 0xFF,
+        (val >> 24) & 0xFF,
+        (val >> 32) & 0xFF,
+        (val >> 40) & 0xFF,
+        (val >> 48) & 0xFF,
+        (val >> 56) & 0xFF,
+    ];
+
+    // Branchless compare-exchange of lanes i and j (straight-line, no control flow).
+    let mut ce = |i: usize, j: usize| {
+        let a = b[i];
+        let c = b[j];
+        let lo = u64::min(a, c);
+        let hi = u64::max(a, c);
+        b[i] = (lo & !dirm) | (hi & dirm);
+        b[j] = (hi & !dirm) | (lo & dirm);
+    };
+
+    // Batcher odd-even mergesort network for n = 8 (19 comparators), fully unrolled.
+    ce(0, 1);
+    ce(2, 3);
+    ce(4, 5);
+    ce(6, 7);
+    ce(0, 2);
+    ce(1, 3);
+    ce(4, 6);
+    ce(5, 7);
+    ce(1, 2);
+    ce(5, 6);
+    ce(0, 4);
+    ce(3, 7);
+    ce(1, 5);
+    ce(2, 6);
+    ce(1, 4);
+    ce(3, 6);
+    ce(2, 4);
+    ce(3, 5);
+    ce(3, 4);
+
+    b[0] | (b[1] << 8)
+        | (b[2] << 16)
+        | (b[3] << 24)
+        | (b[4] << 32)
+        | (b[5] << 40)
+        | (b[6] << 48)
+        | (b[7] << 56)
 }
 
 #[cfg(test)]
@@ -33,8 +85,13 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn bit_parallel_sort8_u32_reference(val: u64, aux: u64) -> u64 {
-        (aux.rotate_right(7)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1)))
-            ^ (val.wrapping_add(aux))
+        // Independent: extract bytes, sort with std, reverse if descending, repack.
+        let mut bytes = val.to_le_bytes();
+        bytes.sort_unstable();
+        if aux & 1 == 1 {
+            bytes.reverse();
+        }
+        u64::from_le_bytes(bytes)
     }
 
     // -------------------------------------------------------------------------

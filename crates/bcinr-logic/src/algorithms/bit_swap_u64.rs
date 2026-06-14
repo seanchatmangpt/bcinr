@@ -7,8 +7,11 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Swaps two single bits of `val`. The positions are taken from `aux`:
+/// `i = aux & 63` (low 6 bits) and `j = (aux >> 6) & 63` (next 6 bits). Uses the
+/// classic XOR-swap of two bit positions
+/// `d = ((val>>i) ^ (val>>j)) & 1; val ^ ((d<<i) | (d<<j))`.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,9 +23,10 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn bit_swap_u64(val: u64, aux: u64) -> u64 {
-    ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-        .wrapping_add(val.count_ones() as u64 | aux)
-        ^ (val | aux)
+    let i = (aux & 63) as u32;
+    let j = ((aux >> 6) & 63) as u32;
+    let d = ((val >> i) ^ (val >> j)) & 1;
+    val ^ ((d << i) | (d << j))
 }
 
 #[cfg(test)]
@@ -34,9 +38,15 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn bit_swap_u64_reference(val: u64, aux: u64) -> u64 {
-        ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-            .wrapping_add(val.count_ones() as u64 | aux)
-            ^ (val | aux)
+        // Independent: extract both bits, clear them, then reinsert swapped.
+        let i = (aux & 63) as u32;
+        let j = ((aux >> 6) & 63) as u32;
+        let bi = (val >> i) & 1;
+        let bj = (val >> j) & 1;
+        let mut out = val & !(1u64 << i) & !(1u64 << j);
+        out |= bj << i;
+        out |= bi << j;
+        out
     }
 
     // -------------------------------------------------------------------------

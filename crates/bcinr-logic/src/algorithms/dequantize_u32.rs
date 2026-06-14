@@ -7,8 +7,9 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Dequantizes the quantized integer `val` by multiplying it with the
+/// integer scale factor `aux` (`real ≈ q * scale`), wrapping on overflow.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -33,7 +34,19 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn dequantize_u32_reference(val: u64, aux: u64) -> u64 {
-        val.wrapping_mul(aux)
+        // Independent derivation: peasant (shift-and-add) multiplication instead of
+        // the single wrapping_mul, producing the same wrapping product.
+        let mut acc: u64 = 0;
+        let mut a = val;
+        let mut b = aux;
+        while b != 0 {
+            if b & 1 == 1 {
+                acc = acc.wrapping_add(a);
+            }
+            a = a.wrapping_shl(1);
+            b >>= 1;
+        }
+        acc
     }
 
     // -------------------------------------------------------------------------

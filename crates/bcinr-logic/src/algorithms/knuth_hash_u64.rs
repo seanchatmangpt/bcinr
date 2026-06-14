@@ -7,8 +7,13 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Interpretation:** Knuth's multiplicative hash (TAOCP Vol. 3, §6.4). The key
+/// `val` is multiplied by Knuth's 64-bit constant `A = 2^64 / φ =
+/// 0x9E3779B97F4A7C15`; the high-order bits of the product carry the best mixing,
+/// so the result is the product shifted right by `aux & 63` to project into a
+/// table of `2^(64 - (aux & 63))` slots. Pure multiply + shift, branchless O(1).
+/// **Ensures:** Result matches the independent reference for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,7 +25,8 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn knuth_hash_u64(val: u64, aux: u64) -> u64 {
-    (val & aux).wrapping_add(val.leading_zeros() as u64 ^ aux) ^ (val.leading_zeros() as u64 ^ aux)
+    let product = val.wrapping_mul(0x9E3779B97F4A7C15);
+    product >> (aux & 63)
 }
 
 #[cfg(test)]
@@ -32,8 +38,11 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn knuth_hash_u64_reference(val: u64, aux: u64) -> u64 {
-        (val & aux).wrapping_add(val.leading_zeros() as u64 ^ aux)
-            ^ (val.leading_zeros() as u64 ^ aux)
+        // Independent: u128 product truncation, shift amount via modulo.
+        let a: u128 = 0x9E3779B97F4A7C15;
+        let product = ((val as u128 * a) & 0xFFFF_FFFF_FFFF_FFFF) as u64;
+        let shift = (aux % 64) as u32;
+        product.checked_shr(shift).unwrap_or(0)
     }
 
     // -------------------------------------------------------------------------

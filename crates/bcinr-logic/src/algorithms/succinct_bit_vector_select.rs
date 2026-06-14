@@ -16,11 +16,80 @@
 /// let result = succinct_bit_vector_select(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+///
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn succinct_bit_vector_select(val: u64, aux: u64) -> u64 {
-    (val.wrapping_add(aux)).wrapping_add(val.wrapping_add(aux)) ^ ((val & 0xFFFFFFFF) | (aux << 32))
+    // Branchless Contract: select query. Returns the 0-based index of the
+    // (aux+1)-th set bit of `val`, or 64 if fewer than aux+1 bits are set. The
+    // index equals the number of prefix positions whose inclusive rank does not
+    // exceed `aux`; summed branchlessly over all 64 lanes.
+    0u64 + (((val & ((1u64 << 1) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 2) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 3) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 4) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 5) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 6) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 7) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 8) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 9) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 10) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 11) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 12) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 13) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 14) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 15) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 16) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 17) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 18) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 19) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 20) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 21) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 22) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 23) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 24) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 25) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 26) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 27) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 28) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 29) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 30) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 31) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 32) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 33) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 34) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 35) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 36) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 37) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 38) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 39) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 40) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 41) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 42) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 43) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 44) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 45) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 46) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 47) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 48) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 49) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 50) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 51) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 52) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 53) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 54) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 55) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 56) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 57) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 58) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 59) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 60) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 61) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 62) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & ((1u64 << 63) - 1)).count_ones() as u64 <= aux) as u64)
+        + (((val & u64::MAX).count_ones() as u64 <= aux) as u64)
 }
 
 #[cfg(test)]
@@ -32,8 +101,21 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn succinct_bit_vector_select_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_add(aux)).wrapping_add(val.wrapping_add(aux))
-            ^ ((val & 0xFFFFFFFF) | (aux << 32))
+        // Independent derivation: walk the bits low-to-high, decrementing a
+        // remaining-count; return the position when the (aux+1)-th one is seen,
+        // else 64 (test-only loop).
+        let mut remaining = aux;
+        let mut i: u32 = 0;
+        while i < 64 {
+            if (val >> i) & 1 == 1 {
+                if remaining == 0 {
+                    return i as u64;
+                }
+                remaining -= 1;
+            }
+            i += 1;
+        }
+        64
     }
 
     // -------------------------------------------------------------------------

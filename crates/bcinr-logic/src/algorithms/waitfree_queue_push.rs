@@ -7,9 +7,15 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: a wait-free ring-buffer push reserves a slot by reading the
+/// monotone tail ticket (`val`) and mapping it into the physical buffer of
+/// capacity `aux` via wrap-around: `slot = tail mod capacity`. A capacity of
+/// zero is treated as one (`max(aux, 1)`) so the mapping is total and the
+/// modulo never divides by zero.
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::waitfree_queue_push::waitfree_queue_push;
@@ -20,7 +26,8 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn waitfree_queue_push(val: u64, aux: u64) -> u64 {
-    (val.rotate_left(13)).wrapping_add(val.wrapping_sub(aux)) ^ (!(val & aux) & (val | aux))
+    let capacity = u64::max(aux, 1);
+    val % capacity
 }
 
 #[cfg(test)]
@@ -33,7 +40,11 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn waitfree_queue_push_reference(val: u64, aux: u64) -> u64 {
-        (val.rotate_left(13)).wrapping_add(val.wrapping_sub(aux)) ^ (!(val & aux) & (val | aux))
+        // Independent structure: derive the remainder as tail - capacity*quotient
+        // instead of the `%` operator, after normalising a zero capacity to one.
+        let capacity = if aux == 0 { 1 } else { aux };
+        let quotient = val / capacity;
+        val - quotient * capacity
     }
 
     // -------------------------------------------------------------------------

@@ -7,8 +7,10 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** SWAR delimiter scan over the 8 packed bytes of `val`. The low byte
+/// of `aux` is broadcast as the delimiter; the result carries `0x80` in the high
+/// bit of every byte lane whose value equals the delimiter (Mycroft's zero-byte test).
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,7 +22,13 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn csv_scan_row_simd(val: u64, aux: u64) -> u64 {
-    (val.reverse_bits() ^ aux).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (val ^ aux)
+    const ONES: u64 = 0x0101_0101_0101_0101;
+    const HIGH: u64 = 0x8080_8080_8080_8080;
+    const LOW7: u64 = 0x7F7F_7F7F_7F7F_7F7F;
+    let delim = (aux & 0xFF).wrapping_mul(ONES);
+    let x = val ^ delim;
+    // Bytes that are zero in `x` (i.e. equal the delimiter) get 0x80 set.
+    !(((x & LOW7).wrapping_add(LOW7) | x) & HIGH) & HIGH
 }
 
 #[cfg(test)]
@@ -33,7 +41,15 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn csv_scan_row_simd_reference(val: u64, aux: u64) -> u64 {
-        (val.reverse_bits() ^ aux).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (val ^ aux)
+        // Independent derivation: scan each byte lane explicitly and rebuild the
+        // 0x80-per-matching-byte mask via a loop instead of SWAR arithmetic.
+        let delim = (aux & 0xFF) as u8;
+        let bytes = val.to_le_bytes();
+        let mut out = [0u8; 8];
+        for i in 0..8 {
+            out[i] = if bytes[i] == delim { 0x80 } else { 0x00 };
+        }
+        u64::from_le_bytes(out)
     }
 
     // -------------------------------------------------------------------------

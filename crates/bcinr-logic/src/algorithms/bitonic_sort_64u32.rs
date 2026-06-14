@@ -7,8 +7,13 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Sorts the eight byte-lanes of `val` (lane 0 = least-significant byte)
+/// using the canonical 24-comparator bitonic sorting network (3 phases of build-and-merge
+/// with the standard alternating sub-block directions). The low bit of `aux` selects the
+/// final order: ascending when even, descending when odd. Each comparator is a branchless
+/// min/max compare-exchange whose direction is a compile-time constant XORed with the
+/// global order bit.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,8 +25,65 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn bitonic_sort_64u32(val: u64, aux: u64) -> u64 {
-    (val.wrapping_shl(3) ^ aux.wrapping_shr(2)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32))
-        ^ (val.wrapping_add(aux))
+    let flip = aux & 1; // 1 => globally descending
+    let mut b = [
+        val & 0xFF,
+        (val >> 8) & 0xFF,
+        (val >> 16) & 0xFF,
+        (val >> 24) & 0xFF,
+        (val >> 32) & 0xFF,
+        (val >> 40) & 0xFF,
+        (val >> 48) & 0xFF,
+        (val >> 56) & 0xFF,
+    ];
+
+    // asc = 1 means "min first" for this comparator before the global flip.
+    let mut ce = |i: usize, j: usize, asc: u64| {
+        let descending = asc ^ 1 ^ flip; // 1 => max first
+        let dirm = 0u64.wrapping_sub(descending);
+        let a = b[i];
+        let c = b[j];
+        let lo = u64::min(a, c);
+        let hi = u64::max(a, c);
+        b[i] = (lo & !dirm) | (hi & dirm);
+        b[j] = (hi & !dirm) | (lo & dirm);
+    };
+
+    // Phase 1
+    ce(0, 1, 1);
+    ce(2, 3, 0);
+    ce(4, 5, 1);
+    ce(6, 7, 0);
+    // Phase 2
+    ce(0, 2, 1);
+    ce(1, 3, 1);
+    ce(4, 6, 0);
+    ce(5, 7, 0);
+    ce(0, 1, 1);
+    ce(2, 3, 1);
+    ce(4, 5, 0);
+    ce(6, 7, 0);
+    // Phase 3
+    ce(0, 4, 1);
+    ce(1, 5, 1);
+    ce(2, 6, 1);
+    ce(3, 7, 1);
+    ce(0, 2, 1);
+    ce(1, 3, 1);
+    ce(4, 6, 1);
+    ce(5, 7, 1);
+    ce(0, 1, 1);
+    ce(2, 3, 1);
+    ce(4, 5, 1);
+    ce(6, 7, 1);
+
+    b[0] | (b[1] << 8)
+        | (b[2] << 16)
+        | (b[3] << 24)
+        | (b[4] << 32)
+        | (b[5] << 40)
+        | (b[6] << 48)
+        | (b[7] << 56)
 }
 
 #[cfg(test)]
@@ -33,8 +95,13 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn bitonic_sort_64u32_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_shl(3) ^ aux.wrapping_shr(2)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32))
-            ^ (val.wrapping_add(aux))
+        // Independent: a correct sort fully orders the lanes, so use std sort directly.
+        let mut bytes = val.to_le_bytes();
+        bytes.sort_unstable();
+        if aux & 1 == 1 {
+            bytes.reverse();
+        }
+        u64::from_le_bytes(bytes)
     }
 
     // -------------------------------------------------------------------------

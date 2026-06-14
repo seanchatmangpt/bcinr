@@ -31,8 +31,15 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn find_first_of_branchless(val: u64, aux: u64) -> u64 {
-    let m = val ^ aux;
-    let res = (m.wrapping_sub(0x0101010101010101u64)) & !m & 0x8080808080808080u64;
+    // Broadcast the target byte (low byte of aux) across all 8 lanes, then use the
+    // classic SWAR zero-byte test to mark lanes where val == target.
+    let needle = (aux & 0xFF).wrapping_mul(0x0101010101010101u64);
+    let m = val ^ needle;
+    // Cascade-safe per-byte match mask (avoids borrow cross-talk on adjacent matches).
+    let res = !(((m & 0x7F7F7F7F7F7F7F7Fu64).wrapping_add(0x7F7F7F7F7F7F7F7Fu64) | m)
+        & 0x8080808080808080u64)
+        & 0x8080808080808080u64;
+    // trailing_zeros of a matched lane's 0x80 bit / 8 = byte index; no match => 64 >> 3 = 8.
     (res.trailing_zeros() as u64) >> 3
 }
 

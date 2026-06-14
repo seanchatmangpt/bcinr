@@ -4,11 +4,14 @@
 
 /// euclidean_dist_sq_u32x2
 ///
-/// Branchless implementation guaranteed to execute in constant time
-/// with zero dynamic dispatch or control flow hazards.
+/// Interpretation: `val` and `aux` each pack a 2D point as two u32 lanes
+/// (x = low 32 bits, y = high 32 bits). Computes the squared Euclidean
+/// distance `dx*dx + dy*dy` where `dx`/`dy` are the unsigned lane differences
+/// (`abs_diff`). The squares and their sum are taken with wrapping u64
+/// arithmetic so the result is always defined.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Result equals wrapping(dx*dx) + wrapping(dy*dy) with dx,dy=abs_diff.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,9 +23,9 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn euclidean_dist_sq_u32x2(val: u64, aux: u64) -> u64 {
-    let dx = (val as u32 as i64).wrapping_sub(aux as u32 as i64);
-    let dy = ((val >> 32) as i64).wrapping_sub((aux >> 32) as i64);
-    (dx * dx + dy * dy) as u64
+    let dx = (val as u32).abs_diff(aux as u32) as u64;
+    let dy = ((val >> 32) as u32).abs_diff((aux >> 32) as u32) as u64;
+    dx.wrapping_mul(dx).wrapping_add(dy.wrapping_mul(dy))
 }
 
 #[cfg(test)]
@@ -34,9 +37,16 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn euclidean_dist_sq_u32x2_reference(val: u64, aux: u64) -> u64 {
-        let dx = (val as u32 as i64).wrapping_sub(aux as u32 as i64);
-        let dy = ((val >> 32) as i64).wrapping_sub((aux >> 32) as i64);
-        (dx * dx + dy * dy) as u64
+        // Independent structure: explicit lane extraction, branchful abs, then
+        // 128-bit squaring truncated to 64 bits to match wrapping semantics.
+        let vx = (val & 0xFFFF_FFFF) as u32;
+        let vy = (val >> 32) as u32;
+        let ax = (aux & 0xFFFF_FFFF) as u32;
+        let ay = (aux >> 32) as u32;
+        let dx = if vx >= ax { vx - ax } else { ax - vx } as u128;
+        let dy = if vy >= ay { vy - ay } else { ay - vy } as u128;
+        let sum = dx * dx + dy * dy;
+        (sum & u64::MAX as u128) as u64
     }
 
     // -------------------------------------------------------------------------

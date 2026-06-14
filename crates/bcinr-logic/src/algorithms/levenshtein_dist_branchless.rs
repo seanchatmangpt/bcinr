@@ -4,11 +4,14 @@
 
 /// levenshtein_dist_branchless
 ///
-/// Branchless implementation guaranteed to execute in constant time
-/// with zero dynamic dispatch or control flow hazards.
+/// Interpretation: `val` and `aux` are two 8-byte strings of equal length.
+/// For equal-length strings the Levenshtein (edit) distance reduces to the
+/// number of substitution positions, i.e. the count of byte lanes that differ.
+/// Computed branchlessly: XOR the words, fold each non-zero byte to exactly
+/// one bit via a SWAR saturate, then population-count the per-byte flags.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Result equals the number of differing bytes between val and aux.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,8 +23,12 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn levenshtein_dist_branchless(val: u64, aux: u64) -> u64 {
-    (val.rotate_left(13)).wrapping_add(val.rotate_left(13))
-        ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+    let diff = val ^ aux;
+    // SWAR: set the high bit of each byte iff that byte is non-zero.
+    const LO: u64 = 0x0101_0101_0101_0101;
+    const HI: u64 = 0x8080_8080_8080_8080;
+    let nonzero = (((diff | HI).wrapping_sub(LO)) | diff) & HI;
+    (nonzero >> 7).count_ones() as u64
 }
 
 #[cfg(test)]
@@ -33,8 +40,16 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn levenshtein_dist_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val.rotate_left(13)).wrapping_add(val.rotate_left(13))
-            ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+        // Independent structure: split into bytes, compare each pair directly.
+        let vb = val.to_le_bytes();
+        let ab = aux.to_le_bytes();
+        let mut count = 0u64;
+        for i in 0..8 {
+            if vb[i] != ab[i] {
+                count += 1;
+            }
+        }
+        count
     }
 
     // -------------------------------------------------------------------------

@@ -7,8 +7,14 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Interpretation:** Maglev's permutation slot computation for one backend over a
+/// lookup table of prime size `M = 65537`. Two independent hashes are derived from
+/// the backend key `val` (via golden-ratio and splitmix style mixers): `offset =
+/// h1 mod M` and `skip = (h2 mod (M - 1)) + 1`. For permutation index `i = aux`
+/// the occupied slot is `permutation(i) = (offset + i * skip) mod M`, exactly the
+/// Maglev population rule. All modular arithmetic, branchless, O(1).
+/// **Ensures:** Result matches the independent reference for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,9 +26,15 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn consistent_hash_maglev(val: u64, aux: u64) -> u64 {
-    ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-        .wrapping_add(val.wrapping_mul(aux.wrapping_add(1)))
-        ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+    const M: u64 = 65537;
+    let h1 = val.wrapping_mul(0x9E3779B185EBCA87);
+    let h2 = val
+        .wrapping_add(0x9E3779B97F4A7C15)
+        .wrapping_mul(0xBF58476D1CE4E5B9);
+    let offset = h1 % M;
+    let skip = (h2 % (M - 1)) + 1;
+    let i = aux % M;
+    (offset + (i.wrapping_mul(skip) % M)) % M
 }
 
 #[cfg(test)]
@@ -34,9 +46,18 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn consistent_hash_maglev_reference(val: u64, aux: u64) -> u64 {
-        ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-            .wrapping_add(val.wrapping_mul(aux.wrapping_add(1)))
-            ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+        // Independent: accumulate i copies of skip by repeated modular addition
+        // (equivalent to i*skip mod M) without an explicit multiply on the index.
+        let m: u128 = 65537;
+        let h1 = (val as u128 * 0x9E3779B185EBCA87) & 0xFFFF_FFFF_FFFF_FFFF;
+        let h2 = (((val as u128 + 0x9E3779B97F4A7C15) & 0xFFFF_FFFF_FFFF_FFFF)
+            * 0xBF58476D1CE4E5B9)
+            & 0xFFFF_FFFF_FFFF_FFFF;
+        let offset = h1 % m;
+        let skip = (h2 % (m - 1)) + 1;
+        let i = (aux as u128) % m;
+        let prod = (i * skip) % m;
+        ((offset + prod) % m) as u64
     }
 
     // -------------------------------------------------------------------------

@@ -7,8 +7,11 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Applies a 6-stage butterfly (Benes half-network) to `val`, where the
+/// control word `aux` (sliced by rotation) selects which bit pairs are exchanged at
+/// each shift distance 1,2,4,8,16,32 via the delta-swap primitive
+/// `t = ((x>>s) ^ x) & mask; x ^ t ^ (t<<s)`.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,7 +23,24 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn benes_network_u64(val: u64, aux: u64) -> u64 {
-    (val & aux).wrapping_add(val | aux) ^ ((val & 0xFFFFFFFF) | (aux << 32))
+    let m1 = aux;
+    let t1 = ((val >> 1) ^ val) & m1;
+    let s1 = val ^ t1 ^ (t1 << 1);
+    let m2 = aux.rotate_left(11);
+    let t2 = ((s1 >> 2) ^ s1) & m2;
+    let s2 = s1 ^ t2 ^ (t2 << 2);
+    let m3 = aux.rotate_left(23);
+    let t3 = ((s2 >> 4) ^ s2) & m3;
+    let s3 = s2 ^ t3 ^ (t3 << 4);
+    let m4 = aux.rotate_left(31);
+    let t4 = ((s3 >> 8) ^ s3) & m4;
+    let s4 = s3 ^ t4 ^ (t4 << 8);
+    let m5 = aux.rotate_left(43);
+    let t5 = ((s4 >> 16) ^ s4) & m5;
+    let s5 = s4 ^ t5 ^ (t5 << 16);
+    let m6 = aux.rotate_left(53);
+    let t6 = ((s5 >> 32) ^ s5) & m6;
+    s5 ^ t6 ^ (t6 << 32)
 }
 
 #[cfg(test)]
@@ -33,7 +53,21 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn benes_network_u64_reference(val: u64, aux: u64) -> u64 {
-        (val & aux).wrapping_add(val | aux) ^ ((val & 0xFFFFFFFF) | (aux << 32))
+        // Independent: drive the same delta-swap stages from a table via a loop.
+        let stages: [(u32, u64); 6] = [
+            (1, aux),
+            (2, aux.rotate_left(11)),
+            (4, aux.rotate_left(23)),
+            (8, aux.rotate_left(31)),
+            (16, aux.rotate_left(43)),
+            (32, aux.rotate_left(53)),
+        ];
+        let mut x = val;
+        for (s, mask) in stages {
+            let diff = ((x >> s) ^ x) & mask;
+            x = (x ^ diff) ^ (diff << s);
+        }
+        x
     }
 
     // -------------------------------------------------------------------------

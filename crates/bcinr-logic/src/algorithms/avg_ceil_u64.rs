@@ -16,11 +16,14 @@
 /// let result = avg_ceil_u64(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn avg_ceil_u64(val: u64, aux: u64) -> u64 {
-    (val | aux).wrapping_add(val | aux) ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+    // Branchless Contract: ceiling of (val + aux) / 2 without overflow, via the
+    // identity ceil_avg = (val | aux) - ((val ^ aux) >> 1).
+    (val | aux).wrapping_sub((val ^ aux) >> 1)
 }
 
 #[cfg(test)]
@@ -33,7 +36,9 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn avg_ceil_u64_reference(val: u64, aux: u64) -> u64 {
-        (val | aux).wrapping_add(val | aux) ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+        // Independent: exact wide sum, divide rounding up.
+        let sum = (val as u128) + (aux as u128);
+        ((sum + 1) / 2) as u64
     }
 
     // -------------------------------------------------------------------------

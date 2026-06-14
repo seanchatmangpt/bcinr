@@ -61,24 +61,27 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn murmur3_x64_128_reference(val: u64, aux: u64) -> u64 {
-        let mut h1 = val;
-        let mut h2 = aux;
-        let c1 = 0x87c37b91114253d5u64;
-        let c2 = 0x4cf5ad432745937fu64;
-        let mut k1 = val.wrapping_mul(c1).rotate_left(31).wrapping_mul(c2);
-        h1 ^= k1;
-        h1 = h1
-            .rotate_left(27)
-            .wrapping_add(h2)
-            .wrapping_mul(5)
-            .wrapping_add(0x52dce729);
-        let mut k2 = aux.wrapping_mul(c2).rotate_left(33).wrapping_mul(c1);
-        h2 ^= k2;
-        h2 = h2
-            .rotate_left(31)
-            .wrapping_add(h1)
-            .wrapping_mul(5)
-            .wrapping_add(0x38495ab5);
+        const C1: u64 = 0x87c37b91114253d5;
+        const C2: u64 = 0x4cf5ad432745937f;
+        // k-mixing helper, parameterised by rotation amount and the (a,b) const order
+        fn kmix(x: u64, rot: u32, a: u64, b: u64) -> u64 {
+            let t = x.wrapping_mul(a);
+            let t = t.rotate_left(rot);
+            t.wrapping_mul(b)
+        }
+        // body-mixing helper for one lane
+        fn bodymix(h: u64, other: u64, rot: u32, add: u64) -> u64 {
+            let r = h.rotate_left(rot);
+            let s = r.wrapping_add(other);
+            let m = s.wrapping_mul(5);
+            m.wrapping_add(add)
+        }
+        let k1 = kmix(val, 31, C1, C2);
+        let h1a = val ^ k1;
+        let h1 = bodymix(h1a, aux, 27, 0x52dce729);
+        let k2 = kmix(aux, 33, C2, C1);
+        let h2a = aux ^ k2;
+        let h2 = bodymix(h2a, h1, 31, 0x38495ab5);
         h1 ^ h2
     }
 

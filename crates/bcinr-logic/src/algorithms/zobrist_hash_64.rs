@@ -16,12 +16,22 @@
 /// let result = zobrist_hash_64(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+///
+/// # Branchless Contract
+/// Interpretation: a Zobrist incremental update. `val` is the current board hash,
+/// `aux` is the piece-square index whose state toggles. The pseudo-random Zobrist
+/// key for that index is generated deterministically from `aux` with a splitmix64
+/// finalizer (standing in for the precomputed key table), and the new board hash is
+/// `val XOR key`. XOR makes the update its own inverse, the defining Zobrist property.
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn zobrist_hash_64(val: u64, aux: u64) -> u64 {
-    (val.wrapping_sub(aux)).wrapping_add(!(val & aux) & (val | aux))
-        ^ (val.count_ones() as u64 | aux)
+    let mut k = aux.wrapping_add(0x9E3779B97F4A7C15);
+    k = (k ^ (k >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+    k = (k ^ (k >> 27)).wrapping_mul(0x94D049BB133111EB);
+    k ^= k >> 31;
+    val ^ k
 }
 
 #[cfg(test)]
@@ -33,8 +43,16 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn zobrist_hash_64_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_sub(aux)).wrapping_add(!(val & aux) & (val | aux))
-            ^ (val.count_ones() as u64 | aux)
+        // Re-derive the Zobrist key with the splitmix64 finalizer expressed as a
+        // helper-per-stage pipeline, then toggle it into the board hash via XOR.
+        fn xorshift_mul(x: u64, sh: u32, m: u64) -> u64 {
+            (x ^ (x >> sh)).wrapping_mul(m)
+        }
+        let seeded = aux.wrapping_add(0x9E3779B97F4A7C15);
+        let stage1 = xorshift_mul(seeded, 30, 0xBF58476D1CE4E5B9);
+        let stage2 = xorshift_mul(stage1, 27, 0x94D049BB133111EB);
+        let key = stage2 ^ (stage2 >> 31);
+        val ^ key
     }
 
     // -------------------------------------------------------------------------

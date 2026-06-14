@@ -37,10 +37,11 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn k_independent_hash_gen_reference(val: u64, aux: u64) -> u64 {
-        let x = val;
-        let a = aux & 0xFFFFFFFF;
-        let b = aux >> 32;
-        x.wrapping_mul(a).wrapping_add(b)
+        // Independent: affine map a*x+b via u128, lanes read from byte split.
+        let a = (aux as u32) as u128;
+        let b = (aux >> 32) as u128;
+        let prod = (val as u128) * a;
+        ((prod + b) & 0xFFFF_FFFF_FFFF_FFFF) as u64
     }
 
     // -------------------------------------------------------------------------

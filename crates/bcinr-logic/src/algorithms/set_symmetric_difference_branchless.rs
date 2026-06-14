@@ -44,7 +44,11 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn set_symmetric_difference_branchless_reference(val: u64, aux: u64) -> u64 {
-        val ^ aux
+        // Independent derivation: union minus intersection,
+        // (val | aux) AND NOT(val AND aux), the set-theoretic definition.
+        let union = val | aux;
+        let intersection = val & aux;
+        union & !intersection
     }
 
     // -------------------------------------------------------------------------

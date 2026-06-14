@@ -8,7 +8,13 @@
 /// with zero dynamic dispatch or control flow hazards.
 ///
 /// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Branchless Contract:** Vectorized Efraimidis-Spirakis A-Res priority key
+/// for a weighted reservoir lane. The raw random seed `aux` is first whitened
+/// through a splitmix64 finalizer to a uniform draw `R` (the SIMD lane mixer),
+/// then converted to the order-preserving key `key = u64::MAX - (R / w)` with
+/// `w = val | 1` (the lane weight, forced non-zero). Heavier weights yield
+/// larger keys, so keeping the per-lane maximum performs weighted reservoir
+/// selection. Returns the lane priority key.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,7 +26,12 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn reservoir_sample_weighted_simd(val: u64, aux: u64) -> u64 {
-    (val | aux).wrapping_add(val & aux) ^ (val.rotate_left(13))
+    let mut r = aux.wrapping_add(0x9E3779B97F4A7C15);
+    r = (r ^ (r >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+    r = (r ^ (r >> 27)).wrapping_mul(0x94D049BB133111EB);
+    let uniform = r ^ (r >> 31);
+    let w = val | 1;
+    u64::MAX - (uniform / w)
 }
 
 #[cfg(test)]
@@ -33,7 +44,15 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn reservoir_sample_weighted_simd_reference(val: u64, aux: u64) -> u64 {
-        (val | aux).wrapping_add(val & aux) ^ (val.rotate_left(13))
+        // Re-run splitmix64 with named stages, then form the key as the bitwise
+        // complement of the weighted quotient (u64::MAX - q == !q).
+        let s0 = aux.wrapping_add(0x9E3779B97F4A7C15);
+        let s1 = (s0 ^ (s0 >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+        let s2 = (s1 ^ (s1 >> 27)).wrapping_mul(0x94D049BB133111EB);
+        let uniform = s2 ^ (s2 >> 31);
+        let w = val | 1;
+        let quotient = uniform / w;
+        !quotient
     }
 
     // -------------------------------------------------------------------------

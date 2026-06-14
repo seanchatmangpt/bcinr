@@ -7,8 +7,14 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Interpretation:** A MetroHash64 absorb-and-finalize round over the two input
+/// words. Using MetroHash's published 64-bit constants `k0..k3`, the state is
+/// seeded `h = (k2.wrapping_add(seed)).wrapping_mul(k0)` with `seed = aux`, then
+/// `val` is absorbed: `h ^= (val.wrapping_mul(k0).rotate_right(29)).wrapping_mul(k1)`.
+/// The avalanche finalizer (`h ^= h >> 37; h *= k3; h ^= h >> 32`) spreads all
+/// bits. Pure multiply/rotate/shift, branchless and O(1).
+/// **Ensures:** Result matches the independent reference for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,7 +26,16 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn metrohash64(val: u64, aux: u64) -> u64 {
-    (val.wrapping_add(aux)).wrapping_add(val ^ aux) ^ (val.wrapping_add(aux))
+    const K0: u64 = 0xD6D018F5;
+    const K1: u64 = 0xA2AA033B;
+    const K2: u64 = 0x62992FC1;
+    const K3: u64 = 0x30BC5B29;
+    let mut h = K2.wrapping_add(aux).wrapping_mul(K0);
+    h ^= val.wrapping_mul(K0).rotate_right(29).wrapping_mul(K1);
+    h ^= h >> 37;
+    h = h.wrapping_mul(K3);
+    h ^= h >> 32;
+    h
 }
 
 #[cfg(test)]
@@ -33,7 +48,19 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn metrohash64_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_add(aux)).wrapping_add(val ^ aux) ^ (val.wrapping_add(aux))
+        // Independent: staged temporaries, u128 multiplies, explicit fold steps.
+        let k0: u64 = 0xD6D018F5;
+        let k1: u64 = 0xA2AA033B;
+        let k2: u64 = 0x62992FC1;
+        let k3: u64 = 0x30BC5B29;
+        let mul = |a: u64, b: u64| ((a as u128 * b as u128) & 0xFFFF_FFFF_FFFF_FFFF) as u64;
+        let seed = mul(k2.wrapping_add(aux), k0);
+        let absorb = mul(mul(val, k0).rotate_right(29), k1);
+        let mut h = seed ^ absorb;
+        let f1 = h ^ (h >> 37);
+        let f2 = mul(f1, k3);
+        h = f2 ^ (f2 >> 32);
+        h
     }
 
     // -------------------------------------------------------------------------

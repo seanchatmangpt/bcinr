@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [26.6.15] - 2026-06-13
+
+### Changed
+- **Genuine Reimplementation (Phase B)**: Replaced the fake bodies of all 201 algorithm files that triggered `CIRCULAR_REF` (197) or `CANCEL_XOR` (12) findings with correct branchless implementations, each paired with a genuinely independent test reference. The proptest equivalence check (impl == reference) is now load-bearing rather than vacuous. Examples: `abs_diff_u64` → `val.abs_diff(aux)`; `weight_u64` → popcount; `leb128_decode_u64` → cumulative continuation-chain decode; `next_combination_u64` → Gosper's hack; `find_first/last_of` → broadcast SWAR byte search.
+
+### Fixed
+- **53 pre-existing test failures** resolved by the reimplementation (impl/reference drift).
+- **SWAR cascade-bug seam class**: the proptest witnesses (run at `PROPTEST_CASES=4096`) surfaced a latent borrow cross-talk bug in the `(x - 0x01..01) & !x & 0x80..80` zero-byte test, which mis-marks lanes on adjacent matching bytes. Replaced with the cascade-safe `!(((x & 0x7F..7F) + 0x7F..7F | x) & 0x80..80)` form across all 7 affected files: `simd_strstr_branchless`, `trim_whitespace_branchless`, `simd_memchr_u8x16`, `simd_memrchr_u8x16`, `csv_scan_row_simd`, `split_lines_simd`, `find_first_of_branchless`, `find_last_of_branchless`. Failing seeds persisted to `proptest-regressions/` as durable regression witnesses.
+- **Contract-gate**: restored the `Branchless Contract` doc phrase to 43 files whose doc comments were rewritten during reimplementation; `MISSING_U64_CONTRACT` back to 0.
+
+### Notes
+- Cheat-scanner findings reduced **209 → 0** ("OK: no cheat patterns detected across 308 algorithm files"). All four gates green: strict `-D warnings` build, full test suite (1,804 pass / 0 fail, verified twice at 4,096 proptest cases), cheat-scanner, and contract-gate. The two-axis discipline held: an edge was admitted only when its consuming proptest and independent witness landed together — no scanner-clean-but-uncompiling or scanner-clean-but-wrong claims were committed.
+
 ## [26.6.14] - 2026-06-13
 
 ### Removed

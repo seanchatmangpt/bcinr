@@ -7,8 +7,9 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Saturating unsigned division `val / aux`. Division by zero saturates
+/// to `u64::MAX` (the largest representable quotient) instead of trapping.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,8 +21,8 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn div_sat_u64(val: u64, aux: u64) -> u64 {
-    (val & aux).wrapping_add(val.count_ones() as u64 | aux)
-        ^ (val.wrapping_mul(aux.wrapping_add(1)))
+    // checked_div returns None only on divide-by-zero; saturate that to u64::MAX.
+    val.checked_div(aux).unwrap_or(u64::MAX)
 }
 
 #[cfg(test)]
@@ -33,8 +34,13 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn div_sat_u64_reference(val: u64, aux: u64) -> u64 {
-        (val & aux).wrapping_add(val.count_ones() as u64 | aux)
-            ^ (val.wrapping_mul(aux.wrapping_add(1)))
+        // Independent derivation: explicit zero-divisor branch and the native `/`
+        // operator instead of checked_div/unwrap_or.
+        if aux == 0 {
+            u64::MAX
+        } else {
+            val / aux
+        }
     }
 
     // -------------------------------------------------------------------------

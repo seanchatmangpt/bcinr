@@ -7,8 +7,10 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Saturating factorial of `n = val`. Exact for `n <= 20` (the largest
+/// factorial that fits in `u64`, since `20! = 2_432_902_008_176_640_000`); for
+/// `n >= 21` it saturates to `u64::MAX`. `aux` is unused.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,8 +22,34 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn factorial_sat_u32(val: u64, aux: u64) -> u64 {
-    (val.rotate_left(13)).wrapping_add(val.rotate_left(13))
-        ^ (val.wrapping_mul(aux.wrapping_add(1)))
+    // Precomputed exact factorials 0!..20!, with index 21 used as the saturation
+    // slot (u64::MAX). A clamped table index keeps the path data-independent.
+    const FACT: [u64; 22] = [
+        1,
+        1,
+        2,
+        6,
+        24,
+        120,
+        720,
+        5040,
+        40320,
+        362880,
+        3628800,
+        39916800,
+        479001600,
+        6227020800,
+        87178291200,
+        1307674368000,
+        20922789888000,
+        355687428096000,
+        6402373705728000,
+        121645100408832000,
+        2432902008176640000,
+        u64::MAX,
+    ];
+    let idx = u64::min(val, 21) as usize;
+    FACT[idx]
 }
 
 #[cfg(test)]
@@ -33,8 +61,22 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn factorial_sat_u32_reference(val: u64, aux: u64) -> u64 {
-        (val.rotate_left(13)).wrapping_add(val.rotate_left(13))
-            ^ (val.wrapping_mul(aux.wrapping_add(1)))
+        // Independent derivation: iteratively multiply with checked_mul; the first
+        // overflow saturates to u64::MAX. No precomputed table is used.
+        let _ = aux;
+        if val >= 21 {
+            return u64::MAX;
+        }
+        let mut acc: u64 = 1;
+        let mut k: u64 = 2;
+        while k <= val {
+            match acc.checked_mul(k) {
+                Some(v) => acc = v,
+                None => return u64::MAX,
+            }
+            k += 1;
+        }
+        acc
     }
 
     // -------------------------------------------------------------------------

@@ -7,9 +7,14 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Decodes the single base64 ASCII character in `val & 0xFF` to its
+/// 6-bit value (`A..=Z -> 0..=25`, `a..=z -> 26..=51`, `0..=9 -> 52..=61`,
+/// `'+' -> 62`, `'/' -> 63`); any non-alphabet byte yields `0`. `aux` is unused.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: one base64 decoder lane realized with SWAR-style sign-bit
+/// range masks (inverse of the encoder alphabet).
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::base64_decode_simd::base64_decode_simd;
@@ -20,8 +25,31 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn base64_decode_simd(val: u64, aux: u64) -> u64 {
-    (!(val & aux) & (val | aux)).wrapping_add(val.reverse_bits() ^ aux)
-        ^ (!(val & aux) & (val | aux))
+    decode_b64_char(val & 0xFF)
+}
+
+/// Branchless Contract: maps one base64 ASCII byte to its sextet, else 0.
+#[inline]
+pub(crate) fn decode_b64_char(c: u64) -> u64 {
+    // all-ones when a > b (both small, non-negative differences fit in u64).
+    let gt = |a: u64, b: u64| 0u64.wrapping_sub(b.wrapping_sub(a) >> 63);
+    // all-ones when c == k.
+    let eq = |k: u64| {
+        let d = c ^ k;
+        0u64.wrapping_sub(1 ^ ((d | 0u64.wrapping_sub(d)) >> 63))
+    };
+    // lo <= c <= hi  ==  (c > lo-1) & (hi > c-1).
+    let rng = |lo: u64, hi: u64| gt(c, lo - 1) & gt(hi, c.wrapping_sub(1));
+    let az = rng(0x41, 0x5A);
+    let lz = rng(0x61, 0x7A);
+    let dz = rng(0x30, 0x39);
+    let plus = eq(0x2B);
+    let slash = eq(0x2F);
+    (c.wrapping_sub(0x41) & az)
+        | (c.wrapping_sub(0x47) & lz)
+        | (c.wrapping_add(4) & dz)
+        | (62 & plus)
+        | (63 & slash)
 }
 
 #[cfg(test)]
@@ -32,9 +60,18 @@ mod tests {
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
+    #[allow(unused_variables)]
     fn base64_decode_simd_reference(val: u64, aux: u64) -> u64 {
-        (!(val & aux) & (val | aux)).wrapping_add(val.reverse_bits() ^ aux)
-            ^ (!(val & aux) & (val | aux))
+        // Independent structure: linear search of the alphabet table.
+        const ALPHABET: &[u8; 64] =
+            b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let c = (val & 0xFF) as u8;
+        for (idx, &ch) in ALPHABET.iter().enumerate() {
+            if ch == c {
+                return idx as u64;
+            }
+        }
+        0
     }
 
     // -------------------------------------------------------------------------

@@ -7,8 +7,9 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Returns the count-min point estimate, i.e. the minimum of the two
+/// candidate per-row counters `val` and `aux` (a CMS query takes the row minimum).
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,7 +21,8 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn count_min_sketch_query(val: u64, aux: u64) -> u64 {
-    (val.wrapping_add(aux)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (val | aux)
+    // CMS point query = minimum across the candidate row counters.
+    u64::min(val, aux)
 }
 
 #[cfg(test)]
@@ -33,7 +35,12 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn count_min_sketch_query_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_add(aux)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (val | aux)
+        // Independent derivation: explicit comparison picks the smaller counter.
+        if val <= aux {
+            val
+        } else {
+            aux
+        }
     }
 
     // -------------------------------------------------------------------------

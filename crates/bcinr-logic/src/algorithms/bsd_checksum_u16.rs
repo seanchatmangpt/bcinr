@@ -7,8 +7,13 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Interpretation:** The classic BSD 16-bit rotating checksum over the 8 bytes
+/// packed (little-endian) in `val`, starting from initial accumulator
+/// `sum = aux & 0xFFFF`. For each byte: rotate the 16-bit accumulator right by one
+/// (`sum = (sum >> 1) | (sum << 15)`), add the byte, and mask to 16 bits. The
+/// 8-byte window is fully unrolled, keeping the routine branchless and O(1).
+/// **Ensures:** Result matches the independent reference for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,7 +25,16 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn bsd_checksum_u16(val: u64, aux: u64) -> u64 {
-    (val.wrapping_add(aux)).wrapping_add(aux.rotate_right(7)) ^ (val.reverse_bits() ^ aux)
+    let mut s = aux & 0xFFFF;
+    s = (((s >> 1) | (s << 15)) & 0xFFFF).wrapping_add(val & 0xFF) & 0xFFFF;
+    s = (((s >> 1) | (s << 15)) & 0xFFFF).wrapping_add((val >> 8) & 0xFF) & 0xFFFF;
+    s = (((s >> 1) | (s << 15)) & 0xFFFF).wrapping_add((val >> 16) & 0xFF) & 0xFFFF;
+    s = (((s >> 1) | (s << 15)) & 0xFFFF).wrapping_add((val >> 24) & 0xFF) & 0xFFFF;
+    s = (((s >> 1) | (s << 15)) & 0xFFFF).wrapping_add((val >> 32) & 0xFF) & 0xFFFF;
+    s = (((s >> 1) | (s << 15)) & 0xFFFF).wrapping_add((val >> 40) & 0xFF) & 0xFFFF;
+    s = (((s >> 1) | (s << 15)) & 0xFFFF).wrapping_add((val >> 48) & 0xFF) & 0xFFFF;
+    s = (((s >> 1) | (s << 15)) & 0xFFFF).wrapping_add((val >> 56) & 0xFF) & 0xFFFF;
+    s
 }
 
 #[cfg(test)]
@@ -33,7 +47,13 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn bsd_checksum_u16_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_add(aux)).wrapping_add(aux.rotate_right(7)) ^ (val.reverse_bits() ^ aux)
+        // Independent: iterate the byte array with a u16 accumulator type.
+        let mut sum: u16 = (aux & 0xFFFF) as u16;
+        for &b in val.to_le_bytes().iter() {
+            sum = sum.rotate_right(1);
+            sum = sum.wrapping_add(b as u16);
+        }
+        sum as u64
     }
 
     // -------------------------------------------------------------------------

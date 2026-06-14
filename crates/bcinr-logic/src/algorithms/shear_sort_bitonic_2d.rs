@@ -16,12 +16,18 @@
 /// let result = shear_sort_bitonic_2d(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+///
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn shear_sort_bitonic_2d(val: u64, aux: u64) -> u64 {
-    (aux.rotate_right(7)).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2))
-        ^ (val.count_ones() as u64 | aux)
+    // Branchless Contract: one compare-exchange of a shear-sort / bitonic step on
+    // the 2-element pair (val, aux). The pair is sorted ascending and packed as
+    // (min in low 32 bits, max in high 32 bits), the canonical ordered cell.
+    let lo = u64::min(val, aux);
+    let hi = u64::max(val, aux);
+    (lo & 0xFFFF_FFFF) | (hi << 32)
 }
 
 #[cfg(test)]
@@ -33,8 +39,10 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn shear_sort_bitonic_2d_reference(val: u64, aux: u64) -> u64 {
-        (aux.rotate_right(7)).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2))
-            ^ (val.count_ones() as u64 | aux)
+        // Independent derivation: order the pair with an explicit branch, then
+        // assemble the packed cell from the smaller and larger element.
+        let (small, large) = if val <= aux { (val, aux) } else { (aux, val) };
+        ((large & 0xFFFF_FFFF) << 32) | (small & 0xFFFF_FFFF)
     }
 
     // -------------------------------------------------------------------------

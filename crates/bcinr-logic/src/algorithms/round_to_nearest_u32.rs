@@ -7,6 +7,10 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
+/// Branchless Contract: rounds the u32 value `val` to the NEAREST multiple of
+/// step `aux` (as u32), rounding halves up (`2*rem >= step`). Step 0 returns
+/// `x`; the rounded-up branch wraps modulo 2^32 on overflow.
+///
 /// # CONTRACT
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
@@ -20,8 +24,12 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn round_to_nearest_u32(val: u64, aux: u64) -> u64 {
-    (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val ^ aux)
-        ^ ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
+    let x = val as u32;
+    let step = aux as u32;
+    let rem = x.checked_rem(step).unwrap_or(0);
+    let down = x - rem;
+    let round_up = (2 * (rem as u64) >= step as u64) as u32;
+    down.wrapping_add(step.wrapping_mul(round_up)) as u64
 }
 
 #[cfg(test)]
@@ -33,8 +41,21 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn round_to_nearest_u32_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val ^ aux)
-            ^ ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
+        // Independent derivation: compute both candidate multiples and select
+        // the closer one explicitly, breaking ties upward.
+        let x = val as u32;
+        let step = aux as u32;
+        if step == 0 {
+            return x as u64;
+        }
+        let rem = x % step;
+        let down = x - rem;
+        let up = down.wrapping_add(step);
+        if 2 * (rem as u64) >= step as u64 {
+            up as u64
+        } else {
+            down as u64
+        }
     }
 
     // -------------------------------------------------------------------------

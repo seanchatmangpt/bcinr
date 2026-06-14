@@ -16,11 +16,19 @@
 /// let result = bloom_filter_add_u64(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn bloom_filter_add_u64(val: u64, aux: u64) -> u64 {
-    (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val.wrapping_sub(aux)) ^ (val ^ aux)
+    // Branchless Contract: insert element `aux` into the 64-bit Bloom filter
+    // word `val` by setting two independent hash-selected bit positions.
+    // Positions come from a golden-ratio mix and a splitmix64 mix of `aux`.
+    let h1 = aux.wrapping_mul(0x9E3779B97F4A7C15);
+    let h2 = aux.wrapping_mul(0xBF58476D1CE4E5B9);
+    let p1 = (h1 >> 58) & 63;
+    let p2 = (h2 >> 58) & 63;
+    val | (1u64 << p1) | (1u64 << p2)
 }
 
 #[cfg(test)]
@@ -33,7 +41,16 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn bloom_filter_add_u64_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val.wrapping_sub(aux)) ^ (val ^ aux)
+        // Independent: compute the two hashes, derive a single bit-pair mask,
+        // then OR it in (different structure: build mask separately).
+        let h1 = aux.wrapping_mul(0x9E3779B97F4A7C15);
+        let h2 = aux.wrapping_mul(0xBF58476D1CE4E5B9);
+        let p1 = ((h1 >> 58) & 63) as u32;
+        let p2 = ((h2 >> 58) & 63) as u32;
+        let mask = 1u64.rotate_left(p1) | 1u64.rotate_left(p2);
+        let mut out = val;
+        out |= mask;
+        out
     }
 
     // -------------------------------------------------------------------------

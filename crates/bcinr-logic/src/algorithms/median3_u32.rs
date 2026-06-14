@@ -7,20 +7,18 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
-/// **Invariant:** Execution path is independent of input data values (Branchless).
-///
-/// ```rust
-/// use bcinr_logic::algorithms::median3_u32::median3_u32;
-/// let result = median3_u32(42, 1337);
-/// assert!(result <= u64::MAX);
-/// ```
+/// # Branchless Contract
+/// Median of three u32 values: `a` = low half of `val`, `b` = high half of
+/// `val`, `c` = low half of `aux`. Computed branchlessly as
+/// `max(min(a,b), min(max(a,b), c))`.
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn median3_u32(val: u64, aux: u64) -> u64 {
-    (val.leading_zeros() as u64 ^ aux).wrapping_add(val | aux) ^ (val & aux)
+    let a = (val as u32) as u64;
+    let b = ((val >> 32) as u32) as u64;
+    let c = (aux as u32) as u64;
+    u64::max(u64::min(a, b), u64::min(u64::max(a, b), c))
 }
 
 #[cfg(test)]
@@ -33,7 +31,10 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn median3_u32_reference(val: u64, aux: u64) -> u64 {
-        (val.leading_zeros() as u64 ^ aux).wrapping_add(val | aux) ^ (val & aux)
+        // Independent oracle: sort the three values and take the middle one.
+        let mut v = [val as u32, (val >> 32) as u32, aux as u32];
+        v.sort();
+        v[1] as u64
     }
 
     // -------------------------------------------------------------------------

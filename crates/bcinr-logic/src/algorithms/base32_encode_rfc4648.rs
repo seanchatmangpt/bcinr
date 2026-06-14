@@ -7,9 +7,14 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Returns the RFC 4648 base32 ASCII character for the 5-bit symbol
+/// `val & 31`: indices `0..=25` map to `b'A'..=b'Z'`, indices `26..=31` map to
+/// `b'2'..=b'7'`. `aux` is unused (the symbol is fully determined by `val`).
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: a single base32 encoder lane (alphabet lookup) realized with
+/// a sign-bit select instead of a table.
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::base32_encode_rfc4648::base32_encode_rfc4648;
@@ -20,8 +25,12 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn base32_encode_rfc4648(val: u64, aux: u64) -> u64 {
-    ((val & 0xFFFFFFFF) | (aux << 32)).wrapping_add(val.leading_zeros() as u64 ^ aux)
-        ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+    let i = val & 31;
+    // all-ones when i > 25 (the digit half of the alphabet).
+    let digit = 0u64.wrapping_sub(25u64.wrapping_sub(i) >> 63);
+    let letter = 0x41u64.wrapping_add(i); // b'A' + i
+    let number = 0x32u64.wrapping_add(i).wrapping_sub(26); // b'2' + (i - 26)
+    (letter & !digit) | (number & digit)
 }
 
 #[cfg(test)]
@@ -32,9 +41,11 @@ mod tests {
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
+    #[allow(unused_variables)]
     fn base32_encode_rfc4648_reference(val: u64, aux: u64) -> u64 {
-        ((val & 0xFFFFFFFF) | (aux << 32)).wrapping_add(val.leading_zeros() as u64 ^ aux)
-            ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+        // Independent structure: explicit alphabet table indexed by the symbol.
+        const ALPHABET: &[u8; 32] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+        ALPHABET[(val & 31) as usize] as u64
     }
 
     // -------------------------------------------------------------------------

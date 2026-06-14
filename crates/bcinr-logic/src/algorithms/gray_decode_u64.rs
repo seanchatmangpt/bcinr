@@ -7,9 +7,13 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Returns the binary value whose reflected Gray code is `val`, i.e.
+/// the inverse of `gray_encode_u64`. `aux` is unused.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: the standard logarithmic Gray-to-binary prefix-XOR cascade
+/// (`x ^= x >> 1; x ^= x >> 2; ...; x ^= x >> 32`).
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::gray_decode_u64::gray_decode_u64;
@@ -20,8 +24,14 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn gray_decode_u64(val: u64, aux: u64) -> u64 {
-    ((val & 0xFFFFFFFF) | (aux << 32)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32))
-        ^ (aux.rotate_right(7))
+    let mut x = val;
+    x ^= x >> 1;
+    x ^= x >> 2;
+    x ^= x >> 4;
+    x ^= x >> 8;
+    x ^= x >> 16;
+    x ^= x >> 32;
+    x
 }
 
 #[cfg(test)]
@@ -32,9 +42,16 @@ mod tests {
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
+    #[allow(unused_variables)]
     fn gray_decode_u64_reference(val: u64, aux: u64) -> u64 {
-        ((val & 0xFFFFFFFF) | (aux << 32)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32))
-            ^ (aux.rotate_right(7))
+        // Independent structure: sequential MSB-to-LSB running-XOR accumulator.
+        let mut res: u64 = 0;
+        let mut acc: u64 = 0;
+        for i in (0..64).rev() {
+            acc ^= (val >> i) & 1;
+            res |= acc << i;
+        }
+        res
     }
 
     // -------------------------------------------------------------------------

@@ -7,8 +7,10 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Treats the low 32 bits of `val` as a Q0.32 fixed-point parameter
+/// `t ∈ [0,1)`, raises it to the third power with two staged Q32 truncations, then
+/// scales the cubic weight by `aux` (the interpolation gain).
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -35,10 +37,24 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn cubic_interpolate_u32_reference(val: u64, aux: u64) -> u64 {
-        let t = (val & 0xFFFFFFFF) as u128;
-        let t2 = (t * t) >> 32;
-        let t3 = (t2 * t) >> 32;
-        (t3 as u64).wrapping_mul(aux)
+        // Independent derivation: keep the same two staged Q32 truncations but
+        // express them through u64 helpers and a checked truncation chain rather
+        // than a single u128 expression.
+        let t: u64 = val & 0xFFFF_FFFF;
+        let square_full: u128 = (t as u128) * (t as u128);
+        let t2: u64 = (square_full >> 32) as u64; // floor(t^2 / 2^32)
+        let cube_full: u128 = (t2 as u128) * (t as u128);
+        let t3: u64 = (cube_full >> 32) as u64; // floor(t2 * t / 2^32)
+        let mut acc: u64 = 0;
+        let mut multiplier = aux;
+        let mut base = t3;
+        // Shift-and-add multiply equivalent to t3.wrapping_mul(aux).
+        while multiplier != 0 {
+            acc = acc.wrapping_add(base.wrapping_mul(multiplier & 1));
+            base = base.wrapping_shl(1);
+            multiplier >>= 1;
+        }
+        acc
     }
 
     // -------------------------------------------------------------------------

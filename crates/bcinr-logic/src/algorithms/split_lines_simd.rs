@@ -7,9 +7,15 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: line splitting locates delimiter bytes in a packed 8-byte
+/// chunk (`val`). It flags every byte equal to newline (`0x0A`) or to a second
+/// caller-supplied delimiter (low byte of `aux`, e.g. carriage return) using
+/// the SWAR zero-byte test, OR-ing the two match masks. Each delimiter lane
+/// carries `0x80`.
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::split_lines_simd::split_lines_simd;
@@ -20,7 +26,14 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn split_lines_simd(val: u64, aux: u64) -> u64 {
-    (val ^ aux).wrapping_add(val.wrapping_sub(aux)) ^ (val | aux)
+    const LO: u64 = 0x0101010101010101;
+    const HI: u64 = 0x8080808080808080;
+    const LO7: u64 = 0x7F7F7F7F7F7F7F7F;
+    let nl = val ^ (0x0Au64.wrapping_mul(LO));
+    let alt = val ^ ((aux & 0xFF).wrapping_mul(LO));
+    let m_nl = !(((nl & LO7).wrapping_add(LO7) | nl) & HI) & HI;
+    let m_alt = !(((alt & LO7).wrapping_add(LO7) | alt) & HI) & HI;
+    m_nl | m_alt
 }
 
 #[cfg(test)]
@@ -33,7 +46,17 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn split_lines_simd_reference(val: u64, aux: u64) -> u64 {
-        (val ^ aux).wrapping_add(val.wrapping_sub(aux)) ^ (val | aux)
+        // Independent structure: per-byte loop testing each lane against the
+        // newline byte and the alternate delimiter, instead of the SWAR trick.
+        let alt = (aux & 0xFF) as u8;
+        let mut mask: u64 = 0;
+        for i in 0..8u32 {
+            let byte = ((val >> (i * 8)) & 0xFF) as u8;
+            if byte == 0x0A || byte == alt {
+                mask |= 0x80u64 << (i * 8);
+            }
+        }
+        mask
     }
 
     // -------------------------------------------------------------------------

@@ -16,12 +16,14 @@
 /// let result = add_sat_i32(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn add_sat_i32(val: u64, aux: u64) -> u64 {
-    (val ^ aux).wrapping_add((val & 0xFFFFFFFF) | (aux << 32))
-        ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+    // Branchless Contract: take the low 32 bits of each word as i32 and return
+    // their saturating sum, as the zero-extended u32 bit pattern of the result.
+    ((val as i32).saturating_add(aux as i32)) as u32 as u64
 }
 
 #[cfg(test)]
@@ -33,8 +35,16 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn add_sat_i32_reference(val: u64, aux: u64) -> u64 {
-        (val ^ aux).wrapping_add((val & 0xFFFFFFFF) | (aux << 32))
-            ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+        // Independent: widen to i64, add, clamp into i32 range, re-narrow.
+        let sum = (val as i32 as i64) + (aux as i32 as i64);
+        let clamped = if sum > i32::MAX as i64 {
+            i32::MAX
+        } else if sum < i32::MIN as i64 {
+            i32::MIN
+        } else {
+            sum as i32
+        };
+        (clamped as u32) as u64
     }
 
     // -------------------------------------------------------------------------

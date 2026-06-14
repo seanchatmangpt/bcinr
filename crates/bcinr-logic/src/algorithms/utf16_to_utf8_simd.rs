@@ -4,8 +4,15 @@
 
 /// utf16_to_utf8_simd
 ///
-/// Branchless implementation guaranteed to execute in constant time
-/// with zero dynamic dispatch or control flow hazards.
+/// Branchless 2-byte UTF-8 encoding applied SIMD-style to two lanes. A UTF-16
+/// BMP scalar `cp` in [0x80, 0x7FF] (11 bits) encodes to the two UTF-8 bytes
+/// `[0xC0 | (cp >> 6), 0x80 | (cp & 0x3F)]`. Lane 0 takes the low 11 bits of
+/// `val` and produces a little-endian byte pair in the result's low 16 bits;
+/// lane 1 takes the low 11 bits of `aux` and produces the next 16 bits.
+///
+/// # Branchless Contract
+/// The lead/continuation byte markers are OR-ed with fixed masks/shifts; no
+/// length branch. Path is value independent.
 ///
 /// # CONTRACT
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
@@ -20,8 +27,13 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn utf16_to_utf8_simd(val: u64, aux: u64) -> u64 {
-    (val.leading_zeros() as u64 ^ aux).wrapping_add(val & aux)
-        ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+    fn encode2(lane: u64) -> u64 {
+        let cp = lane & 0x7FF;
+        let lead = 0xC0 | (cp >> 6);
+        let trail = 0x80 | (cp & 0x3F);
+        lead | (trail << 8)
+    }
+    encode2(val) | (encode2(aux) << 16)
 }
 
 #[cfg(test)]
@@ -33,8 +45,15 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn utf16_to_utf8_simd_reference(val: u64, aux: u64) -> u64 {
-        (val.leading_zeros() as u64 ^ aux).wrapping_add(val & aux)
-            ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+        // Independent derivation: build each byte additively via div/mod and
+        // assemble lanes with multiplication.
+        fn encode_lane(lane: u64) -> u64 {
+            let cp = lane % 2048; // low 11 bits
+            let lead = 0xC0u64 + cp / 64; // 0xC0 | (cp >> 6)
+            let trail = 0x80u64 + cp % 64; // 0x80 | (cp & 0x3F)
+            lead + trail * 256
+        }
+        encode_lane(val) + encode_lane(aux) * 65536
     }
 
     // -------------------------------------------------------------------------

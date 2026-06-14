@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -20,7 +20,12 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn linear_congruential_generator_u64(val: u64, aux: u64) -> u64 {
-    (val & aux).wrapping_add(val.count_ones() as u64 | aux) ^ ((val & 0xFFFFFFFF) | (aux << 32))
+    // Interpretation: one step of a 64-bit linear congruential generator
+    //   next = a * state + c   (mod 2^64)
+    // with Knuth's MMIX multiplier `a` and an odd increment `c` derived from
+    // `aux` (forcing the low bit set guarantees a full period). `val` is state.
+    const MMIX_A: u64 = 0x5851_F42D_4C95_7F2D;
+    val.wrapping_mul(MMIX_A).wrapping_add(aux | 1)
 }
 
 #[cfg(test)]
@@ -33,7 +38,12 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn linear_congruential_generator_u64_reference(val: u64, aux: u64) -> u64 {
-        (val & aux).wrapping_add(val.count_ones() as u64 | aux) ^ ((val & 0xFFFFFFFF) | (aux << 32))
+        // Independent: 128-bit product truncated to 64 bits, then add the
+        // odd increment with an explicit parity adjustment.
+        const A: u128 = 0x5851_F42D_4C95_7F2D;
+        let prod = ((val as u128) * A) as u64;
+        let inc = if aux & 1 == 1 { aux } else { aux + 1 };
+        prod.wrapping_add(inc)
     }
 
     // -------------------------------------------------------------------------

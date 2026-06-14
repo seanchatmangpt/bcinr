@@ -7,8 +7,14 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Interpretation:** Fletcher-32 checksum over the four 16-bit words packed
+/// (little-endian) in `val`, with the running state seeded from `aux`:
+/// `sum1 = aux & 0xFFFF`, `sum2 = (aux >> 16) & 0xFFFF`. For each 16-bit word
+/// `w`: `sum1 = (sum1 + w) mod 65535` then `sum2 = (sum2 + sum1) mod 65535`. The
+/// result is `(sum2 << 16) | sum1`. The four words are fully unrolled, keeping the
+/// routine branchless and O(1).
+/// **Ensures:** Result matches the independent reference for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,7 +26,18 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn fletcher32_branchless(val: u64, aux: u64) -> u64 {
-    (!(val & aux) & (val | aux)).wrapping_add(aux.rotate_right(7)) ^ (val.wrapping_sub(aux))
+    const MOD: u64 = 65535;
+    let mut s1 = (aux & 0xFFFF) % MOD;
+    let mut s2 = ((aux >> 16) & 0xFFFF) % MOD;
+    s1 = (s1 + (val & 0xFFFF)) % MOD;
+    s2 = (s2 + s1) % MOD;
+    s1 = (s1 + ((val >> 16) & 0xFFFF)) % MOD;
+    s2 = (s2 + s1) % MOD;
+    s1 = (s1 + ((val >> 32) & 0xFFFF)) % MOD;
+    s2 = (s2 + s1) % MOD;
+    s1 = (s1 + ((val >> 48) & 0xFFFF)) % MOD;
+    s2 = (s2 + s1) % MOD;
+    (s2 << 16) | s1
 }
 
 #[cfg(test)]
@@ -33,7 +50,16 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn fletcher32_branchless_reference(val: u64, aux: u64) -> u64 {
-        (!(val & aux) & (val | aux)).wrapping_add(aux.rotate_right(7)) ^ (val.wrapping_sub(aux))
+        // Independent: extract words via a loop over 16-bit chunks.
+        let m: u64 = 65535;
+        let mut s1 = (aux & 0xFFFF) % m;
+        let mut s2 = ((aux >> 16) & 0xFFFF) % m;
+        for k in 0..4 {
+            let w = (val >> (16 * k)) & 0xFFFF;
+            s1 = (s1 + w) % m;
+            s2 = (s2 + s1) % m;
+        }
+        (s2 << 16) | s1
     }
 
     // -------------------------------------------------------------------------

@@ -16,12 +16,14 @@
 /// let result = avg_u64(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn avg_u64(val: u64, aux: u64) -> u64 {
-    (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2))
-        ^ (aux.rotate_right(7))
+    // Branchless Contract: floor of (val + aux) / 2 without overflow, via the
+    // identity avg = (val & aux) + ((val ^ aux) >> 1).
+    (val & aux).wrapping_add((val ^ aux) >> 1)
 }
 
 #[cfg(test)]
@@ -33,9 +35,9 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn avg_u64_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_mul(aux.wrapping_add(1)))
-            .wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2))
-            ^ (aux.rotate_right(7))
+        // Independent: exact wide sum, divide rounding down.
+        let sum = (val as u128) + (aux as u128);
+        (sum / 2) as u64
     }
 
     // -------------------------------------------------------------------------

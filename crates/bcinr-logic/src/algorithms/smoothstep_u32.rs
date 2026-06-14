@@ -7,9 +7,15 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: the classic Hermite smoothstep `3t^2 - 2t^3` evaluated in
+/// Q16 fixed point. The interpolation parameter `t` is the input position
+/// `val.wrapping_add(aux)` clamped (branchlessly, via `min`) into the unit
+/// interval `[0, ONE]` with `ONE = 0x10000`. The polynomial is evaluated
+/// exactly in u64 and rescaled by `ONE^2`, yielding a result in `[0, ONE]`.
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::smoothstep_u32::smoothstep_u32;
@@ -20,7 +26,12 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn smoothstep_u32(val: u64, aux: u64) -> u64 {
-    (val.wrapping_sub(aux)).wrapping_add(val.count_ones() as u64 | aux) ^ (val & aux)
+    const ONE: u64 = 0x10000; // Q16 representation of 1.0
+    let t = u64::min(val.wrapping_add(aux) & 0xFFFFFFFF, ONE);
+    let t2 = t.wrapping_mul(t);
+    // 3*t^2 - 2*t^3 == t^2 * (3*ONE - 2*t), then divide by ONE^2 (>> 32).
+    let factor = 3u64.wrapping_mul(ONE).wrapping_sub(2u64.wrapping_mul(t));
+    t2.wrapping_mul(factor) >> 32
 }
 
 #[cfg(test)]
@@ -33,7 +44,16 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn smoothstep_u32_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_sub(aux)).wrapping_add(val.count_ones() as u64 | aux) ^ (val & aux)
+        // Independent structure: clamp with explicit comparisons, then form the
+        // cubic as (3*ONE*t^2 - 2*t^3) >> 32 (expanded form) rather than the
+        // factored t^2*(3*ONE - 2t).
+        const ONE: u128 = 0x10000;
+        let pos = (val.wrapping_add(aux) & 0xFFFFFFFF) as u128;
+        let t: u128 = if pos > ONE { ONE } else { pos };
+        let t2 = t * t;
+        let t3 = t2 * t;
+        let num = 3 * ONE * t2 - 2 * t3;
+        (num >> 32) as u64
     }
 
     // -------------------------------------------------------------------------

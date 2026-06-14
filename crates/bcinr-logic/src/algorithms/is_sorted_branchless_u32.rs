@@ -38,9 +38,19 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn is_sorted_branchless_u32_reference(val: u64, _aux: u64) -> u64 {
-        let a = val as u32;
-        let b = (val >> 32) as u32;
-        (a <= b) as u64
+        // Independent oracle: treat the two u32 halves as a length-2 array and
+        // verify ascending order by scanning adjacent pairs with explicit
+        // control flow (forbidden in the branchless impl).
+        let arr = [val as u32, (val >> 32) as u32];
+        let mut sorted = true;
+        let mut i = 1;
+        while i < arr.len() {
+            if arr[i - 1] > arr[i] {
+                sorted = false;
+            }
+            i += 1;
+        }
+        u64::from(sorted)
     }
 
     // -------------------------------------------------------------------------

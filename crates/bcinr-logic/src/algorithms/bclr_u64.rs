@@ -7,8 +7,8 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Clears the bit of `val` at position `aux mod 64` (BMI `bclr`/`btr`).
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -33,7 +33,15 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn bclr_u64_reference(val: u64, aux: u64) -> u64 {
-        val & !(1u64.wrapping_shl(aux as u32 & 0x3F))
+        // Independent: build the result bit-by-bit, dropping only the target bit.
+        let pos = (aux % 64) as u32;
+        let mut out = 0u64;
+        for i in 0..64u32 {
+            if i != pos && (val >> i) & 1 == 1 {
+                out |= 1u64 << i;
+            }
+        }
+        out
     }
 
     // -------------------------------------------------------------------------

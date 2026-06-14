@@ -4,8 +4,15 @@
 
 /// varint_decode_simd
 ///
-/// Branchless implementation guaranteed to execute in constant time
-/// with zero dynamic dispatch or control flow hazards.
+/// SIMD (8-lane) LEB128 varint decode: given an 8-byte frame
+/// `f = val + aux` packed little-endian into a u64, drop every byte's
+/// continuation bit (0x80) and repack the eight 7-bit payload groups into the
+/// recovered 56-bit integer (`group i` of byte `i` lands at bit `7*i`). This
+/// is the exact inverse of the fixed-width varint framing.
+///
+/// # Branchless Contract
+/// All eight lanes are masked with `0x7F` and reassembled with a fixed shift
+/// pattern; no per-byte branches. Path is value independent.
 ///
 /// # CONTRACT
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
@@ -20,7 +27,16 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn varint_decode_simd(val: u64, aux: u64) -> u64 {
-    (val.leading_zeros() as u64 ^ aux).wrapping_add(val.wrapping_sub(aux)) ^ (val ^ aux)
+    let f = val.wrapping_add(aux);
+    let b0 = f & 0x7F;
+    let b1 = (f >> 8) & 0x7F;
+    let b2 = (f >> 16) & 0x7F;
+    let b3 = (f >> 24) & 0x7F;
+    let b4 = (f >> 32) & 0x7F;
+    let b5 = (f >> 40) & 0x7F;
+    let b6 = (f >> 48) & 0x7F;
+    let b7 = (f >> 56) & 0x7F;
+    b0 | (b1 << 7) | (b2 << 14) | (b3 << 21) | (b4 << 28) | (b5 << 35) | (b6 << 42) | (b7 << 49)
 }
 
 #[cfg(test)]
@@ -33,7 +49,16 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn varint_decode_simd_reference(val: u64, aux: u64) -> u64 {
-        (val.leading_zeros() as u64 ^ aux).wrapping_add(val.wrapping_sub(aux)) ^ (val ^ aux)
+        // Independent derivation: accumulate 7-bit groups in a loop.
+        let f = val.wrapping_add(aux);
+        let mut acc: u64 = 0;
+        let mut shift = 0u32;
+        for i in 0..8u32 {
+            let payload = (f >> (8 * i)) & 0x7F;
+            acc |= payload << shift;
+            shift += 7;
+        }
+        acc
     }
 
     // -------------------------------------------------------------------------

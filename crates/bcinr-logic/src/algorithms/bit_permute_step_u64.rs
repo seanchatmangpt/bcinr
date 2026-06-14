@@ -7,8 +7,11 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** The delta-swap permutation step: exchanges each bit of `val` selected by
+/// mask `aux` with the bit 8 positions higher, via
+/// `t = ((val >> 8) ^ val) & aux; val ^ t ^ (t << 8)`. This is the fundamental
+/// building block of Benes/butterfly bit-permutation networks.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,8 +23,8 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn bit_permute_step_u64(val: u64, aux: u64) -> u64 {
-    ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val.rotate_left(13))
-        ^ (!(val & aux) & (val | aux))
+    let t = ((val >> 8) ^ val) & aux;
+    val ^ t ^ (t << 8)
 }
 
 #[cfg(test)]
@@ -33,8 +36,12 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn bit_permute_step_u64_reference(val: u64, aux: u64) -> u64 {
-        ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val.rotate_left(13))
-            ^ (!(val & aux) & (val | aux))
+        // Independent: same delta-swap derived as two separate masked moves.
+        let diff = ((val >> 8) ^ val) & aux; // bits that differ across the lane gap
+        let low_part = diff; // toggles at the low position
+        let high_part = diff << 8; // toggles at the high position
+        let cleared = val ^ low_part;
+        cleared ^ high_part
     }
 
     // -------------------------------------------------------------------------

@@ -22,8 +22,16 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn aho_corasick_simd_step(val: u64, aux: u64) -> u64 {
-    let byte_vec = (aux & 0xFF) * 0x0101010101010101u64;
-    (val ^ byte_vec).wrapping_add(0x0101010101010101u64)
+    // Broadcast the low byte of `aux` to all 8 lanes, then XOR each lane of
+    // `val` against it (the per-byte match-difference of the SIMD step), and
+    // finally add 1 to every lane independently. The +1 is carry-isolated via
+    // the SWAR identity `((a&M)+(b&M)) ^ ((a^b)&~M)` with M = 0x7F..7F, so a
+    // byte that overflows cannot disturb its neighbour.
+    const ONE: u64 = 0x0101010101010101;
+    const M: u64 = 0x7F7F7F7F7F7F7F7F;
+    let target = (aux & 0xFF).wrapping_mul(ONE);
+    let diff = val ^ target;
+    ((diff & M).wrapping_add(ONE & M)) ^ ((diff ^ ONE) & !M)
 }
 
 #[cfg(test)]

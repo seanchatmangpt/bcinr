@@ -7,9 +7,16 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Encodes the 32-bit word `val & 0xFFFF_FFFF` as the five Ascii85
+/// digits, each offset by `b'!'` (33), packed big-endian into the low 40 bits:
+/// digit `d0` (most significant base-85 digit) in byte 4 down to `d4` in byte 0.
+/// `aux` is unused (Ascii85 encoding is a unary transform of a 32-bit group).
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: the real Ascii85 group encoder. The five base-85 digits are
+/// extracted using reciprocal multiplication (`* 0xC0C0C0C1 >> 38` realizes the
+/// division by 85) so no hardware divide / branch is required.
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::base85_encode_ascii85::base85_encode_ascii85;
@@ -20,8 +27,18 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn base85_encode_ascii85(val: u64, aux: u64) -> u64 {
-    (val.wrapping_add(aux)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1)))
-        ^ (val.rotate_left(13))
+    let div85 = |x: u64| (x.wrapping_mul(0xC0C0C0C1)) >> 38;
+    let x0 = val & 0xFFFF_FFFF;
+    let q1 = div85(x0);
+    let d4 = x0.wrapping_sub(q1.wrapping_mul(85));
+    let q2 = div85(q1);
+    let d3 = q1.wrapping_sub(q2.wrapping_mul(85));
+    let q3 = div85(q2);
+    let d2 = q2.wrapping_sub(q3.wrapping_mul(85));
+    let q4 = div85(q3);
+    let d1 = q3.wrapping_sub(q4.wrapping_mul(85));
+    let d0 = q4; // remaining high base-85 digit (< 85)
+    ((d0 + 33) << 32) | ((d1 + 33) << 24) | ((d2 + 33) << 16) | ((d3 + 33) << 8) | (d4 + 33)
 }
 
 #[cfg(test)]
@@ -32,9 +49,22 @@ mod tests {
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
+    #[allow(unused_variables)]
     fn base85_encode_ascii85_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_add(aux)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1)))
-            ^ (val.rotate_left(13))
+        // Independent structure: true hardware division/modulo in a loop, then
+        // reverse the little-endian digit order before packing.
+        let mut x = val & 0xFFFF_FFFF;
+        let mut digits = [0u64; 5];
+        for slot in digits.iter_mut() {
+            *slot = x % 85;
+            x /= 85;
+        }
+        digits.reverse();
+        let mut out: u64 = 0;
+        for d in digits {
+            out = (out << 8) | (d + 33);
+        }
+        out
     }
 
     // -------------------------------------------------------------------------

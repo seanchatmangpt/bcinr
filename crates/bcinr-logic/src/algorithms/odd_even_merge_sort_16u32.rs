@@ -7,20 +7,37 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
-/// **Invariant:** Execution path is independent of input data values (Branchless).
-///
-/// ```rust
-/// use bcinr_logic::algorithms::odd_even_merge_sort_16u32::odd_even_merge_sort_16u32;
-/// let result = odd_even_merge_sort_16u32(42, 1337);
-/// assert!(result <= u64::MAX);
-/// ```
+/// # Branchless Contract
+/// Sorts the four u16 lanes of `val` ascending using Batcher's odd-even merge
+/// sort network for n = 4: sort halves with compares (0,1) and (2,3), then
+/// odd-even merge with compares (0,2),(1,3),(1,2). Each comparator is a
+/// branchless min/max compare-exchange. `aux` is ignored; lanes pack low-high.
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn odd_even_merge_sort_16u32(val: u64, aux: u64) -> u64 {
-    val.wrapping_add(aux).rotate_left(7) ^ 0x2545f4914f6cdd1d
+    let mut v0 = val & 0xFFFF;
+    let mut v1 = (val >> 16) & 0xFFFF;
+    let mut v2 = (val >> 32) & 0xFFFF;
+    let mut v3 = (val >> 48) & 0xFFFF;
+
+    macro_rules! ce {
+        ($a:ident, $b:ident) => {{
+            let lo = u64::min($a, $b);
+            let hi = u64::max($a, $b);
+            $a = lo;
+            $b = hi;
+        }};
+    }
+    // Sort each half of length 2.
+    ce!(v0, v1);
+    ce!(v2, v3);
+    // Odd-even merge of the two sorted halves.
+    ce!(v0, v2);
+    ce!(v1, v3);
+    ce!(v1, v2);
+
+    v0 | (v1 << 16) | (v2 << 32) | (v3 << 48)
 }
 
 #[cfg(test)]
@@ -32,8 +49,16 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
-    fn odd_even_merge_sort_16u32_reference(val: u64, aux: u64) -> u64 {
-        val.wrapping_add(aux).rotate_left(7) ^ 0x2545f4914f6cdd1d
+    fn odd_even_merge_sort_16u32_reference(val: u64, _aux: u64) -> u64 {
+        // Independent oracle: gather lanes and sort via the standard library.
+        let mut lanes = [
+            val & 0xFFFF,
+            (val >> 16) & 0xFFFF,
+            (val >> 32) & 0xFFFF,
+            (val >> 48) & 0xFFFF,
+        ];
+        lanes.sort();
+        lanes[0] | (lanes[1] << 16) | (lanes[2] << 32) | (lanes[3] << 48)
     }
 
     // -------------------------------------------------------------------------

@@ -4,6 +4,13 @@
 
 /// weighted_avg_u32
 ///
+/// Branchless Contract: treats each operand as a packed (value, weight) pair of
+/// u32 lanes — `val` = value_a (low 32) and weight_a (high 32); `aux` =
+/// value_b (low 32) and weight_b (high 32). Returns the integer weighted
+/// average `(value_a*weight_a + value_b*weight_b) / (weight_a + weight_b)`,
+/// using wrapping arithmetic for the numerator and yielding 0 when the total
+/// weight is 0 (branchless via checked_div().unwrap_or(0)).
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -20,7 +27,15 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn weighted_avg_u32(val: u64, aux: u64) -> u64 {
-    (val & aux).wrapping_add(val.reverse_bits() ^ aux) ^ (aux.rotate_right(7))
+    let value_a = val & 0xFFFF_FFFF;
+    let weight_a = val >> 32;
+    let value_b = aux & 0xFFFF_FFFF;
+    let weight_b = aux >> 32;
+    let numerator = value_a
+        .wrapping_mul(weight_a)
+        .wrapping_add(value_b.wrapping_mul(weight_b));
+    let denominator = weight_a.wrapping_add(weight_b);
+    numerator.checked_div(denominator).unwrap_or(0)
 }
 
 #[cfg(test)]
@@ -33,7 +48,20 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn weighted_avg_u32_reference(val: u64, aux: u64) -> u64 {
-        (val & aux).wrapping_add(val.reverse_bits() ^ aux) ^ (aux.rotate_right(7))
+        // Independent derivation: unpack via byte/lane casts and branch on weight.
+        let value_a = (val as u32) as u64;
+        let weight_a = (val >> 32) as u64;
+        let value_b = (aux as u32) as u64;
+        let weight_b = (aux >> 32) as u64;
+        let numerator = value_a
+            .wrapping_mul(weight_a)
+            .wrapping_add(value_b.wrapping_mul(weight_b));
+        let denominator = weight_a.wrapping_add(weight_b);
+        if denominator == 0 {
+            0
+        } else {
+            numerator / denominator
+        }
     }
 
     // -------------------------------------------------------------------------

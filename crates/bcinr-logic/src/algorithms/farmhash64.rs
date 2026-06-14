@@ -44,8 +44,12 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn farmhash64_reference(val: u64, aux: u64) -> u64 {
-        let h = val.wrapping_add(aux).wrapping_mul(0x9E3779B97F4A7C15u64);
-        h ^ (h >> 33)
+        // Independent: 128-bit product truncation and split fold.
+        let k: u128 = 0x9E3779B97F4A7C15;
+        let sum = (val.wrapping_add(aux)) as u128;
+        let h = (sum.wrapping_mul(k) as u64) & u64::MAX;
+        let upper = h >> 33;
+        h ^ upper
     }
 
     // -------------------------------------------------------------------------

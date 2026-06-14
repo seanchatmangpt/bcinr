@@ -35,7 +35,12 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn rolling_hash_buzhash_reference(val: u64, aux: u64) -> u64 {
-        val.rotate_left(1) ^ aux
+        // BuzHash single-character roll: cyclic 1-bit left shift of the running
+        // hash, then XOR the incoming character hash. Recompose the rotation
+        // from primitive shifts and an explicit carry of the top bit.
+        let carry = (val >> 63) & 1;
+        let shifted = (val << 1) | carry;
+        shifted ^ aux
     }
 
     // -------------------------------------------------------------------------

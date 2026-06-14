@@ -7,9 +7,15 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Decodes the four base64 ASCII characters packed in the low 32
+/// bits of `val` (byte 0 = most significant sextet) into the corresponding
+/// 24-bit value `(s0 << 18) | (s1 << 12) | (s2 << 6) | s3`. Non-alphabet bytes
+/// decode as sextet `0`. `aux` is unused.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: the standard 4-char -> 3-byte base64 chunk decode, with each
+/// lane decoded by SWAR-style sign-bit range masks.
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::base64_decode_chunk4::base64_decode_chunk4;
@@ -20,7 +26,27 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn base64_decode_chunk4(val: u64, aux: u64) -> u64 {
-    (val.count_ones() as u64 | aux).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (val | aux)
+    let s0 = decode_sextet(val & 0xFF);
+    let s1 = decode_sextet((val >> 8) & 0xFF);
+    let s2 = decode_sextet((val >> 16) & 0xFF);
+    let s3 = decode_sextet((val >> 24) & 0xFF);
+    (s0 << 18) | (s1 << 12) | (s2 << 6) | s3
+}
+
+/// Branchless Contract: one base64 ASCII byte -> 6-bit sextet, else 0.
+#[inline]
+fn decode_sextet(c: u64) -> u64 {
+    let gt = |a: u64, b: u64| 0u64.wrapping_sub(b.wrapping_sub(a) >> 63);
+    let eq = |k: u64| {
+        let d = c ^ k;
+        0u64.wrapping_sub(1 ^ ((d | 0u64.wrapping_sub(d)) >> 63))
+    };
+    let rng = |lo: u64, hi: u64| gt(c, lo - 1) & gt(hi, c.wrapping_sub(1));
+    (c.wrapping_sub(0x41) & rng(0x41, 0x5A))
+        | (c.wrapping_sub(0x47) & rng(0x61, 0x7A))
+        | (c.wrapping_add(4) & rng(0x30, 0x39))
+        | (62 & eq(0x2B))
+        | (63 & eq(0x2F))
 }
 
 #[cfg(test)]
@@ -32,8 +58,23 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
+    #[allow(unused_variables)]
     fn base64_decode_chunk4_reference(val: u64, aux: u64) -> u64 {
-        (val.count_ones() as u64 | aux).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (val | aux)
+        // Independent structure: table lookup per char, accumulated by shifting.
+        const ALPHABET: &[u8; 64] =
+            b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let lookup = |c: u8| -> u64 {
+            match ALPHABET.iter().position(|&ch| ch == c) {
+                Some(i) => i as u64,
+                None => 0,
+            }
+        };
+        let mut acc: u64 = 0;
+        for i in 0..4 {
+            let c = ((val >> (8 * i)) & 0xFF) as u8;
+            acc = (acc << 6) | lookup(c);
+        }
+        acc
     }
 
     // -------------------------------------------------------------------------

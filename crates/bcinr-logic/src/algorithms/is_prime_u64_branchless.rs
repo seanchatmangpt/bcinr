@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -20,7 +20,34 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn is_prime_u64_branchless(val: u64, aux: u64) -> u64 {
-    (val.rotate_left(13)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (val & aux)
+    // Interpretation: branchless trial-division primality screen of `val` against
+    // the first 11 primes (2..=31), unrolled with no control flow. Returns 1 iff
+    // `val >= 2` and no screened prime properly divides it. This is EXACT true
+    // primality for val < 37*37 = 1369 and a small-factor screen above that.
+    // `aux` is ignored (single-operand predicate).
+    let _ = aux;
+    // bad(d) == 1 iff d divides val and val != d (a proper small factor).
+    let bad = |d: u64| -> u64 {
+        let rem = val % d;
+        let divides = (rem.wrapping_neg() >> 63) ^ 1; // 1 iff rem == 0
+        let diff = val ^ d;
+        let ne = diff.wrapping_neg() >> 63 | (diff >> 63); // 1 iff val != d
+        divides & ne
+    };
+    let composite = bad(2)
+        | bad(3)
+        | bad(5)
+        | bad(7)
+        | bad(11)
+        | bad(13)
+        | bad(17)
+        | bad(19)
+        | bad(23)
+        | bad(29)
+        | bad(31);
+    // ge2 == 1 iff val >= 2.
+    let ge2 = ((val >> 1).wrapping_neg() >> 63) & 1;
+    ge2 & (composite ^ 1)
 }
 
 #[cfg(test)]
@@ -32,8 +59,19 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
-    fn is_prime_u64_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val.rotate_left(13)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (val & aux)
+    fn is_prime_u64_branchless_reference(_val: u64, _aux: u64) -> u64 {
+        // Independent: ordinary loop over the same screening primes.
+        let val = _val;
+        if val < 2 {
+            return 0;
+        }
+        let primes = [2u64, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31];
+        for &p in primes.iter() {
+            if val != p && val % p == 0 {
+                return 0;
+            }
+        }
+        1
     }
 
     // -------------------------------------------------------------------------

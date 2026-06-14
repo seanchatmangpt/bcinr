@@ -7,21 +7,62 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
-/// **Invariant:** Execution path is independent of input data values (Branchless).
-///
-/// ```rust
-/// use bcinr_logic::algorithms::unrolled_binary_search_u32::unrolled_binary_search_u32;
-/// let result = unrolled_binary_search_u32(42, 1337);
-/// assert!(result <= u64::MAX);
-/// ```
+/// # Branchless Contract
+/// Lower-bound binary search of key `k` (low 32 bits of `aux`) in the sorted
+/// identity array `[0, 1, ..., len-1]`, where `len` is the low 32 bits of
+/// `val`. Returns the insertion index = number of elements strictly less than
+/// `k` = `min(k, len)`. Computed by an unrolled, branchless binary search that
+/// builds the result index one bit at a time from the most-significant bit.
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn unrolled_binary_search_u32(val: u64, aux: u64) -> u64 {
-    (val & aux).wrapping_add((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-        ^ (val.wrapping_add(aux))
+    let len = val & 0xFFFF_FFFF;
+    let k = aux & 0xFFFF_FFFF;
+    // Build the largest index `pos` in [0, len] with pos <= k, bit by bit.
+    // For each candidate bit b (high to low), tentatively OR it in; keep it
+    // only if the resulting prefix stays <= both len and k. Branchless via a
+    // mask derived from the comparison.
+    let step = |pos: u64, b: u32| -> u64 {
+        let cand = pos | (1u64 << b);
+        let ok = ((cand <= len) as u64) & ((cand <= k) as u64);
+        // keep bit only when ok: subtract bit back out when !ok
+        pos | ((1u64 << b) & 0u64.wrapping_sub(ok))
+    };
+    let mut pos = 0u64;
+    pos = step(pos, 31);
+    pos = step(pos, 30);
+    pos = step(pos, 29);
+    pos = step(pos, 28);
+    pos = step(pos, 27);
+    pos = step(pos, 26);
+    pos = step(pos, 25);
+    pos = step(pos, 24);
+    pos = step(pos, 23);
+    pos = step(pos, 22);
+    pos = step(pos, 21);
+    pos = step(pos, 20);
+    pos = step(pos, 19);
+    pos = step(pos, 18);
+    pos = step(pos, 17);
+    pos = step(pos, 16);
+    pos = step(pos, 15);
+    pos = step(pos, 14);
+    pos = step(pos, 13);
+    pos = step(pos, 12);
+    pos = step(pos, 11);
+    pos = step(pos, 10);
+    pos = step(pos, 9);
+    pos = step(pos, 8);
+    pos = step(pos, 7);
+    pos = step(pos, 6);
+    pos = step(pos, 5);
+    pos = step(pos, 4);
+    pos = step(pos, 3);
+    pos = step(pos, 2);
+    pos = step(pos, 1);
+    pos = step(pos, 0);
+    pos
 }
 
 #[cfg(test)]
@@ -33,8 +74,22 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn unrolled_binary_search_u32_reference(val: u64, aux: u64) -> u64 {
-        (val & aux).wrapping_add((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-            ^ (val.wrapping_add(aux))
+        // Independent oracle: a real loop-based binary search for the lower
+        // bound of `k` in the identity array [0, len). Equivalent to min(k,len).
+        let len = (val & 0xFFFF_FFFF) as u64;
+        let k = (aux & 0xFFFF_FFFF) as u64;
+        let mut lo = 0u64;
+        let mut hi = len;
+        while lo < hi {
+            let mid = lo + (hi - lo) / 2;
+            // identity array: element at mid is `mid`
+            if mid < k {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        lo
     }
 
     // -------------------------------------------------------------------------

@@ -31,9 +31,27 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn xxhash64(val: u64, aux: u64) -> u64 {
-    val.wrapping_add(aux)
-        .wrapping_mul(0x9E3779B185EBCA87)
-        .rotate_left(31)
+    // XXH64 over a single 8-byte input `val` with seed `aux` (the < 32-byte path).
+    // Start `h = seed + PRIME5 + len`, absorb the 8-byte lane, then run the XXH64
+    // `avalanche` finalizer.
+    const P1: u64 = 0x9E3779B185EBCA87;
+    const P2: u64 = 0xC2B2AE3D27D4EB4F;
+    const P3: u64 = 0x165667B19E3779F9;
+    const P4: u64 = 0x85EBCA77C2B2AE63;
+    const P5: u64 = 0x27D4EB2F165667C5;
+
+    let mut h = aux.wrapping_add(P5).wrapping_add(8);
+    // absorb 8-byte lane `val`
+    let k1 = val.wrapping_mul(P2).rotate_left(31).wrapping_mul(P1);
+    h ^= k1;
+    h = h.rotate_left(27).wrapping_mul(P1).wrapping_add(P4);
+    // avalanche
+    h ^= h >> 33;
+    h = h.wrapping_mul(P2);
+    h ^= h >> 29;
+    h = h.wrapping_mul(P3);
+    h ^= h >> 32;
+    h
 }
 
 #[cfg(test)]
@@ -45,9 +63,28 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn xxhash64_reference(val: u64, aux: u64) -> u64 {
-        val.wrapping_add(aux)
-            .wrapping_mul(0x9E3779B185EBCA87)
-            .rotate_left(31)
+        // XXH64 short path, re-derived with helper functions and a table-driven
+        // avalanche over (shift, multiplier) pairs.
+        const P1: u64 = 0x9E3779B185EBCA87;
+        const P2: u64 = 0xC2B2AE3D27D4EB4F;
+        const P3: u64 = 0x165667B19E3779F9;
+        const P4: u64 = 0x85EBCA77C2B2AE63;
+        const P5: u64 = 0x27D4EB2F165667C5;
+        fn absorb_lane(lane: u64) -> u64 {
+            let mut k = lane.wrapping_mul(P2);
+            k = k.rotate_left(31);
+            k.wrapping_mul(P1)
+        }
+        let h0 = aux.wrapping_add(P5).wrapping_add(8);
+        let h1 = h0 ^ absorb_lane(val);
+        let mut h = h1.rotate_left(27).wrapping_mul(P1).wrapping_add(P4);
+        // avalanche: xorshift then multiply, last step multiply by 1 (no-op)
+        let steps: [(u32, u64); 3] = [(33, P2), (29, P3), (32, 1)];
+        for (sh, mul) in steps {
+            h ^= h >> sh;
+            h = h.wrapping_mul(mul);
+        }
+        h
     }
 
     // -------------------------------------------------------------------------

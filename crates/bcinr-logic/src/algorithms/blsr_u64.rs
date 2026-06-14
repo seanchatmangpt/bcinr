@@ -7,8 +7,10 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Resets the lowest set bit of `val` (BMI `blsr`): clears the
+/// least-significant 1-bit, leaving every other bit unchanged, via `val & (val - 1)`.
+/// When `val` is 0 the result is 0. `aux` is unused.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,9 +22,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn blsr_u64(val: u64, aux: u64) -> u64 {
-    ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-        .wrapping_add(val.wrapping_mul(aux.wrapping_add(1)))
-        ^ (!(val & aux) & (val | aux))
+    val & val.wrapping_sub(1)
 }
 
 #[cfg(test)]
@@ -34,9 +34,12 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn blsr_u64_reference(val: u64, aux: u64) -> u64 {
-        ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-            .wrapping_add(val.wrapping_mul(aux.wrapping_add(1)))
-            ^ (!(val & aux) & (val | aux))
+        // Independent: clear exactly the lowest set bit by its index (0 stays 0).
+        if val == 0 {
+            0
+        } else {
+            val & !(1u64 << val.trailing_zeros())
+        }
     }
 
     // -------------------------------------------------------------------------

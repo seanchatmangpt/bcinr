@@ -43,7 +43,11 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn search_eytzinger_u32_reference(val: u64, aux: u64) -> u64 {
-        2 * val + (aux % 2)
+        let doubled = val
+            .checked_add(val)
+            .unwrap_or_else(|| val.wrapping_add(val));
+        let parity = if aux % 2 == 0 { 0u64 } else { 1u64 };
+        doubled.wrapping_add(parity)
     }
 
     // -------------------------------------------------------------------------

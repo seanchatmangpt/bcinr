@@ -20,19 +20,21 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn fp_sqrt_u32_q16(val: u64, aux: u64) -> u64 {
+    // Branchless digit-by-digit integer sqrt of (val << 16).
+    // val < 2^64 so the scaled operand is < 2^80; the highest possible
+    // even power of four is 4^40 = 2^80, so 41 reduction steps suffice.
     let mut x = (val as u128) << 16;
     let mut res = 0u128;
-    let mut bit = 1u128 << 62;
-    for _ in 0..32 {
-        let mask = ((bit > x) as u128).wrapping_neg();
-        bit = (bit & mask) | ((bit >> 2) & !mask);
-    }
-    for _ in 0..64 {
-        let cond = x >= res + bit;
+    let mut bit = 1u128 << 80;
+    let mut k = 0u32;
+    while k < 41 {
+        let candidate = res + bit;
+        let cond = x >= candidate;
         let m = (cond as u128).wrapping_neg();
-        x -= (res + bit) & m;
+        x -= candidate & m;
         res = (res >> 1) + (bit & m);
         bit >>= 2;
+        k += 1;
     }
     res as u64
 }

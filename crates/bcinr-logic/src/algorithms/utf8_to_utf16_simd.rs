@@ -4,8 +4,16 @@
 
 /// utf8_to_utf16_simd
 ///
-/// Branchless implementation guaranteed to execute in constant time
-/// with zero dynamic dispatch or control flow hazards.
+/// Branchless UTF-16 surrogate-pair encoding of a supplementary-plane scalar.
+/// A decoded UTF-8 scalar `s` in the supplementary range has offset
+/// `u = s - 0x10000` (20 bits); UTF-16 represents it as a surrogate pair
+/// `high = 0xD800 | (u >> 10)`, `low = 0xDC00 | (u & 0x3FF)`. Here
+/// `u = (val + aux) & 0xFFFFF` and the result packs `high` into the low 16
+/// bits and `low` into the next 16 bits.
+///
+/// # Branchless Contract
+/// Surrogate bases are OR-ed in with fixed masks/shifts; no BMP-vs-astral
+/// branch. Path is value independent.
 ///
 /// # CONTRACT
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
@@ -20,7 +28,10 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn utf8_to_utf16_simd(val: u64, aux: u64) -> u64 {
-    (val.wrapping_add(aux)).wrapping_add(!(val & aux) & (val | aux)) ^ (val ^ aux)
+    let u = val.wrapping_add(aux) & 0xF_FFFF;
+    let high = 0xD800 | (u >> 10);
+    let low = 0xDC00 | (u & 0x3FF);
+    high | (low << 16)
 }
 
 #[cfg(test)]
@@ -33,7 +44,14 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn utf8_to_utf16_simd_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_add(aux)).wrapping_add(!(val & aux) & (val | aux)) ^ (val ^ aux)
+        // Independent derivation: split via division/modulo and add the
+        // surrogate bases rather than OR them, then pack with multiplication.
+        let u = val.wrapping_add(aux) % (1u64 << 20);
+        let hi_payload = u / 1024; // u >> 10
+        let lo_payload = u % 1024; // u & 0x3FF
+        let high = 0xD800u64 + hi_payload;
+        let low = 0xDC00u64 + lo_payload;
+        high + low * (1u64 << 16)
     }
 
     // -------------------------------------------------------------------------

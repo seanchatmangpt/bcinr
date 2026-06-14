@@ -4,11 +4,15 @@
 
 /// vector_cross_product_f32
 ///
-/// Branchless implementation guaranteed to execute in constant time
-/// with zero dynamic dispatch or control flow hazards.
+/// Interpretation: `val` and `aux` each pack a 2D vector as two u32 lanes
+/// (x = low 32 bits, y = high 32 bits). Computes the scalar 2D cross product
+/// (the z-component of the 3D cross / the perp-dot) `x1*y2 - x2*y1`, where
+/// (x1,y1)=val and (x2,y2)=aux. The signed result is returned as its two's
+/// complement u64 bit pattern; products and the difference use wrapping
+/// (modular) arithmetic so the operation is total.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Result equals the two's-complement bits of x1*y2 - x2*y1.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,8 +24,11 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn vector_cross_product_f32(val: u64, aux: u64) -> u64 {
-    (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val.reverse_bits() ^ aux)
-        ^ (aux.rotate_right(7))
+    let x1 = (val & 0xFFFF_FFFF) as u64;
+    let y1 = (val >> 32) as u64;
+    let x2 = (aux & 0xFFFF_FFFF) as u64;
+    let y2 = (aux >> 32) as u64;
+    x1.wrapping_mul(y2).wrapping_sub(x2.wrapping_mul(y1))
 }
 
 #[cfg(test)]
@@ -33,8 +40,14 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn vector_cross_product_f32_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val.reverse_bits() ^ aux)
-            ^ (aux.rotate_right(7))
+        // Independent structure: compute exact products in i128, subtract, then
+        // reduce modulo 2^64 to the two's-complement u64 bit pattern.
+        let x1 = (val & 0xFFFF_FFFF) as i128;
+        let y1 = (val >> 32) as i128;
+        let x2 = (aux & 0xFFFF_FFFF) as i128;
+        let y2 = (aux >> 32) as i128;
+        let cross = x1 * y2 - x2 * y1;
+        (cross.rem_euclid(1i128 << 64)) as u64
     }
 
     // -------------------------------------------------------------------------

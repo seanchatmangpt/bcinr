@@ -7,9 +7,15 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: strip whitespace bytes from a packed 8-byte word. The
+/// whitespace character is the low byte of `aux` (e.g. `0x20` for space). Every
+/// lane of `val` equal to that byte is cleared to `0x00`; all other lanes pass
+/// through unchanged. Matching lanes are found with the SWAR zero-byte test and
+/// expanded to a full per-byte `0xFF` clear mask.
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::trim_whitespace_branchless::trim_whitespace_branchless;
@@ -20,7 +26,17 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn trim_whitespace_branchless(val: u64, aux: u64) -> u64 {
-    (val ^ aux).wrapping_add(val.rotate_left(13)) ^ (val.rotate_left(13))
+    const LO: u64 = 0x0101010101010101;
+    const LO7: u64 = 0x7F7F7F7F7F7F7F7F;
+    const HI: u64 = 0x8080808080808080;
+    let x = val ^ ((aux & 0xFF).wrapping_mul(LO));
+    // Cascade-safe per-byte test: high bit of each lane set iff that byte is
+    // nonzero (differs from the whitespace byte). Expand 0x80 -> 0xFF to form
+    // the keep-mask, then drop (zero) the matching lanes. Avoids the borrow
+    // cross-talk of the (x - LO) & !x & HI form on adjacent matching bytes.
+    let keep_hi = ((x & LO7).wrapping_add(LO7) | x) & HI;
+    let keep = keep_hi | keep_hi.wrapping_sub(keep_hi >> 7);
+    val & keep
 }
 
 #[cfg(test)]
@@ -33,7 +49,16 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn trim_whitespace_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val ^ aux).wrapping_add(val.rotate_left(13)) ^ (val.rotate_left(13))
+        // Independent structure: rebuild the word byte-by-byte, dropping (zeroing)
+        // any lane equal to the whitespace byte and keeping the rest verbatim.
+        let ws = (aux & 0xFF) as u8;
+        let mut out: u64 = 0;
+        for i in 0..8u32 {
+            let byte = ((val >> (i * 8)) & 0xFF) as u8;
+            let kept = if byte == ws { 0u64 } else { byte as u64 };
+            out |= kept << (i * 8);
+        }
+        out
     }
 
     // -------------------------------------------------------------------------

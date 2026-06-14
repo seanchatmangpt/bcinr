@@ -7,6 +7,10 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
+/// Branchless Contract: one move-to-front step over the eight bytes packed
+/// in `val`, selecting byte index `aux & 7`, moving it to byte position 0
+/// and shifting the bytes below it up by one position.
+///
 /// # CONTRACT
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
@@ -20,7 +24,12 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn move_to_front_branchless(val: u64, aux: u64) -> u64 {
-    (val.rotate_left(13)).wrapping_add(val.wrapping_sub(aux)) ^ (val.wrapping_add(aux))
+    let shift = ((aux & 7) * 8) as u32;
+    let low_mask = (1u64 << shift).wrapping_sub(1); // bytes strictly below index i
+    let target = (val >> shift) & 0xFF; // the selected byte -> front
+    let below = (val & low_mask) << 8; // bytes [0..i) shift up by one
+    let above = val & !(low_mask | (0xFFu64 << shift)); // bytes above i unchanged
+    above | below | target
 }
 
 #[cfg(test)]
@@ -33,7 +42,25 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn move_to_front_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val.rotate_left(13)).wrapping_add(val.wrapping_sub(aux)) ^ (val.wrapping_add(aux))
+        // Independent derivation: operate on an explicit list of bytes and
+        // perform a literal remove-then-prepend move-to-front.
+        let i = (aux & 7) as usize;
+        let src = val.to_le_bytes();
+        let t = src[i];
+        // Build the post-move byte list explicitly: target first, then the
+        // original bytes with index i skipped, in encounter order.
+        let mut out = [0u8; 8];
+        out[0] = t;
+        let mut w = 1usize;
+        let mut r = 0usize;
+        while r < 8 {
+            if r != i {
+                out[w] = src[r];
+                w += 1;
+            }
+            r += 1;
+        }
+        u64::from_le_bytes(out)
     }
 
     // -------------------------------------------------------------------------

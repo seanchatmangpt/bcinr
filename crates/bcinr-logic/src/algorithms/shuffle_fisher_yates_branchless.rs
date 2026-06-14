@@ -7,9 +7,15 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: a single Fisher-Yates step picks a swap partner at index
+/// `aux mod 64` and exchanges the working word with it; modelled on a 64-bit
+/// register this is a data-independent cyclic relocation of all bits by the
+/// drawn index — `val.rotate_left(aux mod 64)` — with the drawn index mixed
+/// back in via XOR so the swap source remains recoverable.
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::shuffle_fisher_yates_branchless::shuffle_fisher_yates_branchless;
@@ -20,8 +26,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn shuffle_fisher_yates_branchless(val: u64, aux: u64) -> u64 {
-    (aux.rotate_right(7)).wrapping_add(!(val & aux) & (val | aux))
-        ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+    val.rotate_left((aux & 63) as u32) ^ aux
 }
 
 #[cfg(test)]
@@ -33,8 +38,17 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn shuffle_fisher_yates_branchless_reference(val: u64, aux: u64) -> u64 {
-        (aux.rotate_right(7)).wrapping_add(!(val & aux) & (val | aux))
-            ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+        // Independent structure: realise the cyclic relocation by bit-by-bit
+        // repositioning in a loop instead of the intrinsic rotate, then fold in
+        // the drawn swap index.
+        let k = (aux & 63) as u32;
+        let mut rotated: u64 = 0;
+        for i in 0..64u32 {
+            let bit = (val >> i) & 1;
+            let dest = (i + k) % 64;
+            rotated |= bit << dest;
+        }
+        rotated ^ aux
     }
 
     // -------------------------------------------------------------------------

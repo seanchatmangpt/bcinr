@@ -16,12 +16,20 @@
 /// let result = perfect_hash_lookup_u32(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+///
+/// # Branchless Contract
+/// Interpretation: the query side of a CHD perfect hash. `val` is the key, `aux`
+/// is the displacement value fetched for the key's bucket. The final slot index is
+/// `g(val)` displaced by `aux`: a Fibonacci hash of the key XOR-combined with the
+/// displacement and re-mixed. The lower bits would be masked to the table size by
+/// the caller; here the full 64-bit displaced hash is returned.
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn perfect_hash_lookup_u32(val: u64, aux: u64) -> u64 {
-    (val.reverse_bits() ^ aux).wrapping_add(val.rotate_left(13))
-        ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+    let g = val.wrapping_mul(0x9E3779B97F4A7C15);
+    let displaced = g ^ aux.wrapping_mul(0x100000001B3);
+    (displaced ^ (displaced >> 29)).wrapping_add(aux)
 }
 
 #[cfg(test)]
@@ -33,8 +41,14 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn perfect_hash_lookup_u32_reference(val: u64, aux: u64) -> u64 {
-        (val.reverse_bits() ^ aux).wrapping_add(val.rotate_left(13))
-            ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+        // Same displaced-hash, recomposed with named intermediates and a
+        // separate xorshift step expressed as subtraction-free folding.
+        let key_hash = val.wrapping_mul(0x9E3779B97F4A7C15);
+        let disp = aux.wrapping_mul(0x100000001B3);
+        let combined = key_hash ^ disp;
+        let high = combined >> 29;
+        let avalanched = combined ^ high;
+        avalanched.wrapping_add(aux)
     }
 
     // -------------------------------------------------------------------------

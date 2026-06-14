@@ -16,12 +16,64 @@
 /// let result = siphash_2_4_branchless(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+///
+/// # Branchless Contract
+/// Interpretation: a real SipHash-2-4 over a single 8-byte message word `val`
+/// under the 128-bit key `(0, aux)`. The four state words are initialised with
+/// the standard SipHash IV constants, the message word is absorbed with two
+/// SipRounds (the "2"), the length/finalisation byte is mixed, and four more
+/// SipRounds (the "4") finalise the state. The 2 compression + 4 finalisation
+/// SipRounds are fully unrolled, giving a branchless constant-time MAC.
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn siphash_2_4_branchless(val: u64, aux: u64) -> u64 {
-    (val.rotate_left(13)).wrapping_add(val.reverse_bits() ^ aux)
-        ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+    let k0: u64 = 0;
+    let k1: u64 = aux;
+    let mut v0 = k0 ^ 0x736f6d6570736575;
+    let mut v1 = k1 ^ 0x646f72616e646f6d;
+    let mut v2 = k0 ^ 0x6c7967656e657261;
+    let mut v3 = k1 ^ 0x7465646279746573;
+
+    // absorb message word `val`
+    v3 ^= val;
+    // SipRound x2
+    sipround(&mut v0, &mut v1, &mut v2, &mut v3);
+    sipround(&mut v0, &mut v1, &mut v2, &mut v3);
+    v0 ^= val;
+
+    // finalisation block: top byte = message length (8)
+    let b: u64 = 8u64 << 56;
+    v3 ^= b;
+    sipround(&mut v0, &mut v1, &mut v2, &mut v3);
+    sipround(&mut v0, &mut v1, &mut v2, &mut v3);
+    v0 ^= b;
+
+    v2 ^= 0xff;
+    sipround(&mut v0, &mut v1, &mut v2, &mut v3);
+    sipround(&mut v0, &mut v1, &mut v2, &mut v3);
+    sipround(&mut v0, &mut v1, &mut v2, &mut v3);
+    sipround(&mut v0, &mut v1, &mut v2, &mut v3);
+
+    v0 ^ v1 ^ v2 ^ v3
+}
+
+#[inline]
+fn sipround(v0: &mut u64, v1: &mut u64, v2: &mut u64, v3: &mut u64) {
+    *v0 = v0.wrapping_add(*v1);
+    *v1 = v1.rotate_left(13);
+    *v1 ^= *v0;
+    *v0 = v0.rotate_left(32);
+    *v2 = v2.wrapping_add(*v3);
+    *v3 = v3.rotate_left(16);
+    *v3 ^= *v2;
+    *v0 = v0.wrapping_add(*v3);
+    *v3 = v3.rotate_left(21);
+    *v3 ^= *v0;
+    *v2 = v2.wrapping_add(*v1);
+    *v1 = v1.rotate_left(17);
+    *v1 ^= *v2;
+    *v2 = v2.rotate_left(32);
 }
 
 #[cfg(test)]
@@ -33,8 +85,42 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn siphash_2_4_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val.rotate_left(13)).wrapping_add(val.reverse_bits() ^ aux)
-            ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+        // SipHash-2-4 re-derived with a 4-element state array and a counted-loop
+        // SipRound, instead of four mutable scalars and unrolled calls.
+        fn round(s: &mut [u64; 4]) {
+            s[0] = s[0].wrapping_add(s[1]);
+            s[1] = s[1].rotate_left(13) ^ s[0];
+            s[0] = s[0].rotate_left(32);
+            s[2] = s[2].wrapping_add(s[3]);
+            s[3] = s[3].rotate_left(16) ^ s[2];
+            s[0] = s[0].wrapping_add(s[3]);
+            s[3] = s[3].rotate_left(21) ^ s[0];
+            s[2] = s[2].wrapping_add(s[1]);
+            s[1] = s[1].rotate_left(17) ^ s[2];
+            s[2] = s[2].rotate_left(32);
+        }
+        fn rounds(s: &mut [u64; 4], n: usize) {
+            for _ in 0..n {
+                round(s);
+            }
+        }
+        let (k0, k1) = (0u64, aux);
+        let mut s = [
+            k0 ^ 0x736f6d6570736575,
+            k1 ^ 0x646f72616e646f6d,
+            k0 ^ 0x6c7967656e657261,
+            k1 ^ 0x7465646279746573,
+        ];
+        s[3] ^= val;
+        rounds(&mut s, 2);
+        s[0] ^= val;
+        let b = 8u64 << 56;
+        s[3] ^= b;
+        rounds(&mut s, 2);
+        s[0] ^= b;
+        s[2] ^= 0xff;
+        rounds(&mut s, 4);
+        s[0] ^ s[1] ^ s[2] ^ s[3]
     }
 
     // -------------------------------------------------------------------------

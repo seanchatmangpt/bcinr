@@ -4,8 +4,16 @@
 
 /// varint_encode_simd
 ///
-/// Branchless implementation guaranteed to execute in constant time
-/// with zero dynamic dispatch or control flow hazards.
+/// LEB128 varint framing of a 56-bit payload `p = (val + aux) & 0x00FF_FFFF_FFFF_FFFF`
+/// in SIMD (8-lane) fixed-width form. The payload is split into eight 7-bit
+/// groups; group `i` is placed in output byte `i` and every byte except the
+/// most-significant (byte 7) gets its continuation bit `0x80` set. The result
+/// is the 8-byte LEB128 frame packed little-endian into a u64.
+///
+/// # Branchless Contract
+/// All eight 7-bit lanes are extracted and continuation-marked with a single
+/// fixed mask/shift pattern (no per-byte branches). The path is value
+/// independent.
 ///
 /// # CONTRACT
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
@@ -20,7 +28,26 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn varint_encode_simd(val: u64, aux: u64) -> u64 {
-    (val | aux).wrapping_add(val | aux) ^ (val.rotate_left(13))
+    let p = val.wrapping_add(aux) & 0x00FF_FFFF_FFFF_FFFF;
+    // Place each 7-bit group i into byte i (low 7 bits of the byte).
+    let g0 = p & 0x7F;
+    let g1 = (p >> 7) & 0x7F;
+    let g2 = (p >> 14) & 0x7F;
+    let g3 = (p >> 21) & 0x7F;
+    let g4 = (p >> 28) & 0x7F;
+    let g5 = (p >> 35) & 0x7F;
+    let g6 = (p >> 42) & 0x7F;
+    let g7 = (p >> 49) & 0x7F;
+    let bytes = g0
+        | (g1 << 8)
+        | (g2 << 16)
+        | (g3 << 24)
+        | (g4 << 32)
+        | (g5 << 40)
+        | (g6 << 48)
+        | (g7 << 56);
+    // Continuation bit 0x80 on every byte except the most-significant.
+    bytes | 0x0080_8080_8080_8080
 }
 
 #[cfg(test)]
@@ -33,7 +60,16 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn varint_encode_simd_reference(val: u64, aux: u64) -> u64 {
-        (val | aux).wrapping_add(val | aux) ^ (val.rotate_left(13))
+        // Independent derivation: build the frame byte-by-byte in a loop.
+        let p = val.wrapping_add(aux) & 0x00FF_FFFF_FFFF_FFFF;
+        let mut out: u64 = 0;
+        for i in 0..8u32 {
+            let group = ((p >> (7 * i)) & 0x7F) as u8;
+            let cont: u8 = if i < 7 { 0x80 } else { 0x00 };
+            let byte = (group | cont) as u64;
+            out |= byte << (8 * i);
+        }
+        out
     }
 
     // -------------------------------------------------------------------------

@@ -7,8 +7,11 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Computes a cuckoo filter's alternate bucket index using the
+/// partial-key trick: the fingerprint is the low byte of `val`, the primary bucket
+/// index is `aux`, and the alternate index is `aux XOR hash(fingerprint)` where the
+/// fingerprint is mixed with the golden-ratio constant.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,8 +23,10 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn cuckoo_filter_add_u64(val: u64, aux: u64) -> u64 {
-    (val.wrapping_add(aux)).wrapping_add((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-        ^ (val.leading_zeros() as u64 ^ aux)
+    let fingerprint = val & 0xFF;
+    let fp_hash = fingerprint.wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    // Alternate bucket index = primary index XOR hash(fingerprint).
+    aux ^ fp_hash
 }
 
 #[cfg(test)]
@@ -33,8 +38,15 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn cuckoo_filter_add_u64_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_add(aux)).wrapping_add((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-            ^ (val.leading_zeros() as u64 ^ aux)
+        // Independent derivation: extract the fingerprint as the lowest byte via
+        // a byte array, hash it with the golden-ratio multiplier, and apply the
+        // XOR displacement to the primary index using fold logic.
+        let fingerprint = val.to_le_bytes()[0] as u64;
+        let golden: u64 = 0x9E37_79B9_7F4A_7C15;
+        let hashed = fingerprint.wrapping_mul(golden);
+        let mut result = aux;
+        result ^= hashed;
+        result
     }
 
     // -------------------------------------------------------------------------

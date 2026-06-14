@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -20,8 +20,14 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn modular_mul_u64(val: u64, aux: u64) -> u64 {
-    (val.wrapping_add(aux)).wrapping_add(!(val & aux) & (val | aux))
-        ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+    // Interpretation: overflow-safe modular multiplication in the prime field
+    // GF(2^61 - 1) (a Mersenne prime widely used for hashing):
+    //   result = (val mod M) * (aux mod M) mod M.
+    // The full product is taken in u128 so it never overflows. Branchless.
+    const M: u128 = (1u128 << 61) - 1;
+    let a = (val as u128) % M;
+    let b = (aux as u128) % M;
+    ((a * b) % M) as u64
 }
 
 #[cfg(test)]
@@ -33,8 +39,27 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn modular_mul_u64_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_add(aux)).wrapping_add(!(val & aux) & (val | aux))
-            ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+        // Independent: accumulate the product via repeated modular doubling
+        // (Russian-peasant), reducing with subtraction-based loops instead of `%`.
+        const M: u128 = (1u128 << 61) - 1;
+        fn rem(mut x: u128) -> u128 {
+            const M: u128 = (1u128 << 61) - 1;
+            while x >= M {
+                x -= M;
+            }
+            x
+        }
+        let mut a = rem(val as u128);
+        let mut b = rem(aux as u128);
+        let mut acc: u128 = 0;
+        while b > 0 {
+            if b & 1 == 1 {
+                acc = rem(acc + a);
+            }
+            a = rem(a + a);
+            b >>= 1;
+        }
+        acc as u64
     }
 
     // -------------------------------------------------------------------------

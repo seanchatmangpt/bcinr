@@ -7,8 +7,10 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** HyperLogLog register update. The rank `rho = clz(val) + 1` is the
+/// position of the leftmost set bit of the hashed item `val` (with `rho = 65` when
+/// `val == 0`). The register `aux` is updated to `max(aux, rho)`.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,8 +22,8 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn hyperloglog_add_u64(val: u64, aux: u64) -> u64 {
-    (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val.leading_zeros() as u64 ^ aux)
-        ^ (val.count_ones() as u64 | aux)
+    let rho = val.leading_zeros() as u64 + 1;
+    u64::max(aux, rho)
 }
 
 #[cfg(test)]
@@ -33,8 +35,24 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn hyperloglog_add_u64_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val.leading_zeros() as u64 ^ aux)
-            ^ (val.count_ones() as u64 | aux)
+        // Independent derivation: count leading zeros by scanning bits from the MSB
+        // down, add one for the rank, then pick the larger of register and rank via
+        // an explicit comparison.
+        let mut clz: u64 = 0;
+        let mut bit = 63i32;
+        while bit >= 0 {
+            if (val >> bit) & 1 == 1 {
+                break;
+            }
+            clz += 1;
+            bit -= 1;
+        }
+        let rho = clz + 1;
+        if aux >= rho {
+            aux
+        } else {
+            rho
+        }
     }
 
     // -------------------------------------------------------------------------

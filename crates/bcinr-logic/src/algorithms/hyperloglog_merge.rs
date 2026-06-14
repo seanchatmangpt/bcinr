@@ -7,8 +7,10 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Merges two HyperLogLog registers `val` and `aux` by taking the
+/// elementwise maximum rank `max(val, aux)` (the union of two HLL registers keeps
+/// the larger rank at each register slot).
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,7 +22,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn hyperloglog_merge(val: u64, aux: u64) -> u64 {
-    (val.wrapping_sub(aux)).wrapping_add(aux.rotate_right(7)) ^ (val.count_ones() as u64 | aux)
+    u64::max(val, aux)
 }
 
 #[cfg(test)]
@@ -33,7 +35,11 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn hyperloglog_merge_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_sub(aux)).wrapping_add(aux.rotate_right(7)) ^ (val.count_ones() as u64 | aux)
+        // Independent derivation: select the maximum via an arithmetic mask built
+        // from the comparison, rather than calling u64::max.
+        let take_val = (val > aux) as u64;
+        let mask = take_val.wrapping_neg(); // all ones if val > aux, else zero
+        (val & mask) | (aux & !mask)
     }
 
     // -------------------------------------------------------------------------

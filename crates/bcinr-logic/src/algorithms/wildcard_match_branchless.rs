@@ -4,6 +4,12 @@
 
 /// wildcard_match_branchless
 ///
+/// Branchless Contract: tests whether `val` matches the all-zero pattern under
+/// the wildcard mask `aux`, where a set bit in `aux` marks a "don't care"
+/// position. The match holds iff every non-wildcard bit of `val` is zero, i.e.
+/// `(val & !aux) == 0`. Returns 1 on match and 0 otherwise, computed
+/// branchlessly by reducing the residual word to a 0/1 indicator.
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -20,9 +26,9 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn wildcard_match_branchless(val: u64, aux: u64) -> u64 {
-    ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-        .wrapping_add((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-        ^ (val.count_ones() as u64 | aux)
+    let residual = val & !aux;
+    // residual == 0  ->  1, else 0  (branchless: any set bit makes (x|-x)>>63 == 1)
+    1 ^ ((residual | residual.wrapping_neg()) >> 63)
 }
 
 #[cfg(test)]
@@ -34,9 +40,13 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn wildcard_match_branchless_reference(val: u64, aux: u64) -> u64 {
-        ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-            .wrapping_add((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-            ^ (val.count_ones() as u64 | aux)
+        // Independent derivation: explicit equality check on the masked residual.
+        let residual = val & !aux;
+        if residual == 0 {
+            1
+        } else {
+            0
+        }
     }
 
     // -------------------------------------------------------------------------

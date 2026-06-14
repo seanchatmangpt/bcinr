@@ -4,6 +4,12 @@
 
 /// xoroshiro128_plus
 ///
+/// Branchless Contract: implements the output function of Blackman & Vigna's
+/// xoroshiro128+ generator over the 128-bit state (s0 = `val`, s1 = `aux`).
+/// The returned value is the generator's output for that state, defined as
+/// `s0.wrapping_add(s1)` (the "+" scrambler). The result is produced with pure
+/// wrapping integer arithmetic and no control flow.
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -20,8 +26,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn xoroshiro128_plus(val: u64, aux: u64) -> u64 {
-    ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5)).wrapping_add(val | aux)
-        ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+    val.wrapping_add(aux)
 }
 
 #[cfg(test)]
@@ -33,8 +38,9 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn xoroshiro128_plus_reference(val: u64, aux: u64) -> u64 {
-        ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5)).wrapping_add(val | aux)
-            ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+        // Independent derivation: 128-bit add, discard the carry/high word.
+        let sum = (val as u128) + (aux as u128);
+        (sum & 0xFFFF_FFFF_FFFF_FFFF) as u64
     }
 
     // -------------------------------------------------------------------------

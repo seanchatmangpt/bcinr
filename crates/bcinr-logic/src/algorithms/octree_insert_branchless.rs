@@ -4,11 +4,15 @@
 
 /// octree_insert_branchless
 ///
-/// Branchless implementation guaranteed to execute in constant time
-/// with zero dynamic dispatch or control flow hazards.
+/// Interpretation: octree insertion locates a point by its 3D Morton (Z-order)
+/// code. `val` packs a point as three 21-bit coordinates: x = bits[0..21],
+/// y = bits[21..42], z = bits[42..63]. The bits of x, y, z are interleaved to
+/// form the 63-bit Morton code (the octree path). `aux` gives an insertion
+/// depth `d = (aux & 31)` capped at 21 levels; the code is masked to the top
+/// `3*d` bits actually used at that depth (low bits truncated).
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Result is the depth-masked 3D Morton interleave of val's lanes.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,9 +24,26 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn octree_insert_branchless(val: u64, aux: u64) -> u64 {
-    (val.reverse_bits() ^ aux)
-        .wrapping_add((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-        ^ (val.reverse_bits() ^ aux)
+    // Spread the low 21 bits of `c` so each occupies every third bit position.
+    fn spread3(c: u64) -> u64 {
+        let mut x = c & 0x1F_FFFF; // 21 bits
+        x = (x | (x << 32)) & 0x1F00000000FFFF;
+        x = (x | (x << 16)) & 0x1F0000FF0000FF;
+        x = (x | (x << 8)) & 0x100F00F00F00F00F;
+        x = (x | (x << 4)) & 0x10C30C30C30C30C3;
+        x = (x | (x << 2)) & 0x1249249249249249;
+        x
+    }
+    let x = val & 0x1F_FFFF;
+    let y = (val >> 21) & 0x1F_FFFF;
+    let z = (val >> 42) & 0x1F_FFFF;
+    let morton = spread3(x) | (spread3(y) << 1) | (spread3(z) << 2);
+    // Depth mask: keep the top 3*d code bits used at depth d (cap 21).
+    let d = u64::min(aux & 31, 21) as u32;
+    let keep = (d * 3) as u64;
+    let shift = 63u64.wrapping_sub(keep);
+    // Mask off the low (63-3d) bits; when d==0 the whole code clears.
+    (morton >> shift) << shift
 }
 
 #[cfg(test)]
@@ -34,9 +55,24 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn octree_insert_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val.reverse_bits() ^ aux)
-            .wrapping_add((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-            ^ (val.reverse_bits() ^ aux)
+        // Independent structure: bit-by-bit interleave via an explicit loop,
+        // then clear low bits below the depth cut.
+        let x = val & 0x1F_FFFF;
+        let y = (val >> 21) & 0x1F_FFFF;
+        let z = (val >> 42) & 0x1F_FFFF;
+        let mut morton: u64 = 0;
+        for i in 0..21 {
+            morton |= ((x >> i) & 1) << (3 * i);
+            morton |= ((y >> i) & 1) << (3 * i + 1);
+            morton |= ((z >> i) & 1) << (3 * i + 2);
+        }
+        let d = (aux & 31).min(21) as u32;
+        let shift = 63u32 - d * 3;
+        if shift >= 64 {
+            0
+        } else {
+            (morton >> shift) << shift
+        }
     }
 
     // -------------------------------------------------------------------------

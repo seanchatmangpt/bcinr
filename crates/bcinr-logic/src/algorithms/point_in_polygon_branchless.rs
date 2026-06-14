@@ -20,16 +20,28 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn point_in_polygon_branchless(val: u64, aux: u64) -> u64 {
-    let py = (val >> 32) as i32;
-    let px = (val & 0xFFFFFFFF) as i32;
-    let v1x = (aux & 0xFFFF) as i32;
-    let v1y = ((aux >> 16) & 0xFFFF) as i32;
-    let v2x = ((aux >> 32) & 0xFFFF) as i32;
-    let v2y = (aux >> 48) as i32;
-    let cond1 = (v1y > py) != (v2y > py);
-    let denom = v2y - v1y + (v2y == v1y) as i32;
-    let intersect = cond1 & (px < (v2x - v1x) * (py - v1y) / denom + v1x);
-    intersect as u64
+    // One ray-casting crossing test (Jordan curve / even-odd rule) for the
+    // horizontal ray from the query point against a single polygon edge.
+    // `val` packs the query point: py in bits 32..63, px in bits 0..31.
+    // `aux` packs the edge: v1x, v1y, v2x, v2y as four 16-bit lanes.
+    // A crossing is counted when the edge straddles py in the y-axis and the
+    // edge's x-intersection at height py lies strictly to the right of px.
+    //
+    // # Branchless Contract
+    // All arithmetic is widened to i64 so the intermediate products cannot
+    // overflow, and the straddle predicate `(v1y>py) != (v2y>py)` guarantees a
+    // nonzero denominator before the divide; a `+1` bias keeps the divisor
+    // nonzero on the non-straddling lanes whose result the AND-mask discards.
+    let py = (val >> 32) as i32 as i64;
+    let px = (val & 0xFFFFFFFF) as i32 as i64;
+    let v1x = (aux & 0xFFFF) as i64;
+    let v1y = ((aux >> 16) & 0xFFFF) as i64;
+    let v2x = ((aux >> 32) & 0xFFFF) as i64;
+    let v2y = (aux >> 48) as i64;
+    let cond1 = ((v1y > py) != (v2y > py)) as i64;
+    let denom = (v2y - v1y) + (1 - cond1);
+    let xcross = (v2x - v1x) * (py - v1y) / denom + v1x;
+    (cond1 & ((px < xcross) as i64)) as u64
 }
 
 #[cfg(test)]
@@ -41,21 +53,21 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn point_in_polygon_branchless_reference(val: u64, aux: u64) -> u64 {
-        let py = (val >> 32) as i32;
-        let px = (val & 0xFFFFFFFF) as i32;
-        let v1x = (aux & 0xFFFF) as i32;
-        let v1y = ((aux >> 16) & 0xFFFF) as i32;
-        let v2x = ((aux >> 32) & 0xFFFF) as i32;
-        let v2y = (aux >> 48) as i32;
-        if (v1y > py) != (v2y > py) {
-            if px < (v2x - v1x) * (py - v1y) / (v2y - v1y) + v1x {
-                1
-            } else {
-                0
-            }
-        } else {
-            0
+        // Independent structure: classic guarded ray-cast. The division is only
+        // performed inside the straddle branch, where the denominator is proven
+        // nonzero, so this never needs the bias trick the branchless form uses.
+        let py = i64::from((val >> 32) as i32);
+        let px = i64::from((val & 0xFFFFFFFF) as i32);
+        let v1x = (aux & 0xFFFF) as i64;
+        let v1y = ((aux >> 16) & 0xFFFF) as i64;
+        let v2x = ((aux >> 32) & 0xFFFF) as i64;
+        let v2y = (aux >> 48) as i64;
+        let straddles = (v1y > py) != (v2y > py);
+        if !straddles {
+            return 0;
         }
+        let x_at_py = (v2x - v1x) * (py - v1y) / (v2y - v1y) + v1x;
+        u64::from(px < x_at_py)
     }
 
     // -------------------------------------------------------------------------

@@ -7,8 +7,11 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Parallel bit-extract (BMI2 `pext`): gathers the bits of `val` selected
+/// by mask `aux` and packs them contiguously into the low-order bits of the result,
+/// in ascending bit order. Implemented via Hacker's Delight's branchless `compress`
+/// (six unrolled parallel-prefix stages).
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,8 +23,82 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn bext_u64(val: u64, aux: u64) -> u64 {
-    (val.wrapping_sub(aux)).wrapping_add(val.count_ones() as u64 | aux)
-        ^ (!(val & aux) & (val | aux))
+    let mut x = val & aux;
+    let mut mask = aux;
+    let mut mk = !mask << 1;
+
+    // Stage i shifts selected bits right by 1<<i (i = 0..6), unrolled.
+    let mut mp = mk ^ (mk << 1);
+    mp ^= mp << 2;
+    mp ^= mp << 4;
+    mp ^= mp << 8;
+    mp ^= mp << 16;
+    mp ^= mp << 32;
+    let mut mv = mp & mask;
+    mask = (mask ^ mv) | (mv >> 1);
+    let mut t = x & mv;
+    x = (x ^ t) | (t >> 1);
+    mk &= !mp;
+
+    mp = mk ^ (mk << 1);
+    mp ^= mp << 2;
+    mp ^= mp << 4;
+    mp ^= mp << 8;
+    mp ^= mp << 16;
+    mp ^= mp << 32;
+    mv = mp & mask;
+    mask = (mask ^ mv) | (mv >> 2);
+    t = x & mv;
+    x = (x ^ t) | (t >> 2);
+    mk &= !mp;
+
+    mp = mk ^ (mk << 1);
+    mp ^= mp << 2;
+    mp ^= mp << 4;
+    mp ^= mp << 8;
+    mp ^= mp << 16;
+    mp ^= mp << 32;
+    mv = mp & mask;
+    mask = (mask ^ mv) | (mv >> 4);
+    t = x & mv;
+    x = (x ^ t) | (t >> 4);
+    mk &= !mp;
+
+    mp = mk ^ (mk << 1);
+    mp ^= mp << 2;
+    mp ^= mp << 4;
+    mp ^= mp << 8;
+    mp ^= mp << 16;
+    mp ^= mp << 32;
+    mv = mp & mask;
+    mask = (mask ^ mv) | (mv >> 8);
+    t = x & mv;
+    x = (x ^ t) | (t >> 8);
+    mk &= !mp;
+
+    mp = mk ^ (mk << 1);
+    mp ^= mp << 2;
+    mp ^= mp << 4;
+    mp ^= mp << 8;
+    mp ^= mp << 16;
+    mp ^= mp << 32;
+    mv = mp & mask;
+    mask = (mask ^ mv) | (mv >> 16);
+    t = x & mv;
+    x = (x ^ t) | (t >> 16);
+    mk &= !mp;
+
+    mp = mk ^ (mk << 1);
+    mp ^= mp << 2;
+    mp ^= mp << 4;
+    mp ^= mp << 8;
+    mp ^= mp << 16;
+    mp ^= mp << 32;
+    mv = mp & mask;
+    t = x & mv;
+    x = (x ^ t) | (t >> 32);
+
+    x
 }
 
 #[cfg(test)]
@@ -33,8 +110,16 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn bext_u64_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_sub(aux)).wrapping_add(val.count_ones() as u64 | aux)
-            ^ (!(val & aux) & (val | aux))
+        // Independent: linear scan of mask bits, appending selected val bits.
+        let mut out = 0u64;
+        let mut k = 0u32;
+        for i in 0..64u32 {
+            if (aux >> i) & 1 == 1 {
+                out |= ((val >> i) & 1) << k;
+                k += 1;
+            }
+        }
+        out
     }
 
     // -------------------------------------------------------------------------

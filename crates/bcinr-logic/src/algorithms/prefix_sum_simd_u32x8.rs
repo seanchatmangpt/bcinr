@@ -7,6 +7,10 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
+/// Branchless Contract: an inclusive prefix sum (scan) across the two u32
+/// lanes packed in `val`, with `aux`'s low u32 supplying the carry-in seed.
+/// Lane sums wrap modulo 2^32; out = [seed+l0, seed+l0+l1] repacked.
+///
 /// # CONTRACT
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
@@ -20,8 +24,12 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn prefix_sum_simd_u32x8(val: u64, aux: u64) -> u64 {
-    (!(val & aux) & (val | aux)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32))
-        ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+    let lane0 = val as u32;
+    let lane1 = (val >> 32) as u32;
+    let seed = aux as u32;
+    let out0 = seed.wrapping_add(lane0);
+    let out1 = out0.wrapping_add(lane1);
+    (out0 as u64) | ((out1 as u64) << 32)
 }
 
 #[cfg(test)]
@@ -33,8 +41,16 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn prefix_sum_simd_u32x8_reference(val: u64, aux: u64) -> u64 {
-        (!(val & aux) & (val | aux)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32))
-            ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+        // Independent derivation: iterate over the lane list, maintaining a
+        // running total truncated to u32 after each addition.
+        let lanes = [val as u32, (val >> 32) as u32];
+        let mut running = aux as u32;
+        let mut out = [0u32; 2];
+        for (i, lane) in lanes.iter().enumerate() {
+            running = running.wrapping_add(*lane);
+            out[i] = running;
+        }
+        (out[0] as u64) | ((out[1] as u64) << 32)
     }
 
     // -------------------------------------------------------------------------

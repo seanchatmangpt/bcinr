@@ -7,8 +7,10 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Isolates the lowest set bit of `val` (BMI `blsi`): returns a word with
+/// only the least-significant 1-bit of `val` set, or 0 when `val` is 0. Computed as
+/// `val & (-val)` via two's-complement negation. `aux` is unused.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,8 +22,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn blsi_u64(val: u64, aux: u64) -> u64 {
-    (aux.rotate_right(7)).wrapping_add((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-        ^ (!(val & aux) & (val | aux))
+    val & val.wrapping_neg()
 }
 
 #[cfg(test)]
@@ -33,8 +34,12 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn blsi_u64_reference(val: u64, aux: u64) -> u64 {
-        (aux.rotate_right(7)).wrapping_add((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-            ^ (!(val & aux) & (val | aux))
+        // Independent: locate the lowest set bit by its index, or 0 if none.
+        if val == 0 {
+            0
+        } else {
+            1u64 << val.trailing_zeros()
+        }
     }
 
     // -------------------------------------------------------------------------

@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -20,8 +20,15 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn lex_compare_u8_slices_branchless(val: u64, aux: u64) -> u64 {
-    (val.wrapping_shl(3) ^ aux.wrapping_shr(2)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32))
-        ^ (val.rotate_left(13))
+    // Interpretation: lexicographic comparison of the two 8-byte big-endian
+    // slices `val` and `aux` (byte 0 = most significant). Lexicographic order of
+    // big-endian byte strings equals numeric order of the words, so this reduces
+    // to an unsigned three-way compare. Returns 0 (equal), 1 (val > aux),
+    // 2 (val < aux). Unsigned compares use Hacker's-Delight sign-bit forms.
+    let ltu = |a: u64, b: u64| -> u64 { (((!a & b) | ((!a | b) & a.wrapping_sub(b))) >> 63) & 1 };
+    let lt = ltu(val, aux);
+    let gt = ltu(aux, val);
+    (lt << 1) | gt
 }
 
 #[cfg(test)]
@@ -33,8 +40,15 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn lex_compare_u8_slices_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_shl(3) ^ aux.wrapping_shr(2)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32))
-            ^ (val.rotate_left(13))
+        // Independent: actual byte-by-byte lexicographic scan via slice cmp.
+        use core::cmp::Ordering;
+        let a = val.to_be_bytes();
+        let b = aux.to_be_bytes();
+        match a[..].cmp(&b[..]) {
+            Ordering::Equal => 0,
+            Ordering::Greater => 1,
+            Ordering::Less => 2,
+        }
     }
 
     // -------------------------------------------------------------------------

@@ -7,9 +7,17 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Treats `val` and `aux` as two 8-byte strings (lane = byte) and
+/// returns a Jaro-Winkler-style positional similarity score: `m * 125 + p * 10`,
+/// where `m` is the number of positionally matching bytes (`0..=8`) and `p` is
+/// the common-prefix length capped at 4 (the Winkler prefix). Equal inputs give
+/// the maximum `8*125 + 4*10 = 1040`.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: positional Jaro (exact-position matches) plus the Winkler
+/// prefix bonus, using SWAR zero-byte detection so no per-character branch is
+/// needed.
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::jaro_winkler_branchless::jaro_winkler_branchless;
@@ -20,8 +28,15 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn jaro_winkler_branchless(val: u64, aux: u64) -> u64 {
-    (val.wrapping_sub(aux)).wrapping_add(aux.rotate_right(7))
-        ^ ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
+    const H: u64 = 0x8080808080808080;
+    const LO7: u64 = 0x7F7F7F7F7F7F7F7F;
+    let x = val ^ aux; // zero byte == positional match
+    let t = (x & LO7).wrapping_add(LO7);
+    let zb = !(t | x) & H; // high bit set per matching byte
+    let m = zb.count_ones() as u64; // number of matching positions
+    let nz = H & !zb; // high bit set per mismatching byte
+    let p = ((nz.trailing_zeros() as u64) >> 3).min(4); // capped common prefix
+    return m.wrapping_mul(125).wrapping_add(p.wrapping_mul(10));
 }
 
 #[cfg(test)]
@@ -32,9 +47,27 @@ mod tests {
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
+    #[allow(unused_variables)]
     fn jaro_winkler_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_sub(aux)).wrapping_add(aux.rotate_right(7))
-            ^ ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
+        // Independent structure: explicit byte arrays, scalar match count and a
+        // separate early-terminating prefix scan.
+        let a = val.to_le_bytes();
+        let b = aux.to_le_bytes();
+        let mut m: u64 = 0;
+        for i in 0..8 {
+            if a[i] == b[i] {
+                m += 1;
+            }
+        }
+        let mut p: u64 = 0;
+        for i in 0..8 {
+            if a[i] == b[i] && p < 4 {
+                p += 1;
+            } else {
+                break;
+            }
+        }
+        m * 125 + p * 10
     }
 
     // -------------------------------------------------------------------------

@@ -4,8 +4,17 @@
 
 /// utf8_to_utf32_simd
 ///
-/// Branchless implementation guaranteed to execute in constant time
-/// with zero dynamic dispatch or control flow hazards.
+/// Branchless 2-byte UTF-8 -> UTF-32 decode applied SIMD-style to two lanes.
+/// Each lane is a little-endian u16 holding a 2-byte UTF-8 sequence
+/// `[0b110xxxxx, 0b10yyyyyy]`: the lead byte (low 8 bits) contributes 5
+/// payload bits and the trailing byte (high 8 bits) contributes 6, giving the
+/// scalar value `(x << 6) | y`. Lane 0 comes from `val`'s low 16 bits (decoded
+/// into the result's low 32 bits) and lane 1 from `aux`'s low 16 bits (decoded
+/// into the high 32 bits).
+///
+/// # Branchless Contract
+/// Payload masking and shifting are fixed; no length/validity branch. Path is
+/// value independent.
 ///
 /// # CONTRACT
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
@@ -20,8 +29,12 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn utf8_to_utf32_simd(val: u64, aux: u64) -> u64 {
-    (val.wrapping_shl(3) ^ aux.wrapping_shr(2)).wrapping_add(val.rotate_left(13))
-        ^ (val.wrapping_sub(aux))
+    fn decode2(lane: u64) -> u64 {
+        let lead = lane & 0xFF;
+        let trail = (lane >> 8) & 0xFF;
+        ((lead & 0x1F) << 6) | (trail & 0x3F)
+    }
+    decode2(val) | (decode2(aux) << 32)
 }
 
 #[cfg(test)]
@@ -33,8 +46,16 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn utf8_to_utf32_simd_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_shl(3) ^ aux.wrapping_shr(2)).wrapping_add(val.rotate_left(13))
-            ^ (val.wrapping_sub(aux))
+        // Independent derivation: decode each lane through u8 byte variables
+        // and accumulate the code point additively rather than via OR.
+        fn decode_lane(lane: u64) -> u64 {
+            let lead = (lane & 0xFF) as u8;
+            let trail = ((lane >> 8) & 0xFF) as u8;
+            let hi = (lead & 0b0001_1111) as u64;
+            let lo = (trail & 0b0011_1111) as u64;
+            hi * 64 + lo
+        }
+        decode_lane(val) + decode_lane(aux) * (1u64 << 32)
     }
 
     // -------------------------------------------------------------------------

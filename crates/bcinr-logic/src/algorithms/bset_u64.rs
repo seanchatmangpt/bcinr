@@ -16,12 +16,14 @@
 /// let result = bset_u64(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn bset_u64(val: u64, aux: u64) -> u64 {
-    (!(val & aux) & (val | aux)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32))
-        ^ (aux.rotate_right(7))
+    // Branchless Contract: set the bit at index (aux & 63) in `val`, returning
+    // the updated word. Pure OR with a shifted 1; no control flow.
+    val | (1u64 << (aux & 63))
 }
 
 #[cfg(test)]
@@ -33,8 +35,9 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn bset_u64_reference(val: u64, aux: u64) -> u64 {
-        (!(val & aux) & (val | aux)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32))
-            ^ (aux.rotate_right(7))
+        // Independent: rotate a single set bit into position, then OR it in.
+        let bit = 1u64.rotate_left((aux & 63) as u32);
+        val | bit
     }
 
     // -------------------------------------------------------------------------

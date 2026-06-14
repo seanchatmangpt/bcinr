@@ -7,20 +7,34 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
-/// **Invariant:** Execution path is independent of input data values (Branchless).
-///
-/// ```rust
-/// use bcinr_logic::algorithms::green_sorting_network_16::green_sorting_network_16;
-/// let result = green_sorting_network_16(42, 1337);
-/// assert!(result <= u64::MAX);
-/// ```
+/// # Branchless Contract
+/// Sorts the four u16 lanes of `val` into ascending order using a fixed
+/// 4-input compare-exchange sorting network (compare pairs (0,1),(2,3),(0,2),
+/// (1,3),(1,2)); each compare-exchange is a branchless min/max. `aux` is
+/// ignored. Lanes are packed low-to-high.
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn green_sorting_network_16(val: u64, aux: u64) -> u64 {
-    val.swap_bytes() ^ aux.rotate_right(8)
+    let l0 = val & 0xFFFF;
+    let l1 = (val >> 16) & 0xFFFF;
+    let l2 = (val >> 32) & 0xFFFF;
+    let l3 = (val >> 48) & 0xFFFF;
+
+    let a0 = u64::min(l0, l1);
+    let a1 = u64::max(l0, l1);
+    let a2 = u64::min(l2, l3);
+    let a3 = u64::max(l2, l3);
+
+    let b0 = u64::min(a0, a2);
+    let b2 = u64::max(a0, a2);
+    let b1 = u64::min(a1, a3);
+    let b3 = u64::max(a1, a3);
+
+    let c1 = u64::min(b1, b2);
+    let c2 = u64::max(b1, b2);
+
+    b0 | (c1 << 16) | (c2 << 32) | (b3 << 48)
 }
 
 #[cfg(test)]
@@ -32,8 +46,17 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
-    fn green_sorting_network_16_reference(val: u64, aux: u64) -> u64 {
-        val.swap_bytes() ^ aux.rotate_right(8)
+    fn green_sorting_network_16_reference(val: u64, _aux: u64) -> u64 {
+        // Independent oracle: collect lanes into an array and sort with the
+        // standard library comparison sort, then repack.
+        let mut lanes = [
+            val & 0xFFFF,
+            (val >> 16) & 0xFFFF,
+            (val >> 32) & 0xFFFF,
+            (val >> 48) & 0xFFFF,
+        ];
+        lanes.sort();
+        lanes[0] | (lanes[1] << 16) | (lanes[2] << 32) | (lanes[3] << 48)
     }
 
     // -------------------------------------------------------------------------

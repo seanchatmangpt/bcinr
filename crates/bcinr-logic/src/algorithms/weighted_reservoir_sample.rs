@@ -8,7 +8,14 @@
 /// with zero dynamic dispatch or control flow hazards.
 ///
 /// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Branchless Contract:** Efraimidis-Spirakis A-Res weighted-reservoir
+/// priority key for an item of weight `val` given uniform random draw `aux`.
+/// The real-valued key is `u^(1/w)`, which increases monotonically with the
+/// weight `w`. In the integer domain we use the order-preserving analogue
+/// `key = u64::MAX - (R / w)`, where `R` is the random draw and `w = val | 1`
+/// (forced non-zero). A heavier weight shrinks `R / w`, raising the key, so the
+/// reservoir step that keeps the maximum key over the stream selects items with
+/// probability proportional to their weight.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,7 +27,8 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn weighted_reservoir_sample(val: u64, aux: u64) -> u64 {
-    (val.wrapping_shl(3) ^ aux.wrapping_shr(2)).wrapping_add(aux.rotate_right(7)) ^ (val & aux)
+    let w = val | 1;
+    u64::MAX - (aux / w)
 }
 
 #[cfg(test)]
@@ -33,7 +41,12 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn weighted_reservoir_sample_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_shl(3) ^ aux.wrapping_shr(2)).wrapping_add(aux.rotate_right(7)) ^ (val & aux)
+        // Complement the weighted quotient: invert all bits of (R / w) and add
+        // one to obtain u64::MAX - (R / w) via two's-complement identity.
+        let w = val | 1;
+        let quotient = aux / w;
+        // u64::MAX - q == !q  (bitwise complement), derived independently.
+        !quotient
     }
 
     // -------------------------------------------------------------------------

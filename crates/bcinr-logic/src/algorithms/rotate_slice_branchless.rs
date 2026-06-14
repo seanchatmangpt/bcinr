@@ -16,11 +16,15 @@
 /// let result = rotate_slice_branchless(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+///
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn rotate_slice_branchless(val: u64, aux: u64) -> u64 {
-    (val.wrapping_sub(aux)).wrapping_add(aux.rotate_right(7)) ^ (val & aux)
+    // Branchless Contract: cyclic rotation of the full 64-bit slice left by
+    // `aux & 63` positions. Bits shifted off the top re-enter at the bottom.
+    val.rotate_left((aux & 63) as u32)
 }
 
 #[cfg(test)]
@@ -33,7 +37,14 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn rotate_slice_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_sub(aux)).wrapping_add(aux.rotate_right(7)) ^ (val & aux)
+        // Independent derivation: compose the rotation from two shifts and an OR
+        // rather than the intrinsic, handling the zero-shift case explicitly.
+        let s = (aux % 64) as u32;
+        if s == 0 {
+            val
+        } else {
+            (val << s) | (val >> (64 - s))
+        }
     }
 
     // -------------------------------------------------------------------------

@@ -16,11 +16,18 @@
 /// let result = succinct_bit_vector_rank(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+///
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn succinct_bit_vector_rank(val: u64, aux: u64) -> u64 {
-    (val | aux).wrapping_add(aux.rotate_right(7)) ^ (!(val & aux) & (val | aux))
+    // Branchless Contract: succinct bit-vector rank. Counts the set bits of `val` strictly below
+    // bit position `aux & 63` (the rank of that position), via a masked
+    // population count over the low-order prefix.
+    let p = (aux & 63) as u32;
+    let prefix = (1u64 << p).wrapping_sub(1);
+    (val & prefix).count_ones() as u64
 }
 
 #[cfg(test)]
@@ -33,7 +40,17 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn succinct_bit_vector_rank_reference(val: u64, aux: u64) -> u64 {
-        (val | aux).wrapping_add(aux.rotate_right(7)) ^ (!(val & aux) & (val | aux))
+        // Independent derivation: serial scan counting set bits strictly below
+        // position `aux & 63` (test-only loop), structurally distinct from the
+        // masked population count used by the impl.
+        let p = (aux % 64) as u32;
+        let mut count: u64 = 0;
+        let mut i: u32 = 0;
+        while i < p {
+            count += (val >> i) & 1;
+            i += 1;
+        }
+        count
     }
 
     // -------------------------------------------------------------------------

@@ -7,6 +7,9 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
+/// Branchless Contract: computes modular subtraction in Z/2^64, i.e.
+/// (val - aux) mod 2^64 via two's-complement wrapping.
+///
 /// # CONTRACT
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
@@ -20,7 +23,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn modular_sub_u64(val: u64, aux: u64) -> u64 {
-    (val.wrapping_sub(aux)).wrapping_add(val & aux) ^ (val ^ aux)
+    val.wrapping_sub(aux)
 }
 
 #[cfg(test)]
@@ -33,7 +36,10 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn modular_sub_u64_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_sub(aux)).wrapping_add(val & aux) ^ (val ^ aux)
+        // Independent derivation: subtract via 128-bit arithmetic with an
+        // explicit borrow, then reduce modulo 2^64.
+        let diff = (val as i128) - (aux as i128);
+        diff.rem_euclid(1i128 << 64) as u64
     }
 
     // -------------------------------------------------------------------------

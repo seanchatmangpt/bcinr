@@ -7,8 +7,10 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Applies the identity bit-permutation: every bit `i` of `val` maps to
+/// position `i`, so the result equals `val`. `aux` is the permutation-control word and
+/// is unused because the identity permutation moves no bits.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,8 +22,8 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn bit_permute_identity_64(val: u64, aux: u64) -> u64 {
-    (val.wrapping_shl(3) ^ aux.wrapping_shr(2)).wrapping_add(val.rotate_left(13))
-        ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+    // Identity permutation: bit i maps to position i, so the word is returned unchanged.
+    val.rotate_left(0)
 }
 
 #[cfg(test)]
@@ -33,8 +35,12 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn bit_permute_identity_64_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_shl(3) ^ aux.wrapping_shr(2)).wrapping_add(val.rotate_left(13))
-            ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+        // Independent: relocate each bit to its own (identity-mapped) position.
+        let mut out = 0u64;
+        for i in 0..64u32 {
+            out |= ((val >> i) & 1) << i;
+        }
+        out
     }
 
     // -------------------------------------------------------------------------

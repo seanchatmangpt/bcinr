@@ -16,11 +16,51 @@
 /// let result = median9_u32(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+///
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn median9_u32(val: u64, aux: u64) -> u64 {
-    (val.rotate_left(13)).wrapping_add(val.reverse_bits() ^ aux) ^ (val.count_ones() as u64 | aux)
+    // Median of nine byte values: the eight bytes of `val` plus the low byte
+    // of `aux`. Median = the element of stable rank 4 (the 5th smallest).
+    // Each byte's stable rank is computed branchlessly (no loops) and the
+    // value whose rank is exactly 4 is selected via a mask.
+    let b = [
+        val & 0xFF,
+        (val >> 8) & 0xFF,
+        (val >> 16) & 0xFF,
+        (val >> 24) & 0xFF,
+        (val >> 32) & 0xFF,
+        (val >> 40) & 0xFF,
+        (val >> 48) & 0xFF,
+        (val >> 56) & 0xFF,
+        aux & 0xFF,
+    ];
+    let lt = |x: u64, y: u64| -> u64 { (x < y) as u64 };
+    let eqe = |j: usize, i: usize, x: u64, y: u64| -> u64 { ((x == y) as u64) & ((j < i) as u64) };
+    let rank = |i: usize| -> u64 {
+        lt(b[0], b[i])
+            + lt(b[1], b[i])
+            + lt(b[2], b[i])
+            + lt(b[3], b[i])
+            + lt(b[4], b[i])
+            + lt(b[5], b[i])
+            + lt(b[6], b[i])
+            + lt(b[7], b[i])
+            + lt(b[8], b[i])
+            + eqe(0, i, b[0], b[i])
+            + eqe(1, i, b[1], b[i])
+            + eqe(2, i, b[2], b[i])
+            + eqe(3, i, b[3], b[i])
+            + eqe(4, i, b[4], b[i])
+            + eqe(5, i, b[5], b[i])
+            + eqe(6, i, b[6], b[i])
+            + eqe(7, i, b[7], b[i])
+            + eqe(8, i, b[8], b[i])
+    };
+    let pick = |i: usize| -> u64 { b[i] * ((rank(i) == 4) as u64) };
+    pick(0) + pick(1) + pick(2) + pick(3) + pick(4) + pick(5) + pick(6) + pick(7) + pick(8)
 }
 
 #[cfg(test)]
@@ -32,8 +72,21 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn median9_u32_reference(val: u64, aux: u64) -> u64 {
-        (val.rotate_left(13)).wrapping_add(val.reverse_bits() ^ aux)
-            ^ (val.count_ones() as u64 | aux)
+        // Independent oracle: gather the nine bytes, sort them with the
+        // standard library, and return the middle (index-4) element.
+        let mut b = [
+            val & 0xFF,
+            (val >> 8) & 0xFF,
+            (val >> 16) & 0xFF,
+            (val >> 24) & 0xFF,
+            (val >> 32) & 0xFF,
+            (val >> 40) & 0xFF,
+            (val >> 48) & 0xFF,
+            (val >> 56) & 0xFF,
+            aux & 0xFF,
+        ];
+        b.sort();
+        b[4]
     }
 
     // -------------------------------------------------------------------------

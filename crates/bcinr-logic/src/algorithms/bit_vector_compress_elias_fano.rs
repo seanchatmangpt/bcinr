@@ -7,8 +7,13 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Elias-Fano split-encode of a single value `val` with low-bucket width
+/// `w = aux & 63`. The value is split into its low `w` bits (`lo`, stored verbatim) and
+/// its high part (`hi = val >> w`, stored as a single unary bucket marker). The codeword
+/// is `lo | (1 << (w + hi_capped))`, where `hi_capped = min(hi, 63 - w)` keeps the marker
+/// inside the 64-bit word. This is the per-value low/high decomposition at the heart of
+/// the Elias-Fano compressed bit-vector layout.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,8 +25,12 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn bit_vector_compress_elias_fano(val: u64, aux: u64) -> u64 {
-    (!(val & aux) & (val | aux)).wrapping_add(val | aux)
-        ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+    let w = (aux & 63) as u32;
+    let lo_mask = (1u64 << w).wrapping_sub(1);
+    let lo = val & lo_mask;
+    let hi = val >> w;
+    let hi_capped = u64::min(hi, (63 - w) as u64);
+    lo | (1u64 << (w + hi_capped as u32))
 }
 
 #[cfg(test)]
@@ -33,8 +42,13 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn bit_vector_compress_elias_fano_reference(val: u64, aux: u64) -> u64 {
-        (!(val & aux) & (val | aux)).wrapping_add(val | aux)
-            ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+        // Independent: derive width, parts and marker via explicit branching.
+        let w = (aux % 64) as u32;
+        let lo = if w == 0 { 0 } else { val & ((1u64 << w) - 1) };
+        let hi = val >> w;
+        let limit = (63 - w) as u64;
+        let marker_pos = if hi > limit { 63 } else { w as u64 + hi };
+        lo | (1u64 << marker_pos)
     }
 
     // -------------------------------------------------------------------------

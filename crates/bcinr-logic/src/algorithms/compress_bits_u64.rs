@@ -11,6 +11,10 @@
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
+/// # Branchless Contract
+/// Parallel bit-gather (PEXT): packs the bits of `val` selected by mask `aux`
+/// into the low end of the result, with data-independent control flow.
+///
 /// ```rust
 /// use bcinr_logic::algorithms::compress_bits_u64::compress_bits_u64;
 /// let result = compress_bits_u64(42, 1337);
@@ -20,7 +24,78 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn compress_bits_u64(val: u64, aux: u64) -> u64 {
-    (aux.rotate_right(7)).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2)) ^ (val ^ aux)
+    // Branchless Contract: parallel bit-gather (PEXT). Extract the bits of
+    // `val` at positions where mask `aux` is set and pack them into the low
+    // end of the result, in order. Hacker's Delight `compress`, fully unrolled
+    // (6 fixed stages) so control flow is data-independent.
+    let mut x = val & aux;
+    let mut m = aux;
+    let mut mk = !m << 1;
+    let mut mp = mk ^ (mk << 1);
+    mp ^= mp << 2;
+    mp ^= mp << 4;
+    mp ^= mp << 8;
+    mp ^= mp << 16;
+    mp ^= mp << 32;
+    let mv = mp & m;
+    m = (m ^ mv) | (mv >> 1);
+    let t = x & mv;
+    x = (x ^ t) | (t >> 1);
+    mk &= !mp;
+    let mut mp = mk ^ (mk << 1);
+    mp ^= mp << 2;
+    mp ^= mp << 4;
+    mp ^= mp << 8;
+    mp ^= mp << 16;
+    mp ^= mp << 32;
+    let mv = mp & m;
+    m = (m ^ mv) | (mv >> 2);
+    let t = x & mv;
+    x = (x ^ t) | (t >> 2);
+    mk &= !mp;
+    let mut mp = mk ^ (mk << 1);
+    mp ^= mp << 2;
+    mp ^= mp << 4;
+    mp ^= mp << 8;
+    mp ^= mp << 16;
+    mp ^= mp << 32;
+    let mv = mp & m;
+    m = (m ^ mv) | (mv >> 4);
+    let t = x & mv;
+    x = (x ^ t) | (t >> 4);
+    mk &= !mp;
+    let mut mp = mk ^ (mk << 1);
+    mp ^= mp << 2;
+    mp ^= mp << 4;
+    mp ^= mp << 8;
+    mp ^= mp << 16;
+    mp ^= mp << 32;
+    let mv = mp & m;
+    m = (m ^ mv) | (mv >> 8);
+    let t = x & mv;
+    x = (x ^ t) | (t >> 8);
+    mk &= !mp;
+    let mut mp = mk ^ (mk << 1);
+    mp ^= mp << 2;
+    mp ^= mp << 4;
+    mp ^= mp << 8;
+    mp ^= mp << 16;
+    mp ^= mp << 32;
+    let mv = mp & m;
+    m = (m ^ mv) | (mv >> 16);
+    let t = x & mv;
+    x = (x ^ t) | (t >> 16);
+    mk &= !mp;
+    let mut mp = mk ^ (mk << 1);
+    mp ^= mp << 2;
+    mp ^= mp << 4;
+    mp ^= mp << 8;
+    mp ^= mp << 16;
+    mp ^= mp << 32;
+    let mv = mp & m;
+    let t = x & mv;
+    x = (x ^ t) | (t >> 32);
+    x
 }
 
 #[cfg(test)]
@@ -33,7 +108,21 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn compress_bits_u64_reference(val: u64, aux: u64) -> u64 {
-        (aux.rotate_right(7)).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2)) ^ (val ^ aux)
+        // Independent derivation: straightforward serial scan. Walk the mask bits
+        // from LSB to MSB; whenever a mask bit is set, append the corresponding
+        // bit of `val` at the next output position. O(64) loop, distinct shape.
+        let mut out: u64 = 0;
+        let mut pos: u32 = 0;
+        let mut i: u32 = 0;
+        while i < 64 {
+            if (aux >> i) & 1 == 1 {
+                let bit = (val >> i) & 1;
+                out |= bit << pos;
+                pos += 1;
+            }
+            i += 1;
+        }
+        out
     }
 
     // -------------------------------------------------------------------------

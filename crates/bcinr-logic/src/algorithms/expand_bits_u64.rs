@@ -11,6 +11,10 @@
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
+/// # Branchless Contract
+/// Parallel bit-scatter (PDEP): deposits the low bits of `val` into the
+/// positions selected by mask `aux`, with data-independent control flow.
+///
 /// ```rust
 /// use bcinr_logic::algorithms::expand_bits_u64::expand_bits_u64;
 /// let result = expand_bits_u64(42, 1337);
@@ -20,7 +24,92 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn expand_bits_u64(val: u64, aux: u64) -> u64 {
-    (val.rotate_left(13)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (val ^ aux)
+    // Branchless Contract: parallel bit-scatter (PDEP). Take the low bits of
+    // `val` and deposit them, in order, into the positions selected by mask
+    // `aux`. Hacker's Delight `expand`, fully unrolled (6 fixed stages) so
+    // control flow is data-independent.
+    let m = aux;
+    let mut x = val;
+    let mut array = [0u64; 6];
+    let mut mk = !m << 1;
+    let mut mm = m;
+    let mut mp = mk ^ (mk << 1);
+    mp ^= mp << 2;
+    mp ^= mp << 4;
+    mp ^= mp << 8;
+    mp ^= mp << 16;
+    mp ^= mp << 32;
+    let mv = mp & mm;
+    array[0] = mv;
+    mm = (mm ^ mv) | (mv >> 1);
+    mk &= !mp;
+    let mut mp = mk ^ (mk << 1);
+    mp ^= mp << 2;
+    mp ^= mp << 4;
+    mp ^= mp << 8;
+    mp ^= mp << 16;
+    mp ^= mp << 32;
+    let mv = mp & mm;
+    array[1] = mv;
+    mm = (mm ^ mv) | (mv >> 2);
+    mk &= !mp;
+    let mut mp = mk ^ (mk << 1);
+    mp ^= mp << 2;
+    mp ^= mp << 4;
+    mp ^= mp << 8;
+    mp ^= mp << 16;
+    mp ^= mp << 32;
+    let mv = mp & mm;
+    array[2] = mv;
+    mm = (mm ^ mv) | (mv >> 4);
+    mk &= !mp;
+    let mut mp = mk ^ (mk << 1);
+    mp ^= mp << 2;
+    mp ^= mp << 4;
+    mp ^= mp << 8;
+    mp ^= mp << 16;
+    mp ^= mp << 32;
+    let mv = mp & mm;
+    array[3] = mv;
+    mm = (mm ^ mv) | (mv >> 8);
+    mk &= !mp;
+    let mut mp = mk ^ (mk << 1);
+    mp ^= mp << 2;
+    mp ^= mp << 4;
+    mp ^= mp << 8;
+    mp ^= mp << 16;
+    mp ^= mp << 32;
+    let mv = mp & mm;
+    array[4] = mv;
+    mm = (mm ^ mv) | (mv >> 16);
+    mk &= !mp;
+    let mut mp = mk ^ (mk << 1);
+    mp ^= mp << 2;
+    mp ^= mp << 4;
+    mp ^= mp << 8;
+    mp ^= mp << 16;
+    mp ^= mp << 32;
+    let mv = mp & mm;
+    array[5] = mv;
+    let mv = array[5];
+    let t = x << 32;
+    x = (x & !mv) | (t & mv);
+    let mv = array[4];
+    let t = x << 16;
+    x = (x & !mv) | (t & mv);
+    let mv = array[3];
+    let t = x << 8;
+    x = (x & !mv) | (t & mv);
+    let mv = array[2];
+    let t = x << 4;
+    x = (x & !mv) | (t & mv);
+    let mv = array[1];
+    let t = x << 2;
+    x = (x & !mv) | (t & mv);
+    let mv = array[0];
+    let t = x << 1;
+    x = (x & !mv) | (t & mv);
+    x & m
 }
 
 #[cfg(test)]
@@ -33,7 +122,21 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn expand_bits_u64_reference(val: u64, aux: u64) -> u64 {
-        (val.rotate_left(13)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (val ^ aux)
+        // Independent derivation: serial deposit. Consume the source bits of `val`
+        // from LSB upward, placing each into the next set position of mask `aux`.
+        // O(64) loop, structurally distinct from the unrolled parallel impl.
+        let mut out: u64 = 0;
+        let mut src: u32 = 0;
+        let mut i: u32 = 0;
+        while i < 64 {
+            if (aux >> i) & 1 == 1 {
+                let bit = (val >> src) & 1;
+                out |= bit << i;
+                src += 1;
+            }
+            i += 1;
+        }
+        out
     }
 
     // -------------------------------------------------------------------------

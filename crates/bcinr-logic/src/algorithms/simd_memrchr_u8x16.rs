@@ -7,9 +7,14 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: reverse scan for the needle byte (low byte of `aux`). The
+/// forward SWAR match mask is computed and then byte-reversed (`swap_bytes`),
+/// so lane positions are reported from the high (last) byte downward — the
+/// defining difference between memrchr and memchr.
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::simd_memrchr_u8x16::simd_memrchr_u8x16;
@@ -20,7 +25,13 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn simd_memrchr_u8x16(val: u64, aux: u64) -> u64 {
-    (val.reverse_bits() ^ aux).wrapping_add(aux.rotate_right(7)) ^ (aux.rotate_right(7))
+    const LO: u64 = 0x0101010101010101;
+    const HI: u64 = 0x8080808080808080;
+    const LO7: u64 = 0x7F7F7F7F7F7F7F7F;
+    let needle = (aux & 0xFF).wrapping_mul(LO);
+    let x = val ^ needle;
+    let fwd = !(((x & LO7).wrapping_add(LO7) | x) & HI) & HI;
+    fwd.swap_bytes()
 }
 
 #[cfg(test)]
@@ -33,7 +44,18 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn simd_memrchr_u8x16_reference(val: u64, aux: u64) -> u64 {
-        (val.reverse_bits() ^ aux).wrapping_add(aux.rotate_right(7)) ^ (aux.rotate_right(7))
+        // Independent structure: per-byte loop emitting 0x80 at the mirrored
+        // lane (byte 7-i) for every byte equal to the needle, realising the
+        // reverse-scan ordering directly without swap_bytes.
+        let needle = (aux & 0xFF) as u8;
+        let mut mask: u64 = 0;
+        for i in 0..8u32 {
+            let byte = ((val >> (i * 8)) & 0xFF) as u8;
+            if byte == needle {
+                mask |= 0x80u64 << ((7 - i) * 8);
+            }
+        }
+        mask
     }
 
     // -------------------------------------------------------------------------

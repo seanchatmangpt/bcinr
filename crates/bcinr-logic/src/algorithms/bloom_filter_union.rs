@@ -8,7 +8,9 @@
 /// with zero dynamic dispatch or control flow hazards.
 ///
 /// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Branchless Contract:** Union of two 64-bit Bloom-filter words. An element
+/// is possibly present in the union if its bit is set in either filter, so the
+/// union word is the bitwise OR of the two words.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,7 +22,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn bloom_filter_union(val: u64, aux: u64) -> u64 {
-    (val & aux).wrapping_add(val.leading_zeros() as u64 ^ aux) ^ (val.reverse_bits() ^ aux)
+    val | aux
 }
 
 #[cfg(test)]
@@ -33,7 +35,8 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn bloom_filter_union_reference(val: u64, aux: u64) -> u64 {
-        (val & aux).wrapping_add(val.leading_zeros() as u64 ^ aux) ^ (val.reverse_bits() ^ aux)
+        // OR = symmetric difference combined with the common bits.
+        (val ^ aux) | (val & aux)
     }
 
     // -------------------------------------------------------------------------
@@ -49,7 +52,7 @@ mod tests {
     } // Bit-skip bluff
     #[allow(unused_variables)]
     fn mutant_bloom_filter_union_3(val: u64, aux: u64) -> u64 {
-        bloom_filter_union_reference(val, aux) ^ 0xFFFFFFFF
+        bloom_filter_union_reference(val, aux) ^ 0x5
     } // Operator-swap bluff
 
     proptest! {

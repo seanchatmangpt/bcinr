@@ -16,11 +16,16 @@
 /// let result = burrows_wheeler_transform_step(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn burrows_wheeler_transform_step(val: u64, aux: u64) -> u64 {
-    (val.count_ones() as u64 | aux).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (val | aux)
+    // Branchless Contract: one rotation step of the Burrows-Wheeler transform
+    // over the 8-byte block `val`, producing the cyclic rotation by (aux & 7)
+    // bytes (the row-generation primitive of BWT). Byte-granular rotate_left.
+    let shift = ((aux & 7) * 8) as u32;
+    val.rotate_left(shift)
 }
 
 #[cfg(test)]
@@ -33,7 +38,15 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn burrows_wheeler_transform_step_reference(val: u64, aux: u64) -> u64 {
-        (val.count_ones() as u64 | aux).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (val | aux)
+        // Independent: build the rotated byte sequence explicitly via indexing.
+        let bytes = val.to_le_bytes();
+        let r = (aux & 7) as usize;
+        let mut out = [0u8; 8];
+        for i in 0..8 {
+            // rotate_left by r bytes: LE byte i comes from byte (i - r) mod 8
+            out[i] = bytes[(i + 8 - r) % 8];
+        }
+        u64::from_le_bytes(out)
     }
 
     // -------------------------------------------------------------------------

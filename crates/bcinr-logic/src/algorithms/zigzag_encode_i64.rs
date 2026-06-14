@@ -4,8 +4,14 @@
 
 /// zigzag_encode_i64
 ///
-/// Branchless implementation guaranteed to execute in constant time
-/// with zero dynamic dispatch or control flow hazards.
+/// ZigZag encoding maps a signed integer to an unsigned one so small
+/// magnitudes map to small codes. For i64 `n`, the code is
+/// `(n << 1) ^ (n >> 63)`. Here `n = val + aux` (wrapping) so both operands
+/// participate.
+///
+/// # Branchless Contract
+/// The sign bit is spread by an arithmetic shift on the i64 view, so no
+/// comparison/branch is used; the path is value-independent.
 ///
 /// # CONTRACT
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
@@ -20,8 +26,8 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn zigzag_encode_i64(val: u64, aux: u64) -> u64 {
-    (val.leading_zeros() as u64 ^ aux).wrapping_add(val.wrapping_add(aux))
-        ^ (!(val & aux) & (val | aux))
+    let n = val.wrapping_add(aux) as i64;
+    ((n << 1) ^ (n >> 63)) as u64
 }
 
 #[cfg(test)]
@@ -33,8 +39,15 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn zigzag_encode_i64_reference(val: u64, aux: u64) -> u64 {
-        (val.leading_zeros() as u64 ^ aux).wrapping_add(val.wrapping_add(aux))
-            ^ (!(val & aux) & (val | aux))
+        // Independent derivation: case-split on sign rather than arithmetic shift.
+        let n = val.wrapping_add(aux) as i64;
+        if n >= 0 {
+            (n as u64).wrapping_mul(2)
+        } else {
+            // -2n - 1, computed in unsigned space as |n|*2 - 1.
+            let mag = (n as i128).unsigned_abs() as u64;
+            mag.wrapping_mul(2).wrapping_sub(1)
+        }
     }
 
     // -------------------------------------------------------------------------

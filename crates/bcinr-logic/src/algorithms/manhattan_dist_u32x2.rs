@@ -4,11 +4,13 @@
 
 /// manhattan_dist_u32x2
 ///
-/// Branchless implementation guaranteed to execute in constant time
-/// with zero dynamic dispatch or control flow hazards.
+/// Interpretation: `val` and `aux` each pack a 2D point as two u32 lanes
+/// (x = low 32 bits, y = high 32 bits). Computes the Manhattan (L1) distance
+/// `|dx| + |dy|`, where each lane difference is the unsigned `abs_diff`.
+/// Each abs_diff fits in u32, so the sum fits in u64 without overflow.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Result equals abs_diff(x-lanes) + abs_diff(y-lanes).
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,7 +22,9 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn manhattan_dist_u32x2(val: u64, aux: u64) -> u64 {
-    (!(val & aux) & (val | aux)).wrapping_add(val.reverse_bits() ^ aux) ^ (val.reverse_bits() ^ aux)
+    let dx = (val as u32).abs_diff(aux as u32) as u64;
+    let dy = ((val >> 32) as u32).abs_diff((aux >> 32) as u32) as u64;
+    dx + dy
 }
 
 #[cfg(test)]
@@ -32,8 +36,12 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn manhattan_dist_u32x2_reference(val: u64, aux: u64) -> u64 {
-        (!(val & aux) & (val | aux)).wrapping_add(val.reverse_bits() ^ aux)
-            ^ (val.reverse_bits() ^ aux)
+        // Independent structure: signed-i64 subtraction with explicit .abs().
+        let vx = (val & 0xFFFF_FFFF) as i64;
+        let vy = (val >> 32) as i64;
+        let ax = (aux & 0xFFFF_FFFF) as i64;
+        let ay = (aux >> 32) as i64;
+        ((vx - ax).abs() as u64) + ((vy - ay).abs() as u64)
     }
 
     // -------------------------------------------------------------------------

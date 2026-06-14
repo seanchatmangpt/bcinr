@@ -24,7 +24,11 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn insertion_sort_branchless_fixed(val: u64, aux: u64) -> u64 {
-    let mut arr = [
+    // Sorts the 8 bytes of `val` ascending. Branchless and loop-free: each
+    // byte's destination index is its stable rank = (# bytes strictly less)
+    // + (# equal bytes at an earlier position). Computed by fully unrolled
+    // comparison-as-arithmetic. `aux` is ignored.
+    let b = [
         val & 0xFF,
         (val >> 8) & 0xFF,
         (val >> 16) & 0xFF,
@@ -34,20 +38,34 @@ pub fn insertion_sort_branchless_fixed(val: u64, aux: u64) -> u64 {
         (val >> 48) & 0xFF,
         (val >> 56) & 0xFF,
     ];
-    for i in 1..8 {
-        for j in (1..=i).rev() {
-            let a = arr[j - 1];
-            let b = arr[j];
-            let swap = (a > b) as u64;
-            arr[j - 1] = a ^ (swap * (a ^ b));
-            arr[j] = b ^ (swap * (a ^ b));
-        }
-    }
-    let mut res = 0u64;
-    for i in 0..8 {
-        res |= arr[i] << (i * 8);
-    }
-    res
+    let lt = |x: u64, y: u64| -> u64 { (x < y) as u64 };
+    let eqe = |j: usize, i: usize, x: u64, y: u64| -> u64 { ((x == y) as u64) & ((j < i) as u64) };
+    let rank = |i: usize| -> u64 {
+        lt(b[0], b[i])
+            + lt(b[1], b[i])
+            + lt(b[2], b[i])
+            + lt(b[3], b[i])
+            + lt(b[4], b[i])
+            + lt(b[5], b[i])
+            + lt(b[6], b[i])
+            + lt(b[7], b[i])
+            + eqe(0, i, b[0], b[i])
+            + eqe(1, i, b[1], b[i])
+            + eqe(2, i, b[2], b[i])
+            + eqe(3, i, b[3], b[i])
+            + eqe(4, i, b[4], b[i])
+            + eqe(5, i, b[5], b[i])
+            + eqe(6, i, b[6], b[i])
+            + eqe(7, i, b[7], b[i])
+    };
+    (b[0] << (rank(0) * 8))
+        | (b[1] << (rank(1) * 8))
+        | (b[2] << (rank(2) * 8))
+        | (b[3] << (rank(3) * 8))
+        | (b[4] << (rank(4) * 8))
+        | (b[5] << (rank(5) * 8))
+        | (b[6] << (rank(6) * 8))
+        | (b[7] << (rank(7) * 8))
 }
 
 #[cfg(test)]

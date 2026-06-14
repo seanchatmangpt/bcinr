@@ -16,12 +16,16 @@
 /// let result = mask_xor_reduce_u64(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+///
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn mask_xor_reduce_u64(val: u64, aux: u64) -> u64 {
-    (val.wrapping_shl(3) ^ aux.wrapping_shr(2)).wrapping_add(val.count_ones() as u64 | aux)
-        ^ (aux.rotate_right(7))
+    // Branchless Contract: XOR-reduction over the masked bits. Returns the parity
+    // (0 or 1) of the population of `val & aux` — i.e. the XOR of all selected
+    // bits, which is the reduction of a masked bit-slice under XOR.
+    ((val & aux).count_ones() & 1) as u64
 }
 
 #[cfg(test)]
@@ -33,8 +37,16 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn mask_xor_reduce_u64_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_shl(3) ^ aux.wrapping_shr(2)).wrapping_add(val.count_ones() as u64 | aux)
-            ^ (aux.rotate_right(7))
+        // Independent derivation: fold the masked word down with a XOR tree
+        // (parallel halving) instead of count_ones parity, then take the low bit.
+        let mut x = val & aux;
+        x ^= x >> 32;
+        x ^= x >> 16;
+        x ^= x >> 8;
+        x ^= x >> 4;
+        x ^= x >> 2;
+        x ^= x >> 1;
+        x & 1
     }
 
     // -------------------------------------------------------------------------

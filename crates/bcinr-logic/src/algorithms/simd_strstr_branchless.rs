@@ -7,9 +7,14 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: the inner kernel of a SIMD substring search compares a
+/// window of text (`val`) against the pattern bytes (`aux`) lane-by-lane. This
+/// computes the per-byte equality mask via the SWAR zero-byte test on
+/// `val ^ aux`, carrying `0x80` in each lane where the bytes agree.
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::simd_strstr_branchless::simd_strstr_branchless;
@@ -20,8 +25,14 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn simd_strstr_branchless(val: u64, aux: u64) -> u64 {
-    (val.wrapping_sub(aux)).wrapping_add(val.reverse_bits() ^ aux)
-        ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+    const LO7: u64 = 0x7F7F7F7F7F7F7F7F;
+    const HI: u64 = 0x8080808080808080;
+    let x = val ^ aux;
+    // Cascade-safe per-byte zero test: the high bit of each lane is set iff that
+    // byte is nonzero; invert to mark equal (zero) lanes. Avoids the borrow
+    // cross-talk of the (x - LO) & !x & HI form on adjacent equal bytes.
+    let nonzero = ((x & LO7).wrapping_add(LO7) | x) & HI;
+    !nonzero & HI
 }
 
 #[cfg(test)]
@@ -33,8 +44,17 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn simd_strstr_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_sub(aux)).wrapping_add(val.reverse_bits() ^ aux)
-            ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+        // Independent structure: explicit per-byte equality comparison loop
+        // instead of the SWAR subtract/and zero-byte trick.
+        let mut mask: u64 = 0;
+        for i in 0..8u32 {
+            let a = (val >> (i * 8)) & 0xFF;
+            let b = (aux >> (i * 8)) & 0xFF;
+            if a == b {
+                mask |= 0x80u64 << (i * 8);
+            }
+        }
+        mask
     }
 
     // -------------------------------------------------------------------------

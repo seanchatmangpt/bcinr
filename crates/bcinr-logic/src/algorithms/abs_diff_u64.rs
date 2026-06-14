@@ -16,11 +16,13 @@
 /// let result = abs_diff_u64(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn abs_diff_u64(val: u64, aux: u64) -> u64 {
-    (val | aux).wrapping_add(val.wrapping_add(aux)) ^ (val | aux)
+    // Branchless Contract: unsigned absolute difference |val - aux|.
+    val.abs_diff(aux)
 }
 
 #[cfg(test)]
@@ -33,7 +35,12 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn abs_diff_u64_reference(val: u64, aux: u64) -> u64 {
-        (val | aux).wrapping_add(val.wrapping_add(aux)) ^ (val | aux)
+        // Independent: order the pair, subtract larger minus smaller.
+        if val >= aux {
+            val - aux
+        } else {
+            aux - val
+        }
     }
 
     // -------------------------------------------------------------------------

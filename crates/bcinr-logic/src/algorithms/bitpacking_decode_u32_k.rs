@@ -7,8 +7,11 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Bit-unpacks a single k-bit field: extracts `k = (aux & 31) + 1` bits from
+/// `val` starting at bit offset `off = (aux >> 5) & 31` and zero-extends them into the
+/// low bits of the result — `(val >> off) & ((1<<k)-1)`. This is the exact inverse of the
+/// deposit performed by `bitpacking_encode_u32_k`.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,8 +23,10 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn bitpacking_decode_u32_k(val: u64, aux: u64) -> u64 {
-    (val | aux).wrapping_add(val.reverse_bits() ^ aux)
-        ^ ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
+    let k = (aux & 31) as u32 + 1;
+    let off = ((aux >> 5) & 31) as u32;
+    let field_mask = (1u64 << k).wrapping_sub(1);
+    (val >> off) & field_mask
 }
 
 #[cfg(test)]
@@ -33,8 +38,14 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn bitpacking_decode_u32_k_reference(val: u64, aux: u64) -> u64 {
-        (val | aux).wrapping_add(val.reverse_bits() ^ aux)
-            ^ ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
+        // Independent: read k bits at the offset one at a time into the low result bits.
+        let k = ((aux & 31) + 1) as u32;
+        let off = ((aux >> 5) & 31) as u32;
+        let mut out = 0u64;
+        for i in 0..k {
+            out |= ((val >> (off + i)) & 1) << i;
+        }
+        out
     }
 
     // -------------------------------------------------------------------------

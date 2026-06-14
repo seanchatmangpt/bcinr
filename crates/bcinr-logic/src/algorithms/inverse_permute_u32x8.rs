@@ -24,12 +24,25 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn inverse_permute_u32x8(val: u64, aux: u64) -> u64 {
-    let mut res = 0u64;
-    for i in 0..8 {
-        let p_i = (val >> (i * 4)) & 0x7;
-        res |= (i as u64) << (p_i * 4);
-    }
-    res
+    // Invert an 8-element permutation stored as 8 nibbles (each value masked to 0..7):
+    // for source index i mapping to position p_i, the inverse places i at nibble p_i.
+    // Fully unrolled to keep the path branch- and loop-free.
+    let p0 = (val >> 0) & 0x7;
+    let p1 = (val >> 4) & 0x7;
+    let p2 = (val >> 8) & 0x7;
+    let p3 = (val >> 12) & 0x7;
+    let p4 = (val >> 16) & 0x7;
+    let p5 = (val >> 20) & 0x7;
+    let p6 = (val >> 24) & 0x7;
+    let p7 = (val >> 28) & 0x7;
+    (0u64 << (p0 * 4))
+        | (1u64 << (p1 * 4))
+        | (2u64 << (p2 * 4))
+        | (3u64 << (p3 * 4))
+        | (4u64 << (p4 * 4))
+        | (5u64 << (p5 * 4))
+        | (6u64 << (p6 * 4))
+        | (7u64 << (p7 * 4))
 }
 
 #[cfg(test)]

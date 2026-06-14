@@ -7,9 +7,14 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Returns the standard base64 ASCII character for the 6-bit sextet
+/// `val & 63`: `0..=25 -> A..=Z`, `26..=51 -> a..=z`, `52..=61 -> 0..=9`,
+/// `62 -> '+'`, `63 -> '/'`. `aux` is unused.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: one base64 encoder lane realized as a cascade of nested
+/// sign-bit selects (the masks are monotonically nested), replacing a table.
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::base64_encode_simd::base64_encode_simd;
@@ -20,8 +25,18 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn base64_encode_simd(val: u64, aux: u64) -> u64 {
-    ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5)).wrapping_add(val | aux)
-        ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+    let i = val & 63;
+    let gt = |k: u64| 0u64.wrapping_sub(k.wrapping_sub(i) >> 63); // all-ones when i > k
+    let m1 = gt(25);
+    let m2 = gt(51);
+    let m3 = gt(61);
+    let m4 = gt(62);
+    let mut c = i.wrapping_add(0x41); // i < 26 -> 'A'+i
+    c = (c & !m1) | (i.wrapping_add(71) & m1); // 'a'+(i-26)
+    c = (c & !m2) | (i.wrapping_sub(4) & m2); // '0'+(i-52)
+    c = (c & !m3) | (i.wrapping_sub(19) & m3); // '+'
+    c = (c & !m4) | (i.wrapping_sub(16) & m4); // '/'
+    c
 }
 
 #[cfg(test)]
@@ -32,9 +47,12 @@ mod tests {
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
+    #[allow(unused_variables)]
     fn base64_encode_simd_reference(val: u64, aux: u64) -> u64 {
-        ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5)).wrapping_add(val | aux)
-            ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+        // Independent structure: direct alphabet table indexed by the sextet.
+        const ALPHABET: &[u8; 64] =
+            b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        ALPHABET[(val & 63) as usize] as u64
     }
 
     // -------------------------------------------------------------------------

@@ -16,12 +16,20 @@
 /// let result = delta_swap_u64(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+///
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn delta_swap_u64(val: u64, aux: u64) -> u64 {
-    (val | aux).wrapping_add(val.count_ones() as u64 | aux)
-        ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+    // Branchless Contract: delta-swap bit exchange. `aux` supplies both the swap
+    // distance `shift = aux & 63` and the selection mask `mask = aux`: pairs of
+    // bits a distance `shift` apart selected by `mask` are exchanged. Classic
+    // involutionary permutation primitive used in bit-matrix transposes.
+    let shift = (aux & 63) as u32;
+    let mask = aux;
+    let t = ((val >> shift) ^ val) & mask;
+    val ^ t ^ (t << shift)
 }
 
 #[cfg(test)]
@@ -33,8 +41,19 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn delta_swap_u64_reference(val: u64, aux: u64) -> u64 {
-        (val | aux).wrapping_add(val.count_ones() as u64 | aux)
-            ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+        // Independent derivation: spell out the exchange with named temporaries
+        // and an explicit XOR-swap of the two bit fields rather than the fused
+        // single-expression form used by the impl.
+        let shift = (aux % 64) as u32;
+        let mask = aux;
+        let lo = val & mask;
+        let hi = (val >> shift) & mask;
+        let diff = lo ^ hi;
+        // Apply the exchange field at its base position and at the shifted
+        // position via two separate XORs (impl fuses these into one expression).
+        let mut r = val ^ diff;
+        r ^= diff << shift;
+        r
     }
 
     // -------------------------------------------------------------------------

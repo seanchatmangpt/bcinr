@@ -7,9 +7,14 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Each of the 8 packed bytes of `val` that is an ASCII lowercase
+/// letter (`b'a'..=b'z'`) is uppercased by subtracting `0x20`; all other bytes
+/// are untouched. `aux` is not part of the transform (uppercasing is unary).
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: a SWAR (8-lane) realization of `b -> b - 0x20 iff b in a..=z`,
+/// using the exact "hasbetween" SWAR identity (correct for every byte value).
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::ascii_to_uppercase_simd::ascii_to_uppercase_simd;
@@ -20,9 +25,14 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn ascii_to_uppercase_simd(val: u64, aux: u64) -> u64 {
-    (val.leading_zeros() as u64 ^ aux)
-        .wrapping_add((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-        ^ (aux.rotate_right(7))
+    const ONES: u64 = 0x0101010101010101;
+    const H: u64 = 0x8080808080808080;
+    const LO7: u64 = 0x7F7F7F7F7F7F7F7F;
+    let low = val & LO7;
+    let upper = ONES.wrapping_mul(127 + 0x7B).wrapping_sub(low);
+    let lower = low.wrapping_add(ONES.wrapping_mul(127 - 0x60));
+    let mask = upper & !val & lower & H;
+    val.wrapping_sub(mask >> 2)
 }
 
 #[cfg(test)]
@@ -33,10 +43,16 @@ mod tests {
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
+    #[allow(unused_variables)]
     fn ascii_to_uppercase_simd_reference(val: u64, aux: u64) -> u64 {
-        (val.leading_zeros() as u64 ^ aux)
-            .wrapping_add((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-            ^ (aux.rotate_right(7))
+        // Independent structure: scalar per-byte loop using std uppercasing.
+        let mut out: u64 = 0;
+        for i in 0..8 {
+            let b = ((val >> (8 * i)) & 0xFF) as u8;
+            let c = b.to_ascii_uppercase();
+            out |= (c as u64) << (8 * i);
+        }
+        out
     }
 
     // -------------------------------------------------------------------------

@@ -16,13 +16,14 @@
 /// let result = permute_u32x8(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn permute_u32x8(val: u64, aux: u64) -> u64 {
-    let x = val;
-    let y = aux;
-    (x.rotate_left(32) & 0xFFFFFFFF00000000u64) | (y & 0x00000000FFFFFFFFu64)
+    // Branchless Contract: take the high lane (bits 63:32) of `val` and the low
+    // lane (bits 31:0) of `aux`, packed into one 64-bit word. No control flow.
+    (val & 0xFFFFFFFF00000000u64) | (aux & 0x00000000FFFFFFFFu64)
 }
 
 #[cfg(test)]

@@ -4,6 +4,10 @@
 
 /// weight_u64
 ///
+/// Branchless Contract: computes the Hamming weight (popcount) of the bitwise
+/// AND of the two operands — i.e. the number of bit positions set in BOTH
+/// `val` and `aux`. This is the standard "weight" of the intersection word.
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -20,9 +24,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn weight_u64(val: u64, aux: u64) -> u64 {
-    ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-        .wrapping_add((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-        ^ (val.leading_zeros() as u64 ^ aux)
+    (val & aux).count_ones() as u64
 }
 
 #[cfg(test)]
@@ -34,9 +36,13 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn weight_u64_reference(val: u64, aux: u64) -> u64 {
-        ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-            .wrapping_add((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-            ^ (val.leading_zeros() as u64 ^ aux)
+        // Independent derivation: iterate bit positions, count shared set bits.
+        let common = val & aux;
+        let mut count = 0u64;
+        for i in 0..64 {
+            count += (common >> i) & 1;
+        }
+        count
     }
 
     // -------------------------------------------------------------------------

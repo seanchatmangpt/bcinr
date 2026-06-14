@@ -7,9 +7,16 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: incorporate one sample into a t-digest centroid. The
+/// centroid `val` packs a running weight `w` (high 32 bits) and a count `n`
+/// (low 32 bits). Adding a sample of weight `x` (low 32 bits of `aux`) yields
+/// `n' = n + 1`, `w' = w + x` (both modulo 2^32), and the centroid's mean is
+/// `w' / n'`. Because the new count is always at least 1 the division is total.
+/// The result repacks `mean` in the high 32 bits and `n'` in the low 32 bits.
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::t_digest_add_u32::t_digest_add_u32;
@@ -20,9 +27,14 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn t_digest_add_u32(val: u64, aux: u64) -> u64 {
-    ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-        .wrapping_add((val & 0xFFFFFFFF) | (aux << 32))
-        ^ (val.wrapping_mul(aux.wrapping_add(1)))
+    let n = val & 0xFFFFFFFF;
+    let w = val >> 32;
+    let x = aux & 0xFFFFFFFF;
+    // n in [0, 2^32-1] so n2 = n+1 in [1, 2^32]: never zero, division is total.
+    let n2 = n + 1;
+    let w2 = w.wrapping_add(x) & 0xFFFFFFFF;
+    let mean = w2 / n2;
+    (mean << 32) | (n2 & 0xFFFFFFFF)
 }
 
 #[cfg(test)]
@@ -34,9 +46,28 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn t_digest_add_u32_reference(val: u64, aux: u64) -> u64 {
-        ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-            .wrapping_add((val & 0xFFFFFFFF) | (aux << 32))
-            ^ (val.wrapping_mul(aux.wrapping_add(1)))
+        // Independent structure: unpack the centroid into named u64 fields,
+        // update count and weight, and rebuild via field-wise shifts. The mean
+        // is computed by repeated subtraction (long division) rather than `/`.
+        let count = (val as u32) as u64;
+        let weight = (val >> 32) as u64;
+        let sample = (aux as u32) as u64;
+        let new_count = count + 1; // count <= 2^32-1, so new_count >= 1
+        let new_weight = ((weight as u32).wrapping_add(sample as u32)) as u64;
+        // Bit-by-bit (restoring) long division: a different structure from the
+        // impl's single `/` operator, but the same quotient.
+        let mut rem: u64 = 0;
+        let mut mean: u64 = 0;
+        let mut bit = 32i32; // new_weight fits in 32 bits
+        while bit > 0 {
+            bit -= 1;
+            rem = (rem << 1) | ((new_weight >> bit) & 1);
+            if rem >= new_count {
+                rem -= new_count;
+                mean |= 1u64 << bit;
+            }
+        }
+        (mean << 32) | (new_count & 0xFFFFFFFF)
     }
 
     // -------------------------------------------------------------------------

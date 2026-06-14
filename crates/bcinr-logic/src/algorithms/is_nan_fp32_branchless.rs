@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -20,8 +20,20 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn is_nan_fp32_branchless(val: u64, aux: u64) -> u64 {
-    (val.rotate_left(13)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32))
-        ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+    // Interpretation: the low 32 bits of `val` and of `aux` each hold an IEEE-754
+    // binary32 bit pattern. A value is NaN iff its exponent field is all-ones
+    // (0xFF) AND its 23-bit mantissa is non-zero. We pack: bit0 = nan(val),
+    // bit1 = nan(aux). Fully branchless via masked exponent/mantissa compares.
+    let nan = |x: u64| -> u64 {
+        let exp = (x >> 23) & 0xFF;
+        // exp_is_max == 1 iff exp == 0xFF.
+        let exp_is_max = (exp ^ 0xFF).wrapping_sub(1) >> 63;
+        let mant = x & 0x7F_FFFF;
+        // mant_nz == 1 iff mant != 0.
+        let mant_nz = mant.wrapping_neg() >> 63;
+        exp_is_max & mant_nz
+    };
+    nan(val) | (nan(aux) << 1)
 }
 
 #[cfg(test)]
@@ -33,8 +45,15 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn is_nan_fp32_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val.rotate_left(13)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32))
-            ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+        // Independent: reconstruct the f32 and use the standard library predicate.
+        let bit = |x: u64| -> u64 {
+            if f32::from_bits(x as u32).is_nan() {
+                1
+            } else {
+                0
+            }
+        };
+        bit(val) | (bit(aux) << 1)
     }
 
     // -------------------------------------------------------------------------

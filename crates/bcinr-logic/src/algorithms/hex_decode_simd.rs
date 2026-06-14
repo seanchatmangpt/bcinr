@@ -7,9 +7,15 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Decodes the two hex ASCII characters in the low 16 bits of `val`
+/// (high byte = high nibble, low byte = low nibble) into the byte value
+/// `(hi_nibble << 4) | lo_nibble`. Each character accepts `0..=9`, `a..=f`, and
+/// `A..=F`; any other byte contributes nibble `0`. `aux` is unused.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: one hex-pair decoder lane, each character mapped with SWAR
+/// sign-bit range masks (inverse of the hex encoder).
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::hex_decode_simd::hex_decode_simd;
@@ -20,9 +26,19 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn hex_decode_simd(val: u64, aux: u64) -> u64 {
-    ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-        .wrapping_add(val.wrapping_mul(aux.wrapping_add(1)))
-        ^ (val.wrapping_add(aux))
+    let hi = decode_hex_nibble((val >> 8) & 0xFF);
+    let lo = decode_hex_nibble(val & 0xFF);
+    (hi << 4) | lo
+}
+
+/// Branchless Contract: one hex ASCII byte -> 4-bit nibble, else 0.
+#[inline]
+fn decode_hex_nibble(c: u64) -> u64 {
+    let gt = |a: u64, b: u64| 0u64.wrapping_sub(b.wrapping_sub(a) >> 63);
+    let rng = |lo: u64, hi: u64| gt(c, lo - 1) & gt(hi, c.wrapping_sub(1));
+    (c.wrapping_sub(0x30) & rng(0x30, 0x39)) // '0'..'9' -> 0..9
+        | (c.wrapping_sub(0x57) & rng(0x61, 0x66)) // 'a'..'f' -> 10..15
+        | (c.wrapping_sub(0x37) & rng(0x41, 0x46)) // 'A'..'F' -> 10..15
 }
 
 #[cfg(test)]
@@ -33,10 +49,16 @@ mod tests {
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
+    #[allow(unused_variables)]
     fn hex_decode_simd_reference(val: u64, aux: u64) -> u64 {
-        ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-            .wrapping_add(val.wrapping_mul(aux.wrapping_add(1)))
-            ^ (val.wrapping_add(aux))
+        // Independent structure: std char hex parsing via to_digit(16).
+        let nib = |c: u64| -> u64 {
+            char::from(c as u8)
+                .to_digit(16)
+                .map(|d| d as u64)
+                .unwrap_or(0)
+        };
+        (nib((val >> 8) & 0xFF) << 4) | nib(val & 0xFF)
     }
 
     // -------------------------------------------------------------------------

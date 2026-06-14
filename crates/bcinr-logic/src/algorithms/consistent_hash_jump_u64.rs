@@ -7,8 +7,15 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Interpretation:** One probe step of Lamping & Veach's jump consistent hash.
+/// The key stream `key` is seeded from `val` and advanced one step with the
+/// jump-hash LCG (`key = key * 2862933555777941757 + 1`). The current bucket index
+/// `j = aux` produces the next candidate landing point
+/// `b = (j + 1) * (2^31 / ((key >> 33) + 1))` exactly as in the reference
+/// algorithm's inner loop body. Evaluating a single deterministic step keeps the
+/// routine branchless and O(1).
+/// **Ensures:** Result matches the independent reference for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,8 +27,10 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn consistent_hash_jump_u64(val: u64, aux: u64) -> u64 {
-    (val.wrapping_sub(aux)).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2))
-        ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+    let key = val.wrapping_mul(2862933555777941757).wrapping_add(1);
+    let j = aux;
+    let denom = (key >> 33).wrapping_add(1);
+    j.wrapping_add(1).wrapping_mul((1u64 << 31) / denom)
 }
 
 #[cfg(test)]
@@ -33,8 +42,14 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn consistent_hash_jump_u64_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_sub(aux)).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2))
-            ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+        // Independent: u128 LCG step, double-precision ratio cast back to integer.
+        let key = ((val as u128 * 2862933555777941757u128 + 1) & 0xFFFF_FFFF_FFFF_FFFF) as u64;
+        let denom = (key >> 33) + 1;
+        let factor = (1u64 << 31).checked_div(denom).unwrap();
+        match aux.checked_add(1) {
+            Some(j1) => j1.wrapping_mul(factor),
+            None => 0u64.wrapping_mul(factor),
+        }
     }
 
     // -------------------------------------------------------------------------

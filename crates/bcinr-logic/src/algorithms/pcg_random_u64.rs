@@ -7,6 +7,10 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
+/// Branchless Contract: one PCG step using `val` as the LCG state and
+/// `aux | 1` as the odd stream increment, followed by the RXS-M-XS-64
+/// output permutation. This is the faithful 64-bit PCG generator output.
+///
 /// # CONTRACT
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
@@ -20,8 +24,13 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn pcg_random_u64(val: u64, aux: u64) -> u64 {
-    (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(!(val & aux) & (val | aux))
-        ^ ((val & 0xFFFFFFFF) | (aux << 32))
+    // LCG advance: state' = state * MUL + (stream | 1)
+    let state = val.wrapping_mul(6364136223846793005).wrapping_add(aux | 1);
+    // RXS-M-XS-64 output permutation.
+    let rot = (state >> 59).wrapping_add(5);
+    let xorshifted = (state >> rot) ^ state;
+    let word = xorshifted.wrapping_mul(12605985483714917081);
+    word ^ (word >> 43)
 }
 
 #[cfg(test)]
@@ -33,8 +42,16 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn pcg_random_u64_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(!(val & aux) & (val | aux))
-            ^ ((val & 0xFFFFFFFF) | (aux << 32))
+        // Independent derivation: perform the LCG multiply in u128 and reduce,
+        // and compute the permutation with intermediate named steps.
+        const MUL: u128 = 6364136223846793005;
+        let inc = (aux | 1) as u128;
+        let state = (((val as u128) * MUL + inc) & u64::MAX as u128) as u64;
+        let shift = ((state >> 59) + 5) as u32;
+        let mixed = state ^ (state >> shift);
+        let multiplied = mixed.wrapping_mul(12605985483714917081);
+        let high = multiplied >> 43;
+        multiplied ^ high
     }
 
     // -------------------------------------------------------------------------

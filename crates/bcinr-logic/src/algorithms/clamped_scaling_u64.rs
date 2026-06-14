@@ -16,11 +16,14 @@
 /// let result = clamped_scaling_u64(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn clamped_scaling_u64(val: u64, aux: u64) -> u64 {
-    ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val & aux) ^ (val.wrapping_add(aux))
+    // Branchless Contract: scale `val` by factor `aux`, clamping the product to
+    // u64::MAX on overflow (saturating multiply).
+    val.saturating_mul(aux)
 }
 
 #[cfg(test)]
@@ -32,8 +35,13 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn clamped_scaling_u64_reference(val: u64, aux: u64) -> u64 {
-        ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val & aux)
-            ^ (val.wrapping_add(aux))
+        // Independent: widen to u128, multiply, then clamp into u64 range.
+        let product = (val as u128) * (aux as u128);
+        if product > u64::MAX as u128 {
+            u64::MAX
+        } else {
+            product as u64
+        }
     }
 
     // -------------------------------------------------------------------------

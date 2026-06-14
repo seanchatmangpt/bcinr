@@ -16,11 +16,17 @@
 /// let result = is_subset_mask_u64(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+///
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn is_subset_mask_u64(val: u64, aux: u64) -> u64 {
-    (val.wrapping_sub(aux)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (val ^ aux)
+    // Branchless Contract: subset test. Returns 1 if every set bit of `val` is
+    // also set in `aux` (val is a subset of aux), else 0. Computed without
+    // branches by collapsing the residual `val & !aux` to a single 0/1 flag.
+    let residual = val & !aux;
+    ((residual | residual.wrapping_neg()) >> 63) ^ 1
 }
 
 #[cfg(test)]
@@ -33,7 +39,14 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn is_subset_mask_u64_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_sub(aux)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (val ^ aux)
+        // Independent derivation: direct equality test using a comparison branch
+        // (test-only). val is a subset of aux exactly when masking off aux leaves
+        // nothing behind.
+        if (val & !aux) == 0 {
+            1
+        } else {
+            0
+        }
     }
 
     // -------------------------------------------------------------------------

@@ -7,8 +7,14 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Interpretation:** A single HighwayHash multiply-accumulate lane update. Lane
+/// state `v1 = val`, `v0 = aux`, multiplier `mul0`. The lane absorbs the message:
+/// `v1 = v1 + v0 + mul0`, then the cross 32x32 product feeds back into the
+/// multiplier: `mul0 ^= (v1 & 0xFFFFFFFF) * (v0 >> 32)`, mirroring HighwayHash's
+/// `Update`. The lane is finalized by folding the multiplier into the lane state.
+/// Pure 64-bit arithmetic, branchless, O(1).
+/// **Ensures:** Result matches the independent reference for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,7 +26,12 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn highwayhash_64(val: u64, aux: u64) -> u64 {
-    (val.reverse_bits() ^ aux).wrapping_add(val.wrapping_sub(aux)) ^ (val & aux)
+    let v0 = aux;
+    let mut mul0 = 0x9E3779B97F4A7C15u64;
+    let v1 = val.wrapping_add(v0).wrapping_add(mul0);
+    let cross = (v1 & 0xFFFF_FFFF).wrapping_mul(v0 >> 32);
+    mul0 ^= cross;
+    v1.wrapping_add(mul0)
 }
 
 #[cfg(test)]
@@ -33,7 +44,15 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn highwayhash_64_reference(val: u64, aux: u64) -> u64 {
-        (val.reverse_bits() ^ aux).wrapping_add(val.wrapping_sub(aux)) ^ (val & aux)
+        // Independent: u128 cross product, staged temporaries.
+        let v0 = aux;
+        let mul0_init: u64 = 0x9E3779B97F4A7C15;
+        let v1 = val.wrapping_add(v0).wrapping_add(mul0_init);
+        let lo = (v1 & 0xFFFF_FFFF) as u128;
+        let hi = (v0 >> 32) as u128;
+        let cross = (lo * hi) as u64;
+        let mul0 = mul0_init ^ cross;
+        v1.wrapping_add(mul0)
     }
 
     // -------------------------------------------------------------------------

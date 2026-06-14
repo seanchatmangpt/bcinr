@@ -7,8 +7,9 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Returns the Hamming distance between `val` and `aux`, i.e. the number
+/// of differing bit positions, `popcount(val XOR aux)` (result in 0..=64).
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,8 +21,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn hamming_dist_simd(val: u64, aux: u64) -> u64 {
-    (val.count_ones() as u64 | aux).wrapping_add(val.rotate_left(13))
-        ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+    (val ^ aux).count_ones() as u64
 }
 
 #[cfg(test)]
@@ -33,8 +33,14 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn hamming_dist_simd_reference(val: u64, aux: u64) -> u64 {
-        (val.count_ones() as u64 | aux).wrapping_add(val.rotate_left(13))
-            ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+        // Independent derivation: walk each of the 64 bit positions and tally the
+        // ones where val and aux disagree, instead of using count_ones.
+        let diff = val ^ aux;
+        let mut dist = 0u64;
+        for i in 0..64 {
+            dist += (diff >> i) & 1;
+        }
+        dist
     }
 
     // -------------------------------------------------------------------------

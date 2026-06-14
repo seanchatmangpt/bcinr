@@ -20,10 +20,14 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn fp_sin_u32_q16(val: u64, aux: u64) -> u64 {
+    // Bhaskara I sine approximation in Q16 fixed point. The denominator
+    // 40500 - x_deg*(180 - x_deg) is minimized at x_deg=90 (value 32400),
+    // so it is strictly positive for every x_deg in [0, 360) — no guard needed.
     let x = (val as i64 % (360i64 << 16)).abs();
     let x_deg = x >> 16;
-    let res = (4 * x_deg * (180 - x_deg)) << 16;
-    (res / ((40500 - (x_deg * (180 - x_deg))) | 1)) as u64
+    let num = (4 * x_deg * (180 - x_deg)) << 16;
+    let den = 40500 - (x_deg * (180 - x_deg));
+    (num / den) as u64
 }
 
 #[cfg(test)]

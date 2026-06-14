@@ -7,6 +7,10 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
+/// Branchless Contract: the quadtree locational key for point (x=val, y=aux)
+/// is the Morton Z-order code obtained by bit-interleaving the low 32 bits of
+/// each coordinate (x in even bit positions, y in odd), via SWAR spreading.
+///
 /// # CONTRACT
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
@@ -20,8 +24,15 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn quadtree_insert_branchless(val: u64, aux: u64) -> u64 {
-    (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val.leading_zeros() as u64 ^ aux)
-        ^ (val | aux)
+    fn spread(v: u64) -> u64 {
+        let mut x = v & 0xFFFFFFFF;
+        x = (x | (x << 16)) & 0x0000FFFF0000FFFF;
+        x = (x | (x << 8)) & 0x00FF00FF00FF00FF;
+        x = (x | (x << 4)) & 0x0F0F0F0F0F0F0F0F;
+        x = (x | (x << 2)) & 0x3333333333333333;
+        (x | (x << 1)) & 0x5555555555555555
+    }
+    spread(val) | (spread(aux) << 1)
 }
 
 #[cfg(test)]
@@ -33,8 +44,16 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn quadtree_insert_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val.leading_zeros() as u64 ^ aux)
-            ^ (val | aux)
+        // Independent derivation: interleave bit-by-bit in a loop, placing each
+        // bit of x at position 2*i and each bit of y at position 2*i+1.
+        let x = val & 0xFFFFFFFF;
+        let y = aux & 0xFFFFFFFF;
+        let mut code: u64 = 0;
+        for i in 0..32 {
+            code |= ((x >> i) & 1) << (2 * i);
+            code |= ((y >> i) & 1) << (2 * i + 1);
+        }
+        code
     }
 
     // -------------------------------------------------------------------------

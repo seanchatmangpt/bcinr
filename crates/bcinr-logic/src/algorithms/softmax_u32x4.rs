@@ -36,14 +36,14 @@ mod tests {
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
-    #[allow(clippy::manual_checked_ops)]
     fn softmax_u32x4_reference(val: u64, aux: u64) -> u64 {
         let den = aux.wrapping_add(1);
         if den == 0 {
-            0
-        } else {
-            (val * val) / den
+            return 0;
         }
+        // True squared value reduced modulo 2^64 (independent of impl's wrapping_mul).
+        let sq = ((val as u128) * (val as u128)) % (1u128 << 64);
+        (sq / den as u128) as u64
     }
 
     // -------------------------------------------------------------------------

@@ -31,8 +31,10 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn find_last_of_branchless(val: u64, aux: u64) -> u64 {
-    let x = val ^ (aux.wrapping_mul(0x0101010101010101));
-    let m = (x.wrapping_sub(0x0101010101010101)) & (!x) & 0x8080808080808080;
+    let x = val ^ ((aux & 0xFF).wrapping_mul(0x0101010101010101));
+    // Cascade-safe per-byte match mask (0x80 in each lane equal to the needle).
+    let m = !(((x & 0x7F7F7F7F7F7F7F7F).wrapping_add(0x7F7F7F7F7F7F7F7F) | x) & 0x8080808080808080)
+        & 0x8080808080808080;
     let has_match = (((m.wrapping_neg() | m) as i64) >> 63) as u64 & 1;
     let idx = (63u64.wrapping_sub(m.leading_zeros() as u64)) >> 3;
     (idx & has_match.wrapping_neg()) | (8 & (!has_match.wrapping_neg()))

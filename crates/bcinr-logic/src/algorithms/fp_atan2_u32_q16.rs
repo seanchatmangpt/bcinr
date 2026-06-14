@@ -20,29 +20,32 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn fp_atan2_u32_q16(val: u64, aux: u64) -> u64 {
-    let y = val as i64;
-    let x = aux as i64;
+    // Inputs are interpreted as signed 32-bit coordinates (the "_u32_" lane),
+    // sign-extended to i64. This bounds |y|,|x| < 2^31 so every shift and
+    // product below stays well inside i64 with no overflow or abs panic.
+    let y = (val as u32 as i32) as i64;
+    let x = (aux as u32 as i32) as i64;
     let abs_y = y.abs();
     let abs_x = x.abs();
 
-    let mut angle: i64;
-    let cond = abs_x > abs_y;
-    let m_cond = (cond as i64).wrapping_neg();
+    let m_cond = ((abs_x > abs_y) as i64).wrapping_neg();
 
+    // Polynomial atan approximation on the ratio of the smaller to larger leg.
     let n = (abs_x.min(abs_y) << 16) / (abs_x.max(abs_y) | 1);
     let n2 = (n * n) >> 16;
+    let base = n - ((n * n2) >> 16) / 3;
 
-    angle = (n * 0x00010000) >> 16;
-    angle -= ((n * n2) >> 16) / 3;
-
+    // If |x| <= |y| reflect about 90 degrees; otherwise keep the base angle.
     let off = 90i64 << 16;
-    angle = (angle & m_cond) | ((off - angle) & !m_cond);
+    let angle = (base & m_cond) | ((off - base) & !m_cond);
 
-    let sign_y = ((y >= 0) as i64).wrapping_neg() | 1;
-    angle *= sign_y;
+    // Mirror across the x-axis for negative y: +1 when y >= 0, -1 when y < 0.
+    let sign_y = 1 - 2 * ((y < 0) as i64);
+    let signed = angle * sign_y;
 
+    // Shift into the correct half-plane for negative x.
     let q_adj = ((x < 0) as i64).wrapping_neg() & ((180i64 << 16).wrapping_mul(sign_y));
-    (angle + q_adj) as u64
+    (signed + q_adj) as u64
 }
 
 #[cfg(test)]
@@ -54,8 +57,8 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn fp_atan2_u32_q16_reference(val: u64, aux: u64) -> u64 {
-        let y = val as i64;
-        let x = aux as i64;
+        let y = (val as u32 as i32) as i64;
+        let x = (aux as u32 as i32) as i64;
         let abs_y = y.abs();
         let abs_x = x.abs();
 

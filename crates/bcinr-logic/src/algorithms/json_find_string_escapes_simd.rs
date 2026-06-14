@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -20,7 +20,31 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn json_find_string_escapes_simd(val: u64, aux: u64) -> u64 {
-    (val ^ aux).wrapping_add(aux.rotate_right(7)) ^ (val.rotate_left(13))
+    // Interpretation: SIMD scan of the 8 bytes of `val` for the JSON in-string
+    // escape-relevant characters: backslash '\' (0x5C) and double-quote '"'
+    // (0x22). For each matching lane we emit that byte's most-significant bit,
+    // AND-gated by the per-lane active mask in `aux` (lane active iff non-zero).
+    // Branchless via unrolled per-lane byte-equality.
+    // Per-lane branchless scalar equality (single-byte values, carry-free).
+    let eq = |b: u64, c: u64| 1 - ((((b ^ c) + 255) >> 8) & 1); // 1 iff b == c
+    let lane = |b: u64, a: u64| -> u64 {
+        let hit = eq(b, 0x5C) | eq(b, 0x22);
+        let active = (a + 255) >> 8 & 1; // 1 iff a != 0
+        (hit & active) << 7
+    };
+    let v = val.to_le_bytes();
+    let a = aux.to_le_bytes();
+    let out = [
+        lane(v[0] as u64, a[0] as u64) as u8,
+        lane(v[1] as u64, a[1] as u64) as u8,
+        lane(v[2] as u64, a[2] as u64) as u8,
+        lane(v[3] as u64, a[3] as u64) as u8,
+        lane(v[4] as u64, a[4] as u64) as u8,
+        lane(v[5] as u64, a[5] as u64) as u8,
+        lane(v[6] as u64, a[6] as u64) as u8,
+        lane(v[7] as u64, a[7] as u64) as u8,
+    ];
+    u64::from_le_bytes(out)
 }
 
 #[cfg(test)]
@@ -33,7 +57,17 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn json_find_string_escapes_simd_reference(val: u64, aux: u64) -> u64 {
-        (val ^ aux).wrapping_add(aux.rotate_right(7)) ^ (val.rotate_left(13))
+        // Independent: explicit per-byte scan for the two escape characters.
+        let v = val.to_le_bytes();
+        let a = aux.to_le_bytes();
+        let mut out = [0u8; 8];
+        for i in 0..8 {
+            let hit = v[i] == b'\\' || v[i] == b'"';
+            if a[i] != 0 && hit {
+                out[i] = 0x80;
+            }
+        }
+        u64::from_le_bytes(out)
     }
 
     // -------------------------------------------------------------------------

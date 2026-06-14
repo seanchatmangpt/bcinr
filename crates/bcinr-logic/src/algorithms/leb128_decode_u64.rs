@@ -33,6 +33,7 @@
 /// let result = leb128_decode_u64(0x2A, 0);
 /// assert_eq!(result, 42);
 /// ```
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 pub fn leb128_decode_u64(bytes: u64, _aux: u64) -> u64 {
@@ -46,48 +47,37 @@ pub fn leb128_decode_u64(bytes: u64, _aux: u64) -> u64 {
     let b6 = ((bytes >> 48) & 0xFF) as u8;
     let b7 = ((bytes >> 56) & 0xFF) as u8;
 
-    // Branchless LEB128 decoding
-    // Process all 8 bytes in parallel, then mask based on continuation bits
+    // Branchless Contract: a byte's 7 payload bits are included iff EVERY preceding
+    // byte set its continuation bit (bit 7). The gate is therefore the cumulative AND
+    // of all prior continuation bits, expanded to a full 0/all-ones lane mask. No
+    // control flow: the running mask is folded by repeated bitwise AND.
 
-    // Byte 0: always included
-    let mut result: u64 = (b0 & 0x7F) as u64;
+    // Per-byte continuation lane masks (all-ones when that byte continues).
+    let c0 = 0u64.wrapping_sub(((b0 >> 7) & 1) as u64);
+    let c1 = 0u64.wrapping_sub(((b1 >> 7) & 1) as u64);
+    let c2 = 0u64.wrapping_sub(((b2 >> 7) & 1) as u64);
+    let c3 = 0u64.wrapping_sub(((b3 >> 7) & 1) as u64);
+    let c4 = 0u64.wrapping_sub(((b4 >> 7) & 1) as u64);
+    let c5 = 0u64.wrapping_sub(((b5 >> 7) & 1) as u64);
+    let c6 = 0u64.wrapping_sub(((b6 >> 7) & 1) as u64);
 
-    // Byte 1: included if b0 has continuation bit (bit 7)
-    let b1_contrib = ((b1 & 0x7F) as u64) << 7;
-    let cont1_mask = ((b0 >> 7) & 1) as u64;
-    result |= b1_contrib & (-(cont1_mask as i64) as u64);
+    // Cumulative include masks: gate_k is all-ones iff bytes 0..k all continued.
+    let g1 = c0;
+    let g2 = g1 & c1;
+    let g3 = g2 & c2;
+    let g4 = g3 & c3;
+    let g5 = g4 & c4;
+    let g6 = g5 & c5;
+    let g7 = g6 & c6;
 
-    // Byte 2: included if b1 has continuation bit
-    let b2_contrib = ((b2 & 0x7F) as u64) << 14;
-    let cont2_mask = ((b1 >> 7) & 1) as u64;
-    result |= b2_contrib & (-(cont2_mask as i64) as u64);
-
-    // Byte 3: included if b2 has continuation bit
-    let b3_contrib = ((b3 & 0x7F) as u64) << 21;
-    let cont3_mask = ((b2 >> 7) & 1) as u64;
-    result |= b3_contrib & (-(cont3_mask as i64) as u64);
-
-    // Byte 4: included if b3 has continuation bit
-    let b4_contrib = ((b4 & 0x7F) as u64) << 28;
-    let cont4_mask = ((b3 >> 7) & 1) as u64;
-    result |= b4_contrib & (-(cont4_mask as i64) as u64);
-
-    // Byte 5: included if b4 has continuation bit
-    let b5_contrib = ((b5 & 0x7F) as u64) << 35;
-    let cont5_mask = ((b4 >> 7) & 1) as u64;
-    result |= b5_contrib & (-(cont5_mask as i64) as u64);
-
-    // Byte 6: included if b5 has continuation bit
-    let b6_contrib = ((b6 & 0x7F) as u64) << 42;
-    let cont6_mask = ((b5 >> 7) & 1) as u64;
-    result |= b6_contrib & (-(cont6_mask as i64) as u64);
-
-    // Byte 7: included if b6 has continuation bit
-    let b7_contrib = ((b7 & 0x7F) as u64) << 49;
-    let cont7_mask = ((b6 >> 7) & 1) as u64;
-    result |= b7_contrib & (-(cont7_mask as i64) as u64);
-
-    result
+    (b0 & 0x7F) as u64
+        | ((((b1 & 0x7F) as u64) << 7) & g1)
+        | ((((b2 & 0x7F) as u64) << 14) & g2)
+        | ((((b3 & 0x7F) as u64) << 21) & g3)
+        | ((((b4 & 0x7F) as u64) << 28) & g4)
+        | ((((b5 & 0x7F) as u64) << 35) & g5)
+        | ((((b6 & 0x7F) as u64) << 42) & g6)
+        | ((((b7 & 0x7F) as u64) << 49) & g7)
 }
 
 #[cfg(test)]

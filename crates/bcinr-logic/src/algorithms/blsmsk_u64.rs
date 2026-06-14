@@ -7,8 +7,10 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Computes the BMI `blsmsk` mask: all bits up to and including the lowest
+/// set bit of `val` are set, via `val ^ (val - 1)`. When `val` is 0 the result is the
+/// all-ones word. `aux` is unused.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -34,7 +36,13 @@ mod tests {
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
     fn blsmsk_u64_reference(val: u64, aux: u64) -> u64 {
-        val ^ val.wrapping_sub(1)
+        // Independent: build the mask from the lowest-set-bit index (all-ones if none).
+        let tz = val.trailing_zeros();
+        if tz >= 64 {
+            u64::MAX
+        } else {
+            (1u64 << tz) | ((1u64 << tz) - 1)
+        }
     }
 
     // -------------------------------------------------------------------------

@@ -7,6 +7,10 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
+/// Branchless Contract: rounds the u32 value `val` UP to the nearest higher
+/// multiple of step `aux` (as u32): `x + ((step - x mod step) mod step)`.
+/// Step 0 returns `x`; the final add wraps modulo 2^32 on overflow.
+///
 /// # CONTRACT
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
@@ -20,8 +24,12 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn round_up_u32(val: u64, aux: u64) -> u64 {
-    (val.reverse_bits() ^ aux).wrapping_add(val.wrapping_sub(aux))
-        ^ ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
+    let x = val as u32;
+    let step = aux as u32;
+    let rem = x.checked_rem(step).unwrap_or(0);
+    let deficit = step.wrapping_sub(rem);
+    let add = deficit.checked_rem(step).unwrap_or(0);
+    x.wrapping_add(add) as u64
 }
 
 #[cfg(test)]
@@ -33,8 +41,20 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn round_up_u32_reference(val: u64, aux: u64) -> u64 {
-        (val.reverse_bits() ^ aux).wrapping_add(val.wrapping_sub(aux))
-            ^ ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
+        // Independent derivation: floor to a multiple, then conditionally add a
+        // full step when there was a non-zero remainder (matching wrap-on-add).
+        let x = val as u32;
+        let step = aux as u32;
+        if step == 0 {
+            return x as u64;
+        }
+        let rem = x % step;
+        let down = x - rem;
+        if rem == 0 {
+            down as u64
+        } else {
+            down.wrapping_add(step) as u64
+        }
     }
 
     // -------------------------------------------------------------------------

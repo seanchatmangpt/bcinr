@@ -7,8 +7,13 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Interpretation:** Adler-32 checksum of the 8 bytes packed (little-endian) in
+/// `val`, where `aux` supplies the running state: `a = aux & 0xFFFF` (low sum),
+/// `b = (aux >> 16) & 0xFFFF` (high sum). Each byte updates `a += byte` then
+/// `b += a`, both taken mod 65521. The result is `(b << 16) | a`. The 8-byte
+/// window is fully unrolled, so the whole routine is branchless and O(1).
+/// **Ensures:** Result matches the independent reference for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,8 +25,26 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn adler32_branchless(val: u64, aux: u64) -> u64 {
-    (val.rotate_left(13)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1)))
-        ^ (!(val & aux) & (val | aux))
+    const MOD: u64 = 65521;
+    let mut a = (aux & 0xFFFF) % MOD;
+    let mut b = ((aux >> 16) & 0xFFFF) % MOD;
+    a = (a + (val & 0xFF)) % MOD;
+    b = (b + a) % MOD;
+    a = (a + ((val >> 8) & 0xFF)) % MOD;
+    b = (b + a) % MOD;
+    a = (a + ((val >> 16) & 0xFF)) % MOD;
+    b = (b + a) % MOD;
+    a = (a + ((val >> 24) & 0xFF)) % MOD;
+    b = (b + a) % MOD;
+    a = (a + ((val >> 32) & 0xFF)) % MOD;
+    b = (b + a) % MOD;
+    a = (a + ((val >> 40) & 0xFF)) % MOD;
+    b = (b + a) % MOD;
+    a = (a + ((val >> 48) & 0xFF)) % MOD;
+    b = (b + a) % MOD;
+    a = (a + ((val >> 56) & 0xFF)) % MOD;
+    b = (b + a) % MOD;
+    (b << 16) | a
 }
 
 #[cfg(test)]
@@ -33,8 +56,22 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn adler32_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val.rotate_left(13)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1)))
-            ^ (!(val & aux) & (val | aux))
+        // Independent: gather bytes into a slice and accumulate via a loop.
+        let m: u64 = 65521;
+        let bytes = val.to_le_bytes();
+        let mut a = (aux & 0xFFFF) % m;
+        let mut b = ((aux >> 16) & 0xFFFF) % m;
+        for &byte in bytes.iter() {
+            a += byte as u64;
+            if a >= m {
+                a -= m;
+            }
+            b += a;
+            if b >= m {
+                b -= m;
+            }
+        }
+        (b << 16) | a
     }
 
     // -------------------------------------------------------------------------

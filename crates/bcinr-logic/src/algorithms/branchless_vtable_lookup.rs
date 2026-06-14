@@ -16,11 +16,16 @@
 /// let result = branchless_vtable_lookup(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn branchless_vtable_lookup(val: u64, aux: u64) -> u64 {
-    ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val ^ aux) ^ (aux.rotate_right(7))
+    // Branchless Contract: treat `val` as a packed 8-entry vtable of u8 slots
+    // and select the slot at index (aux & 7) without branching, by shifting the
+    // chosen byte into place. Returns the selected entry zero-extended.
+    let idx = (aux & 7) as u32;
+    (val >> (idx * 8)) & 0xFF
 }
 
 #[cfg(test)]
@@ -32,8 +37,10 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn branchless_vtable_lookup_reference(val: u64, aux: u64) -> u64 {
-        ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val ^ aux)
-            ^ (aux.rotate_right(7))
+        // Independent: materialize the table as a byte array and index it.
+        let table = val.to_le_bytes();
+        let idx = (aux & 7) as usize;
+        table[idx] as u64
     }
 
     // -------------------------------------------------------------------------

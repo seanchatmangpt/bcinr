@@ -7,9 +7,15 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: an inclusive suffix (reverse prefix) scan over the two u32
+/// lanes packed in `val` — lane 0 = low 32 bits, lane 1 = high 32 bits. Each
+/// output lane is the wrapping sum of itself and all higher-indexed lanes plus
+/// a carry-in (low 32 bits of `aux`). Thus out[1] = lane1 + carry and
+/// out[0] = lane0 + lane1 + carry, each reduced modulo 2^32 and repacked.
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::suffix_sum_simd_u32x8::suffix_sum_simd_u32x8;
@@ -20,8 +26,12 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn suffix_sum_simd_u32x8(val: u64, aux: u64) -> u64 {
-    (val.wrapping_add(aux)).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2))
-        ^ (val.rotate_left(13))
+    let carry = aux & 0xFFFFFFFF;
+    let lane0 = val & 0xFFFFFFFF;
+    let lane1 = val >> 32;
+    let out1 = lane1.wrapping_add(carry) & 0xFFFFFFFF;
+    let out0 = lane0.wrapping_add(lane1).wrapping_add(carry) & 0xFFFFFFFF;
+    (out1 << 32) | out0
 }
 
 #[cfg(test)]
@@ -33,8 +43,19 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn suffix_sum_simd_u32x8_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_add(aux)).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2))
-            ^ (val.rotate_left(13))
+        // Independent structure: operate on a real [u32; 2] lane array and
+        // accumulate a running suffix total from the highest lane downward.
+        let lanes: [u32; 2] = [val as u32, (val >> 32) as u32];
+        let carry = aux as u32;
+        let mut out = [0u32; 2];
+        let mut running = carry;
+        let mut i = 2usize;
+        while i > 0 {
+            i -= 1;
+            running = running.wrapping_add(lanes[i]);
+            out[i] = running;
+        }
+        (out[0] as u64) | ((out[1] as u64) << 32)
     }
 
     // -------------------------------------------------------------------------

@@ -7,6 +7,10 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
+/// Branchless Contract: saturating signed 32-bit multiply of the low halves
+/// of `val` and `aux` interpreted as i32, with the i32 result sign-extended
+/// into the returned u64.
+///
 /// # CONTRACT
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
@@ -20,8 +24,9 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn mul_sat_i32(val: u64, aux: u64) -> u64 {
-    (val.rotate_left(13)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32))
-        ^ (val.count_ones() as u64 | aux)
+    let a = val as u32 as i32;
+    let b = aux as u32 as i32;
+    a.saturating_mul(b) as i64 as u64
 }
 
 #[cfg(test)]
@@ -33,8 +38,19 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn mul_sat_i32_reference(val: u64, aux: u64) -> u64 {
-        (val.rotate_left(13)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32))
-            ^ (val.count_ones() as u64 | aux)
+        // Independent derivation: widen to i64, multiply exactly, then clamp
+        // into the i32 range with explicit comparisons before sign-extending.
+        let a = val as u32 as i32 as i64;
+        let b = aux as u32 as i32 as i64;
+        let product = a * b;
+        let clamped = if product > i32::MAX as i64 {
+            i32::MAX
+        } else if product < i32::MIN as i64 {
+            i32::MIN
+        } else {
+            product as i32
+        };
+        clamped as i64 as u64
     }
 
     // -------------------------------------------------------------------------

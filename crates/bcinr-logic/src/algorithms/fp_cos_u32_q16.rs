@@ -20,11 +20,15 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn fp_cos_u32_q16(val: u64, aux: u64) -> u64 {
+    // cos(x) = sin(x + 90 degrees) via Bhaskara I in Q16 fixed point.
+    // The denominator 40500 - x_deg*(180 - x_deg) is minimized at x_deg=90
+    // (value 32400), so it is strictly positive for every x_deg — no guard needed.
     let x = (val as i64 % (360i64 << 16)).abs();
-    let sin_val = (x + (90i64 << 16)) % (360i64 << 16);
-    let x_deg = sin_val >> 16;
-    let res = (4 * x_deg * (180 - x_deg)) << 16;
-    (res / ((40500 - (x_deg * (180 - x_deg))) | 1)) as u64
+    let shifted = (x + (90i64 << 16)) % (360i64 << 16);
+    let x_deg = shifted >> 16;
+    let num = (4 * x_deg * (180 - x_deg)) << 16;
+    let den = 40500 - (x_deg * (180 - x_deg));
+    (num / den) as u64
 }
 
 #[cfg(test)]

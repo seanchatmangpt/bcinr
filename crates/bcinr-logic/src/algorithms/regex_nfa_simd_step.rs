@@ -7,6 +7,11 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
+/// Branchless Contract: one Glushkov/bitap NFA transition step over a 64-bit
+/// active-state bitset `val` against the current symbol's transition mask
+/// `aux`: shift all states forward by one, inject the always-live start state,
+/// then keep only states permitted by the mask -> `((val << 1) | 1) & aux`.
+///
 /// # CONTRACT
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
@@ -20,9 +25,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn regex_nfa_simd_step(val: u64, aux: u64) -> u64 {
-    (val.reverse_bits() ^ aux)
-        .wrapping_add((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-        ^ (val.reverse_bits() ^ aux)
+    ((val << 1) | 1) & aux
 }
 
 #[cfg(test)]
@@ -34,9 +37,16 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn regex_nfa_simd_step_reference(val: u64, aux: u64) -> u64 {
-        (val.reverse_bits() ^ aux)
-            .wrapping_add((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-            ^ (val.reverse_bits() ^ aux)
+        // Independent derivation: compute the propagated/start state set first,
+        // then filter it state-by-state against the transition mask in a loop.
+        let propagated = (val << 1) | 1;
+        let mut next = 0u64;
+        for i in 0..64 {
+            let bit = (propagated >> i) & 1;
+            let allowed = (aux >> i) & 1;
+            next |= (bit & allowed) << i;
+        }
+        next
     }
 
     // -------------------------------------------------------------------------

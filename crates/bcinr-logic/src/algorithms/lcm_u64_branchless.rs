@@ -78,7 +78,9 @@ mod tests {
             b = a % b;
             a = t;
         }
-        (val / a) * aux
+        // lcm = val/gcd * aux; wraps modulo 2^64 to mirror the branchless
+        // primitive's wrapping_mul semantics when the true lcm exceeds u64.
+        (val / a).wrapping_mul(aux)
     }
 
     // -------------------------------------------------------------------------

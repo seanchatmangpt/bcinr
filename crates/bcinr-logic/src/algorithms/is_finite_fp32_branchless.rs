@@ -7,7 +7,7 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
@@ -20,9 +20,17 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn is_finite_fp32_branchless(val: u64, aux: u64) -> u64 {
-    (val.leading_zeros() as u64 ^ aux)
-        .wrapping_add((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-        ^ (val.reverse_bits() ^ aux)
+    // Interpretation: the low 32 bits of `val` and of `aux` each hold an IEEE-754
+    // binary32 bit pattern. A value is finite iff its exponent field (bits 23..30)
+    // is not all-ones (0xFF). We pack the two predicates: bit0 = finite(val),
+    // bit1 = finite(aux). Fully branchless via masked exponent compare.
+    let finite = |x: u64| -> u64 {
+        let exp = (x >> 23) & 0xFF;
+        // d == 0 exactly when exp == 0xFF (infinite/NaN); else d != 0 (finite).
+        let d = exp ^ 0xFF;
+        d.wrapping_neg() >> 63
+    };
+    finite(val) | (finite(aux) << 1)
 }
 
 #[cfg(test)]
@@ -34,9 +42,16 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn is_finite_fp32_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val.leading_zeros() as u64 ^ aux)
-            .wrapping_add((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-            ^ (val.reverse_bits() ^ aux)
+        // Independent: reconstruct the f32 and use the standard library predicate.
+        let bit = |x: u64| -> u64 {
+            let f = f32::from_bits(x as u32);
+            if f.is_finite() {
+                1
+            } else {
+                0
+            }
+        };
+        bit(val) | (bit(aux) << 1)
     }
 
     // -------------------------------------------------------------------------

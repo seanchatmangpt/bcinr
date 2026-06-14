@@ -16,12 +16,24 @@
 /// let result = convex_hull_monotone_chain_step(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn convex_hull_monotone_chain_step(val: u64, aux: u64) -> u64 {
-    (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val.count_ones() as u64 | aux)
-        ^ (val & aux)
+    // Branchless Contract: the orientation test driving Andrew's monotone-chain
+    // convex-hull step. Each operand packs a 2D vector as two i32 components
+    // (x in the low half, y in the high half). Returns the sign of the cross
+    // product vx*ay - vy*ax as a two's-complement u64 (-1 = clockwise/right
+    // turn, 0 = collinear, 1 = counter-clockwise/left turn).
+    let vx = (val as i32) as i128;
+    let vy = ((val >> 32) as i32) as i128;
+    let ax = (aux as i32) as i128;
+    let ay = ((aux >> 32) as i32) as i128;
+    let cross = vx * ay - vy * ax;
+    // Branchless signum via comparison masks (booleans, no control flow).
+    let s = (cross > 0) as i64 - (cross < 0) as i64;
+    s as u64
 }
 
 #[cfg(test)]
@@ -33,8 +45,18 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn convex_hull_monotone_chain_step_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val.count_ones() as u64 | aux)
-            ^ (val & aux)
+        // Independent: compute the cross product, classify with match on ordering.
+        let vx = (val as i32) as i128;
+        let vy = ((val >> 32) as i32) as i128;
+        let ax = (aux as i32) as i128;
+        let ay = ((aux >> 32) as i32) as i128;
+        let cross = vx * ay - vy * ax;
+        let s: i64 = match cross.cmp(&0) {
+            core::cmp::Ordering::Greater => 1,
+            core::cmp::Ordering::Equal => 0,
+            core::cmp::Ordering::Less => -1,
+        };
+        s as u64
     }
 
     // -------------------------------------------------------------------------

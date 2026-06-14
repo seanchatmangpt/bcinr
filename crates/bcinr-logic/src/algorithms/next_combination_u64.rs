@@ -4,6 +4,8 @@
 
 /// next_combination_u64
 ///
+/// # Branchless Contract
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -22,9 +24,13 @@
 pub fn next_combination_u64(val: u64, aux: u64) -> u64 {
     let v = val;
     let t = v | v.wrapping_sub(1);
-
-    (t.wrapping_add(1))
-        | (((!t & (t.wrapping_add(1))).wrapping_sub(1)) >> (v.trailing_zeros().wrapping_add(1)))
+    let tp1 = t.wrapping_add(1);
+    // Shift amount ctz(v)+1; mask to 0..=63 to avoid UB shift; v==0 result is squelched below.
+    let shift = v.trailing_zeros().wrapping_add(1) & 63;
+    let gosper = tp1 | (((!t & tp1).wrapping_sub(1)) >> shift);
+    // Branchless: when v == 0 (Gosper undefined), yield 0 per the reference convention.
+    let nonzero = 0u64.wrapping_sub((v != 0) as u64);
+    gosper & nonzero
 }
 
 #[cfg(test)]
@@ -35,14 +41,23 @@ mod tests {
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
+    // Independent reference: the value Gosper's hack computes, derived structurally
+    // rather than copying the bit-twiddle. Gosper produces, from the low block of
+    // set bits, a result equal to:
+    //   smallest = (1 << k) - 1  where k = popcount of the lowest run,
+    //   moved one position up plus the relocated low bits.
+    // We compute it via the canonical "ripple + ones" decomposition using u128 to
+    // sidestep the u64 overflow that the in-place hack relies on wrapping for.
     fn next_combination_u64_reference(val: u64, _aux: u64) -> u64 {
-        let v = val;
+        let v = val as u128;
         if v == 0 {
             return 0;
         }
-        let t = v | (v - 1);
-
-        (t + 1) | (((!t & (t + 1)) - 1) >> (v.trailing_zeros() + 1))
+        let smallest = v & v.wrapping_neg(); // lowest set bit
+        let ripple = v + smallest; // carry the low block up
+        let ones = v ^ ripple; // bits that changed
+        let ones = (ones >> 2) / smallest; // surviving low ones, shifted into place
+        (ripple | ones) as u64
     }
 
     // -------------------------------------------------------------------------

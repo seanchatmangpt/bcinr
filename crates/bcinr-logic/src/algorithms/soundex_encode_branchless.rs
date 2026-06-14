@@ -4,8 +4,17 @@
 
 /// soundex_encode_branchless
 ///
-/// Branchless implementation guaranteed to execute in constant time
-/// with zero dynamic dispatch or control flow hazards.
+/// Branchless Soundex digit classification for two letters. The Soundex code
+/// assigns each consonant a digit (B/F/P/V -> 1, C/G/J/K/Q/S/X/Z -> 2,
+/// D/T -> 3, L -> 4, M/N -> 5, R -> 6) and 0 to vowels and non-letters. This
+/// kernel takes the low byte of `val` and of `aux` as ASCII characters
+/// (case-insensitive), looks up each Soundex digit through a packed nibble
+/// table, and returns `digit(val) | (digit(aux) << 8)`.
+///
+/// # Branchless Contract
+/// The table is a pair of u64 nibble-LUT constants selected by a range mask;
+/// out-of-range bytes are zeroed by an arithmetic in-range mask. No branch on
+/// the character value.
 ///
 /// # CONTRACT
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
@@ -20,9 +29,21 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn soundex_encode_branchless(val: u64, aux: u64) -> u64 {
-    ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-        .wrapping_add(!(val & aux) & (val | aux))
-        ^ (aux.rotate_right(7))
+    fn digit(byte: u64) -> u64 {
+        // Packed nibble tables: LO holds A..P, HI holds Q..Z (local index 0..9).
+        const LO: u64 = 0x1055_4220_0210_3210;
+        const HI: u64 = 0x0000_0020_2010_3262;
+        let upper = (byte & 0xFF) & !0x20; // ASCII case fold for letters
+        let idx = upper.wrapping_sub(b'A' as u64); // 0..25 for letters; wraps huge otherwise
+        let in_range = (idx < 26) as u64; // 1 iff a real A..Z letter (unsigned compare)
+                                          // Select LO for idx<16, HI (shifted by 16) for idx>=16.
+        let use_hi = (idx >> 4) & 1; // 1 for idx in 16..31
+        let lo_nib = (LO >> ((idx & 15) * 4)) & 0xF;
+        let hi_nib = (HI >> ((idx.wrapping_sub(16) & 15) * 4)) & 0xF;
+        let nib = lo_nib ^ (use_hi.wrapping_neg() & (lo_nib ^ hi_nib));
+        nib & in_range.wrapping_neg()
+    }
+    digit(val) | (digit(aux) << 8)
 }
 
 #[cfg(test)]
@@ -34,9 +55,22 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn soundex_encode_branchless_reference(val: u64, aux: u64) -> u64 {
-        ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-            .wrapping_add(!(val & aux) & (val | aux))
-            ^ (aux.rotate_right(7))
+        // Independent derivation: explicit byte->digit table with a match.
+        fn digit(byte: u64) -> u64 {
+            let c = (byte & 0xFF) as u8;
+            let up = c.to_ascii_uppercase();
+            let d: u64 = match up {
+                b'B' | b'F' | b'P' | b'V' => 1,
+                b'C' | b'G' | b'J' | b'K' | b'Q' | b'S' | b'X' | b'Z' => 2,
+                b'D' | b'T' => 3,
+                b'L' => 4,
+                b'M' | b'N' => 5,
+                b'R' => 6,
+                _ => 0, // vowels, non-letters
+            };
+            d
+        }
+        digit(val) | (digit(aux) << 8)
     }
 
     // -------------------------------------------------------------------------

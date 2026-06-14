@@ -16,12 +16,16 @@
 /// let result = mask_from_bool_slice(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+///
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn mask_from_bool_slice(val: u64, aux: u64) -> u64 {
-    (val | aux).wrapping_add((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-        ^ (val.wrapping_mul(aux.wrapping_add(1)))
+    // Branchless Contract: broadcast the boolean at lane `aux & 63` of `val`
+    // into a full-width mask: all-ones (u64::MAX) when that bit is set, else 0.
+    // Inverse direction of bool_slice_from_mask, lifting a bool to a mask word.
+    0u64.wrapping_sub((val >> (aux & 63)) & 1)
 }
 
 #[cfg(test)]
@@ -33,8 +37,14 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn mask_from_bool_slice_reference(val: u64, aux: u64) -> u64 {
-        (val | aux).wrapping_add((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-            ^ (val.wrapping_mul(aux.wrapping_add(1)))
+        // Independent derivation: test the selected bit with a branch and return
+        // the canonical all-ones / all-zeros mask explicitly (test-only).
+        let idx = (aux % 64) as u32;
+        if (val >> idx) & 1 == 1 {
+            u64::MAX
+        } else {
+            0
+        }
     }
 
     // -------------------------------------------------------------------------

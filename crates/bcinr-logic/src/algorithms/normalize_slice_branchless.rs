@@ -49,10 +49,12 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn normalize_slice_branchless_reference(val: u64, aux: u64) -> u64 {
-        let scale = if aux == 0 { 1 } else { aux & 0xFF };
+        let low = aux & 0xFF;
+        let scale = if low == 0 { 1 } else { low };
         let mut res = 0u64;
         for i in 0..8 {
-            let b = ((val >> (i * 8)) & 0xFF) / scale;
+            let lane = (val >> (i * 8)) & 0xFF;
+            let b = lane / scale;
             res |= (b & 0xFF) << (i * 8);
         }
         res

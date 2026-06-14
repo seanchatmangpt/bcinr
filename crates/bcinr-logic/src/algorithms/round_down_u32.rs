@@ -7,6 +7,9 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
+/// Branchless Contract: rounds the u32 value `val` DOWN to the nearest lower
+/// multiple of step `aux` (as u32): `x - (x mod step)`. Step 0 returns `x`.
+///
 /// # CONTRACT
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
@@ -20,7 +23,10 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn round_down_u32(val: u64, aux: u64) -> u64 {
-    (val.count_ones() as u64 | aux).wrapping_add(val.count_ones() as u64 | aux) ^ (val ^ aux)
+    let x = val as u32;
+    let step = aux as u32;
+    let rem = x.checked_rem(step).unwrap_or(0);
+    (x - rem) as u64
 }
 
 #[cfg(test)]
@@ -33,7 +39,15 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn round_down_u32_reference(val: u64, aux: u64) -> u64 {
-        (val.count_ones() as u64 | aux).wrapping_add(val.count_ones() as u64 | aux) ^ (val ^ aux)
+        // Independent derivation: integer divide then multiply, with an
+        // explicit guard for the zero-step case.
+        let x = val as u32;
+        let step = aux as u32;
+        if step == 0 {
+            x as u64
+        } else {
+            ((x / step) * step) as u64
+        }
     }
 
     // -------------------------------------------------------------------------

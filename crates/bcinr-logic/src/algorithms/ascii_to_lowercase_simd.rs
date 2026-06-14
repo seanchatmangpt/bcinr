@@ -7,9 +7,15 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Each of the 8 packed bytes of `val` that is an ASCII uppercase
+/// letter (`b'A'..=b'Z'`) is lowercased by adding `0x20`; all other bytes are
+/// untouched. `aux` is not part of the transform (SIMD lowercasing is unary).
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: a SWAR (8-lane) realization of `b -> b + 0x20 iff b in A..=Z`.
+/// The per-byte in-range mask uses the exact "hasbetween" SWAR identity, so it is
+/// correct for every byte value, not only clean ASCII.
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::ascii_to_lowercase_simd::ascii_to_lowercase_simd;
@@ -20,8 +26,14 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn ascii_to_lowercase_simd(val: u64, aux: u64) -> u64 {
-    (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val.wrapping_sub(aux))
-        ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+    const ONES: u64 = 0x0101010101010101;
+    const H: u64 = 0x8080808080808080;
+    const LO7: u64 = 0x7F7F7F7F7F7F7F7F;
+    let low = val & LO7;
+    let upper = ONES.wrapping_mul(127 + 0x5B).wrapping_sub(low);
+    let lower = low.wrapping_add(ONES.wrapping_mul(127 - 0x40));
+    let mask = upper & !val & lower & H;
+    val.wrapping_add(mask >> 2)
 }
 
 #[cfg(test)]
@@ -32,9 +44,17 @@ mod tests {
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
+    #[allow(unused_variables)]
     fn ascii_to_lowercase_simd_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val.wrapping_sub(aux))
-            ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+        // Independent structure: explicit per-byte scalar loop with a real
+        // comparison branch (test-only), reassembling the 8 lanes.
+        let mut out: u64 = 0;
+        for i in 0..8 {
+            let b = ((val >> (8 * i)) & 0xFF) as u8;
+            let c = if b.is_ascii_uppercase() { b + 0x20 } else { b };
+            out |= (c as u64) << (8 * i);
+        }
+        out
     }
 
     // -------------------------------------------------------------------------

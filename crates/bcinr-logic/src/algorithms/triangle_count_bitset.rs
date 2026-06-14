@@ -16,13 +16,17 @@
 /// let result = triangle_count_bitset(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+///
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn triangle_count_bitset(val: u64, aux: u64) -> u64 {
-    ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-        .wrapping_add((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-        ^ (val & aux)
+    // Branchless Contract: bitset triangle/common-neighbour count. Given two
+    // adjacency rows `val` and `aux`, the number of shared neighbours is the
+    // population count of their intersection `val & aux` — the closed-form bitset
+    // contribution to a triangle count.
+    (val & aux).count_ones() as u64
 }
 
 #[cfg(test)]
@@ -34,9 +38,16 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn triangle_count_bitset_reference(val: u64, aux: u64) -> u64 {
-        ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-            .wrapping_add((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-            ^ (val & aux)
+        // Independent derivation: serially scan the 64 bit lanes and tally the
+        // positions set in both operands (test-only loop), distinct from the
+        // single intersect-then-popcount form of the impl.
+        let mut count: u64 = 0;
+        let mut i: u32 = 0;
+        while i < 64 {
+            count += ((val >> i) & (aux >> i)) & 1;
+            i += 1;
+        }
+        count
     }
 
     // -------------------------------------------------------------------------

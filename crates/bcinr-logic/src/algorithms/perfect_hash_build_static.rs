@@ -16,12 +16,23 @@
 /// let result = perfect_hash_build_static(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+///
+/// # Branchless Contract
+/// Interpretation: the CHD-style displacement seed for a static perfect hash.
+/// `val` is the key, `aux` is the trial seed for its bucket. The seed is folded
+/// into the key by Fibonacci hashing (`* golden ratio`) and a second seed-keyed
+/// avalanche, yielding the displaced 64-bit position. A perfect-hash build loops
+/// over candidate `aux` seeds until this slot is collision-free; this primitive
+/// computes one candidate displacement.
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn perfect_hash_build_static(val: u64, aux: u64) -> u64 {
-    (val.count_ones() as u64 | aux).wrapping_add(!(val & aux) & (val | aux))
-        ^ ((val & 0xFFFFFFFF) | (aux << 32))
+    let mixed = val.wrapping_mul(0x9E3779B97F4A7C15) ^ aux;
+    let folded = mixed.rotate_left(((aux & 63) as u32).wrapping_add(1));
+    folded
+        .wrapping_add(aux.wrapping_mul(0x100000001B3))
+        .rotate_right(17)
 }
 
 #[cfg(test)]
@@ -33,8 +44,19 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn perfect_hash_build_static_reference(val: u64, aux: u64) -> u64 {
-        (val.count_ones() as u64 | aux).wrapping_add(!(val & aux) & (val | aux))
-            ^ ((val & 0xFFFFFFFF) | (aux << 32))
+        // Re-derive via explicit rotate-by-shifts instead of rotate_* methods.
+        let golden: u128 = 0x9E3779B97F4A7C15;
+        let mixed = ((val as u128 * golden) as u64) ^ aux;
+        let r = ((aux & 63) + 1) as u32; // 1..=64
+                                         // left rotate by r using shift/OR (r in 1..=64)
+        let folded = if r == 64 {
+            mixed
+        } else {
+            (mixed << r) | (mixed >> (64 - r))
+        };
+        let summed = folded.wrapping_add(aux.wrapping_mul(0x100000001B3));
+        // right rotate by 17 via shifts
+        (summed >> 17) | (summed << (64 - 17))
     }
 
     // -------------------------------------------------------------------------

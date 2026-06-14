@@ -34,11 +34,17 @@
 /// let fp2 = quotient_filter_add_u64(42, 1338);
 /// assert_ne!(fp1, fp2); // Different aux produces different fingerprints
 /// ```
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 pub fn quotient_filter_add_u64(val: u64, aux: u64) -> u64 {
-    // Mix inputs via XOR to combine both values
-    let mut h = val ^ aux;
+    // # Branchless Contract
+    // Combine the two inputs *order-dependently* so a fingerprint distinguishes
+    // (val, aux) from (aux, val): `aux` is rotated before being folded into
+    // `val`, defeating the symmetry of a bare XOR. The three-round rotate/shift
+    // avalanche then diffuses every input bit across the output. XOR, rotate and
+    // shift only — zero branches, constant time.
+    let mut h = val ^ aux.rotate_left(17).wrapping_add(0x9E3779B97F4A7C15);
 
     // Round 1: XOR with rotated version (rotl by 19)
     h ^= h.rotate_left(19);
@@ -61,10 +67,18 @@ mod tests {
     // REFERENCE: Standard three-round mixing function
     // -------------------------------------------------------------------------
     fn quotient_filter_add_u64_reference(val: u64, aux: u64) -> u64 {
-        let mut h = val ^ aux;
-        h ^= h.rotate_left(19);
-        h ^= h.rotate_left(31);
-        h ^= h >> 27;
+        // Independent structure: build the rotated/biased aux term in named
+        // steps, then run the avalanche as an explicit fold over a list of
+        // (rotate-or-shift) operations rather than the inlined chain.
+        const GOLDEN: u64 = 0x9E3779B97F4A7C15;
+        let aux_term = aux.rotate_left(17).wrapping_add(GOLDEN);
+        let mut h = val ^ aux_term;
+        // (amount, is_right_shift)
+        let rounds: [(u32, bool); 3] = [(19, false), (31, false), (27, true)];
+        for (amt, is_shr) in rounds {
+            let mixed = if is_shr { h >> amt } else { h.rotate_left(amt) };
+            h ^= mixed;
+        }
         h
     }
 
@@ -112,10 +126,11 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_quotient_filter_add_u64_boundaries() {
-        // Zero inputs
+        // Zero inputs: order-dependent mixing folds a nonzero golden-ratio
+        // aux term even when both inputs are zero, so the fingerprint is the
+        // mixed golden constant rather than 0. Impl and reference must agree.
         let fp_00 = quotient_filter_add_u64(0, 0);
         assert_eq!(fp_00, quotient_filter_add_u64_reference(0, 0));
-        assert_eq!(fp_00, 0); // 0 XOR 0 through all rounds = 0
 
         // All ones
         let fp_max = quotient_filter_add_u64(u64::MAX, u64::MAX);
@@ -129,7 +144,8 @@ mod tests {
         let fp_0_max = quotient_filter_add_u64(0, u64::MAX);
         assert_eq!(fp_max_0, quotient_filter_add_u64_reference(u64::MAX, 0));
         assert_eq!(fp_0_max, quotient_filter_add_u64_reference(0, u64::MAX));
-        assert_eq!(fp_max_0, fp_0_max); // u64::MAX XOR 0 = u64::MAX either way
+        // Order-dependent: swapping val/aux must change the fingerprint.
+        assert_ne!(fp_max_0, fp_0_max, "order should affect fingerprint");
 
         // Single bit variations
         let fp_1 = quotient_filter_add_u64(1, 0);

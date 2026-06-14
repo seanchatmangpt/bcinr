@@ -7,6 +7,11 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
+/// Branchless Contract: a fixed-seed pseudo-random permutation (bijection)
+/// of the input index `val`, additionally keyed by `aux`. Realized by the
+/// SplitMix64 finalizer seeded with the golden-ratio constant; every step
+/// (add, xorshift, odd multiply) is invertible, so the map is a permutation.
+///
 /// # CONTRACT
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
@@ -20,8 +25,10 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn random_permutation_fixed_seed(val: u64, aux: u64) -> u64 {
-    (val.count_ones() as u64 | aux).wrapping_add(val.count_ones() as u64 | aux)
-        ^ (val.leading_zeros() as u64 ^ aux)
+    let mut z = val.wrapping_add(aux).wrapping_add(0x9E3779B97F4A7C15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D049BB133111EB);
+    z ^ (z >> 31)
 }
 
 #[cfg(test)]
@@ -33,8 +40,16 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn random_permutation_fixed_seed_reference(val: u64, aux: u64) -> u64 {
-        (val.count_ones() as u64 | aux).wrapping_add(val.count_ones() as u64 | aux)
-            ^ (val.leading_zeros() as u64 ^ aux)
+        // Independent derivation: express the SplitMix64 finalizer through an
+        // explicit xorshift helper applied between the two odd multiplies.
+        fn xorshift(x: u64, s: u32) -> u64 {
+            x ^ (x >> s)
+        }
+        const SEED: u64 = 0x9E3779B97F4A7C15;
+        let seeded = val.wrapping_add(aux).wrapping_add(SEED);
+        let m1 = xorshift(seeded, 30).wrapping_mul(0xBF58476D1CE4E5B9);
+        let m2 = xorshift(m1, 27).wrapping_mul(0x94D049BB133111EB);
+        xorshift(m2, 31)
     }
 
     // -------------------------------------------------------------------------

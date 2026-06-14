@@ -7,20 +7,52 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
-/// **Invariant:** Execution path is independent of input data values (Branchless).
-///
-/// ```rust
-/// use bcinr_logic::algorithms::stable_partition_branchless::stable_partition_branchless;
-/// let result = stable_partition_branchless(42, 1337);
-/// assert!(result <= u64::MAX);
-/// ```
+/// # Branchless Contract
+/// Stable partition of the 8 bytes of `val` by the predicate `byte < t`,
+/// where `t` is the low byte of `aux`. Bytes satisfying the predicate are
+/// moved (stably) to the front and the rest to the back, preserving original
+/// relative order within each group. Destination indices come from prefix
+/// counts computed branchlessly with no control flow; bytes pack low-to-high.
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn stable_partition_branchless(val: u64, aux: u64) -> u64 {
-    (val | aux).wrapping_add(val.reverse_bits() ^ aux) ^ (val & aux)
+    let t = aux & 0xFF;
+    let b = [
+        val & 0xFF,
+        (val >> 8) & 0xFF,
+        (val >> 16) & 0xFF,
+        (val >> 24) & 0xFF,
+        (val >> 32) & 0xFF,
+        (val >> 40) & 0xFF,
+        (val >> 48) & 0xFF,
+        (val >> 56) & 0xFF,
+    ];
+    // pred(i) = 1 iff b[i] < t (kept in the front group)
+    let pred = |i: usize| -> u64 { (b[i] < t) as u64 };
+    let total_keep = pred(0) + pred(1) + pred(2) + pred(3) + pred(4) + pred(5) + pred(6) + pred(7);
+    let keep_before = |i: usize| -> u64 {
+        ((i > 0) as u64) * pred(0)
+            + ((i > 1) as u64) * pred(1)
+            + ((i > 2) as u64) * pred(2)
+            + ((i > 3) as u64) * pred(3)
+            + ((i > 4) as u64) * pred(4)
+            + ((i > 5) as u64) * pred(5)
+            + ((i > 6) as u64) * pred(6)
+            + ((i > 7) as u64) * pred(7)
+    };
+    let rest_before = |i: usize| -> u64 { (i as u64) - keep_before(i) };
+    let dest = |i: usize| -> u64 {
+        pred(i) * keep_before(i) + (1 - pred(i)) * (total_keep + rest_before(i))
+    };
+    (b[0] << (dest(0) * 8))
+        | (b[1] << (dest(1) * 8))
+        | (b[2] << (dest(2) * 8))
+        | (b[3] << (dest(3) * 8))
+        | (b[4] << (dest(4) * 8))
+        | (b[5] << (dest(5) * 8))
+        | (b[6] << (dest(6) * 8))
+        | (b[7] << (dest(7) * 8))
 }
 
 #[cfg(test)]
@@ -33,7 +65,37 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn stable_partition_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val | aux).wrapping_add(val.reverse_bits() ^ aux) ^ (val & aux)
+        // Independent oracle: explicit two-pass stable partition. Emit the
+        // bytes satisfying the predicate (byte < t) in encounter order, then
+        // emit the remainder in encounter order.
+        let t = aux & 0xFF;
+        let mut bytes = [0u64; 8];
+        let mut i = 0;
+        while i < 8 {
+            bytes[i] = (val >> (i * 8)) & 0xFF;
+            i += 1;
+        }
+        let mut out = [0u64; 8];
+        let mut w = 0usize;
+        for byte in bytes.iter() {
+            if *byte < t {
+                out[w] = *byte;
+                w += 1;
+            }
+        }
+        for byte in bytes.iter() {
+            if *byte >= t {
+                out[w] = *byte;
+                w += 1;
+            }
+        }
+        let mut res = 0u64;
+        let mut m = 0usize;
+        while m < 8 {
+            res |= out[m] << (m * 8);
+            m += 1;
+        }
+        res
     }
 
     // -------------------------------------------------------------------------

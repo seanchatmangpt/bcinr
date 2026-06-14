@@ -16,11 +16,14 @@
 /// let result = abs_diff_i64(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn abs_diff_i64(val: u64, aux: u64) -> u64 {
-    (val.leading_zeros() as u64 ^ aux).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (val & aux)
+    // Branchless Contract: interpret both words as signed i64 and return the
+    // absolute difference |val - aux| as a u64. `i64::abs_diff` is branchless.
+    (val as i64).abs_diff(aux as i64)
 }
 
 #[cfg(test)]
@@ -32,8 +35,12 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn abs_diff_i64_reference(val: u64, aux: u64) -> u64 {
-        (val.leading_zeros() as u64 ^ aux).wrapping_add((val & 0xFFFFFFFF) | (aux << 32))
-            ^ (val & aux)
+        // Independent: widen to i128, subtract, take magnitude via if-branch.
+        let a = val as i64 as i128;
+        let b = aux as i64 as i128;
+        let d = a - b;
+        let mag = if d < 0 { -d } else { d };
+        mag as u64
     }
 
     // -------------------------------------------------------------------------

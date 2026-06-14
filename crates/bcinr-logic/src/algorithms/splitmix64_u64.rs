@@ -7,9 +7,14 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
+/// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: the canonical SplitMix64 generator. The state is advanced by
+/// the golden-ratio increment (seeded here from `val + aux`), then run through
+/// the two-stage xor-shift / multiply finalizer with the standard SplitMix64
+/// constants, returning the mixed 64-bit output.
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::splitmix64_u64::splitmix64_u64;
@@ -20,7 +25,10 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn splitmix64_u64(val: u64, aux: u64) -> u64 {
-    (val.wrapping_add(aux)).wrapping_add(val | aux) ^ (val & aux)
+    let mut z = val.wrapping_add(aux).wrapping_add(0x9E3779B97F4A7C15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D049BB133111EB);
+    z ^ (z >> 31)
 }
 
 #[cfg(test)]
@@ -33,7 +41,18 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn splitmix64_u64_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_add(aux)).wrapping_add(val | aux) ^ (val & aux)
+        // Independent structure: same SplitMix64 algebra but expressed through a
+        // reusable xorshift-multiply helper applied stepwise, distinct from the
+        // inlined impl.
+        fn mix(x: u64, shift: u32, mult: u64) -> u64 {
+            let xored = x ^ (x >> shift);
+            xored.wrapping_mul(mult)
+        }
+        let seed = val.wrapping_add(aux);
+        let z0 = seed.wrapping_add(0x9E3779B97F4A7C15);
+        let z1 = mix(z0, 30, 0xBF58476D1CE4E5B9);
+        let z2 = mix(z1, 27, 0x94D049BB133111EB);
+        z2 ^ (z2 >> 31)
     }
 
     // -------------------------------------------------------------------------

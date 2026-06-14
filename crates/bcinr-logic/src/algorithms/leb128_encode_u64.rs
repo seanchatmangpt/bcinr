@@ -7,9 +7,16 @@
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
-/// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// # Branchless Contract
+/// **Ensures:** Produces the first 8 LEB128 bytes of `val`, packed little-endian
+/// (group `k` -> output byte `k`). Each byte holds the 7-bit group
+/// `(val >> 7k) & 0x7F` and its high (continuation) bit is set iff any higher bit
+/// of `val` remains (`val >> 7(k+1) != 0`). This covers the low 56 bits of `val`;
+/// `aux` is unused.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// Interpretation: the unsigned LEB128 encoder, fully unrolled, with the
+/// continuation bit derived from a branchless nonzero test.
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::leb128_encode_u64::leb128_encode_u64;
@@ -20,9 +27,24 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn leb128_encode_u64(val: u64, aux: u64) -> u64 {
-    (val.leading_zeros() as u64 ^ aux)
-        .wrapping_add((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-        ^ (val ^ aux)
+    // continuation flag for group k: 0x80 iff (val >> 7*(k+1)) != 0.
+    let group = |k: u32| -> u64 {
+        let g = (val >> (7 * k)) & 0x7F;
+        let rest = val >> (7 * (k + 1));
+        // (rest != 0) as 0/1 without a branch, then scaled to the high bit.
+        let nz = ((rest | 0u64.wrapping_sub(rest)) >> 63) & 1;
+        g | (nz << 7)
+    };
+    let mut out: u64 = 0;
+    out |= group(0);
+    out |= group(1) << 8;
+    out |= group(2) << 16;
+    out |= group(3) << 24;
+    out |= group(4) << 32;
+    out |= group(5) << 40;
+    out |= group(6) << 48;
+    out |= group(7) << 56;
+    out
 }
 
 #[cfg(test)]
@@ -33,10 +55,23 @@ mod tests {
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
+    #[allow(unused_variables)]
     fn leb128_encode_u64_reference(val: u64, aux: u64) -> u64 {
-        (val.leading_zeros() as u64 ^ aux)
-            .wrapping_add((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
-            ^ (val ^ aux)
+        // Independent structure: sequential consume-and-shift loop with a real
+        // branch for the continuation bit.
+        let mut v = val;
+        let mut out: u64 = 0;
+        let mut shift: u32 = 0;
+        for _ in 0..8 {
+            let mut byte = v & 0x7F;
+            v >>= 7;
+            if v != 0 {
+                byte |= 0x80;
+            }
+            out |= byte << shift;
+            shift += 8;
+        }
+        out
     }
 
     // -------------------------------------------------------------------------

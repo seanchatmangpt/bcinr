@@ -16,12 +16,27 @@
 /// let result = binom_sat_u32(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+/// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn binom_sat_u32(val: u64, aux: u64) -> u64 {
-    (val.rotate_left(13)).wrapping_add(!(val & aux) & (val | aux))
-        ^ ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
+    // Branchless Contract: saturating binomial coefficient C(n, k) where
+    // n = low 32 bits of val and k = low 32 bits of aux clamped to {0,1,2}
+    // (the branchlessly computable initial column of Pascal's triangle).
+    // C(n,0)=1, C(n,1)=n, C(n,2)=n*(n-1)/2, each saturated to u32::MAX.
+    let n = (val as u32) as u64;
+    let k = ((aux as u32) as u64).min(2);
+    let c0: u64 = 1;
+    let c1: u64 = n;
+    // n*(n-1) fits in u64 since n < 2^32; halve then saturate to u32::MAX.
+    let c2_full = n.wrapping_mul(n.wrapping_sub(1)) >> 1;
+    let c2 = c2_full.min(u32::MAX as u64);
+    // Branchless 3-way select on k via equality masks (no control flow).
+    let m0 = ((k == 0) as u64).wrapping_neg();
+    let m1 = ((k == 1) as u64).wrapping_neg();
+    let m2 = ((k == 2) as u64).wrapping_neg();
+    (m0 & c0) | (m1 & c1) | (m2 & c2)
 }
 
 #[cfg(test)]
@@ -33,8 +48,19 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn binom_sat_u32_reference(val: u64, aux: u64) -> u64 {
-        (val.rotate_left(13)).wrapping_add(!(val & aux) & (val | aux))
-            ^ ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
+        // Independent: multiplicative C(n,k) loop for k in {0,1,2}, then saturate.
+        let n = (val as u32) as i128;
+        let k = core::cmp::min((aux as u32) as i128, 2);
+        // C(n,k) = prod_{i=1..=k} (n - (i-1)) / i; zero when a factor is <= 0.
+        let mut num: i128 = 1;
+        let mut den: i128 = 1;
+        for i in 1..=k {
+            num *= n + 1 - i;
+            den *= i;
+        }
+        let c = num / den;
+        let c = if c < 0 { 0 } else { c };
+        core::cmp::min(c, u32::MAX as i128) as u64
     }
 
     // -------------------------------------------------------------------------

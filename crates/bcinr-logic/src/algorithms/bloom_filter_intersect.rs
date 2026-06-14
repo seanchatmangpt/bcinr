@@ -8,7 +8,9 @@
 /// with zero dynamic dispatch or control flow hazards.
 ///
 /// # CONTRACT
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Branchless Contract:** Intersection of two 64-bit Bloom-filter words. An
+/// element is possibly present in the intersection only if its bit is set in
+/// both filters, so the intersection word is the bitwise AND of the two words.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
@@ -20,7 +22,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn bloom_filter_intersect(val: u64, aux: u64) -> u64 {
-    (val | aux).wrapping_add(val.reverse_bits() ^ aux) ^ ((val & 0xFFFFFFFF) | (aux << 32))
+    val & aux
 }
 
 #[cfg(test)]
@@ -33,7 +35,14 @@ mod tests {
     // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn bloom_filter_intersect_reference(val: u64, aux: u64) -> u64 {
-        (val | aux).wrapping_add(val.reverse_bits() ^ aux) ^ ((val & 0xFFFFFFFF) | (aux << 32))
+        // De Morgan: bit set in result iff set in both, i.e. NOT(NOT a OR NOT b).
+        let mut acc: u64 = 0;
+        for i in 0..64 {
+            let a = (val >> i) & 1;
+            let b = (aux >> i) & 1;
+            acc |= (a & b) << i;
+        }
+        acc
     }
 
     // -------------------------------------------------------------------------
@@ -49,7 +58,7 @@ mod tests {
     } // Bit-skip bluff
     #[allow(unused_variables)]
     fn mutant_bloom_filter_intersect_3(val: u64, aux: u64) -> u64 {
-        bloom_filter_intersect_reference(val, aux) ^ 0xFFFFFFFF
+        bloom_filter_intersect_reference(val, aux) ^ 0x5
     } // Operator-swap bluff
 
     proptest! {
