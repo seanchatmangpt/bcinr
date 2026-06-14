@@ -1,0 +1,242 @@
+:root {
+  --bg: #0a0a0a;
+  --fg: #e8e8e8;
+  --accent: #7c3aed;
+  --muted: #555;
+  --border: #222;
+  --code-bg: #111;
+  --tier1: #16a34a;
+  --tier2: #d97706;
+  --tier3: #dc2626;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: "SF Mono", "Fira Code", monospace;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+}
+
+nav {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+
+nav a {
+  color: var(--fg);
+  text-decoration: none;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+
+nav a:hover { opacity: 1; }
+
+nav a.brand {
+  font-weight: 700;
+  font-size: 16px;
+  opacity: 1;
+  color: var(--accent);
+}
+
+main {
+  flex: 1;
+  padding: 32px 24px;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+footer {
+  border-top: 1px solid var(--border);
+  padding: 12px 24px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.loading {
+  color: var(--muted);
+  padding: 32px;
+  text-align: center;
+}
+
+h1 { font-size: 28px; margin-bottom: 8px; }
+h2 { font-size: 20px; margin-bottom: 16px; color: var(--accent); }
+p { color: var(--muted); margin-bottom: 16px; }
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 40px;
+}
+
+.stat-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  background: var(--code-bg);
+}
+
+.stat-card .value {
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--accent);
+  display: block;
+}
+
+.stat-card .label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  display: block;
+  margin-top: 4px;
+}
+
+.algo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.algo-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  background: var(--code-bg);
+  text-decoration: none;
+  color: var(--fg);
+  display: block;
+  transition: border-color 0.15s;
+}
+
+.algo-card:hover { border-color: var(--accent); }
+
+.algo-card .name {
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.algo-card .tier {
+  font-size: 10px;
+  border-radius: 3px;
+  padding: 1px 5px;
+  display: inline-block;
+  margin-top: 6px;
+  font-weight: 600;
+}
+
+.tier-1 { background: #052e16; color: var(--tier1); }
+.tier-2 { background: #1c0a00; color: var(--tier2); }
+.tier-3 { background: #1f0000; color: var(--tier3); }
+
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.module-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  background: var(--code-bg);
+}
+
+.module-card h3 {
+  font-size: 16px;
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+
+.fn-list {
+  list-style: none;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.fn-list li {
+  padding: 2px 0;
+  border-bottom: 1px solid #1a1a1a;
+}
+
+.fn-list li:last-child { border-bottom: none; }
+
+pre {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+  overflow-x: auto;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #a0a0a0;
+}
+
+.back-link {
+  display: inline-block;
+  color: var(--muted);
+  text-decoration: none;
+  margin-bottom: 24px;
+  font-size: 12px;
+}
+
+.back-link:hover { color: var(--fg); }
+
+.badge {
+  display: inline-block;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: var(--muted);
+  margin-right: 8px;
+  margin-bottom: 8px;
+}
+
+.source-notice {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 24px;
+  padding: 8px 12px;
+  border-left: 2px solid var(--accent);
+}
+
+.sig {
+  color: #6ee7b7;
+  font-family: "SF Mono", monospace;
+  font-size: 12px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: #0a1a0a;
+  border-radius: 4px;
+  border: 1px solid #1a2a1a;
+}
+
+.test-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tier1);
+}
+
+.dot.red { background: var(--tier3); }
