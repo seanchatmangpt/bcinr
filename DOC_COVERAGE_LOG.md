@@ -128,3 +128,57 @@ Tracks bijective coverage: every documented capability has a running example, ev
 - `bcinr::sketch`: HyperLogLog / Bloom filter API (unexamined)
 - `bcinr::algorithms::*` — 308 algorithms, each with `/// # Branchless Contract`: a representative cross-section example covering one from each difficulty tier (1-100, 101-200, 201-300) is the right approach rather than 308 individual examples
 
+
+---
+
+## Iteration 3 — 2026-06-14
+
+**State:** commit `d125c49`, tree clean, rustc `1.97.0-nightly`
+
+### Gap Map (at iteration start — remaining after iteration 2)
+
+**Documented-but-unexercised:**
+- `bcinr::scan`: `find_byte_mask`, `skip_spaces`, `is_ascii_u64_slice`
+- `bcinr::utf8`: `count_codepoints`
+- `bcinr::sketch`: `count_min_sketch_update`
+- `bcinr::algorithms::*`: 308 algorithm functions (representative cross-section still needed)
+- `bcinr::bitset` standalone (queued)
+- `bcinr::reduce::horizontal_max_u8x8` / `horizontal_min_u8x8` (OPEN-defective)
+
+### Triples Closed
+
+**Triple 7 — Scan Primitives ✅**
+- **Doc:** `crates/bcinr-logic/src/scan.rs`
+- **Example:** `bcinr/examples/scan_primitives.rs`
+- **Run output:** `find_byte_mask(b"hello world", b'l') = 0b01000001100`, `skip_spaces(b"   hello") = 3`, `tokenizer: skipped 3 spaces, token=token`, `All scan primitive assertions passed.`
+- **Exit code: 0**
+- **Fail-if-fake:** bit-position assertions on the mask fail if `find_byte_mask` miscounts; the tokenizer cross-product composition fails end-to-end if either scan function is wrong
+
+**Triple 8 — UTF-8 Codepoints + Count-Min Sketch ✅**
+- **Doc:** `crates/bcinr-logic/src/utf8.rs` + `src/sketch.rs`
+- **Example:** `bcinr/examples/utf8_and_sketch.rs`
+- **Run output:** `count_codepoints(héllo bytes=6)=5`, `count_min_sketch: 3/3 rows have max=2`, `saturation: updating MAX cells stays at u32::MAX = true`, `All UTF-8 and sketch assertions passed.`
+- **Exit code: 0**
+- **Fail-if-fake:** `count_codepoints(héllo) != héllo.len()` assertion catches raw byte-counting; saturation test fails if `saturating_add` wraps
+
+**Triple 9 — Algorithm Cross-Section (5 functions, composition pipeline) ✅**
+- **Doc:** `crates/bcinr-logic/src/algorithms/` — `abs_diff_u64`, `rotate_left_u64`, `gcd_u64_branchless`, `popcount_u128`, `leb128_decode_u64`
+- **Example:** `bcinr/examples/algorithms_cross_section.rs`
+- **Run output:** `gcd(12,8)=4`, `leb128_decode(0x0180)=128`, `pipeline: gcd=12, normalized=(4,3), combined_bits=3, rotate=4096`, `All algorithm cross-section assertions passed.`
+- **Exit code: 0**
+- **Composition proof:** GCD normalization pipeline chains gcd → abs_diff → rotate_left → popcount; any broken link fails the final `rotate=4096` assertion
+
+### Queued (next iterations)
+
+**OPEN-documented-unexercised (remaining):**
+- `bcinr::bitset` standalone: `rank_u64`, `select_bit_u64`, `parity_u64_slice`, `jaccard_u64_slices`, `hamming_u64_slices`, `intersect_u64_slices`, `union_u64_slices` — used only as sub-operations in iteration 1's pipeline; need a dedicated standalone example
+- `bcinr::reduce::horizontal_max_u8x8` / `horizontal_min_u8x8` — OPEN-defective (SWAR overflow bug)
+- `bcinr::algorithms::*` — 308 total functions; 5 demonstrated in triple 9; ~303 not individually witnessed. The cross-section proves the surface pattern; exhaustive 308-example coverage is a separate (very large) task.
+- `bcinr::network` — not yet examined
+- `bcinr::parse` — not yet examined
+
+**Approximate coverage state after 3 iterations (9 triples):**
+- Core modules (mask, fix, int, bitset, dfa, reduce, scan, utf8, sketch): ~80% of public fns have running witnesses
+- Algorithm module (308 fns): 5/308 individually witnessed; the shared branchless contract pattern is documented in the cross-section
+- Defects found: 1 (horizontal_max/min_u8x8 SWAR overflow); 3 README false claims corrected
+
