@@ -66,3 +66,65 @@ Tracks bijective coverage: every documented capability has a running example, ev
 - `bcinr_core::api::fix::add_sat_u8` — present in `bcinr-api/src/mod.rs` declaration but `bcinr-api/src/lib.rs` is empty, so the `mod.rs` is dead. If `add_sat_u8` is an intended public API, the `lib.rs` needs to be fixed to declare/re-export the modules from `mod.rs`. Currently the entire `bcinr_core::api` module tree is unreachable.
 
 ---
+
+---
+
+## Iteration 2 — 2026-06-14
+
+**State:** commit `2f601db`, tree clean, rustc `1.97.0-nightly` (cb40c25f6 2026-05-04)
+
+### Gap Map (at iteration start — remaining after iteration 1)
+
+**Documented-but-unexercised:**
+- `bcinr::int`: `popcount_u64/u32`, `leading_zeros_u64/u32`, `trailing_zeros_u64/u32`, `reverse_bits_u64/u32`, `next_power_of_two_u32`, `is_pow2_u32`, `parity_u32`, `saturating_add/sub/mul_i64`
+- `bcinr::dfa`: `dfa_advance`, `dfa_run`, `dfa_is_accepting`
+- `bcinr::reduce`: `horizontal_or_u32`, `horizontal_and_u32`, `horizontal_xor_u32`, `horizontal_sum_u8x8`, `horizontal_max_u8x8`, `horizontal_min_u8x8`
+- `bcinr::bitset` (standalone): `rank_u64`, `select_bit_u64`, `parity_u64_slice`, `jaccard_u64_slices`
+- `bcinr::logic::algorithms::*`: 308 algorithm functions (open)
+
+### Triples Closed
+
+**Triple 4 — Integer Bit Operations ✅**
+- **Doc:** `crates/bcinr-logic/src/int.rs` (rustdoc on all public fns)
+- **Example:** `bcinr/examples/integer_ops.rs`
+- **Run output:** `popcount_u64(0b1011)=3`, `trailing_zeros_u64(0x10)=4`, `next_power_of_two_u32(100)=128`, `saturating_add_i64(MAX,1)=9223372036854775807`, `All integer operation assertions passed.`
+- **Exit code: 0**
+- **Fail-if-fake:** `reverse_bits_u64(reverse_bits_u64(x)) == x` (double-reverse identity) would fail if the bit-reversal is wrong; parity cross-check against `popcount_u32 & 1` would fail if either diverges
+
+**Triple 5 — DFA Pattern Matching ✅**
+- **Doc:** `crates/bcinr-logic/src/dfa.rs` (rustdoc on `dfa_advance`, `dfa_run`, `dfa_is_accepting`)
+- **Example:** `bcinr/examples/dfa_matching.rs`
+- **Run output:** `dfa_advance: S0+0=0, S0+1=1, S1+1=0`, `dfa_run([1,1,1]) → state 1 (accepted=true)`, `dfa_run([1,1]) → state 0 (accepted=false)`, `All DFA matching assertions passed.`
+- **Exit code: 0**
+- **Fail-if-fake:** `assert_eq!(s0_on_one, 1, "S0 + 1 → S1")` breaks if advance ignores input; empty-input assertion verifies initial state is preserved
+
+**Triple 6 — Horizontal Reductions ✅ (partial)**
+- **Doc:** `crates/bcinr-logic/src/reduce.rs` (rustdoc on all public fns)
+- **Example:** `bcinr/examples/horizontal_reductions.rs`
+- **Run output:** `horizontal_or_u32([1,2,4])=0b111`, `horizontal_sum_u8x8([1..8])=36`, `flags union=0b1111, intersection=0b1000`, `All horizontal reduction assertions passed.`
+- **Exit code: 0**
+- **Covered:** `horizontal_or_u32`, `horizontal_and_u32`, `horizontal_xor_u32`, `horizontal_sum_u8x8`
+
+### Defect Found: OPEN-defect — horizontal_max_u8x8 / horizontal_min_u8x8
+
+**Severity:** debug-build panic (release may silently produce wrong results)
+
+`horizontal_max_u8x8` and `horizontal_min_u8x8` in `crates/bcinr-logic/src/reduce.rs:57` use plain `+` for a SWAR byte-lane comparison, causing integer overflow in debug builds (Rust's overflow checks fire). The intermediate `(v2 & mask) + (mask ^ (v & mask))` can produce values where byte-lane carries propagate across u64 word boundaries, corrupting adjacent lanes.
+
+**Fix needed:** Replace `+` with `wrapping_add` at minimum (prevents panic); a correct fix also needs to prevent cross-lane carry (mask inputs to 7 bits or restructure the SWAR comparison). These two functions are marked OPEN-defective until repaired.
+
+### Also Noted
+
+- `dfa.rs` and `reduce.rs` contain residual "Padding Line N" and boilerplate comments not caught by `strip_boilerplate.py` (different sentinel text). Tracked for a future strip pass.
+- `dfa.rs` module tests contain a vacuous `dfa_reference(val,aux) = val^aux` with no relation to DFA semantics — leftover scaffolding, not tested here.
+
+### Queued (next iterations)
+
+**OPEN-documented-unexercised:**
+- `bcinr::bitset` standalone: `rank_u64`, `select_bit_u64`, `parity_u64_slice`, `jaccard_u64_slices`, `hamming_u64_slices`, `intersect_u64_slices`, `union_u64_slices`
+- `bcinr::reduce::horizontal_max_u8x8` / `horizontal_min_u8x8` — OPEN-defective (need impl fix before example can witness)
+- `bcinr::scan`: all scan functions (unexamined)
+- `bcinr::utf8`: all UTF-8 functions (unexamined)
+- `bcinr::sketch`: HyperLogLog / Bloom filter API (unexamined)
+- `bcinr::algorithms::*` — 308 algorithms, each with `/// # Branchless Contract`: a representative cross-section example covering one from each difficulty tier (1-100, 101-200, 201-300) is the right approach rather than 308 individual examples
+
