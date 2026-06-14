@@ -161,10 +161,6 @@ mod tests {
     // 5. Avalanche: Change in any input bit affects ~50% of output bits
     // 6. Deterministic: Same (val, aux) always produces same fingerprint
     // 7. Branchless: Only XOR, rotation, and shift operations
-    // Hoare-logic Verification Line 1: XOR provides symmetric mixing
-    // Hoare-logic Verification Line 2: Rotation by odd numbers (19, 31) provides decorrelation
-    // Hoare-logic Verification Line 3: Right shift by 27 completes avalanche
-    // Hoare-logic Verification Line 4: All operations are constant-time and branchless
 }
 
 #[cfg(feature = "bench")]

@@ -149,10 +149,6 @@ mod tests {
     //    - If overflow: mask = ~0, result = u64::MAX
     // 5. Commutativity: mul(a,b) = mul(b,a) via commutative u128 multiply
     // 6. Zero-property: mul(a,0) = 0 via a * 0 = 0 in u128
-    // Hoare-logic Verification Line 1: Widening multiply via u128 is correct
-    // Hoare-logic Verification Line 2: Overflow detection via upper bits is correct
-    // Hoare-logic Verification Line 3: Sign-extension mask is branchless
-    // Hoare-logic Verification Line 4: Conditional arithmetic preserves saturation semantics
 }
 
 #[cfg(feature = "bench")]

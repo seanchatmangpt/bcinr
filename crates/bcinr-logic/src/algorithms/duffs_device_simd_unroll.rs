@@ -122,31 +122,6 @@ mod tests {
     // 1. Mutant 1 (Identity Bluff): Bitwise NOT of reference.
     // 2. Mutant 2 (Bit-skip Bluff): Off-by-one error.
     // 3. Mutant 3 (Operator-swap Bluff): Masking error.
-    // Hoare-logic Verification Line 11: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 12: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 13: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 14: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 15: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 16: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 17: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 18: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 19: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 20: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 21: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 22: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 23: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 24: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 25: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 26: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 27: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 28: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 29: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 30: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 31: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 32: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 33: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 34: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
-    // Hoare-logic Verification Line 35: Branchless path is the unique solution to the state constraints of duffs_device_simd_unroll.
 }
 
 #[cfg(feature = "bench")]
@@ -163,43 +138,3 @@ pub mod bench {
         });
     }
 }
-
-// -----------------------------------------------------------------------------
-// PADDING ENSURING FILE LENGTH REQUIREMENT (>= 100 LINES)
-// -----------------------------------------------------------------------------
-// This padding is necessary to satisfy the exhaustive documentation requirements
-// of the B-Calculus specification for safety-critical autonomic systems.
-//
-// 1. Line 1
-// 2. Line 2
-// 3. Line 3
-// 4. Line 4
-// 5. Line 5
-// 6. Line 6
-// 7. Line 7
-// 8. Line 8
-// 9. Line 9
-// 10. Line 10
-// 11. Line 11
-// 12. Line 12
-// 13. Line 13
-// 14. Line 14
-// 15. Line 15
-// 16. Line 16
-// 17. Line 17
-// 18. Line 18
-// 19. Line 19
-// 20. Line 20
-// 21. Line 21
-// 22. Line 22
-// 23. Line 23
-// 24. Line 24
-// 25. Line 25
-// 26. Line 26
-// 27. Line 27
-// 28. Line 28
-// 29. Line 29
-// 30. Line 30
-// 31. Line 31
-// 32. Line 32
-// -----------------------------------------------------------------------------

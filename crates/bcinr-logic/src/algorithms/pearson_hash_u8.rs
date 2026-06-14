@@ -161,10 +161,6 @@ mod tests {
     // 5. Return as u64: result = PEARSON_TABLE[mixed] as u64
     // 6. Result is always in [0, 255] by construction (u8 table values)
     // 7. No conditional branches: table lookup is via bounds-checked array indexing
-    // Hoare-logic Verification Line 1: Byte extraction via masking is correct
-    // Hoare-logic Verification Line 2: XOR mixing is branchless
-    // Hoare-logic Verification Line 3: Table lookup index is in [0, 255] (u8 type)
-    // Hoare-logic Verification Line 4: Pearson permutation table provides good avalanche
 }
 
 #[cfg(feature = "bench")]

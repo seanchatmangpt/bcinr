@@ -201,10 +201,6 @@ mod tests {
     // 5. Result: result |= (contribution & mask)
     // 6. Proof: All bytes processed, masked by continuation chain
     // 7. No conditional branches: all contributions computed and masked
-    // Hoare-logic Verification Line 1: Byte extraction via shifts is correct
-    // Hoare-logic Verification Line 2: Data extraction via & 0x7F is correct
-    // Hoare-logic Verification Line 3: Continuation detection via & 0x80 is correct
-    // Hoare-logic Verification Line 4: Branchless masking via sign-extension is correct
 }
 
 #[cfg(feature = "bench")]

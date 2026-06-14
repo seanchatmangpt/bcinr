@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [26.6.14] - 2026-06-13
+
+### Removed
+- **Boilerplate Strip**: Deterministically removed 793 `PADDING` + `FAKE_PROOF` cheat findings (~17,300 lines) across 275 algorithm files via `tools/strip_boilerplate.py`. Eliminated artificial file-length padding blocks and 25-line copy-pasted "Hoare-logic Verification" comment clusters. Pure comment removal — zero behavioral change (verified: identical 1,751 pass / 53 pre-existing-fail test results before and after).
+
+### Added
+- **`tools/strip_boilerplate.py`**: Idempotent, safety-guarded script that strips padding and fake-proof comment blocks. Refuses to truncate any file with real code after the padding marker.
+
+### Notes
+- Cheat-scanner findings reduced **1,003 → 209**. Remaining findings are all genuine "needs real implementation" flags: 197 `CIRCULAR_REF` (test reference is a verbatim copy of the implementation, leaving correctness unverified) and 12 `CANCEL_XOR` (self-canceling XOR bodies). These require real branchless reimplementation with independent references and are **tracked for v26.7.0** — deliberately left as honest findings rather than re-faked.
+
 ## [26.6.13] - 2026-06-13
 
 ### Added
