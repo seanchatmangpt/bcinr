@@ -1,6 +1,8 @@
 # BCINR Algorithm & Abstraction Catalog
 
-This catalog documents the entire 306-module branchless substrate, grouped by operational family.
+> **Status (June 2026):** Structural index only — descriptions are generated scaffolding, not verified prose. Authoritative function-level documentation lives in each file's `///` doc comment. As of v26.6.15 all 308 algorithm files have genuine branchless implementations and independent proptest references. See `docs/diataxis/reference/algorithm-families.md` for the curated family overview.
+
+This catalog documents the entire 308-module branchless substrate, grouped by operational family.
 
 ## 1. Advanced Bit Manipulation
 

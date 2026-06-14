@@ -1,4 +1,42 @@
-# Release Notes: bcinr v26.6.13
+# Release Notes: bcinr v26.6.15
+
+**Release Date:** June 13–14, 2026  
+**Codename:** Honest Algorithms  
+**Status:** Stable — All CI gates green, cheat-scanner clean, 1,804 tests passing
+
+---
+
+## v26.6.15 — Genuine Reimplementation (Phase B)
+
+**Date:** June 13, 2026
+
+After Phase A (boilerplate strip), 209 genuine findings remained: 197 `CIRCULAR_REF` (test reference was a verbatim copy of the implementation, making propts vacuous) and 12 `CANCEL_XOR` (self-canceling XOR bodies). Phase B replaced all 201 affected files with correct branchless implementations paired with genuinely independent references.
+
+### What Changed
+- **201 algorithm files** reimplemented with real branchless bodies and independent `_reference` fns.
+- **53 pre-existing test failures** cleared as a side effect (impl/reference drift resolved).
+- **SWAR cascade-bug** fixed across 8 files: the `(x - LO) & !x & HI` zero-byte test was producing false positives on adjacent equal bytes due to borrow cross-talk. Replaced with cascade-safe `!(((x & LO7) + LO7 | x) & HI) & HI` across `simd_strstr_branchless`, `trim_whitespace_branchless`, `simd_memchr_u8x16`, `simd_memrchr_u8x16`, `csv_scan_row_simd`, `split_lines_simd`, `find_first_of_branchless`, `find_last_of_branchless`.
+- **Contract-gate** restored: 43 files whose doc comments were rewritten had `MISSING_U64_CONTRACT` reinstated.
+
+### Final State
+- Cheat-scanner findings: **0** ("OK: no cheat patterns detected across 308 algorithm files")
+- Test suite: **1,804 pass / 0 fail** (verified at PROPTEST_CASES=4096)
+- All five CI gates green: strict `-D warnings` build, full test suite, cheat-scanner, contract-gate, clippy.
+
+---
+
+## v26.6.14 — Boilerplate Strip (Phase A)
+
+**Date:** June 13, 2026
+
+Deterministically removed 793 `PADDING` + `FAKE_PROOF` cheat findings (~17,300 lines) across 275 algorithm files via `tools/strip_boilerplate.py`. Pure comment removal — zero behavioral change.
+
+- Cheat-scanner findings: **1,003 → 209**
+- Test results unchanged (1,751 pass / 53 pre-existing fail before and after strip)
+
+---
+
+## v26.6.13 — Cheat Scanner & CI Gate
 
 **Release Date:** June 13, 2026  
 **Codename:** Comprehensive Gap Closure  
@@ -217,7 +255,7 @@ While major gaps are closed, some non-critical patterns remain:
 ```
 
 ### Test Coverage
-- **1,910 unit tests** + **370 doctests** + **38 benchmarks** ✅
+- **1,804 unit tests** passing (post Phase B) ✅
 - **All passing** on Rust 1.70+ (MSRV)
 - **Cross-platform:** x86_64, ARM (Neon fallbacks verified)
 

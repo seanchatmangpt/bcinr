@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**bcinr** (BranchlessCInRust v26.4.18) is a performance-first, research-grade systems library providing a principled calculus for branchless algorithmics. It is designed for high-performance, deterministic systems where predictable latency, memory-safety, and side-channel resilience are critical requirements.
+**bcinr** (BranchlessCInRust v26.6.15) is a performance-first, research-grade systems library providing a principled calculus for branchless algorithmics. It is designed for high-performance, deterministic systems where predictable latency, memory-safety, and side-channel resilience are critical requirements.
 
 ### Core Principles
 
@@ -447,5 +447,5 @@ See `docs/BENCHMARKS.md` for:
 
 ---
 
-**Last Updated:** April 2026
-**Version:** 26.4.18
+**Last Updated:** June 2026
+**Version:** 26.6.15

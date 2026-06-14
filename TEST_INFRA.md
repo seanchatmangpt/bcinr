@@ -1,5 +1,7 @@
 # BCINR Test Infrastructure Specification
 
+> **Status (June 2026):** Historical specification document. The CI pipeline described here is implemented in `Makefile.toml` (`cargo make ci`). Current gate additions not reflected here: `scan-cheats` (bcinr-cheat-scanner, 5 anti-pattern detectors) and the SWAR cascade-fix. See CHANGELOG.md `[26.6.14]`–`[26.6.15]` for authoritative current state.
+
 This document defines the opaque-box end-to-end (E2E) testing infrastructure for the `bcinr` project. It establishes the test philosophy, inventories all key features, describes the test runner architecture, outlines real-world application scenarios, and sets coverage thresholds.
 
 ## 1. Test Philosophy

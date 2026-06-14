@@ -1,5 +1,7 @@
 # BCINR Test Readiness Verification Report
 
+> **Status (June 2026):** Point-in-time snapshot from v26.6.13. Superseded by CHANGELOG.md `[26.6.15]`. Current state: 1,804 tests passing, 0 cheat-scanner findings, all 5 CI gates green.
+
 This document records the E2E test suite validation checklist and execution results for the `bcinr` project.
 
 ## 1. E2E Verification Checklist
