@@ -22,6 +22,9 @@ export default function RootLayout({
             <a href="/algorithms">Algorithms</a>
             <a href="/modules">Core Modules</a>
             <a href="/examples">Examples</a>
+            <a href="/benchmarks">Benchmarks</a>
+            <a href="/proptest">Proptest</a>
+            <a href="/safety">Safety</a>
             <a href="/changelog">Changelog</a>
           </nav>
         </header>
