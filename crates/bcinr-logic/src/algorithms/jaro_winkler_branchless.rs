@@ -36,7 +36,7 @@ pub fn jaro_winkler_branchless(val: u64, aux: u64) -> u64 {
     let m = zb.count_ones() as u64; // number of matching positions
     let nz = H & !zb; // high bit set per mismatching byte
     let p = ((nz.trailing_zeros() as u64) >> 3).min(4); // capped common prefix
-    return m.wrapping_mul(125).wrapping_add(p.wrapping_mul(10));
+    m.wrapping_mul(125).wrapping_add(p.wrapping_mul(10))
 }
 
 #[cfg(test)]

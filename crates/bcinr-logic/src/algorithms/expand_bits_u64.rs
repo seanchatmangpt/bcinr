@@ -90,8 +90,6 @@ pub fn expand_bits_u64(val: u64, aux: u64) -> u64 {
     mp ^= mp << 16;
     mp ^= mp << 32;
     let mv = mp & mm;
-    array[5] = mv;
-    let mv = array[5];
     let t = x << 32;
     x = (x & !mv) | (t & mv);
     let mv = array[4];

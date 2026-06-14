@@ -27,7 +27,7 @@ pub fn inverse_permute_u32x8(val: u64, aux: u64) -> u64 {
     // Invert an 8-element permutation stored as 8 nibbles (each value masked to 0..7):
     // for source index i mapping to position p_i, the inverse places i at nibble p_i.
     // Fully unrolled to keep the path branch- and loop-free.
-    let p0 = (val >> 0) & 0x7;
+    let p0 = val & 0x7;
     let p1 = (val >> 4) & 0x7;
     let p2 = (val >> 8) & 0x7;
     let p3 = (val >> 12) & 0x7;

@@ -24,10 +24,10 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn vector_cross_product_f32(val: u64, aux: u64) -> u64 {
-    let x1 = (val & 0xFFFF_FFFF) as u64;
-    let y1 = (val >> 32) as u64;
-    let x2 = (aux & 0xFFFF_FFFF) as u64;
-    let y2 = (aux >> 32) as u64;
+    let x1 = val & 0xFFFF_FFFF;
+    let y1 = val >> 32;
+    let x2 = aux & 0xFFFF_FFFF;
+    let y2 = aux >> 32;
     x1.wrapping_mul(y2).wrapping_sub(x2.wrapping_mul(y1))
 }
 

@@ -26,7 +26,7 @@ pub fn succinct_bit_vector_select(val: u64, aux: u64) -> u64 {
     // (aux+1)-th set bit of `val`, or 64 if fewer than aux+1 bits are set. The
     // index equals the number of prefix positions whose inclusive rank does not
     // exceed `aux`; summed branchlessly over all 64 lanes.
-    0u64 + (((val & ((1u64 << 1) - 1)).count_ones() as u64 <= aux) as u64)
+    (((val & ((1u64 << 1) - 1)).count_ones() as u64 <= aux) as u64)
         + (((val & ((1u64 << 2) - 1)).count_ones() as u64 <= aux) as u64)
         + (((val & ((1u64 << 3) - 1)).count_ones() as u64 <= aux) as u64)
         + (((val & ((1u64 << 4) - 1)).count_ones() as u64 <= aux) as u64)
@@ -89,7 +89,7 @@ pub fn succinct_bit_vector_select(val: u64, aux: u64) -> u64 {
         + (((val & ((1u64 << 61) - 1)).count_ones() as u64 <= aux) as u64)
         + (((val & ((1u64 << 62) - 1)).count_ones() as u64 <= aux) as u64)
         + (((val & ((1u64 << 63) - 1)).count_ones() as u64 <= aux) as u64)
-        + (((val & u64::MAX).count_ones() as u64 <= aux) as u64)
+        + ((val.count_ones() as u64 <= aux) as u64)
 }
 
 #[cfg(test)]

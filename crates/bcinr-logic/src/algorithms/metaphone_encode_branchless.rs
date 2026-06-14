@@ -27,7 +27,7 @@ pub fn metaphone_encode_branchless(val: u64, aux: u64) -> u64 {
     // re-packed, one per output byte. Fully branchless: case fold by masking,
     // group lookup by a 3-bit-per-letter packed table, range guarded by masks.
     // `aux` is ignored (single string operand).
-    const TABLE: u128 = 0x0010_4086_b222_d890_0886_88;
+    const TABLE: u128 = 0x00_1040_86b2_22d8_9008_8688;
     let _ = aux;
     let code = |b: u64| -> u64 {
         let u = b & !0x20; // fold ASCII letters to upper case

@@ -25,7 +25,7 @@ pub fn clmul_u64(val: u64, aux: u64) -> u64 {
     // `aux`, truncated to the low 64 bits. For each set bit i of `aux` we XOR in
     // `val << i`; the shift is gated by a 0/all-ones mask derived from bit i, so
     // no data-dependent branch occurs.
-    0u64 ^ (val.wrapping_shl(0) & 0u64.wrapping_sub((aux >> 0) & 1))
+    (val & 0u64.wrapping_sub(aux & 1))
         ^ (val.wrapping_shl(1) & 0u64.wrapping_sub((aux >> 1) & 1))
         ^ (val.wrapping_shl(2) & 0u64.wrapping_sub((aux >> 2) & 1))
         ^ (val.wrapping_shl(3) & 0u64.wrapping_sub((aux >> 3) & 1))
