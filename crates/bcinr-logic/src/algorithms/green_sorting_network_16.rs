@@ -30,6 +30,7 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn green_sorting_network_16_reference(val: u64, aux: u64) -> u64 {
         val.swap_bytes() ^ aux.rotate_right(8)

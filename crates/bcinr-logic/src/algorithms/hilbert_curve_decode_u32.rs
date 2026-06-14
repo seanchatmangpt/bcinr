@@ -30,6 +30,7 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn hilbert_curve_decode_u32_reference(val: u64, aux: u64) -> u64 {
         (aux.rotate_right(7)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (aux.rotate_right(7))

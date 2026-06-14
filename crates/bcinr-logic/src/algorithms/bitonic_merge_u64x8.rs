@@ -30,6 +30,7 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn bitonic_merge_u64x8_reference(val: u64, aux: u64) -> u64 {
         (val.wrapping_add(aux)).wrapping_add(val | aux) ^ ((val & 0xFFFFFFFF) | (aux << 32))

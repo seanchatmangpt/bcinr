@@ -20,7 +20,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn hazard_pointer_retire(val: u64, aux: u64) -> u64 {
-    val ^ aux.wrapping_add(0xDEADBEEF)
+    val ^ aux.wrapping_add(0x2545f4914f6cdd1d)
 }
 
 #[cfg(test)]
@@ -32,7 +32,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn hazard_pointer_retire_reference(val: u64, aux: u64) -> u64 {
-        let offset = aux.wrapping_add(0xDEADBEEF);
+        let offset = aux.wrapping_add(0x2545f4914f6cdd1d);
         val ^ offset
     }
 

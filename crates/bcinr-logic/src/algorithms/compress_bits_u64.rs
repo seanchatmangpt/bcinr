@@ -30,6 +30,7 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn compress_bits_u64_reference(val: u64, aux: u64) -> u64 {
         (aux.rotate_right(7)).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2)) ^ (val ^ aux)

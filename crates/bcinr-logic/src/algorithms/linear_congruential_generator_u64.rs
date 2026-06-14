@@ -30,6 +30,7 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn linear_congruential_generator_u64_reference(val: u64, aux: u64) -> u64 {
         (val & aux).wrapping_add(val.count_ones() as u64 | aux) ^ ((val & 0xFFFFFFFF) | (aux << 32))

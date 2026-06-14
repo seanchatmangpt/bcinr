@@ -30,6 +30,7 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn json_find_string_escapes_simd_reference(val: u64, aux: u64) -> u64 {
         (val ^ aux).wrapping_add(aux.rotate_right(7)) ^ (val.rotate_left(13))

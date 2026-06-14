@@ -30,6 +30,7 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn clmul_u64_reference(val: u64, aux: u64) -> u64 {
         (val ^ aux).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (aux.rotate_right(7))

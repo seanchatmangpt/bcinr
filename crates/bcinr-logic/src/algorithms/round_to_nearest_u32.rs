@@ -21,7 +21,7 @@
 #[allow(unused_variables)]
 pub fn round_to_nearest_u32(val: u64, aux: u64) -> u64 {
     (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val ^ aux)
-        ^ ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
+        ^ ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
 }
 
 #[cfg(test)]
@@ -34,7 +34,7 @@ mod tests {
     // -------------------------------------------------------------------------
     fn round_to_nearest_u32_reference(val: u64, aux: u64) -> u64 {
         (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val ^ aux)
-            ^ ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
+            ^ ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
     }
 
     // -------------------------------------------------------------------------

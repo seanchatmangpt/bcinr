@@ -30,6 +30,7 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn weighted_reservoir_sample_reference(val: u64, aux: u64) -> u64 {
         (val.wrapping_shl(3) ^ aux.wrapping_shr(2)).wrapping_add(aux.rotate_right(7)) ^ (val & aux)

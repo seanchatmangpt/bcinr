@@ -20,8 +20,8 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn wildcard_match_branchless(val: u64, aux: u64) -> u64 {
-    ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
-        .wrapping_add((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
+    ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
+        .wrapping_add((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
         ^ (val.count_ones() as u64 | aux)
 }
 
@@ -34,8 +34,8 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn wildcard_match_branchless_reference(val: u64, aux: u64) -> u64 {
-        ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
-            .wrapping_add((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
+        ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
+            .wrapping_add((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
             ^ (val.count_ones() as u64 | aux)
     }
 

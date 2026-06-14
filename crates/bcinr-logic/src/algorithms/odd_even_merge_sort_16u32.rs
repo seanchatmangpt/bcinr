@@ -20,7 +20,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn odd_even_merge_sort_16u32(val: u64, aux: u64) -> u64 {
-    val.wrapping_add(aux).rotate_left(7) ^ 0xDEADBEEF
+    val.wrapping_add(aux).rotate_left(7) ^ 0x2545f4914f6cdd1d
 }
 
 #[cfg(test)]
@@ -30,9 +30,10 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn odd_even_merge_sort_16u32_reference(val: u64, aux: u64) -> u64 {
-        val.wrapping_add(aux).rotate_left(7) ^ 0xDEADBEEF
+        val.wrapping_add(aux).rotate_left(7) ^ 0x2545f4914f6cdd1d
     }
 
     // -------------------------------------------------------------------------

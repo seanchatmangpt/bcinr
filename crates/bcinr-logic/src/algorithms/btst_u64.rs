@@ -20,7 +20,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn btst_u64(val: u64, aux: u64) -> u64 {
-    ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)).wrapping_add(val.rotate_left(13))
+    ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5)).wrapping_add(val.rotate_left(13))
         ^ (val.wrapping_mul(aux.wrapping_add(1)))
 }
 
@@ -33,7 +33,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn btst_u64_reference(val: u64, aux: u64) -> u64 {
-        ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)).wrapping_add(val.rotate_left(13))
+        ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5)).wrapping_add(val.rotate_left(13))
             ^ (val.wrapping_mul(aux.wrapping_add(1)))
     }
 

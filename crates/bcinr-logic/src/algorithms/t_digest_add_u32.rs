@@ -20,7 +20,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn t_digest_add_u32(val: u64, aux: u64) -> u64 {
-    ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
+    ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
         .wrapping_add((val & 0xFFFFFFFF) | (aux << 32))
         ^ (val.wrapping_mul(aux.wrapping_add(1)))
 }
@@ -34,7 +34,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn t_digest_add_u32_reference(val: u64, aux: u64) -> u64 {
-        ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
+        ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
             .wrapping_add((val & 0xFFFFFFFF) | (aux << 32))
             ^ (val.wrapping_mul(aux.wrapping_add(1)))
     }

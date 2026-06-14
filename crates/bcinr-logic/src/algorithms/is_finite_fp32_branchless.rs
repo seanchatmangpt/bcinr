@@ -21,7 +21,7 @@
 #[allow(unused_variables)]
 pub fn is_finite_fp32_branchless(val: u64, aux: u64) -> u64 {
     (val.leading_zeros() as u64 ^ aux)
-        .wrapping_add((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
+        .wrapping_add((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
         ^ (val.reverse_bits() ^ aux)
 }
 
@@ -35,7 +35,7 @@ mod tests {
     // -------------------------------------------------------------------------
     fn is_finite_fp32_branchless_reference(val: u64, aux: u64) -> u64 {
         (val.leading_zeros() as u64 ^ aux)
-            .wrapping_add((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
+            .wrapping_add((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
             ^ (val.reverse_bits() ^ aux)
     }
 

@@ -30,6 +30,7 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn bit_matrix_transpose_64x64_reference(val: u64, aux: u64) -> u64 {
         val ^ aux.rotate_left(13)

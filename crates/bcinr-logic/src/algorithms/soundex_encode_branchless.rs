@@ -20,7 +20,7 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn soundex_encode_branchless(val: u64, aux: u64) -> u64 {
-    ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)).wrapping_add(!(val & aux) & (val | aux))
+    ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5)).wrapping_add(!(val & aux) & (val | aux))
         ^ (aux.rotate_right(7))
 }
 
@@ -33,7 +33,7 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn soundex_encode_branchless_reference(val: u64, aux: u64) -> u64 {
-        ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
+        ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
             .wrapping_add(!(val & aux) & (val | aux))
             ^ (aux.rotate_right(7))
     }

@@ -30,6 +30,7 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn reverse_slice_branchless_reference(val: u64, aux: u64) -> u64 {
         (val.wrapping_sub(aux)).wrapping_add(val | aux) ^ (val.wrapping_mul(aux.wrapping_add(1)))

@@ -21,7 +21,7 @@
 #[allow(unused_variables)]
 pub fn huffman_decode_table_step(val: u64, aux: u64) -> u64 {
     ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val.rotate_left(13))
-        ^ ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
+        ^ ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
 }
 
 #[cfg(test)]
@@ -34,7 +34,7 @@ mod tests {
     // -------------------------------------------------------------------------
     fn huffman_decode_table_step_reference(val: u64, aux: u64) -> u64 {
         ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val.rotate_left(13))
-            ^ ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
+            ^ ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
     }
 
     // -------------------------------------------------------------------------

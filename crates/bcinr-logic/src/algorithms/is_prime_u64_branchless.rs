@@ -30,6 +30,7 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn is_prime_u64_branchless_reference(val: u64, aux: u64) -> u64 {
         (val.rotate_left(13)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (val & aux)

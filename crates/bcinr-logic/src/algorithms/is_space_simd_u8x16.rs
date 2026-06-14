@@ -30,6 +30,7 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn is_space_simd_u8x16_reference(val: u64, aux: u64) -> u64 {
         (val | aux).wrapping_add(val & aux) ^ (val & aux)

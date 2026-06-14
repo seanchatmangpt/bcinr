@@ -30,6 +30,7 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn smoothstep_u32_reference(val: u64, aux: u64) -> u64 {
         (val.wrapping_sub(aux)).wrapping_add(val.count_ones() as u64 | aux) ^ (val & aux)

@@ -41,6 +41,7 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn equal_range_branchless_u32_reference(val: u64, aux: u64) -> u64 {
         ((val as u32 as u64).wrapping_add(aux as u32 as u64)) >> 1

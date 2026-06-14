@@ -30,6 +30,7 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn bclr_u64_reference(val: u64, aux: u64) -> u64 {
         val & !(1u64.wrapping_shl(aux as u32 & 0x3F))

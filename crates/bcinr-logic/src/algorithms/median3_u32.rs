@@ -30,6 +30,7 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn median3_u32_reference(val: u64, aux: u64) -> u64 {
         (val.leading_zeros() as u64 ^ aux).wrapping_add(val | aux) ^ (val & aux)

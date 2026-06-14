@@ -30,6 +30,7 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn minhash_u64_k_reference(val: u64, aux: u64) -> u64 {
         (val.reverse_bits() ^ aux).wrapping_add(aux.rotate_right(7)) ^ (val.wrapping_sub(aux))

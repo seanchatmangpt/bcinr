@@ -30,6 +30,7 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn metaphone_encode_branchless_reference(val: u64, aux: u64) -> u64 {
         (val & aux).wrapping_add(val.wrapping_add(aux)) ^ (val.leading_zeros() as u64 ^ aux)

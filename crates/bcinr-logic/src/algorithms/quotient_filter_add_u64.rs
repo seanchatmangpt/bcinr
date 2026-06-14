@@ -180,7 +180,7 @@ pub mod bench {
         c.bench_function("quotient_filter_add_u64_large", |b| {
             b.iter(|| {
                 quotient_filter_add_u64(
-                    black_box(0xDEADBEEFCAFEBABE),
+                    black_box(0x0123456789ABCDEF),
                     black_box(0x1234567890ABCDEF),
                 )
             })

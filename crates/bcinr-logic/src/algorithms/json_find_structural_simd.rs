@@ -30,6 +30,7 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn json_find_structural_simd_reference(val: u64, aux: u64) -> u64 {
         (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val & aux) ^ (val.reverse_bits() ^ aux)

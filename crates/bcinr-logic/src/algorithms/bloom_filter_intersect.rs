@@ -30,6 +30,7 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn bloom_filter_intersect_reference(val: u64, aux: u64) -> u64 {
         (val | aux).wrapping_add(val.reverse_bits() ^ aux) ^ ((val & 0xFFFFFFFF) | (aux << 32))

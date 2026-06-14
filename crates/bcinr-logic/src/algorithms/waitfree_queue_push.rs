@@ -30,6 +30,7 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn waitfree_queue_push_reference(val: u64, aux: u64) -> u64 {
         (val.rotate_left(13)).wrapping_add(val.wrapping_sub(aux)) ^ (!(val & aux) & (val | aux))

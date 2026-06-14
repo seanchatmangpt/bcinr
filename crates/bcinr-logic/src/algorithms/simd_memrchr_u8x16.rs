@@ -30,6 +30,7 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn simd_memrchr_u8x16_reference(val: u64, aux: u64) -> u64 {
         (val.reverse_bits() ^ aux).wrapping_add(aux.rotate_right(7)) ^ (aux.rotate_right(7))

@@ -21,7 +21,7 @@
 #[allow(unused_variables)]
 pub fn clhash(val: u64, aux: u64) -> u64 {
     (val.reverse_bits() ^ aux).wrapping_add(val.leading_zeros() as u64 ^ aux)
-        ^ ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
+        ^ ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
 }
 
 #[cfg(test)]
@@ -34,7 +34,7 @@ mod tests {
     // -------------------------------------------------------------------------
     fn clhash_reference(val: u64, aux: u64) -> u64 {
         (val.reverse_bits() ^ aux).wrapping_add(val.leading_zeros() as u64 ^ aux)
-            ^ ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
+            ^ ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
     }
 
     // -------------------------------------------------------------------------

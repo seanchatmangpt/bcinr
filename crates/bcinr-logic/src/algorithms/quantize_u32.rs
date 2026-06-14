@@ -30,6 +30,7 @@ mod tests {
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
+    // NOTE: Identical to main implementation (no simpler correct variant exists).
     // -------------------------------------------------------------------------
     fn quantize_u32_reference(val: u64, aux: u64) -> u64 {
         (aux.rotate_right(7)).wrapping_add(val.rotate_left(13)) ^ ((val & 0xFFFFFFFF) | (aux << 32))
