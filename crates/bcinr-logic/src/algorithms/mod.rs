@@ -1,3 +1,4 @@
+// SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #![allow(dead_code)]
 pub mod parallel_bits_deposit_u64;
 pub mod parallel_bits_extract_u64;

@@ -1,6 +1,7 @@
 //! Pattern: Fixed-Shape Bit-Layout Transcode
 //! Purpose: Performs hardware-agnostic SIMD re-layout using parallel bit extraction/deposit.
 //! Primitive dependencies: `parallel_bits_extract_u64`, `parallel_bits_deposit_u64`.
+use crate::algorithms::parallel_bits_deposit_u64::parallel_bits_deposit_u64;
 ///
 /// # CONTRACT
 /// - **Input contract:** extract_mask and deposit_mask must be pre-defined.
@@ -19,7 +20,6 @@
 /// # Admissibility
 /// Admissible_T1: YES. Pure bitwise polynomial.
 use crate::algorithms::parallel_bits_extract_u64::parallel_bits_extract_u64;
-use crate::algorithms::parallel_bits_deposit_u64::parallel_bits_deposit_u64;
 
 /// # AXIOMATIC PROOF: Hoare-logic Analysis
 /// Precondition: { input ∈ Validbit_transcoder }
@@ -31,7 +31,10 @@ pub struct BitTranscoder {
 
 impl BitTranscoder {
     pub const fn new(extract_mask: u64, deposit_mask: u64) -> Self {
-        Self { extract_mask, deposit_mask }
+        Self {
+            extract_mask,
+            deposit_mask,
+        }
     }
 
     /// Lossless bit-layout transcode.
@@ -40,8 +43,7 @@ impl BitTranscoder {
     pub fn transcode(&self, val: u64) -> u64 {
         let extracted = parallel_bits_extract_u64(val, self.extract_mask);
         parallel_bits_deposit_u64(extracted, self.deposit_mask)
-    
-}
+    }
 
     /// Branchless field swap between two words.
     /// Contract: masks must be disjoint.
@@ -52,15 +54,15 @@ impl BitTranscoder {
         let out1 = parallel_bits_deposit_u64(v1, self.deposit_mask);
         let out2 = parallel_bits_deposit_u64(v2, self.extract_mask);
         out1 | out2
-    
-}
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    
 
-    fn bit_transcoder_reference(val: u64, _aux: u64) -> u64 { val }
+    fn bit_transcoder_reference(val: u64, _aux: u64) -> u64 {
+        val
+    }
 
     #[test]
     fn test_bit_transcoder_equivalence() {
@@ -72,16 +74,28 @@ mod tests {
         // Boundary verification
     }
 
-    fn mutant_bit_transcoder_1(val: u64, aux: u64) -> u64 { !bit_transcoder_reference(val, aux) }
-    fn mutant_bit_transcoder_2(val: u64, aux: u64) -> u64 { bit_transcoder_reference(val, aux).wrapping_add(1) }
-    fn mutant_bit_transcoder_3(val: u64, aux: u64) -> u64 { bit_transcoder_reference(val, aux) ^ 0xFF }
+    fn mutant_bit_transcoder_1(val: u64, aux: u64) -> u64 {
+        !bit_transcoder_reference(val, aux)
+    }
+    fn mutant_bit_transcoder_2(val: u64, aux: u64) -> u64 {
+        bit_transcoder_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_bit_transcoder_3(val: u64, aux: u64) -> u64 {
+        bit_transcoder_reference(val, aux) ^ 0xFF
+    }
 
     #[test]
-    fn test_counterfactual_mutant_1() { assert!(bit_transcoder_reference(1, 1) != mutant_bit_transcoder_1(1, 1)); }
+    fn test_counterfactual_mutant_1() {
+        assert!(bit_transcoder_reference(1, 1) != mutant_bit_transcoder_1(1, 1));
+    }
     #[test]
-    fn test_counterfactual_mutant_2() { assert!(bit_transcoder_reference(1, 1) != mutant_bit_transcoder_2(1, 1)); }
+    fn test_counterfactual_mutant_2() {
+        assert!(bit_transcoder_reference(1, 1) != mutant_bit_transcoder_2(1, 1));
+    }
     #[test]
-    fn test_counterfactual_mutant_3() { assert!(bit_transcoder_reference(1, 1) != mutant_bit_transcoder_3(1, 1)); }
+    fn test_counterfactual_mutant_3() {
+        assert!(bit_transcoder_reference(1, 1) != mutant_bit_transcoder_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 85: Satisfies Radon Law.

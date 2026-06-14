@@ -3,6 +3,7 @@
 // High avalanche, simple construction; branchless table lookup.
 
 // Standard Pearson hash permutation table (256-byte lookup)
+// SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 const PEARSON_TABLE: [u8; 256] = [
     251, 175, 119, 215, 81, 142, 237, 85, 90, 154, 121, 50, 235, 142, 218, 240,
     199, 247, 27, 34, 239, 107, 142, 25, 34, 214, 118, 206, 35, 139, 53, 199,

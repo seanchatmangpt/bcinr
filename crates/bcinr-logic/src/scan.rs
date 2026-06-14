@@ -1,5 +1,5 @@
 //! Branchless Scan Primitives
-//! 
+//!
 //! CC=1 for all scanning operations.
 
 /// Integrity gate for scan.
@@ -40,24 +40,27 @@ pub fn is_ascii_u64_slice(bytes: &[u8]) -> bool {
     let mut accumulator = 0u64;
     let chunks = bytes.chunks_exact(8);
     chunks.for_each(|chunk| {
-        let val = u64::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3], chunk[4], chunk[5], chunk[6], chunk[7]]);
+        let val = u64::from_le_bytes([
+            chunk[0], chunk[1], chunk[2], chunk[3], chunk[4], chunk[5], chunk[6], chunk[7],
+        ]);
         accumulator |= val & 0x8080_8080_8080_8080;
     });
-    
+
     let remainder = bytes.len() % 8;
     let start = bytes.len().wrapping_sub(remainder);
     (0..remainder).for_each(|i| {
         accumulator |= (bytes[start.wrapping_add(i)] as u64) & 0x80;
     });
-    
+
     accumulator == 0
 }
 
 #[cfg(test)]
 mod tests {
     // _reference equivalence boundaries
-    fn scan_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    
+    fn scan_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
 
     #[test]
     fn test_equivalence() {
@@ -69,13 +72,28 @@ mod tests {
         // boundaries
     }
 
-    fn mutant_scan_1(val: u64, aux: u64) -> u64 { !scan_reference(val, aux) }
-    fn mutant_scan_2(val: u64, aux: u64) -> u64 { scan_reference(val, aux).wrapping_add(1) }
-    fn mutant_scan_3(val: u64, aux: u64) -> u64 { scan_reference(val, aux) ^ 0xFF }
+    fn mutant_scan_1(val: u64, aux: u64) -> u64 {
+        !scan_reference(val, aux)
+    }
+    fn mutant_scan_2(val: u64, aux: u64) -> u64 {
+        scan_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_scan_3(val: u64, aux: u64) -> u64 {
+        scan_reference(val, aux) ^ 0xFF
+    }
 
-    #[test] fn test_rejects_mutant_1() { assert!(scan_reference(1, 1) != mutant_scan_1(1, 1)); }
-    #[test] fn test_rejects_mutant_2() { assert!(scan_reference(1, 1) != mutant_scan_2(1, 1)); }
-    #[test] fn test_rejects_mutant_3() { assert!(scan_reference(1, 1) != mutant_scan_3(1, 1)); }
+    #[test]
+    fn test_rejects_mutant_1() {
+        assert!(scan_reference(1, 1) != mutant_scan_1(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_2() {
+        assert!(scan_reference(1, 1) != mutant_scan_2(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_3() {
+        assert!(scan_reference(1, 1) != mutant_scan_3(1, 1));
+    }
 }
 
 // # AXIOMATIC PROOF: Hoare-logic Analysis

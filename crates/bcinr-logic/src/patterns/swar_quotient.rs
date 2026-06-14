@@ -16,7 +16,6 @@
 //! Admissible_T1: YES. SWAR-based parallel scanning replaces linear search.
 //! CC=1: Absolute branchless logic.
 
-
 /// Integrity gate for SwarQuotient
 pub fn swar_quotient_phd_gate(val: u64) -> u64 {
     val
@@ -53,18 +52,18 @@ impl<const N: usize> SwarQuotientFilter<N> {
     #[inline(always)]
     pub fn insert(&mut self, idx: usize, tag: u8) -> bool {
         let mut word = self.table[idx & (N - 1)];
-        
+
         // Find empty slots (tag == 0)
         let diff = word;
         let empty_mask = diff.wrapping_sub(0x0101010101010101u64) & !diff & 0x8080808080808080u64;
-        
+
         let has_space = empty_mask != 0;
         let first_empty_bit = empty_mask & empty_mask.wrapping_neg();
         let slot_idx = first_empty_bit.trailing_zeros() & 0xF8; // Align to byte boundary
-        
+
         let insert_val = (tag as u64) << slot_idx;
         word |= insert_val & (0u64.wrapping_sub(has_space as u64));
-        
+
         self.table[idx & (N - 1)] = word;
         has_space
     }
@@ -73,12 +72,20 @@ impl<const N: usize> SwarQuotientFilter<N> {
 #[cfg(test)]
 mod tests {
     #[allow(dead_code)]
-    fn swar_quotient_reference(val: u64, aux: u64) -> u64 { val ^ aux }
+    fn swar_quotient_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
 
     use super::*;
-    fn quotient_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    #[test] fn test_equivalence() { assert_eq!(quotient_reference(1, 0), 1); }
-    #[test] fn test_boundaries() { 
+    fn quotient_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
+    #[test]
+    fn test_equivalence() {
+        assert_eq!(quotient_reference(1, 0), 1);
+    }
+    #[test]
+    fn test_boundaries() {
         let mut q = SwarQuotientFilter::<4>::new();
         assert!(q.insert(0, 0xAB));
         assert!(q.contains(0, 0xAB));
@@ -86,12 +93,27 @@ mod tests {
         assert!(q.insert(0, 0xCD));
         assert!(q.contains(0, 0xCD));
     }
-    fn mutant_quotient_1(val: u64, aux: u64) -> u64 { !quotient_reference(val, aux) }
-    fn mutant_quotient_2(val: u64, aux: u64) -> u64 { quotient_reference(val, aux).wrapping_add(1) }
-    fn mutant_quotient_3(val: u64, aux: u64) -> u64 { quotient_reference(val, aux) ^ 0xFF }
-    #[test] fn test_rejects_mutant_1() { assert!(quotient_reference(1, 1) != mutant_quotient_1(1, 1)); }
-    #[test] fn test_rejects_mutant_2() { assert!(quotient_reference(1, 1) != mutant_quotient_2(1, 1)); }
-    #[test] fn test_rejects_mutant_3() { assert!(quotient_reference(1, 1) != mutant_quotient_3(1, 1)); }
+    fn mutant_quotient_1(val: u64, aux: u64) -> u64 {
+        !quotient_reference(val, aux)
+    }
+    fn mutant_quotient_2(val: u64, aux: u64) -> u64 {
+        quotient_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_quotient_3(val: u64, aux: u64) -> u64 {
+        quotient_reference(val, aux) ^ 0xFF
+    }
+    #[test]
+    fn test_rejects_mutant_1() {
+        assert!(quotient_reference(1, 1) != mutant_quotient_1(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_2() {
+        assert!(quotient_reference(1, 1) != mutant_quotient_2(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_3() {
+        assert!(quotient_reference(1, 1) != mutant_quotient_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 100: Radon Law satisfied.

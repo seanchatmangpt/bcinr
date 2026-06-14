@@ -1,6 +1,6 @@
 // oracle equivalence boundaries
 //! Parallel Reduction Primitives
-//! 
+//!
 //! CC=1 for all horizontal operations.
 
 #[inline]
@@ -63,16 +63,37 @@ pub fn horizontal_min_u8x8(v: u64) -> u8 {
 
 #[cfg(test)]
 mod tests_phd_reduce {
-    
-    fn reduce_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    #[test] fn test_equivalence() { assert_eq!(reduce_reference(1, 0), 1); }
-    #[test] fn test_boundaries() { }
-    fn mutant_reduce_1(val: u64, aux: u64) -> u64 { !reduce_reference(val, aux) }
-    fn mutant_reduce_2(val: u64, aux: u64) -> u64 { reduce_reference(val, aux).wrapping_add(1) }
-    fn mutant_reduce_3(val: u64, aux: u64) -> u64 { reduce_reference(val, aux) ^ 0xFF }
-    #[test] fn test_rejects_mutant_1() { assert!(reduce_reference(1, 1) != mutant_reduce_1(1, 1)); }
-    #[test] fn test_rejects_mutant_2() { assert!(reduce_reference(1, 1) != mutant_reduce_2(1, 1)); }
-    #[test] fn test_rejects_mutant_3() { assert!(reduce_reference(1, 1) != mutant_reduce_3(1, 1)); }
+
+    fn reduce_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
+    #[test]
+    fn test_equivalence() {
+        assert_eq!(reduce_reference(1, 0), 1);
+    }
+    #[test]
+    fn test_boundaries() {}
+    fn mutant_reduce_1(val: u64, aux: u64) -> u64 {
+        !reduce_reference(val, aux)
+    }
+    fn mutant_reduce_2(val: u64, aux: u64) -> u64 {
+        reduce_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_reduce_3(val: u64, aux: u64) -> u64 {
+        reduce_reference(val, aux) ^ 0xFF
+    }
+    #[test]
+    fn test_rejects_mutant_1() {
+        assert!(reduce_reference(1, 1) != mutant_reduce_1(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_2() {
+        assert!(reduce_reference(1, 1) != mutant_reduce_2(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_3() {
+        assert!(reduce_reference(1, 1) != mutant_reduce_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 100: Radon Law verified.

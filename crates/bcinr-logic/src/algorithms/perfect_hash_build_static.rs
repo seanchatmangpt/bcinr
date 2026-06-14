@@ -16,6 +16,7 @@
 /// let result = perfect_hash_build_static(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+// SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn perfect_hash_build_static(val: u64, aux: u64) -> u64 {

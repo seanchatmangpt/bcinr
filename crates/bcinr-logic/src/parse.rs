@@ -1,6 +1,6 @@
 // oracle equivalence boundaries
 //! Branchless Parsing Primitives
-//! 
+//!
 //! CC=1 for all parsing operations.
 
 /// Skip whitespace branchlessly using a fixed-width scan.
@@ -26,9 +26,9 @@ pub fn parse_hex_u32(bytes: &[u8]) -> Result<u32, ()> {
         let is_digit = b.is_ascii_digit() as u32;
         let is_upper = (b'A'..=b'F').contains(&b) as u32;
         let is_lower = (b'a'..=b'f').contains(&b) as u32;
-        let val = (is_digit * (b.wrapping_sub(b'0') as u32)) |
-                  (is_upper * (b.wrapping_sub(b'A').wrapping_add(10) as u32)) |
-                  (is_lower * (b.wrapping_sub(b'a').wrapping_add(10) as u32));
+        let val = (is_digit * (b.wrapping_sub(b'0') as u32))
+            | (is_upper * (b.wrapping_sub(b'A').wrapping_add(10) as u32))
+            | (is_lower * (b.wrapping_sub(b'a').wrapping_add(10) as u32));
         err |= (!(is_digit | is_upper | is_lower) & (i < len) as u32) & 1;
         res = (res << (4 * (i < len) as u32)) | (val & 0u32.wrapping_sub((i < len) as u32));
     });
@@ -38,8 +38,9 @@ pub fn parse_hex_u32(bytes: &[u8]) -> Result<u32, ()> {
 #[cfg(test)]
 mod tests {
     // _reference equivalence boundaries
-    fn parse_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    
+    fn parse_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
 
     #[test]
     fn test_equivalence() {
@@ -51,13 +52,28 @@ mod tests {
         assert_eq!(parse_reference(0, 0), 0);
     }
 
-    fn mutant_parse_1(val: u64, aux: u64) -> u64 { !parse_reference(val, aux) }
-    fn mutant_parse_2(val: u64, aux: u64) -> u64 { parse_reference(val, aux).wrapping_add(1) }
-    fn mutant_parse_3(val: u64, aux: u64) -> u64 { parse_reference(val, aux) ^ 0xFF }
+    fn mutant_parse_1(val: u64, aux: u64) -> u64 {
+        !parse_reference(val, aux)
+    }
+    fn mutant_parse_2(val: u64, aux: u64) -> u64 {
+        parse_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_parse_3(val: u64, aux: u64) -> u64 {
+        parse_reference(val, aux) ^ 0xFF
+    }
 
-    #[test] fn test_rejects_mutant_1() { assert!(parse_reference(1, 1) != mutant_parse_1(1, 1)); }
-    #[test] fn test_rejects_mutant_2() { assert!(parse_reference(1, 1) != mutant_parse_2(1, 1)); }
-    #[test] fn test_rejects_mutant_3() { assert!(parse_reference(1, 1) != mutant_parse_3(1, 1)); }
+    #[test]
+    fn test_rejects_mutant_1() {
+        assert!(parse_reference(1, 1) != mutant_parse_1(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_2() {
+        assert!(parse_reference(1, 1) != mutant_parse_2(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_3() {
+        assert!(parse_reference(1, 1) != mutant_parse_3(1, 1));
+    }
 }
 
 // # AXIOMATIC PROOF: Hoare-logic Analysis

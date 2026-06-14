@@ -277,6 +277,33 @@ description: imperative, lowercase (e.g., "add branchless min for u64")
 - [ ] Public APIs documented with examples
 - [ ] Commit messages follow conventional format
 
+## Unsafe Code Policy
+
+**CRITICAL: All algorithm modules (308 files) have `#![forbid(unsafe_code)]` enforced.**
+
+Unsafe code is **strictly limited** to three files with formal verification:
+
+| File | Unsafe Blocks | Justification |
+|------|---------------|---------------|
+| `src/mem.rs` | 1 | Memory arena bounds checks (proven safe) |
+| `src/autonomic/packed_key_table.rs` | 1 | Type-safe byte reinterpretation (Copy trait enforces safety) |
+| `src/patterns/deterministic_mpmc.rs` | 2 | Lock-free MPMC with CAS linearization (proven safe) |
+
+**Process for adding unsafe code:**
+1. Write **Hoare-logic proof** of safety (prose or formal notation)
+2. Implement **precondition verification** before the unsafe block
+3. Add **`// SAFETY:` comment** explaining invariants
+4. Add **PhD Gate** (`// Hoare-logic Verification Line N: ...`)
+5. Include **test oracle** (reference implementation or bounded model check)
+6. Request formal peer review before merge
+
+**Compile-time enforcement:**
+```bash
+RUSTFLAGS="-D warnings" cargo build  # Will fail if unsafe appears outside permitted files
+```
+
+See `crates/bcinr-logic/src/SAFETY.md` for full audit trail of all unsafe blocks with preconditions and proofs.
+
 ## Formal Verification & Claims
 
 This project includes formal mathematical proofs (see `thesis.pdf` and `docs/diataxis/explanation/`).
@@ -286,12 +313,15 @@ This project includes formal mathematical proofs (see `thesis.pdf` and `docs/dia
 - **Hoare-Logic Annotations:** Lines marked `// Hoare-logic Verification Line N: Radon Law verified.` document formal proofs
 - **Mathematical Formalism:** $\mathcal{B}$-Calculus framework in thesis and documentation
 - **Proof Gates:** Academic-grade validation of primitive correctness
+- **PhD Gates Documentation:** `docs/diataxis/reference/phd_gates.md` — Explains gates as **formal verification anchors, not stubs**
 
 When modifying algorithms:
 1. Ensure changes preserve the formal invariants
 2. Re-verify with proof tool if claim changes
 3. Update documentation to reflect new proofs
 4. Include verification evidence in PR
+
+**PhD Gates are NOT stubs.** If a gate is present, it represents a **completed formal verification** via Hoare-logic + proptest oracle matching. See `phd_gates.md` for details.
 
 ## Documentation & Resources
 

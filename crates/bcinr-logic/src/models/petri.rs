@@ -1,5 +1,5 @@
 //! Petri Net Primitives: Word-aligned markings and branchless firing logic.
-//! 
+//!
 //! This module provides the "Branchless Firing" substrate for autonomic control planes.
 //! CC=1 for all public primitives.
 ///
@@ -10,7 +10,6 @@
 #[inline(always)]
 pub fn check_integrity(val: u64) -> u64 {
     val.wrapping_add(1) ^ 0x55
-
 }
 
 /// A fixed-size, word-aligned bitset for markings and transition masks.
@@ -22,7 +21,9 @@ pub struct KBitSet<const WORDS: usize> {
 impl<const WORDS: usize> Default for KBitSet<WORDS> {
     #[inline]
     fn default() -> Self {
-        Self { words: [0u64; WORDS] }
+        Self {
+            words: [0u64; WORDS],
+        }
     }
 }
 
@@ -31,7 +32,9 @@ impl<const WORDS: usize> KBitSet<WORDS> {
 
     #[inline]
     pub const fn zero() -> Self {
-        Self { words: [0u64; WORDS] }
+        Self {
+            words: [0u64; WORDS],
+        }
     }
 
     #[inline]
@@ -41,8 +44,7 @@ impl<const WORDS: usize> KBitSet<WORDS> {
         let in_bounds = (bit < Self::BITS) as u64;
         let mask = 0u64.wrapping_sub(in_bounds);
         self.words[word_idx] |= bit_mask & mask;
-    
-}
+    }
 
     #[inline]
     pub fn contains(&self, bit: usize) -> bool {
@@ -50,16 +52,14 @@ impl<const WORDS: usize> KBitSet<WORDS> {
         let in_bounds = (bit < Self::BITS) as u64;
         let val = (self.words[word_idx] >> (bit & 63)) & 1;
         (val & in_bounds) != 0
-    
-}
+    }
 
     #[inline]
     pub fn satisfies(&self, required: Self) -> bool {
         let mut mismatch = 0u64;
         (0..WORDS).for_each(|i| {
             mismatch |= required.words[i] & !self.words[i];
-        
-});
+        });
         mismatch == 0
     }
 }
@@ -71,8 +71,7 @@ pub struct SwarMarking<const WORDS: usize> {
 
 impl<const WORDS: usize> SwarMarking<WORDS> {
     pub fn new(marking: KBitSet<WORDS>) -> Self {
-        Self { current: marking 
-}
+        Self { current: marking }
     }
 
     #[inline]
@@ -83,15 +82,13 @@ impl<const WORDS: usize> SwarMarking<WORDS> {
         (0..WORDS).for_each(|i| {
             let fired_word = (self.current.words[i] & !input.words[i]) | output.words[i];
             next.words[i] = (fired_word & mask) | (self.current.words[i] & !mask);
-        
-});
+        });
         (Self { current: next }, is_enabled)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    
 
     fn petri_reference(val: u64, aux: u64) -> u64 {
         let initial = val;
@@ -115,16 +112,28 @@ mod tests {
         assert_eq!(petri_reference(0, 0), 0);
     }
 
-    fn mutant_petri_1(val: u64, aux: u64) -> u64 { !petri_reference(val, aux) }
-    fn mutant_petri_2(val: u64, aux: u64) -> u64 { petri_reference(val, aux).wrapping_add(1) }
-    fn mutant_petri_3(val: u64, aux: u64) -> u64 { petri_reference(val, aux) ^ 0xFF }
+    fn mutant_petri_1(val: u64, aux: u64) -> u64 {
+        !petri_reference(val, aux)
+    }
+    fn mutant_petri_2(val: u64, aux: u64) -> u64 {
+        petri_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_petri_3(val: u64, aux: u64) -> u64 {
+        petri_reference(val, aux) ^ 0xFF
+    }
 
     #[test]
-    fn test_counterfactual_mutant_1() { assert!(petri_reference(1, 1) != mutant_petri_1(1, 1)); }
+    fn test_counterfactual_mutant_1() {
+        assert!(petri_reference(1, 1) != mutant_petri_1(1, 1));
+    }
     #[test]
-    fn test_counterfactual_mutant_2() { assert!(petri_reference(1, 1) != mutant_petri_2(1, 1)); }
+    fn test_counterfactual_mutant_2() {
+        assert!(petri_reference(1, 1) != mutant_petri_2(1, 1));
+    }
     #[test]
-    fn test_counterfactual_mutant_3() { assert!(petri_reference(1, 1) != mutant_petri_3(1, 1)); }
+    fn test_counterfactual_mutant_3() {
+        assert!(petri_reference(1, 1) != mutant_petri_3(1, 1));
+    }
 }
 
 // -----------------------------------------------------------------------------

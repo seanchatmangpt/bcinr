@@ -35,7 +35,9 @@ impl Default for BitonicPriorityQueue8 {
 
 impl BitonicPriorityQueue8 {
     pub const fn new() -> Self {
-        Self { data: [u32::MAX; 8] }
+        Self {
+            data: [u32::MAX; 8],
+        }
     }
 
     /// Pushes a new priority value branchlessly.
@@ -54,11 +56,11 @@ impl BitonicPriorityQueue8 {
         let val = self.data[0];
         let has_data = (val != u32::MAX) as u32;
         let mask = 0u32.wrapping_sub(has_data);
-        
+
         // Tombstone min value and re-sort
         self.data[0] = u32::MAX;
         bitonic_sort_8u32(&mut self.data);
-        
+
         (val & mask, mask)
     }
 }
@@ -66,12 +68,20 @@ impl BitonicPriorityQueue8 {
 #[cfg(test)]
 mod tests {
     #[allow(dead_code)]
-    fn bitonic_pq_reference(val: u64, aux: u64) -> u64 { val ^ aux }
+    fn bitonic_pq_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
 
     use super::*;
-    fn pq_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    #[test] fn test_equivalence() { assert_eq!(pq_reference(1, 0), 1); }
-    #[test] fn test_boundaries() { 
+    fn pq_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
+    #[test]
+    fn test_equivalence() {
+        assert_eq!(pq_reference(1, 0), 1);
+    }
+    #[test]
+    fn test_boundaries() {
         let mut pq = BitonicPriorityQueue8::new();
         pq.push(100);
         pq.push(50);
@@ -81,12 +91,27 @@ mod tests {
         let (v2, _) = pq.pop();
         assert_eq!(v2, 100);
     }
-    fn mutant_pq_1(val: u64, aux: u64) -> u64 { !pq_reference(val, aux) }
-    fn mutant_pq_2(val: u64, aux: u64) -> u64 { pq_reference(val, aux).wrapping_add(1) }
-    fn mutant_pq_3(val: u64, aux: u64) -> u64 { pq_reference(val, aux) ^ 0xFF }
-    #[test] fn test_rejects_mutant_1() { assert!(pq_reference(1, 1) != mutant_pq_1(1, 1)); }
-    #[test] fn test_rejects_mutant_2() { assert!(pq_reference(1, 1) != mutant_pq_2(1, 1)); }
-    #[test] fn test_rejects_mutant_3() { assert!(pq_reference(1, 1) != mutant_pq_3(1, 1)); }
+    fn mutant_pq_1(val: u64, aux: u64) -> u64 {
+        !pq_reference(val, aux)
+    }
+    fn mutant_pq_2(val: u64, aux: u64) -> u64 {
+        pq_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_pq_3(val: u64, aux: u64) -> u64 {
+        pq_reference(val, aux) ^ 0xFF
+    }
+    #[test]
+    fn test_rejects_mutant_1() {
+        assert!(pq_reference(1, 1) != mutant_pq_1(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_2() {
+        assert!(pq_reference(1, 1) != mutant_pq_2(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_3() {
+        assert!(pq_reference(1, 1) != mutant_pq_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 100: Radon Law satisfied.

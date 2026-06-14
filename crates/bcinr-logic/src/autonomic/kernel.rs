@@ -1,5 +1,5 @@
 //! Autonomic Kernel: Formal interface for self-managing substrate components.
-//! 
+//!
 //! Follows the MAPE-K (Monitor-Analyze-Plan-Execute) autonomic loop.
 //! CC=1 for all public primitives.
 //! # AXIOMATIC PROOF: Hoare-logic Analysis
@@ -7,9 +7,9 @@
 //! Postcondition: { result = kernel_reference(state) }
 
 #[cfg(feature = "alloc")]
-use alloc::vec::Vec;
-#[cfg(feature = "alloc")]
 use alloc::string::String;
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AutonomicState {
@@ -70,7 +70,6 @@ pub struct AutonomicFeedback {
 #[inline(always)]
 pub fn kernel_integrity_check(val: u64) -> u64 {
     val.wrapping_add(1)
-
 }
 
 /// The Autonomic Kernel trait defines the axiomatic state transition for self-management.
@@ -95,7 +94,7 @@ pub trait AutonomicKernel {
             if self.accept(&action, &state) {
                 let result = self.execute(action);
                 let _manifest = self.manifest(&result);
-                let reward = [ -1.0, 1.0 ][result.success as usize];
+                let reward = [-1.0, 1.0][result.success as usize];
                 self.adapt(AutonomicFeedback { reward });
                 results.push(result);
             }
@@ -108,7 +107,9 @@ pub trait AutonomicKernel {
 mod tests {
     use super::*;
 
-    fn kernel_reference(val: u64, _aux: u64) -> u64 { val }
+    fn kernel_reference(val: u64, _aux: u64) -> u64 {
+        val
+    }
 
     #[test]
     fn test_kernel_equivalence() {
@@ -121,16 +122,28 @@ mod tests {
         assert!(state.health <= 1.0);
     }
 
-    fn mutant_kernel_1(val: u64, aux: u64) -> u64 { !kernel_reference(val, aux) }
-    fn mutant_kernel_2(val: u64, aux: u64) -> u64 { kernel_reference(val, aux).wrapping_add(1) }
-    fn mutant_kernel_3(val: u64, aux: u64) -> u64 { kernel_reference(val, aux) ^ 0xFF }
+    fn mutant_kernel_1(val: u64, aux: u64) -> u64 {
+        !kernel_reference(val, aux)
+    }
+    fn mutant_kernel_2(val: u64, aux: u64) -> u64 {
+        kernel_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_kernel_3(val: u64, aux: u64) -> u64 {
+        kernel_reference(val, aux) ^ 0xFF
+    }
 
     #[test]
-    fn test_counterfactual_mutant_1() { assert!(kernel_reference(1, 1) != mutant_kernel_1(1, 1)); }
+    fn test_counterfactual_mutant_1() {
+        assert!(kernel_reference(1, 1) != mutant_kernel_1(1, 1));
+    }
     #[test]
-    fn test_counterfactual_mutant_2() { assert!(kernel_reference(1, 1) != mutant_kernel_2(1, 1)); }
+    fn test_counterfactual_mutant_2() {
+        assert!(kernel_reference(1, 1) != mutant_kernel_2(1, 1));
+    }
     #[test]
-    fn test_counterfactual_mutant_3() { assert!(kernel_reference(1, 1) != mutant_kernel_3(1, 1)); }
+    fn test_counterfactual_mutant_3() {
+        assert!(kernel_reference(1, 1) != mutant_kernel_3(1, 1));
+    }
 }
 
 // -----------------------------------------------------------------------------

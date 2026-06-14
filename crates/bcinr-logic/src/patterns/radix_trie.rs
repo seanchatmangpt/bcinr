@@ -49,23 +49,23 @@ impl<const N: usize> RadixTrieNode<N> {
         let word_idx = (b >> 6) as usize;
         let bit_idx = (b & 63) as u32;
         let word = self.bitmap[word_idx];
-        
+
         let exists = (word >> bit_idx) & 1;
         let exists_mask = 0u32.wrapping_sub(exists as u32);
-        
+
         // 1. Rank calculation (popcount of bits before b)
         let mut rank = 0usize;
         (0..word_idx).for_each(|i| {
             rank += self.bitmap[i].count_ones() as usize;
         });
-        
+
         // Bits in current word before the target bit
         let pre_mask = (1u64 << bit_idx) - 1;
         rank += (word & pre_mask).count_ones() as usize;
-        
+
         // 2. Map rank to child array
         let child_idx = self.children[rank & (N - 1)];
-        
+
         (child_idx & exists_mask, exists_mask)
     }
 }
@@ -73,30 +73,53 @@ impl<const N: usize> RadixTrieNode<N> {
 #[cfg(test)]
 mod tests {
     #[allow(dead_code)]
-    fn radix_trie_reference(val: u64, aux: u64) -> u64 { val ^ aux }
+    fn radix_trie_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
 
     use super::*;
-    fn trie_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    #[test] fn test_equivalence() { assert_eq!(trie_reference(1, 0), 1); }
-    #[test] fn test_boundaries() { 
+    fn trie_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
+    #[test]
+    fn test_equivalence() {
+        assert_eq!(trie_reference(1, 0), 1);
+    }
+    #[test]
+    fn test_boundaries() {
         let mut node = RadixTrieNode::<16>::new();
         // Occupy slots for 'a' (97) and 'z' (122)
         node.bitmap[1] |= 1 << (97 - 64);
         node.bitmap[1] |= 1 << (122 - 64);
         node.children[0] = 100;
         node.children[1] = 200;
-        
+
         let (idx1, _) = node.lookup(b'a');
         assert_eq!(idx1, 100);
         let (idx2, _) = node.lookup(b'z');
         assert_eq!(idx2, 200);
     }
-    fn mutant_trie_1(val: u64, aux: u64) -> u64 { !trie_reference(val, aux) }
-    fn mutant_trie_2(val: u64, aux: u64) -> u64 { trie_reference(val, aux).wrapping_add(1) }
-    fn mutant_trie_3(val: u64, aux: u64) -> u64 { trie_reference(val, aux) ^ 0xFF }
-    #[test] fn test_rejects_mutant_1() { assert!(trie_reference(1, 1) != mutant_trie_1(1, 1)); }
-    #[test] fn test_rejects_mutant_2() { assert!(trie_reference(1, 1) != mutant_trie_2(1, 1)); }
-    #[test] fn test_rejects_mutant_3() { assert!(trie_reference(1, 1) != mutant_trie_3(1, 1)); }
+    fn mutant_trie_1(val: u64, aux: u64) -> u64 {
+        !trie_reference(val, aux)
+    }
+    fn mutant_trie_2(val: u64, aux: u64) -> u64 {
+        trie_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_trie_3(val: u64, aux: u64) -> u64 {
+        trie_reference(val, aux) ^ 0xFF
+    }
+    #[test]
+    fn test_rejects_mutant_1() {
+        assert!(trie_reference(1, 1) != mutant_trie_1(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_2() {
+        assert!(trie_reference(1, 1) != mutant_trie_2(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_3() {
+        assert!(trie_reference(1, 1) != mutant_trie_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 100: Radon Law satisfied.

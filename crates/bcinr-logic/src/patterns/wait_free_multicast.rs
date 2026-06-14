@@ -25,7 +25,9 @@ impl<const CONSUMERS: usize> BoundedSpscMulticast<CONSUMERS> {
         if CONSUMERS > 64 {
             return Err("u64 delivery mask supports at most 64 consumers");
         }
-        Ok(Self { rings: core::array::from_fn(|_| SpscRingState::new()) })
+        Ok(Self {
+            rings: core::array::from_fn(|_| SpscRingState::new()),
+        })
     }
 
     #[inline(always)]
@@ -38,7 +40,9 @@ impl<const CONSUMERS: usize> BoundedSpscMulticast<CONSUMERS> {
     #[inline(always)]
     pub fn any_full_mask(&self) -> u64 {
         let mut any_full = 0u64;
-        (0..CONSUMERS).for_each(|i| { any_full |= Self::ring_full_mask(&self.rings[i]); });
+        (0..CONSUMERS).for_each(|i| {
+            any_full |= Self::ring_full_mask(&self.rings[i]);
+        });
         any_full
     }
 
@@ -59,32 +63,53 @@ impl<const CONSUMERS: usize> BoundedSpscMulticast<CONSUMERS> {
     pub fn broadcast_all_or_none(&mut self) -> u64 {
         let can_deliver_mask = !self.any_full_mask();
         let mut delivery_mask = 0u64;
-        
+
         (0..CONSUMERS).for_each(|i| {
             let h = self.rings[i].head;
             let next = (h.wrapping_add(1)) & self.rings[i].mask;
             let success = (can_deliver_mask & 1) as u32;
-            
+
             self.rings[i].head = (next & success) | (h & !success);
             delivery_mask |= (success as u64) << (i as u32);
         });
-        
+
         delivery_mask
     }
 }
 
 #[cfg(test)]
 mod tests_multicast {
-    
-    fn multicast_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    #[test] fn test_equivalence() { assert_eq!(multicast_reference(1, 0), 1); }
-    #[test] fn test_boundaries() { }
-    fn mutant_multicast_1(val: u64, aux: u64) -> u64 { !multicast_reference(val, aux) }
-    fn mutant_multicast_2(val: u64, aux: u64) -> u64 { multicast_reference(val, aux).wrapping_add(1) }
-    fn mutant_multicast_3(val: u64, aux: u64) -> u64 { multicast_reference(val, aux) ^ 0xFF }
-    #[test] fn test_rejects_mutant_1() { assert!(multicast_reference(1, 1) != mutant_multicast_1(1, 1)); }
-    #[test] fn test_rejects_mutant_2() { assert!(multicast_reference(1, 1) != mutant_multicast_2(1, 1)); }
-    #[test] fn test_rejects_mutant_3() { assert!(multicast_reference(1, 1) != mutant_multicast_3(1, 1)); }
+
+    fn multicast_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
+    #[test]
+    fn test_equivalence() {
+        assert_eq!(multicast_reference(1, 0), 1);
+    }
+    #[test]
+    fn test_boundaries() {}
+    fn mutant_multicast_1(val: u64, aux: u64) -> u64 {
+        !multicast_reference(val, aux)
+    }
+    fn mutant_multicast_2(val: u64, aux: u64) -> u64 {
+        multicast_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_multicast_3(val: u64, aux: u64) -> u64 {
+        multicast_reference(val, aux) ^ 0xFF
+    }
+    #[test]
+    fn test_rejects_mutant_1() {
+        assert!(multicast_reference(1, 1) != mutant_multicast_1(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_2() {
+        assert!(multicast_reference(1, 1) != mutant_multicast_2(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_3() {
+        assert!(multicast_reference(1, 1) != mutant_multicast_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 100: Radon Law satisfied.

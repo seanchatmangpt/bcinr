@@ -3,8 +3,8 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::patterns::*;
     use crate::models::petri::KBitSet;
+    use crate::patterns::*;
 
     #[test]
     fn test_bloom_scan_pipeline() {
@@ -20,7 +20,7 @@ mod tests {
         let inputs = [KBitSet { words: [1; 1] }];
         let outputs = [KBitSet { words: [2; 1] }];
         let mut engine = PriorityPetriEngine::new_checked(initial, inputs, outputs).unwrap();
-        
+
         let mask = engine.step();
         assert_eq!(mask & 1, 1);
         assert_eq!(engine.state.current.words[0], 2);
@@ -160,5 +160,4 @@ mod tests {
         assert_eq!(wheel.tick(), 0);
         assert_eq!(wheel.tick(), 1);
     }
-
 }

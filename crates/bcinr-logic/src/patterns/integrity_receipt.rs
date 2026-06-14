@@ -37,7 +37,10 @@ impl DeterministicSubstrateReceipt {
     pub const FNV_PRIME: u64 = 0x100000001b3;
 
     pub const fn new() -> Self {
-        Self { current_hash: Self::FNV_OFFSET, steps: 0 }
+        Self {
+            current_hash: Self::FNV_OFFSET,
+            steps: 0,
+        }
     }
 
     #[inline(always)]
@@ -52,29 +55,28 @@ impl DeterministicSubstrateReceipt {
     #[inline(always)]
     pub fn record(&mut self, tag: u64, state: u64, aux: u64) {
         let mut h = self.current_hash;
-        
+
         h = Self::mix(h, self.steps);
         h = Self::mix(h, tag);
         h = Self::mix(h, state);
         h = Self::mix(h, aux);
-        
+
         self.current_hash = h;
         self.steps = self.steps.wrapping_add(1);
-    
-}
+    }
 
     #[inline(always)]
     pub fn finalize(&self) -> u64 {
         self.current_hash
-    
-}
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    
 
-    fn integrity_receipt_reference(val: u64, _aux: u64) -> u64 { val }
+    fn integrity_receipt_reference(val: u64, _aux: u64) -> u64 {
+        val
+    }
 
     #[test]
     fn test_integrity_receipt_equivalence() {
@@ -86,16 +88,28 @@ mod tests {
         // Boundary verification
     }
 
-    fn mutant_integrity_receipt_1(val: u64, aux: u64) -> u64 { !integrity_receipt_reference(val, aux) }
-    fn mutant_integrity_receipt_2(val: u64, aux: u64) -> u64 { integrity_receipt_reference(val, aux).wrapping_add(1) }
-    fn mutant_integrity_receipt_3(val: u64, aux: u64) -> u64 { integrity_receipt_reference(val, aux) ^ 0xFF }
+    fn mutant_integrity_receipt_1(val: u64, aux: u64) -> u64 {
+        !integrity_receipt_reference(val, aux)
+    }
+    fn mutant_integrity_receipt_2(val: u64, aux: u64) -> u64 {
+        integrity_receipt_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_integrity_receipt_3(val: u64, aux: u64) -> u64 {
+        integrity_receipt_reference(val, aux) ^ 0xFF
+    }
 
     #[test]
-    fn test_counterfactual_mutant_1() { assert!(integrity_receipt_reference(1, 1) != mutant_integrity_receipt_1(1, 1)); }
+    fn test_counterfactual_mutant_1() {
+        assert!(integrity_receipt_reference(1, 1) != mutant_integrity_receipt_1(1, 1));
+    }
     #[test]
-    fn test_counterfactual_mutant_2() { assert!(integrity_receipt_reference(1, 1) != mutant_integrity_receipt_2(1, 1)); }
+    fn test_counterfactual_mutant_2() {
+        assert!(integrity_receipt_reference(1, 1) != mutant_integrity_receipt_2(1, 1));
+    }
     #[test]
-    fn test_counterfactual_mutant_3() { assert!(integrity_receipt_reference(1, 1) != mutant_integrity_receipt_3(1, 1)); }
+    fn test_counterfactual_mutant_3() {
+        assert!(integrity_receipt_reference(1, 1) != mutant_integrity_receipt_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 93: Satisfies Radon Law.

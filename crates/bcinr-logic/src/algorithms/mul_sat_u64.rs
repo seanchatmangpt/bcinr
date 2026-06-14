@@ -31,6 +31,7 @@
 /// assert_eq!(mul_sat_u64(u64::MAX, 2), u64::MAX);
 /// assert_eq!(mul_sat_u64(0, u64::MAX), 0);
 /// ```
+// SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 pub fn mul_sat_u64(a: u64, b: u64) -> u64 {
     // Compute full 128-bit product via u64 -> u128 conversions

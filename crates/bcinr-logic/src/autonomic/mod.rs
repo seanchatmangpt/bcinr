@@ -1,22 +1,25 @@
 //! Autonomic Computing: Generic MAPE-K building blocks for self-managing systems.
-//! 
+//!
 //! Provides primitives for building autonomic loops without imposing a specific execution model.
 
-pub mod packed_key_table;
-pub mod rl_state;
 pub mod autonomic_substrate;
-pub mod policy_guard;
-pub mod metric_accumulator;
 #[cfg(feature = "alloc")]
 pub mod kernel;
+pub mod metric_accumulator;
+pub mod packed_key_table;
+pub mod policy_guard;
+pub mod rl_state;
 
-pub use packed_key_table::PackedKeyTable;
-pub use rl_state::RlState;
 pub use autonomic_substrate::AutonomicSubstrate;
-pub use policy_guard::PolicyGuard;
-pub use metric_accumulator::MetricAccumulator;
 #[cfg(feature = "alloc")]
-pub use kernel::{AutonomicKernel, AutonomicState, ActionKind, ActionRisk, AutonomicAction, AutonomicResult, AutonomicFeedback};
+pub use kernel::{
+    ActionKind, ActionRisk, AutonomicAction, AutonomicFeedback, AutonomicKernel, AutonomicResult,
+    AutonomicState,
+};
+pub use metric_accumulator::MetricAccumulator;
+pub use packed_key_table::PackedKeyTable;
+pub use policy_guard::PolicyGuard;
+pub use rl_state::RlState;
 
 /// Generic Autonomic Health/Integrity state.
 #[derive(Debug, Clone, Copy, PartialEq)]

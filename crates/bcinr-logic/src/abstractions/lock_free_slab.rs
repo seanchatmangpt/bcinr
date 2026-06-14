@@ -38,42 +38,63 @@ impl<const N: usize> LockFreeSlab<N> {
         let head = self.freelist.load(Ordering::Relaxed);
         let mut success = 0u32;
         let mut result = 0u32;
-        
+
         (0..1).for_each(|_| {
             let is_empty = (head == 0xFFFFFFFF) as u32;
             let can_alloc = (!is_empty) & 1;
             let can_alloc_mask = 0u32.wrapping_sub(can_alloc);
-            
+
             let next = (head.wrapping_add(1)) & can_alloc_mask | head & !can_alloc_mask;
-            
+
             let cas_res = self.freelist.compare_exchange_weak(
                 head,
                 next,
                 Ordering::Relaxed,
-                Ordering::Relaxed
+                Ordering::Relaxed,
             );
-            
+
             let cas_success = (cas_res.is_ok() && can_alloc != 0) as u32;
             success = cas_success;
             result = head & (0u32.wrapping_sub(cas_success));
         });
-        
+
         (result, success)
     }
 }
 
 #[cfg(test)]
 mod tests_slab {
-    
-    fn slab_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    #[test] fn test_equivalence() { assert_eq!(slab_reference(1, 0), 1); }
-    #[test] fn test_boundaries() { }
-    fn mutant_slab_1(val: u64, aux: u64) -> u64 { !slab_reference(val, aux) }
-    fn mutant_slab_2(val: u64, aux: u64) -> u64 { slab_reference(val, aux).wrapping_add(1) }
-    fn mutant_slab_3(val: u64, aux: u64) -> u64 { slab_reference(val, aux) ^ 0xFF }
-    #[test] fn test_rejects_mutant_1() { assert!(slab_reference(1, 1) != mutant_slab_1(1, 1)); }
-    #[test] fn test_rejects_mutant_2() { assert!(slab_reference(1, 1) != mutant_slab_2(1, 1)); }
-    #[test] fn test_rejects_mutant_3() { assert!(slab_reference(1, 1) != mutant_slab_3(1, 1)); }
+
+    fn slab_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
+    #[test]
+    fn test_equivalence() {
+        assert_eq!(slab_reference(1, 0), 1);
+    }
+    #[test]
+    fn test_boundaries() {}
+    fn mutant_slab_1(val: u64, aux: u64) -> u64 {
+        !slab_reference(val, aux)
+    }
+    fn mutant_slab_2(val: u64, aux: u64) -> u64 {
+        slab_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_slab_3(val: u64, aux: u64) -> u64 {
+        slab_reference(val, aux) ^ 0xFF
+    }
+    #[test]
+    fn test_rejects_mutant_1() {
+        assert!(slab_reference(1, 1) != mutant_slab_1(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_2() {
+        assert!(slab_reference(1, 1) != mutant_slab_2(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_3() {
+        assert!(slab_reference(1, 1) != mutant_slab_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 100: Radon Law satisfied.

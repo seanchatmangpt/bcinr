@@ -14,16 +14,39 @@ pub fn swar_mask_ones(val: u64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    
-    fn swar_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    #[test] fn test_equivalence() { assert_eq!(swar_reference(1, 2), 3); }
-    #[test] fn test_boundaries() { assert_eq!(swar_reference(0, 0), 0); }
-    fn mutant_swar_1(val: u64, aux: u64) -> u64 { !swar_reference(val, aux) }
-    fn mutant_swar_2(val: u64, aux: u64) -> u64 { swar_reference(val, aux).wrapping_add(1) }
-    fn mutant_swar_3(val: u64, aux: u64) -> u64 { swar_reference(val, aux) ^ 0xFF }
-    #[test] fn test_rejects_mutant_1() { assert!(swar_reference(1, 1) != mutant_swar_1(1, 1)); }
-    #[test] fn test_rejects_mutant_2() { assert!(swar_reference(1, 1) != mutant_swar_2(1, 1)); }
-    #[test] fn test_rejects_mutant_3() { assert!(swar_reference(1, 1) != mutant_swar_3(1, 1)); }
+
+    fn swar_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
+    #[test]
+    fn test_equivalence() {
+        assert_eq!(swar_reference(1, 2), 3);
+    }
+    #[test]
+    fn test_boundaries() {
+        assert_eq!(swar_reference(0, 0), 0);
+    }
+    fn mutant_swar_1(val: u64, aux: u64) -> u64 {
+        !swar_reference(val, aux)
+    }
+    fn mutant_swar_2(val: u64, aux: u64) -> u64 {
+        swar_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_swar_3(val: u64, aux: u64) -> u64 {
+        swar_reference(val, aux) ^ 0xFF
+    }
+    #[test]
+    fn test_rejects_mutant_1() {
+        assert!(swar_reference(1, 1) != mutant_swar_1(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_2() {
+        assert!(swar_reference(1, 1) != mutant_swar_2(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_3() {
+        assert!(swar_reference(1, 1) != mutant_swar_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 100: Radon Law satisfied.

@@ -64,12 +64,20 @@ impl<const N: usize> TimeWheel<N> {
 #[cfg(test)]
 mod tests {
     #[allow(dead_code)]
-    fn time_wheel_reference(val: u64, aux: u64) -> u64 { val ^ aux }
+    fn time_wheel_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
 
     use super::*;
-    fn wheel_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    #[test] fn test_equivalence() { assert_eq!(wheel_reference(1, 0), 1); }
-    #[test] fn test_boundaries() { 
+    fn wheel_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
+    #[test]
+    fn test_equivalence() {
+        assert_eq!(wheel_reference(1, 0), 1);
+    }
+    #[test]
+    fn test_boundaries() {
         let mut wheel = TimeWheel::<8>::new();
         wheel.schedule(2, 0); // Schedule bit 0 for tick 2
         assert_eq!(wheel.tick(), 0);
@@ -77,12 +85,27 @@ mod tests {
         assert_eq!(wheel.tick(), 1); // Fired
         assert_eq!(wheel.tick(), 0);
     }
-    fn mutant_wheel_1(val: u64, aux: u64) -> u64 { !wheel_reference(val, aux) }
-    fn mutant_wheel_2(val: u64, aux: u64) -> u64 { wheel_reference(val, aux).wrapping_add(1) }
-    fn mutant_wheel_3(val: u64, aux: u64) -> u64 { wheel_reference(val, aux) ^ 0xFF }
-    #[test] fn test_rejects_mutant_1() { assert!(wheel_reference(1, 1) != mutant_wheel_1(1, 1)); }
-    #[test] fn test_rejects_mutant_2() { assert!(wheel_reference(1, 1) != mutant_wheel_2(1, 1)); }
-    #[test] fn test_rejects_mutant_3() { assert!(wheel_reference(1, 1) != mutant_wheel_3(1, 1)); }
+    fn mutant_wheel_1(val: u64, aux: u64) -> u64 {
+        !wheel_reference(val, aux)
+    }
+    fn mutant_wheel_2(val: u64, aux: u64) -> u64 {
+        wheel_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_wheel_3(val: u64, aux: u64) -> u64 {
+        wheel_reference(val, aux) ^ 0xFF
+    }
+    #[test]
+    fn test_rejects_mutant_1() {
+        assert!(wheel_reference(1, 1) != mutant_wheel_1(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_2() {
+        assert!(wheel_reference(1, 1) != mutant_wheel_2(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_3() {
+        assert!(wheel_reference(1, 1) != mutant_wheel_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 100: Radon Law satisfied.

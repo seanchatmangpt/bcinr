@@ -1,6 +1,6 @@
 // oracle equivalence boundaries
 //! Branchless Fixed-Point Arithmetic
-//! 
+//!
 //! CC=1 for all numeric primitives.
 
 /// Saturating addition for u32.
@@ -24,14 +24,16 @@ pub fn clamp_u32(val: u32, min: u32, max: u32) -> u32 {
 /// Simple bucketization branchlessly.
 #[inline(always)]
 pub fn bucketize_u32(val: u32, step: u32) -> u32 {
-    val.wrapping_div(step.wrapping_add((step == 0) as u32)).wrapping_mul(step)
+    val.wrapping_div(step.wrapping_add((step == 0) as u32))
+        .wrapping_mul(step)
 }
 
 #[cfg(test)]
 mod tests {
     // _reference equivalence boundaries
-    fn fix_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    
+    fn fix_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
 
     #[test]
     fn test_equivalence() {
@@ -43,13 +45,28 @@ mod tests {
         assert_eq!(fix_reference(0, 0), 0);
     }
 
-    fn mutant_fix_1(val: u64, aux: u64) -> u64 { !fix_reference(val, aux) }
-    fn mutant_fix_2(val: u64, aux: u64) -> u64 { fix_reference(val, aux).wrapping_add(1) }
-    fn mutant_fix_3(val: u64, aux: u64) -> u64 { fix_reference(val, aux) ^ 0xFF }
+    fn mutant_fix_1(val: u64, aux: u64) -> u64 {
+        !fix_reference(val, aux)
+    }
+    fn mutant_fix_2(val: u64, aux: u64) -> u64 {
+        fix_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_fix_3(val: u64, aux: u64) -> u64 {
+        fix_reference(val, aux) ^ 0xFF
+    }
 
-    #[test] fn test_rejects_mutant_1() { assert!(fix_reference(1, 1) != mutant_fix_1(1, 1)); }
-    #[test] fn test_rejects_mutant_2() { assert!(fix_reference(1, 1) != mutant_fix_2(1, 1)); }
-    #[test] fn test_rejects_mutant_3() { assert!(fix_reference(1, 1) != mutant_fix_3(1, 1)); }
+    #[test]
+    fn test_rejects_mutant_1() {
+        assert!(fix_reference(1, 1) != mutant_fix_1(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_2() {
+        assert!(fix_reference(1, 1) != mutant_fix_2(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_3() {
+        assert!(fix_reference(1, 1) != mutant_fix_3(1, 1));
+    }
 }
 
 // # AXIOMATIC PROOF: Hoare-logic Analysis

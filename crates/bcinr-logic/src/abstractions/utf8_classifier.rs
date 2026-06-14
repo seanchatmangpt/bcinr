@@ -16,7 +16,7 @@ impl Utf8Classifier {
     pub fn classify(&self, byte: u8) -> (u8, u8) {
         let is_cont = ((byte & 0xC0) == 0x80) as u8;
         let is_cont_mask = 0u8.wrapping_sub(is_cont);
-        
+
         let len = [1, 2, 3, 4][(byte >> 4).count_ones() as usize & 3];
         (is_cont_mask, len)
     }
@@ -25,8 +25,9 @@ impl Utf8Classifier {
 #[cfg(test)]
 mod tests {
     // _reference equivalence boundaries
-    fn utf8_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    
+    fn utf8_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
 
     #[test]
     fn test_equivalence() {
@@ -38,13 +39,28 @@ mod tests {
         // boundaries
     }
 
-    fn mutant_utf8_1(val: u64, aux: u64) -> u64 { !utf8_reference(val, aux) }
-    fn mutant_utf8_2(val: u64, aux: u64) -> u64 { utf8_reference(val, aux).wrapping_add(1) }
-    fn mutant_utf8_3(val: u64, aux: u64) -> u64 { utf8_reference(val, aux) ^ 0xFF }
+    fn mutant_utf8_1(val: u64, aux: u64) -> u64 {
+        !utf8_reference(val, aux)
+    }
+    fn mutant_utf8_2(val: u64, aux: u64) -> u64 {
+        utf8_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_utf8_3(val: u64, aux: u64) -> u64 {
+        utf8_reference(val, aux) ^ 0xFF
+    }
 
-    #[test] fn test_rejects_mutant_1() { assert!(utf8_reference(1, 1) != mutant_utf8_1(1, 1)); }
-    #[test] fn test_rejects_mutant_2() { assert!(utf8_reference(1, 1) != mutant_utf8_2(1, 1)); }
-    #[test] fn test_rejects_mutant_3() { assert!(utf8_reference(1, 1) != mutant_utf8_3(1, 1)); }
+    #[test]
+    fn test_rejects_mutant_1() {
+        assert!(utf8_reference(1, 1) != mutant_utf8_1(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_2() {
+        assert!(utf8_reference(1, 1) != mutant_utf8_2(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_3() {
+        assert!(utf8_reference(1, 1) != mutant_utf8_3(1, 1));
+    }
 }
 
 // # AXIOMATIC PROOF: Hoare-logic Analysis

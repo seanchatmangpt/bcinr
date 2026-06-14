@@ -49,19 +49,18 @@ impl<const TICKS: usize> WcetFiber<TICKS> {
     #[inline(always)]
     pub fn execute_budget_fixed(&mut self, events: &[u32; TICKS]) -> u64 {
         let mut success_mask = 0u64;
-        
+
         (0..TICKS).for_each(|i| {
             let event = events[i];
             let (_, mask) = self.state.advance(event);
-            
+
             let bit_idx = (i as u32) & 0x3F;
             success_mask |= ((mask & 1) as u64) << bit_idx;
-            
+
             // Constant-shape update
             self.instruction_pointer += (mask & 1) as usize;
-        
-});
-        
+        });
+
         success_mask
     }
 
@@ -69,15 +68,15 @@ impl<const TICKS: usize> WcetFiber<TICKS> {
     pub fn context_switch(&mut self, other_state: &mut FiberState, other_ip: &mut usize) {
         core::mem::swap(&mut self.state, other_state);
         core::mem::swap(&mut self.instruction_pointer, other_ip);
-    
-}
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    
 
-    fn wcet_fiber_reference(val: u64, _aux: u64) -> u64 { val }
+    fn wcet_fiber_reference(val: u64, _aux: u64) -> u64 {
+        val
+    }
 
     #[test]
     fn test_wcet_fiber_equivalence() {
@@ -89,16 +88,28 @@ mod tests {
         // Boundary verification
     }
 
-    fn mutant_wcet_fiber_1(val: u64, aux: u64) -> u64 { !wcet_fiber_reference(val, aux) }
-    fn mutant_wcet_fiber_2(val: u64, aux: u64) -> u64 { wcet_fiber_reference(val, aux).wrapping_add(1) }
-    fn mutant_wcet_fiber_3(val: u64, aux: u64) -> u64 { wcet_fiber_reference(val, aux) ^ 0xFF }
+    fn mutant_wcet_fiber_1(val: u64, aux: u64) -> u64 {
+        !wcet_fiber_reference(val, aux)
+    }
+    fn mutant_wcet_fiber_2(val: u64, aux: u64) -> u64 {
+        wcet_fiber_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_wcet_fiber_3(val: u64, aux: u64) -> u64 {
+        wcet_fiber_reference(val, aux) ^ 0xFF
+    }
 
     #[test]
-    fn test_counterfactual_mutant_1() { assert!(wcet_fiber_reference(1, 1) != mutant_wcet_fiber_1(1, 1)); }
+    fn test_counterfactual_mutant_1() {
+        assert!(wcet_fiber_reference(1, 1) != mutant_wcet_fiber_1(1, 1));
+    }
     #[test]
-    fn test_counterfactual_mutant_2() { assert!(wcet_fiber_reference(1, 1) != mutant_wcet_fiber_2(1, 1)); }
+    fn test_counterfactual_mutant_2() {
+        assert!(wcet_fiber_reference(1, 1) != mutant_wcet_fiber_2(1, 1));
+    }
     #[test]
-    fn test_counterfactual_mutant_3() { assert!(wcet_fiber_reference(1, 1) != mutant_wcet_fiber_3(1, 1)); }
+    fn test_counterfactual_mutant_3() {
+        assert!(wcet_fiber_reference(1, 1) != mutant_wcet_fiber_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 96: Satisfies Radon Law.

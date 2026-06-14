@@ -13,8 +13,8 @@
 //! Admissible_T1: YES. O(1) table lookup + bitmask policy gating.
 //! CC=1: Absolute branchless logic.
 
-use crate::dfa::{dfa_advance};
 use crate::autonomic::policy_guard::PolicyGuard;
+use crate::dfa::dfa_advance;
 
 pub struct ConstantShapePolicyDfa {
     pub table: &'static [usize],
@@ -32,10 +32,22 @@ impl ConstantShapePolicyDfa {
         blacklist: u64,
         error_state: usize,
     ) -> Result<Self, &'static str> {
-        if state_count > 64 { return Err("u64 policy mask supports at most 64 states"); }
-        if table.len() < state_count.saturating_mul(alphabet_size) { return Err("Table size mismatch"); }
-        if error_state >= state_count { return Err("Invalid error state"); }
-        Ok(Self { table, alphabet_size, state_count, blacklisted_states_mask: blacklist, error_state })
+        if state_count > 64 {
+            return Err("u64 policy mask supports at most 64 states");
+        }
+        if table.len() < state_count.saturating_mul(alphabet_size) {
+            return Err("Table size mismatch");
+        }
+        if error_state >= state_count {
+            return Err("Invalid error state");
+        }
+        Ok(Self {
+            table,
+            alphabet_size,
+            state_count,
+            blacklisted_states_mask: blacklist,
+            error_state,
+        })
     }
 
     /// Runs one step of the DFA branchlessly.
@@ -46,7 +58,8 @@ impl ConstantShapePolicyDfa {
         let state_bit = 1u64.wrapping_shl((next as u32) & 0x3F);
         let blacklisted = self.blacklisted_states_mask & state_bit;
         let allowed_mask = PolicyGuard::mask_eq(blacklisted, 0);
-        let gated_state = ((next as u64 & allowed_mask) | (self.error_state as u64 & !allowed_mask)) as usize;
+        let gated_state =
+            ((next as u64 & allowed_mask) | (self.error_state as u64 & !allowed_mask)) as usize;
         (gated_state, allowed_mask)
     }
 
@@ -65,16 +78,37 @@ impl ConstantShapePolicyDfa {
 
 #[cfg(test)]
 mod tests_policy_dfa {
-    
-    fn policy_dfa_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    #[test] fn test_equivalence() { assert_eq!(policy_dfa_reference(1, 0), 1); }
-    #[test] fn test_boundaries() { }
-    fn mutant_policy_dfa_1(val: u64, aux: u64) -> u64 { !policy_dfa_reference(val, aux) }
-    fn mutant_policy_dfa_2(val: u64, aux: u64) -> u64 { policy_dfa_reference(val, aux).wrapping_add(1) }
-    fn mutant_policy_dfa_3(val: u64, aux: u64) -> u64 { policy_dfa_reference(val, aux) ^ 0xFF }
-    #[test] fn test_rejects_mutant_1() { assert!(policy_dfa_reference(1, 1) != mutant_policy_dfa_1(1, 1)); }
-    #[test] fn test_rejects_mutant_2() { assert!(policy_dfa_reference(1, 1) != mutant_policy_dfa_2(1, 1)); }
-    #[test] fn test_rejects_mutant_3() { assert!(policy_dfa_reference(1, 1) != mutant_policy_dfa_3(1, 1)); }
+
+    fn policy_dfa_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
+    #[test]
+    fn test_equivalence() {
+        assert_eq!(policy_dfa_reference(1, 0), 1);
+    }
+    #[test]
+    fn test_boundaries() {}
+    fn mutant_policy_dfa_1(val: u64, aux: u64) -> u64 {
+        !policy_dfa_reference(val, aux)
+    }
+    fn mutant_policy_dfa_2(val: u64, aux: u64) -> u64 {
+        policy_dfa_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_policy_dfa_3(val: u64, aux: u64) -> u64 {
+        policy_dfa_reference(val, aux) ^ 0xFF
+    }
+    #[test]
+    fn test_rejects_mutant_1() {
+        assert!(policy_dfa_reference(1, 1) != mutant_policy_dfa_1(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_2() {
+        assert!(policy_dfa_reference(1, 1) != mutant_policy_dfa_2(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_3() {
+        assert!(policy_dfa_reference(1, 1) != mutant_policy_dfa_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 100: Radon Law satisfied.

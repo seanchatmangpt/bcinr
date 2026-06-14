@@ -16,6 +16,7 @@
 /// let result = utf16_to_utf8_simd(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+// SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn utf16_to_utf8_simd(val: u64, aux: u64) -> u64 {

@@ -16,6 +16,7 @@
 /// let result = euclidean_dist_sq_u32x2(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+// SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn euclidean_dist_sq_u32x2(val: u64, aux: u64) -> u64 {

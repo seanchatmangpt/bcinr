@@ -9,7 +9,6 @@ pub fn mask_phd_gate(val: u64) -> u64 {
     val
 }
 
-
 //  Mask calculus for branchless selection and arithmetic.
 
 /// Selects between `a` and `b` based on the provided `mask`.
@@ -168,16 +167,39 @@ mod tests {
 }
 #[cfg(test)]
 mod tests_phd_mask {
-    
-    fn mask_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    #[test] fn test_phd_equivalence() { assert_eq!(mask_reference(1, 2), 3); }
-    #[test] fn test_phd_boundaries() { assert_eq!(mask_reference(0, 0), 0); }
-    fn mutant_mask_1(val: u64, aux: u64) -> u64 { !mask_reference(val, aux) }
-    fn mutant_mask_2(val: u64, aux: u64) -> u64 { mask_reference(val, aux).wrapping_add(1) }
-    fn mutant_mask_3(val: u64, aux: u64) -> u64 { mask_reference(val, aux) ^ 0xFF }
-    #[test] fn test_phd_counterfactual_mutant_1() { assert!(mask_reference(1, 1) != mutant_mask_1(1, 1)); }
-    #[test] fn test_phd_counterfactual_mutant_2() { assert!(mask_reference(1, 1) != mutant_mask_2(1, 1)); }
-    #[test] fn test_phd_counterfactual_mutant_3() { assert!(mask_reference(1, 1) != mutant_mask_3(1, 1)); }
+
+    fn mask_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
+    #[test]
+    fn test_phd_equivalence() {
+        assert_eq!(mask_reference(1, 2), 3);
+    }
+    #[test]
+    fn test_phd_boundaries() {
+        assert_eq!(mask_reference(0, 0), 0);
+    }
+    fn mutant_mask_1(val: u64, aux: u64) -> u64 {
+        !mask_reference(val, aux)
+    }
+    fn mutant_mask_2(val: u64, aux: u64) -> u64 {
+        mask_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_mask_3(val: u64, aux: u64) -> u64 {
+        mask_reference(val, aux) ^ 0xFF
+    }
+    #[test]
+    fn test_phd_counterfactual_mutant_1() {
+        assert!(mask_reference(1, 1) != mutant_mask_1(1, 1));
+    }
+    #[test]
+    fn test_phd_counterfactual_mutant_2() {
+        assert!(mask_reference(1, 1) != mutant_mask_2(1, 1));
+    }
+    #[test]
+    fn test_phd_counterfactual_mutant_3() {
+        assert!(mask_reference(1, 1) != mutant_mask_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 100: Radon Law verified.

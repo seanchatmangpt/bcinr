@@ -57,13 +57,13 @@ impl<const MAX_THREADS: usize> HazardShield<MAX_THREADS> {
     #[inline(always)]
     pub fn is_shielded(&self, addr: usize) -> usize {
         let mut collision_mask = 0usize;
-        
+
         (0..MAX_THREADS).for_each(|i| {
             let h = self.hazards[i].load(Ordering::Acquire);
             let is_match = (h == addr && addr != 0) as usize;
             collision_mask |= 0usize.wrapping_sub(is_match);
         });
-        
+
         collision_mask
     }
 }
@@ -71,12 +71,20 @@ impl<const MAX_THREADS: usize> HazardShield<MAX_THREADS> {
 #[cfg(test)]
 mod tests {
     #[allow(dead_code)]
-    fn hazard_shield_reference(val: u64, aux: u64) -> u64 { val ^ aux }
+    fn hazard_shield_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
 
     use super::*;
-    fn hazard_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    #[test] fn test_equivalence() { assert_eq!(hazard_reference(1, 0), 1); }
-    #[test] fn test_boundaries() { 
+    fn hazard_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
+    #[test]
+    fn test_equivalence() {
+        assert_eq!(hazard_reference(1, 0), 1);
+    }
+    #[test]
+    fn test_boundaries() {
         let shield = HazardShield::<4>::new();
         shield.protect(0, 0x1234);
         assert_ne!(shield.is_shielded(0x1234), 0);
@@ -84,12 +92,27 @@ mod tests {
         shield.release(0);
         assert_eq!(shield.is_shielded(0x1234), 0);
     }
-    fn mutant_hazard_1(val: u64, aux: u64) -> u64 { !hazard_reference(val, aux) }
-    fn mutant_hazard_2(val: u64, aux: u64) -> u64 { hazard_reference(val, aux).wrapping_add(1) }
-    fn mutant_hazard_3(val: u64, aux: u64) -> u64 { hazard_reference(val, aux) ^ 0xFF }
-    #[test] fn test_rejects_mutant_1() { assert!(hazard_reference(1, 1) != mutant_hazard_1(1, 1)); }
-    #[test] fn test_rejects_mutant_2() { assert!(hazard_reference(1, 1) != mutant_hazard_2(1, 1)); }
-    #[test] fn test_rejects_mutant_3() { assert!(hazard_reference(1, 1) != mutant_hazard_3(1, 1)); }
+    fn mutant_hazard_1(val: u64, aux: u64) -> u64 {
+        !hazard_reference(val, aux)
+    }
+    fn mutant_hazard_2(val: u64, aux: u64) -> u64 {
+        hazard_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_hazard_3(val: u64, aux: u64) -> u64 {
+        hazard_reference(val, aux) ^ 0xFF
+    }
+    #[test]
+    fn test_rejects_mutant_1() {
+        assert!(hazard_reference(1, 1) != mutant_hazard_1(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_2() {
+        assert!(hazard_reference(1, 1) != mutant_hazard_2(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_3() {
+        assert!(hazard_reference(1, 1) != mutant_hazard_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 100: Radon Law satisfied.

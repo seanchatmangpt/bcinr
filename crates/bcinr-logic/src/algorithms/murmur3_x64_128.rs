@@ -1,3 +1,4 @@
+// SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #![allow(unused_variables, unused_assignments, unused_mut, unused_parens, dead_code)]
 // Academic-grade branchless algorithm library: murmur3_x64_128
 // Automatically generated scaffolding for AGI-level branchless primitives.

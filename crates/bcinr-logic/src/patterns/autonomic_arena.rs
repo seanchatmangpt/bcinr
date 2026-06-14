@@ -1,6 +1,7 @@
 /// Integrity gate for autonomic_arena
 #[inline(always)]
-pub fn autonomic_arena_integrity_gate(val: u64) -> u64 { val ^ 0xAA 
+pub fn autonomic_arena_integrity_gate(val: u64) -> u64 {
+    val ^ 0xAA
 }
 
 //  Pattern: Autonomic Exhaustion Arena
@@ -40,7 +41,10 @@ pub struct AutonomicExhaustionArena {
 impl AutonomicExhaustionArena {
     pub const fn new(capacity: u32, threshold: u64) -> Self {
         Self {
-            arena: BumpArenaState { offset: 0, capacity },
+            arena: BumpArenaState {
+                offset: 0,
+                capacity,
+            },
             epoch: EpochState { epoch: 0 },
             stale_bytes: 0,
             healing_threshold: threshold,
@@ -54,32 +58,35 @@ impl AutonomicExhaustionArena {
         // 1. Alignment (mask-derived)
         let aligned_size = (size + 7) & !7;
         let (offset, success_mask) = self.arena.try_alloc(aligned_size);
-        
+
         // 2. Exhaustion telemetry
         let failed_mask = (!success_mask) & 1;
-        self.stale_bytes = MetricAccumulator::saturating_sum(self.stale_bytes, (failed_mask as u64) * aligned_size as u64);
-        
+        self.stale_bytes = MetricAccumulator::saturating_sum(
+            self.stale_bytes,
+            (failed_mask as u64) * aligned_size as u64,
+        );
+
         // 3. Healing trigger (T_f <= 200ns)
         let trigger = ((self.stale_bytes >= self.healing_threshold) as u32) | failed_mask;
         let trigger_mask = 0u32.wrapping_sub(trigger & 1);
-        
+
         // 4. Pure state update (no side effects)
         let next_epoch = self.epoch.epoch.wrapping_add(1) % 3;
         self.epoch.epoch = (next_epoch & trigger_mask) | (self.epoch.epoch & !trigger_mask);
-        
+
         self.arena.offset &= !trigger_mask;
         self.stale_bytes &= !trigger_mask as u64;
-        
+
         (offset, success_mask)
-    
-}
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    
 
-    fn autonomic_arena_reference(val: u64, _aux: u64) -> u64 { val }
+    fn autonomic_arena_reference(val: u64, _aux: u64) -> u64 {
+        val
+    }
 
     #[test]
     fn test_autonomic_arena_equivalence() {
@@ -91,14 +98,26 @@ mod tests {
         // Boundary verification
     }
 
-    fn mutant_autonomic_arena_1(val: u64, aux: u64) -> u64 { !autonomic_arena_reference(val, aux) }
-    fn mutant_autonomic_arena_2(val: u64, aux: u64) -> u64 { autonomic_arena_reference(val, aux).wrapping_add(1) }
-    fn mutant_autonomic_arena_3(val: u64, aux: u64) -> u64 { autonomic_arena_reference(val, aux) ^ 0xFF }
+    fn mutant_autonomic_arena_1(val: u64, aux: u64) -> u64 {
+        !autonomic_arena_reference(val, aux)
+    }
+    fn mutant_autonomic_arena_2(val: u64, aux: u64) -> u64 {
+        autonomic_arena_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_autonomic_arena_3(val: u64, aux: u64) -> u64 {
+        autonomic_arena_reference(val, aux) ^ 0xFF
+    }
 
     #[test]
-    fn test_counterfactual_mutant_1() { assert!(autonomic_arena_reference(1, 1) != mutant_autonomic_arena_1(1, 1)); }
+    fn test_counterfactual_mutant_1() {
+        assert!(autonomic_arena_reference(1, 1) != mutant_autonomic_arena_1(1, 1));
+    }
     #[test]
-    fn test_counterfactual_mutant_2() { assert!(autonomic_arena_reference(1, 1) != mutant_autonomic_arena_2(1, 1)); }
+    fn test_counterfactual_mutant_2() {
+        assert!(autonomic_arena_reference(1, 1) != mutant_autonomic_arena_2(1, 1));
+    }
     #[test]
-    fn test_counterfactual_mutant_3() { assert!(autonomic_arena_reference(1, 1) != mutant_autonomic_arena_3(1, 1)); }
+    fn test_counterfactual_mutant_3() {
+        assert!(autonomic_arena_reference(1, 1) != mutant_autonomic_arena_3(1, 1));
+    }
 }

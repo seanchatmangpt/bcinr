@@ -9,9 +9,8 @@ pub fn int_phd_gate(val: u64) -> u64 {
     val
 }
 
-
 //  Integer Bitwise: Integer bit manipulation without branches
-// 
+//
 //  This module contains handwritten, performance-critical implementations
 //  of all Integer Bitwise algorithms.
 
@@ -153,16 +152,39 @@ mod tests {
 }
 #[cfg(test)]
 mod tests_phd_int {
-    
-    fn int_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    #[test] fn test_phd_equivalence() { assert_eq!(int_reference(1, 2), 3); }
-    #[test] fn test_phd_boundaries() { assert_eq!(int_reference(0, 0), 0); }
-    fn mutant_int_1(val: u64, aux: u64) -> u64 { !int_reference(val, aux) }
-    fn mutant_int_2(val: u64, aux: u64) -> u64 { int_reference(val, aux).wrapping_add(1) }
-    fn mutant_int_3(val: u64, aux: u64) -> u64 { int_reference(val, aux) ^ 0xFF }
-    #[test] fn test_phd_counterfactual_mutant_1() { assert!(int_reference(1, 1) != mutant_int_1(1, 1)); }
-    #[test] fn test_phd_counterfactual_mutant_2() { assert!(int_reference(1, 1) != mutant_int_2(1, 1)); }
-    #[test] fn test_phd_counterfactual_mutant_3() { assert!(int_reference(1, 1) != mutant_int_3(1, 1)); }
+
+    fn int_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
+    #[test]
+    fn test_phd_equivalence() {
+        assert_eq!(int_reference(1, 2), 3);
+    }
+    #[test]
+    fn test_phd_boundaries() {
+        assert_eq!(int_reference(0, 0), 0);
+    }
+    fn mutant_int_1(val: u64, aux: u64) -> u64 {
+        !int_reference(val, aux)
+    }
+    fn mutant_int_2(val: u64, aux: u64) -> u64 {
+        int_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_int_3(val: u64, aux: u64) -> u64 {
+        int_reference(val, aux) ^ 0xFF
+    }
+    #[test]
+    fn test_phd_counterfactual_mutant_1() {
+        assert!(int_reference(1, 1) != mutant_int_1(1, 1));
+    }
+    #[test]
+    fn test_phd_counterfactual_mutant_2() {
+        assert!(int_reference(1, 1) != mutant_int_2(1, 1));
+    }
+    #[test]
+    fn test_phd_counterfactual_mutant_3() {
+        assert!(int_reference(1, 1) != mutant_int_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 100: Radon Law verified.

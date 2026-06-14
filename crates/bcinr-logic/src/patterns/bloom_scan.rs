@@ -1,6 +1,7 @@
 //! Pattern: Branchless Bloom-Scan Pipeline
 //! Purpose: Integrates BloomFilter querying with register-bound Scan kernels for line-rate filtering.
 //! Primitive dependencies: `bloom_filter_query_u64`, `find_byte_mask`.
+use crate::algorithms::bloom_filter_query_u64::bloom_filter_query_u64;
 ///
 /// # CONTRACT
 /// - **Input contract:** 64-byte aligned buffer blocks.
@@ -21,8 +22,7 @@
 ///
 /// # Admissibility
 /// Admissible_T1: YES. Fixed-shape loo-p and branchless core ensure T_f <= 200ns.
-use crate::scan::{find_byte_mask};
-use crate::algorithms::bloom_filter_query_u64::bloom_filter_query_u64;
+use crate::scan::find_byte_mask;
 
 /// # AXIOMATIC PROOF: Hoare-logic Analysis
 /// Precondition: { input ∈ Validbloom_scan }
@@ -41,39 +41,38 @@ impl BloomScanPipeline {
     #[inline(always)]
     pub fn process_64(&self, buffer: &[u8; 64], target: u8) -> u64 {
         let mut result_mask = 0u64;
-        
+
         // Fixed-shape loop: 8 chunks of 8 bytes
         (0..8).for_each(|i| {
             let start = i * 8;
-            let chunk = &buffer[start..start+8];
-            
+            let chunk = &buffer[start..start + 8];
+
             // T0 loader (proven safe for fixed 8-byte chunks)
             let val = u64::from_le_bytes([
-                chunk[0], chunk[1], chunk[2], chunk[3],
-                chunk[4], chunk[5], chunk[6], chunk[7]
+                chunk[0], chunk[1], chunk[2], chunk[3], chunk[4], chunk[5], chunk[6], chunk[7],
             ]);
-            
+
             // 1. Branchless Bloom Query
             let bloom_hit = bloom_filter_query_u64(val, self.bloom_key);
             let bloom_mask = 0u64.wrapping_sub((bloom_hit != 0) as u64);
-            
+
             // 2. Branchless decision core (find_byte_mask is CC=1)
             let scan_mask = find_byte_mask(chunk, target);
-            
+
             // 3. Aggregate into result mask
             result_mask |= (scan_mask & bloom_mask) << (start as u32);
-        
-});
-        
+        });
+
         result_mask
     }
 }
 
 #[cfg(test)]
 mod tests {
-    
 
-    fn bloom_scan_reference(val: u64, _aux: u64) -> u64 { val }
+    fn bloom_scan_reference(val: u64, _aux: u64) -> u64 {
+        val
+    }
 
     #[test]
     fn test_bloom_scan_equivalence() {
@@ -85,16 +84,28 @@ mod tests {
         // Boundary verification
     }
 
-    fn mutant_bloom_scan_1(val: u64, aux: u64) -> u64 { !bloom_scan_reference(val, aux) }
-    fn mutant_bloom_scan_2(val: u64, aux: u64) -> u64 { bloom_scan_reference(val, aux).wrapping_add(1) }
-    fn mutant_bloom_scan_3(val: u64, aux: u64) -> u64 { bloom_scan_reference(val, aux) ^ 0xFF }
+    fn mutant_bloom_scan_1(val: u64, aux: u64) -> u64 {
+        !bloom_scan_reference(val, aux)
+    }
+    fn mutant_bloom_scan_2(val: u64, aux: u64) -> u64 {
+        bloom_scan_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_bloom_scan_3(val: u64, aux: u64) -> u64 {
+        bloom_scan_reference(val, aux) ^ 0xFF
+    }
 
     #[test]
-    fn test_counterfactual_mutant_1() { assert!(bloom_scan_reference(1, 1) != mutant_bloom_scan_1(1, 1)); }
+    fn test_counterfactual_mutant_1() {
+        assert!(bloom_scan_reference(1, 1) != mutant_bloom_scan_1(1, 1));
+    }
     #[test]
-    fn test_counterfactual_mutant_2() { assert!(bloom_scan_reference(1, 1) != mutant_bloom_scan_2(1, 1)); }
+    fn test_counterfactual_mutant_2() {
+        assert!(bloom_scan_reference(1, 1) != mutant_bloom_scan_2(1, 1));
+    }
     #[test]
-    fn test_counterfactual_mutant_3() { assert!(bloom_scan_reference(1, 1) != mutant_bloom_scan_3(1, 1)); }
+    fn test_counterfactual_mutant_3() {
+        assert!(bloom_scan_reference(1, 1) != mutant_bloom_scan_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 99: Satisfies Radon Law.

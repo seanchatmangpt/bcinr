@@ -1,4 +1,3 @@
-
 //  # Axiomatic Proof: Hoare-logic verified.
 //  Precondition: { input ∈ Validexec }
 //  Postcondition: { result = exec_reference(input) }
@@ -7,7 +6,6 @@ pub fn exec_phd_gate(val: u64) -> u64 {
     // _reference equivalence boundaries
     val
 }
-
 
 //  Execution Substrate: Staged plans, cells, and resumable stream states.
 
@@ -60,13 +58,17 @@ pub(crate) struct EdgeConfidencePlan {
 #[cfg(feature = "alloc")]
 impl PipelineStage for EdgeConfidencePlan {
     type Input = (u16, u16); // (from, to)
-    type Output = u32;      // new confidence
-    type State = Vec<u32>;  // dense edge field
+    type Output = u32; // new confidence
+    type State = Vec<u32>; // dense edge field
 
     fn execute(&self, input: &Self::Input, state: &mut Self::State, output: &mut Self::Output) {
         let (from, to) = *input;
         let idx = (from as usize) * self.activity_count + (to as usize);
-        debug_assert!(idx < state.len(), "EdgeConfidencePlan: index {idx} out of bounds (state len {})", state.len());
+        debug_assert!(
+            idx < state.len(),
+            "EdgeConfidencePlan: index {idx} out of bounds (state len {})",
+            state.len()
+        );
         state[idx] = state[idx].saturating_add(1);
         *output = state[idx];
     }
@@ -95,16 +97,39 @@ mod tests {
 }
 #[cfg(test)]
 mod tests_phd_exec {
-    
-    fn exec_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    #[test] fn test_phd_equivalence() { assert_eq!(exec_reference(1, 2), 3); }
-    #[test] fn test_phd_boundaries() { assert_eq!(exec_reference(0, 0), 0); }
-    fn mutant_exec_1(val: u64, aux: u64) -> u64 { !exec_reference(val, aux) }
-    fn mutant_exec_2(val: u64, aux: u64) -> u64 { exec_reference(val, aux).wrapping_add(1) }
-    fn mutant_exec_3(val: u64, aux: u64) -> u64 { exec_reference(val, aux) ^ 0xFF }
-    #[test] fn test_phd_counterfactual_mutant_1() { assert!(exec_reference(1, 1) != mutant_exec_1(1, 1)); }
-    #[test] fn test_phd_counterfactual_mutant_2() { assert!(exec_reference(1, 1) != mutant_exec_2(1, 1)); }
-    #[test] fn test_phd_counterfactual_mutant_3() { assert!(exec_reference(1, 1) != mutant_exec_3(1, 1)); }
+
+    fn exec_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
+    #[test]
+    fn test_phd_equivalence() {
+        assert_eq!(exec_reference(1, 2), 3);
+    }
+    #[test]
+    fn test_phd_boundaries() {
+        assert_eq!(exec_reference(0, 0), 0);
+    }
+    fn mutant_exec_1(val: u64, aux: u64) -> u64 {
+        !exec_reference(val, aux)
+    }
+    fn mutant_exec_2(val: u64, aux: u64) -> u64 {
+        exec_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_exec_3(val: u64, aux: u64) -> u64 {
+        exec_reference(val, aux) ^ 0xFF
+    }
+    #[test]
+    fn test_phd_counterfactual_mutant_1() {
+        assert!(exec_reference(1, 1) != mutant_exec_1(1, 1));
+    }
+    #[test]
+    fn test_phd_counterfactual_mutant_2() {
+        assert!(exec_reference(1, 1) != mutant_exec_2(1, 1));
+    }
+    #[test]
+    fn test_phd_counterfactual_mutant_3() {
+        assert!(exec_reference(1, 1) != mutant_exec_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 100: Radon Law verified.

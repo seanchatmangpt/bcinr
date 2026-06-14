@@ -4,24 +4,93 @@
 
 /// Integrity gate for utils
 #[inline(always)]
-pub fn utils_integrity_gate(val: u64) -> u64 { val ^ 0xAA 
+pub fn utils_integrity_gate(val: u64) -> u64 {
+    val ^ 0xAA
 }
 
 /// Utility Substrate: High-performance data structures for autonomic systems.
 pub mod dense_kernel;
 
+/// Test helper for parameterized mutant testing across algorithm modules.
+#[cfg(test)]
+pub mod mutant_harness {
+    /// Parameterized mutant test: verifies that all three standard mutants (NOT, +1, XOR)
+    /// differ from the reference implementation on given inputs.
+    ///
+    /// Used to reduce boilerplate across 307+ algorithm test modules.
+    ///
+    /// # Example
+    /// ```ignore
+    /// #[test]
+    /// fn test_my_algo_counterfactual_mutants() {
+    ///     verify_mutant_divergence(
+    ///         42u64,
+    ///         1337u64,
+    ///         |val, aux| my_algo_reference(val, aux),
+    ///         |val, aux| !my_algo_reference(val, aux),
+    ///         |val, aux| my_algo_reference(val, aux).wrapping_add(1),
+    ///         |val, aux| my_algo_reference(val, aux) ^ 0xFFFFFFFF,
+    ///     );
+    /// }
+    /// ```
+    #[inline]
+    pub fn verify_mutant_divergence<F, M1, M2, M3>(
+        val: u64,
+        aux: u64,
+        reference: F,
+        mutant_1: M1,
+        mutant_2: M2,
+        mutant_3: M3,
+    ) where
+        F: Fn(u64, u64) -> u64,
+        M1: Fn(u64, u64) -> u64,
+        M2: Fn(u64, u64) -> u64,
+        M3: Fn(u64, u64) -> u64,
+    {
+        let expected = reference(val, aux);
+        let actual_m1 = mutant_1(val, aux);
+        let actual_m2 = mutant_2(val, aux);
+        let actual_m3 = mutant_3(val, aux);
+
+        assert_ne!(expected, actual_m1, "Mutant 1 (NOT) failed to diverge");
+        assert_ne!(expected, actual_m2, "Mutant 2 (+1) failed to diverge");
+        assert_ne!(expected, actual_m3, "Mutant 3 (XOR) failed to diverge");
+    }
+}
+
 #[cfg(test)]
 mod tests_utils {
-    
-    fn utils_reference(val: u64, _aux: u64) -> u64 { val }
-    #[test] fn test_utils_equivalence() { assert_eq!(utils_reference(1, 0), 1); }
-    #[test] fn test_utils_boundaries() { }
-    fn mutant_utils_1(val: u64, aux: u64) -> u64 { !utils_reference(val, aux) }
-    fn mutant_utils_2(val: u64, aux: u64) -> u64 { utils_reference(val, aux).wrapping_add(1) }
-    fn mutant_utils_3(val: u64, aux: u64) -> u64 { utils_reference(val, aux) ^ 0xFF }
-    #[test] fn test_utils_counterfactual_mutant_1() { assert!(utils_reference(1, 1) != mutant_utils_1(1, 1)); }
-    #[test] fn test_utils_counterfactual_mutant_2() { assert!(utils_reference(1, 1) != mutant_utils_2(1, 1)); }
-    #[test] fn test_utils_counterfactual_mutant_3() { assert!(utils_reference(1, 1) != mutant_utils_3(1, 1)); }
+
+    fn utils_reference(val: u64, _aux: u64) -> u64 {
+        val
+    }
+    #[test]
+    fn test_utils_equivalence() {
+        assert_eq!(utils_reference(1, 0), 1);
+    }
+    #[test]
+    fn test_utils_boundaries() {}
+    fn mutant_utils_1(val: u64, aux: u64) -> u64 {
+        !utils_reference(val, aux)
+    }
+    fn mutant_utils_2(val: u64, aux: u64) -> u64 {
+        utils_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_utils_3(val: u64, aux: u64) -> u64 {
+        utils_reference(val, aux) ^ 0xFF
+    }
+    #[test]
+    fn test_utils_counterfactual_mutant_1() {
+        assert!(utils_reference(1, 1) != mutant_utils_1(1, 1));
+    }
+    #[test]
+    fn test_utils_counterfactual_mutant_2() {
+        assert!(utils_reference(1, 1) != mutant_utils_2(1, 1));
+    }
+    #[test]
+    fn test_utils_counterfactual_mutant_3() {
+        assert!(utils_reference(1, 1) != mutant_utils_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 25: Satisfies Radon Law.

@@ -1,5 +1,5 @@
 //! Metric Accumulator: Branchless utility for aggregating system health/integrity.
-//! 
+//!
 //! Provides saturating sums and exponential moving averages without conditional jumps.
 ///
 /// # AXIOMATIC PROOF: Hoare-logic Analysis
@@ -11,11 +11,10 @@
 #[inline(always)]
 pub fn metric_accumulator_sat_add(current: u64, val: u64) -> u64 {
     current.saturating_add(val)
-
 }
 
 /// A branchless utility for aggregating system health/integrity scores.
-/// 
+///
 /// Follows the "Contract with Teeth": Oracle, Boundaries, 3 Mutants.
 /// CC=1 for all public primitives.
 pub struct MetricAccumulator;
@@ -26,16 +25,14 @@ impl MetricAccumulator {
     #[inline]
     pub fn saturating_sum(current: u64, val: u64) -> u64 {
         metric_accumulator_sat_add(current, val)
-    
-}
+    }
 
     /// Calculates an Exponential Moving Average (EMA).
     /// CC=1.
     #[inline]
     pub fn ema(current: f32, val: f32, alpha: f32) -> f32 {
         (alpha * val) + (1.0 - alpha) * current
-    
-}
+    }
 }
 
 #[cfg(test)]
@@ -46,22 +43,32 @@ mod tests {
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn metric_accumulator_sat_add_reference(current: u64, val: u64) -> u64 {
-        if (u64::MAX - current) < val { u64::MAX } else { current + val }
+        if (u64::MAX - current) < val {
+            u64::MAX
+        } else {
+            current + val
+        }
     }
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
-    fn mutant_metric_accumulator_sat_add_1(current: u64, val: u64) -> u64 { current.wrapping_add(val) }
-    fn mutant_metric_accumulator_sat_add_2(current: u64, val: u64) -> u64 { current.saturating_sub(val) }
-    fn mutant_metric_accumulator_sat_add_3(current: u64, _val: u64) -> u64 { current }
+    fn mutant_metric_accumulator_sat_add_1(current: u64, val: u64) -> u64 {
+        current.wrapping_add(val)
+    }
+    fn mutant_metric_accumulator_sat_add_2(current: u64, val: u64) -> u64 {
+        current.saturating_sub(val)
+    }
+    fn mutant_metric_accumulator_sat_add_3(current: u64, _val: u64) -> u64 {
+        current
+    }
 
     #[test]
     fn test_metric_accumulator_sat_add_equivalence() {
         let expected = metric_accumulator_sat_add_reference(100, 50);
         let actual = metric_accumulator_sat_add(100, 50);
         assert_eq!(expected, actual);
-        
+
         let expected2 = metric_accumulator_sat_add_reference(u64::MAX - 10, 20);
         let actual2 = metric_accumulator_sat_add(u64::MAX - 10, 20);
         assert_eq!(expected2, actual2);

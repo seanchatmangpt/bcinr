@@ -1,8 +1,8 @@
 pub mod bump_arena;
-pub mod spsc_ring_buffer;
-pub mod lock_free_slab;
 pub mod epoch_reclamation;
+pub mod lock_free_slab;
 pub mod resumable_fiber;
+pub mod spsc_ring_buffer;
 pub mod utf8_classifier;
 // Hoare-logic Verification Line 6: Radon Law verified.
 // Hoare-logic Verification Line 7: Radon Law verified.

@@ -28,18 +28,32 @@ impl ChaChaSponge {
     pub const fn new(seed: [u32; 4]) -> Self {
         let mut state = [0u32; 16];
         // Constants (from ChaCha20 spec: "expand 32-byte k")
-        state[0] = 0x61707865; state[1] = 0x3320646e; state[2] = 0x79622d32; state[3] = 0x6b206574;
-        state[4] = seed[0]; state[5] = seed[1]; state[6] = seed[2]; state[7] = seed[3];
+        state[0] = 0x61707865;
+        state[1] = 0x3320646e;
+        state[2] = 0x79622d32;
+        state[3] = 0x6b206574;
+        state[4] = seed[0];
+        state[5] = seed[1];
+        state[6] = seed[2];
+        state[7] = seed[3];
         // Rest initialized to zero
         Self { state }
     }
 
     #[inline(always)]
     fn quarter_round(state: &mut [u32; 16], a: usize, b: usize, c: usize, d: usize) {
-        state[a] = state[a].wrapping_add(state[b]); state[d] ^= state[a]; state[d] = state[d].rotate_left(16);
-        state[c] = state[c].wrapping_add(state[d]); state[b] ^= state[c]; state[b] = state[b].rotate_left(12);
-        state[a] = state[a].wrapping_add(state[b]); state[d] ^= state[a]; state[d] = state[d].rotate_left(8);
-        state[c] = state[c].wrapping_add(state[d]); state[b] ^= state[c]; state[b] = state[b].rotate_left(7);
+        state[a] = state[a].wrapping_add(state[b]);
+        state[d] ^= state[a];
+        state[d] = state[d].rotate_left(16);
+        state[c] = state[c].wrapping_add(state[d]);
+        state[b] ^= state[c];
+        state[b] = state[b].rotate_left(12);
+        state[a] = state[a].wrapping_add(state[b]);
+        state[d] ^= state[a];
+        state[d] = state[d].rotate_left(8);
+        state[c] = state[c].wrapping_add(state[d]);
+        state[b] ^= state[c];
+        state[b] = state[b].rotate_left(7);
     }
 
     /// Performs a ChaCha8 permutation (8 rounds) branchlessly.
@@ -77,12 +91,20 @@ impl ChaChaSponge {
 #[cfg(test)]
 mod tests {
     #[allow(dead_code)]
-    fn chacha_sponge_reference(val: u64, aux: u64) -> u64 { val ^ aux }
+    fn chacha_sponge_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
 
     use super::*;
-    fn chacha_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    #[test] fn test_equivalence() { assert_eq!(chacha_reference(1, 0), 1); }
-    #[test] fn test_boundaries() { 
+    fn chacha_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
+    #[test]
+    fn test_equivalence() {
+        assert_eq!(chacha_reference(1, 0), 1);
+    }
+    #[test]
+    fn test_boundaries() {
         let mut sponge = ChaChaSponge::new([0; 4]);
         sponge.absorb(0x1234567890ABCDEF);
         let h1 = sponge.squeeze();
@@ -90,12 +112,27 @@ mod tests {
         let h2 = sponge.squeeze();
         assert_ne!(h1, h2);
     }
-    fn mutant_chacha_1(val: u64, aux: u64) -> u64 { !chacha_reference(val, aux) }
-    fn mutant_chacha_2(val: u64, aux: u64) -> u64 { chacha_reference(val, aux).wrapping_add(1) }
-    fn mutant_chacha_3(val: u64, aux: u64) -> u64 { chacha_reference(val, aux) ^ 0xFF }
-    #[test] fn test_rejects_mutant_1() { assert!(chacha_reference(1, 1) != mutant_chacha_1(1, 1)); }
-    #[test] fn test_rejects_mutant_2() { assert!(chacha_reference(1, 1) != mutant_chacha_2(1, 1)); }
-    #[test] fn test_rejects_mutant_3() { assert!(chacha_reference(1, 1) != mutant_chacha_3(1, 1)); }
+    fn mutant_chacha_1(val: u64, aux: u64) -> u64 {
+        !chacha_reference(val, aux)
+    }
+    fn mutant_chacha_2(val: u64, aux: u64) -> u64 {
+        chacha_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_chacha_3(val: u64, aux: u64) -> u64 {
+        chacha_reference(val, aux) ^ 0xFF
+    }
+    #[test]
+    fn test_rejects_mutant_1() {
+        assert!(chacha_reference(1, 1) != mutant_chacha_1(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_2() {
+        assert!(chacha_reference(1, 1) != mutant_chacha_2(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_3() {
+        assert!(chacha_reference(1, 1) != mutant_chacha_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 100: Radon Law satisfied.

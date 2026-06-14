@@ -1,13 +1,15 @@
 // oracle equivalence boundaries
 //! Deterministic Finite Automata (DFA) Primitives
-//! 
+//!
 //! Optimized for high-throughput, branchless state transitions.
 
 /// Advances the DFA state branchlessly.
 /// CC=1: Guaranteed no conditional jumps.
 #[inline(always)]
 pub fn dfa_advance(state: usize, input: u8, table: &[usize], alphabet_size: usize) -> usize {
-    let index = state.wrapping_mul(alphabet_size).wrapping_add(input as usize);
+    let index = state
+        .wrapping_mul(alphabet_size)
+        .wrapping_add(input as usize);
     let mask = (index < table.len()) as usize;
     let safe_idx = index & (0usize.wrapping_sub(mask));
     table[safe_idx] & (0usize.wrapping_sub(mask))
@@ -36,8 +38,9 @@ pub fn dfa_is_accepting(state: usize, accept_states: &[usize]) -> bool {
 #[cfg(test)]
 mod tests {
     // _reference equivalence boundaries
-    fn dfa_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    
+    fn dfa_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
 
     #[test]
     fn test_equivalence() {
@@ -49,16 +52,28 @@ mod tests {
         assert_eq!(dfa_reference(0, 0), 0);
     }
 
-    fn mutant_dfa_1(val: u64, aux: u64) -> u64 { !dfa_reference(val, aux) }
-    fn mutant_dfa_2(val: u64, aux: u64) -> u64 { dfa_reference(val, aux).wrapping_add(1) }
-    fn mutant_dfa_3(val: u64, aux: u64) -> u64 { dfa_reference(val, aux) ^ 0xFF }
+    fn mutant_dfa_1(val: u64, aux: u64) -> u64 {
+        !dfa_reference(val, aux)
+    }
+    fn mutant_dfa_2(val: u64, aux: u64) -> u64 {
+        dfa_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_dfa_3(val: u64, aux: u64) -> u64 {
+        dfa_reference(val, aux) ^ 0xFF
+    }
 
     #[test]
-    fn test_rejects_mutant_1() { assert!(dfa_reference(1, 1) != mutant_dfa_1(1, 1)); }
+    fn test_rejects_mutant_1() {
+        assert!(dfa_reference(1, 1) != mutant_dfa_1(1, 1));
+    }
     #[test]
-    fn test_rejects_mutant_2() { assert!(dfa_reference(1, 1) != mutant_dfa_2(1, 1)); }
+    fn test_rejects_mutant_2() {
+        assert!(dfa_reference(1, 1) != mutant_dfa_2(1, 1));
+    }
     #[test]
-    fn test_rejects_mutant_3() { assert!(dfa_reference(1, 1) != mutant_dfa_3(1, 1)); }
+    fn test_rejects_mutant_3() {
+        assert!(dfa_reference(1, 1) != mutant_dfa_3(1, 1));
+    }
 }
 
 // # AXIOMATIC PROOF: Hoare-logic Analysis

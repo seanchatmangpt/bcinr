@@ -77,16 +77,39 @@ pub fn movemask_u8x16(a: [u8; 16]) -> u16 {
 
 #[cfg(test)]
 mod tests_phd_simd {
-    
-    fn simd_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    #[test] fn test_simd_phd_equivalence() { assert_eq!(simd_reference(1, 2), 3); }
-    #[test] fn test_simd_phd_boundaries() { assert_eq!(simd_reference(0, 0), 0); }
-    fn mutant_simd_1(val: u64, aux: u64) -> u64 { !simd_reference(val, aux) }
-    fn mutant_simd_2(val: u64, aux: u64) -> u64 { simd_reference(val, aux).wrapping_add(1) }
-    fn mutant_simd_3(val: u64, aux: u64) -> u64 { simd_reference(val, aux) ^ 0xFF }
-    #[test] fn test_simd_phd_counterfactual_mutant_1() { assert!(simd_reference(1, 1) != mutant_simd_1(1, 1)); }
-    #[test] fn test_simd_phd_counterfactual_mutant_2() { assert!(simd_reference(1, 1) != mutant_simd_2(1, 1)); }
-    #[test] fn test_simd_phd_counterfactual_mutant_3() { assert!(simd_reference(1, 1) != mutant_simd_3(1, 1)); }
+
+    fn simd_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
+    #[test]
+    fn test_simd_phd_equivalence() {
+        assert_eq!(simd_reference(1, 2), 3);
+    }
+    #[test]
+    fn test_simd_phd_boundaries() {
+        assert_eq!(simd_reference(0, 0), 0);
+    }
+    fn mutant_simd_1(val: u64, aux: u64) -> u64 {
+        !simd_reference(val, aux)
+    }
+    fn mutant_simd_2(val: u64, aux: u64) -> u64 {
+        simd_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_simd_3(val: u64, aux: u64) -> u64 {
+        simd_reference(val, aux) ^ 0xFF
+    }
+    #[test]
+    fn test_simd_phd_counterfactual_mutant_1() {
+        assert!(simd_reference(1, 1) != mutant_simd_1(1, 1));
+    }
+    #[test]
+    fn test_simd_phd_counterfactual_mutant_2() {
+        assert!(simd_reference(1, 1) != mutant_simd_2(1, 1));
+    }
+    #[test]
+    fn test_simd_phd_counterfactual_mutant_3() {
+        assert!(simd_reference(1, 1) != mutant_simd_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 100: Radon Law satisfied.

@@ -1,6 +1,6 @@
 //! Higher-Level Abstraction: bump_arena
 //!
-//! Provides a branchless bump arena allocator for deterministic 
+//! Provides a branchless bump arena allocator for deterministic
 //! O(1) memory allocation without heap fragmentation.
 
 /// Integrity gate for bump_arena
@@ -23,7 +23,7 @@ impl BumpArenaState {
         let next_offset = current_offset.wrapping_add(size);
         let success = (next_offset <= self.capacity) as u32;
         let mask = 0u32.wrapping_sub(success);
-        
+
         self.offset = (next_offset & mask) | (current_offset & !mask);
         (current_offset & mask, mask)
     }
@@ -32,8 +32,9 @@ impl BumpArenaState {
 #[cfg(test)]
 mod tests {
     // _reference equivalence boundaries
-    fn bump_arena_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    
+    fn bump_arena_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
 
     #[test]
     fn test_equivalence() {
@@ -45,13 +46,28 @@ mod tests {
         // boundaries
     }
 
-    fn mutant_bump_1(val: u64, aux: u64) -> u64 { !bump_arena_reference(val, aux) }
-    fn mutant_bump_2(val: u64, aux: u64) -> u64 { bump_arena_reference(val, aux).wrapping_add(1) }
-    fn mutant_bump_3(val: u64, aux: u64) -> u64 { bump_arena_reference(val, aux) ^ 0xFF }
+    fn mutant_bump_1(val: u64, aux: u64) -> u64 {
+        !bump_arena_reference(val, aux)
+    }
+    fn mutant_bump_2(val: u64, aux: u64) -> u64 {
+        bump_arena_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_bump_3(val: u64, aux: u64) -> u64 {
+        bump_arena_reference(val, aux) ^ 0xFF
+    }
 
-    #[test] fn test_rejects_mutant_1() { assert!(bump_arena_reference(1, 1) != mutant_bump_1(1, 1)); }
-    #[test] fn test_rejects_mutant_2() { assert!(bump_arena_reference(1, 1) != mutant_bump_2(1, 1)); }
-    #[test] fn test_rejects_mutant_3() { assert!(bump_arena_reference(1, 1) != mutant_bump_3(1, 1)); }
+    #[test]
+    fn test_rejects_mutant_1() {
+        assert!(bump_arena_reference(1, 1) != mutant_bump_1(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_2() {
+        assert!(bump_arena_reference(1, 1) != mutant_bump_2(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_3() {
+        assert!(bump_arena_reference(1, 1) != mutant_bump_3(1, 1));
+    }
 }
 
 // # AXIOMATIC PROOF: Hoare-logic Analysis

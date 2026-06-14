@@ -4,7 +4,8 @@
 
 /// Integrity gate for models
 #[inline(always)]
-pub fn models_integrity_gate(val: u64) -> u64 { val ^ 0xAA 
+pub fn models_integrity_gate(val: u64) -> u64 {
+    val ^ 0xAA
 }
 
 /// Process Models: Formal representations of system behavior.
@@ -13,16 +14,37 @@ pub mod vision_2030;
 
 #[cfg(test)]
 mod tests_models {
-    
-    fn models_reference(val: u64, _aux: u64) -> u64 { val }
-    #[test] fn test_models_equivalence() { assert_eq!(models_reference(1, 0), 1); }
-    #[test] fn test_models_boundaries() { }
-    fn mutant_models_1(val: u64, aux: u64) -> u64 { !models_reference(val, aux) }
-    fn mutant_models_2(val: u64, aux: u64) -> u64 { models_reference(val, aux).wrapping_add(1) }
-    fn mutant_models_3(val: u64, aux: u64) -> u64 { models_reference(val, aux) ^ 0xFF }
-    #[test] fn test_models_counterfactual_mutant_1() { assert!(models_reference(1, 1) != mutant_models_1(1, 1)); }
-    #[test] fn test_models_counterfactual_mutant_2() { assert!(models_reference(1, 1) != mutant_models_2(1, 1)); }
-    #[test] fn test_models_counterfactual_mutant_3() { assert!(models_reference(1, 1) != mutant_models_3(1, 1)); }
+
+    fn models_reference(val: u64, _aux: u64) -> u64 {
+        val
+    }
+    #[test]
+    fn test_models_equivalence() {
+        assert_eq!(models_reference(1, 0), 1);
+    }
+    #[test]
+    fn test_models_boundaries() {}
+    fn mutant_models_1(val: u64, aux: u64) -> u64 {
+        !models_reference(val, aux)
+    }
+    fn mutant_models_2(val: u64, aux: u64) -> u64 {
+        models_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_models_3(val: u64, aux: u64) -> u64 {
+        models_reference(val, aux) ^ 0xFF
+    }
+    #[test]
+    fn test_models_counterfactual_mutant_1() {
+        assert!(models_reference(1, 1) != mutant_models_1(1, 1));
+    }
+    #[test]
+    fn test_models_counterfactual_mutant_2() {
+        assert!(models_reference(1, 1) != mutant_models_2(1, 1));
+    }
+    #[test]
+    fn test_models_counterfactual_mutant_3() {
+        assert!(models_reference(1, 1) != mutant_models_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 26: Satisfies Radon Law.

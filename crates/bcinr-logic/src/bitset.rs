@@ -1,8 +1,8 @@
 //  Bitset Algebra: Bitset operations: rank, select, set, clear
-// 
+//
 //  This module contains handwritten, performance-critical implementations
 //  of all Bitset Algebra algorithms.
-// 
+//
 //  # Axiomatic Proof: Hoare-logic verified.
 //  Precondition: { input ∈ ValidBitset }
 //  Postcondition: { result = bitset_reference(input) }
@@ -30,7 +30,8 @@ pub const fn clear_bit_u64(x: u64, pos: usize) -> u64 {
 #[inline]
 #[must_use]
 pub fn rank_u64(x: u64, pos: usize) -> usize {
-    let mask = (0u64.wrapping_sub((pos >= 63) as u64)) | ((1u64.wrapping_shl((pos + 1) as u32 & 0x3F)).wrapping_sub(1));
+    let mask = (0u64.wrapping_sub((pos >= 63) as u64))
+        | ((1u64.wrapping_shl((pos + 1) as u32 & 0x3F)).wrapping_sub(1));
     (x & mask).count_ones() as usize
 }
 
@@ -41,18 +42,18 @@ pub fn select_bit_u64(x: u64, n: usize) -> Option<usize> {
     let mut res = 0;
     let mut x_copy = x;
     let mut count = n + 1;
-    
+
     (0..6).rev().for_each(|i| {
         let step = 1 << i;
         let mask = (1u64 << step) - 1;
         let low_count = (x_copy & mask).count_ones() as usize;
         let go_high_mask = 0usize.wrapping_sub((low_count < count) as usize);
-        
+
         res += step & go_high_mask;
         x_copy >>= step & go_high_mask;
         count -= low_count & go_high_mask;
     });
-    
+
     let exists = (res < 64 && count == 1 && ((x_copy & 1) != 0)) as usize;
     [None, Some(res)][exists]
 }
@@ -74,13 +75,14 @@ pub fn jaccard_u64_slices(a: &[u64], b: &[u64]) -> f32 {
     let mut union = 0;
     let len_a = a.len();
     let len_b = b.len();
-    let min_len = (len_a & (0usize.wrapping_sub((len_a < len_b) as usize))) | (len_b & (0usize.wrapping_sub((len_a >= len_b) as usize)));
-    
+    let min_len = (len_a & (0usize.wrapping_sub((len_a < len_b) as usize)))
+        | (len_b & (0usize.wrapping_sub((len_a >= len_b) as usize)));
+
     (0..min_len).for_each(|i| {
         intersection += (a[i] & b[i]).count_ones();
         union += (a[i] | b[i]).count_ones();
     });
-    
+
     (intersection as f32) / (union as f32 + (union == 0) as u32 as f32)
 }
 
@@ -91,7 +93,8 @@ pub fn hamming_u64_slices(a: &[u64], b: &[u64]) -> usize {
     let mut dist = 0;
     let len_a = a.len();
     let len_b = b.len();
-    let min_len = (len_a & (0usize.wrapping_sub((len_a < len_b) as usize))) | (len_b & (0usize.wrapping_sub((len_a >= len_b) as usize)));
+    let min_len = (len_a & (0usize.wrapping_sub((len_a < len_b) as usize)))
+        | (len_b & (0usize.wrapping_sub((len_a >= len_b) as usize)));
     (0..min_len).for_each(|i| dist += (a[i] ^ b[i]).count_ones() as usize);
     dist
 }
@@ -100,7 +103,8 @@ pub fn hamming_u64_slices(a: &[u64], b: &[u64]) -> usize {
 pub fn intersect_u64_slices(a: &mut [u64], b: &[u64]) {
     let len_a = a.len();
     let len_b = b.len();
-    let min_len = (len_a & (0usize.wrapping_sub((len_a < len_b) as usize))) | (len_b & (0usize.wrapping_sub((len_a >= len_b) as usize)));
+    let min_len = (len_a & (0usize.wrapping_sub((len_a < len_b) as usize)))
+        | (len_b & (0usize.wrapping_sub((len_a >= len_b) as usize)));
     (0..min_len).for_each(|i| a[i] &= b[i]);
 }
 
@@ -108,7 +112,8 @@ pub fn intersect_u64_slices(a: &mut [u64], b: &[u64]) {
 pub fn union_u64_slices(a: &mut [u64], b: &[u64]) {
     let len_a = a.len();
     let len_b = b.len();
-    let min_len = (len_a & (0usize.wrapping_sub((len_a < len_b) as usize))) | (len_b & (0usize.wrapping_sub((len_a >= len_b) as usize)));
+    let min_len = (len_a & (0usize.wrapping_sub((len_a < len_b) as usize)))
+        | (len_b & (0usize.wrapping_sub((len_a >= len_b) as usize)));
     (0..min_len).for_each(|i| a[i] |= b[i]);
 }
 
@@ -122,16 +127,37 @@ pub fn any_bit_set_u64_slice(a: &[u64]) -> bool {
 
 #[cfg(test)]
 mod tests_phd_bitset {
-    
-    fn bitset_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    #[test] fn test_phd_equivalence() { assert_eq!(bitset_reference(1, 0), 1); }
-    #[test] fn test_phd_boundaries() { }
-    fn mutant_bitset_1(val: u64, aux: u64) -> u64 { !bitset_reference(val, aux) }
-    fn mutant_bitset_2(val: u64, aux: u64) -> u64 { bitset_reference(val, aux).wrapping_add(1) }
-    fn mutant_bitset_3(val: u64, aux: u64) -> u64 { bitset_reference(val, aux) ^ 0xFF }
-    #[test] fn test_phd_counterfactual_mutant_1() { assert!(bitset_reference(1, 1) != mutant_bitset_1(1, 1)); }
-    #[test] fn test_phd_counterfactual_mutant_2() { assert!(bitset_reference(1, 1) != mutant_bitset_2(1, 1)); }
-    #[test] fn test_phd_counterfactual_mutant_3() { assert!(bitset_reference(1, 1) != mutant_bitset_3(1, 1)); }
+
+    fn bitset_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
+    #[test]
+    fn test_phd_equivalence() {
+        assert_eq!(bitset_reference(1, 0), 1);
+    }
+    #[test]
+    fn test_phd_boundaries() {}
+    fn mutant_bitset_1(val: u64, aux: u64) -> u64 {
+        !bitset_reference(val, aux)
+    }
+    fn mutant_bitset_2(val: u64, aux: u64) -> u64 {
+        bitset_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_bitset_3(val: u64, aux: u64) -> u64 {
+        bitset_reference(val, aux) ^ 0xFF
+    }
+    #[test]
+    fn test_phd_counterfactual_mutant_1() {
+        assert!(bitset_reference(1, 1) != mutant_bitset_1(1, 1));
+    }
+    #[test]
+    fn test_phd_counterfactual_mutant_2() {
+        assert!(bitset_reference(1, 1) != mutant_bitset_2(1, 1));
+    }
+    #[test]
+    fn test_phd_counterfactual_mutant_3() {
+        assert!(bitset_reference(1, 1) != mutant_bitset_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 100: Radon Law verified.

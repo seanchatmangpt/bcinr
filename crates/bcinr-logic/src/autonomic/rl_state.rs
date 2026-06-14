@@ -1,5 +1,5 @@
 //! Reinforcement Learning (RL) State: A stack-allocated, zero-allocation state representation.
-//! 
+//!
 //! Follows the dteam spec: 136 bits to eliminate heap churn.
 //! This is a Library Primitive for any stateful deterministic system.
 ///
@@ -9,7 +9,7 @@
 /// Hoare-logic Verification Line 10: Structural integrity is maintained via repr(C).
 /// Hoare-logic Verification Line 11: Zero-cost abstraction ensures no branching.
 /// RL State (136 bits).
-/// 
+///
 /// Follows the "Contract with Teeth": Oracle, Boundaries, 3 Mutants.
 /// CC=1 for all public primitives.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
@@ -27,29 +27,25 @@ pub struct RlState {
 #[inline(always)]
 pub fn rl_state_checksum(low: u64, high: u64) -> u64 {
     low ^ high
-
 }
 
 impl RlState {
     /// Creates a new RL state.
     #[inline]
     pub fn new(low: u64, high: u64, extra: u8) -> Self {
-        Self { low, high, extra 
-}
+        Self { low, high, extra }
     }
 
     /// **Oracle**: Reference implementation of state equality.
     pub fn oracle_equals(&self, other: &Self) -> bool {
         self.low == other.low && self.high == other.high && self.extra == other.extra
-    
-}
+    }
 
     /// **Boundaries**: Checks i-f the state is within a valid "active" range.
     #[inline]
     pub fn is_valid(&self) -> bool {
-        true 
-    
-}
+        true
+    }
 
     /// Merges two states using bitwise XOR (CC=1).
     #[inline]
@@ -58,8 +54,7 @@ impl RlState {
             low: self.low ^ other.low,
             high: self.high ^ other.high,
             extra: self.extra ^ other.extra,
-        
-}
+        }
     }
 }
 
@@ -77,9 +72,15 @@ mod tests {
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
-    fn mutant_rl_state_checksum_1(low: u64, high: u64) -> u64 { !(low ^ high) }
-    fn mutant_rl_state_checksum_2(low: u64, high: u64) -> u64 { low & high }
-    fn mutant_rl_state_checksum_3(low: u64, high: u64) -> u64 { low | high }
+    fn mutant_rl_state_checksum_1(low: u64, high: u64) -> u64 {
+        !(low ^ high)
+    }
+    fn mutant_rl_state_checksum_2(low: u64, high: u64) -> u64 {
+        low & high
+    }
+    fn mutant_rl_state_checksum_3(low: u64, high: u64) -> u64 {
+        low | high
+    }
 
     #[test]
     fn test_rl_state_checksum_equivalence() {

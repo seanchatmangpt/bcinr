@@ -33,6 +33,7 @@
 /// let result = leb128_decode_u64(0x2A, 0);
 /// assert_eq!(result, 42);
 /// ```
+// SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 pub fn leb128_decode_u64(bytes: u64, _aux: u64) -> u64 {
     // Extract bytes from the packed u64 in little-endian order

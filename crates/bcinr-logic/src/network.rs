@@ -1,5 +1,5 @@
 //! Branchless Network Primitives
-//! 
+//!
 //! CC=1 for all networking operations.
 
 /// Compare and exchange branchlessly for small arrays.
@@ -56,8 +56,9 @@ pub fn bitonic_sort_16u32(a: &mut [u32; 16]) {
 #[cfg(test)]
 mod tests {
     // _reference equivalence boundaries
-    fn network_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    
+    fn network_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
 
     #[test]
     fn test_equivalence() {
@@ -69,13 +70,28 @@ mod tests {
         assert_eq!(network_reference(0, 0), 0);
     }
 
-    fn mutant_network_1(val: u64, aux: u64) -> u64 { !network_reference(val, aux) }
-    fn mutant_network_2(val: u64, aux: u64) -> u64 { network_reference(val, aux).wrapping_add(1) }
-    fn mutant_network_3(val: u64, aux: u64) -> u64 { network_reference(val, aux) ^ 0xFF }
+    fn mutant_network_1(val: u64, aux: u64) -> u64 {
+        !network_reference(val, aux)
+    }
+    fn mutant_network_2(val: u64, aux: u64) -> u64 {
+        network_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_network_3(val: u64, aux: u64) -> u64 {
+        network_reference(val, aux) ^ 0xFF
+    }
 
-    #[test] fn test_rejects_mutant_1() { assert!(network_reference(1, 1) != mutant_network_1(1, 1)); }
-    #[test] fn test_rejects_mutant_2() { assert!(network_reference(1, 1) != mutant_network_2(1, 1)); }
-    #[test] fn test_rejects_mutant_3() { assert!(network_reference(1, 1) != mutant_network_3(1, 1)); }
+    #[test]
+    fn test_rejects_mutant_1() {
+        assert!(network_reference(1, 1) != mutant_network_1(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_2() {
+        assert!(network_reference(1, 1) != mutant_network_2(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_3() {
+        assert!(network_reference(1, 1) != mutant_network_3(1, 1));
+    }
 }
 
 // # AXIOMATIC PROOF: Hoare-logic Analysis

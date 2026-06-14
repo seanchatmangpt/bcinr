@@ -16,6 +16,7 @@
 /// let result = is_space_simd_u8x16(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+// SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn is_space_simd_u8x16(val: u64, aux: u64) -> u64 {

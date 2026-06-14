@@ -34,6 +34,7 @@
 /// let fp2 = quotient_filter_add_u64(42, 1338);
 /// assert_ne!(fp1, fp2); // Different aux produces different fingerprints
 /// ```
+// SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 pub fn quotient_filter_add_u64(val: u64, aux: u64) -> u64 {
     // Mix inputs via XOR to combine both values

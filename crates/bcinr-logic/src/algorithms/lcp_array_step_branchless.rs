@@ -18,6 +18,7 @@
 /// let result = lcp_array_step_branchless(42, 1337);
 /// assert!(result <= u64::MAX);
 /// ```
+// SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn lcp_array_step_branchless(val: u64, aux: u64) -> u64 {

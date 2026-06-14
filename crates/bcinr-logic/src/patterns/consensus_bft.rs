@@ -63,12 +63,20 @@ impl<const THRESHOLD: usize> FixedConsensus<THRESHOLD> {
 #[cfg(test)]
 mod tests {
     #[allow(dead_code)]
-    fn consensus_bft_reference(val: u64, aux: u64) -> u64 { val ^ aux }
+    fn consensus_bft_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
 
     use super::*;
-    fn bft_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    #[test] fn test_equivalence() { assert_eq!(bft_reference(1, 0), 1); }
-    #[test] fn test_boundaries() { 
+    fn bft_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
+    #[test]
+    fn test_equivalence() {
+        assert_eq!(bft_reference(1, 0), 1);
+    }
+    #[test]
+    fn test_boundaries() {
         let mut bft = FixedConsensus::<3>::new();
         bft.vote(0);
         bft.vote(1);
@@ -76,12 +84,27 @@ mod tests {
         bft.vote(2);
         assert_ne!(bft.is_reached(), 0);
     }
-    fn mutant_bft_1(val: u64, aux: u64) -> u64 { !bft_reference(val, aux) }
-    fn mutant_bft_2(val: u64, aux: u64) -> u64 { bft_reference(val, aux).wrapping_add(1) }
-    fn mutant_bft_3(val: u64, aux: u64) -> u64 { bft_reference(val, aux) ^ 0xFF }
-    #[test] fn test_rejects_mutant_1() { assert!(bft_reference(1, 1) != mutant_bft_1(1, 1)); }
-    #[test] fn test_rejects_mutant_2() { assert!(bft_reference(1, 1) != mutant_bft_2(1, 1)); }
-    #[test] fn test_rejects_mutant_3() { assert!(bft_reference(1, 1) != mutant_bft_3(1, 1)); }
+    fn mutant_bft_1(val: u64, aux: u64) -> u64 {
+        !bft_reference(val, aux)
+    }
+    fn mutant_bft_2(val: u64, aux: u64) -> u64 {
+        bft_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_bft_3(val: u64, aux: u64) -> u64 {
+        bft_reference(val, aux) ^ 0xFF
+    }
+    #[test]
+    fn test_rejects_mutant_1() {
+        assert!(bft_reference(1, 1) != mutant_bft_1(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_2() {
+        assert!(bft_reference(1, 1) != mutant_bft_2(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_3() {
+        assert!(bft_reference(1, 1) != mutant_bft_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 100: Radon Law satisfied.

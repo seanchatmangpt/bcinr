@@ -1,5 +1,5 @@
 //! Dense Kernel: Cache-friendly mapping and word-aligned bitset primitives.
-//! 
+//!
 //! Optimized for no_std, high-throughput autonomic engines.
 
 /// Integrity gate for dense_kernel
@@ -40,7 +40,9 @@ impl<K, V> Default for PackedKeyTable<K, V> {
 #[cfg(feature = "alloc")]
 impl<K, V> PackedKeyTable<K, V> {
     pub fn new() -> Self {
-        Self { entries: Vec::new() }
+        Self {
+            entries: Vec::new(),
+        }
     }
 
     #[inline(always)]
@@ -57,8 +59,9 @@ impl<K, V> PackedKeyTable<K, V> {
 #[cfg(test)]
 mod tests {
     // _reference equivalence boundaries
-    fn dense_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    
+    fn dense_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
 
     #[test]
     fn test_equivalence() {
@@ -70,13 +73,28 @@ mod tests {
         // boundaries
     }
 
-    fn mutant_dense_1(val: u64, aux: u64) -> u64 { !dense_reference(val, aux) }
-    fn mutant_dense_2(val: u64, aux: u64) -> u64 { dense_reference(val, aux).wrapping_add(1) }
-    fn mutant_dense_3(val: u64, aux: u64) -> u64 { dense_reference(val, aux) ^ 0xFF }
+    fn mutant_dense_1(val: u64, aux: u64) -> u64 {
+        !dense_reference(val, aux)
+    }
+    fn mutant_dense_2(val: u64, aux: u64) -> u64 {
+        dense_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_dense_3(val: u64, aux: u64) -> u64 {
+        dense_reference(val, aux) ^ 0xFF
+    }
 
-    #[test] fn test_rejects_mutant_1() { assert!(dense_reference(1, 1) != mutant_dense_1(1, 1)); }
-    #[test] fn test_rejects_mutant_2() { assert!(dense_reference(1, 1) != mutant_dense_2(1, 1)); }
-    #[test] fn test_rejects_mutant_3() { assert!(dense_reference(1, 1) != mutant_dense_3(1, 1)); }
+    #[test]
+    fn test_rejects_mutant_1() {
+        assert!(dense_reference(1, 1) != mutant_dense_1(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_2() {
+        assert!(dense_reference(1, 1) != mutant_dense_2(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_3() {
+        assert!(dense_reference(1, 1) != mutant_dense_3(1, 1));
+    }
 }
 
 // # AXIOMATIC PROOF: Hoare-logic Analysis

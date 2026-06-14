@@ -24,7 +24,11 @@ pub struct PriorityPetriEngine<const WORDS: usize, const TRANSITIONS: usize> {
 
 impl<const WORDS: usize, const TRANSITIONS: usize> PriorityPetriEngine<WORDS, TRANSITIONS> {
     /// Checked constructor for the Petri Engine.
-    pub fn new_checked(initial: KBitSet<WORDS>, inputs: [KBitSet<WORDS>; TRANSITIONS], outputs: [KBitSet<WORDS>; TRANSITIONS]) -> Result<Self, &'static str> {
+    pub fn new_checked(
+        initial: KBitSet<WORDS>,
+        inputs: [KBitSet<WORDS>; TRANSITIONS],
+        outputs: [KBitSet<WORDS>; TRANSITIONS],
+    ) -> Result<Self, &'static str> {
         if TRANSITIONS > 64 {
             return Err("u64 firing mask aliasing beyond 64 transitions");
         }
@@ -39,31 +43,52 @@ impl<const WORDS: usize, const TRANSITIONS: usize> PriorityPetriEngine<WORDS, TR
     #[inline(always)]
     pub fn step(&mut self) -> u64 {
         let mut firing_mask = 0u64;
-        
+
         (0..TRANSITIONS).for_each(|i| {
             let (next_state, was_fired) = self.state.try_fire(self.inputs[i], self.outputs[i]);
             self.state = next_state;
-            
+
             let bit_idx = (i as u32) & 0x3F;
             firing_mask |= (was_fired as u64) << bit_idx;
         });
-        
+
         firing_mask
     }
 }
 
 #[cfg(test)]
 mod tests_petri_engine {
-    
-    fn petri_engine_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    #[test] fn test_equivalence() { assert_eq!(petri_engine_reference(1, 0), 1); }
-    #[test] fn test_boundaries() { }
-    fn mutant_petri_engine_1(val: u64, aux: u64) -> u64 { !petri_engine_reference(val, aux) }
-    fn mutant_petri_engine_2(val: u64, aux: u64) -> u64 { petri_engine_reference(val, aux).wrapping_add(1) }
-    fn mutant_petri_engine_3(val: u64, aux: u64) -> u64 { petri_engine_reference(val, aux) ^ 0xFF }
-    #[test] fn test_rejects_mutant_1() { assert!(petri_engine_reference(1, 1) != mutant_petri_engine_1(1, 1)); }
-    #[test] fn test_rejects_mutant_2() { assert!(petri_engine_reference(1, 1) != mutant_petri_engine_2(1, 1)); }
-    #[test] fn test_rejects_mutant_3() { assert!(petri_engine_reference(1, 1) != mutant_petri_engine_3(1, 1)); }
+
+    fn petri_engine_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
+    #[test]
+    fn test_equivalence() {
+        assert_eq!(petri_engine_reference(1, 0), 1);
+    }
+    #[test]
+    fn test_boundaries() {}
+    fn mutant_petri_engine_1(val: u64, aux: u64) -> u64 {
+        !petri_engine_reference(val, aux)
+    }
+    fn mutant_petri_engine_2(val: u64, aux: u64) -> u64 {
+        petri_engine_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_petri_engine_3(val: u64, aux: u64) -> u64 {
+        petri_engine_reference(val, aux) ^ 0xFF
+    }
+    #[test]
+    fn test_rejects_mutant_1() {
+        assert!(petri_engine_reference(1, 1) != mutant_petri_engine_1(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_2() {
+        assert!(petri_engine_reference(1, 1) != mutant_petri_engine_2(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_3() {
+        assert!(petri_engine_reference(1, 1) != mutant_petri_engine_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 100: Radon Law satisfied.

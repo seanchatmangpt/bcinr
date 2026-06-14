@@ -1,5 +1,5 @@
 //! Autonomic Substrate: A generic MAPE-K container for self-managing systems.
-//! 
+//!
 //! Provides a modular substrate that holds internal knowledge and state.
 //! CC=1 for all public primitives.
 //!
@@ -69,7 +69,9 @@ where
 mod tests {
     use super::*;
 
-    fn substrate_reference(val: u64, _aux: u64) -> u64 { val }
+    fn substrate_reference(val: u64, _aux: u64) -> u64 {
+        val
+    }
 
     #[test]
     fn test_substrate_equivalence() {
@@ -82,13 +84,28 @@ mod tests {
         assert!(!substrate.is_knowledge_full());
     }
 
-    fn mutant_substrate_1(val: u64, aux: u64) -> u64 { !substrate_reference(val, aux) }
-    fn mutant_substrate_2(val: u64, aux: u64) -> u64 { substrate_reference(val, aux).wrapping_add(1) }
-    fn mutant_substrate_3(val: u64, aux: u64) -> u64 { substrate_reference(val, aux) ^ 0xFF }
+    fn mutant_substrate_1(val: u64, aux: u64) -> u64 {
+        !substrate_reference(val, aux)
+    }
+    fn mutant_substrate_2(val: u64, aux: u64) -> u64 {
+        substrate_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_substrate_3(val: u64, aux: u64) -> u64 {
+        substrate_reference(val, aux) ^ 0xFF
+    }
 
-    #[test] fn test_counterfactual_mutant_1() { assert!(substrate_reference(1, 1) != mutant_substrate_1(1, 1)); }
-    #[test] fn test_counterfactual_mutant_2() { assert!(substrate_reference(1, 1) != mutant_substrate_2(1, 1)); }
-    #[test] fn test_counterfactual_mutant_3() { assert!(substrate_reference(1, 1) != mutant_substrate_3(1, 1)); }
+    #[test]
+    fn test_counterfactual_mutant_1() {
+        assert!(substrate_reference(1, 1) != mutant_substrate_1(1, 1));
+    }
+    #[test]
+    fn test_counterfactual_mutant_2() {
+        assert!(substrate_reference(1, 1) != mutant_substrate_2(1, 1));
+    }
+    #[test]
+    fn test_counterfactual_mutant_3() {
+        assert!(substrate_reference(1, 1) != mutant_substrate_3(1, 1));
+    }
 }
 
 // -----------------------------------------------------------------------------

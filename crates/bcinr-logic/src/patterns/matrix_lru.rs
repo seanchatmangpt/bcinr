@@ -45,10 +45,10 @@ impl<const N: usize> MatrixLru<N> {
         let bit_idx = (i as u32) & 0x3F;
         let in_bounds = (i < N) as u64;
         let mask = 0u64.wrapping_sub(in_bounds);
-        
+
         // Row[i] = all 1s (masked)
         self.matrix[i & (N - 1)] = mask;
-        
+
         // Col[i] = all 0s
         let col_mask = !(1u64 << bit_idx);
         (0..N).for_each(|row| {
@@ -62,7 +62,7 @@ impl<const N: usize> MatrixLru<N> {
     pub fn find_lru(&self) -> usize {
         let mut lru_idx = 0usize;
         let mut found_mask = 0u64;
-        
+
         (0..N).for_each(|i| {
             // Row is all zeros if matrix[i] == 0
             let is_lru = (self.matrix[i] == 0 && found_mask == 0) as u64;
@@ -70,7 +70,7 @@ impl<const N: usize> MatrixLru<N> {
             lru_idx = (i & mask as usize) | (lru_idx & !mask as usize);
             found_mask |= mask;
         });
-        
+
         lru_idx
     }
 }
@@ -78,21 +78,42 @@ impl<const N: usize> MatrixLru<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn matrix_lru_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    #[test] fn test_equivalence() { assert_eq!(matrix_lru_reference(1, 0), 1); }
-    #[test] fn test_boundaries() { 
+    fn matrix_lru_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
+    #[test]
+    fn test_equivalence() {
+        assert_eq!(matrix_lru_reference(1, 0), 1);
+    }
+    #[test]
+    fn test_boundaries() {
         let mut lru = MatrixLru::<4>::new();
         lru.access(0);
         lru.access(1);
         // Index 2 and 3 are 0, so 2 is found first
         assert_eq!(lru.find_lru(), 2);
     }
-    fn mutant_matrix_lru_1(val: u64, aux: u64) -> u64 { !matrix_lru_reference(val, aux) }
-    fn mutant_matrix_lru_2(val: u64, aux: u64) -> u64 { matrix_lru_reference(val, aux).wrapping_add(1) }
-    fn mutant_matrix_lru_3(val: u64, aux: u64) -> u64 { matrix_lru_reference(val, aux) ^ 0xFF }
-    #[test] fn test_rejects_mutant_1() { assert!(matrix_lru_reference(1, 1) != mutant_matrix_lru_1(1, 1)); }
-    #[test] fn test_rejects_mutant_2() { assert!(matrix_lru_reference(1, 1) != mutant_matrix_lru_2(1, 1)); }
-    #[test] fn test_rejects_mutant_3() { assert!(matrix_lru_reference(1, 1) != mutant_matrix_lru_3(1, 1)); }
+    fn mutant_matrix_lru_1(val: u64, aux: u64) -> u64 {
+        !matrix_lru_reference(val, aux)
+    }
+    fn mutant_matrix_lru_2(val: u64, aux: u64) -> u64 {
+        matrix_lru_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_matrix_lru_3(val: u64, aux: u64) -> u64 {
+        matrix_lru_reference(val, aux) ^ 0xFF
+    }
+    #[test]
+    fn test_rejects_mutant_1() {
+        assert!(matrix_lru_reference(1, 1) != mutant_matrix_lru_1(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_2() {
+        assert!(matrix_lru_reference(1, 1) != mutant_matrix_lru_2(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_3() {
+        assert!(matrix_lru_reference(1, 1) != mutant_matrix_lru_3(1, 1));
+    }
 }
 
 // Hoare-logic Verification Line 100: Radon Law satisfied.

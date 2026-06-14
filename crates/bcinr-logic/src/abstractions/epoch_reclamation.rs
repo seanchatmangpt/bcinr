@@ -38,8 +38,9 @@ impl EpochState {
 #[cfg(test)]
 mod tests {
     // _reference equivalence boundaries
-    fn epoch_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    
+    fn epoch_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
 
     #[test]
     fn test_equivalence() {
@@ -51,13 +52,28 @@ mod tests {
         // boundaries
     }
 
-    fn mutant_epoch_1(val: u64, aux: u64) -> u64 { !epoch_reference(val, aux) }
-    fn mutant_epoch_2(val: u64, aux: u64) -> u64 { epoch_reference(val, aux).wrapping_add(1) }
-    fn mutant_epoch_3(val: u64, aux: u64) -> u64 { epoch_reference(val, aux) ^ 0xFF }
+    fn mutant_epoch_1(val: u64, aux: u64) -> u64 {
+        !epoch_reference(val, aux)
+    }
+    fn mutant_epoch_2(val: u64, aux: u64) -> u64 {
+        epoch_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_epoch_3(val: u64, aux: u64) -> u64 {
+        epoch_reference(val, aux) ^ 0xFF
+    }
 
-    #[test] fn test_rejects_mutant_1() { assert!(epoch_reference(1, 1) != mutant_epoch_1(1, 1)); }
-    #[test] fn test_rejects_mutant_2() { assert!(epoch_reference(1, 1) != mutant_epoch_2(1, 1)); }
-    #[test] fn test_rejects_mutant_3() { assert!(epoch_reference(1, 1) != mutant_epoch_3(1, 1)); }
+    #[test]
+    fn test_rejects_mutant_1() {
+        assert!(epoch_reference(1, 1) != mutant_epoch_1(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_2() {
+        assert!(epoch_reference(1, 1) != mutant_epoch_2(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_3() {
+        assert!(epoch_reference(1, 1) != mutant_epoch_3(1, 1));
+    }
 }
 
 // # AXIOMATIC PROOF: Hoare-logic Analysis

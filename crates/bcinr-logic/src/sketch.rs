@@ -1,6 +1,6 @@
 // oracle equivalence boundaries
 //! Branchless Sketching Primitives
-//! 
+//!
 //! CC=1 for all sketching operations.
 
 /// Count-Min Sketch update step branchlessly.
@@ -16,8 +16,9 @@ pub fn count_min_sketch_update(table: &mut [u32], hash: u64, depth: usize, width
 #[cfg(test)]
 mod tests {
     // _reference equivalence boundaries
-    fn sketch_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    
+    fn sketch_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
 
     #[test]
     fn test_equivalence() {
@@ -29,13 +30,28 @@ mod tests {
         assert_eq!(sketch_reference(0, 0), 0);
     }
 
-    fn mutant_sketch_1(val: u64, aux: u64) -> u64 { !sketch_reference(val, aux) }
-    fn mutant_sketch_2(val: u64, aux: u64) -> u64 { sketch_reference(val, aux).wrapping_add(1) }
-    fn mutant_sketch_3(val: u64, aux: u64) -> u64 { sketch_reference(val, aux) ^ 0xFF }
+    fn mutant_sketch_1(val: u64, aux: u64) -> u64 {
+        !sketch_reference(val, aux)
+    }
+    fn mutant_sketch_2(val: u64, aux: u64) -> u64 {
+        sketch_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_sketch_3(val: u64, aux: u64) -> u64 {
+        sketch_reference(val, aux) ^ 0xFF
+    }
 
-    #[test] fn test_rejects_mutant_1() { assert!(sketch_reference(1, 1) != mutant_sketch_1(1, 1)); }
-    #[test] fn test_rejects_mutant_2() { assert!(sketch_reference(1, 1) != mutant_sketch_2(1, 1)); }
-    #[test] fn test_rejects_mutant_3() { assert!(sketch_reference(1, 1) != mutant_sketch_3(1, 1)); }
+    #[test]
+    fn test_rejects_mutant_1() {
+        assert!(sketch_reference(1, 1) != mutant_sketch_1(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_2() {
+        assert!(sketch_reference(1, 1) != mutant_sketch_2(1, 1));
+    }
+    #[test]
+    fn test_rejects_mutant_3() {
+        assert!(sketch_reference(1, 1) != mutant_sketch_3(1, 1));
+    }
 }
 
 // # AXIOMATIC PROOF: Hoare-logic Analysis
