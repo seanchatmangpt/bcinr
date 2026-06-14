@@ -11,8 +11,15 @@ This document defines the agentic protocols for the BCINR deterministic substrat
 
 ### `@turing_machine` (The Enforcer of Determinism)
 - **Role**: Structural Auditor.
-- **Task**: Police the `bcinr-contract-gate`. If any LLM-bluff or hidden branch ($CC > 1$) is detected, delete the implementation and refactor into bitwise logic.
-- **Standard**: The instruction stream must be identical for all inputs.
+- **Task**: Police the `bcinr-contract-gate` and `bcinr-cheat-scanner`. If any LLM-bluff or hidden branch ($CC > 1$) is detected, delete the implementation and refactor into bitwise logic. Enforce `bcinr-cheat-scanner` gate: five systematic cheat patterns are now prohibited:
+  1. **Self-Canceling XOR** — `A.wrapping_add(B) ^ A` renders function body meaningless
+  2. **Circular Reference Oracles** — `_reference` is a copy of `impl`; tests prove nothing
+  3. **Magic Constants** — `0xDEADBEEF`, `0xCAFEBABE` in production code
+  4. **Artificial File-Length Inflation** — padding blocks to meet arbitrary line count
+  5. **Boilerplate Verification Claims** — copy-pasted "Hoare-logic Verification Line N" comments
+
+  Any file triggering a `CHEAT[*]` finding must be refactored before merge. Run `cargo make scan-cheats` to validate.
+- **Standard**: The instruction stream must be identical for all inputs. No synthetic cheats.
 
 ### `@armstrong_fault` (The Master of Failure Law)
 - **Role**: Adversarial Tester.

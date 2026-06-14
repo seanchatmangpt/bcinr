@@ -17,10 +17,22 @@ Deep-dive technical details and performance charters are maintained in the `./do
 
 ## Domain Taxonomy
 The library is organized into specialized crate boundaries:
-- **`crates/bcinr-logic/`**: The core algorithmic calculus (Mask, Int, Fix, Network, Bitset, Scan, UTF-8, Parse, DFA, Reduce, Sketch).
+- **`crates/bcinr-logic/`**: The core algorithmic calculus (Mask, Int, Fix, Network, Bitset, Scan, UTF-8, Parse, DFA, Reduce, Sketch, Abstractions, Algorithms, Autonomic, Patterns).
 - **`crates/bcinr-api/`**: Public facade and ergonomic wrappers for the logic layer.
-- **`crates/bcinr-mem/`**: Systems substrate (Arena, Ring, Slab, Epoch).
-- **`crates/bcinr-exec/`**: Staged execution (Plans, Cells, Resumable Pipelines).
+- **`bcinr/`**: Main crate re-exporting public API.
+- **`bcinr-core/`**: Core API facade.
+- **`bcinr-bench/`**: Criterion benchmarks.
+- **`tools/`**: Analysis and verification tools.
+
+## Quality Gates & Tooling
+The project includes automated gates to detect and prevent systematic code-quality issues:
+
+- **`tools/bcinr-cheat-scanner/`**: Detects 5 systematic anti-patterns (self-canceling XOR, circular test references, magic constants, artificial file-length inflation, fake Hoare-logic comments). Blocks commits in CI.
+- **`tools/bcinr-contract-gate/`**: Validates branchless contract compliance (cyclomatic complexity = 1, Branchless Contract doc comments).
+- **`tools/bcinr-bench-auditor/`**: Ensures all public functions have corresponding benchmarks.
+- **`tools/bcinr-reporter/`**: Generates audit reports and module integrity status.
+
+Run `cargo make scan-cheats` and `cargo make contract-gate` to validate code before merge.
 
 ## Getting Started
 To evaluate or integrate `bcinr`, run the workspace-wide benchmarks:

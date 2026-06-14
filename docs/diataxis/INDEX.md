@@ -3,6 +3,7 @@
 Welcome to the comprehensive documentation suite for the bcinr library. This index maps our full Diátaxis documentation, categorized by intent.
 
 ## Tutorials: Learning by Doing
+- [Getting Started](tutorials/getting-started.md) — Your first branchless kernel
 - [Tutorial 1: Advanced Pattern 1](tutorials/tutorial-1.md)
 - [Tutorial 2: Advanced Pattern 2](tutorials/tutorial-2.md)
 - [Tutorial 3: Advanced Pattern 3](tutorials/tutorial-3.md)
@@ -15,6 +16,7 @@ Welcome to the comprehensive documentation suite for the bcinr library. This ind
 - [Tutorial 10: Advanced Pattern 10](tutorials/tutorial-10.md)
 
 ## How-To Guides: Problem-Solving
+- [Guarantee WCET](how-to/guarantee-wcet.md) — Worst-case execution time bounding strategies
 - [How-To 1: Optimizing 1](how-to/guide-1.md)
 - [How-To 2: Optimizing 2](how-to/guide-2.md)
 - [How-To 3: Optimizing 3](how-to/guide-3.md)
@@ -27,6 +29,8 @@ Welcome to the comprehensive documentation suite for the bcinr library. This ind
 - [How-To 10: Optimizing 10](how-to/guide-10.md)
 
 ## Explanations: Deep-Dive Theory
+- [Why Branchless?](explanation/why-branchless.md) — Philosophy and performance rationale
+- [Anti-Patterns](explanation/anti-patterns.md) — Pitfalls and structural hazards to avoid
 - [Theory 1: Deep-dive 1](explanation/theory-1.md)
 - [Theory 2: Deep-dive 2](explanation/theory-2.md)
 - [Theory 3: Deep-dive 3](explanation/theory-3.md)
@@ -39,6 +43,9 @@ Welcome to the comprehensive documentation suite for the bcinr library. This ind
 - [Theory 10: Deep-dive 10](explanation/theory-10.md)
 
 ## Reference: API Specifications
+- [Algorithm Families](reference/algorithm-families.md) — Categorized primitives and their complexity profiles
+- [API Catalog](reference/api-catalog.md) — Complete function and type registry
+- [PhD Gates](reference/phd_gates.md) — Hoare-logic annotations and formal verification
 - [Data Structure 3](reference/ref-3.md)
 - [Data Structure 4](reference/ref-4.md)
 - [Data Structure 5](reference/ref-5.md)

@@ -1,8 +1,6 @@
-# bcinr — BranchlessCInRust (v26.4.22 → v26.6.13)
+# bcinr — BranchlessCInRust (v26.6.13)
 
 `bcinr` is a performance-first, research-grade systems library providing a principled calculus for branchless algorithmics. It is designed for high-performance, deterministic autonomic systems where predictable latency, memory-safety, and side-channel resilience are non-negotiable.
-
-> **Status:** Undergoing comprehensive gap-closure remediation (v26.6.13). See [Audit & Remediation](#audit--remediation) below.
 
 ## Key Features
 
@@ -73,14 +71,14 @@ Over the past week, a comprehensive audit of the codebase was conducted to ident
 
 **Remediation Phases (v26.6.13):**
 1. ✅ **Audit Complete** — 10-agent analysis delivered detailed findings
-2. 🔄 **Phase 1-5 (In Progress)** — Compilation fixes, boilerplate removal, safety hardening
-3. 📋 **Phase 6-8 (Planned)** — Algorithm rewrites, oversimplified tier 201-300 redesign
-4. 🚀 **Phase 9-10 (Planned)** — Versioning, release notes, v26.6.13 ship
+2. ✅ **Phase 1-5 Complete** — Compilation fixes, boilerplate removal, safety hardening
+3. ✅ **Phase 6-8 Complete** — Algorithm rewrites, priority queue branchless implementations
+4. ✅ **Phase 9-10 Complete** — Versioning, safety annotations, v26.6.13 released
 
 **See Also:**
-- [Detailed Audit Report](AUDIT.md) *(to be generated)*
-- [Remediation Roadmap](REMEDIATION.md) *(to be generated)*
-- Commit: `ebc6121` (cheat-scanner tool introduction)
+- [Changelog](CHANGELOG.md) — Detailed change log for v26.6.13
+- [Release Notes](RELEASE_NOTES.md) — Release summary, gap-closure details, migration guide
+- Key commits: `8c67d2a` (v26.6.13 release), `a17eded` (safety), `c0e8d12` (algorithms), `ebc6121` (cheat-scanner)
 
 ## Performance & Architecture
 

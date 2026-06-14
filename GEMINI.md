@@ -1,4 +1,4 @@
-# BCINR — BranchlessCInRust (v26.4.19)
+# BCINR — BranchlessCInRust (v26.6.13)
 ## Project Mandate: The Deterministic Substrate
 
 `bcinr` is a civilizational-scale systems library providing an axiomatic calculus for branchless algorithmics. It is designed to be the "hard substrate" for AGI, where timing side-channels are physically impossible and logic is expressed as arithmetic.

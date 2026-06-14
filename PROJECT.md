@@ -1,9 +1,11 @@
-# Project: BCINR release v26.6.12
+# Project: BCINR release v26.6.13
 
 ## Architecture
 - `crates/bcinr-logic/`: The core logic crate containing 307 branchless algorithm files under `src/algorithms/`.
 - `tools/bcinr-contract-gate/`: Static analysis tool parsing rust code to verify Cyclomatic Complexity = 1 and compliance.
+- `tools/bcinr-cheat-scanner/`: Detects 5 systematic anti-patterns (self-canceling XOR, circular references, magic constants, padding inflation, fake proofs). Blocks commits in CI.
 - `tools/bcinr-bench-auditor/`: Tool comparing public symbols against criterion benchmarks.
+- `tools/bcinr-reporter/`: Generates audit reports and module integrity status.
 - `tools/u64_audit.py`: Python audit script updating doc clauses, references, proof blocks, and padding in algorithm files.
 
 ## Milestones
