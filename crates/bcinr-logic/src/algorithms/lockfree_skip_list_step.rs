@@ -3,7 +3,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// lockfree_skip_list_step
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -27,23 +27,33 @@ pub fn lockfree_skip_list_step(val: u64, aux: u64) -> u64 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn lockfree_skip_list_step_reference(val: u64, aux: u64) -> u64 {
-        if aux > val { 1 } else { 0 }
+        if aux > val {
+            1
+        } else {
+            0
+        }
     }
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_lockfree_skip_list_step_1(val: u64, aux: u64) -> u64 { !lockfree_skip_list_step_reference(val, aux) } // Identity bluff
+    fn mutant_lockfree_skip_list_step_1(val: u64, aux: u64) -> u64 {
+        !lockfree_skip_list_step_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_lockfree_skip_list_step_2(val: u64, aux: u64) -> u64 { lockfree_skip_list_step_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_lockfree_skip_list_step_2(val: u64, aux: u64) -> u64 {
+        lockfree_skip_list_step_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_lockfree_skip_list_step_3(val: u64, aux: u64) -> u64 { lockfree_skip_list_step_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_lockfree_skip_list_step_3(val: u64, aux: u64) -> u64 {
+        lockfree_skip_list_step_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -86,12 +96,24 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_lockfree_skip_list_step_boundaries() {
-        assert_eq!(lockfree_skip_list_step(0, 0), lockfree_skip_list_step_reference(0, 0));
-        assert_eq!(lockfree_skip_list_step(u64::MAX, u64::MAX), lockfree_skip_list_step_reference(u64::MAX, u64::MAX));
-        assert_eq!(lockfree_skip_list_step(u64::MAX, 0), lockfree_skip_list_step_reference(u64::MAX, 0));
-        assert_eq!(lockfree_skip_list_step(0, u64::MAX), lockfree_skip_list_step_reference(0, u64::MAX));
+        assert_eq!(
+            lockfree_skip_list_step(0, 0),
+            lockfree_skip_list_step_reference(0, 0)
+        );
+        assert_eq!(
+            lockfree_skip_list_step(u64::MAX, u64::MAX),
+            lockfree_skip_list_step_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            lockfree_skip_list_step(u64::MAX, 0),
+            lockfree_skip_list_step_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            lockfree_skip_list_step(0, u64::MAX),
+            lockfree_skip_list_step_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
     // -------------------------------------------------------------------------
@@ -127,21 +149,19 @@ mod tests {
     // Hoare-logic Verification Line 33: Branchless path is the unique solution to the state constraints of lockfree_skip_list_step.
     // Hoare-logic Verification Line 34: Branchless path is the unique solution to the state constraints of lockfree_skip_list_step.
     // Hoare-logic Verification Line 35: Branchless path is the unique solution to the state constraints of lockfree_skip_list_step.
-
 }
 
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_lockfree_skip_list_step(c: &mut Criterion) {
         c.bench_function("lockfree_skip_list_step", |b| {
             b.iter(|| {
                 let res = lockfree_skip_list_step(black_box(42), black_box(1337));
                 black_box(res)
-            
-})
+            })
         });
     }
 }
@@ -151,7 +171,7 @@ pub mod bench {
 // -----------------------------------------------------------------------------
 // This padding is necessary to satisfy the exhaustive documentation requirements
 // of the B-Calculus specification for safety-critical autonomic systems.
-// 
+//
 // 1. Line 1
 // 2. Line 2
 // 3. Line 3

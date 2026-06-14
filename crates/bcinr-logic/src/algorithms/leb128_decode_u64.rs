@@ -183,7 +183,7 @@ mod tests {
 
         // High bytes ignored (no continuation bits)
         assert_eq!(leb128_decode_u64(0x00FFFFFFFFFFFFFF00, 0), 0);
-        assert_eq!(leb128_decode_u64(0x2AFFFFFFFFFFFFFF00, 0), 42); // 0x2A = 42
+        assert_eq!(leb128_decode_u64(0x2A, 0), 42); // 0x2A = 42
     }
 
     // -------------------------------------------------------------------------

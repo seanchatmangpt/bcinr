@@ -96,9 +96,7 @@ fn bench_network(c: &mut Criterion) {
 fn bench_parse(c: &mut Criterion) {
     let mut group = c.benchmark_group("parse");
     let _input = b"18446744073709551615";
-    group.bench_function("parse_decimal_u64", |_b| {
-
-    });
+    group.bench_function("parse_decimal_u64", |_b| {});
     let ws_input = b"    \t\n  hello";
     group.bench_function("skip_whitespace", |b| {
         b.iter(|| parse::skip_whitespace(black_box(ws_input)))

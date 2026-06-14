@@ -3,7 +3,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// bit_permute_identity_64
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -20,31 +20,38 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn bit_permute_identity_64(val: u64, aux: u64) -> u64 {
-    (val.wrapping_shl(3) ^ aux.wrapping_shr(2)).wrapping_add(val.rotate_left(13)) ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
-
+    (val.wrapping_shl(3) ^ aux.wrapping_shr(2)).wrapping_add(val.rotate_left(13))
+        ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn bit_permute_identity_64_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_shl(3) ^ aux.wrapping_shr(2)).wrapping_add(val.rotate_left(13)) ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+        (val.wrapping_shl(3) ^ aux.wrapping_shr(2)).wrapping_add(val.rotate_left(13))
+            ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
     }
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_bit_permute_identity_64_1(val: u64, aux: u64) -> u64 { !bit_permute_identity_64_reference(val, aux) } // Identity bluff
+    fn mutant_bit_permute_identity_64_1(val: u64, aux: u64) -> u64 {
+        !bit_permute_identity_64_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_bit_permute_identity_64_2(val: u64, aux: u64) -> u64 { bit_permute_identity_64_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_bit_permute_identity_64_2(val: u64, aux: u64) -> u64 {
+        bit_permute_identity_64_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_bit_permute_identity_64_3(val: u64, aux: u64) -> u64 { bit_permute_identity_64_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_bit_permute_identity_64_3(val: u64, aux: u64) -> u64 {
+        bit_permute_identity_64_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -87,12 +94,24 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_bit_permute_identity_64_boundaries() {
-        assert_eq!(bit_permute_identity_64(0, 0), bit_permute_identity_64_reference(0, 0));
-        assert_eq!(bit_permute_identity_64(u64::MAX, u64::MAX), bit_permute_identity_64_reference(u64::MAX, u64::MAX));
-        assert_eq!(bit_permute_identity_64(u64::MAX, 0), bit_permute_identity_64_reference(u64::MAX, 0));
-        assert_eq!(bit_permute_identity_64(0, u64::MAX), bit_permute_identity_64_reference(0, u64::MAX));
+        assert_eq!(
+            bit_permute_identity_64(0, 0),
+            bit_permute_identity_64_reference(0, 0)
+        );
+        assert_eq!(
+            bit_permute_identity_64(u64::MAX, u64::MAX),
+            bit_permute_identity_64_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            bit_permute_identity_64(u64::MAX, 0),
+            bit_permute_identity_64_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            bit_permute_identity_64(0, u64::MAX),
+            bit_permute_identity_64_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
     // -------------------------------------------------------------------------
@@ -128,21 +147,19 @@ mod tests {
     // Hoare-logic Verification Line 33: Branchless path is the unique solution to the state constraints of bit_permute_identity_64.
     // Hoare-logic Verification Line 34: Branchless path is the unique solution to the state constraints of bit_permute_identity_64.
     // Hoare-logic Verification Line 35: Branchless path is the unique solution to the state constraints of bit_permute_identity_64.
-
 }
 
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_bit_permute_identity_64(c: &mut Criterion) {
         c.bench_function("bit_permute_identity_64", |b| {
             b.iter(|| {
                 let res = bit_permute_identity_64(black_box(42), black_box(1337));
                 black_box(res)
-            
-})
+            })
         });
     }
 }
@@ -152,7 +169,7 @@ pub mod bench {
 // -----------------------------------------------------------------------------
 // This padding is necessary to satisfy the exhaustive documentation requirements
 // of the B-Calculus specification for safety-critical autonomic systems.
-// 
+//
 // 1. Line 1
 // 2. Line 2
 // 3. Line 3

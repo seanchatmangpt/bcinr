@@ -3,7 +3,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// is_sorted_branchless_u32
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -24,34 +24,40 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn is_sorted_branchless_u32(val: u64, aux: u64) -> u64 {
-    let a = (val >> 0) as u32;
+    let a = val as u32;
     let b = (val >> 32) as u32;
-    ((a <= b) as u64)
+    (a <= b) as u64
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
-    fn is_sorted_branchless_u32_reference(val: u64, aux: u64) -> u64 {
-        let a = (val >> 0) as u32;
-    let b = (val >> 32) as u32;
-    ((a <= b) as u64)
+    fn is_sorted_branchless_u32_reference(val: u64, _aux: u64) -> u64 {
+        let a = val as u32;
+        let b = (val >> 32) as u32;
+        (a <= b) as u64
     }
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_is_sorted_branchless_u32_1(val: u64, aux: u64) -> u64 { !is_sorted_branchless_u32_reference(val, aux) } // Identity bluff
+    fn mutant_is_sorted_branchless_u32_1(val: u64, aux: u64) -> u64 {
+        !is_sorted_branchless_u32_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_is_sorted_branchless_u32_2(val: u64, aux: u64) -> u64 { is_sorted_branchless_u32_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_is_sorted_branchless_u32_2(val: u64, aux: u64) -> u64 {
+        is_sorted_branchless_u32_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_is_sorted_branchless_u32_3(val: u64, aux: u64) -> u64 { is_sorted_branchless_u32_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_is_sorted_branchless_u32_3(val: u64, aux: u64) -> u64 {
+        is_sorted_branchless_u32_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -94,12 +100,24 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_is_sorted_branchless_u32_boundaries() {
-        assert_eq!(is_sorted_branchless_u32(0, 0), is_sorted_branchless_u32_reference(0, 0));
-        assert_eq!(is_sorted_branchless_u32(u64::MAX, u64::MAX), is_sorted_branchless_u32_reference(u64::MAX, u64::MAX));
-        assert_eq!(is_sorted_branchless_u32(u64::MAX, 0), is_sorted_branchless_u32_reference(u64::MAX, 0));
-        assert_eq!(is_sorted_branchless_u32(0, u64::MAX), is_sorted_branchless_u32_reference(0, u64::MAX));
+        assert_eq!(
+            is_sorted_branchless_u32(0, 0),
+            is_sorted_branchless_u32_reference(0, 0)
+        );
+        assert_eq!(
+            is_sorted_branchless_u32(u64::MAX, u64::MAX),
+            is_sorted_branchless_u32_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            is_sorted_branchless_u32(u64::MAX, 0),
+            is_sorted_branchless_u32_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            is_sorted_branchless_u32(0, u64::MAX),
+            is_sorted_branchless_u32_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // BRANCHLESS CONTRACT: is_sorted_branchless_u32
     // -------------------------------------------------------------------------
@@ -134,21 +152,19 @@ mod tests {
     //     is_sorted_branchless_u32(val, aux)
     //   { result ∈ U64 ∧ runtime ∈ admissible_T1 }
     // -------------------------------------------------------------------------
-
 }
 
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_is_sorted_branchless_u32(c: &mut Criterion) {
         c.bench_function("is_sorted_branchless_u32", |b| {
             b.iter(|| {
                 let res = is_sorted_branchless_u32(black_box(42), black_box(1337));
                 black_box(res)
-            
-})
+            })
         });
     }
 }

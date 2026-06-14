@@ -1,11 +1,17 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
-#![allow(unused_variables, unused_assignments, unused_mut, unused_parens, dead_code)]
+#![allow(
+    unused_variables,
+    unused_assignments,
+    unused_mut,
+    unused_parens,
+    dead_code
+)]
 // Academic-grade branchless algorithm library: xxhash64
 // Automatically generated scaffolding for AGI-level branchless primitives.
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// xxhash64
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -25,30 +31,40 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn xxhash64(val: u64, aux: u64) -> u64 {
-    val.wrapping_add(aux).wrapping_mul(0x9E3779B185EBCA87).rotate_left(31)
+    val.wrapping_add(aux)
+        .wrapping_mul(0x9E3779B185EBCA87)
+        .rotate_left(31)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn xxhash64_reference(val: u64, aux: u64) -> u64 {
-        val.wrapping_add(aux).wrapping_mul(0x9E3779B185EBCA87).rotate_left(31)
+        val.wrapping_add(aux)
+            .wrapping_mul(0x9E3779B185EBCA87)
+            .rotate_left(31)
     }
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_xxhash64_1(val: u64, aux: u64) -> u64 { !xxhash64_reference(val, aux) } // Identity bluff
+    fn mutant_xxhash64_1(val: u64, aux: u64) -> u64 {
+        !xxhash64_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_xxhash64_2(val: u64, aux: u64) -> u64 { xxhash64_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_xxhash64_2(val: u64, aux: u64) -> u64 {
+        xxhash64_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_xxhash64_3(val: u64, aux: u64) -> u64 { xxhash64_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_xxhash64_3(val: u64, aux: u64) -> u64 {
+        xxhash64_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -92,11 +108,14 @@ mod tests {
     #[test]
     fn test_xxhash64_boundaries() {
         assert_eq!(xxhash64(0, 0), xxhash64_reference(0, 0));
-        assert_eq!(xxhash64(u64::MAX, u64::MAX), xxhash64_reference(u64::MAX, u64::MAX));
+        assert_eq!(
+            xxhash64(u64::MAX, u64::MAX),
+            xxhash64_reference(u64::MAX, u64::MAX)
+        );
         assert_eq!(xxhash64(u64::MAX, 0), xxhash64_reference(u64::MAX, 0));
         assert_eq!(xxhash64(0, u64::MAX), xxhash64_reference(0, u64::MAX));
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis
     // -------------------------------------------------------------------------
@@ -123,7 +142,7 @@ mod tests {
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_xxhash64(c: &mut Criterion) {
         c.bench_function("xxhash64", |b| {
             b.iter(|| {

@@ -3,7 +3,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// inverse_permute_u32x8
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -36,28 +36,34 @@ pub fn inverse_permute_u32x8(val: u64, aux: u64) -> u64 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
-    fn inverse_permute_u32x8_reference(val: u64, aux: u64) -> u64 {
+    fn inverse_permute_u32x8_reference(val: u64, _aux: u64) -> u64 {
         let mut res = 0u64;
-    for i in 0..8 {
-        let p_i = (val >> (i * 4)) & 0x7;
-        res |= (i as u64) << (p_i * 4);
-    }
-    res
+        for i in 0..8 {
+            let p_i = (val >> (i * 4)) & 0x7;
+            res |= (i as u64) << (p_i * 4);
+        }
+        res
     }
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_inverse_permute_u32x8_1(val: u64, aux: u64) -> u64 { !inverse_permute_u32x8_reference(val, aux) } // Identity bluff
+    fn mutant_inverse_permute_u32x8_1(val: u64, aux: u64) -> u64 {
+        !inverse_permute_u32x8_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_inverse_permute_u32x8_2(val: u64, aux: u64) -> u64 { inverse_permute_u32x8_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_inverse_permute_u32x8_2(val: u64, aux: u64) -> u64 {
+        inverse_permute_u32x8_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_inverse_permute_u32x8_3(val: u64, aux: u64) -> u64 { inverse_permute_u32x8_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_inverse_permute_u32x8_3(val: u64, aux: u64) -> u64 {
+        inverse_permute_u32x8_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -100,12 +106,24 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_inverse_permute_u32x8_boundaries() {
-        assert_eq!(inverse_permute_u32x8(0, 0), inverse_permute_u32x8_reference(0, 0));
-        assert_eq!(inverse_permute_u32x8(u64::MAX, u64::MAX), inverse_permute_u32x8_reference(u64::MAX, u64::MAX));
-        assert_eq!(inverse_permute_u32x8(u64::MAX, 0), inverse_permute_u32x8_reference(u64::MAX, 0));
-        assert_eq!(inverse_permute_u32x8(0, u64::MAX), inverse_permute_u32x8_reference(0, u64::MAX));
+        assert_eq!(
+            inverse_permute_u32x8(0, 0),
+            inverse_permute_u32x8_reference(0, 0)
+        );
+        assert_eq!(
+            inverse_permute_u32x8(u64::MAX, u64::MAX),
+            inverse_permute_u32x8_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            inverse_permute_u32x8(u64::MAX, 0),
+            inverse_permute_u32x8_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            inverse_permute_u32x8(0, u64::MAX),
+            inverse_permute_u32x8_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // BRANCHLESS CONTRACT: inverse_permute_u32x8
     // -------------------------------------------------------------------------
@@ -140,21 +158,19 @@ mod tests {
     //     inverse_permute_u32x8(val, aux)
     //   { result ∈ U64 ∧ runtime ∈ admissible_T1 }
     // -------------------------------------------------------------------------
-
 }
 
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_inverse_permute_u32x8(c: &mut Criterion) {
         c.bench_function("inverse_permute_u32x8", |b| {
             b.iter(|| {
                 let res = inverse_permute_u32x8(black_box(42), black_box(1337));
                 black_box(res)
-            
-})
+            })
         });
     }
 }

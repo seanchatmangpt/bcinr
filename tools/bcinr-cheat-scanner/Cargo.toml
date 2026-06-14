@@ -1,7 +1,13 @@
 [package]
 name = "bcinr-cheat-scanner"
-version = "26.4.22"
+version = "26.6.13"
 edition = "2021"
+description = "Detects algorithmic cheats and anti-patterns in branchless code"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/example/bcinr"
+readme = "../../README.md"
+keywords = ["branchless", "algorithms", "anti-patterns"]
+categories = ["development-tools"]
 
 [dependencies]
 walkdir = "2"

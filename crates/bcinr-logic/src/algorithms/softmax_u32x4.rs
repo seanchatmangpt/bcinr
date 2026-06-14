@@ -3,7 +3,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// softmax_u32x4
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -32,10 +32,11 @@ pub fn softmax_u32x4(val: u64, aux: u64) -> u64 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
+    #[allow(clippy::manual_checked_ops)]
     fn softmax_u32x4_reference(val: u64, aux: u64) -> u64 {
         let den = aux.wrapping_add(1);
         if den == 0 {
@@ -49,11 +50,17 @@ mod tests {
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_softmax_u32x4_1(val: u64, aux: u64) -> u64 { !softmax_u32x4_reference(val, aux) } // Identity bluff
+    fn mutant_softmax_u32x4_1(val: u64, aux: u64) -> u64 {
+        !softmax_u32x4_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_softmax_u32x4_2(val: u64, aux: u64) -> u64 { softmax_u32x4_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_softmax_u32x4_2(val: u64, aux: u64) -> u64 {
+        softmax_u32x4_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_softmax_u32x4_3(val: u64, aux: u64) -> u64 { softmax_u32x4_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_softmax_u32x4_3(val: u64, aux: u64) -> u64 {
+        softmax_u32x4_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -97,11 +104,20 @@ mod tests {
     #[test]
     fn test_softmax_u32x4_boundaries() {
         assert_eq!(softmax_u32x4(0, 0), softmax_u32x4_reference(0, 0));
-        assert_eq!(softmax_u32x4(u64::MAX, u64::MAX), softmax_u32x4_reference(u64::MAX, u64::MAX));
-        assert_eq!(softmax_u32x4(u64::MAX, 0), softmax_u32x4_reference(u64::MAX, 0));
-        assert_eq!(softmax_u32x4(0, u64::MAX), softmax_u32x4_reference(0, u64::MAX));
+        assert_eq!(
+            softmax_u32x4(u64::MAX, u64::MAX),
+            softmax_u32x4_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            softmax_u32x4(u64::MAX, 0),
+            softmax_u32x4_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            softmax_u32x4(0, u64::MAX),
+            softmax_u32x4_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
     // -------------------------------------------------------------------------
@@ -137,21 +153,19 @@ mod tests {
     // Hoare-logic Verification Line 33: Branchless path is the unique solution to the state constraints of softmax_u32x4.
     // Hoare-logic Verification Line 34: Branchless path is the unique solution to the state constraints of softmax_u32x4.
     // Hoare-logic Verification Line 35: Branchless path is the unique solution to the state constraints of softmax_u32x4.
-
 }
 
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_softmax_u32x4(c: &mut Criterion) {
         c.bench_function("softmax_u32x4", |b| {
             b.iter(|| {
                 let res = softmax_u32x4(black_box(42), black_box(1337));
                 black_box(res)
-            
-})
+            })
         });
     }
 }
@@ -161,7 +175,7 @@ pub mod bench {
 // -----------------------------------------------------------------------------
 // This padding is necessary to satisfy the exhaustive documentation requirements
 // of the B-Calculus specification for safety-critical autonomic systems.
-// 
+//
 // 1. Line 1
 // 2. Line 2
 // 3. Line 3

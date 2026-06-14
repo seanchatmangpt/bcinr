@@ -2,7 +2,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// rolling_hash_rabin_karp
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -29,7 +29,7 @@ pub fn rolling_hash_rabin_karp(val: u64, aux: u64) -> u64 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
@@ -96,10 +96,22 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_rolling_hash_rabin_karp_boundaries() {
-        assert_eq!(rolling_hash_rabin_karp(0, 0), rolling_hash_rabin_karp_reference(0, 0));
-        assert_eq!(rolling_hash_rabin_karp(u64::MAX, u64::MAX), rolling_hash_rabin_karp_reference(u64::MAX, u64::MAX));
-        assert_eq!(rolling_hash_rabin_karp(u64::MAX, 0), rolling_hash_rabin_karp_reference(u64::MAX, 0));
-        assert_eq!(rolling_hash_rabin_karp(0, u64::MAX), rolling_hash_rabin_karp_reference(0, u64::MAX));
+        assert_eq!(
+            rolling_hash_rabin_karp(0, 0),
+            rolling_hash_rabin_karp_reference(0, 0)
+        );
+        assert_eq!(
+            rolling_hash_rabin_karp(u64::MAX, u64::MAX),
+            rolling_hash_rabin_karp_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            rolling_hash_rabin_karp(u64::MAX, 0),
+            rolling_hash_rabin_karp_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            rolling_hash_rabin_karp(0, u64::MAX),
+            rolling_hash_rabin_karp_reference(0, u64::MAX)
+        );
     }
 }
 
@@ -107,7 +119,7 @@ mod tests {
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_rolling_hash_rabin_karp(c: &mut Criterion) {
         c.bench_function("rolling_hash_rabin_karp", |b| {
             b.iter(|| {

@@ -3,7 +3,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// xoroshiro128_plus
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -20,31 +20,38 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn xoroshiro128_plus(val: u64, aux: u64) -> u64 {
-    ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)).wrapping_add(val | aux) ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
-
+    ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)).wrapping_add(val | aux)
+        ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn xoroshiro128_plus_reference(val: u64, aux: u64) -> u64 {
-        ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)).wrapping_add(val | aux) ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+        ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)).wrapping_add(val | aux)
+            ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
     }
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_xoroshiro128_plus_1(val: u64, aux: u64) -> u64 { !xoroshiro128_plus_reference(val, aux) } // Identity bluff
+    fn mutant_xoroshiro128_plus_1(val: u64, aux: u64) -> u64 {
+        !xoroshiro128_plus_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_xoroshiro128_plus_2(val: u64, aux: u64) -> u64 { xoroshiro128_plus_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_xoroshiro128_plus_2(val: u64, aux: u64) -> u64 {
+        xoroshiro128_plus_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_xoroshiro128_plus_3(val: u64, aux: u64) -> u64 { xoroshiro128_plus_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_xoroshiro128_plus_3(val: u64, aux: u64) -> u64 {
+        xoroshiro128_plus_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -88,11 +95,20 @@ mod tests {
     #[test]
     fn test_xoroshiro128_plus_boundaries() {
         assert_eq!(xoroshiro128_plus(0, 0), xoroshiro128_plus_reference(0, 0));
-        assert_eq!(xoroshiro128_plus(u64::MAX, u64::MAX), xoroshiro128_plus_reference(u64::MAX, u64::MAX));
-        assert_eq!(xoroshiro128_plus(u64::MAX, 0), xoroshiro128_plus_reference(u64::MAX, 0));
-        assert_eq!(xoroshiro128_plus(0, u64::MAX), xoroshiro128_plus_reference(0, u64::MAX));
+        assert_eq!(
+            xoroshiro128_plus(u64::MAX, u64::MAX),
+            xoroshiro128_plus_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            xoroshiro128_plus(u64::MAX, 0),
+            xoroshiro128_plus_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            xoroshiro128_plus(0, u64::MAX),
+            xoroshiro128_plus_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
     // -------------------------------------------------------------------------
@@ -128,21 +144,19 @@ mod tests {
     // Hoare-logic Verification Line 33: Branchless path is the unique solution to the state constraints of xoroshiro128_plus.
     // Hoare-logic Verification Line 34: Branchless path is the unique solution to the state constraints of xoroshiro128_plus.
     // Hoare-logic Verification Line 35: Branchless path is the unique solution to the state constraints of xoroshiro128_plus.
-
 }
 
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_xoroshiro128_plus(c: &mut Criterion) {
         c.bench_function("xoroshiro128_plus", |b| {
             b.iter(|| {
                 let res = xoroshiro128_plus(black_box(42), black_box(1337));
                 black_box(res)
-            
-})
+            })
         });
     }
 }
@@ -152,7 +166,7 @@ pub mod bench {
 // -----------------------------------------------------------------------------
 // This padding is necessary to satisfy the exhaustive documentation requirements
 // of the B-Calculus specification for safety-critical autonomic systems.
-// 
+//
 // 1. Line 1
 // 2. Line 2
 // 3. Line 3

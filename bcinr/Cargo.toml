@@ -1,6 +1,6 @@
 [package]
 name = "bcinr"
-version = "26.4.22"
+version = "26.6.13"
 edition = "2021"
 description = "BranchlessCInRust: Academic-grade branchless algorithm library"
 repository = "https://github.com/example/bcinr"
@@ -11,9 +11,9 @@ keywords = ["branchless", "simd", "performance"]
 categories = ["algorithms", "no-std"]
 
 [dependencies]
-bcinr-api = { path = "../crates/bcinr-api", version = "26.4.22" }
-bcinr-core = { path = "../bcinr-core", version = "26.4.22" }
-bcinr-logic = { path = "../crates/bcinr-logic", version = "26.4.22" }
+bcinr-api = { path = "../crates/bcinr-api", version = "26.6.13" }
+bcinr-core = { path = "../bcinr-core", version = "26.6.13" }
+bcinr-logic = { path = "../crates/bcinr-logic", version = "26.6.13" }
 
 [dev-dependencies]
 tempfile = "3.27"

@@ -3,7 +3,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// shear_sort_bitonic_2d
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -20,31 +20,38 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn shear_sort_bitonic_2d(val: u64, aux: u64) -> u64 {
-    (aux.rotate_right(7)).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2)) ^ (val.count_ones() as u64 | aux)
-
+    (aux.rotate_right(7)).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+        ^ (val.count_ones() as u64 | aux)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn shear_sort_bitonic_2d_reference(val: u64, aux: u64) -> u64 {
-        (aux.rotate_right(7)).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2)) ^ (val.count_ones() as u64 | aux)
+        (aux.rotate_right(7)).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+            ^ (val.count_ones() as u64 | aux)
     }
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_shear_sort_bitonic_2d_1(val: u64, aux: u64) -> u64 { !shear_sort_bitonic_2d_reference(val, aux) } // Identity bluff
+    fn mutant_shear_sort_bitonic_2d_1(val: u64, aux: u64) -> u64 {
+        !shear_sort_bitonic_2d_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_shear_sort_bitonic_2d_2(val: u64, aux: u64) -> u64 { shear_sort_bitonic_2d_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_shear_sort_bitonic_2d_2(val: u64, aux: u64) -> u64 {
+        shear_sort_bitonic_2d_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_shear_sort_bitonic_2d_3(val: u64, aux: u64) -> u64 { shear_sort_bitonic_2d_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_shear_sort_bitonic_2d_3(val: u64, aux: u64) -> u64 {
+        shear_sort_bitonic_2d_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -87,12 +94,24 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_shear_sort_bitonic_2d_boundaries() {
-        assert_eq!(shear_sort_bitonic_2d(0, 0), shear_sort_bitonic_2d_reference(0, 0));
-        assert_eq!(shear_sort_bitonic_2d(u64::MAX, u64::MAX), shear_sort_bitonic_2d_reference(u64::MAX, u64::MAX));
-        assert_eq!(shear_sort_bitonic_2d(u64::MAX, 0), shear_sort_bitonic_2d_reference(u64::MAX, 0));
-        assert_eq!(shear_sort_bitonic_2d(0, u64::MAX), shear_sort_bitonic_2d_reference(0, u64::MAX));
+        assert_eq!(
+            shear_sort_bitonic_2d(0, 0),
+            shear_sort_bitonic_2d_reference(0, 0)
+        );
+        assert_eq!(
+            shear_sort_bitonic_2d(u64::MAX, u64::MAX),
+            shear_sort_bitonic_2d_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            shear_sort_bitonic_2d(u64::MAX, 0),
+            shear_sort_bitonic_2d_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            shear_sort_bitonic_2d(0, u64::MAX),
+            shear_sort_bitonic_2d_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
     // -------------------------------------------------------------------------
@@ -128,21 +147,19 @@ mod tests {
     // Hoare-logic Verification Line 33: Branchless path is the unique solution to the state constraints of shear_sort_bitonic_2d.
     // Hoare-logic Verification Line 34: Branchless path is the unique solution to the state constraints of shear_sort_bitonic_2d.
     // Hoare-logic Verification Line 35: Branchless path is the unique solution to the state constraints of shear_sort_bitonic_2d.
-
 }
 
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_shear_sort_bitonic_2d(c: &mut Criterion) {
         c.bench_function("shear_sort_bitonic_2d", |b| {
             b.iter(|| {
                 let res = shear_sort_bitonic_2d(black_box(42), black_box(1337));
                 black_box(res)
-            
-})
+            })
         });
     }
 }
@@ -152,7 +169,7 @@ pub mod bench {
 // -----------------------------------------------------------------------------
 // This padding is necessary to satisfy the exhaustive documentation requirements
 // of the B-Calculus specification for safety-critical autonomic systems.
-// 
+//
 // 1. Line 1
 // 2. Line 2
 // 3. Line 3

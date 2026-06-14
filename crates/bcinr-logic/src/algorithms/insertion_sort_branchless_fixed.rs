@@ -3,7 +3,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// insertion_sort_branchless_fixed
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -25,15 +25,21 @@
 #[allow(unused_variables)]
 pub fn insertion_sort_branchless_fixed(val: u64, aux: u64) -> u64 {
     let mut arr = [
-        (val >> 0) & 0xFF, (val >> 8) & 0xFF, (val >> 16) & 0xFF, (val >> 24) & 0xFF,
-        (val >> 32) & 0xFF, (val >> 40) & 0xFF, (val >> 48) & 0xFF, (val >> 56) & 0xFF,
+        val & 0xFF,
+        (val >> 8) & 0xFF,
+        (val >> 16) & 0xFF,
+        (val >> 24) & 0xFF,
+        (val >> 32) & 0xFF,
+        (val >> 40) & 0xFF,
+        (val >> 48) & 0xFF,
+        (val >> 56) & 0xFF,
     ];
     for i in 1..8 {
         for j in (1..=i).rev() {
-            let a = arr[j-1];
+            let a = arr[j - 1];
             let b = arr[j];
             let swap = (a > b) as u64;
-            arr[j-1] = a ^ (swap * (a ^ b));
+            arr[j - 1] = a ^ (swap * (a ^ b));
             arr[j] = b ^ (swap * (a ^ b));
         }
     }
@@ -48,40 +54,52 @@ pub fn insertion_sort_branchless_fixed(val: u64, aux: u64) -> u64 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
-    fn insertion_sort_branchless_fixed_reference(val: u64, aux: u64) -> u64 {
+    fn insertion_sort_branchless_fixed_reference(val: u64, _aux: u64) -> u64 {
         let mut arr = [
-        (val >> 0) & 0xFF, (val >> 8) & 0xFF, (val >> 16) & 0xFF, (val >> 24) & 0xFF,
-        (val >> 32) & 0xFF, (val >> 40) & 0xFF, (val >> 48) & 0xFF, (val >> 56) & 0xFF,
-    ];
-    for i in 1..8 {
-        for j in (1..=i).rev() {
-            let a = arr[j-1];
-            let b = arr[j];
-            let swap = (a > b) as u64;
-            arr[j-1] = a ^ (swap * (a ^ b));
-            arr[j] = b ^ (swap * (a ^ b));
+            val & 0xFF,
+            (val >> 8) & 0xFF,
+            (val >> 16) & 0xFF,
+            (val >> 24) & 0xFF,
+            (val >> 32) & 0xFF,
+            (val >> 40) & 0xFF,
+            (val >> 48) & 0xFF,
+            (val >> 56) & 0xFF,
+        ];
+        for i in 1..8 {
+            for j in (1..=i).rev() {
+                let a = arr[j - 1];
+                let b = arr[j];
+                let swap = (a > b) as u64;
+                arr[j - 1] = a ^ (swap * (a ^ b));
+                arr[j] = b ^ (swap * (a ^ b));
+            }
         }
-    }
-    let mut res = 0u64;
-    for i in 0..8 {
-        res |= arr[i] << (i * 8);
-    }
-    res
+        let mut res = 0u64;
+        for i in 0..8 {
+            res |= arr[i] << (i * 8);
+        }
+        res
     }
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_insertion_sort_branchless_fixed_1(val: u64, aux: u64) -> u64 { !insertion_sort_branchless_fixed_reference(val, aux) } // Identity bluff
+    fn mutant_insertion_sort_branchless_fixed_1(val: u64, aux: u64) -> u64 {
+        !insertion_sort_branchless_fixed_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_insertion_sort_branchless_fixed_2(val: u64, aux: u64) -> u64 { insertion_sort_branchless_fixed_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_insertion_sort_branchless_fixed_2(val: u64, aux: u64) -> u64 {
+        insertion_sort_branchless_fixed_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_insertion_sort_branchless_fixed_3(val: u64, aux: u64) -> u64 { insertion_sort_branchless_fixed_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_insertion_sort_branchless_fixed_3(val: u64, aux: u64) -> u64 {
+        insertion_sort_branchless_fixed_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -124,12 +142,24 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_insertion_sort_branchless_fixed_boundaries() {
-        assert_eq!(insertion_sort_branchless_fixed(0, 0), insertion_sort_branchless_fixed_reference(0, 0));
-        assert_eq!(insertion_sort_branchless_fixed(u64::MAX, u64::MAX), insertion_sort_branchless_fixed_reference(u64::MAX, u64::MAX));
-        assert_eq!(insertion_sort_branchless_fixed(u64::MAX, 0), insertion_sort_branchless_fixed_reference(u64::MAX, 0));
-        assert_eq!(insertion_sort_branchless_fixed(0, u64::MAX), insertion_sort_branchless_fixed_reference(0, u64::MAX));
+        assert_eq!(
+            insertion_sort_branchless_fixed(0, 0),
+            insertion_sort_branchless_fixed_reference(0, 0)
+        );
+        assert_eq!(
+            insertion_sort_branchless_fixed(u64::MAX, u64::MAX),
+            insertion_sort_branchless_fixed_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            insertion_sort_branchless_fixed(u64::MAX, 0),
+            insertion_sort_branchless_fixed_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            insertion_sort_branchless_fixed(0, u64::MAX),
+            insertion_sort_branchless_fixed_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // BRANCHLESS CONTRACT: insertion_sort_branchless_fixed
     // -------------------------------------------------------------------------
@@ -164,21 +194,19 @@ mod tests {
     //     insertion_sort_branchless_fixed(val, aux)
     //   { result ∈ U64 ∧ runtime ∈ admissible_T1 }
     // -------------------------------------------------------------------------
-
 }
 
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_insertion_sort_branchless_fixed(c: &mut Criterion) {
         c.bench_function("insertion_sort_branchless_fixed", |b| {
             b.iter(|| {
                 let res = insertion_sort_branchless_fixed(black_box(42), black_box(1337));
                 black_box(res)
-            
-})
+            })
         });
     }
 }

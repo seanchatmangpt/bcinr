@@ -3,7 +3,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// quadtree_insert_branchless
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -20,31 +20,38 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn quadtree_insert_branchless(val: u64, aux: u64) -> u64 {
-    (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val.leading_zeros() as u64 ^ aux) ^ (val | aux)
-
+    (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val.leading_zeros() as u64 ^ aux)
+        ^ (val | aux)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn quadtree_insert_branchless_reference(val: u64, aux: u64) -> u64 {
-        (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val.leading_zeros() as u64 ^ aux) ^ (val | aux)
+        (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add(val.leading_zeros() as u64 ^ aux)
+            ^ (val | aux)
     }
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_quadtree_insert_branchless_1(val: u64, aux: u64) -> u64 { !quadtree_insert_branchless_reference(val, aux) } // Identity bluff
+    fn mutant_quadtree_insert_branchless_1(val: u64, aux: u64) -> u64 {
+        !quadtree_insert_branchless_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_quadtree_insert_branchless_2(val: u64, aux: u64) -> u64 { quadtree_insert_branchless_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_quadtree_insert_branchless_2(val: u64, aux: u64) -> u64 {
+        quadtree_insert_branchless_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_quadtree_insert_branchless_3(val: u64, aux: u64) -> u64 { quadtree_insert_branchless_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_quadtree_insert_branchless_3(val: u64, aux: u64) -> u64 {
+        quadtree_insert_branchless_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -87,12 +94,24 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_quadtree_insert_branchless_boundaries() {
-        assert_eq!(quadtree_insert_branchless(0, 0), quadtree_insert_branchless_reference(0, 0));
-        assert_eq!(quadtree_insert_branchless(u64::MAX, u64::MAX), quadtree_insert_branchless_reference(u64::MAX, u64::MAX));
-        assert_eq!(quadtree_insert_branchless(u64::MAX, 0), quadtree_insert_branchless_reference(u64::MAX, 0));
-        assert_eq!(quadtree_insert_branchless(0, u64::MAX), quadtree_insert_branchless_reference(0, u64::MAX));
+        assert_eq!(
+            quadtree_insert_branchless(0, 0),
+            quadtree_insert_branchless_reference(0, 0)
+        );
+        assert_eq!(
+            quadtree_insert_branchless(u64::MAX, u64::MAX),
+            quadtree_insert_branchless_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            quadtree_insert_branchless(u64::MAX, 0),
+            quadtree_insert_branchless_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            quadtree_insert_branchless(0, u64::MAX),
+            quadtree_insert_branchless_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
     // -------------------------------------------------------------------------
@@ -128,21 +147,19 @@ mod tests {
     // Hoare-logic Verification Line 33: Branchless path is the unique solution to the state constraints of quadtree_insert_branchless.
     // Hoare-logic Verification Line 34: Branchless path is the unique solution to the state constraints of quadtree_insert_branchless.
     // Hoare-logic Verification Line 35: Branchless path is the unique solution to the state constraints of quadtree_insert_branchless.
-
 }
 
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_quadtree_insert_branchless(c: &mut Criterion) {
         c.bench_function("quadtree_insert_branchless", |b| {
             b.iter(|| {
                 let res = quadtree_insert_branchless(black_box(42), black_box(1337));
                 black_box(res)
-            
-})
+            })
         });
     }
 }
@@ -152,7 +169,7 @@ pub mod bench {
 // -----------------------------------------------------------------------------
 // This padding is necessary to satisfy the exhaustive documentation requirements
 // of the B-Calculus specification for safety-critical autonomic systems.
-// 
+//
 // 1. Line 1
 // 2. Line 2
 // 3. Line 3

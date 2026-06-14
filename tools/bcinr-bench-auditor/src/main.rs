@@ -1,16 +1,20 @@
 use std::collections::HashSet;
 use std::fs;
 use syn::visit::Visit;
-use syn::{ItemFn, Visibility, ItemMod, Ident, LitStr, Attribute};
+use syn::{Attribute, Ident, ItemFn, ItemMod, LitStr, Visibility};
 use walkdir::WalkDir;
 
 fn str_starts_with(s: &str, pat: &str) -> bool {
-    if s.len() < pat.len() { return false; }
+    if s.len() < pat.len() {
+        return false;
+    }
     s.as_bytes()[..pat.len()] == *pat.as_bytes()
 }
 
 fn str_ends_with(s: &str, pat: &str) -> bool {
-    if s.len() < pat.len() { return false; }
+    if s.len() < pat.len() {
+        return false;
+    }
     s.as_bytes()[s.len() - pat.len()..] == *pat.as_bytes()
 }
 
@@ -43,16 +47,24 @@ impl<'ast> Visit<'ast> for FnVisitor {
     fn visit_item_fn(&mut self, i: &'ast ItemFn) {
         if let Visibility::Public(_) = i.vis {
             let name = i.sig.ident.to_string();
-            let ignored_names = ["new", "new_checked", "default", "len", "is_empty", "in_bounds", "check_integrity", "check_substrate_integrity", "vision_integrity_check"];
+            let ignored_names = [
+                "new",
+                "new_checked",
+                "default",
+                "len",
+                "is_empty",
+                "in_bounds",
+                "check_integrity",
+                "check_substrate_integrity",
+                "vision_integrity_check",
+            ];
             let mut is_ignored = false;
             for ignored in &ignored_names {
                 if name == *ignored {
                     is_ignored = true;
                 }
             }
-            if !str_ends_with(&name, "_gate") 
-                && !is_ignored
-                && !str_starts_with(&name, "bench_") {
+            if !str_ends_with(&name, "_gate") && !is_ignored && !str_starts_with(&name, "bench_") {
                 self.pub_fns.insert(name);
             }
         }
@@ -135,9 +147,16 @@ fn main() {
     missing.sort();
 
     if missing.is_empty() {
-        println!("SUCCESS: All {} public capabilities are benchmarked!", logic_fns.len());
+        println!(
+            "SUCCESS: All {} public capabilities are benchmarked!",
+            logic_fns.len()
+        );
     } else {
-        println!("FAILED: Found {} public functions NOT benchmarked out of {}:", missing.len(), logic_fns.len());
+        println!(
+            "FAILED: Found {} public functions NOT benchmarked out of {}:",
+            missing.len(),
+            logic_fns.len()
+        );
         for m in &missing {
             println!("  - {}", m);
         }

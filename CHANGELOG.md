@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [26.6.13] - 2026-06-13
+
+### Added
+- **Cheat Detection Tool** (`bcinr-cheat-scanner`): Automated detection of 5 systematic anti-patterns (padding boilerplate, fake Hoare proofs, circular test references, magic constants, self-canceling XOR).
+- **Integrated CI Gate**: `cargo make scan-cheats` blocks commits containing detected cheat patterns.
+- **Safety Annotations**: Formalized unsafe code boundaries with safety level markers throughout the codebase.
+- **Priority Queue Algorithms**: Branchless implementations of priority queue operations with academic backing.
+
+### Changed
+- **Boilerplate Removal**: Eliminated 275+ files with artificial length-inflation comments and copy-pasted verification claims.
+- **Algorithm Rewrites**: Refactored core algorithms to eliminate circular test references where implementation and reference were identical.
+- **Compilation Fixes**: Resolved test scaffolding errors and unused variable warnings across algorithm implementations.
+- **Code Quality**: Applied clippy fixes, cargo fmt normalization, and eliminated deprecated lint patterns.
+- **Versioning**: Bumped all workspace crates to `26.6.13`.
+
+### Fixed
+- **Test Boilerplate**: Removed redundant `let expected = expected;` statements from counterfactual mutant tests.
+- **Literal Range Errors**: Fixed overflowing u64 literals in LEB128 decoder tests.
+- **Unused Parameters**: Prefixed unused `aux` parameters with `_` in reference implementations.
+- **Format String Width**: Corrected format specifier in debug assertions to use `{:#x}` instead of `{:#02x}`.
+- **Unnecessary Parentheses**: Removed redundant parentheses in arithmetic expressions.
+- **Manual Checked Operations**: Suppressed clippy warnings for intentional explicit division checks.
+- **Metadata Completeness**: Added missing `description`, `license`, `repository`, and `readme` fields to tool crates.
+
+### Security
+- **Hardened Allocation**: Ensured all memory operations use panic-free patterns with Result-based contracts.
+- **SIMD Safety**: Maintained safe pointer operations with no `transmute` usage.
+- **Supply Chain**: Verified zero external dependencies in core logic layer.
+
+### Documentation
+- Updated README with v26.6.13 remediation status and feature overview.
+- Documented new `scan-cheats` gate and its role in preventing code quality regressions.
+
+### Notes
+- **Remediation Initiative**: v26.6.13 closes systematic gaps identified in comprehensive codebase audit.
+- **Cheat Patterns**: Scanner identifies padding (boilerplate), fake proofs (verification claims), circular refs (identical test/impl), magic constants (0xDEADBEEF), and self-canceling XOR patterns.
+- **CI Status**: All core checks pass (fmt, clippy, check); scan-cheats gate active but with known findings in non-critical tool crates.
+
 ## [26.4.22] - 2026-04-21
 
 ### Changed

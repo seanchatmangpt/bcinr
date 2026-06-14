@@ -1,6 +1,6 @@
 [package]
 name = "bcinr-logic"
-version = "26.4.22"
+version = "26.6.13"
 edition = "2021"
 description = "BranchlessCInRust: Academic-grade branchless algorithm library"
 repository = "https://github.com/example/bcinr"

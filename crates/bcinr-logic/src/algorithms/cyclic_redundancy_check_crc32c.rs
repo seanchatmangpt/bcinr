@@ -2,7 +2,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// cyclic_redundancy_check_crc32c
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -25,14 +25,14 @@ pub fn cyclic_redundancy_check_crc32c(val: u64, aux: u64) -> u64 {
     let mut crc = val as u32;
     let b = aux as u8;
     crc ^= b as u32;
-    crc = (crc >> 1) ^ (0x82F63B78 & ((crc & 1).wrapping_neg() as u32));
-    crc = (crc >> 1) ^ (0x82F63B78 & ((crc & 1).wrapping_neg() as u32));
-    crc = (crc >> 1) ^ (0x82F63B78 & ((crc & 1).wrapping_neg() as u32));
-    crc = (crc >> 1) ^ (0x82F63B78 & ((crc & 1).wrapping_neg() as u32));
-    crc = (crc >> 1) ^ (0x82F63B78 & ((crc & 1).wrapping_neg() as u32));
-    crc = (crc >> 1) ^ (0x82F63B78 & ((crc & 1).wrapping_neg() as u32));
-    crc = (crc >> 1) ^ (0x82F63B78 & ((crc & 1).wrapping_neg() as u32));
-    crc = (crc >> 1) ^ (0x82F63B78 & ((crc & 1).wrapping_neg() as u32));
+    crc = (crc >> 1) ^ (0x82F63B78 & (crc & 1).wrapping_neg());
+    crc = (crc >> 1) ^ (0x82F63B78 & (crc & 1).wrapping_neg());
+    crc = (crc >> 1) ^ (0x82F63B78 & (crc & 1).wrapping_neg());
+    crc = (crc >> 1) ^ (0x82F63B78 & (crc & 1).wrapping_neg());
+    crc = (crc >> 1) ^ (0x82F63B78 & (crc & 1).wrapping_neg());
+    crc = (crc >> 1) ^ (0x82F63B78 & (crc & 1).wrapping_neg());
+    crc = (crc >> 1) ^ (0x82F63B78 & (crc & 1).wrapping_neg());
+    crc = (crc >> 1) ^ (0x82F63B78 & (crc & 1).wrapping_neg());
     crc as u64
 }
 
@@ -40,7 +40,7 @@ pub fn cyclic_redundancy_check_crc32c(val: u64, aux: u64) -> u64 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
@@ -115,10 +115,22 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_cyclic_redundancy_check_crc32c_boundaries() {
-        assert_eq!(cyclic_redundancy_check_crc32c(0, 0), cyclic_redundancy_check_crc32c_reference(0, 0));
-        assert_eq!(cyclic_redundancy_check_crc32c(u64::MAX, u64::MAX), cyclic_redundancy_check_crc32c_reference(u64::MAX, u64::MAX));
-        assert_eq!(cyclic_redundancy_check_crc32c(u64::MAX, 0), cyclic_redundancy_check_crc32c_reference(u64::MAX, 0));
-        assert_eq!(cyclic_redundancy_check_crc32c(0, u64::MAX), cyclic_redundancy_check_crc32c_reference(0, u64::MAX));
+        assert_eq!(
+            cyclic_redundancy_check_crc32c(0, 0),
+            cyclic_redundancy_check_crc32c_reference(0, 0)
+        );
+        assert_eq!(
+            cyclic_redundancy_check_crc32c(u64::MAX, u64::MAX),
+            cyclic_redundancy_check_crc32c_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            cyclic_redundancy_check_crc32c(u64::MAX, 0),
+            cyclic_redundancy_check_crc32c_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            cyclic_redundancy_check_crc32c(0, u64::MAX),
+            cyclic_redundancy_check_crc32c_reference(0, u64::MAX)
+        );
     }
 }
 
@@ -126,7 +138,7 @@ mod tests {
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_cyclic_redundancy_check_crc32c(c: &mut Criterion) {
         c.bench_function("cyclic_redundancy_check_crc32c", |b| {
             b.iter(|| {

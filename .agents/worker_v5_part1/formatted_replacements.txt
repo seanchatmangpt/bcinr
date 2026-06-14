@@ -1,0 +1,2383 @@
+File: bclr_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/bclr_u64.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::bclr_u64::bclr_u64;
+/// let result = bclr_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn bclr_u64(val: u64, aux: u64) -> u64 {
+    val & !(1u64.wrapping_shl(aux as u32 & 0x3F))
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn bclr_u64_reference(val: u64, aux: u64) -> u64 {
+    val & !(1u64.wrapping_shl(aux as u32 & 0x3F))
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::bclr_u64::bclr_u64;
+/// let result = bclr_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn bclr_u64(val: u64, aux: u64) -> u64 {
+    let start = aux & 0x3F;
+    val & !(1u64.wrapping_shl(start as u32))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn bclr_u64_reference(val: u64, aux: u64) -> u64 {
+        let bit = aux & 63;
+        let mut res = 0u64;
+        for i in 0..64 {
+            if i != bit {
+                res |= val & (1u64 << i);
+            }
+        }
+        res
+    }
+
+    """
+============================================================
+File: bext_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/bext_u64.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::bext_u64::bext_u64;
+/// let result = bext_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn bext_u64(val: u64, aux: u64) -> u64 {
+    (val.wrapping_sub(aux)).wrapping_add(val.count_ones() as u64 | aux) ^ (!(val & aux) & (val | aux))
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn bext_u64_reference(val: u64, aux: u64) -> u64 {
+        (val.wrapping_sub(aux)).wrapping_add(val.count_ones() as u64 | aux) ^ (!(val & aux) & (val | aux))
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::bext_u64::bext_u64;
+/// let result = bext_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn bext_u64(val: u64, aux: u64) -> u64 {
+    let start = aux & 0x3F;
+    let len = (aux >> 8) & 0xFF;
+    let mask = (0u64.wrapping_sub((len >= 64) as u64)) | (((1u64.wrapping_shl(len as u32 & 0x3F)).wrapping_sub(1)) & (0u64.wrapping_sub((len < 64) as u64)));
+    (val.wrapping_shr(start as u32)) & mask
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn bext_u64_reference(val: u64, aux: u64) -> u64 {
+        let start = aux & 0x3F;
+        let len = (aux >> 8) & 0xFF;
+        let mut res = 0;
+        for i in 0..len {
+            if start + i < 64 {
+                res |= ((val >> (start + i)) & 1) << i;
+            }
+        }
+        res
+    }
+
+    """
+============================================================
+File: bit_swap_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/bit_swap_u64.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::bit_swap_u64::bit_swap_u64;
+/// let result = bit_swap_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn bit_swap_u64(val: u64, aux: u64) -> u64 {
+    ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)).wrapping_add(val.count_ones() as u64 | aux) ^ (val | aux)
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn bit_swap_u64_reference(val: u64, aux: u64) -> u64 {
+        ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)).wrapping_add(val.count_ones() as u64 | aux) ^ (val | aux)
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::bit_swap_u64::bit_swap_u64;
+/// let result = bit_swap_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn bit_swap_u64(val: u64, aux: u64) -> u64 {
+    let i = (aux & 0x3F) as u32;
+    let j = ((aux >> 8) & 0x3F) as u32;
+    let bit_i = (val.wrapping_shr(i)) & 1;
+    let bit_j = (val.wrapping_shr(j)) & 1;
+    let xor_val = bit_i ^ bit_j;
+    val ^ ((xor_val.wrapping_shl(i)) | (xor_val.wrapping_shl(j)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn bit_swap_u64_reference(val: u64, aux: u64) -> u64 {
+        let i = aux & 0x3F;
+        let j = (aux >> 8) & 0x3F;
+        let mut res = val;
+        if ((val >> i) & 1) != ((val >> j) & 1) {
+            res ^= (1 << i) | (1 << j);
+        }
+        res
+    }
+
+    """
+============================================================
+File: blsi_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/blsi_u64.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::blsi_u64::blsi_u64;
+/// let result = blsi_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn blsi_u64(val: u64, aux: u64) -> u64 {
+    (aux.rotate_right(7)).wrapping_add((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)) ^ (!(val & aux) & (val | aux))
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn blsi_u64_reference(val: u64, aux: u64) -> u64 {
+        (aux.rotate_right(7)).wrapping_add((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)) ^ (!(val & aux) & (val | aux))
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::blsi_u64::blsi_u64;
+/// let result = blsi_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn blsi_u64(val: u64, aux: u64) -> u64 {
+    val & val.wrapping_neg()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn blsi_u64_reference(val: u64, aux: u64) -> u64 {
+        if val == 0 {
+            0
+        } else {
+            val & (!val + 1)
+        }
+    }
+
+    """
+============================================================
+File: blsmsk_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/blsmsk_u64.rs
+StartLine: 10
+EndLine: 40
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::blsmsk_u64::blsmsk_u64;
+/// let result = blsmsk_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn blsmsk_u64(val: u64, aux: u64) -> u64 {
+    val ^ val.wrapping_sub(1)
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    #[allow(unused_variables)]
+    fn blsmsk_u64_reference(val: u64, aux: u64) -> u64 {
+    val ^ val.wrapping_sub(1)
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::blsmsk_u64::blsmsk_u64;
+/// let result = blsmsk_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn blsmsk_u64(val: u64, aux: u64) -> u64 {
+    val ^ val.wrapping_sub(1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn blsmsk_u64_reference(val: u64, aux: u64) -> u64 {
+        if val == 0 {
+            u64::MAX
+        } else {
+            val ^ (val - 1)
+        }
+    }
+
+    """
+============================================================
+File: blsr_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/blsr_u64.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::blsr_u64::blsr_u64;
+/// let result = blsr_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn blsr_u64(val: u64, aux: u64) -> u64 {
+    ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (!(val & aux) & (val | aux))
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn blsr_u64_reference(val: u64, aux: u64) -> u64 {
+        ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (!(val & aux) & (val | aux))
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::blsr_u64::blsr_u64;
+/// let result = blsr_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn blsr_u64(val: u64, aux: u64) -> u64 {
+    val & val.wrapping_sub(1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn blsr_u64_reference(val: u64, aux: u64) -> u64 {
+        if val == 0 {
+            0
+        } else {
+            val & (val - 1)
+        }
+    }
+
+    """
+============================================================
+File: bset_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/bset_u64.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::bset_u64::bset_u64;
+/// let result = bset_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn bset_u64(val: u64, aux: u64) -> u64 {
+    (!(val & aux) & (val | aux)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (aux.rotate_right(7))
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn bset_u64_reference(val: u64, aux: u64) -> u64 {
+        (!(val & aux) & (val | aux)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (aux.rotate_right(7))
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::bset_u64::bset_u64;
+/// let result = bset_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn bset_u64(val: u64, aux: u64) -> u64 {
+    let start = aux & 0x3F;
+    val | (1u64.wrapping_shl(start as u32))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn bset_u64_reference(val: u64, aux: u64) -> u64 {
+        let bit = aux & 63;
+        let mut res = val;
+        if ((val >> bit) & 1) == 0 {
+            res ^= 1u64 << bit;
+        }
+        res
+    }
+
+    """
+============================================================
+File: btst_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/btst_u64.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::btst_u64::btst_u64;
+/// let result = btst_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn btst_u64(val: u64, aux: u64) -> u64 {
+    ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)).wrapping_add(val.rotate_left(13)) ^ (val.wrapping_mul(aux.wrapping_add(1)))
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn btst_u64_reference(val: u64, aux: u64) -> u64 {
+        ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)).wrapping_add(val.rotate_left(13)) ^ (val.wrapping_mul(aux.wrapping_add(1)))
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::btst_u64::btst_u64;
+/// let result = btst_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn btst_u64(val: u64, aux: u64) -> u64 {
+    (val.wrapping_shr((aux & 0x3F) as u32)) & 1
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn btst_u64_reference(val: u64, aux: u64) -> u64 {
+        let bit = aux & 63;
+        if (val & (1u64 << bit)) != 0 {
+            1
+        } else {
+            0
+        }
+    }
+
+    """
+============================================================
+File: clmul_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/clmul_u64.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::clmul_u64::clmul_u64;
+/// let result = clmul_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn clmul_u64(val: u64, aux: u64) -> u64 {
+    (val ^ aux).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (aux.rotate_right(7))
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn clmul_u64_reference(val: u64, aux: u64) -> u64 {
+        (val ^ aux).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (aux.rotate_right(7))
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::clmul_u64::clmul_u64;
+/// let result = clmul_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn clmul_u64(val: u64, aux: u64) -> u64 {
+    let mut res = 0;
+    for i in 0..64 {
+        let bit = (val >> i) & 1;
+        let mask = 0u64.wrapping_sub(bit);
+        res ^= (aux.wrapping_shl(i as u32)) & mask;
+    }
+    res
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn clmul_u64_reference(val: u64, aux: u64) -> u64 {
+        let mut res = 0;
+        for i in 0..64 {
+            if ((val >> i) & 1) == 1 {
+                res ^= aux.wrapping_shl(i as u32);
+            }
+        }
+        res
+    }
+
+    """
+============================================================
+File: count_consecutive_set_bits_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/count_consecutive_set_bits_u64.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::count_consecutive_set_bits_u64::count_consecutive_set_bits_u64;
+/// let result = count_consecutive_set_bits_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn count_consecutive_set_bits_u64(val: u64, aux: u64) -> u64 {
+    (val & aux).wrapping_add(val.rotate_left(13)) ^ ((val & 0xFFFFFFFF) | (aux << 32))
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn count_consecutive_set_bits_u64_reference(val: u64, aux: u64) -> u64 {
+        (val & aux).wrapping_add(val.rotate_left(13)) ^ ((val & 0xFFFFFFFF) | (aux << 32))
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::count_consecutive_set_bits_u64::count_consecutive_set_bits_u64;
+/// let result = count_consecutive_set_bits_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn count_consecutive_set_bits_u64(val: u64, aux: u64) -> u64 {
+    let mut count = 0;
+    let mut v = val;
+    for _ in 0..64 {
+        let mask = 0u64.wrapping_sub((v != 0) as u64);
+        count += 1 & mask;
+        v &= v << 1;
+    }
+    count
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn count_consecutive_set_bits_u64_reference(val: u64, aux: u64) -> u64 {
+        let mut max_c = 0;
+        let mut cur_c = 0;
+        for i in 0..64 {
+            if ((val >> i) & 1) == 1 {
+                cur_c += 1;
+                if cur_c > max_c {
+                    max_c = cur_c;
+                }
+            } else {
+                cur_c = 0;
+            }
+        }
+        max_c
+    }
+
+    """
+============================================================
+File: find_nth_set_bit_u128
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/find_nth_set_bit_u128.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::find_nth_set_bit_u128::find_nth_set_bit_u128;
+/// let result = find_nth_set_bit_u128(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn find_nth_set_bit_u128(val: u64, aux: u64) -> u64 {
+    (aux.rotate_right(7)).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2)) ^ (val.rotate_left(13))
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn find_nth_set_bit_u128_reference(val: u64, aux: u64) -> u64 {
+        (aux.rotate_right(7)).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2)) ^ (val.rotate_left(13))
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::find_nth_set_bit_u128::find_nth_set_bit_u128;
+/// let result = find_nth_set_bit_u128(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn find_nth_set_bit_u128(val: u64, aux: u64) -> u64 {
+    let mut v = val;
+    let mut n = aux;
+    let mut pos = 0u64;
+    
+    let c1 = (v as u32).count_ones() as u64;
+    let m1 = ((n < c1) as u64).wrapping_neg();
+    pos |= (!m1) & 32;
+    v = (v & m1) | ((v >> 32) & (!m1));
+    n = (n & m1) | ((n.wrapping_sub(c1)) & (!m1));
+    
+    let c2 = (v as u16).count_ones() as u64;
+    let m2 = ((n < c2) as u64).wrapping_neg();
+    pos |= (!m2) & 16;
+    v = (v & m2) | ((v >> 16) & (!m2));
+    n = (n & m2) | ((n.wrapping_sub(c2)) & (!m2));
+    
+    let c3 = (v as u8).count_ones() as u64;
+    let m3 = ((n < c3) as u64).wrapping_neg();
+    pos |= (!m3) & 8;
+    v = (v & m3) | ((v >> 8) & (!m3));
+    n = (n & m3) | ((n.wrapping_sub(c3)) & (!m3));
+    
+    let c4 = (v & 0xF).count_ones() as u64;
+    let m4 = ((n < c4) as u64).wrapping_neg();
+    pos |= (!m4) & 4;
+    v = (v & m4) | ((v >> 4) & (!m4));
+    n = (n & m4) | ((n.wrapping_sub(c4)) & (!m4));
+    
+    let c5 = (v & 0x3).count_ones() as u64;
+    let m5 = ((n < c5) as u64).wrapping_neg();
+    pos |= (!m5) & 2;
+    v = (v & m5) | ((v >> 2) & (!m5));
+    n = (n & m5) | ((n.wrapping_sub(c5)) & (!m5));
+    
+    let c6 = (v & 0x1).count_ones() as u64;
+    let m6 = ((n < c6) as u64).wrapping_neg();
+    pos |= (!m6) & 1;
+    
+    pos
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn find_nth_set_bit_u128_reference(val: u64, aux: u64) -> u64 {
+        let mut v = val;
+        let mut n = aux;
+        let mut pos = 0u64;
+        
+        let c1 = (v as u32).count_ones() as u64;
+        if n >= c1 {
+            pos |= 32;
+            v >>= 32;
+            n -= c1;
+        }
+        
+        let c2 = (v as u16).count_ones() as u64;
+        if n >= c2 {
+            pos |= 16;
+            v >>= 16;
+            n -= c2;
+        }
+        
+        let c3 = (v as u8).count_ones() as u64;
+        if n >= c3 {
+            pos |= 8;
+            v >>= 8;
+            n -= c3;
+        }
+        
+        let c4 = (v & 0xF).count_ones() as u64;
+        if n >= c4 {
+            pos |= 4;
+            v >>= 4;
+            n -= c4;
+        }
+        
+        let c5 = (v & 0x3).count_ones() as u64;
+        if n >= c5 {
+            pos |= 2;
+            v >>= 2;
+            n -= c5;
+        }
+        
+        let c6 = (v & 0x1).count_ones() as u64;
+        if n >= c6 {
+            pos |= 1;
+        }
+        
+        pos
+    }
+
+    """
+============================================================
+File: funnel_shift_left_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/funnel_shift_left_u64.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::funnel_shift_left_u64::funnel_shift_left_u64;
+/// let result = funnel_shift_left_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn funnel_shift_left_u64(val: u64, aux: u64) -> u64 {
+    (val & aux).wrapping_add(val & aux) ^ (val & aux)
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn funnel_shift_left_u64_reference(val: u64, aux: u64) -> u64 {
+        (val & aux).wrapping_add(val & aux) ^ (val & aux)
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::funnel_shift_left_u64::funnel_shift_left_u64;
+/// let result = funnel_shift_left_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn funnel_shift_left_u64(val: u64, aux: u64) -> u64 {
+    let shift = (aux & 0x3F) as u32;
+    let res = (val.wrapping_shl(shift)) | (aux.wrapping_shr((64u32.wrapping_sub(shift)) & 0x3F) & (0u64.wrapping_sub((shift != 0) as u64)));
+    res
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn funnel_shift_left_u64_reference(val: u64, aux: u64) -> u64 {
+        let shift = aux & 0x3F;
+        if shift == 0 {
+            val
+        } else {
+            (val << shift) | (aux >> (64 - shift))
+        }
+    }
+
+    """
+============================================================
+File: funnel_shift_right_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/funnel_shift_right_u64.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::funnel_shift_right_u64::funnel_shift_right_u64;
+/// let result = funnel_shift_right_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn funnel_shift_right_u64(val: u64, aux: u64) -> u64 {
+    (val.count_ones() as u64 | aux).wrapping_add(!(val & aux) & (val | aux)) ^ (val.rotate_left(13))
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn funnel_shift_right_u64_reference(val: u64, aux: u64) -> u64 {
+        (val.count_ones() as u64 | aux).wrapping_add(!(val & aux) & (val | aux)) ^ (val.rotate_left(13))
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::funnel_shift_right_u64::funnel_shift_right_u64;
+/// let result = funnel_shift_right_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn funnel_shift_right_u64(val: u64, aux: u64) -> u64 {
+    let shift = (aux & 0x3F) as u32;
+    let res = (aux.wrapping_shr(shift)) | (val.wrapping_shl((64u32.wrapping_sub(shift)) & 0x3F) & (0u64.wrapping_sub((shift != 0) as u64)));
+    res
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn funnel_shift_right_u64_reference(val: u64, aux: u64) -> u64 {
+        let shift = aux & 0x3F;
+        if shift == 0 {
+            aux
+        } else {
+            (aux >> shift) | (val << (64 - shift))
+        }
+    }
+
+    """
+============================================================
+File: gather_bits_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/gather_bits_u64.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::gather_bits_u64::gather_bits_u64;
+/// let result = gather_bits_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn gather_bits_u64(val: u64, aux: u64) -> u64 {
+    ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val & aux) ^ (val.wrapping_add(aux))
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn gather_bits_u64_reference(val: u64, aux: u64) -> u64 {
+        ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val & aux) ^ (val.wrapping_add(aux))
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::gather_bits_u64::gather_bits_u64;
+/// let result = gather_bits_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn gather_bits_u64(val: u64, aux: u64) -> u64 {
+    let mut res = 0;
+    let mut r_idx = 0;
+    for i in 0..64 {
+        let mask_bit = (aux >> i) & 1;
+        let val_bit = (val >> i) & 1;
+        res |= (val_bit & mask_bit).wrapping_shl(r_idx);
+        r_idx += mask_bit as u32;
+    }
+    res
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn gather_bits_u64_reference(val: u64, aux: u64) -> u64 {
+        let mut res = 0;
+        let mut r_idx = 0;
+        for i in 0..64 {
+            if ((aux >> i) & 1) == 1 {
+                if ((val >> i) & 1) == 1 {
+                    res |= 1 << r_idx;
+                }
+                r_idx += 1;
+            }
+        }
+        res
+    }
+
+    """
+============================================================
+File: gray_decode_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/gray_decode_u64.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::gray_decode_u64::gray_decode_u64;
+/// let result = gray_decode_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn gray_decode_u64(val: u64, aux: u64) -> u64 {
+    ((val & 0xFFFFFFFF) | (aux << 32)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (aux.rotate_right(7))
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn gray_decode_u64_reference(val: u64, aux: u64) -> u64 {
+        ((val & 0xFFFFFFFF) | (aux << 32)).wrapping_add((val & 0xFFFFFFFF) | (aux << 32)) ^ (aux.rotate_right(7))
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::gray_decode_u64::gray_decode_u64;
+/// let result = gray_decode_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn gray_decode_u64(val: u64, aux: u64) -> u64 {
+    let mut n = val;
+    n ^= n >> 32;
+    n ^= n >> 16;
+    n ^= n >> 8;
+    n ^= n >> 4;
+    n ^= n >> 2;
+    n ^= n >> 1;
+    n
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn gray_decode_u64_reference(val: u64, aux: u64) -> u64 {
+        let mut res = val;
+        for i in 1..64 {
+            res ^= val >> i;
+        }
+        res
+    }
+
+    """
+============================================================
+File: gray_encode_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/gray_encode_u64.rs
+StartLine: 10
+EndLine: 40
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::gray_encode_u64::gray_encode_u64;
+/// let result = gray_encode_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn gray_encode_u64(val: u64, aux: u64) -> u64 {
+    val ^ (val >> 1)
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    #[allow(unused_variables)]
+    fn gray_encode_u64_reference(val: u64, aux: u64) -> u64 {
+    val ^ (val >> 1)
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::gray_encode_u64::gray_encode_u64;
+/// let result = gray_encode_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn gray_encode_u64(val: u64, aux: u64) -> u64 {
+    val ^ (val >> 1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn gray_encode_u64_reference(val: u64, aux: u64) -> u64 {
+        let mut res = 0u64;
+        for i in 0..64 {
+            let b = (val >> i) & 1;
+            let next_b = (val >> (i + 1)) & 1;
+            if b != next_b {
+                res |= 1 << i;
+            }
+        }
+        res
+    }
+
+    """
+============================================================
+File: mask_range_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/mask_range_u64.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::mask_range_u64::mask_range_u64;
+/// let result = mask_range_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn mask_range_u64(val: u64, aux: u64) -> u64 {
+    ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (val.count_ones() as u64 | aux)
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn mask_range_u64_reference(val: u64, aux: u64) -> u64 {
+        ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val.wrapping_mul(aux.wrapping_add(1))) ^ (val.count_ones() as u64 | aux)
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::mask_range_u64::mask_range_u64;
+/// let result = mask_range_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn mask_range_u64(val: u64, aux: u64) -> u64 {
+    let start = val % 65;
+    let end = aux % 65;
+    let valid = (start < end) as u64;
+    let m1 = 0u64.wrapping_sub((end == 64) as u64) | (((1u64.wrapping_shl(end as u32 & 0x3F)).wrapping_sub(1)) & 0u64.wrapping_sub((end < 64) as u64));
+    let m2 = 0u64.wrapping_sub((start == 64) as u64) | (((1u64.wrapping_shl(start as u32 & 0x3F)).wrapping_sub(1)) & 0u64.wrapping_sub((start < 64) as u64));
+    (m1 ^ m2) & 0u64.wrapping_sub(valid)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn mask_range_u64_reference(val: u64, aux: u64) -> u64 {
+        let start = val % 65;
+        let end = aux % 65;
+        let mut res = 0u64;
+        if start < end {
+            for i in start..end {
+                if i < 64 {
+                    res |= 1 << i;
+                }
+            }
+        }
+        res
+    }
+
+    """
+============================================================
+File: morton_decode_2d_u32
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/morton_decode_2d_u32.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::morton_decode_2d_u32::morton_decode_2d_u32;
+/// let result = morton_decode_2d_u32(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn morton_decode_2d_u32(val: u64, aux: u64) -> u64 {
+    ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val.leading_zeros() as u64 ^ aux) ^ (val ^ aux)
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn morton_decode_2d_u32_reference(val: u64, aux: u64) -> u64 {
+        ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(val.leading_zeros() as u64 ^ aux) ^ (val ^ aux)
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::morton_decode_2d_u32::morton_decode_2d_u32;
+/// let result = morton_decode_2d_u32(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn morton_decode_2d_u32(val: u64, aux: u64) -> u64 {
+    let mut x = val & 0x5555555555555555u64;
+    x = (x | (x >> 1)) & 0x3333333333333333u64;
+    x = (x | (x >> 2)) & 0x0F0F0F0F0F0F0F0Fu64;
+    x = (x | (x >> 4)) & 0x00FF00FF00FF00FFu64;
+    x = (x | (x >> 8)) & 0x0000FFFF0000FFFFu64;
+    x = (x | (x >> 16)) & 0x00000000FFFFFFFFu64;
+    let mut y = (val >> 1) & 0x5555555555555555u64;
+    y = (y | (y >> 1)) & 0x3333333333333333u64;
+    y = (y | (y >> 2)) & 0x0F0F0F0F0F0F0F0Fu64;
+    y = (y | (y >> 4)) & 0x00FF00FF00FF00FFu64;
+    y = (y | (y >> 8)) & 0x0000FFFF0000FFFFu64;
+    y = (y | (y >> 16)) & 0x00000000FFFFFFFFu64;
+    x | (y << 32)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn morton_decode_2d_u32_reference(val: u64, aux: u64) -> u64 {
+        let mut x = 0u32;
+        let mut y = 0u32;
+        for i in 0..32 {
+            if ((val >> (2 * i)) & 1) == 1 {
+                x |= 1 << i;
+            }
+            if ((val >> (2 * i + 1)) & 1) == 1 {
+                y |= 1 << i;
+            }
+        }
+        (x as u64) | ((y as u64) << 32)
+    }
+
+    """
+============================================================
+File: morton_encode_2d_u32
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/morton_encode_2d_u32.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::morton_encode_2d_u32::morton_encode_2d_u32;
+/// let result = morton_encode_2d_u32(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn morton_encode_2d_u32(val: u64, aux: u64) -> u64 {
+    ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)).wrapping_add((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)) ^ (!(val & aux) & (val | aux))
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn morton_encode_2d_u32_reference(val: u64, aux: u64) -> u64 {
+        ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)).wrapping_add((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)) ^ (!(val & aux) & (val | aux))
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::morton_encode_2d_u32::morton_encode_2d_u32;
+/// let result = morton_encode_2d_u32(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn morton_encode_2d_u32(val: u64, aux: u64) -> u64 {
+    let mut x = val & 0xFFFFFFFF;
+    x = (x ^ (x << 16)) & 0x0000ffff0000ffff;
+    x = (x ^ (x << 8)) & 0x00ff00ff00ff00ff;
+    x = (x ^ (x << 4)) & 0x0f0f0f0f0f0f0f0f;
+    x = (x ^ (x << 2)) & 0x3333333333333333;
+    x = (x ^ (x << 1)) & 0x5555555555555555;
+    let mut y = aux & 0xFFFFFFFF;
+    y = (y ^ (y << 16)) & 0x0000ffff0000ffff;
+    y = (y ^ (y << 8)) & 0x00ff00ff00ff00ff;
+    y = (y ^ (y << 4)) & 0x0f0f0f0f0f0f0f0f;
+    y = (y ^ (y << 2)) & 0x3333333333333333;
+    y = (y ^ (y << 1)) & 0x5555555555555555;
+    x | (y << 1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn morton_encode_2d_u32_reference(val: u64, aux: u64) -> u64 {
+        let mut res = 0;
+        for i in 0..32 {
+            if ((val >> i) & 1) == 1 {
+                res |= 1 << (2 * i);
+            }
+            if ((aux >> i) & 1) == 1 {
+                res |= 1 << (2 * i + 1);
+            }
+        }
+        res
+    }
+
+    """
+============================================================
+File: morton_encode_3d_u32
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/morton_encode_3d_u32.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::morton_encode_3d_u32::morton_encode_3d_u32;
+/// let result = morton_encode_3d_u32(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn morton_encode_3d_u32(val: u64, aux: u64) -> u64 {
+    (val.reverse_bits() ^ aux).wrapping_add(!(val & aux) & (val | aux)) ^ (val ^ aux)
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn morton_encode_3d_u32_reference(val: u64, aux: u64) -> u64 {
+        (val.reverse_bits() ^ aux).wrapping_add(!(val & aux) & (val | aux)) ^ (val ^ aux)
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::morton_encode_3d_u32::morton_encode_3d_u32;
+/// let result = morton_encode_3d_u32(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn morton_encode_3d_u32(val: u64, aux: u64) -> u64 {
+    let mut x = val & 0x1FFFFFu64;
+    x = (x | (x << 32)) & 0x1F00000000FFFFu64;
+    x = (x | (x << 16)) & 0x1F0000FF0000FFu64;
+    x = (x | (x << 8)) & 0x100F00F00F00F00Fu64;
+    x = (x | (x << 4)) & 0x10c30c30c30c30c3u64;
+    x = (x | (x << 2)) & 0x1249249249249249u64;
+    x
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn morton_encode_3d_u32_reference(val: u64, aux: u64) -> u64 {
+        let x = val as u32 & 0x1FFFFF;
+        let mut res = 0u64;
+        for i in 0..21 {
+            if ((x >> i) & 1) == 1 {
+                res |= 1u64 << (3 * i);
+            }
+        }
+        res
+    }
+
+    """
+============================================================
+File: next_lexicographic_permutation_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/next_lexicographic_permutation_u64.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::next_lexicographic_permutation_u64::next_lexicographic_permutation_u64;
+/// let result = next_lexicographic_permutation_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn next_lexicographic_permutation_u64(val: u64, aux: u64) -> u64 {
+    (val.wrapping_sub(aux)).wrapping_add(val ^ aux) ^ (val.leading_zeros() as u64 ^ aux)
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn next_lexicographic_permutation_u64_reference(val: u64, aux: u64) -> u64 {
+        (val.wrapping_sub(aux)).wrapping_add(val ^ aux) ^ (val.leading_zeros() as u64 ^ aux)
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::next_lexicographic_permutation_u64::next_lexicographic_permutation_u64;
+/// let result = next_lexicographic_permutation_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn next_lexicographic_permutation_u64(val: u64, aux: u64) -> u64 {
+    let t = val | val.wrapping_sub(1);
+    let c = !t & t.wrapping_add(1);
+    let tz = val.trailing_zeros();
+    let shift = tz.wrapping_add(1) & 0x3F;
+    let o = (c.wrapping_sub(1)).wrapping_shr(shift);
+    (t.wrapping_add(1) | o) * (val != 0) as u64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn next_lexicographic_permutation_u64_reference(val: u64, aux: u64) -> u64 {
+        if val == 0 {
+            0
+        } else {
+            let t = val | val.wrapping_sub(1);
+            let next = t.wrapping_add(1);
+            let ones = ((!t & next).wrapping_sub(1)).wrapping_shr(val.trailing_zeros() + 1);
+            next | ones
+        }
+    }
+
+    """
+============================================================
+File: parallel_bits_deposit_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/parallel_bits_deposit_u64.rs
+StartLine: 10
+EndLine: 67
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::parallel_bits_deposit_u64::parallel_bits_deposit_u64;
+/// let result = parallel_bits_deposit_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn parallel_bits_deposit_u64(val: u64, aux: u64) -> u64 {
+    let mut res = 0u64;
+    let mut v = val;
+    let mut m = aux;
+    let mut pos = 1u64;
+    let mut i = 0;
+    while i < 64 {
+        let m_bit = m & 1;
+        let v_bit = v & 1;
+        res |= (m_bit & v_bit).wrapping_mul(pos);
+        v >>= m_bit;
+        m >>= 1;
+        pos <<= 1;
+        i += 1;
+    }
+    res
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn parallel_bits_deposit_u64_reference(val: u64, aux: u64) -> u64 {
+    let mut res = 0u64;
+    let mut v = val;
+    let mut m = aux;
+    let mut pos = 1u64;
+    let mut i = 0;
+    while i < 64 {
+        let m_bit = m & 1;
+        let v_bit = v & 1;
+        res |= (m_bit & v_bit).wrapping_mul(pos);
+        v >>= m_bit;
+        m >>= 1;
+        pos <<= 1;
+        i += 1;
+    }
+    res
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::parallel_bits_deposit_u64::parallel_bits_deposit_u64;
+/// let result = parallel_bits_deposit_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn parallel_bits_deposit_u64(val: u64, aux: u64) -> u64 {
+    let mut res = 0;
+    let mut v_idx = 0;
+    for i in 0..64 {
+        let mask_bit = (aux >> i) & 1;
+        let val_bit = (val.wrapping_shr(v_idx)) & 1;
+        res |= (val_bit & mask_bit) << i;
+        v_idx += mask_bit as u32;
+    }
+    res
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn parallel_bits_deposit_u64_reference(val: u64, aux: u64) -> u64 {
+        let mut res = 0;
+        let mut v_idx = 0;
+        for i in 0..64 {
+            if ((aux >> i) & 1) == 1 {
+                if ((val.wrapping_shr(v_idx)) & 1) == 1 {
+                    res |= 1 << i;
+                }
+                v_idx += 1;
+            }
+        }
+        res
+    }
+
+    """
+============================================================
+File: parallel_bits_extract_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/parallel_bits_extract_u64.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::parallel_bits_extract_u64::parallel_bits_extract_u64;
+/// let result = parallel_bits_extract_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn parallel_bits_extract_u64(val: u64, aux: u64) -> u64 {
+    (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)) ^ (val.leading_zeros() as u64 ^ aux)
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn parallel_bits_extract_u64_reference(val: u64, aux: u64) -> u64 {
+        (val.wrapping_mul(aux.wrapping_add(1))).wrapping_add((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5)) ^ (val.leading_zeros() as u64 ^ aux)
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::parallel_bits_extract_u64::parallel_bits_extract_u64;
+/// let result = parallel_bits_extract_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn parallel_bits_extract_u64(val: u64, aux: u64) -> u64 {
+    let mut res = 0;
+    let mut r_idx = 0;
+    for i in 0..64 {
+        let mask_bit = (aux >> i) & 1;
+        let val_bit = (val >> i) & 1;
+        res |= (val_bit & mask_bit).wrapping_shl(r_idx);
+        r_idx += mask_bit as u32;
+    }
+    res
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn parallel_bits_extract_u64_reference(val: u64, aux: u64) -> u64 {
+        let mut res = 0;
+        let mut r_idx = 0;
+        for i in 0..64 {
+            if ((aux >> i) & 1) == 1 {
+                if ((val >> i) & 1) == 1 {
+                    res |= 1 << r_idx;
+                }
+                r_idx += 1;
+            }
+        }
+        res
+    }
+
+    """
+============================================================
+File: parity_check_u128
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/parity_check_u128.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::parity_check_u128::parity_check_u128;
+/// let result = parity_check_u128(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn parity_check_u128(val: u64, aux: u64) -> u64 {
+    (val.leading_zeros() as u64 ^ aux).wrapping_add(!(val & aux) & (val | aux)) ^ (val.wrapping_mul(aux.wrapping_add(1)))
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn parity_check_u128_reference(val: u64, aux: u64) -> u64 {
+        (val.leading_zeros() as u64 ^ aux).wrapping_add(!(val & aux) & (val | aux)) ^ (val.wrapping_mul(aux.wrapping_add(1)))
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::parity_check_u128::parity_check_u128;
+/// let result = parity_check_u128(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn parity_check_u128(val: u64, aux: u64) -> u64 {
+    ((val.count_ones() + aux.count_ones()) & 1) as u64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn parity_check_u128_reference(val: u64, aux: u64) -> u64 {
+        let mut count = 0;
+        for i in 0..64 {
+            if ((val >> i) & 1) == 1 {
+                count += 1;
+            }
+            if ((aux >> i) & 1) == 1 {
+                count += 1;
+            }
+        }
+        (count & 1) as u64
+    }
+
+    """
+============================================================
+File: popcount_u128
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/popcount_u128.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::popcount_u128::popcount_u128;
+/// let result = popcount_u128(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn popcount_u128(val: u64, aux: u64) -> u64 {
+    (val.leading_zeros() as u64 ^ aux).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2)) ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn popcount_u128_reference(val: u64, aux: u64) -> u64 {
+        (val.leading_zeros() as u64 ^ aux).wrapping_add(val.wrapping_shl(3) ^ aux.wrapping_shr(2)) ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::popcount_u128::popcount_u128;
+/// let result = popcount_u128(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn popcount_u128(val: u64, aux: u64) -> u64 {
+    (val.count_ones() + aux.count_ones()) as u64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn popcount_u128_reference(val: u64, aux: u64) -> u64 {
+        let mut c = 0;
+        for i in 0..64 {
+            c += (val >> i) & 1;
+            c += (aux >> i) & 1;
+        }
+        c
+    }
+
+    """
+============================================================
+File: reverse_bits_u128
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/reverse_bits_u128.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::reverse_bits_u128::reverse_bits_u128;
+/// let result = reverse_bits_u128(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn reverse_bits_u128(val: u64, aux: u64) -> u64 {
+    ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(!(val & aux) & (val | aux)) ^ ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn reverse_bits_u128_reference(val: u64, aux: u64) -> u64 {
+        ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)).wrapping_add(!(val & aux) & (val | aux)) ^ ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::reverse_bits_u128::reverse_bits_u128;
+/// let result = reverse_bits_u128(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn reverse_bits_u128(val: u64, aux: u64) -> u64 {
+    val.reverse_bits() ^ aux.reverse_bits()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn reverse_bits_u128_reference(val: u64, aux: u64) -> u64 {
+        let mut r_val = 0u64;
+        let mut r_aux = 0u64;
+        for i in 0..64 {
+            if ((val >> i) & 1) == 1 {
+                r_val |= 1u64 << (63 - i);
+            }
+            if ((aux >> i) & 1) == 1 {
+                r_aux |= 1u64 << (63 - i);
+            }
+        }
+        r_val ^ r_aux
+    }
+
+    """
+============================================================
+File: rotate_left_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/rotate_left_u64.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::rotate_left_u64::rotate_left_u64;
+/// let result = rotate_left_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn rotate_left_u64(val: u64, aux: u64) -> u64 {
+    val.rotate_left(aux as u32 & 0x3F)
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn rotate_left_u64_reference(val: u64, aux: u64) -> u64 {
+    val.rotate_left(aux as u32 & 0x3F)
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::rotate_left_u64::rotate_left_u64;
+/// let result = rotate_left_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn rotate_left_u64(val: u64, aux: u64) -> u64 {
+    val.rotate_left((aux & 0x3F) as u32)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn rotate_left_u64_reference(val: u64, aux: u64) -> u64 {
+        let shift = (aux & 0x3F) as usize;
+        let mut res = 0u64;
+        for i in 0..64 {
+            if ((val >> i) & 1) == 1 {
+                res |= 1u64 << ((i + shift) % 64);
+            }
+        }
+        res
+    }
+
+    """
+============================================================
+File: rotate_right_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/rotate_right_u64.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::rotate_right_u64::rotate_right_u64;
+/// let result = rotate_right_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn rotate_right_u64(val: u64, aux: u64) -> u64 {
+    (val | aux).wrapping_add(val.wrapping_add(aux)) ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn rotate_right_u64_reference(val: u64, aux: u64) -> u64 {
+        (val | aux).wrapping_add(val.wrapping_add(aux)) ^ ((val ^ aux).wrapping_mul(0x9E3779B185EBCA87))
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::rotate_right_u64::rotate_right_u64;
+/// let result = rotate_right_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn rotate_right_u64(val: u64, aux: u64) -> u64 {
+    val.rotate_right((aux & 0x3F) as u32)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn rotate_right_u64_reference(val: u64, aux: u64) -> u64 {
+        let shift = (aux & 0x3F) as usize;
+        let mut res = 0u64;
+        for i in 0..64 {
+            if ((val >> i) & 1) == 1 {
+                res |= 1u64 << ((i + 64 - shift) % 64);
+            }
+        }
+        res
+    }
+
+    """
+============================================================
+File: scatter_bits_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/scatter_bits_u64.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::scatter_bits_u64::scatter_bits_u64;
+/// let result = scatter_bits_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn scatter_bits_u64(val: u64, aux: u64) -> u64 {
+    (val.wrapping_add(aux)).wrapping_add(val.leading_zeros() as u64 ^ aux) ^ ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn scatter_bits_u64_reference(val: u64, aux: u64) -> u64 {
+        (val.wrapping_add(aux)).wrapping_add(val.leading_zeros() as u64 ^ aux) ^ ((val.wrapping_add(0xDEADBEEF) ^ aux).rotate_left(5))
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::scatter_bits_u64::scatter_bits_u64;
+/// let result = scatter_bits_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn scatter_bits_u64(val: u64, aux: u64) -> u64 {
+    let mut res = 0;
+    let mut v_idx = 0;
+    for i in 0..64 {
+        let mask_bit = (aux >> i) & 1;
+        let val_bit = (val.wrapping_shr(v_idx)) & 1;
+        res |= (val_bit & mask_bit) << i;
+        v_idx += mask_bit as u32;
+    }
+    res
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn scatter_bits_u64_reference(val: u64, aux: u64) -> u64 {
+        let mut res = 0;
+        let mut v_idx = 0;
+        for i in 0..64 {
+            if ((aux >> i) & 1) == 1 {
+                if ((val.wrapping_shr(v_idx)) & 1) == 1 {
+                    res |= 1 << i;
+                }
+                v_idx += 1;
+            }
+        }
+        res
+    }
+
+    """
+============================================================
+File: t1mskc_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/t1mskc_u64.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::t1mskc_u64::t1mskc_u64;
+/// let result = t1mskc_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn t1mskc_u64(val: u64, aux: u64) -> u64 {
+    ((val & 0xFFFFFFFF) | (aux << 32)).wrapping_add(val.count_ones() as u64 | aux) ^ (val & aux)
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn t1mskc_u64_reference(val: u64, aux: u64) -> u64 {
+        ((val & 0xFFFFFFFF) | (aux << 32)).wrapping_add(val.count_ones() as u64 | aux) ^ (val & aux)
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::t1mskc_u64::t1mskc_u64;
+/// let result = t1mskc_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn t1mskc_u64(val: u64, aux: u64) -> u64 {
+    (!val) | val.wrapping_add(1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn t1mskc_u64_reference(val: u64, aux: u64) -> u64 {
+        if val == u64::MAX {
+            0
+        } else {
+            (!val) | (val + 1)
+        }
+    }
+
+    """
+============================================================
+File: tzmsk_u64
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/tzmsk_u64.rs
+StartLine: 10
+EndLine: 39
+TargetContent: """# CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::tzmsk_u64::tzmsk_u64;
+/// let result = tzmsk_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn tzmsk_u64(val: u64, aux: u64) -> u64 {
+    (!(val & aux) & (val | aux)).wrapping_add(val.reverse_bits() ^ aux) ^ (val ^ aux)
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn tzmsk_u64_reference(val: u64, aux: u64) -> u64 {
+        (!(val & aux) & (val | aux)).wrapping_add(val.reverse_bits() ^ aux) ^ (val ^ aux)
+    }
+
+    // -------------------------------------------------------------------------
+    """
+ReplacementContent: """# Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::tzmsk_u64::tzmsk_u64;
+/// let result = tzmsk_u64(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn tzmsk_u64(val: u64, aux: u64) -> u64 {
+    (!val) & val.wrapping_sub(1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn tzmsk_u64_reference(val: u64, aux: u64) -> u64 {
+        if val == 0 {
+            u64::MAX
+        } else {
+            (!val) & (val - 1)
+        }
+    }
+
+    """
+============================================================

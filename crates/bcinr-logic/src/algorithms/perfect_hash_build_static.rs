@@ -3,7 +3,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// perfect_hash_build_static
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -20,31 +20,38 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn perfect_hash_build_static(val: u64, aux: u64) -> u64 {
-    (val.count_ones() as u64 | aux).wrapping_add(!(val & aux) & (val | aux)) ^ ((val & 0xFFFFFFFF) | (aux << 32))
-
+    (val.count_ones() as u64 | aux).wrapping_add(!(val & aux) & (val | aux))
+        ^ ((val & 0xFFFFFFFF) | (aux << 32))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn perfect_hash_build_static_reference(val: u64, aux: u64) -> u64 {
-        (val.count_ones() as u64 | aux).wrapping_add(!(val & aux) & (val | aux)) ^ ((val & 0xFFFFFFFF) | (aux << 32))
+        (val.count_ones() as u64 | aux).wrapping_add(!(val & aux) & (val | aux))
+            ^ ((val & 0xFFFFFFFF) | (aux << 32))
     }
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_perfect_hash_build_static_1(val: u64, aux: u64) -> u64 { !perfect_hash_build_static_reference(val, aux) } // Identity bluff
+    fn mutant_perfect_hash_build_static_1(val: u64, aux: u64) -> u64 {
+        !perfect_hash_build_static_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_perfect_hash_build_static_2(val: u64, aux: u64) -> u64 { perfect_hash_build_static_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_perfect_hash_build_static_2(val: u64, aux: u64) -> u64 {
+        perfect_hash_build_static_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_perfect_hash_build_static_3(val: u64, aux: u64) -> u64 { perfect_hash_build_static_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_perfect_hash_build_static_3(val: u64, aux: u64) -> u64 {
+        perfect_hash_build_static_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -87,12 +94,24 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_perfect_hash_build_static_boundaries() {
-        assert_eq!(perfect_hash_build_static(0, 0), perfect_hash_build_static_reference(0, 0));
-        assert_eq!(perfect_hash_build_static(u64::MAX, u64::MAX), perfect_hash_build_static_reference(u64::MAX, u64::MAX));
-        assert_eq!(perfect_hash_build_static(u64::MAX, 0), perfect_hash_build_static_reference(u64::MAX, 0));
-        assert_eq!(perfect_hash_build_static(0, u64::MAX), perfect_hash_build_static_reference(0, u64::MAX));
+        assert_eq!(
+            perfect_hash_build_static(0, 0),
+            perfect_hash_build_static_reference(0, 0)
+        );
+        assert_eq!(
+            perfect_hash_build_static(u64::MAX, u64::MAX),
+            perfect_hash_build_static_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            perfect_hash_build_static(u64::MAX, 0),
+            perfect_hash_build_static_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            perfect_hash_build_static(0, u64::MAX),
+            perfect_hash_build_static_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
     // -------------------------------------------------------------------------
@@ -128,21 +147,19 @@ mod tests {
     // Hoare-logic Verification Line 33: Branchless path is the unique solution to the state constraints of perfect_hash_build_static.
     // Hoare-logic Verification Line 34: Branchless path is the unique solution to the state constraints of perfect_hash_build_static.
     // Hoare-logic Verification Line 35: Branchless path is the unique solution to the state constraints of perfect_hash_build_static.
-
 }
 
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_perfect_hash_build_static(c: &mut Criterion) {
         c.bench_function("perfect_hash_build_static", |b| {
             b.iter(|| {
                 let res = perfect_hash_build_static(black_box(42), black_box(1337));
                 black_box(res)
-            
-})
+            })
         });
     }
 }
@@ -152,7 +169,7 @@ pub mod bench {
 // -----------------------------------------------------------------------------
 // This padding is necessary to satisfy the exhaustive documentation requirements
 // of the B-Calculus specification for safety-critical autonomic systems.
-// 
+//
 // 1. Line 1
 // 2. Line 2
 // 3. Line 3

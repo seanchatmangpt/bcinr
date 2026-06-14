@@ -50,7 +50,7 @@ pub fn mul_sat_u64(a: u64, b: u64) -> u64 {
     // Return (lower & ~mask) | (u64::MAX & mask)
     // If mask = 0: returns lower
     // If mask = 0xFFFF...FFFF: returns u64::MAX
-    (lower & !mask) | (u64::MAX & mask)
+    (lower & !mask) | mask
 }
 
 #[cfg(test)]

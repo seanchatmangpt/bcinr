@@ -3,7 +3,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// mask_range_u64
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -23,8 +23,12 @@ pub fn mask_range_u64(val: u64, aux: u64) -> u64 {
     let start = val % 65;
     let end = aux % 65;
     let valid = (start < end) as u64;
-    let m1 = 0u64.wrapping_sub((end == 64) as u64) | (((1u64.wrapping_shl(end as u32 & 0x3F)).wrapping_sub(1)) & 0u64.wrapping_sub((end < 64) as u64));
-    let m2 = 0u64.wrapping_sub((start == 64) as u64) | (((1u64.wrapping_shl(start as u32 & 0x3F)).wrapping_sub(1)) & 0u64.wrapping_sub((start < 64) as u64));
+    let m1 = 0u64.wrapping_sub((end == 64) as u64)
+        | (((1u64.wrapping_shl(end as u32 & 0x3F)).wrapping_sub(1))
+            & 0u64.wrapping_sub((end < 64) as u64));
+    let m2 = 0u64.wrapping_sub((start == 64) as u64)
+        | (((1u64.wrapping_shl(start as u32 & 0x3F)).wrapping_sub(1))
+            & 0u64.wrapping_sub((start < 64) as u64));
     (m1 ^ m2) & 0u64.wrapping_sub(valid)
 }
 
@@ -32,7 +36,7 @@ pub fn mask_range_u64(val: u64, aux: u64) -> u64 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
@@ -53,11 +57,17 @@ mod tests {
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_mask_range_u64_1(val: u64, aux: u64) -> u64 { !mask_range_u64_reference(val, aux) } // Identity bluff
+    fn mutant_mask_range_u64_1(val: u64, aux: u64) -> u64 {
+        !mask_range_u64_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_mask_range_u64_2(val: u64, aux: u64) -> u64 { mask_range_u64_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_mask_range_u64_2(val: u64, aux: u64) -> u64 {
+        mask_range_u64_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_mask_range_u64_3(val: u64, aux: u64) -> u64 { mask_range_u64_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_mask_range_u64_3(val: u64, aux: u64) -> u64 {
+        mask_range_u64_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -101,11 +111,20 @@ mod tests {
     #[test]
     fn test_mask_range_u64_boundaries() {
         assert_eq!(mask_range_u64(0, 0), mask_range_u64_reference(0, 0));
-        assert_eq!(mask_range_u64(u64::MAX, u64::MAX), mask_range_u64_reference(u64::MAX, u64::MAX));
-        assert_eq!(mask_range_u64(u64::MAX, 0), mask_range_u64_reference(u64::MAX, 0));
-        assert_eq!(mask_range_u64(0, u64::MAX), mask_range_u64_reference(0, u64::MAX));
+        assert_eq!(
+            mask_range_u64(u64::MAX, u64::MAX),
+            mask_range_u64_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            mask_range_u64(u64::MAX, 0),
+            mask_range_u64_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            mask_range_u64(0, u64::MAX),
+            mask_range_u64_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
     // -------------------------------------------------------------------------
@@ -141,21 +160,19 @@ mod tests {
     // Hoare-logic Verification Line 33: Branchless path is the unique solution to the state constraints of mask_range_u64.
     // Hoare-logic Verification Line 34: Branchless path is the unique solution to the state constraints of mask_range_u64.
     // Hoare-logic Verification Line 35: Branchless path is the unique solution to the state constraints of mask_range_u64.
-
 }
 
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_mask_range_u64(c: &mut Criterion) {
         c.bench_function("mask_range_u64", |b| {
             b.iter(|| {
                 let res = mask_range_u64(black_box(42), black_box(1337));
                 black_box(res)
-            
-})
+            })
         });
     }
 }
@@ -165,7 +182,7 @@ pub mod bench {
 // -----------------------------------------------------------------------------
 // This padding is necessary to satisfy the exhaustive documentation requirements
 // of the B-Calculus specification for safety-critical autonomic systems.
-// 
+//
 // 1. Line 1
 // 2. Line 2
 // 3. Line 3

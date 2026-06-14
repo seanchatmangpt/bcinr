@@ -3,7 +3,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// page_rank_simd_step
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -20,30 +20,43 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn page_rank_simd_step(val: u64, aux: u64) -> u64 {
-    let nz = (aux != 0) as u64; let out_degree = (aux + (1 - nz)) as f64; let rank = (val * nz) as f64; (rank / out_degree) as u64
+    let nz = (aux != 0) as u64;
+    let out_degree = (aux + (1 - nz)) as f64;
+    let rank = (val * nz) as f64;
+    (rank / out_degree) as u64
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn page_rank_simd_step_reference(val: u64, aux: u64) -> u64 {
-        if aux == 0 { 0 } else { (val as f64 / aux as f64) as u64 }
+        if aux == 0 {
+            0
+        } else {
+            (val as f64 / aux as f64) as u64
+        }
     }
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_page_rank_simd_step_1(val: u64, aux: u64) -> u64 { !page_rank_simd_step_reference(val, aux) } // Identity bluff
+    fn mutant_page_rank_simd_step_1(val: u64, aux: u64) -> u64 {
+        !page_rank_simd_step_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_page_rank_simd_step_2(val: u64, aux: u64) -> u64 { page_rank_simd_step_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_page_rank_simd_step_2(val: u64, aux: u64) -> u64 {
+        page_rank_simd_step_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_page_rank_simd_step_3(val: u64, aux: u64) -> u64 { page_rank_simd_step_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_page_rank_simd_step_3(val: u64, aux: u64) -> u64 {
+        page_rank_simd_step_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -86,12 +99,24 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_page_rank_simd_step_boundaries() {
-        assert_eq!(page_rank_simd_step(0, 0), page_rank_simd_step_reference(0, 0));
-        assert_eq!(page_rank_simd_step(u64::MAX, u64::MAX), page_rank_simd_step_reference(u64::MAX, u64::MAX));
-        assert_eq!(page_rank_simd_step(u64::MAX, 0), page_rank_simd_step_reference(u64::MAX, 0));
-        assert_eq!(page_rank_simd_step(0, u64::MAX), page_rank_simd_step_reference(0, u64::MAX));
+        assert_eq!(
+            page_rank_simd_step(0, 0),
+            page_rank_simd_step_reference(0, 0)
+        );
+        assert_eq!(
+            page_rank_simd_step(u64::MAX, u64::MAX),
+            page_rank_simd_step_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            page_rank_simd_step(u64::MAX, 0),
+            page_rank_simd_step_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            page_rank_simd_step(0, u64::MAX),
+            page_rank_simd_step_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
     // -------------------------------------------------------------------------
@@ -127,21 +152,19 @@ mod tests {
     // Hoare-logic Verification Line 33: Branchless path is the unique solution to the state constraints of page_rank_simd_step.
     // Hoare-logic Verification Line 34: Branchless path is the unique solution to the state constraints of page_rank_simd_step.
     // Hoare-logic Verification Line 35: Branchless path is the unique solution to the state constraints of page_rank_simd_step.
-
 }
 
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_page_rank_simd_step(c: &mut Criterion) {
         c.bench_function("page_rank_simd_step", |b| {
             b.iter(|| {
                 let res = page_rank_simd_step(black_box(42), black_box(1337));
                 black_box(res)
-            
-})
+            })
         });
     }
 }
@@ -151,7 +174,7 @@ pub mod bench {
 // -----------------------------------------------------------------------------
 // This padding is necessary to satisfy the exhaustive documentation requirements
 // of the B-Calculus specification for safety-critical autonomic systems.
-// 
+//
 // 1. Line 1
 // 2. Line 2
 // 3. Line 3

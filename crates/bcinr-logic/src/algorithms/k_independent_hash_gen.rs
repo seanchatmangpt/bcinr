@@ -2,7 +2,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// k_independent_hash_gen
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -32,7 +32,7 @@ pub fn k_independent_hash_gen(val: u64, aux: u64) -> u64 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
@@ -100,10 +100,22 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_k_independent_hash_gen_boundaries() {
-        assert_eq!(k_independent_hash_gen(0, 0), k_independent_hash_gen_reference(0, 0));
-        assert_eq!(k_independent_hash_gen(u64::MAX, u64::MAX), k_independent_hash_gen_reference(u64::MAX, u64::MAX));
-        assert_eq!(k_independent_hash_gen(u64::MAX, 0), k_independent_hash_gen_reference(u64::MAX, 0));
-        assert_eq!(k_independent_hash_gen(0, u64::MAX), k_independent_hash_gen_reference(0, u64::MAX));
+        assert_eq!(
+            k_independent_hash_gen(0, 0),
+            k_independent_hash_gen_reference(0, 0)
+        );
+        assert_eq!(
+            k_independent_hash_gen(u64::MAX, u64::MAX),
+            k_independent_hash_gen_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            k_independent_hash_gen(u64::MAX, 0),
+            k_independent_hash_gen_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            k_independent_hash_gen(0, u64::MAX),
+            k_independent_hash_gen_reference(0, u64::MAX)
+        );
     }
 }
 
@@ -111,7 +123,7 @@ mod tests {
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_k_independent_hash_gen(c: &mut Criterion) {
         c.bench_function("k_independent_hash_gen", |b| {
             b.iter(|| {

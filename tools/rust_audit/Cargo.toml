@@ -1,0 +1,12 @@
+[package]
+name = "rust_audit"
+version = "0.1.0"
+edition = "2024"
+description = "Rust code auditing and analysis tool"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/example/bcinr"
+readme = "../../README.md"
+keywords = ["audit", "analysis", "rust"]
+categories = ["development-tools"]
+
+[dependencies]

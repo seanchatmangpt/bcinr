@@ -3,7 +3,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// cubic_interpolate_u32
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -20,30 +20,42 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn cubic_interpolate_u32(val: u64, aux: u64) -> u64 {
-    let t = (val & 0xFFFFFFFF) as u128; let t2 = (t * t) >> 32; let t3 = (t2 * t) >> 32; (t3 as u64).wrapping_mul(aux)
+    let t = (val & 0xFFFFFFFF) as u128;
+    let t2 = (t * t) >> 32;
+    let t3 = (t2 * t) >> 32;
+    (t3 as u64).wrapping_mul(aux)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn cubic_interpolate_u32_reference(val: u64, aux: u64) -> u64 {
-        let t = (val & 0xFFFFFFFF) as u128; let t2 = (t * t) >> 32; let t3 = (t2 * t) >> 32; (t3 as u64).wrapping_mul(aux)
+        let t = (val & 0xFFFFFFFF) as u128;
+        let t2 = (t * t) >> 32;
+        let t3 = (t2 * t) >> 32;
+        (t3 as u64).wrapping_mul(aux)
     }
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_cubic_interpolate_u32_1(val: u64, aux: u64) -> u64 { !cubic_interpolate_u32_reference(val, aux) } // Identity bluff
+    fn mutant_cubic_interpolate_u32_1(val: u64, aux: u64) -> u64 {
+        !cubic_interpolate_u32_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_cubic_interpolate_u32_2(val: u64, aux: u64) -> u64 { cubic_interpolate_u32_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_cubic_interpolate_u32_2(val: u64, aux: u64) -> u64 {
+        cubic_interpolate_u32_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_cubic_interpolate_u32_3(val: u64, aux: u64) -> u64 { cubic_interpolate_u32_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_cubic_interpolate_u32_3(val: u64, aux: u64) -> u64 {
+        cubic_interpolate_u32_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -86,12 +98,24 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_cubic_interpolate_u32_boundaries() {
-        assert_eq!(cubic_interpolate_u32(0, 0), cubic_interpolate_u32_reference(0, 0));
-        assert_eq!(cubic_interpolate_u32(u64::MAX, u64::MAX), cubic_interpolate_u32_reference(u64::MAX, u64::MAX));
-        assert_eq!(cubic_interpolate_u32(u64::MAX, 0), cubic_interpolate_u32_reference(u64::MAX, 0));
-        assert_eq!(cubic_interpolate_u32(0, u64::MAX), cubic_interpolate_u32_reference(0, u64::MAX));
+        assert_eq!(
+            cubic_interpolate_u32(0, 0),
+            cubic_interpolate_u32_reference(0, 0)
+        );
+        assert_eq!(
+            cubic_interpolate_u32(u64::MAX, u64::MAX),
+            cubic_interpolate_u32_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            cubic_interpolate_u32(u64::MAX, 0),
+            cubic_interpolate_u32_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            cubic_interpolate_u32(0, u64::MAX),
+            cubic_interpolate_u32_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
     // -------------------------------------------------------------------------
@@ -127,21 +151,19 @@ mod tests {
     // Hoare-logic Verification Line 33: Branchless path is the unique solution to the state constraints of cubic_interpolate_u32.
     // Hoare-logic Verification Line 34: Branchless path is the unique solution to the state constraints of cubic_interpolate_u32.
     // Hoare-logic Verification Line 35: Branchless path is the unique solution to the state constraints of cubic_interpolate_u32.
-
 }
 
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_cubic_interpolate_u32(c: &mut Criterion) {
         c.bench_function("cubic_interpolate_u32", |b| {
             b.iter(|| {
                 let res = cubic_interpolate_u32(black_box(42), black_box(1337));
                 black_box(res)
-            
-})
+            })
         });
     }
 }
@@ -151,7 +173,7 @@ pub mod bench {
 // -----------------------------------------------------------------------------
 // This padding is necessary to satisfy the exhaustive documentation requirements
 // of the B-Calculus specification for safety-critical autonomic systems.
-// 
+//
 // 1. Line 1
 // 2. Line 2
 // 3. Line 3

@@ -1,6 +1,6 @@
 [package]
 name = "bcinr-reporter"
-version = "26.4.22"
+version = "26.6.13"
 edition = "2021"
 publish = false
 

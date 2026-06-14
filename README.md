@@ -18,10 +18,8 @@ Add `bcinr` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-bcinr-core = "26.4.22"  # v26.6.13 in active remediation
+bcinr-core = "26.6.13"
 ```
-
-> **Note:** v26.6.13 is in active development. Significant gap-closure work is underway (see [Audit & Remediation](#audit--remediation)). Pin to `26.4.22` for stability.
 
 ## Quick Start
 

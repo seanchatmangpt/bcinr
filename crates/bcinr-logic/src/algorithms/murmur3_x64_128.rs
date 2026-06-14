@@ -1,11 +1,17 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
-#![allow(unused_variables, unused_assignments, unused_mut, unused_parens, dead_code)]
+#![allow(
+    unused_variables,
+    unused_assignments,
+    unused_mut,
+    unused_parens,
+    dead_code
+)]
 // Academic-grade branchless algorithm library: murmur3_x64_128
 // Automatically generated scaffolding for AGI-level branchless primitives.
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// murmur3_x64_128
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -31,10 +37,18 @@ pub fn murmur3_x64_128(val: u64, aux: u64) -> u64 {
     let c2 = 0x4cf5ad432745937fu64;
     let mut k1 = val.wrapping_mul(c1).rotate_left(31).wrapping_mul(c2);
     h1 ^= k1;
-    h1 = h1.rotate_left(27).wrapping_add(h2).wrapping_mul(5).wrapping_add(0x52dce729);
+    h1 = h1
+        .rotate_left(27)
+        .wrapping_add(h2)
+        .wrapping_mul(5)
+        .wrapping_add(0x52dce729);
     let mut k2 = aux.wrapping_mul(c2).rotate_left(33).wrapping_mul(c1);
     h2 ^= k2;
-    h2 = h2.rotate_left(31).wrapping_add(h1).wrapping_mul(5).wrapping_add(0x38495ab5);
+    h2 = h2
+        .rotate_left(31)
+        .wrapping_add(h1)
+        .wrapping_mul(5)
+        .wrapping_add(0x38495ab5);
     h1 ^ h2
 }
 
@@ -42,7 +56,7 @@ pub fn murmur3_x64_128(val: u64, aux: u64) -> u64 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
@@ -53,10 +67,18 @@ mod tests {
         let c2 = 0x4cf5ad432745937fu64;
         let mut k1 = val.wrapping_mul(c1).rotate_left(31).wrapping_mul(c2);
         h1 ^= k1;
-        h1 = h1.rotate_left(27).wrapping_add(h2).wrapping_mul(5).wrapping_add(0x52dce729);
+        h1 = h1
+            .rotate_left(27)
+            .wrapping_add(h2)
+            .wrapping_mul(5)
+            .wrapping_add(0x52dce729);
         let mut k2 = aux.wrapping_mul(c2).rotate_left(33).wrapping_mul(c1);
         h2 ^= k2;
-        h2 = h2.rotate_left(31).wrapping_add(h1).wrapping_mul(5).wrapping_add(0x38495ab5);
+        h2 = h2
+            .rotate_left(31)
+            .wrapping_add(h1)
+            .wrapping_mul(5)
+            .wrapping_add(0x38495ab5);
         h1 ^ h2
     }
 
@@ -64,11 +86,17 @@ mod tests {
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_murmur3_x64_128_1(val: u64, aux: u64) -> u64 { !murmur3_x64_128_reference(val, aux) } // Identity bluff
+    fn mutant_murmur3_x64_128_1(val: u64, aux: u64) -> u64 {
+        !murmur3_x64_128_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_murmur3_x64_128_2(val: u64, aux: u64) -> u64 { murmur3_x64_128_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_murmur3_x64_128_2(val: u64, aux: u64) -> u64 {
+        murmur3_x64_128_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_murmur3_x64_128_3(val: u64, aux: u64) -> u64 { murmur3_x64_128_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_murmur3_x64_128_3(val: u64, aux: u64) -> u64 {
+        murmur3_x64_128_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -89,7 +117,6 @@ mod tests {
 
         #[test]
         fn test_murmur3_x64_128_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
-            let expected = expected; // Always passes as fallback since we check below
             let actual = mutant_murmur3_x64_128_2(val, aux);
             let expected_ref = murmur3_x64_128_reference(val, aux);
             if expected_ref != actual {
@@ -99,7 +126,6 @@ mod tests {
 
         #[test]
         fn test_murmur3_x64_128_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
-            let expected = expected; // Always passes as fallback since we check below
             let actual = mutant_murmur3_x64_128_3(val, aux);
             let expected_ref = murmur3_x64_128_reference(val, aux);
             if expected_ref != actual {
@@ -114,11 +140,20 @@ mod tests {
     #[test]
     fn test_murmur3_x64_128_boundaries() {
         assert_eq!(murmur3_x64_128(0, 0), murmur3_x64_128_reference(0, 0));
-        assert_eq!(murmur3_x64_128(u64::MAX, u64::MAX), murmur3_x64_128_reference(u64::MAX, u64::MAX));
-        assert_eq!(murmur3_x64_128(u64::MAX, 0), murmur3_x64_128_reference(u64::MAX, 0));
-        assert_eq!(murmur3_x64_128(0, u64::MAX), murmur3_x64_128_reference(0, u64::MAX));
+        assert_eq!(
+            murmur3_x64_128(u64::MAX, u64::MAX),
+            murmur3_x64_128_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            murmur3_x64_128(u64::MAX, 0),
+            murmur3_x64_128_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            murmur3_x64_128(0, u64::MAX),
+            murmur3_x64_128_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis
     // -------------------------------------------------------------------------
@@ -145,7 +180,7 @@ mod tests {
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_murmur3_x64_128(c: &mut Criterion) {
         c.bench_function("murmur3_x64_128", |b| {
             b.iter(|| {

@@ -1,11 +1,17 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
-#![allow(unused_variables, unused_assignments, unused_mut, unused_parens, dead_code)]
+#![allow(
+    unused_variables,
+    unused_assignments,
+    unused_mut,
+    unused_parens,
+    dead_code
+)]
 // Academic-grade branchless algorithm library: unique_branchless_u32
 // Automatically generated scaffolding for AGI-level branchless primitives.
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// unique_branchless_u32
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -36,25 +42,35 @@ pub fn unique_branchless_u32(val: u64, aux: u64) -> u64 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn unique_branchless_u32_reference(val: u64, aux: u64) -> u64 {
         let a = val & 0xFFFFFFFF;
         let b = val >> 32;
-        if a == b { a } else { a | (b << 32) }
+        if a == b {
+            a
+        } else {
+            a | (b << 32)
+        }
     }
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_unique_branchless_u32_1(val: u64, aux: u64) -> u64 { !unique_branchless_u32_reference(val, aux) } // Identity bluff
+    fn mutant_unique_branchless_u32_1(val: u64, aux: u64) -> u64 {
+        !unique_branchless_u32_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_unique_branchless_u32_2(val: u64, aux: u64) -> u64 { unique_branchless_u32_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_unique_branchless_u32_2(val: u64, aux: u64) -> u64 {
+        unique_branchless_u32_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_unique_branchless_u32_3(val: u64, aux: u64) -> u64 { unique_branchless_u32_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_unique_branchless_u32_3(val: u64, aux: u64) -> u64 {
+        unique_branchless_u32_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -97,12 +113,24 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_unique_branchless_u32_boundaries() {
-        assert_eq!(unique_branchless_u32(0, 0), unique_branchless_u32_reference(0, 0));
-        assert_eq!(unique_branchless_u32(u64::MAX, u64::MAX), unique_branchless_u32_reference(u64::MAX, u64::MAX));
-        assert_eq!(unique_branchless_u32(u64::MAX, 0), unique_branchless_u32_reference(u64::MAX, 0));
-        assert_eq!(unique_branchless_u32(0, u64::MAX), unique_branchless_u32_reference(0, u64::MAX));
+        assert_eq!(
+            unique_branchless_u32(0, 0),
+            unique_branchless_u32_reference(0, 0)
+        );
+        assert_eq!(
+            unique_branchless_u32(u64::MAX, u64::MAX),
+            unique_branchless_u32_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            unique_branchless_u32(u64::MAX, 0),
+            unique_branchless_u32_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            unique_branchless_u32(0, u64::MAX),
+            unique_branchless_u32_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis
     // -------------------------------------------------------------------------
@@ -129,7 +157,7 @@ mod tests {
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_unique_branchless_u32(c: &mut Criterion) {
         c.bench_function("unique_branchless_u32", |b| {
             b.iter(|| {

@@ -3,7 +3,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// matrix_mul_simd_f32
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -20,30 +20,45 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn matrix_mul_simd_f32(val: u64, aux: u64) -> u64 {
-    let a1 = f32::from_bits((val & 0xFFFFFFFF) as u32); let a2 = f32::from_bits((val >> 32) as u32); let b1 = f32::from_bits((aux & 0xFFFFFFFF) as u32); let b2 = f32::from_bits((aux >> 32) as u32); (a1 * b1 + a2 * b2).to_bits() as u64
+    let a1 = f32::from_bits((val & 0xFFFFFFFF) as u32);
+    let a2 = f32::from_bits((val >> 32) as u32);
+    let b1 = f32::from_bits((aux & 0xFFFFFFFF) as u32);
+    let b2 = f32::from_bits((aux >> 32) as u32);
+    (a1 * b1 + a2 * b2).to_bits() as u64
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn matrix_mul_simd_f32_reference(val: u64, aux: u64) -> u64 {
-        let a1 = f32::from_bits((val & 0xFFFFFFFF) as u32); let a2 = f32::from_bits((val >> 32) as u32); let b1 = f32::from_bits((aux & 0xFFFFFFFF) as u32); let b2 = f32::from_bits((aux >> 32) as u32); let sum = (a1 * b1) + (a2 * b2); sum.to_bits() as u64
+        let a1 = f32::from_bits((val & 0xFFFFFFFF) as u32);
+        let a2 = f32::from_bits((val >> 32) as u32);
+        let b1 = f32::from_bits((aux & 0xFFFFFFFF) as u32);
+        let b2 = f32::from_bits((aux >> 32) as u32);
+        let sum = (a1 * b1) + (a2 * b2);
+        sum.to_bits() as u64
     }
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_matrix_mul_simd_f32_1(val: u64, aux: u64) -> u64 { !matrix_mul_simd_f32_reference(val, aux) } // Identity bluff
+    fn mutant_matrix_mul_simd_f32_1(val: u64, aux: u64) -> u64 {
+        !matrix_mul_simd_f32_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_matrix_mul_simd_f32_2(val: u64, aux: u64) -> u64 { matrix_mul_simd_f32_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_matrix_mul_simd_f32_2(val: u64, aux: u64) -> u64 {
+        matrix_mul_simd_f32_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_matrix_mul_simd_f32_3(val: u64, aux: u64) -> u64 { matrix_mul_simd_f32_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_matrix_mul_simd_f32_3(val: u64, aux: u64) -> u64 {
+        matrix_mul_simd_f32_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -86,12 +101,24 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_matrix_mul_simd_f32_boundaries() {
-        assert_eq!(matrix_mul_simd_f32(0, 0), matrix_mul_simd_f32_reference(0, 0));
-        assert_eq!(matrix_mul_simd_f32(u64::MAX, u64::MAX), matrix_mul_simd_f32_reference(u64::MAX, u64::MAX));
-        assert_eq!(matrix_mul_simd_f32(u64::MAX, 0), matrix_mul_simd_f32_reference(u64::MAX, 0));
-        assert_eq!(matrix_mul_simd_f32(0, u64::MAX), matrix_mul_simd_f32_reference(0, u64::MAX));
+        assert_eq!(
+            matrix_mul_simd_f32(0, 0),
+            matrix_mul_simd_f32_reference(0, 0)
+        );
+        assert_eq!(
+            matrix_mul_simd_f32(u64::MAX, u64::MAX),
+            matrix_mul_simd_f32_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            matrix_mul_simd_f32(u64::MAX, 0),
+            matrix_mul_simd_f32_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            matrix_mul_simd_f32(0, u64::MAX),
+            matrix_mul_simd_f32_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
     // -------------------------------------------------------------------------
@@ -127,21 +154,19 @@ mod tests {
     // Hoare-logic Verification Line 33: Branchless path is the unique solution to the state constraints of matrix_mul_simd_f32.
     // Hoare-logic Verification Line 34: Branchless path is the unique solution to the state constraints of matrix_mul_simd_f32.
     // Hoare-logic Verification Line 35: Branchless path is the unique solution to the state constraints of matrix_mul_simd_f32.
-
 }
 
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_matrix_mul_simd_f32(c: &mut Criterion) {
         c.bench_function("matrix_mul_simd_f32", |b| {
             b.iter(|| {
                 let res = matrix_mul_simd_f32(black_box(42), black_box(1337));
                 black_box(res)
-            
-})
+            })
         });
     }
 }
@@ -151,7 +176,7 @@ pub mod bench {
 // -----------------------------------------------------------------------------
 // This padding is necessary to satisfy the exhaustive documentation requirements
 // of the B-Calculus specification for safety-critical autonomic systems.
-// 
+//
 // 1. Line 1
 // 2. Line 2
 // 3. Line 3

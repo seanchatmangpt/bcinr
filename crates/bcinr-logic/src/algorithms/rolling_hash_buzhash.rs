@@ -2,7 +2,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// rolling_hash_buzhash
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -29,12 +29,12 @@ pub fn rolling_hash_buzhash(val: u64, aux: u64) -> u64 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn rolling_hash_buzhash_reference(val: u64, aux: u64) -> u64 {
-        (val << 1 | val >> 63) ^ aux
+        val.rotate_left(1) ^ aux
     }
 
     // -------------------------------------------------------------------------
@@ -94,10 +94,22 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_rolling_hash_buzhash_boundaries() {
-        assert_eq!(rolling_hash_buzhash(0, 0), rolling_hash_buzhash_reference(0, 0));
-        assert_eq!(rolling_hash_buzhash(u64::MAX, u64::MAX), rolling_hash_buzhash_reference(u64::MAX, u64::MAX));
-        assert_eq!(rolling_hash_buzhash(u64::MAX, 0), rolling_hash_buzhash_reference(u64::MAX, 0));
-        assert_eq!(rolling_hash_buzhash(0, u64::MAX), rolling_hash_buzhash_reference(0, u64::MAX));
+        assert_eq!(
+            rolling_hash_buzhash(0, 0),
+            rolling_hash_buzhash_reference(0, 0)
+        );
+        assert_eq!(
+            rolling_hash_buzhash(u64::MAX, u64::MAX),
+            rolling_hash_buzhash_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            rolling_hash_buzhash(u64::MAX, 0),
+            rolling_hash_buzhash_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            rolling_hash_buzhash(0, u64::MAX),
+            rolling_hash_buzhash_reference(0, u64::MAX)
+        );
     }
 }
 
@@ -105,7 +117,7 @@ mod tests {
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_rolling_hash_buzhash(c: &mut Criterion) {
         c.bench_function("rolling_hash_buzhash", |b| {
             b.iter(|| {

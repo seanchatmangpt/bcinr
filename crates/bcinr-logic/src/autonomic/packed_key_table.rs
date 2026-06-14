@@ -64,9 +64,7 @@ fn hash_key<K: Copy>(key: &K) -> u64 {
     // 2. key is a valid, properly-aligned reference
     // 3. The lifetime is bounded by the function call
     let key_size = core::mem::size_of::<K>();
-    let key_bytes = unsafe {
-        core::slice::from_raw_parts(key as *const K as *const u8, key_size)
-    };
+    let key_bytes = unsafe { core::slice::from_raw_parts(key as *const K as *const u8, key_size) };
     // Hoare-logic Verification Line 28: Type-safe byte reinterpretation verified.
     fnv1a_64(key_bytes)
 }

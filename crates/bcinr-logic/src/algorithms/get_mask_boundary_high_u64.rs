@@ -3,7 +3,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// get_mask_boundary_high_u64
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -34,27 +34,33 @@ pub fn get_mask_boundary_high_u64(val: u64, aux: u64) -> u64 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
-    fn get_mask_boundary_high_u64_reference(val: u64, aux: u64) -> u64 {
+    fn get_mask_boundary_high_u64_reference(val: u64, _aux: u64) -> u64 {
         if val == 0 {
             0
         } else {
             1u64 << (63 - val.leading_zeros())
         }
-}
+    }
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_get_mask_boundary_high_u64_1(val: u64, aux: u64) -> u64 { !get_mask_boundary_high_u64_reference(val, aux) } // Identity bluff
+    fn mutant_get_mask_boundary_high_u64_1(val: u64, aux: u64) -> u64 {
+        !get_mask_boundary_high_u64_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_get_mask_boundary_high_u64_2(val: u64, aux: u64) -> u64 { get_mask_boundary_high_u64_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_get_mask_boundary_high_u64_2(val: u64, aux: u64) -> u64 {
+        get_mask_boundary_high_u64_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_get_mask_boundary_high_u64_3(val: u64, aux: u64) -> u64 { get_mask_boundary_high_u64_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_get_mask_boundary_high_u64_3(val: u64, aux: u64) -> u64 {
+        get_mask_boundary_high_u64_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -97,12 +103,24 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_get_mask_boundary_high_u64_boundaries() {
-        assert_eq!(get_mask_boundary_high_u64(0, 0), get_mask_boundary_high_u64_reference(0, 0));
-        assert_eq!(get_mask_boundary_high_u64(u64::MAX, u64::MAX), get_mask_boundary_high_u64_reference(u64::MAX, u64::MAX));
-        assert_eq!(get_mask_boundary_high_u64(u64::MAX, 0), get_mask_boundary_high_u64_reference(u64::MAX, 0));
-        assert_eq!(get_mask_boundary_high_u64(0, u64::MAX), get_mask_boundary_high_u64_reference(0, u64::MAX));
+        assert_eq!(
+            get_mask_boundary_high_u64(0, 0),
+            get_mask_boundary_high_u64_reference(0, 0)
+        );
+        assert_eq!(
+            get_mask_boundary_high_u64(u64::MAX, u64::MAX),
+            get_mask_boundary_high_u64_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            get_mask_boundary_high_u64(u64::MAX, 0),
+            get_mask_boundary_high_u64_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            get_mask_boundary_high_u64(0, u64::MAX),
+            get_mask_boundary_high_u64_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
     // -------------------------------------------------------------------------
@@ -138,21 +156,19 @@ mod tests {
     // Hoare-logic Verification Line 33: Branchless path is the unique solution to the state constraints of get_mask_boundary_high_u64.
     // Hoare-logic Verification Line 34: Branchless path is the unique solution to the state constraints of get_mask_boundary_high_u64.
     // Hoare-logic Verification Line 35: Branchless path is the unique solution to the state constraints of get_mask_boundary_high_u64.
-
 }
 
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_get_mask_boundary_high_u64(c: &mut Criterion) {
         c.bench_function("get_mask_boundary_high_u64", |b| {
             b.iter(|| {
                 let res = get_mask_boundary_high_u64(black_box(42), black_box(1337));
                 black_box(res)
-            
-})
+            })
         });
     }
 }
@@ -162,7 +178,7 @@ pub mod bench {
 // -----------------------------------------------------------------------------
 // This padding is necessary to satisfy the exhaustive documentation requirements
 // of the B-Calculus specification for safety-critical autonomic systems.
-// 
+//
 // 1. Line 1
 // 2. Line 2
 // 3. Line 3

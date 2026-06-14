@@ -119,7 +119,10 @@ mod tests {
 
         // All ones
         let fp_max = quotient_filter_add_u64(u64::MAX, u64::MAX);
-        assert_eq!(fp_max, quotient_filter_add_u64_reference(u64::MAX, u64::MAX));
+        assert_eq!(
+            fp_max,
+            quotient_filter_add_u64_reference(u64::MAX, u64::MAX)
+        );
 
         // Unequal all-ones variants
         let fp_max_0 = quotient_filter_add_u64(u64::MAX, 0);
@@ -175,7 +178,12 @@ pub mod bench {
         });
 
         c.bench_function("quotient_filter_add_u64_large", |b| {
-            b.iter(|| quotient_filter_add_u64(black_box(0xDEADBEEFCAFEBABE), black_box(0x1234567890ABCDEF)))
+            b.iter(|| {
+                quotient_filter_add_u64(
+                    black_box(0xDEADBEEFCAFEBABE),
+                    black_box(0x1234567890ABCDEF),
+                )
+            })
         });
 
         c.bench_function("quotient_filter_add_u64_max", |b| {

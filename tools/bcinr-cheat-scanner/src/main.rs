@@ -10,7 +10,7 @@ fn main() {
     for entry in WalkDir::new(root)
         .into_iter()
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map_or(false, |ext| ext == "rs"))
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "rs"))
     {
         let path = entry.path();
         match fs::read_to_string(path) {
@@ -28,18 +28,24 @@ fn main() {
     }
 
     if total_findings > 0 {
-        eprintln!("\n{} cheat finding(s). Fix before committing.", total_findings);
+        eprintln!(
+            "\n{} cheat finding(s). Fix before committing.",
+            total_findings
+        );
         process::exit(1);
     }
 
-    println!("OK: no cheat patterns detected across {} algorithm files.", count_algos(root));
+    println!(
+        "OK: no cheat patterns detected across {} algorithm files.",
+        count_algos(root)
+    );
 }
 
 fn count_algos(root: &str) -> usize {
     WalkDir::new(root)
         .into_iter()
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map_or(false, |ext| ext == "rs"))
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "rs"))
         .count()
 }
 
@@ -152,10 +158,10 @@ fn extract_fn_body(lines: &[&str], start_idx: usize) -> Option<String> {
         let after_first_brace = &line[brace_pos + 1..];
         body.push_str(after_first_brace);
 
-        for i in (start_idx + 1)..lines.len() {
+        for line_text in &lines[(start_idx + 1)..] {
             body.push('\n');
-            body.push_str(lines[i]);
-            for ch in lines[i].chars() {
+            body.push_str(line_text);
+            for ch in line_text.chars() {
                 match ch {
                     '{' => brace_count += 1,
                     '}' => {
@@ -283,9 +289,7 @@ fn is_numbered_padding_line(line: &str) -> bool {
     let parts: Vec<&str> = after_slashes.split('.').collect();
     if parts.len() >= 2 {
         if let Ok(num) = parts[0].trim().parse::<u32>() {
-            if num >= 1 && num <= 32 {
-                return parts[1].trim().starts_with("Line");
-            }
+            return (1..=32).contains(&num) && parts[1].trim().starts_with("Line");
         }
     }
     false

@@ -1,0 +1,488 @@
+=== matrix_mul_simd_f32 ===
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/matrix_mul_simd_f32.rs
+StartLine: 10
+EndLine: 36
+TargetContent:
+/// # CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::matrix_mul_simd_f32::matrix_mul_simd_f32;
+/// let result = matrix_mul_simd_f32(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn matrix_mul_simd_f32(val: u64, aux: u64) -> u64 {
+    (val.wrapping_add(aux)).wrapping_add((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)) ^ (val | aux)
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn matrix_mul_simd_f32_reference(val: u64, aux: u64) -> u64 {
+        (val.wrapping_add(aux)).wrapping_add((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)) ^ (val | aux)
+    }
+ReplacementContent:
+/// # Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::matrix_mul_simd_f32::matrix_mul_simd_f32;
+/// let result = matrix_mul_simd_f32(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn matrix_mul_simd_f32(val: u64, aux: u64) -> u64 {
+    let a1 = f32::from_bits((val & 0xFFFFFFFF) as u32); let a2 = f32::from_bits((val >> 32) as u32); let b1 = f32::from_bits((aux & 0xFFFFFFFF) as u32); let b2 = f32::from_bits((aux >> 32) as u32); (a1 * b1 + a2 * b2).to_bits() as u64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn matrix_mul_simd_f32_reference(val: u64, aux: u64) -> u64 {
+        let a1 = f32::from_bits((val & 0xFFFFFFFF) as u32); let a2 = f32::from_bits((val >> 32) as u32); let b1 = f32::from_bits((aux & 0xFFFFFFFF) as u32); let b2 = f32::from_bits((aux >> 32) as u32); let sum = (a1 * b1) + (a2 * b2); sum.to_bits() as u64
+    }
+
+================================================================================
+=== matrix_transpose_simd_f32 ===
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/matrix_transpose_simd_f32.rs
+StartLine: 10
+EndLine: 36
+TargetContent:
+/// # CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::matrix_transpose_simd_f32::matrix_transpose_simd_f32;
+/// let result = matrix_transpose_simd_f32(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn matrix_transpose_simd_f32(val: u64, aux: u64) -> u64 {
+    (val ^ aux).wrapping_add(val | aux) ^ (val & aux)
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn matrix_transpose_simd_f32_reference(val: u64, aux: u64) -> u64 {
+        (val ^ aux).wrapping_add(val | aux) ^ (val & aux)
+    }
+ReplacementContent:
+/// # Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::matrix_transpose_simd_f32::matrix_transpose_simd_f32;
+/// let result = matrix_transpose_simd_f32(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn matrix_transpose_simd_f32(val: u64, aux: u64) -> u64 {
+    let a11 = val & 0xFFFFFFFF; let a21 = aux & 0xFFFFFFFF; a11 | (a21 << 32)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn matrix_transpose_simd_f32_reference(val: u64, aux: u64) -> u64 {
+        let a11 = val & 0xFFFFFFFF; let a21 = aux & 0xFFFFFFFF; (a21 << 32) | a11
+    }
+
+================================================================================
+=== max_flow_edmonds_karp_step ===
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/max_flow_edmonds_karp_step.rs
+StartLine: 10
+EndLine: 36
+TargetContent:
+/// # CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::max_flow_edmonds_karp_step::max_flow_edmonds_karp_step;
+/// let result = max_flow_edmonds_karp_step(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn max_flow_edmonds_karp_step(val: u64, aux: u64) -> u64 {
+    (val.wrapping_sub(aux)).wrapping_add(val | aux) ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn max_flow_edmonds_karp_step_reference(val: u64, aux: u64) -> u64 {
+        (val.wrapping_sub(aux)).wrapping_add(val | aux) ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+    }
+ReplacementContent:
+/// # Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::max_flow_edmonds_karp_step::max_flow_edmonds_karp_step;
+/// let result = max_flow_edmonds_karp_step(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn max_flow_edmonds_karp_step(val: u64, aux: u64) -> u64 {
+    let cap = val; let flow = aux; let valid = (cap >= flow) as u64; (cap.wrapping_sub(flow)) * valid
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn max_flow_edmonds_karp_step_reference(val: u64, aux: u64) -> u64 {
+        if val >= aux { val - aux } else { 0 }
+    }
+
+================================================================================
+=== minimum_spanning_tree_prim_step ===
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/minimum_spanning_tree_prim_step.rs
+StartLine: 10
+EndLine: 36
+TargetContent:
+/// # CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::minimum_spanning_tree_prim_step::minimum_spanning_tree_prim_step;
+/// let result = minimum_spanning_tree_prim_step(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn minimum_spanning_tree_prim_step(val: u64, aux: u64) -> u64 {
+    (val.leading_zeros() as u64 ^ aux).wrapping_add(val.reverse_bits() ^ aux) ^ (val.reverse_bits() ^ aux)
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn minimum_spanning_tree_prim_step_reference(val: u64, aux: u64) -> u64 {
+        (val.leading_zeros() as u64 ^ aux).wrapping_add(val.reverse_bits() ^ aux) ^ (val.reverse_bits() ^ aux)
+    }
+ReplacementContent:
+/// # Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::minimum_spanning_tree_prim_step::minimum_spanning_tree_prim_step;
+/// let result = minimum_spanning_tree_prim_step(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn minimum_spanning_tree_prim_step(val: u64, aux: u64) -> u64 {
+    let m = 0u64.wrapping_sub((val < aux) as u64); (val & m) | (aux & !m)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn minimum_spanning_tree_prim_step_reference(val: u64, aux: u64) -> u64 {
+        if val < aux { val } else { aux }
+    }
+
+================================================================================
+=== page_rank_simd_step ===
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/page_rank_simd_step.rs
+StartLine: 10
+EndLine: 36
+TargetContent:
+/// # CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::page_rank_simd_step::page_rank_simd_step;
+/// let result = page_rank_simd_step(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn page_rank_simd_step(val: u64, aux: u64) -> u64 {
+    (val.rotate_left(13)).wrapping_add(val.reverse_bits() ^ aux) ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn page_rank_simd_step_reference(val: u64, aux: u64) -> u64 {
+        (val.rotate_left(13)).wrapping_add(val.reverse_bits() ^ aux) ^ (val.wrapping_shl(3) ^ aux.wrapping_shr(2))
+    }
+ReplacementContent:
+/// # Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::page_rank_simd_step::page_rank_simd_step;
+/// let result = page_rank_simd_step(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn page_rank_simd_step(val: u64, aux: u64) -> u64 {
+    let nz = (aux != 0) as u64; let out_degree = (aux + (1 - nz)) as f64; let rank = (val * nz) as f64; (rank / out_degree) as u64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn page_rank_simd_step_reference(val: u64, aux: u64) -> u64 {
+        if aux == 0 { 0 } else { (val as f64 / aux as f64) as u64 }
+    }
+
+================================================================================
+=== point_in_polygon_branchless ===
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/point_in_polygon_branchless.rs
+StartLine: 10
+EndLine: 36
+TargetContent:
+/// # CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::point_in_polygon_branchless::point_in_polygon_branchless;
+/// let result = point_in_polygon_branchless(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn point_in_polygon_branchless(val: u64, aux: u64) -> u64 {
+    (!(val & aux) & (val | aux)).wrapping_add(aux.rotate_right(7)) ^ (val.wrapping_mul(aux.wrapping_add(1)))
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn point_in_polygon_branchless_reference(val: u64, aux: u64) -> u64 {
+        (!(val & aux) & (val | aux)).wrapping_add(aux.rotate_right(7)) ^ (val.wrapping_mul(aux.wrapping_add(1)))
+    }
+ReplacementContent:
+/// # Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::point_in_polygon_branchless::point_in_polygon_branchless;
+/// let result = point_in_polygon_branchless(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn point_in_polygon_branchless(val: u64, aux: u64) -> u64 {
+    let py = (val >> 32) as i32; let px = (val & 0xFFFFFFFF) as i32; let v1x = (aux & 0xFFFF) as i32; let v1y = ((aux >> 16) & 0xFFFF) as i32; let v2x = ((aux >> 32) & 0xFFFF) as i32; let v2y = (aux >> 48) as i32; let cond1 = (v1y > py) != (v2y > py); let denom = v2y - v1y + (v2y == v1y) as i32; let intersect = cond1 & (px < (v2x - v1x) * (py - v1y) / denom + v1x); intersect as u64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn point_in_polygon_branchless_reference(val: u64, aux: u64) -> u64 {
+        let py = (val >> 32) as i32; let px = (val & 0xFFFFFFFF) as i32; let v1x = (aux & 0xFFFF) as i32; let v1y = ((aux >> 16) & 0xFFFF) as i32; let v2x = ((aux >> 32) & 0xFFFF) as i32; let v2y = (aux >> 48) as i32; if (v1y > py) != (v2y > py) { if px < (v2x - v1x) * (py - v1y) / (v2y - v1y) + v1x { 1 } else { 0 } } else { 0 }
+    }
+
+================================================================================
+=== quaternion_mul_branchless ===
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/quaternion_mul_branchless.rs
+StartLine: 10
+EndLine: 36
+TargetContent:
+/// # CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::quaternion_mul_branchless::quaternion_mul_branchless;
+/// let result = quaternion_mul_branchless(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn quaternion_mul_branchless(val: u64, aux: u64) -> u64 {
+    (!(val & aux) & (val | aux)).wrapping_add((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)) ^ (val.count_ones() as u64 | aux)
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn quaternion_mul_branchless_reference(val: u64, aux: u64) -> u64 {
+        (!(val & aux) & (val | aux)).wrapping_add((val ^ aux).wrapping_mul(0x9E3779B185EBCA87)) ^ (val.count_ones() as u64 | aux)
+    }
+ReplacementContent:
+/// # Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::quaternion_mul_branchless::quaternion_mul_branchless;
+/// let result = quaternion_mul_branchless(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn quaternion_mul_branchless(val: u64, aux: u64) -> u64 {
+    let a = val >> 32; let b = val & 0xFFFFFFFF; let c = aux >> 32; let d = aux & 0xFFFFFFFF; let r = a.wrapping_mul(c).wrapping_sub(b.wrapping_mul(d)); let i = a.wrapping_mul(d).wrapping_add(b.wrapping_mul(c)); (r << 32) | (i & 0xFFFFFFFF)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn quaternion_mul_branchless_reference(val: u64, aux: u64) -> u64 {
+        let a = val >> 32; let b = val & 0xFFFFFFFF; let c = aux >> 32; let d = aux & 0xFFFFFFFF; let r = (a.wrapping_mul(c)).wrapping_sub(b.wrapping_mul(d)); let i = (a.wrapping_mul(d)).wrapping_add(b.wrapping_mul(c)); (r << 32) | (i & 0xFFFFFFFF)
+    }
+
+================================================================================
+=== ray_sphere_intersect_branchless ===
+TargetFile: /Users/sac/bcinr/crates/bcinr-logic/src/algorithms/ray_sphere_intersect_branchless.rs
+StartLine: 10
+EndLine: 36
+TargetContent:
+/// # CONTRACT
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::ray_sphere_intersect_branchless::ray_sphere_intersect_branchless;
+/// let result = ray_sphere_intersect_branchless(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn ray_sphere_intersect_branchless(val: u64, aux: u64) -> u64 {
+    (aux.rotate_right(7)).wrapping_add(val.reverse_bits() ^ aux) ^ (val.rotate_left(13))
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn ray_sphere_intersect_branchless_reference(val: u64, aux: u64) -> u64 {
+        (aux.rotate_right(7)).wrapping_add(val.reverse_bits() ^ aux) ^ (val.rotate_left(13))
+    }
+ReplacementContent:
+/// # Branchless Contract
+/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Invariant:** Execution path is independent of input data values (Branchless).
+///
+/// ```rust
+/// use bcinr_logic::algorithms::ray_sphere_intersect_branchless::ray_sphere_intersect_branchless;
+/// let result = ray_sphere_intersect_branchless(42, 1337);
+/// assert!(result <= u64::MAX);
+/// ```
+#[no_mangle]
+#[allow(unused_variables)]
+pub fn ray_sphere_intersect_branchless(val: u64, aux: u64) -> u64 {
+    let b = val; let c = aux; let disc = b.wrapping_mul(b).wrapping_sub(4u64.wrapping_mul(c)); (disc.leading_zeros() == 0) as u64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    // -------------------------------------------------------------------------
+    // POSITIVE ORACLE: Reference implementation
+    // -------------------------------------------------------------------------
+    fn ray_sphere_intersect_branchless_reference(val: u64, aux: u64) -> u64 {
+        let b = val; let c = aux; let disc = b.wrapping_mul(b).wrapping_sub(4u64.wrapping_mul(c)); if (disc >> 63) == 1 { 0 } else { 1 }
+    }
+
+================================================================================

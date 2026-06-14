@@ -1,11 +1,17 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
-#![allow(unused_variables, unused_assignments, unused_mut, unused_parens, dead_code)]
+#![allow(
+    unused_variables,
+    unused_assignments,
+    unused_mut,
+    unused_parens,
+    dead_code
+)]
 // Academic-grade branchless algorithm library: farmhash64
 // Automatically generated scaffolding for AGI-level branchless primitives.
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// farmhash64
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -33,7 +39,7 @@ pub fn farmhash64(val: u64, aux: u64) -> u64 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
@@ -46,11 +52,17 @@ mod tests {
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_farmhash64_1(val: u64, aux: u64) -> u64 { !mutant_farmhash64_reference(val, aux) } // Identity bluff
+    fn mutant_farmhash64_1(val: u64, aux: u64) -> u64 {
+        !mutant_farmhash64_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_farmhash64_reference(val: u64, aux: u64) -> u64 { farmhash64_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_farmhash64_reference(val: u64, aux: u64) -> u64 {
+        farmhash64_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_farmhash64_3(val: u64, aux: u64) -> u64 { farmhash64_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_farmhash64_3(val: u64, aux: u64) -> u64 {
+        farmhash64_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -71,7 +83,6 @@ mod tests {
 
         #[test]
         fn test_farmhash64_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
-            let expected = expected; // Always passes as fallback since we check below
             let actual = mutant_farmhash64_reference(val, aux);
             let expected_ref = farmhash64_reference(val, aux);
             if expected_ref != actual {
@@ -81,7 +92,6 @@ mod tests {
 
         #[test]
         fn test_farmhash64_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
-            let expected = expected; // Always passes as fallback since we check below
             let actual = mutant_farmhash64_3(val, aux);
             let expected_ref = farmhash64_reference(val, aux);
             if expected_ref != actual {
@@ -96,11 +106,14 @@ mod tests {
     #[test]
     fn test_farmhash64_boundaries() {
         assert_eq!(farmhash64(0, 0), farmhash64_reference(0, 0));
-        assert_eq!(farmhash64(u64::MAX, u64::MAX), farmhash64_reference(u64::MAX, u64::MAX));
+        assert_eq!(
+            farmhash64(u64::MAX, u64::MAX),
+            farmhash64_reference(u64::MAX, u64::MAX)
+        );
         assert_eq!(farmhash64(u64::MAX, 0), farmhash64_reference(u64::MAX, 0));
         assert_eq!(farmhash64(0, u64::MAX), farmhash64_reference(0, u64::MAX));
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis
     // -------------------------------------------------------------------------
@@ -127,7 +140,7 @@ mod tests {
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_farmhash64(c: &mut Criterion) {
         c.bench_function("farmhash64", |b| {
             b.iter(|| {

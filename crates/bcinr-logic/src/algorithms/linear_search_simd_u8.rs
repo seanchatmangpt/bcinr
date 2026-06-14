@@ -1,11 +1,17 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
-#![allow(unused_variables, unused_assignments, unused_mut, unused_parens, dead_code)]
+#![allow(
+    unused_variables,
+    unused_assignments,
+    unused_mut,
+    unused_parens,
+    dead_code
+)]
 // Academic-grade branchless algorithm library: linear_search_simd_u8
 // Automatically generated scaffolding for AGI-level branchless primitives.
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// linear_search_simd_u8
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -39,7 +45,7 @@ pub fn linear_search_simd_u8(val: u64, aux: u64) -> u64 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
@@ -57,11 +63,17 @@ mod tests {
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_linear_search_simd_u8_1(val: u64, aux: u64) -> u64 { !linear_search_simd_u8_reference(val, aux) } // Identity bluff
+    fn mutant_linear_search_simd_u8_1(val: u64, aux: u64) -> u64 {
+        !linear_search_simd_u8_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_linear_search_simd_u8_2(val: u64, aux: u64) -> u64 { linear_search_simd_u8_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_linear_search_simd_u8_2(val: u64, aux: u64) -> u64 {
+        linear_search_simd_u8_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_linear_search_simd_u8_3(val: u64, aux: u64) -> u64 { linear_search_simd_u8_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_linear_search_simd_u8_3(val: u64, aux: u64) -> u64 {
+        linear_search_simd_u8_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -104,12 +116,24 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_linear_search_simd_u8_boundaries() {
-        assert_eq!(linear_search_simd_u8(0, 0), linear_search_simd_u8_reference(0, 0));
-        assert_eq!(linear_search_simd_u8(u64::MAX, u64::MAX), linear_search_simd_u8_reference(u64::MAX, u64::MAX));
-        assert_eq!(linear_search_simd_u8(u64::MAX, 0), linear_search_simd_u8_reference(u64::MAX, 0));
-        assert_eq!(linear_search_simd_u8(0, u64::MAX), linear_search_simd_u8_reference(0, u64::MAX));
+        assert_eq!(
+            linear_search_simd_u8(0, 0),
+            linear_search_simd_u8_reference(0, 0)
+        );
+        assert_eq!(
+            linear_search_simd_u8(u64::MAX, u64::MAX),
+            linear_search_simd_u8_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            linear_search_simd_u8(u64::MAX, 0),
+            linear_search_simd_u8_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            linear_search_simd_u8(0, u64::MAX),
+            linear_search_simd_u8_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis
     // -------------------------------------------------------------------------
@@ -136,7 +160,7 @@ mod tests {
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_linear_search_simd_u8(c: &mut Criterion) {
         c.bench_function("linear_search_simd_u8", |b| {
             b.iter(|| {

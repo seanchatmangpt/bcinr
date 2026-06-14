@@ -3,7 +3,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// fp_atan2_u32_q16
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -24,23 +24,23 @@ pub fn fp_atan2_u32_q16(val: u64, aux: u64) -> u64 {
     let x = aux as i64;
     let abs_y = y.abs();
     let abs_x = x.abs();
-    
+
     let mut angle: i64;
     let cond = abs_x > abs_y;
     let m_cond = (cond as i64).wrapping_neg();
-    
+
     let n = (abs_x.min(abs_y) << 16) / (abs_x.max(abs_y) | 1);
     let n2 = (n * n) >> 16;
-    
+
     angle = (n * 0x00010000) >> 16;
-    angle = (angle - ((n * n2) >> 16) / 3);
-    
-    let off = (90i64 << 16);
+    angle -= ((n * n2) >> 16) / 3;
+
+    let off = 90i64 << 16;
     angle = (angle & m_cond) | ((off - angle) & !m_cond);
-    
+
     let sign_y = ((y >= 0) as i64).wrapping_neg() | 1;
-    angle = angle * sign_y;
-    
+    angle *= sign_y;
+
     let q_adj = ((x < 0) as i64).wrapping_neg() & ((180i64 << 16).wrapping_mul(sign_y));
     (angle + q_adj) as u64
 }
@@ -49,7 +49,7 @@ pub fn fp_atan2_u32_q16(val: u64, aux: u64) -> u64 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
@@ -58,26 +58,26 @@ mod tests {
         let x = aux as i64;
         let abs_y = y.abs();
         let abs_x = x.abs();
-        
+
         let n = if abs_x > abs_y {
             (abs_y << 16) / (abs_x | 1)
         } else {
             (abs_x << 16) / (abs_y | 1)
         };
-        
+
         let n2 = (n * n) >> 16;
-        let mut angle = n - (n * n2 >> 16) / 3;
-        
+        let mut angle = n - ((n * n2) >> 16) / 3;
+
         if abs_x > abs_y {
             // angle is correct
         } else {
             angle = (90i64 << 16) - angle;
         }
-        
+
         if y < 0 {
             angle = -angle;
         }
-        
+
         if x < 0 {
             if y >= 0 {
                 angle += 180i64 << 16;
@@ -92,11 +92,17 @@ mod tests {
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_fp_atan2_u32_q16_1(val: u64, aux: u64) -> u64 { !fp_atan2_u32_q16_reference(val, aux) } // Identity bluff
+    fn mutant_fp_atan2_u32_q16_1(val: u64, aux: u64) -> u64 {
+        !fp_atan2_u32_q16_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_fp_atan2_u32_q16_2(val: u64, aux: u64) -> u64 { fp_atan2_u32_q16_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_fp_atan2_u32_q16_2(val: u64, aux: u64) -> u64 {
+        fp_atan2_u32_q16_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_fp_atan2_u32_q16_3(val: u64, aux: u64) -> u64 { fp_atan2_u32_q16_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_fp_atan2_u32_q16_3(val: u64, aux: u64) -> u64 {
+        fp_atan2_u32_q16_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -140,11 +146,20 @@ mod tests {
     #[test]
     fn test_fp_atan2_u32_q16_boundaries() {
         assert_eq!(fp_atan2_u32_q16(0, 0), fp_atan2_u32_q16_reference(0, 0));
-        assert_eq!(fp_atan2_u32_q16(u64::MAX, u64::MAX), fp_atan2_u32_q16_reference(u64::MAX, u64::MAX));
-        assert_eq!(fp_atan2_u32_q16(u64::MAX, 0), fp_atan2_u32_q16_reference(u64::MAX, 0));
-        assert_eq!(fp_atan2_u32_q16(0, u64::MAX), fp_atan2_u32_q16_reference(0, u64::MAX));
+        assert_eq!(
+            fp_atan2_u32_q16(u64::MAX, u64::MAX),
+            fp_atan2_u32_q16_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            fp_atan2_u32_q16(u64::MAX, 0),
+            fp_atan2_u32_q16_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            fp_atan2_u32_q16(0, u64::MAX),
+            fp_atan2_u32_q16_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
     // -------------------------------------------------------------------------
@@ -180,21 +195,19 @@ mod tests {
     // Hoare-logic Verification Line 33: Branchless path is the unique solution to the state constraints of fp_atan2_u32_q16.
     // Hoare-logic Verification Line 34: Branchless path is the unique solution to the state constraints of fp_atan2_u32_q16.
     // Hoare-logic Verification Line 35: Branchless path is the unique solution to the state constraints of fp_atan2_u32_q16.
-
 }
 
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_fp_atan2_u32_q16(c: &mut Criterion) {
         c.bench_function("fp_atan2_u32_q16", |b| {
             b.iter(|| {
                 let res = fp_atan2_u32_q16(black_box(42), black_box(1337));
                 black_box(res)
-            
-})
+            })
         });
     }
 }
@@ -204,7 +217,7 @@ pub mod bench {
 // -----------------------------------------------------------------------------
 // This padding is necessary to satisfy the exhaustive documentation requirements
 // of the B-Calculus specification for safety-critical autonomic systems.
-// 
+//
 // 1. Line 1
 // 2. Line 2
 // 3. Line 3

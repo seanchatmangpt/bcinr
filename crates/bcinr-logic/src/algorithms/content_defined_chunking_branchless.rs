@@ -2,7 +2,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// content_defined_chunking_branchless
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -22,14 +22,15 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn content_defined_chunking_branchless(val: u64, aux: u64) -> u64 {
-    val.wrapping_shl(1).wrapping_add(aux.wrapping_mul(0x9E3779B97F4A7C15u64))
+    val.wrapping_shl(1)
+        .wrapping_add(aux.wrapping_mul(0x9E3779B97F4A7C15u64))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
@@ -96,10 +97,22 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_content_defined_chunking_branchless_boundaries() {
-        assert_eq!(content_defined_chunking_branchless(0, 0), content_defined_chunking_branchless_reference(0, 0));
-        assert_eq!(content_defined_chunking_branchless(u64::MAX, u64::MAX), content_defined_chunking_branchless_reference(u64::MAX, u64::MAX));
-        assert_eq!(content_defined_chunking_branchless(u64::MAX, 0), content_defined_chunking_branchless_reference(u64::MAX, 0));
-        assert_eq!(content_defined_chunking_branchless(0, u64::MAX), content_defined_chunking_branchless_reference(0, u64::MAX));
+        assert_eq!(
+            content_defined_chunking_branchless(0, 0),
+            content_defined_chunking_branchless_reference(0, 0)
+        );
+        assert_eq!(
+            content_defined_chunking_branchless(u64::MAX, u64::MAX),
+            content_defined_chunking_branchless_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            content_defined_chunking_branchless(u64::MAX, 0),
+            content_defined_chunking_branchless_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            content_defined_chunking_branchless(0, u64::MAX),
+            content_defined_chunking_branchless_reference(0, u64::MAX)
+        );
     }
 }
 
@@ -107,7 +120,7 @@ mod tests {
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_content_defined_chunking_branchless(c: &mut Criterion) {
         c.bench_function("content_defined_chunking_branchless", |b| {
             b.iter(|| {

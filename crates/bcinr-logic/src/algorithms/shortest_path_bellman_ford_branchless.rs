@@ -3,7 +3,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// shortest_path_bellman_ford_branchless
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -27,23 +27,33 @@ pub fn shortest_path_bellman_ford_branchless(val: u64, aux: u64) -> u64 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn shortest_path_bellman_ford_branchless_reference(val: u64, aux: u64) -> u64 {
-        if val > u64::MAX - aux { u64::MAX } else { val + aux }
+        if val > u64::MAX - aux {
+            u64::MAX
+        } else {
+            val + aux
+        }
     }
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_shortest_path_bellman_ford_branchless_1(val: u64, aux: u64) -> u64 { !shortest_path_bellman_ford_branchless_reference(val, aux) } // Identity bluff
+    fn mutant_shortest_path_bellman_ford_branchless_1(val: u64, aux: u64) -> u64 {
+        !shortest_path_bellman_ford_branchless_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_shortest_path_bellman_ford_branchless_2(val: u64, aux: u64) -> u64 { shortest_path_bellman_ford_branchless_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_shortest_path_bellman_ford_branchless_2(val: u64, aux: u64) -> u64 {
+        shortest_path_bellman_ford_branchless_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_shortest_path_bellman_ford_branchless_3(val: u64, aux: u64) -> u64 { shortest_path_bellman_ford_branchless_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_shortest_path_bellman_ford_branchless_3(val: u64, aux: u64) -> u64 {
+        shortest_path_bellman_ford_branchless_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -86,12 +96,24 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_shortest_path_bellman_ford_branchless_boundaries() {
-        assert_eq!(shortest_path_bellman_ford_branchless(0, 0), shortest_path_bellman_ford_branchless_reference(0, 0));
-        assert_eq!(shortest_path_bellman_ford_branchless(u64::MAX, u64::MAX), shortest_path_bellman_ford_branchless_reference(u64::MAX, u64::MAX));
-        assert_eq!(shortest_path_bellman_ford_branchless(u64::MAX, 0), shortest_path_bellman_ford_branchless_reference(u64::MAX, 0));
-        assert_eq!(shortest_path_bellman_ford_branchless(0, u64::MAX), shortest_path_bellman_ford_branchless_reference(0, u64::MAX));
+        assert_eq!(
+            shortest_path_bellman_ford_branchless(0, 0),
+            shortest_path_bellman_ford_branchless_reference(0, 0)
+        );
+        assert_eq!(
+            shortest_path_bellman_ford_branchless(u64::MAX, u64::MAX),
+            shortest_path_bellman_ford_branchless_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            shortest_path_bellman_ford_branchless(u64::MAX, 0),
+            shortest_path_bellman_ford_branchless_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            shortest_path_bellman_ford_branchless(0, u64::MAX),
+            shortest_path_bellman_ford_branchless_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
     // -------------------------------------------------------------------------
@@ -127,21 +149,19 @@ mod tests {
     // Hoare-logic Verification Line 33: Branchless path is the unique solution to the state constraints of shortest_path_bellman_ford_branchless.
     // Hoare-logic Verification Line 34: Branchless path is the unique solution to the state constraints of shortest_path_bellman_ford_branchless.
     // Hoare-logic Verification Line 35: Branchless path is the unique solution to the state constraints of shortest_path_bellman_ford_branchless.
-
 }
 
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_shortest_path_bellman_ford_branchless(c: &mut Criterion) {
         c.bench_function("shortest_path_bellman_ford_branchless", |b| {
             b.iter(|| {
                 let res = shortest_path_bellman_ford_branchless(black_box(42), black_box(1337));
                 black_box(res)
-            
-})
+            })
         });
     }
 }
@@ -151,7 +171,7 @@ pub mod bench {
 // -----------------------------------------------------------------------------
 // This padding is necessary to satisfy the exhaustive documentation requirements
 // of the B-Calculus specification for safety-critical autonomic systems.
-// 
+//
 // 1. Line 1
 // 2. Line 2
 // 3. Line 3

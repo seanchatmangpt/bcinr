@@ -3,7 +3,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// quaternion_mul_branchless
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -20,30 +20,48 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn quaternion_mul_branchless(val: u64, aux: u64) -> u64 {
-    let a = val >> 32; let b = val & 0xFFFFFFFF; let c = aux >> 32; let d = aux & 0xFFFFFFFF; let r = a.wrapping_mul(c).wrapping_sub(b.wrapping_mul(d)); let i = a.wrapping_mul(d).wrapping_add(b.wrapping_mul(c)); (r << 32) | (i & 0xFFFFFFFF)
+    let a = val >> 32;
+    let b = val & 0xFFFFFFFF;
+    let c = aux >> 32;
+    let d = aux & 0xFFFFFFFF;
+    let r = a.wrapping_mul(c).wrapping_sub(b.wrapping_mul(d));
+    let i = a.wrapping_mul(d).wrapping_add(b.wrapping_mul(c));
+    (r << 32) | (i & 0xFFFFFFFF)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn quaternion_mul_branchless_reference(val: u64, aux: u64) -> u64 {
-        let a = val >> 32; let b = val & 0xFFFFFFFF; let c = aux >> 32; let d = aux & 0xFFFFFFFF; let r = (a.wrapping_mul(c)).wrapping_sub(b.wrapping_mul(d)); let i = (a.wrapping_mul(d)).wrapping_add(b.wrapping_mul(c)); (r << 32) | (i & 0xFFFFFFFF)
+        let a = val >> 32;
+        let b = val & 0xFFFFFFFF;
+        let c = aux >> 32;
+        let d = aux & 0xFFFFFFFF;
+        let r = (a.wrapping_mul(c)).wrapping_sub(b.wrapping_mul(d));
+        let i = (a.wrapping_mul(d)).wrapping_add(b.wrapping_mul(c));
+        (r << 32) | (i & 0xFFFFFFFF)
     }
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_quaternion_mul_branchless_1(val: u64, aux: u64) -> u64 { !quaternion_mul_branchless_reference(val, aux) } // Identity bluff
+    fn mutant_quaternion_mul_branchless_1(val: u64, aux: u64) -> u64 {
+        !quaternion_mul_branchless_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_quaternion_mul_branchless_2(val: u64, aux: u64) -> u64 { quaternion_mul_branchless_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_quaternion_mul_branchless_2(val: u64, aux: u64) -> u64 {
+        quaternion_mul_branchless_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_quaternion_mul_branchless_3(val: u64, aux: u64) -> u64 { quaternion_mul_branchless_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_quaternion_mul_branchless_3(val: u64, aux: u64) -> u64 {
+        quaternion_mul_branchless_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -86,12 +104,24 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_quaternion_mul_branchless_boundaries() {
-        assert_eq!(quaternion_mul_branchless(0, 0), quaternion_mul_branchless_reference(0, 0));
-        assert_eq!(quaternion_mul_branchless(u64::MAX, u64::MAX), quaternion_mul_branchless_reference(u64::MAX, u64::MAX));
-        assert_eq!(quaternion_mul_branchless(u64::MAX, 0), quaternion_mul_branchless_reference(u64::MAX, 0));
-        assert_eq!(quaternion_mul_branchless(0, u64::MAX), quaternion_mul_branchless_reference(0, u64::MAX));
+        assert_eq!(
+            quaternion_mul_branchless(0, 0),
+            quaternion_mul_branchless_reference(0, 0)
+        );
+        assert_eq!(
+            quaternion_mul_branchless(u64::MAX, u64::MAX),
+            quaternion_mul_branchless_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            quaternion_mul_branchless(u64::MAX, 0),
+            quaternion_mul_branchless_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            quaternion_mul_branchless(0, u64::MAX),
+            quaternion_mul_branchless_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
     // -------------------------------------------------------------------------
@@ -127,21 +157,19 @@ mod tests {
     // Hoare-logic Verification Line 33: Branchless path is the unique solution to the state constraints of quaternion_mul_branchless.
     // Hoare-logic Verification Line 34: Branchless path is the unique solution to the state constraints of quaternion_mul_branchless.
     // Hoare-logic Verification Line 35: Branchless path is the unique solution to the state constraints of quaternion_mul_branchless.
-
 }
 
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_quaternion_mul_branchless(c: &mut Criterion) {
         c.bench_function("quaternion_mul_branchless", |b| {
             b.iter(|| {
                 let res = quaternion_mul_branchless(black_box(42), black_box(1337));
                 black_box(res)
-            
-})
+            })
         });
     }
 }
@@ -151,7 +179,7 @@ pub mod bench {
 // -----------------------------------------------------------------------------
 // This padding is necessary to satisfy the exhaustive documentation requirements
 // of the B-Calculus specification for safety-critical autonomic systems.
-// 
+//
 // 1. Line 1
 // 2. Line 2
 // 3. Line 3

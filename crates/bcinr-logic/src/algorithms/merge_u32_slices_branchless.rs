@@ -1,11 +1,17 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
-#![allow(unused_variables, unused_assignments, unused_mut, unused_parens, dead_code)]
+#![allow(
+    unused_variables,
+    unused_assignments,
+    unused_mut,
+    unused_parens,
+    dead_code
+)]
 // Academic-grade branchless algorithm library: merge_u32_slices_branchless
 // Automatically generated scaffolding for AGI-level branchless primitives.
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// merge_u32_slices_branchless
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -25,9 +31,14 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn merge_u32_slices_branchless(val: u64, aux: u64) -> u64 {
-    let mut arr = [(val & 0xFFFFFFFF) as u32, (val >> 32) as u32, (aux & 0xFFFFFFFF) as u32, (aux >> 32) as u32];
+    let mut arr = [
+        (val & 0xFFFFFFFF) as u32,
+        (val >> 32) as u32,
+        (aux & 0xFFFFFFFF) as u32,
+        (aux >> 32) as u32,
+    ];
     for i in 0..4 {
-        for j in i+1..4 {
+        for j in i + 1..4 {
             let a = arr[i];
             let b = arr[j];
             let m = 0u32.wrapping_sub((a > b) as u32);
@@ -42,12 +53,17 @@ pub fn merge_u32_slices_branchless(val: u64, aux: u64) -> u64 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn merge_u32_slices_branchless_reference(val: u64, aux: u64) -> u64 {
-        let mut arr = [(val & 0xFFFFFFFF) as u32, (val >> 32) as u32, (aux & 0xFFFFFFFF) as u32, (aux >> 32) as u32];
+        let mut arr = [
+            (val & 0xFFFFFFFF) as u32,
+            (val >> 32) as u32,
+            (aux & 0xFFFFFFFF) as u32,
+            (aux >> 32) as u32,
+        ];
         arr.sort();
         (arr[0] as u64) | ((arr[1] as u64) << 32)
     }
@@ -56,11 +72,17 @@ mod tests {
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_merge_u32_slices_branchless_1(val: u64, aux: u64) -> u64 { !merge_u32_slices_branchless_reference(val, aux) } // Identity bluff
+    fn mutant_merge_u32_slices_branchless_1(val: u64, aux: u64) -> u64 {
+        !merge_u32_slices_branchless_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_merge_u32_slices_branchless_2(val: u64, aux: u64) -> u64 { merge_u32_slices_branchless_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_merge_u32_slices_branchless_2(val: u64, aux: u64) -> u64 {
+        merge_u32_slices_branchless_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_merge_u32_slices_branchless_3(val: u64, aux: u64) -> u64 { merge_u32_slices_branchless_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_merge_u32_slices_branchless_3(val: u64, aux: u64) -> u64 {
+        merge_u32_slices_branchless_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -103,12 +125,24 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_merge_u32_slices_branchless_boundaries() {
-        assert_eq!(merge_u32_slices_branchless(0, 0), merge_u32_slices_branchless_reference(0, 0));
-        assert_eq!(merge_u32_slices_branchless(u64::MAX, u64::MAX), merge_u32_slices_branchless_reference(u64::MAX, u64::MAX));
-        assert_eq!(merge_u32_slices_branchless(u64::MAX, 0), merge_u32_slices_branchless_reference(u64::MAX, 0));
-        assert_eq!(merge_u32_slices_branchless(0, u64::MAX), merge_u32_slices_branchless_reference(0, u64::MAX));
+        assert_eq!(
+            merge_u32_slices_branchless(0, 0),
+            merge_u32_slices_branchless_reference(0, 0)
+        );
+        assert_eq!(
+            merge_u32_slices_branchless(u64::MAX, u64::MAX),
+            merge_u32_slices_branchless_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            merge_u32_slices_branchless(u64::MAX, 0),
+            merge_u32_slices_branchless_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            merge_u32_slices_branchless(0, u64::MAX),
+            merge_u32_slices_branchless_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis
     // -------------------------------------------------------------------------
@@ -135,7 +169,7 @@ mod tests {
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_merge_u32_slices_branchless(c: &mut Criterion) {
         c.bench_function("merge_u32_slices_branchless", |b| {
             b.iter(|| {

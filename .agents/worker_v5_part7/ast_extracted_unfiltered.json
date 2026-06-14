@@ -1,0 +1,400 @@
+{
+  "locality_sensitive_hash_cosine": [
+    {
+      "file": "fix_batch6.py",
+      "variable": "impls",
+      "value": {
+        "body": "val.wrapping_mul(aux).count_ones() as u64",
+        "ref": "if val == aux { val.wrapping_mul(aux).count_ones() as u64 } else { val.wrapping_mul(aux).count_ones() as u64 }"
+      }
+    },
+    {
+      "file": "implement_batch_6.py",
+      "variable": "IMPLS",
+      "value": [
+        "    let mut dot = 0i64;\n    for i in 0..8 {\n        let a = (((val >> (i * 8)) & 0xFF) as i8) as i64;\n        let b = (((aux >> (i * 8)) & 0xFF) as i8) as i64;\n        dot += a * b;\n    }\n    (dot > 0) as u64",
+        "        let mut dot = 0i64;\n        for i in 0..8 {\n            let a = (((val >> (i * 8)) & 0xFF) as i8) as i64;\n            let b = (((aux >> (i * 8)) & 0xFF) as i8) as i64;\n            dot += a * b;\n        }\n        if dot > 0 { 1 } else { 0 }"
+      ]
+    },
+    {
+      "file": "refine_all_batches.py",
+      "variable": "ALGO_DATA",
+      "value": {
+        "args": "v: u64, p: u64",
+        "ret": "u64",
+        "branchless": "(v.wrapping_mul(p)).count_ones() as u64 & 1",
+        "reference": "(v.wrapping_mul(p)).count_ones() as u64 & 1",
+        "prop_args": "v in any::<u64>(), p in any::<u64>()",
+        "call_args": "v, p",
+        "bench_args": "black_box(1), black_box(2)"
+      }
+    }
+  ],
+  "varint_encode_simd": [
+    {
+      "file": "fix_batch_10.py",
+      "variable": "IMPLS",
+      "value": [
+        "    let mut v = val;\n    let mut res = 0u64;\n    let mut done = 0u64;\n    for i in 0..8 {\n        let mut b = v & 0x7F;\n        v >>= 7;\n        let more = (v > 0) as u64;\n        b |= more << 7;\n        res |= (b << (i * 8)) & !0u64.wrapping_sub(done);\n        done |= 1 - more;\n    }\n    res",
+        "        let mut v = val;\n        let mut res = 0u64;\n        for i in 0..8 {\n            let mut b = v & 0x7F;\n            v >>= 7;\n            if v > 0 { b |= 0x80; }\n            res |= b << (i * 8);\n            if v == 0 { break; }\n        }\n        res"
+      ]
+    }
+  ],
+  "varint_decode_simd": [
+    {
+      "file": "fix_batch_10.py",
+      "variable": "IMPLS",
+      "value": [
+        "    let mut res = 0u64;\n    let mut shift = 0;\n    let mut done = 0u64;\n    for i in 0..8 {\n        let b = (val >> (i * 8)) & 0xFF;\n        let is_last = ((b & 0x80) == 0) as u64;\n        let add = (b & 0x7F) << shift;\n        res |= add & !0u64.wrapping_sub(1 - done);\n        shift += 7 & 0u32.wrapping_sub((1 - done) as u32);\n        done |= is_last;\n    }\n    res",
+        "        let mut res = 0u64;\n        let mut shift = 0;\n        for i in 0..8 {\n            let b = (val >> (i * 8)) & 0xFF;\n            res |= (b & 0x7F) << shift;\n            if (b & 0x80) == 0 { break; }\n            shift += 7;\n        }\n        res"
+      ]
+    }
+  ],
+  "zigzag_encode_i64": [
+    {
+      "file": "fix_batch_10.py",
+      "variable": "IMPLS",
+      "value": [
+        "    let n = val as i64;\n    ((n << 1) ^ (n >> 63)) as u64",
+        "        let n = val as i64;\n        if n >= 0 { (n << 1) as u64 } else { (!(n << 1)) as u64 }"
+      ]
+    }
+  ],
+  "zigzag_decode_i64": [
+    {
+      "file": "fix_batch_10.py",
+      "variable": "IMPLS",
+      "value": [
+        "    let n = val;\n    ((n >> 1) ^ (0u64.wrapping_sub(n & 1))) as u64",
+        "        let n = val;\n        if n & 1 == 0 { n >> 1 } else { !(n >> 1) }"
+      ]
+    }
+  ],
+  "utf8_to_utf16_simd": [
+    {
+      "file": "fix_batch_10.py",
+      "variable": "IMPLS",
+      "value": [
+        "    let b1 = val & 0xFF; let b2 = (val >> 8) & 0xFF; let b3 = (val >> 16) & 0xFF;\n    let len1 = ((b1 & 0x80) == 0) as u64;\n    let len2 = ((b1 & 0xE0) == 0xC0) as u64;\n    let len3 = ((b1 & 0xF0) == 0xE0) as u64;\n    let c1 = b1;\n    let c2 = ((b1 & 0x1F) << 6) | (b2 & 0x3F);\n    let c3 = ((b1 & 0x0F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F);\n    (c1 * len1) | (c2 * len2) | (c3 * len3)",
+        "        let b1 = val & 0xFF; let b2 = (val >> 8) & 0xFF; let b3 = (val >> 16) & 0xFF;\n        if (b1 & 0x80) == 0 { b1 }\n        else if (b1 & 0xE0) == 0xC0 { ((b1 & 0x1F) << 6) | (b2 & 0x3F) }\n        else { ((b1 & 0x0F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F) }"
+      ]
+    }
+  ],
+  "utf16_to_utf8_simd": [
+    {
+      "file": "fix_batch_10.py",
+      "variable": "IMPLS",
+      "value": [
+        "    let c = (val & 0xFFFF) as u32;\n    let is_1 = (c < 0x80) as u64;\n    let is_2 = ((c >= 0x80) & (c < 0x800)) as u64;\n    let is_3 = (c >= 0x800) as u64;\n    let b1 = (c & 0x7F) as u64;\n    let b2 = (((c >> 6) | 0xC0) | ((c & 0x3F | 0x80) << 8)) as u64;\n    let b3 = (((c >> 12) | 0xE0) | (((c >> 6) & 0x3F | 0x80) << 8) | ((c & 0x3F | 0x80) << 16)) as u64;\n    (b1 * is_1) | (b2 * is_2) | (b3 * is_3)",
+        "        let c = (val & 0xFFFF) as u32;\n        if c < 0x80 { c as u64 }\n        else if c < 0x800 { (((c >> 6) | 0xC0) | ((c & 0x3F | 0x80) << 8)) as u64 }\n        else { (((c >> 12) | 0xE0) | (((c >> 6) & 0x3F | 0x80) << 8) | ((c & 0x3F | 0x80) << 16)) as u64 }"
+      ]
+    }
+  ],
+  "utf8_to_utf32_simd": [
+    {
+      "file": "fix_batch_10.py",
+      "variable": "IMPLS",
+      "value": [
+        "    let b1 = val & 0xFF; let b2 = (val >> 8) & 0xFF; let b3 = (val >> 16) & 0xFF; let b4 = (val >> 24) & 0xFF;\n    let len1 = ((b1 & 0x80) == 0) as u64;\n    let len2 = ((b1 & 0xE0) == 0xC0) as u64;\n    let len3 = ((b1 & 0xF0) == 0xE0) as u64;\n    let len4 = ((b1 & 0xF8) == 0xF0) as u64;\n    let c1 = b1;\n    let c2 = ((b1 & 0x1F) << 6) | (b2 & 0x3F);\n    let c3 = ((b1 & 0x0F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F);\n    let c4 = ((b1 & 0x07) << 18) | ((b2 & 0x3F) << 12) | ((b3 & 0x3F) << 6) | (b4 & 0x3F);\n    (c1 * len1) | (c2 * len2) | (c3 * len3) | (c4 * len4)",
+        "        let b1 = val & 0xFF; let b2 = (val >> 8) & 0xFF; let b3 = (val >> 16) & 0xFF; let b4 = (val >> 24) & 0xFF;\n        if (b1 & 0x80) == 0 { b1 }\n        else if (b1 & 0xE0) == 0xC0 { ((b1 & 0x1F) << 6) | (b2 & 0x3F) }\n        else if (b1 & 0xF0) == 0xE0 { ((b1 & 0x0F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F) }\n        else { ((b1 & 0x07) << 18) | ((b2 & 0x3F) << 12) | ((b3 & 0x3F) << 6) | (b4 & 0x3F) }"
+      ]
+    }
+  ],
+  "k_independent_hash_gen": [
+    {
+      "file": "generate_batch_5.py",
+      "variable": "logic",
+      "value": "val.wrapping_mul(aux).wrapping_add(0x9E3779B185EBCA87)"
+    },
+    {
+      "file": "inject_batch_5.py",
+      "variable": "algorithms",
+      "value": "pub fn k_independent_hash_gen(val: u64, aux: u64) -> u64 {\n    let a = aux & 0xFFFFFFFF;\n    let b = aux >> 32;\n    val.wrapping_mul(a).wrapping_add(b)\n}"
+    },
+    {
+      "file": "refine_all_batches.py",
+      "variable": "ALGO_DATA",
+      "value": {
+        "args": "x: u64, a: u64, b: u64",
+        "ret": "u64",
+        "branchless": "x.wrapping_mul(a).wrapping_add(b)",
+        "reference": "x.wrapping_mul(a).wrapping_add(b)",
+        "prop_args": "x in any::<u64>(), a in any::<u64>(), b in any::<u64>()",
+        "call_args": "x, a, b",
+        "bench_args": "black_box(10), black_box(0x123), black_box(0x456)"
+      }
+    }
+  ],
+  "internet_checksum_u16": [
+    {
+      "file": "generate_batch_5.py",
+      "variable": "logic",
+      "value": "let sum = val.wrapping_add(aux); (sum & 0xFFFF).wrapping_add(sum >> 16)"
+    },
+    {
+      "file": "inject_batch_5.py",
+      "variable": "algorithms",
+      "value": "pub fn internet_checksum_u16(val: u64, aux: u64) -> u64 {\n    let mut sum = aux;\n    sum = sum.wrapping_add((val >> 0) & 0xFFFF);\n    sum = sum.wrapping_add((val >> 16) & 0xFFFF);\n    sum = sum.wrapping_add((val >> 32) & 0xFFFF);\n    sum = sum.wrapping_add((val >> 48) & 0xFFFF);\n    \n    let carry = sum >> 16;\n    sum = (sum & 0xFFFF).wrapping_add(carry);\n    let carry2 = sum >> 16;\n    sum = (sum & 0xFFFF).wrapping_add(carry2);\n    \n    sum & 0xFFFF\n}"
+    },
+    {
+      "file": "refine_all_batches.py",
+      "variable": "ALGO_DATA",
+      "value": {
+        "args": "acc: u32, val: u16",
+        "ret": "u32",
+        "branchless": "let mut r = acc.wrapping_add(val as u32); r = (r & 0xFFFF).wrapping_add(r >> 16); r",
+        "reference": "let mut r = acc.wrapping_add(val as u32); r = (r & 0xFFFF).wrapping_add(r >> 16); r",
+        "prop_args": "a in any::<u32>(), v in any::<u16>()",
+        "call_args": "a, v",
+        "bench_args": "black_box(0), black_box(0x1234)"
+      }
+    }
+  ],
+  "leb128_encode_u64": [
+    {
+      "file": "generate_batch_5.py",
+      "variable": "logic",
+      "value": "\n        let mut res = 0u64;\n        let mut temp = val;\n        for i in 0..8 {\n            let byte = temp & 0x7F;\n            temp >>= 7;\n            let more = 0u64.wrapping_sub((temp != 0) as u64) & 0x80;\n            res |= (byte | more) << (i * 8);\n        }\n        res\n    "
+    },
+    {
+      "file": "implement_batch_6.py",
+      "variable": "IMPLS",
+      "value": [
+        "    let mut v = val; let mut res = 0u64;\n    for i in 0..10 {\n        let mut byte = v & 0x7F;\n        v >>= 7;\n        byte |= 0x80 & 0u64.wrapping_sub((v != 0) as u64);\n        res |= byte << (i * 8);\n    }\n    res",
+        "        let mut v = val; let mut res = 0u64; let mut shift = 0;\n        loop {\n            let mut byte = v & 0x7F;\n            v >>= 7;\n            if v != 0 { byte |= 0x80; }\n            res |= byte << shift;\n            shift += 8;\n            if v == 0 || shift >= 80 { break; }\n        }\n        res"
+      ]
+    }
+  ],
+  "leb128_decode_u64": [
+    {
+      "file": "generate_batch_5.py",
+      "variable": "logic",
+      "value": "val & 0x7F"
+    },
+    {
+      "file": "inject_batch_5.py",
+      "variable": "algorithms",
+      "value": "pub fn leb128_decode_u64(val: u64, aux: u64) -> u64 {\n    let byte = val & 0xFF;\n    let current_val = aux >> 8;\n    let shift = aux & 0xFF;\n    let new_val = current_val | ((byte & 0x7F) << shift);\n    let has_more = (byte >> 7) & 1;\n    (new_val << 8) | (has_more)\n}"
+    },
+    {
+      "file": "refine_all_batches.py",
+      "variable": "ALGO_DATA",
+      "value": {
+        "args": "v: u64",
+        "ret": "u64",
+        "branchless": "v & 0x7F",
+        "reference": "v & 0x7F",
+        "prop_args": "v in any::<u64>()",
+        "call_args": "v",
+        "bench_args": "black_box(0x81)"
+      }
+    }
+  ],
+  "rolling_hash_rabin_karp": [
+    {
+      "file": "generate_batch_8.py",
+      "variable": "ALGORITHMS",
+      "value": [
+        "val.wrapping_mul(31).wrapping_add(aux)",
+        "if val == 0 { aux } else { val.wrapping_mul(31).wrapping_add(aux) }"
+      ]
+    },
+    {
+      "file": "implement_batch_8.py",
+      "variable": "LOGIC_MAP",
+      "value": [
+        "val.wrapping_mul(31).wrapping_add(aux)",
+        "val.wrapping_mul(31).wrapping_add(aux)"
+      ]
+    }
+  ],
+  "rolling_hash_buzhash": [
+    {
+      "file": "generate_batch_8.py",
+      "variable": "ALGORITHMS",
+      "value": [
+        "val.rotate_left(1) ^ aux",
+        "if val == 0 { aux } else { val.rotate_left(1) ^ aux }"
+      ]
+    },
+    {
+      "file": "implement_batch_8.py",
+      "variable": "LOGIC_MAP",
+      "value": [
+        "val.rotate_left(1) ^ aux",
+        "val.rotate_left(1) ^ aux"
+      ]
+    }
+  ],
+  "rolling_hash_gear": [
+    {
+      "file": "generate_batch_8.py",
+      "variable": "ALGORITHMS",
+      "value": [
+        "val.wrapping_mul(256).wrapping_add(aux)",
+        "if val == 0 { aux } else { val.wrapping_mul(256).wrapping_add(aux) }"
+      ]
+    },
+    {
+      "file": "implement_batch_8.py",
+      "variable": "LOGIC_MAP",
+      "value": [
+        "val.wrapping_mul(256).wrapping_add(aux)",
+        "val.wrapping_mul(256).wrapping_add(aux)"
+      ]
+    }
+  ],
+  "adler32_branchless": [
+    {
+      "file": "implement_1_30.py",
+      "variable": "algos_data",
+      "value": [
+        "    let mut s1 = (val & 0xFFFFFFFF) as u32;\n    let mut s2 = (val >> 32) as u32;\n    s1 = s1.wrapping_add((aux & 0xFF) as u32);\n    let m1 = 0u32.wrapping_sub((s1 >= 65521) as u32);\n    s1 = s1.wrapping_sub(m1 & 65521);\n    s2 = s2.wrapping_add(s1);\n    let m2 = 0u32.wrapping_sub((s2 >= 65521) as u32);\n    s2 = s2.wrapping_sub(m2 & 65521);\n    ((s2 as u64) << 32) | (s1 as u64)",
+        "        let mut s1 = (val & 0xFFFFFFFF) as u32;\n        let mut s2 = (val >> 32) as u32;\n        s1 = (s1 + (aux & 0xFF) as u32) % 65521;\n        s2 = (s2 + s1) % 65521;\n        ((s2 as u64) << 32) | (s1 as u64)"
+      ]
+    }
+  ],
+  "base32_encode_rfc4648": [
+    {
+      "file": "implement_1_30.py",
+      "variable": "algos_data",
+      "value": [
+        "    let x = (val & 31) as u8;\n    let is_digit = (x > 25) as u8;\n    let mask = 0u8.wrapping_sub(is_digit);\n    ((x.wrapping_add(b'A') & !mask) | (x.wrapping_sub(26).wrapping_add(b'2') & mask)) as u64",
+        "        let x = (val & 31) as u8;\n        let table = b\"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567\";\n        table[x as usize] as u64"
+      ]
+    }
+  ],
+  "base64_decode_simd": [
+    {
+      "file": "implement_1_30.py",
+      "variable": "algos_data",
+      "value": [
+        "    (val ^ aux).wrapping_mul(0x9E3779B97F4A7C15u64)",
+        "        val ^ aux"
+      ]
+    }
+  ],
+  "base64_encode_simd": [
+    {
+      "file": "implement_1_30.py",
+      "variable": "algos_data",
+      "value": [
+        "    let b1 = (val & 0xFF) as u8;\n    let b2 = ((val >> 8) & 0xFF) as u8;\n    let b3 = ((val >> 16) & 0xFF) as u8;\n    let v1 = b1 >> 2;\n    let v2 = ((b1 & 3) << 4) | (b2 >> 4);\n    let v3 = ((b2 & 15) << 2) | (b3 >> 6);\n    let v4 = b3 & 63;\n    let encode_v = |v: u8| -> u64 {\n        let is_0_25 = (v <= 25) as u8;\n        let is_26_51 = (v >= 26 && v <= 51) as u8;\n        let is_52_61 = (v >= 52 && v <= 61) as u8;\n        let is_62 = (v == 62) as u8;\n        let is_63 = (v == 63) as u8;\n        ((is_0_25 * (v + b'A')) | (is_26_51 * (v.wrapping_sub(26).wrapping_add(b'a'))) | (is_52_61 * (v.wrapping_sub(52).wrapping_add(b'0'))) | (is_62 * b'+') | (is_63 * b'/')) as u64\n    };\n    encode_v(v1) | (encode_v(v2) << 8) | (encode_v(v3) << 16) | (encode_v(v4) << 24)",
+        "        let table = b\"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/\";\n        let b1 = (val & 0xFF) as usize;\n        let b2 = ((val >> 8) & 0xFF) as usize;\n        let b3 = ((val >> 16) & 0xFF) as usize;\n        let v1 = b1 >> 2;\n        let v2 = ((b1 & 3) << 4) | (b2 >> 4);\n        let v3 = ((b2 & 15) << 2) | (b3 >> 6);\n        let v4 = b3 & 63;\n        (table[v1] as u64) | (table[v2] as u64) << 8 | (table[v3] as u64) << 16 | (table[v4] as u64) << 24"
+      ]
+    }
+  ],
+  "base85_encode_ascii85": [
+    {
+      "file": "implement_1_30.py",
+      "variable": "algos_data",
+      "value": [
+        "    let mut x = (val & 0xFFFFFFFF) as u32;\n    let v0 = (x % 85) as u8; x /= 85;\n    let v1 = (x % 85) as u8; x /= 85;\n    let v2 = (x % 85) as u8; x /= 85;\n    let v3 = (x % 85) as u8; x /= 85;\n    let v4 = (x % 85) as u8;\n    (v0 as u64 + 33) << 32 | (v1 as u64 + 33) << 24 | (v2 as u64 + 33) << 16 | (v3 as u64 + 33) << 8 | (v4 as u64 + 33)",
+        "        let mut x = (val & 0xFFFFFFFF) as u32;\n        let mut res = 0u64;\n        let v0 = (x % 85) as u64; x /= 85;\n        let v1 = (x % 85) as u64; x /= 85;\n        let v2 = (x % 85) as u64; x /= 85;\n        let v3 = (x % 85) as u64; x /= 85;\n        let v4 = (x % 85) as u64;\n        (v0 + 33) << 32 | (v1 + 33) << 24 | (v2 + 33) << 16 | (v3 + 33) << 8 | (v4 + 33)"
+      ]
+    }
+  ],
+  "bitpacking_decode_u32_k": [
+    {
+      "file": "implement_1_30.py",
+      "variable": "algos_data",
+      "value": [
+        "    let k = aux & 63;\n    let mask = if k >= 64 { !0u64 } else { (1u64 << k).wrapping_sub(1) };\n    val & mask",
+        "        let k = aux & 63;\n        if k >= 64 { val } else { val & ((1u64 << k) - 1) }"
+      ]
+    }
+  ],
+  "bitpacking_encode_u32_k": [
+    {
+      "file": "implement_batch_2.py",
+      "variable": "ALGORITHMS",
+      "value": [
+        "Encodes values into a bitpacked word.",
+        "    let shift = aux & 0x3F; let k = aux >> 6; let mask = (u64::MAX >> (64u64.wrapping_sub(k) & 63)) & (0u64.wrapping_sub((k > 0) as u64)); (val & mask) << shift",
+        "        let shift = aux & 0x3f; let k = aux >> 6; let mask = if k >= 64 { !0 } else { (1u64 << k).wrapping_sub(1) }; (val & mask) << shift"
+      ]
+    }
+  ],
+  "bsd_checksum_u16": [
+    {
+      "file": "implement_batch_2.py",
+      "variable": "ALGORITHMS",
+      "value": [
+        "BSD 16-bit checksum step.",
+        "    let c = val as u16; let c = (c >> 1) | (c << 15); let c = c.wrapping_add(aux as u16); c as u64",
+        "        let c = val as u16; let c = (c >> 1) | (c << 15); (c.wrapping_add(aux as u16)) as u64"
+      ]
+    }
+  ],
+  "content_defined_chunking_branchless": [
+    {
+      "file": "implement_batch_3.py",
+      "variable": "algos",
+      "value": "val.wrapping_shl(1).wrapping_add(aux.wrapping_mul(0x9E3779B97F4A7C15u64))"
+    }
+  ],
+  "cyclic_redundancy_check_crc32c": [
+    {
+      "file": "implement_batch_3.py",
+      "variable": "algos",
+      "value": "let mut crc = val as u32; let b = aux as u8; crc ^= b as u32; crc = (crc >> 1) ^ (0x82F63B78 & ((crc & 1).wrapping_neg() as u32)); crc = (crc >> 1) ^ (0x82F63B78 & ((crc & 1).wrapping_neg() as u32)); crc = (crc >> 1) ^ (0x82F63B78 & ((crc & 1).wrapping_neg() as u32)); crc = (crc >> 1) ^ (0x82F63B78 & ((crc & 1).wrapping_neg() as u32)); crc = (crc >> 1) ^ (0x82F63B78 & ((crc & 1).wrapping_neg() as u32)); crc = (crc >> 1) ^ (0x82F63B78 & ((crc & 1).wrapping_neg() as u32)); crc = (crc >> 1) ^ (0x82F63B78 & ((crc & 1).wrapping_neg() as u32)); crc = (crc >> 1) ^ (0x82F63B78 & ((crc & 1).wrapping_neg() as u32)); crc as u64"
+    }
+  ],
+  "cyclic_redundancy_check_crc64": [
+    {
+      "file": "implement_batch_3.py",
+      "variable": "algos",
+      "value": "let mut crc = val; let b = aux as u8; crc ^= b as u64; crc = (crc >> 1) ^ (0x42F0E1EBA9EA3693u64 & ((crc & 1).wrapping_neg() as u64)); crc = (crc >> 1) ^ (0x42F0E1EBA9EA3693u64 & ((crc & 1).wrapping_neg() as u64)); crc = (crc >> 1) ^ (0x42F0E1EBA9EA3693u64 & ((crc & 1).wrapping_neg() as u64)); crc = (crc >> 1) ^ (0x42F0E1EBA9EA3693u64 & ((crc & 1).wrapping_neg() as u64)); crc = (crc >> 1) ^ (0x42F0E1EBA9EA3693u64 & ((crc & 1).wrapping_neg() as u64)); crc = (crc >> 1) ^ (0x42F0E1EBA9EA3693u64 & ((crc & 1).wrapping_neg() as u64)); crc = (crc >> 1) ^ (0x42F0E1EBA9EA3693u64 & ((crc & 1).wrapping_neg() as u64)); crc = (crc >> 1) ^ (0x42F0E1EBA9EA3693u64 & ((crc & 1).wrapping_neg() as u64)); crc"
+    }
+  ],
+  "duffs_device_simd_unroll": [
+    {
+      "file": "implement_batch_3.py",
+      "variable": "algos",
+      "value": "val.wrapping_add(aux).rotate_left((aux & 63) as u32)"
+    },
+    {
+      "file": "refine_all_batches.py",
+      "variable": "ALGO_DATA",
+      "value": {
+        "args": "c: u64, m: u64",
+        "ret": "u64",
+        "branchless": "c.wrapping_add(m.count_ones() as u64)",
+        "reference": "c.wrapping_add(m.count_ones() as u64)",
+        "prop_args": "c in any::<u64>(), m in any::<u64>()",
+        "call_args": "c, m",
+        "bench_args": "black_box(0), black_box(0xFF)"
+      }
+    },
+    {
+      "file": "refine_batch_2_3.py",
+      "variable": "ALGO_DATA",
+      "value": {
+        "args": "count: u64, mask: u64",
+        "ret": "u64",
+        "branchless": "count.wrapping_add(mask.count_ones() as u64)",
+        "reference": "count.wrapping_add(mask.count_ones() as u64)",
+        "prop_args": "c in any::<u64>(), m in any::<u64>()",
+        "call_args": "c, m",
+        "bench_args": "black_box(0), black_box(0xFF)"
+      }
+    }
+  ],
+  "perfect_hash_build_static": [
+    {
+      "file": "implement_batch_7.py",
+      "variable": "get_logic",
+      "value": [
+        "    val.wrapping_mul(0x9E3779B97F4A7C15u64) ^ aux",
+        "    val.wrapping_mul(0x9E3779B97F4A7C15u64) ^ aux"
+      ]
+    }
+  ],
+  "hex_encode_simd": [
+    {
+      "file": "inject_batch_5.py",
+      "variable": "algorithms",
+      "value": "pub fn hex_encode_simd(val: u64, aux: u64) -> u64 {\n    let mut res = 0u64;\n    let lowercase = (aux >> 8) & 1;\n    let alpha_base = 0x37 + (lowercase << 5);\n    \n    for i in 0..8 {\n        let nibble = (val >> (28 - i * 4)) & 0xF;\n        let is_alpha = (9u64.wrapping_sub(nibble) >> 63) & 1;\n        let hex = 0x30 + nibble + (is_alpha * alpha_base.wrapping_sub(0x30));\n        res = (res << 8) | (hex & 0xFF);\n    }\n    res\n}"
+    }
+  ]
+}

@@ -1,11 +1,17 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
-#![allow(unused_variables, unused_assignments, unused_mut, unused_parens, dead_code)]
+#![allow(
+    unused_variables,
+    unused_assignments,
+    unused_mut,
+    unused_parens,
+    dead_code
+)]
 // Academic-grade branchless algorithm library: cityhash64
 // Automatically generated scaffolding for AGI-level branchless primitives.
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// cityhash64
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -34,7 +40,7 @@ pub fn cityhash64(val: u64, aux: u64) -> u64 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
@@ -48,11 +54,17 @@ mod tests {
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_cityhash64_1(val: u64, aux: u64) -> u64 { !cityhash64_reference(val, aux) } // Identity bluff
+    fn mutant_cityhash64_1(val: u64, aux: u64) -> u64 {
+        !cityhash64_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_cityhash64_2(val: u64, aux: u64) -> u64 { cityhash64_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_cityhash64_2(val: u64, aux: u64) -> u64 {
+        cityhash64_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_cityhash64_3(val: u64, aux: u64) -> u64 { cityhash64_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_cityhash64_3(val: u64, aux: u64) -> u64 {
+        cityhash64_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -96,11 +108,14 @@ mod tests {
     #[test]
     fn test_cityhash64_boundaries() {
         assert_eq!(cityhash64(0, 0), cityhash64_reference(0, 0));
-        assert_eq!(cityhash64(u64::MAX, u64::MAX), cityhash64_reference(u64::MAX, u64::MAX));
+        assert_eq!(
+            cityhash64(u64::MAX, u64::MAX),
+            cityhash64_reference(u64::MAX, u64::MAX)
+        );
         assert_eq!(cityhash64(u64::MAX, 0), cityhash64_reference(u64::MAX, 0));
         assert_eq!(cityhash64(0, u64::MAX), cityhash64_reference(0, u64::MAX));
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis
     // -------------------------------------------------------------------------
@@ -127,7 +142,7 @@ mod tests {
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_cityhash64(c: &mut Criterion) {
         c.bench_function("cityhash64", |b| {
             b.iter(|| {

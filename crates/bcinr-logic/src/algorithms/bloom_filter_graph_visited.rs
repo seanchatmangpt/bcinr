@@ -3,7 +3,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// bloom_filter_graph_visited
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -27,23 +27,30 @@ pub fn bloom_filter_graph_visited(val: u64, aux: u64) -> u64 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn bloom_filter_graph_visited_reference(val: u64, aux: u64) -> u64 {
-        let bit = 1u64 << (aux & 63); val | bit
+        let bit = 1u64 << (aux & 63);
+        val | bit
     }
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_bloom_filter_graph_visited_1(val: u64, aux: u64) -> u64 { !bloom_filter_graph_visited_reference(val, aux) } // Identity bluff
+    fn mutant_bloom_filter_graph_visited_1(val: u64, aux: u64) -> u64 {
+        !bloom_filter_graph_visited_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_bloom_filter_graph_visited_2(val: u64, aux: u64) -> u64 { bloom_filter_graph_visited_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_bloom_filter_graph_visited_2(val: u64, aux: u64) -> u64 {
+        bloom_filter_graph_visited_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_bloom_filter_graph_visited_3(val: u64, aux: u64) -> u64 { bloom_filter_graph_visited_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_bloom_filter_graph_visited_3(val: u64, aux: u64) -> u64 {
+        bloom_filter_graph_visited_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -86,12 +93,24 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_bloom_filter_graph_visited_boundaries() {
-        assert_eq!(bloom_filter_graph_visited(0, 0), bloom_filter_graph_visited_reference(0, 0));
-        assert_eq!(bloom_filter_graph_visited(u64::MAX, u64::MAX), bloom_filter_graph_visited_reference(u64::MAX, u64::MAX));
-        assert_eq!(bloom_filter_graph_visited(u64::MAX, 0), bloom_filter_graph_visited_reference(u64::MAX, 0));
-        assert_eq!(bloom_filter_graph_visited(0, u64::MAX), bloom_filter_graph_visited_reference(0, u64::MAX));
+        assert_eq!(
+            bloom_filter_graph_visited(0, 0),
+            bloom_filter_graph_visited_reference(0, 0)
+        );
+        assert_eq!(
+            bloom_filter_graph_visited(u64::MAX, u64::MAX),
+            bloom_filter_graph_visited_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            bloom_filter_graph_visited(u64::MAX, 0),
+            bloom_filter_graph_visited_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            bloom_filter_graph_visited(0, u64::MAX),
+            bloom_filter_graph_visited_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
     // -------------------------------------------------------------------------
@@ -127,21 +146,19 @@ mod tests {
     // Hoare-logic Verification Line 33: Branchless path is the unique solution to the state constraints of bloom_filter_graph_visited.
     // Hoare-logic Verification Line 34: Branchless path is the unique solution to the state constraints of bloom_filter_graph_visited.
     // Hoare-logic Verification Line 35: Branchless path is the unique solution to the state constraints of bloom_filter_graph_visited.
-
 }
 
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_bloom_filter_graph_visited(c: &mut Criterion) {
         c.bench_function("bloom_filter_graph_visited", |b| {
             b.iter(|| {
                 let res = bloom_filter_graph_visited(black_box(42), black_box(1337));
                 black_box(res)
-            
-})
+            })
         });
     }
 }
@@ -151,7 +168,7 @@ pub mod bench {
 // -----------------------------------------------------------------------------
 // This padding is necessary to satisfy the exhaustive documentation requirements
 // of the B-Calculus specification for safety-critical autonomic systems.
-// 
+//
 // 1. Line 1
 // 2. Line 2
 // 3. Line 3

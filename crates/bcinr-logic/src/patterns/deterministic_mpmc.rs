@@ -270,7 +270,8 @@ impl<T: Default + Copy, const N: usize> LockFreeMpmcRing<T, N> {
             if cas_success != 0 {
                 unsafe {
                     result = *slot.data.get();
-                    slot.sequence.store(t.wrapping_add(self.mask).wrapping_add(1), Ordering::Release);
+                    slot.sequence
+                        .store(t.wrapping_add(self.mask).wrapping_add(1), Ordering::Release);
                 }
             } else {
                 // Reading/writing to dummy is safe; it's immediately discarded.

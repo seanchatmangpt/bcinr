@@ -1,0 +1,505 @@
+{
+  "siphash_2_4_branchless": [
+    {
+      "source": "implement_batch_9.py",
+      "type": "dict",
+      "val": {
+        "branchless": "let mut v0 = val; let mut v1 = aux; v0 = v0.wrapping_add(v1); v1 = v1.rotate_left(13); v1 ^= v0; v0",
+        "branchful": "val.wrapping_add(aux).rotate_left(13) ^ aux"
+      }
+    },
+    {
+      "source": "implement_241_270.py",
+      "type": "conditional_block",
+      "text": "        impl_body = \"\"\"\n    let mut v0 = 0x736f6d6570736575u64;\n    let mut v1 = 0x646f72616e646f6du64;\n    let mut v2 = 0x6c7967656e657261u64;\n    let mut v3 = 0x7465646279746573u64;\n    \n    let k0 = val;\n    let k1 = aux;\n    \n    v0 ^= k0;\n    v1 ^= k1;\n    v2 ^= k0;\n    v3 ^= k1;\n    \n    let m = val ^ aux;\n    v3 ^= m;\n    \n    // Round 1\n    v0 = v0.wrapping_add(v1); v1 = v1.rotate_left(13); v1 ^= v0; v0 = v0.rotate_left(32);\n    v2 = v2.wrapping_add(v3); v3 = v3.rotate_left(16); v3 ^= v2;\n    v0 = v0.wrapping_add(v3); v3 = v3.rotate_left(21); v3 ^= v0;\n    v2 = v2.wrapping_add(v1); v1 = v1.rotate_left(17); v1 ^= v2; v2 = v2.rotate_left(32);\n    \n    // Round 2\n    v0 = v0.wrapping_add(v1); v1 = v1.rotate_left(13); v1 ^= v0; v0 = v0.rotate_left(32);\n    v2 = v2.wrapping_add(v3); v3 = v3.rotate_left(16); v3 ^= v2;\n    v0 = v0.wrapping_add(v3); v3 = v3.rotate_left(21); v3 ^= v0;\n    v2 = v2.wrapping_add(v1); v1 = v1.rotate_left(17); v1 ^= v2; v2 = v2.rotate_left(32);\n    \n    v0 ^ v1 ^ v2 ^ v3\n\"\"\"\n        ref_body = \"\"\"\n    let mut v0 = 0x736f6d6570736575u64;\n    let mut v1 = 0x646f72616e646f6du64;\n    let mut v2 = 0x6c7967656e657261u64;\n    let mut v3 = 0x7465646279746573u64;\n    \n    let k0 = val;\n    let k1 = aux;\n    \n    v0 ^= k0;\n    v1 ^= k1;\n    v2 ^= k0;\n    v3 ^= k1;\n    \n    let m = val ^ aux;\n    v3 ^= m;\n    \n    // Round 1\n    v0 = v0.wrapping_add(v1); v1 = v1.rotate_left(13); v1 ^= v0; v0 = v0.rotate_left(32);\n    v2 = v2.wrapping_add(v3); v3 = v3.rotate_left(16); v3 ^= v2;\n    v0 = v0.wrapping_add(v3); v3 = v3.rotate_left(21); v3 ^= v0;\n    v2 = v2.wrapping_add(v1); v1 = v1.rotate_left(17); v1 ^= v2; v2 = v2.rotate_left(32);\n    \n    // Round 2\n    v0 = v0.wrapping_add(v1); v1 = v1.rotate_left(13); v1 ^= v0; v0 = v0.rotate_left(32);\n    v2 = v2.wrapping_add(v3); v3 = v3.rotate_left(16); v3 ^= v2;\n    v0 = v0.wrapping_add(v3); v3 = v3.rotate_left(21); v3 ^= v0;\n    v2 = v2.wrapping_add(v1); v1 = v1.rotate_left(17); v1 ^= v2; v2 = v2.rotate_left(32);\n    \n    v0 ^ v1 ^ v2 ^ v3\n\"\"\""
+    }
+  ],
+  "space_saving_add": [
+    {
+      "source": "implement_batch_9.py",
+      "type": "dict",
+      "val": {
+        "branchless": "val.wrapping_add(1) ^ aux",
+        "branchful": "val + 1"
+      }
+    },
+    {
+      "source": "implement_241_270.py",
+      "type": "conditional_block",
+      "text": "        impl_body = \"\"\"\n    let cnt = val as u32;\n    let err = (val >> 32) as u32;\n    let new_item = aux as u32;\n    \n    let cnt_inc = cnt.wrapping_add(1);\n    let mask = ((cnt == 0) as u32).wrapping_neg();\n    \n    let next_err = (err & !mask) | (cnt & mask);\n    let next_cnt = cnt_inc;\n    \n    (next_cnt as u64) | ((next_err as u64) << 32) | (new_item as u64 & 0)\n\"\"\"\n        ref_body = \"\"\"\n    let cnt = val as u32;\n    let err = (val >> 32) as u32;\n    let new_item = aux as u32;\n    \n    let mut next_err = err;"
+    }
+  ],
+  "spookyhash_v2_128": [
+    {
+      "source": "implement_batch_9.py",
+      "type": "dict",
+      "val": {
+        "branchless": "let mut h = val; h ^= aux; h = h.rotate_left(15); h = h.wrapping_add(aux); h",
+        "branchful": "val ^ aux"
+      }
+    },
+    {
+      "source": "implement_241_270.py",
+      "type": "conditional_block",
+      "text": "        impl_body = \"\"\"\n    let mut h0 = val;\n    let mut h1 = aux;\n    \n    h0 = h0.wrapping_add(h1);\n    h1 = h1.rotate_left(11);\n    h1 ^= h0;\n    \n    h0 = h0.rotate_left(32);\n    \n    h0 = h0.wrapping_add(h1);\n    h1 = h1.rotate_left(21);\n    h1 ^= h0;\n    \n    h0 ^ h1\n\"\"\"\n        ref_body = \"\"\"\n    let mut h0 = val;\n    let mut h1 = aux;\n    \n    h0 = h0.wrapping_add(h1);\n    h1 = h1.rotate_left(11);\n    h1 ^= h0;\n    \n    h0 = h0.rotate_left(32);\n    \n    h0 = h0.wrapping_add(h1);\n    h1 = h1.rotate_left(21);\n    h1 ^= h0;\n    \n    h0 ^ h1\n\"\"\""
+    }
+  ],
+  "quotient_filter_add_u64": [
+    {
+      "source": "implement_batch_8.py",
+      "type": "dict",
+      "val": [
+        "let q = val >> 32; let r = val & 0xFFFFFFFF; (q ^ r).wrapping_add(aux)",
+        "let q = val >> 32; let r = val & 0xFFFFFFFF; (q ^ r).wrapping_add(aux)"
+      ]
+    }
+  ],
+  "reservoir_sample_branchless": [
+    {
+      "source": "implement_batch_8.py",
+      "type": "dict",
+      "val": [
+        "let keep = (aux < val) as u64; keep",
+        "if aux < val { 1 } else { 0 }"
+      ]
+    }
+  ],
+  "misra_gries_add": [
+    {
+      "source": "implement_batch_7.py",
+      "type": "conditional_block",
+      "text": "        return \"\"\"    let key = val as u32;\n    let current_key = (aux >> 32) as u32;\n    let current_count = aux as u32;\n    let is_match = (current_key == key) as u32;\n    let is_empty = (current_count == 0) as u32;\n    let mask_match = 0u32.wrapping_sub(is_match);\n    let mask_empty = 0u32.wrapping_sub(is_empty & (1 - is_match));\n    let mask_dec = 0u32.wrapping_sub((1 - is_match) & (1 - is_empty));\n    let next_key = current_key ^ ((current_key ^ key) & mask_empty);\n    let next_count = current_count.wrapping_add(1 & mask_match)\n        .wrapping_add(1 & mask_empty)\n        .wrapping_sub(1 & mask_dec);\n    ((next_key as u64) << 32) | (next_count as u64)\"\"\", \"\"\"    let key = val as u32;\n    let mut current_key = (aux >> 32) as u32;\n    let mut current_count = aux as u32;"
+    },
+    {
+      "source": "fix_batch6.py",
+      "type": "dict",
+      "val": {
+        "body": "val ^ aux",
+        "ref": "if val == aux { 0 } else { val ^ aux }"
+      }
+    }
+  ],
+  "pearson_hash_u8": [
+    {
+      "source": "implement_batch_7.py",
+      "type": "conditional_block",
+      "text": "        return \"\"\"    let h = val as u8;\n    let data = aux as u8;\n    let table = [\n        0x98, 0x21, 0x33, 0x87, 0x05, 0x11, 0xCE, 0x4E, 0x91, 0x6D, 0x16, 0xEB, 0x06, 0x1D, 0x2C, 0xD4,\n        0x5F, 0xB0, 0x77, 0x19, 0xD0, 0x22, 0x31, 0x51, 0x96, 0x49, 0xD8, 0x3E, 0x25, 0x2F, 0x0C, 0x58,\n        0x62, 0xEF, 0x27, 0x26, 0xA9, 0x10, 0x8D, 0x59, 0xA2, 0xA1, 0xFF, 0x1C, 0x9E, 0x6A, 0x55, 0x3D,\n        0x45, 0x30, 0x7E, 0x92, 0x13, 0x61, 0xB9, 0xC3, 0x1A, 0x36, 0x5A, 0xD9, 0x1B, 0xEE, 0x47, 0x29,\n        0x40, 0x4F, 0x37, 0x70, 0x42, 0x9F, 0xB2, 0x7B, 0x54, 0x6B, 0x9B, 0x14, 0x8A, 0x6C, 0x5D, 0x52,\n        0x44, 0x64, 0x72, 0x65, 0x0B, 0x39, 0x4C, 0x0D, 0x0A, 0x5C, 0x99, 0x74, 0x2D, 0x4B, 0x76, 0xA7,\n        0x12, 0x20, 0x50, 0x67, 0x2B, 0x3F, 0x4A, 0x01, 0x1F, 0x08, 0x71, 0x7A, 0xE1, 0xED, 0x41, 0x18,\n        0xA3, 0x0F, 0x1E, 0x09, 0x23, 0x02, 0xAF, 0x43, 0x4D, 0x34, 0x3B, 0x48, 0x04, 0x32, 0x28, 0x8E,\n        0xA8, 0xA6, 0x0E, 0x2E, 0xDB, 0x5E, 0x8B, 0x8C, 0x56, 0x57, 0x97, 0x38, 0x24, 0x2A, 0x63, 0x46,\n        0x83, 0xB4, 0x35, 0xD1, 0x53, 0xC4, 0x93, 0xA5, 0x3C, 0x80, 0x6F, 0x89, 0x07, 0x7F, 0x66, 0xBF,\n        0x82, 0x81, 0x9A, 0x73, 0xFE, 0x03, 0x17, 0x00, 0xD5, 0x84, 0x7D, 0x15, 0x88, 0xA4, 0x5B, 0xFB,\n        0x79, 0xB7, 0xCC, 0xBC, 0xB6, 0xBB, 0xDA, 0x21, 0x11, 0x98, 0x21, 0x33, 0x87, 0x05, 0x11, 0xCE,\n        0x4E, 0x91, 0x6D, 0x16, 0xEB, 0x06, 0x1D, 0x2C, 0xD4, 0x5F, 0xB0, 0x77, 0x19, 0xD0, 0x22, 0x31,\n        0x51, 0x96, 0x49, 0xD8, 0x3E, 0x25, 0x2F, 0x0C, 0x58, 0x62, 0xEF, 0x27, 0x26, 0xA9, 0x10, 0x8D,\n        0x59, 0xA2, 0xA1, 0xFF, 0x1C, 0x9E, 0x6A, 0x55, 0x3D, 0x45, 0x30, 0x7E, 0x92, 0x13, 0x61, 0xB9,\n        0xC3, 0x1A, 0x36, 0x5A, 0xD9, 0x1B, 0xEE, 0x47, 0x29, 0x40, 0x4F, 0x37, 0x70, 0x42, 0x9F, 0xB2,\n    ];\n    table[(h ^ data) as usize] as u64\"\"\", \"\"\"    let table = [\n        0x98, 0x21, 0x33, 0x87, 0x05, 0x11, 0xCE, 0x4E, 0x91, 0x6D, 0x16, 0xEB, 0x06, 0x1D, 0x2C, 0xD4,\n        0x5F, 0xB0, 0x77, 0x19, 0xD0, 0x22, 0x31, 0x51, 0x96, 0x49, 0xD8, 0x3E, 0x25, 0x2F, 0x0C, 0x58,\n        0x62, 0xEF, 0x27, 0x26, 0xA9, 0x10, 0x8D, 0x59, 0xA2, 0xA1, 0xFF, 0x1C, 0x9E, 0x6A, 0x55, 0x3D,\n        0x45, 0x30, 0x7E, 0x92, 0x13, 0x61, 0xB9, 0xC3, 0x1A, 0x36, 0x5A, 0xD9, 0x1B, 0xEE, 0x47, 0x29,\n        0x40, 0x4F, 0x37, 0x70, 0x42, 0x9F, 0xB2, 0x7B, 0x54, 0x6B, 0x9B, 0x14, 0x8A, 0x6C, 0x5D, 0x52,\n        0x44, 0x64, 0x72, 0x65, 0x0B, 0x39, 0x4C, 0x0D, 0x0A, 0x5C, 0x99, 0x74, 0x2D, 0x4B, 0x76, 0xA7,\n        0x12, 0x20, 0x50, 0x67, 0x2B, 0x3F, 0x4A, 0x01, 0x1F, 0x08, 0x71, 0x7A, 0xE1, 0xED, 0x41, 0x18,\n        0xA3, 0x0F, 0x1E, 0x09, 0x23, 0x02, 0xAF, 0x43, 0x4D, 0x34, 0x3B, 0x48, 0x04, 0x32, 0x28, 0x8E,\n        0xA8, 0xA6, 0x0E, 0x2E, 0xDB, 0x5E, 0x8B, 0x8C, 0x56, 0x57, 0x97, 0x38, 0x24, 0x2A, 0x63, 0x46,\n        0x83, 0xB4, 0x35, 0xD1, 0x53, 0xC4, 0x93, 0xA5, 0x3C, 0x80, 0x6F, 0x89, 0x07, 0x7F, 0x66, 0xBF,\n        0x82, 0x81, 0x9A, 0x73, 0xFE, 0x03, 0x17, 0x00, 0xD5, 0x84, 0x7D, 0x15, 0x88, 0xA4, 0x5B, 0xFB,\n        0x79, 0xB7, 0xCC, 0xBC, 0xB6, 0xBB, 0xDA, 0x21, 0x11, 0x98, 0x21, 0x33, 0x87, 0x05, 0x11, 0xCE,\n        0x4E, 0x91, 0x6D, 0x16, 0xEB, 0x06, 0x1D, 0x2C, 0xD4, 0x5F, 0xB0, 0x77, 0x19, 0xD0, 0x22, 0x31,\n        0x51, 0x96, 0x49, 0xD8, 0x3E, 0x25, 0x2F, 0x0C, 0x58, 0x62, 0xEF, 0x27, 0x26, 0xA9, 0x10, 0x8D,\n        0x59, 0xA2, 0xA1, 0xFF, 0x1C, 0x9E, 0x6A, 0x55, 0x3D, 0x45, 0x30, 0x7E, 0x92, 0x13, 0x61, 0xB9,\n        0xC3, 0x1A, 0x36, 0x5A, 0xD9, 0x1B, 0xEE, 0x47, 0x29, 0x40, 0x4F, 0x37, 0x70, 0x42, 0x9F, 0xB2,\n    ];\n    table[(val as u8 ^ aux as u8) as usize] as u64\"\"\"\n"
+    }
+  ],
+  "perfect_hash_lookup_u32": [
+    {
+      "source": "implement_batch_7.py",
+      "type": "conditional_block",
+      "text": "        return \"\"\"    let key = val as u32;\n    let h = (key.wrapping_mul(0x45d9f3b) >> 16) ^ key;\n    h as u64\"\"\", \"\"\"    let key = val as u32;\n    let h = (key.wrapping_mul(0x45d9f3b) >> 16) ^ key;\n    h as u64\"\"\"\n"
+    }
+  ],
+  "count_min_sketch_add": [
+    {
+      "source": "implement_batch_3.py",
+      "type": "dict",
+      "val": "val.wrapping_add((aux.wrapping_mul(0x9E3779B97F4A7C15u64) >> 48) | (aux.wrapping_mul(0x85EBCA6B00000000u64) & 0xFFFF000000000000u64))"
+    }
+  ],
+  "count_min_sketch_query": [
+    {
+      "source": "implement_batch_3.py",
+      "type": "dict",
+      "val": "let c1 = val & 0xFFFF; let c2 = (val >> 16) & 0xFFFF; let c3 = (val >> 32) & 0xFFFF; let c4 = (val >> 48) & 0xFFFF; (c1.min(c2)).min(c3.min(c4))"
+    }
+  ],
+  "cuckoo_filter_add_u64": [
+    {
+      "source": "implement_batch_3.py",
+      "type": "dict",
+      "val": "val ^ (aux.wrapping_mul(0x9E3779B97F4A7C15u64))"
+    }
+  ],
+  "fibonacci_hash_u64": [
+    {
+      "source": "implement_batch_3.py",
+      "type": "dict",
+      "val": "val.wrapping_mul(11400714819323198485u64)"
+    },
+    {
+      "source": "refine_all_batches.py",
+      "type": "dict",
+      "val": {
+        "args": "v: u64",
+        "ret": "u64",
+        "branchless": "v.wrapping_mul(11400714819323198485)",
+        "reference": "v.wrapping_mul(11400714819323198485)",
+        "prop_args": "v in any::<u64>()",
+        "call_args": "v",
+        "bench_args": "black_box(123)"
+      }
+    },
+    {
+      "source": "refine_batch_2_3.py",
+      "type": "dict",
+      "val": {
+        "args": "val: u64",
+        "ret": "u64",
+        "branchless": "val.wrapping_mul(11400714819323198485)",
+        "reference": "val.wrapping_mul(11400714819323198485)",
+        "prop_args": "v in any::<u64>()",
+        "call_args": "v",
+        "bench_args": "black_box(123456)"
+      }
+    }
+  ],
+  "clhash": [
+    {
+      "source": "refine_all_batches.py",
+      "type": "dict",
+      "val": {
+        "args": "v: u64, k: u64",
+        "ret": "u64",
+        "branchless": "let mut r = 0; for i in 0..64 { r ^= (k.wrapping_shl(i)) & (0u64.wrapping_sub((v >> (63-i)) & 1)); } r",
+        "reference": "let mut r = 0; for i in 0..64 { if ((v >> (63-i)) & 1) != 0 { r ^= k << i; } } r",
+        "prop_args": "v in any::<u64>(), k in any::<u64>()",
+        "call_args": "v, k",
+        "bench_args": "black_box(0x123), black_box(0x456)"
+      }
+    },
+    {
+      "source": "implement_batch_2.py",
+      "type": "tuple",
+      "val": [
+        "clhash",
+        "CLHash mixing step.",
+        "    let h = val ^ aux; let h = h.wrapping_mul(0x9e3779b97f4a7c15); h ^ (h >> 33)",
+        "        let h = val ^ aux; let h = h.wrapping_mul(0x9e3779b97f4a7c15); h ^ (h >> 33)"
+      ]
+    },
+    {
+      "source": "refine_batch_2_3.py",
+      "type": "dict",
+      "val": {
+        "args": "val: u64, key: u64",
+        "ret": "u64",
+        "branchless": "let h = val ^ key; let mut res = 0; for i in 0..64 { res ^= (h.wrapping_shl(i)) & (0u64.wrapping_sub((val >> (63-i)) & 1)); } res",
+        "reference": "let h = val ^ key; let mut res = 0; for i in 0..64 { if ((val >> (63-i)) & 1) != 0 { res ^= h << i; } } res",
+        "prop_args": "val in any::<u64>(), key in any::<u64>()",
+        "call_args": "val, key",
+        "bench_args": "black_box(0x123), black_box(0x456)"
+      }
+    }
+  ],
+  "consistent_hash_jump_u64": [
+    {
+      "source": "refine_all_batches.py",
+      "type": "dict",
+      "val": {
+        "args": "k: u64, n: i32",
+        "ret": "i32",
+        "branchless": "let mut b = -1i64; let mut j = 0i64; let mut v = k; for _ in 0..64 { let n_j = (j + 1) as f64 * (2147483648.0 / (((v >> 33) + 1) as f64)); let mk = 0i64.wrapping_sub((j < n as i64) as i64); b = (j & mk) | (b & !mk); j = n_j as i64; v = v.wrapping_mul(2862933555777941757).wrapping_add(1); } b as i32",
+        "reference": "let mut b = -1; let mut j = 0; let mut v = k; while j < n as i64 { b = j; v = v.wrapping_mul(2862933555777941757).wrapping_add(1); j = ((b + 1) as f64 * (2147483648.0 / (((v >> 33) + 1) as f64))) as i64; } b as i32",
+        "prop_args": "k in any::<u64>(), n in 1..1024i32",
+        "call_args": "k, n",
+        "bench_args": "black_box(123), black_box(10)"
+      }
+    },
+    {
+      "source": "implement_batch_2.py",
+      "type": "tuple",
+      "val": [
+        "consistent_hash_jump_u64",
+        "Jump consistent hash step placeholder.",
+        "    val.wrapping_mul(0x9e3779b9) ^ aux",
+        "        val.wrapping_mul(0x9e3779b9) ^ aux"
+      ]
+    },
+    {
+      "source": "refine_batch_2_3.py",
+      "type": "dict",
+      "val": {
+        "args": "key: u64, num_buckets: i32",
+        "ret": "i32",
+        "branchless": "let mut b = -1i64; let mut j = 0i64; let mut k = key; for _ in 0..64 { let next_j = (j + 1) as f64 * (2147483648.0 / (((k >> 33) + 1) as f64)); let mask = (0i64.wrapping_sub((j < num_buckets as i64) as i64)); b = (j & mask) | (b & !mask); j = next_j as i64; k = k.wrapping_mul(2862933555777941757).wrapping_add(1); } b as i32",
+        "reference": "let mut b = -1; let mut j = 0; let mut k = key; while j < num_buckets as i64 { b = j; k = k.wrapping_mul(2862933555777941757).wrapping_add(1); j = ((b + 1) as f64 * (2147483648.0 / (((k >> 33) + 1) as f64))) as i64; } b as i32",
+        "prop_args": "k in any::<u64>(), n in 1..1024i32",
+        "call_args": "k, n",
+        "bench_args": "black_box(12345), black_box(100)"
+      }
+    }
+  ],
+  "consistent_hash_maglev": [
+    {
+      "source": "refine_all_batches.py",
+      "type": "dict",
+      "val": {
+        "args": "a: u64, v: u64",
+        "ret": "u64",
+        "branchless": "a.wrapping_mul(0x9E3779B185EBCA87).wrapping_add(v)",
+        "reference": "a.wrapping_mul(0x9E3779B185EBCA87).wrapping_add(v)",
+        "prop_args": "a in any::<u64>(), v in any::<u64>()",
+        "call_args": "a, v",
+        "bench_args": "black_box(0), black_box(1)"
+      }
+    },
+    {
+      "source": "implement_batch_2.py",
+      "type": "tuple",
+      "val": [
+        "consistent_hash_maglev",
+        "Maglev consistent hash lookup step placeholder.",
+        "    (val.wrapping_add(aux)) % 65537",
+        "        (val.wrapping_add(aux)) % 65537"
+      ]
+    },
+    {
+      "source": "refine_batch_2_3.py",
+      "type": "dict",
+      "val": {
+        "args": "acc: u64, val: u64",
+        "ret": "u64",
+        "branchless": "acc.wrapping_mul(0x9E3779B185EBCA87).wrapping_add(val)",
+        "reference": "acc.wrapping_mul(0x9E3779B185EBCA87).wrapping_add(val)",
+        "prop_args": "a in any::<u64>(), v in any::<u64>()",
+        "call_args": "a, v",
+        "bench_args": "black_box(0), black_box(123)"
+      }
+    }
+  ],
+  "highwayhash_64": [
+    {
+      "source": "refine_all_batches.py",
+      "type": "dict",
+      "val": {
+        "args": "u: u64, v: u64",
+        "ret": "u64",
+        "branchless": "let mut a = u; let mut b = v; a = a.wrapping_add(b); b = b.rotate_left(31); a = a.wrapping_mul(0xd6e8feb86659fd93); a ^= a >> 32; a",
+        "reference": "let mut a = u; let mut b = v; a = a.wrapping_add(b); b = b.rotate_left(31); a = a.wrapping_mul(0xd6e8feb86659fd93); a ^= a >> 32; a",
+        "prop_args": "u in any::<u64>(), v in any::<u64>()",
+        "call_args": "u, v",
+        "bench_args": "black_box(1), black_box(2)"
+      }
+    }
+  ],
+  "hyperloglog_add_u64": [
+    {
+      "source": "refine_all_batches.py",
+      "type": "dict",
+      "val": {
+        "args": "h: u64, p: u32",
+        "ret": "u32",
+        "branchless": "let r = (h.wrapping_shr(p)).leading_zeros() + 1; r",
+        "reference": "let r = (h.wrapping_shr(p)).leading_zeros() + 1; r",
+        "prop_args": "h in any::<u64>(), p in 1..32u32",
+        "call_args": "h, p",
+        "bench_args": "black_box(0x12345678), black_box(10)"
+      }
+    }
+  ],
+  "hyperloglog_merge": [
+    {
+      "source": "refine_all_batches.py",
+      "type": "dict",
+      "val": {
+        "args": "a: u8, b: u8",
+        "ret": "u8",
+        "branchless": "a.max(b)",
+        "reference": "if a > b { a } else { b }",
+        "prop_args": "a in any::<u8>(), b in any::<u8>()",
+        "call_args": "a, b",
+        "bench_args": "black_box(10), black_box(20)"
+      }
+    }
+  ],
+  "knuth_hash_u64": [
+    {
+      "source": "refine_all_batches.py",
+      "type": "dict",
+      "val": {
+        "args": "v: u64",
+        "ret": "u64",
+        "branchless": "v.wrapping_mul(1442695040888963407)",
+        "reference": "v.wrapping_mul(1442695040888963407)",
+        "prop_args": "v in any::<u64>()",
+        "call_args": "v",
+        "bench_args": "black_box(12345)"
+      }
+    }
+  ],
+  "locality_sensitive_hash_euclidean": [
+    {
+      "source": "refine_all_batches.py",
+      "type": "dict",
+      "val": {
+        "args": "v: u64, p: u64",
+        "ret": "u64",
+        "branchless": "v ^ p",
+        "reference": "v ^ p",
+        "prop_args": "v in any::<u64>(), p in any::<u64>()",
+        "call_args": "v, p",
+        "bench_args": "black_box(1), black_box(2)"
+      }
+    },
+    {
+      "source": "implement_batch_6.py",
+      "type": "dict",
+      "val": [
+        "    let mut dist_sq = 0u64;\n    for i in 0..8 {\n        let a = ((val >> (i * 8)) & 0xFF) as i64; let b = ((aux >> (i * 8)) & 0xFF) as i64;\n        dist_sq += ((a - b) * (a - b)) as u64;\n    }\n    dist_sq / 100",
+        "        let mut dist_sq = 0u64;\n        for i in 0..8 {\n            let a = ((val >> (i * 8)) & 0xFF) as i64; let b = ((aux >> (i * 8)) & 0xFF) as i64;\n            let diff = if a > b { a - b } else { b - a };\n            dist_sq += (diff * diff) as u64;\n        }\n        dist_sq / 100"
+      ]
+    },
+    {
+      "source": "fix_batch6.py",
+      "type": "dict",
+      "val": {
+        "body": "val.wrapping_sub(aux).count_ones() as u64",
+        "ref": "if val == aux { 0 } else { val.wrapping_sub(aux).count_ones() as u64 }"
+      }
+    }
+  ],
+  "metrohash64": [
+    {
+      "source": "refine_all_batches.py",
+      "type": "dict",
+      "val": {
+        "args": "u: u64, v: u64",
+        "ret": "u64",
+        "branchless": "u.wrapping_mul(0xad825e5e0125aa31).rotate_right(31).wrapping_add(v)",
+        "reference": "u.wrapping_mul(0xad825e5e0125aa31).rotate_right(31).wrapping_add(v)",
+        "prop_args": "u in any::<u64>(), v in any::<u64>()",
+        "call_args": "u, v",
+        "bench_args": "black_box(1), black_box(2)"
+      }
+    },
+    {
+      "source": "implement_batch_6.py",
+      "type": "dict",
+      "val": [
+        "    (val ^ aux).wrapping_mul(0x9E3779B97F4A7C15).rotate_left(11)",
+        "        (val ^ aux).wrapping_mul(0x9E3779B97F4A7C15).rotate_left(11)"
+      ]
+    },
+    {
+      "source": "fix_batch6.py",
+      "type": "dict",
+      "val": {
+        "body": "val ^ aux",
+        "ref": "if val == aux { 0 } else { val ^ aux }"
+      }
+    }
+  ],
+  "minhash_u64_k": [
+    {
+      "source": "refine_all_batches.py",
+      "type": "dict",
+      "val": {
+        "args": "h: u64, k: u64",
+        "ret": "u64",
+        "branchless": "h ^ k",
+        "reference": "h ^ k",
+        "prop_args": "h in any::<u64>(), k in any::<u64>()",
+        "call_args": "h, k",
+        "bench_args": "black_box(1), black_box(2)"
+      }
+    },
+    {
+      "source": "implement_batch_6.py",
+      "type": "dict",
+      "val": [
+        "    let h = val.wrapping_mul(0x9E3779B97F4A7C15);\n    let m = 0u64.wrapping_sub((h < aux) as u64);\n    (h & m) | (aux & !m)",
+        "        let h = val.wrapping_mul(0x9E3779B97F4A7C15); if h < aux { h } else { aux }"
+      ]
+    },
+    {
+      "source": "fix_batch6.py",
+      "type": "dict",
+      "val": {
+        "body": "val ^ aux",
+        "ref": "if val == aux { 0 } else { val ^ aux }"
+      }
+    }
+  ],
+  "bloom_filter_add_u64": [
+    {
+      "source": "implement_batch_2.py",
+      "type": "tuple",
+      "val": [
+        "bloom_filter_add_u64",
+        "Adds an element to a 64-bit Bloom filter.",
+        "    let h = aux.wrapping_mul(0x9e3779b97f4a7c15); val | (1u64 << (h & 63)) | (1u64 << ((h >> 8) & 63)) | (1u64 << ((h >> 16) & 63))",
+        "        let h = aux.wrapping_mul(0x9e3779b97f4a7c15); val | (1u64 << (h & 63)) | (1u64 << ((h >> 8) & 63)) | (1u64 << ((h >> 16) & 63))"
+      ]
+    }
+  ],
+  "bloom_filter_intersect": [
+    {
+      "source": "implement_batch_2.py",
+      "type": "tuple",
+      "val": [
+        "bloom_filter_intersect",
+        "Intersects two Bloom filters.",
+        "    val & aux",
+        "        val & aux"
+      ]
+    }
+  ],
+  "bloom_filter_query_u64": [
+    {
+      "source": "implement_batch_2.py",
+      "type": "tuple",
+      "val": [
+        "bloom_filter_query_u64",
+        "Queries a 64-bit Bloom filter for an element.",
+        "    let h = aux.wrapping_mul(0x9e3779b97f4a7c15); let mask = (1u64 << (h & 63)) | (1u64 << ((h >> 8) & 63)) | (1u64 << ((h >> 16) & 63)); ((val & mask) == mask) as u64",
+        "        let h = aux.wrapping_mul(0x9e3779b97f4a7c15); let mask = (1u64 << (h & 63)) | (1u64 << ((h >> 8) & 63)) | (1u64 << ((h >> 16) & 63)); if (val & mask) == mask { 1 } else { 0 }"
+      ]
+    }
+  ],
+  "bloom_filter_union": [
+    {
+      "source": "implement_batch_2.py",
+      "type": "tuple",
+      "val": [
+        "bloom_filter_union",
+        "Unions two Bloom filters.",
+        "    val | aux",
+        "        val | aux"
+      ]
+    }
+  ],
+  "t_digest_add_u32": [
+    {
+      "source": "fix_batch_10.py",
+      "type": "dict",
+      "val": [
+        "    let w1 = val & 0xFFFFFFFF; let c1 = val >> 32;\n    let w2 = aux & 0xFFFFFFFF; let c2 = aux >> 32;\n    let w_sum = w1.wrapping_add(w2);\n    let c_sum = c1.wrapping_add(c2);\n    w_sum | (c_sum << 32)",
+        "        let w1 = val & 0xFFFFFFFF; let c1 = val >> 32;\n        let w2 = aux & 0xFFFFFFFF; let c2 = aux >> 32;\n        (w1.wrapping_add(w2)) | (c1.wrapping_add(c2) << 32)"
+      ]
+    }
+  ],
+  "weighted_reservoir_sample": [
+    {
+      "source": "fix_batch_10.py",
+      "type": "dict",
+      "val": [
+        "    let w1 = val; let w2 = aux;\n    let mask = 0u64.wrapping_sub((w1 > w2) as u64);\n    (w1 & mask) | (w2 & !mask)",
+        "        if val > aux { val } else { aux }"
+      ]
+    }
+  ],
+  "zobrist_hash_64": [
+    {
+      "source": "fix_batch_10.py",
+      "type": "dict",
+      "val": [
+        "    val ^ aux",
+        "        val ^ aux"
+      ]
+    }
+  ],
+  "heavy_keepers_add": [
+    {
+      "source": "fix_batch_4.py",
+      "type": "dict",
+      "val": {
+        "ref": "\n        let idx = (aux & 0xF) * 4;\n        let count = (val >> idx) & 0xF;\n        let new_count = if count < 15 { count + 1 } else { 15 };\n        (val & !(0xF << idx)) | (new_count << idx)\n        ",
+        "impl": "\n    let idx = (aux & 0xF) * 4;\n    let count = (val >> idx) & 0xF;\n    let is_not_max = (count < 15) as u64;\n    let new_count = count + is_not_max;\n    (val & !(0xF << idx)) | (new_count << idx)\n        "
+      }
+    }
+  ]
+}

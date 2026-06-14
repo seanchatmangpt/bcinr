@@ -15,4 +15,3 @@ extern crate alloc;
 pub use bcinr_api as api;
 /// Core algorithmic implementations (re-exported from bcinr-logic)
 pub use bcinr_logic as logic;
-

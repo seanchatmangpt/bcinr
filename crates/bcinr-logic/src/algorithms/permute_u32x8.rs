@@ -3,7 +3,7 @@
 // Assumes adherence to zero-branching, 0-allocation, and sub-10ns latency.
 
 /// permute_u32x8
-/// 
+///
 /// Branchless implementation guaranteed to execute in constant time
 /// with zero dynamic dispatch or control flow hazards.
 ///
@@ -23,30 +23,35 @@ pub fn permute_u32x8(val: u64, aux: u64) -> u64 {
     let x = val;
     let y = aux;
     (x.rotate_left(32) & 0xFFFFFFFF00000000u64) | (y & 0x00000000FFFFFFFFu64)
-
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    
+
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
     fn permute_u32x8_reference(val: u64, aux: u64) -> u64 {
-    (val & 0xFFFFFFFF00000000u64) | (aux & 0x00000000FFFFFFFFu64)
+        (val & 0xFFFFFFFF00000000u64) | (aux & 0x00000000FFFFFFFFu64)
     }
 
     // -------------------------------------------------------------------------
     // NEGATIVE MUTANTS: Intentionally flawed versions
     // -------------------------------------------------------------------------
     #[allow(unused_variables)]
-    fn mutant_permute_u32x8_1(val: u64, aux: u64) -> u64 { !permute_u32x8_reference(val, aux) } // Identity bluff
+    fn mutant_permute_u32x8_1(val: u64, aux: u64) -> u64 {
+        !permute_u32x8_reference(val, aux)
+    } // Identity bluff
     #[allow(unused_variables)]
-    fn mutant_permute_u32x8_2(val: u64, aux: u64) -> u64 { permute_u32x8_reference(val, aux).wrapping_add(1) } // Bit-skip bluff
+    fn mutant_permute_u32x8_2(val: u64, aux: u64) -> u64 {
+        permute_u32x8_reference(val, aux).wrapping_add(1)
+    } // Bit-skip bluff
     #[allow(unused_variables)]
-    fn mutant_permute_u32x8_3(val: u64, aux: u64) -> u64 { permute_u32x8_reference(val, aux) ^ 0xFFFFFFFF } // Operator-swap bluff
+    fn mutant_permute_u32x8_3(val: u64, aux: u64) -> u64 {
+        permute_u32x8_reference(val, aux) ^ 0xFFFFFFFF
+    } // Operator-swap bluff
 
     proptest! {
         #[test]
@@ -90,11 +95,20 @@ mod tests {
     #[test]
     fn test_permute_u32x8_boundaries() {
         assert_eq!(permute_u32x8(0, 0), permute_u32x8_reference(0, 0));
-        assert_eq!(permute_u32x8(u64::MAX, u64::MAX), permute_u32x8_reference(u64::MAX, u64::MAX));
-        assert_eq!(permute_u32x8(u64::MAX, 0), permute_u32x8_reference(u64::MAX, 0));
-        assert_eq!(permute_u32x8(0, u64::MAX), permute_u32x8_reference(0, u64::MAX));
+        assert_eq!(
+            permute_u32x8(u64::MAX, u64::MAX),
+            permute_u32x8_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            permute_u32x8(u64::MAX, 0),
+            permute_u32x8_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            permute_u32x8(0, u64::MAX),
+            permute_u32x8_reference(0, u64::MAX)
+        );
     }
-    
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
     // -------------------------------------------------------------------------
@@ -130,21 +144,19 @@ mod tests {
     // Hoare-logic Verification Line 33: Branchless path is the unique solution to the state constraints of permute_u32x8.
     // Hoare-logic Verification Line 34: Branchless path is the unique solution to the state constraints of permute_u32x8.
     // Hoare-logic Verification Line 35: Branchless path is the unique solution to the state constraints of permute_u32x8.
-
 }
 
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
-    
+
     pub fn bench_permute_u32x8(c: &mut Criterion) {
         c.bench_function("permute_u32x8", |b| {
             b.iter(|| {
                 let res = permute_u32x8(black_box(42), black_box(1337));
                 black_box(res)
-            
-})
+            })
         });
     }
 }
@@ -154,7 +166,7 @@ pub mod bench {
 // -----------------------------------------------------------------------------
 // This padding is necessary to satisfy the exhaustive documentation requirements
 // of the B-Calculus specification for safety-critical autonomic systems.
-// 
+//
 // 1. Line 1
 // 2. Line 2
 // 3. Line 3

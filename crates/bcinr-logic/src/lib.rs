@@ -1,5 +1,5 @@
 #![no_std]
-#![allow(unused_attributes)]
+#![allow(unused_attributes, clippy::needless_range_loop)]
 #[cfg(feature = "alloc")]
 extern crate alloc;
 #[cfg(all(test, feature = "std"))]
