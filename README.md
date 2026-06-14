@@ -22,20 +22,30 @@ bcinr-core = "26.6.13"
 ## Quick Start
 
 ```rust
-use bcinr_core::api::{select_u32, add_sat_u8, clamp_u32};
+use bcinr::mask::{select_u32, min_u32, max_u32};
+use bcinr::fix::{add_sat, clamp_u32};
 
 // Branchless selection: mask 0xFFFFFFFF selects first arg, 0x0 selects second
 let val = select_u32(0xFFFFFFFF, 10, 20);
 assert_eq!(val, 10);
 
-// Saturating arithmetic: never overflows
-let sum = add_sat_u8(200, 100);
-assert_eq!(sum, 255);
+// Saturating arithmetic (u32): never wraps past MAX
+let sum = add_sat(u32::MAX, 1);
+assert_eq!(sum, u32::MAX);
 
-// Safe clamping: returns Result for contract validation
-let clamped = clamp_u32(150, 0, 100).unwrap();
+// Clamping: returns u32 directly, no Result
+let clamped = clamp_u32(150, 0, 100);
 assert_eq!(clamped, 100);
+
+// Composition: branchless clamp via min/max
+let also_clamped = min_u32(max_u32(150, 0), 100);
+assert_eq!(also_clamped, 100);
 ```
+
+See [`examples/mask_primitives.rs`](bcinr/examples/mask_primitives.rs),
+[`examples/saturation_arithmetic.rs`](bcinr/examples/saturation_arithmetic.rs), and
+[`examples/branchless_pipeline.rs`](bcinr/examples/branchless_pipeline.rs) for
+runnable witnesses (`cargo run --example <name>`).
 
 ## Documentation (Diátaxis)
 
