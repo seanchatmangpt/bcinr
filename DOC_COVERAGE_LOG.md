@@ -182,3 +182,66 @@ Tracks bijective coverage: every documented capability has a running example, ev
 - Algorithm module (308 fns): 5/308 individually witnessed; the shared branchless contract pattern is documented in the cross-section
 - Defects found: 1 (horizontal_max/min_u8x8 SWAR overflow); 3 README false claims corrected
 
+
+---
+
+## Iteration 4 — 2026-06-14
+
+**State:** commit `4f026b8`, tree clean, rustc `1.97.0-nightly`
+
+### Gap Map (at iteration start — remaining after iteration 3)
+
+**Documented-but-unexercised:**
+- `bcinr::network`: `compare_exchange`, `bitonic_sort_8u32`, `bitonic_sort_16u32`
+- `bcinr::parse`: `skip_whitespace`, `parse_hex_u32`
+- `bcinr::bitset` standalone: `rank_u64`, `select_bit_u64`, `parity_u64_slice`, `jaccard_u64_slices`, `hamming_u64_slices`, `intersect_u64_slices`, `union_u64_slices`, `any_bit_set_u64_slice`
+
+### Triples Closed
+
+**Triple 10 — Sorting Networks ✅**
+- **Doc:** `crates/bcinr-logic/src/network.rs`
+- **Example:** `bcinr/examples/sorting_networks.rs`
+- **Run output:** `bitonic_sort_8u32: [7,2,8,1,5,3,9,4] → [1,2,3,4,5,7,8,9]`, `bitonic_sort_16u32(random 0..15): [0..15]`, `rank of 120 in sorted: 4`, `All sorting network assertions passed.`
+- **Exit code: 0**
+- **Fail-if-fake:** `assert_eq!(arr8, sorted8_ref)` fails if any element is out of order; reverse-sorted and all-equal edge cases enforce full correctness; stdlib cross-check for sort-16 (`arr16_ref.sort()`) makes the reference independent
+
+**Triple 11 — Parse Primitives ✅**
+- **Doc:** `crates/bcinr-logic/src/parse.rs`
+- **Example:** `bcinr/examples/parse_primitives.rs`
+- **Run output:** `skip_whitespace(b"\t\nhello")=2`, `parse_hex_u32(b"DEADBEEF")=Ok(3735928559)`, `skip+parse(b"  CAFE"): start=2, val=Ok(51966)`, `All parse primitive assertions passed.`
+- **Exit code: 0**
+- **Fail-if-fake:** `Err` cases for empty, non-hex, and >8-digit inputs; case-insensitivity cross-check; skip+parse composition fails end-to-end if either is wrong
+
+**Triple 12 — Bitset Algebra ✅**
+- **Doc:** `crates/bcinr-logic/src/bitset.rs`
+- **Example:** `bcinr/examples/bitset_algebra.rs`
+- **Run output:** `rank_u64(0b10110101,7)=5`, `rank-select round-trip: OK for all 5 set bits`, `jaccard([0b1100],[0b1010])=0.3333`, `intersect=0b1010`, `union=0b1111`, `All bitset algebra assertions passed.`
+- **Exit code: 0**
+- **Fail-if-fake:** rank-select round-trip `rank(select(x,n), pos) = n+1` would break if either function is wrong; jaccard floating-point comparison with tolerance; disjoint=0.0 and identical=1.0 boundary cases
+
+### Coverage State After 4 Iterations (12 triples)
+
+**Covered modules (running witnesses exist):**
+- `bcinr::mask` ✅ — triple 1
+- `bcinr::fix` ✅ — triple 2
+- `bcinr::bitset` ✅ — triple 3 (pipeline) + triple 12 (standalone)
+- `bcinr::int` ✅ — triple 4
+- `bcinr::dfa` ✅ — triple 5
+- `bcinr::reduce` ✅ (partial: or/and/xor/sum) — triple 6; horizontal_max/min OPEN-defective
+- `bcinr::scan` ✅ — triple 7
+- `bcinr::utf8` ✅ — triple 8
+- `bcinr::sketch` ✅ — triple 8
+- `bcinr::algorithms` ✅ (representative cross-section: 5/308) — triple 9
+- `bcinr::network` ✅ — triple 10
+- `bcinr::parse` ✅ — triple 11
+
+**Remaining documented-but-unexercised:**
+- `bcinr::reduce::horizontal_max_u8x8` / `horizontal_min_u8x8` — OPEN-defective (implementation bug)
+- `bcinr::algorithms::*` — 303 remaining algorithm functions; each has `/// # Branchless Contract`
+  doc but no individual example. Cross-section (triple 9) covers the *pattern* but not individual witnesses.
+
+**Bijective coverage assessment:**
+- All 12 core module clusters: ✅ covered with running examples
+- Algorithm surface: cross-section documented; individual bijection would require ~303 more examples
+- No exercised-but-undocumented examples: all 12 examples reference their doc files in headers
+
