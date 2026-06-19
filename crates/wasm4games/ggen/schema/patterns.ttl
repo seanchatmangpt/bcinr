@@ -1,0 +1,376 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix w4g:  <https://wasm4games.dev/ontology#> .
+
+#################################################################
+# wasm4games pattern ontology
+#
+# This is the ggen INPUT SURFACE. `ggen sync` runs the SPARQL queries in
+# ggen/queries/ over this graph and renders the Tera templates in
+# ggen/templates/ to (re)produce the committed Rust under src/patterns/.
+# The committed Rust is the offline source of truth; this graph is its model.
+#################################################################
+
+#################################################################
+# Classes
+#################################################################
+
+w4g:Pattern a rdfs:Class ;
+    rdfs:comment "A branchless game pattern: a pure u64->u64 kernel plus its evidence metadata." .
+
+w4g:ObjectKind a rdfs:Class ;
+    rdfs:comment "An OCEL object type an event links to." .
+
+w4g:Lowering a rdfs:Class ;
+    rdfs:comment "A branchless lowering family (mirrors crate::ir::LoweringKind)." .
+
+#################################################################
+# Properties
+#################################################################
+
+w4g:id            a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:integer .
+w4g:name          a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:string .
+w4g:lowering      a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range w4g:Lowering .
+w4g:stateCard     a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:integer .
+w4g:eventCode     a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:integer .
+w4g:eventName     a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:string .
+w4g:otelSpan      a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:integer .
+w4g:requiredStatus a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:integer .
+w4g:refusalStatus a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:integer .
+w4g:primitive     a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:string .
+w4g:doc           a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:string .
+w4g:touchesObject a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range w4g:ObjectKind .
+
+w4g:code a rdf:Property ; rdfs:domain w4g:ObjectKind ; rdfs:range xsd:integer .
+# (w4g:name is reused for ObjectKind labels.)
+
+#################################################################
+# Lowering individuals (one per crate::ir::LoweringKind variant)
+#################################################################
+
+w4g:Lut        a w4g:Lowering ; w4g:name "Lut" .
+w4g:Mask       a w4g:Lowering ; w4g:name "Mask" .
+w4g:Saturating a w4g:Lowering ; w4g:name "Saturating" .
+w4g:Bitset     a w4g:Lowering ; w4g:name "Bitset" .
+w4g:Dfa        a w4g:Lowering ; w4g:name "Dfa" .
+w4g:Network    a w4g:Lowering ; w4g:name "Network" .
+w4g:Receipt    a w4g:Lowering ; w4g:name "Receipt" .
+
+#################################################################
+# ObjectKind individuals (stable codes, reused across patterns)
+#################################################################
+
+w4g:obj_player        a w4g:ObjectKind ; w4g:code 1  ; w4g:name "player" .
+w4g:obj_world         a w4g:ObjectKind ; w4g:code 2  ; w4g:name "world" .
+w4g:obj_entity        a w4g:ObjectKind ; w4g:code 3  ; w4g:name "entity" .
+w4g:obj_entity_a      a w4g:ObjectKind ; w4g:code 4  ; w4g:name "entity_a" .
+w4g:obj_entity_b      a w4g:ObjectKind ; w4g:code 5  ; w4g:name "entity_b" .
+w4g:obj_attacker      a w4g:ObjectKind ; w4g:code 6  ; w4g:name "attacker" .
+w4g:obj_target        a w4g:ObjectKind ; w4g:code 7  ; w4g:name "target" .
+w4g:obj_receipt_chain a w4g:ObjectKind ; w4g:code 8  ; w4g:name "receipt_chain" .
+w4g:obj_event         a w4g:ObjectKind ; w4g:code 9  ; w4g:name "event" .
+w4g:obj_object        a w4g:ObjectKind ; w4g:code 10 ; w4g:name "object" .
+w4g:obj_span          a w4g:ObjectKind ; w4g:code 11 ; w4g:name "span" .
+w4g:obj_frame         a w4g:ObjectKind ; w4g:code 12 ; w4g:name "frame" .
+w4g:obj_quantity      a w4g:ObjectKind ; w4g:code 13 ; w4g:name "quantity" .
+w4g:obj_hud_widget    a w4g:ObjectKind ; w4g:code 14 ; w4g:name "hud_widget" .
+w4g:obj_projectile    a w4g:ObjectKind ; w4g:code 15 ; w4g:name "projectile" .
+w4g:obj_session       a w4g:ObjectKind ; w4g:code 16 ; w4g:name "session" .
+w4g:obj_artifact      a w4g:ObjectKind ; w4g:code 17 ; w4g:name "artifact" .
+w4g:obj_prompt        a w4g:ObjectKind ; w4g:code 18 ; w4g:name "prompt" .
+w4g:obj_agent         a w4g:ObjectKind ; w4g:code 19 ; w4g:name "agent" .
+w4g:obj_item          a w4g:ObjectKind ; w4g:code 20 ; w4g:name "item" .
+w4g:obj_quest         a w4g:ObjectKind ; w4g:code 21 ; w4g:name "quest" .
+
+#################################################################
+# Pattern individuals (one per committed kernel; ORDER BY w4g:id)
+#################################################################
+
+w4g:input_admitted a w4g:Pattern ;
+    w4g:id 1 ;
+    w4g:name "input_admitted" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 9 ;
+    w4g:eventCode 2 ;
+    w4g:eventName "InputAdmitted" ;
+    w4g:otelSpan 2 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::eq_mask_u32" ;
+    w4g:doc "Map a raw input byte to an admission status code via a branchless eq-mask classifier." ;
+    w4g:touchesObject w4g:obj_player .
+
+w4g:fixed_tick_advanced a w4g:Pattern ;
+    w4g:id 2 ;
+    w4g:name "fixed_tick_advanced" ;
+    w4g:lowering w4g:Saturating ;
+    w4g:stateCard 64 ;
+    w4g:eventCode 1 ;
+    w4g:eventName "FixedTickAdvanced" ;
+    w4g:otelSpan 1 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::int::saturating_add_i64" ;
+    w4g:doc "Advance a fixed-step accumulator and emit whole ticks via bucketize." ;
+    w4g:touchesObject w4g:obj_world .
+
+w4g:entity_state_transitioned a w4g:Pattern ;
+    w4g:id 3 ;
+    w4g:name "entity_state_transitioned" ;
+    w4g:lowering w4g:Dfa ;
+    w4g:stateCard 4 ;
+    w4g:eventCode 16 ;
+    w4g:eventName "EntityStateTransitioned" ;
+    w4g:otelSpan 16 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::dfa::dfa_advance" ;
+    w4g:doc "Advance an entity lifecycle DFA one transition over a flat table." ;
+    w4g:touchesObject w4g:obj_entity .
+
+w4g:object_spawned a w4g:Pattern ;
+    w4g:id 4 ;
+    w4g:name "object_spawned" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 6 ;
+    w4g:eventCode 18 ;
+    w4g:eventName "ObjectSpawned" ;
+    w4g:otelSpan 18 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::fix::clamp_u32" ;
+    w4g:doc "Resolve a requested archetype to its initial packed state via a bounded LUT." ;
+    w4g:touchesObject w4g:obj_entity .
+
+w4g:aabb_collision_resolved a w4g:Pattern ;
+    w4g:id 5 ;
+    w4g:name "aabb_collision_resolved" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 2 ;
+    w4g:eventCode 17 ;
+    w4g:eventName "AabbCollisionResolved" ;
+    w4g:otelSpan 17 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::lt_mask_u32" ;
+    w4g:doc "Resolve AABB overlap via the separating-axis test, ANDing four lt-masks." ;
+    w4g:touchesObject w4g:obj_entity_a ;
+    w4g:touchesObject w4g:obj_entity_b .
+
+w4g:ocel_event_linked a w4g:Pattern ;
+    w4g:id 6 ;
+    w4g:name "ocel_event_linked" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 32 ;
+    w4g:eventCode 33 ;
+    w4g:eventName "OcelEventLinked" ;
+    w4g:otelSpan 33 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::select_u64" ;
+    w4g:doc "Gate event-object link validity with select; report admitted link popcount." ;
+    w4g:touchesObject w4g:obj_event ;
+    w4g:touchesObject w4g:obj_object .
+
+w4g:otel_span_emitted a w4g:Pattern ;
+    w4g:id 7 ;
+    w4g:name "otel_span_emitted" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 8 ;
+    w4g:eventCode 34 ;
+    w4g:eventName "OtelSpanEmitted" ;
+    w4g:otelSpan 34 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::fix::clamp_u32" ;
+    w4g:doc "Resolve a pattern slot to its runtime OTEL span code via a bounded LUT." ;
+    w4g:touchesObject w4g:obj_span .
+
+w4g:replay_frame_recorded a w4g:Pattern ;
+    w4g:id 8 ;
+    w4g:name "replay_frame_recorded" ;
+    w4g:lowering w4g:Receipt ;
+    w4g:stateCard 64 ;
+    w4g:eventCode 35 ;
+    w4g:eventName "ReplayFrameRecorded" ;
+    w4g:otelSpan 35 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::patterns::integrity_receipt::DeterministicSubstrateReceipt" ;
+    w4g:doc "Fold (prior digest, tick, input, state) into a deterministic replay digest." ;
+    w4g:touchesObject w4g:obj_frame .
+
+w4g:receipt_appended a w4g:Pattern ;
+    w4g:id 9 ;
+    w4g:name "receipt_appended" ;
+    w4g:lowering w4g:Receipt ;
+    w4g:stateCard 64 ;
+    w4g:eventCode 32 ;
+    w4g:eventName "ReceiptAppended" ;
+    w4g:otelSpan 3 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::patterns::integrity_receipt::DeterministicSubstrateReceipt" ;
+    w4g:doc "Append one transition to a rolling receipt chain via FNV-1a folding." ;
+    w4g:touchesObject w4g:obj_receipt_chain .
+
+w4g:physics_value_rendered a w4g:Pattern ;
+    w4g:id 10 ;
+    w4g:name "physics_value_rendered" ;
+    w4g:lowering w4g:Saturating ;
+    w4g:stateCard 32 ;
+    w4g:eventCode 48 ;
+    w4g:eventName "PhysicsValueRendered" ;
+    w4g:otelSpan 48 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::fix::clamp_u32" ;
+    w4g:doc "Render a raw quantity into a display-safe range by clamping to [lo, hi]." ;
+    w4g:touchesObject w4g:obj_quantity .
+
+w4g:semantic_lod_selected a w4g:Pattern ;
+    w4g:id 11 ;
+    w4g:name "semantic_lod_selected" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 7 ;
+    w4g:eventCode 49 ;
+    w4g:eventName "SemanticLodSelected" ;
+    w4g:otelSpan 49 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::fix::bucketize_u32" ;
+    w4g:doc "Select a semantic LOD tier for a HUD widget by quantizing distance." ;
+    w4g:touchesObject w4g:obj_hud_widget .
+
+w4g:projectile_advanced a w4g:Pattern ;
+    w4g:id 12 ;
+    w4g:name "projectile_advanced" ;
+    w4g:lowering w4g:Saturating ;
+    w4g:stateCard 32 ;
+    w4g:eventCode 50 ;
+    w4g:eventName "ProjectileAdvanced" ;
+    w4g:otelSpan 50 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::int::saturating_add_i64" ;
+    w4g:doc "Integrate a projectile by velocity with saturation, then clamp into the field." ;
+    w4g:touchesObject w4g:obj_projectile .
+
+w4g:ai_action_selected a w4g:Pattern ;
+    w4g:id 13 ;
+    w4g:name "ai_action_selected" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 4 ;
+    w4g:eventCode 64 ;
+    w4g:eventName "AiActionSelected" ;
+    w4g:otelSpan 64 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::select_u32" ;
+    w4g:doc "Select an AI action by utility argmax over four scores (first index wins ties)." ;
+    w4g:touchesObject w4g:obj_agent .
+
+w4g:damage_applied a w4g:Pattern ;
+    w4g:id 14 ;
+    w4g:name "damage_applied" ;
+    w4g:lowering w4g:Saturating ;
+    w4g:stateCard 16 ;
+    w4g:eventCode 66 ;
+    w4g:eventName "DamageApplied" ;
+    w4g:otelSpan 66 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::int::saturating_sub_i64" ;
+    w4g:doc "Apply branchless saturating damage with crit select and an HP floor." ;
+    w4g:touchesObject w4g:obj_attacker ;
+    w4g:touchesObject w4g:obj_target .
+
+w4g:status_effect_ticked a w4g:Pattern ;
+    w4g:id 15 ;
+    w4g:name "status_effect_ticked" ;
+    w4g:lowering w4g:Bitset ;
+    w4g:stateCard 16 ;
+    w4g:eventCode 67 ;
+    w4g:eventName "StatusEffectTicked" ;
+    w4g:otelSpan 67 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::bitset::rank_u64" ;
+    w4g:doc "Tick a status-effect set: set/clear an effect bit, decay duration, recount actives." ;
+    w4g:touchesObject w4g:obj_target .
+
+w4g:inventory_item_changed a w4g:Pattern ;
+    w4g:id 16 ;
+    w4g:name "inventory_item_changed" ;
+    w4g:lowering w4g:Bitset ;
+    w4g:stateCard 32 ;
+    w4g:eventCode 68 ;
+    w4g:eventName "InventoryItemChanged" ;
+    w4g:otelSpan 68 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::bitset::select_bit_u64" ;
+    w4g:doc "Change an inventory: find the first free slot on add, clear a slot on remove." ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:touchesObject w4g:obj_item .
+
+w4g:quest_step_advanced a w4g:Pattern ;
+    w4g:id 17 ;
+    w4g:name "quest_step_advanced" ;
+    w4g:lowering w4g:Dfa ;
+    w4g:stateCard 5 ;
+    w4g:eventCode 69 ;
+    w4g:eventName "QuestStepAdvanced" ;
+    w4g:otelSpan 69 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::dfa::dfa_advance" ;
+    w4g:doc "Advance a linear quest one step; complete moves forward, abandon resets." ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:touchesObject w4g:obj_quest .
+
+w4g:mastery_moment_detected a w4g:Pattern ;
+    w4g:id 18 ;
+    w4g:name "mastery_moment_detected" ;
+    w4g:lowering w4g:Bitset ;
+    w4g:stateCard 32 ;
+    w4g:eventCode 80 ;
+    w4g:eventName "MasteryMomentDetected" ;
+    w4g:otelSpan 80 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::bitset::rank_u64" ;
+    w4g:doc "Detect a mastery moment when the rolling streak popcount meets a threshold." ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:touchesObject w4g:obj_session .
+
+w4g:share_artifact_generated a w4g:Pattern ;
+    w4g:id 19 ;
+    w4g:name "share_artifact_generated" ;
+    w4g:lowering w4g:Receipt ;
+    w4g:stateCard 64 ;
+    w4g:eventCode 81 ;
+    w4g:eventName "ShareArtifactGenerated" ;
+    w4g:otelSpan 81 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::patterns::integrity_receipt::DeterministicSubstrateReceipt" ;
+    w4g:doc "Generate a deterministic, receipt-stamped shareable artifact id." ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:touchesObject w4g:obj_artifact .
+
+w4g:nps_prompt_gated a w4g:Pattern ;
+    w4g:id 20 ;
+    w4g:name "nps_prompt_gated" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 9 ;
+    w4g:eventCode 82 ;
+    w4g:eventName "NpsPromptGated" ;
+    w4g:otelSpan 82 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::select_u32" ;
+    w4g:doc "Gate an NPS prompt on readiness vs saturation, yielding ADMITTED/BLOCKED/REFUSED." ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:touchesObject w4g:obj_prompt .
