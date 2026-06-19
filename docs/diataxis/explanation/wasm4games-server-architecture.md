@@ -142,6 +142,38 @@ build profile only.
 > fence above is the point — not because virtual threads, records, sealed types, or FFM exist
 > (they are all older).
 
+### JEP 527 as a platform moat (fenced)
+
+JEP 527 adds hybrid post-quantum key exchange to TLS 1.3 (a PQ algorithm combined with a
+traditional one); apps using `javax.net.ssl` benefit **by default, without code changes**. For
+a normal game server that is a security upgrade. For this architecture it is a category move:
+the **transport** becomes future-conformant at the same moment the **gameplay** layer becomes
+generated, receipted, replayable, and process-admitted.
+
+Why it matters for *games* specifically — **harvest-now, decrypt-later**. The durable value
+here is not only accounts / payments / match state; it is the player's authored history: feats,
+receipts, replay proofs, manufactured parts, pilot record, cross-platform progression, and the
+social / promotion trail. If game evidence becomes long-lived identity / economy / community
+data, protecting it with PQ-hybrid transport is foundational, not premature.
+
+The moat is the *combination*, not the cryptography alone:
+
+```text
+Java 27 PQ-hybrid TLS (default transport)
++ generated server protocols + platform gateways (ggen)
++ branchless wasm4games kernels
++ OCEL/OTel evidence + receipt chains
++ wasm4pm admission
+= an evidence-secure, post-quantum-transported game platform
+```
+
+**Fence (do not over-claim):** competitors *can* eventually flip on PQ TLS. The edge is not
+"nobody can compete" — it is that PQ transport arrives *inside* a generated, evidence-native,
+cross-platform game-law architecture from the start, and that retrofitting trust (TLS / cert /
+key workflows, evidence transport, telemetry integrity, replay integrity, gateways, audit
+story) onto years of engine-specific, telemetry-string systems is expensive. Designing around
+trust from the beginning is the moat.
+
 ## ggen server-side target set (tiered)
 
 ```text
