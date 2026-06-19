@@ -118,6 +118,54 @@ mod tests {
         assert_eq!(out2 & 0xFF, 2);
         assert_eq!((out2 >> 8) & 0xFFFF, 100);
     }
+
+    // Two-sided breed-rigor battery.
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-domain: the maximum already lives at index 0 (or all lanes tie at 0).
+        &[
+            (0, 9u64 | (5u64 << 16) | (3u64 << 32) | (1u64 << 48)),
+            (0, 0),
+        ]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Argmax sits at a non-zero lane; the selection network must move off index 0.
+        &[
+            (0, 5u64 | (9u64 << 16) | (3u64 << 32) | (9u64 << 48)),
+            (0, 100u64 << 32),
+        ]
+    }
+    fn weakened(_s: u64, i: u64) -> u64 {
+        // Broken variant: skips argmax, always reporting lane 0 (index 0, value q0).
+        let q0 = i & 0xFFFF;
+        q0 << 8
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                policy_action_selected(s, i),
+                policy_action_selected_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                policy_action_selected(s, i),
+                policy_action_selected_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != policy_action_selected_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

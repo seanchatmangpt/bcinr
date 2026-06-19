@@ -95,6 +95,57 @@ mod tests {
         let out3 = episode_return_bounded(2000, input3);
         assert_eq!(out3 & 0xFFFF_FFFF, 1567);
     }
+
+    // Two-sided breed-rigor battery.
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-domain: accumulated return stays under max_return (no ceiling clamp).
+        &[
+            (1000, 5u64 | (230u64 << 8) | (2000u64 << 16)),
+            (0, 10u64 | (255u64 << 8) | (100u64 << 16)),
+        ]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Out-of-domain: discounted return + reward overshoots max_return and must be clamped.
+        &[
+            (10000, (255u64 << 8) | (100u64 << 16)),
+            (8000, 50u64 | (255u64 << 8) | (500u64 << 16)),
+        ]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken variant: omits the min(max_return) ceiling clamp.
+        let ret = (s & 0xFFFF_FFFF) as i64;
+        let reward = (i & 0xFF) as i64;
+        let disc_num = ((i >> 8) & 0xFF) as i64;
+        let discounted = (ret * disc_num) / 256;
+        (saturating_add_i64(discounted, reward).max(0) as u64) & 0xFFFF_FFFF
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                episode_return_bounded(s, i),
+                episode_return_bounded_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                episode_return_bounded(s, i),
+                episode_return_bounded_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != episode_return_bounded_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

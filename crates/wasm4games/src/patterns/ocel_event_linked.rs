@@ -85,6 +85,44 @@ mod tests {
         assert_eq!((out >> 32) & 0xFF, 2);
         assert_eq!(ocel_event_linked(0, 0xFFFF_FFFF), 0);
     }
+
+    // Two-sided breed-rigor battery.
+    // Legal: every proposed link is already inside the permitted gate (subset).
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[(0xFF, 0b11), (0xFFFF, 0xF0), (0xFFFF_FFFF, 0)]
+    }
+    // Extreme: proposals reach outside the gate, so the kernel must mask them off.
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[(0xFF, 0b1_0000_0011), (0, 0xFFFF_FFFF)]
+    }
+    // Weakened: omits the gate, admitting the raw proposal (and its inflated count).
+    fn weakened(s: u64, i: u64) -> u64 {
+        let _ = s;
+        let proposed = i & 0xFFFF_FFFF;
+        let count = (proposed.count_ones() as u64) & 0xFF;
+        proposed | (count << 32)
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(ocel_event_linked(s, i), ocel_event_linked_reference(s, i));
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(ocel_event_linked(s, i), ocel_event_linked_reference(s, i));
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != ocel_event_linked_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

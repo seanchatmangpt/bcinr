@@ -95,6 +95,53 @@ mod tests {
             fixed_tick_advanced_reference(0xFFFF_FFFF, 0xFFFF_FFFF)
         );
     }
+
+    // Two-sided breed-rigor battery.
+    // Legal: totals already aligned to the step (snap-down is a no-op).
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[(0, 0), (30, 10 << 32), (10, 10 | (10 << 32))]
+    }
+    // Extreme: totals that are NOT a step multiple, so the kernel must snap down.
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[
+            (29, 3 | (10 << 32)),
+            (0xFFFF_FFFF, 0xFFFF_FFFF | (10 << 32)),
+        ]
+    }
+    // Weakened: omits the bucketize snap-down, returning the raw (unaligned) total.
+    fn weakened(s: u64, i: u64) -> u64 {
+        let acc = (s & 0xFFFF_FFFF) as i64;
+        let elapsed = (i & 0xFFFF_FFFF) as i64;
+        let total = (acc.saturating_add(elapsed) & 0xFFFF_FFFF) as u64;
+        total & 0xFFFF_FFFF
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                fixed_tick_advanced(s, i),
+                fixed_tick_advanced_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                fixed_tick_advanced(s, i),
+                fixed_tick_advanced_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != fixed_tick_advanced_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

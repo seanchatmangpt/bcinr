@@ -89,6 +89,45 @@ mod tests {
         assert_eq!(input_admitted(0, 0xFF), status::REFUSED as u64);
         assert_eq!(input_admitted(0, 0x41), status::ADMITTED as u64);
     }
+
+    // Two-sided breed-rigor battery.
+    // Legal, in-domain bytes: ordinary printable codes admit cleanly.
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[(0, 0x41), (0, 0x01), (0, 0x7E)]
+    }
+    // Out-of-domain bytes the classifier must refuse/block: the reserved sentinel and zero.
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[(0, 0xFF), (0, 0x00)]
+    }
+    // Weakened: omits the sentinel override (takes the wrong branch), so 0xFF reads as ADMITTED.
+    fn weakened(s: u64, i: u64) -> u64 {
+        let _ = s;
+        let byte = (i & 0xFF) as u32;
+        let is_zero = is_zero_mask_u32(byte);
+        let base = select_u32(is_zero, status::BLOCKED as u32, status::ADMITTED as u32);
+        (base as u64) & 0xFF
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(input_admitted(s, i), input_admitted_reference(s, i));
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(input_admitted(s, i), input_admitted_reference(s, i));
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != input_admitted_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

@@ -94,6 +94,57 @@ mod tests {
         let i3 = 99u64;
         assert_eq!(lag_compensation_applied(s3, i3), 200);
     }
+
+    // Two-sided breed-rigor battery.
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-domain: rewind lands inside [0, 0xFFFF], the clamp does not fire.
+        &[
+            (1000 | (10 << 16), 5), // 1000 - 50 -> 950
+            (200, 99),              // vel=0 -> 200 unchanged
+        ]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Out-of-domain: rewind underflows below 0, the clamp floors it.
+        &[
+            (100 | (50 << 16), 5),  // 100 - 250 -> -150 -> clamp 0
+            (10 | (200 << 16), 99), // large rewind -> negative -> clamp 0
+        ]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken variant: omits the .max(0) / clamp; underflow leaks into the low word.
+        let server_pos = (s & 0xFFFF) as i64;
+        let vel_raw = ((s >> 16) & 0xFFFF) as i64;
+        let velocity = (vel_raw as i16) as i64;
+        let lag = (i & 0xFF) as i64;
+        ((server_pos - velocity * lag) as u64) & 0xFFFF
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                lag_compensation_applied(s, i),
+                lag_compensation_applied_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                lag_compensation_applied(s, i),
+                lag_compensation_applied_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != lag_compensation_applied_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

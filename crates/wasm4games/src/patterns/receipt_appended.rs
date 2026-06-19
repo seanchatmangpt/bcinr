@@ -91,6 +91,51 @@ mod tests {
         // Sensitivity: different event -> different digest.
         assert_ne!(receipt_appended(seed, 1), receipt_appended(seed, 2));
     }
+
+    // Two-sided breed-rigor battery.
+    // NOTE: this kernel is a pure FNV-1a fold with no value bound to clamp/saturate; its
+    // invariant is order/field sensitivity, so the weakening drops a fold term (a wrong-branch
+    // omission) rather than removing a numeric bound.
+    // Legal: ordinary in-domain (prior digest, event) pairs.
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[(0xCBF2_9CE4_8422_2325, 42), (0, 0), (0x1234, 7)]
+    }
+    // Extreme: all-bits-set operands where the xor-aux term is maximally nonzero.
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[(0, u64::MAX), (u64::MAX, 0)]
+    }
+    // Weakened: omits the final `input ^ state` aux fold, dropping a contributing field.
+    fn weakened(s: u64, i: u64) -> u64 {
+        const PRIME: u64 = DeterministicSubstrateReceipt::FNV_PRIME;
+        let mix = |h: u64, x: u64| (h ^ x).wrapping_mul(PRIME);
+        let mut h = s;
+        h = mix(h, 0);
+        h = mix(h, i);
+        h = mix(h, s);
+        // (input ^ state aux fold deliberately omitted here)
+        h
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(receipt_appended(s, i), receipt_appended_reference(s, i));
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(receipt_appended(s, i), receipt_appended_reference(s, i));
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != receipt_appended_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

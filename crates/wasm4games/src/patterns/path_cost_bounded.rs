@@ -91,6 +91,60 @@ mod tests {
             path_cost_bounded_reference(100, 100)
         );
     }
+
+    // --- two-sided breed-rigor battery ---
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[
+            // Within budget: pass through, no overflow.
+            (50, 100),
+            // Exactly at budget: still within, no clamp.
+            (100, 100),
+        ]
+    }
+
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[
+            // Over budget: cost must be CLAMPED down to budget and flagged.
+            (150, 100),
+            // Far over budget: clamp pins the result to the budget ceiling.
+            (0xFFFF_FFFF, 100),
+        ]
+    }
+
+    // Weakened: emit the raw cost with no clamp to the budget ceiling, so
+    // over-budget costs leak through unbounded.
+    fn weakened(s: u64, i: u64) -> u64 {
+        let cost = (s & 0xFFFF_FFFF) as u32;
+        let budget = (i & 0xFFFF_FFFF) as u32;
+        let over = (lt_mask_u32(budget, cost) >> 31) & 1;
+        // BUG: no clamp_u32 — cost passes through unbounded.
+        (cost as u64) | ((over as u64) << 32)
+    }
+
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(path_cost_bounded(s, i), path_cost_bounded_reference(s, i));
+        }
+    }
+
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(path_cost_bounded(s, i), path_cost_bounded_reference(s, i));
+        }
+    }
+
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != path_cost_bounded_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

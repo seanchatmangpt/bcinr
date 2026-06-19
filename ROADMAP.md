@@ -7,9 +7,19 @@
 ## Current state (admitted)
 
 - `crates/wasm4games` — `no_std`, offline-pure, branchless game-pattern foundry on
-  `bcinr-logic`. 20 generated kernels across four families, Pattern IR, byte-class status
-  vocabulary, evidence layer (OCEL events, OTEL span codes, FNV receipt chains, replay),
-  in-crate `verify` self-checks, dependency-free `compat` mirror of `wasm4pm-compat` shapes.
+  `bcinr-logic`. **75 generated kernels**: ids 1–70 across 14 families, plus an **Anti-Cheat**
+  family (ids 71–75: movement / resource-bound / cooldown / action-rate / transition legality
+  detectors). Pattern IR, byte-class status vocabulary, evidence layer (OCEL events, OTEL
+  span codes, FNV receipt chains, replay), in-crate `verify` self-checks, dependency-free
+  `compat` mirror of `wasm4pm-compat` shapes.
+- **Breed-rigor battery (per kernel).** Each kernel ships a branchless body + a branchful
+  `_reference` oracle (proptest `equivalence`) + 3 value-mutants (`cf1`/`cf2`/`cf3`) + a
+  **two-sided fixture corpus** (`must_admit`/`must_refuse`) + a `weakened` variant that must
+  fail the refuse corpus + boundaries + a dormant `bench` module + 2 Hoare-logic lines. The
+  whole catalog folds into a pinned `GOLDEN_CORPUS_DIGEST` in `corpus.rs`. Anti-cheat
+  detectors are the proving case: they return a verdict (0 = admitted, nonzero = refused),
+  each carrying its own authority (legality spec). Rationale:
+  `docs/diataxis/explanation/wasm4games-the-honest-kernel.md`.
 - `crates/wasm4games/ggen/` — RDF + SPARQL + Tera input surface (`ggen sync`) that
   regenerates the committed kernels. Docs are ggen-first (the GGEN-ONLY covenant).
 - `crates/wasm4games-wasm4pm` — workspace-excluded, online-only admission bridge to the

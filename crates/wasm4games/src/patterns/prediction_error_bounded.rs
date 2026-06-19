@@ -103,6 +103,55 @@ mod tests {
         assert_eq!(out3 & 0xFFFF, 10);
         assert_eq!((out3 >> 16) & 0xFF, 0);
     }
+
+    // Two-sided breed-rigor battery.
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-domain: error <= threshold, clamp is a no-op and resync stays 0.
+        &[
+            (100 | (105 << 16), 10), // error 5 <= 10
+            (100 | (110 << 16), 10), // error 10 == 10 (boundary, resync 0)
+        ]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Out-of-domain: error > threshold, clamp caps error and resync flag fires.
+        &[
+            (100 | (120 << 16), 10), // error 20 -> clamp 10, resync 1
+            (100 | (500 << 16), 10), // error 400 -> clamp 10, resync 1
+        ]
+    }
+    fn weakened(s: u64, _i: u64) -> u64 {
+        // Broken variant: omits the clamp and the resync flag; raw error passes through.
+        let pred = (s & 0xFFFF) as u32;
+        let actual = ((s >> 16) & 0xFFFF) as u32;
+        pred.abs_diff(actual) as u64
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                prediction_error_bounded(s, i),
+                prediction_error_bounded_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                prediction_error_bounded(s, i),
+                prediction_error_bounded_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != prediction_error_bounded_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

@@ -115,6 +115,73 @@ mod tests {
         let rem = inventory_item_changed(0b0011, 1u64 << 8);
         assert_eq!(rem & 0xFFFF_FFFF, 0b0001);
     }
+
+    // --- two-sided breed-rigor battery ---
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[
+            // Add into a partly-free inventory: lowest free slot is 2.
+            (0b0011, 1),
+            // Remove slot 1 from an occupied inventory.
+            (0b0011, 1u64 << 8),
+        ]
+    }
+
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[
+            // Full low-32 occupancy + add: no free slot, must emit NO_SLOT sentinel.
+            (0xFFFF_FFFF, 1),
+            // Full inventory ignoring high bits: still no free slot.
+            (0xFFFF_FFFF_FFFF_FFFF, 1),
+        ]
+    }
+
+    // Weakened: drop the NO_SLOT sentinel, falling back to slot 0 when the
+    // inventory is full instead of signalling overflow.
+    fn weakened(s: u64, i: u64) -> u64 {
+        let occ = s & 0xFFFF_FFFF;
+        let add = (i & 1) == 1;
+        let rem_slot = ((i >> 8) & 0x1F) as usize;
+        let free_bits = (!occ) & 0xFFFF_FFFF;
+        let first_free = select_bit_u64(free_bits, 0);
+        let (new_occ, slot) = match (add, first_free) {
+            (true, Some(s)) => (set_bit_u64(occ, s) & 0xFFFF_FFFF, s as u64),
+            // BUG: full inventory reports slot 0 instead of NO_SLOT.
+            (true, None) => (occ, 0),
+            (false, _) => (clear_bit_u64(occ, rem_slot) & 0xFFFF_FFFF, rem_slot as u64),
+        };
+        new_occ | (slot << 32)
+    }
+
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                inventory_item_changed(s, i),
+                inventory_item_changed_reference(s, i)
+            );
+        }
+    }
+
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                inventory_item_changed(s, i),
+                inventory_item_changed_reference(s, i)
+            );
+        }
+    }
+
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != inventory_item_changed_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

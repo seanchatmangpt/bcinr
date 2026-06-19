@@ -99,6 +99,59 @@ mod tests {
         assert_eq!(out2 & 0xFFFF, 0);
         assert_eq!((out2 >> 16) & 0xFFFF, 0);
     }
+
+    // Two-sided breed-rigor battery.
+    // Legal: motion that stays strictly inside the play-field on both axes.
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[
+            (10 | (10 << 16), 5 | (5 << 16) | (100 << 32)),
+            (50 | (50 << 16), 100 << 32),
+        ]
+    }
+    // Extreme: motion past the upper field bound and below zero, which the kernel must clamp.
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[
+            (90 | (90 << 16), 50 | (50 << 16) | (100 << 32)),
+            (2 | (2 << 16), 0xFFFB | (0xFFFB << 16) | (100 << 32)),
+        ]
+    }
+    // Weakened: omits the floor and the field clamp, leaking the raw integrated lane.
+    fn weakened(s: u64, i: u64) -> u64 {
+        let x = (s & 0xFFFF) as i64;
+        let y = ((s >> 16) & 0xFFFF) as i64;
+        let vx = ((i & 0xFFFF) as u16 as i16) as i64;
+        let vy = (((i >> 16) & 0xFFFF) as u16 as i16) as i64;
+        let nx = (saturating_add_i64(x, vx) as u64) & 0xFFFF;
+        let ny = (saturating_add_i64(y, vy) as u64) & 0xFFFF;
+        nx | (ny << 16)
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                projectile_advanced(s, i),
+                projectile_advanced_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                projectile_advanced(s, i),
+                projectile_advanced_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != projectile_advanced_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

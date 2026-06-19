@@ -115,6 +115,55 @@ mod tests {
         let i3 = 100u64 | upper;
         assert_eq!(fov_adjusted(s1, i3), 120);
     }
+
+    // Two-sided breed-rigor battery. Packing helper: min=30, max=120 in bits[16..32].
+    const FOV_BOUNDS: u64 = 30750 << 16; // 30 | (120 << 8)
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-domain: fov+delta lands inside [30, 120], clamp does not fire.
+        &[
+            (90, 10 | FOV_BOUNDS),         // +10 -> 100
+            (50, 0x8000 | 5 | FOV_BOUNDS), // -5  -> 45
+        ]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Out-of-domain: delta drives result past a bound, clamp fires.
+        &[
+            (90, 100 | FOV_BOUNDS),          // +100 -> 190 -> clamp 120
+            (90, 0x8000 | 100 | FOV_BOUNDS), // -100 -> -10 -> clamp 30
+        ]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken variant: omits the [min, max] clamp.
+        let fov = (s & 0xFFFF) as i64;
+        let raw_delta = (i & 0xFFFF) as i64;
+        let d = if (raw_delta >> 15) != 0 {
+            -(raw_delta & 0x7FFF)
+        } else {
+            raw_delta & 0x7FFF
+        };
+        ((fov + d) as u64) & 0xFFFF
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(fov_adjusted(s, i), fov_adjusted_reference(s, i));
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(fov_adjusted(s, i), fov_adjusted_reference(s, i));
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != fov_adjusted_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

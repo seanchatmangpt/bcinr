@@ -95,6 +95,49 @@ mod tests {
         // Dead is absorbing.
         assert_eq!(entity_state_transitioned(3, 0), 3);
     }
+
+    // Two-sided breed-rigor battery.
+    // Legal lifecycle transitions out of live states.
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[(0, 0), (1, 3), (1, 1)]
+    }
+    // Extreme: the absorbing Dead state must stay Dead for every event symbol.
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[(3, 0), (3, 2)]
+    }
+    // Weakened: drops the absorbing-Dead rule by collapsing Dead onto Hurt (wrong branch).
+    fn weakened(s: u64, i: u64) -> u64 {
+        let st = ((s as usize) & 0x3).min(2);
+        let sym = ((i & 0xFF) as usize) & 0x3;
+        (TABLE[st * ALPHABET + sym] as u64) & 0xFF
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                entity_state_transitioned(s, i),
+                entity_state_transitioned_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                entity_state_transitioned(s, i),
+                entity_state_transitioned_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != entity_state_transitioned_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

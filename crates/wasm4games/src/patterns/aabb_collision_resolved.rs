@@ -107,6 +107,77 @@ mod tests {
         let d = pack(10, 0, 20, 10);
         assert_eq!(aabb_collision_resolved(a, d), 0);
     }
+
+    // Two-sided breed-rigor battery.
+    // Box layout: [min_x, min_y, max_x, max_y] packed as 16-bit lanes (see `pack`).
+    // Legal, unambiguous cases: a clear overlap and a clearly disjoint pair.
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[
+            // A=[0,0,10,10] overlaps B=[5,5,15,15].
+            (
+                (10 << 32) | (10 << 48),
+                5 | (5 << 16) | (15 << 32) | (15 << 48),
+            ),
+            // A=[0,0,10,10] disjoint from C=[20,20,30,30].
+            (
+                (10 << 32) | (10 << 48),
+                20 | (20 << 16) | (30 << 32) | (30 << 48),
+            ),
+        ]
+    }
+    // Extreme degenerate cases: edge-touching boxes the strict-`<` test must reject.
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[
+            // A=[0,0,10,10] touches D=[10,0,20,10] on the x edge.
+            ((10 << 32) | (10 << 48), 10 | (20 << 32) | (10 << 48)),
+            // A=[0,0,10,10] touches E=[0,10,10,20] on the y edge.
+            (
+                (10 << 32) | (10 << 48),
+                (10 << 16) | (10 << 32) | (20 << 48),
+            ),
+        ]
+    }
+    // Weakened: uses `<=` instead of `<` (wrong branch), so edge-touching reports a collision.
+    fn weakened(s: u64, i: u64) -> u64 {
+        let a_min_x = s & 0xFFFF;
+        let a_min_y = (s >> 16) & 0xFFFF;
+        let a_max_x = (s >> 32) & 0xFFFF;
+        let a_max_y = (s >> 48) & 0xFFFF;
+        let b_min_x = i & 0xFFFF;
+        let b_min_y = (i >> 16) & 0xFFFF;
+        let b_max_x = (i >> 32) & 0xFFFF;
+        let b_max_y = (i >> 48) & 0xFFFF;
+        let hit =
+            a_min_x <= b_max_x && b_min_x <= a_max_x && a_min_y <= b_max_y && b_min_y <= a_max_y;
+        hit as u64
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                aabb_collision_resolved(s, i),
+                aabb_collision_resolved_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                aabb_collision_resolved(s, i),
+                aabb_collision_resolved_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != aabb_collision_resolved_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

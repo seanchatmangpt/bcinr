@@ -136,6 +136,57 @@ mod tests {
         // SYNCED(2) + TIMEOUT(3) -> LOST(4)
         assert_eq!(sync_state_admitted(2, 3), 4);
     }
+
+    // Two-sided breed-rigor battery. The operative bound is the LOST absorbing state:
+    // from LOST, ACK/DRIFT/TIMEOUT stay LOST (only START_SYNC/RESYNC escape). admit =
+    // ordinary progress transitions; refuse = LOST-absorbing transitions a weakening drops.
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[
+            (0, 0), // UNSYNCED + START_SYNC -> SYNCING(1)
+            (1, 1), // SYNCING + ACK -> SYNCED(2)
+        ]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // LOST must absorb these symbols; a weakened transition would escape LOST.
+        &[
+            (LOST as u64, 1), // LOST + ACK -> LOST(4)
+            (LOST as u64, 3), // LOST + TIMEOUT -> LOST(4)
+        ]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken variant: treats LOST like DRIFTED, omitting the LOST absorbing bound.
+        let current = (s & 0xFF) as usize;
+        let demoted = if current == LOST { DRIFTED } else { current };
+        let symbol = (i & 0xFF) as u8;
+        dfa_advance(demoted, symbol, &SYNC_TABLE, 5) as u64
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                sync_state_admitted(s, i),
+                sync_state_admitted_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                sync_state_admitted(s, i),
+                sync_state_admitted_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != sync_state_admitted_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

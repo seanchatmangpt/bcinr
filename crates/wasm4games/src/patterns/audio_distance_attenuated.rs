@@ -93,6 +93,57 @@ mod tests {
             audio_distance_attenuated_reference(100, 999)
         );
     }
+
+    // Two-sided breed-rigor battery.
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-domain: reduction < max_vol, the [0, max_vol] floor does not fire.
+        &[
+            (200 | (2 << 8), 10), // 200 - 20 -> 180
+            (100, 999),           // atten=0 -> 100 unchanged
+        ]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Out-of-domain: reduction >= max_vol, the floor clamps the volume to 0.
+        &[
+            (200 | (2 << 8), 200),   // 200 - 400 -> 0
+            (50 | (255 << 8), 1000), // huge reduction -> 0
+        ]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken variant: omits the saturating-sub floor and clamp; underflow wraps.
+        let max_vol = (s & 0xFF) as u32;
+        let atten = ((s >> 8) & 0xFF) as u32;
+        let dist = (i & 0xFFFF) as u32;
+        let reduction = atten.saturating_mul(dist);
+        (max_vol.wrapping_sub(reduction) as u64) & 0xFF
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                audio_distance_attenuated(s, i),
+                audio_distance_attenuated_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                audio_distance_attenuated(s, i),
+                audio_distance_attenuated_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != audio_distance_attenuated_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

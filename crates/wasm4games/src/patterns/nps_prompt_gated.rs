@@ -112,6 +112,61 @@ mod tests {
             status::BLOCKED as u64
         );
     }
+
+    // --- two-sided breed-rigor battery ---
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[
+            // Below the bar, under cap -> BLOCKED.
+            (30, 50 | (3u64 << 16)),
+            // At/above the bar, under cap -> ADMITTED.
+            (80, 50 | (3u64 << 16)),
+        ]
+    }
+
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[
+            // Saturation dominates even a passing score -> REFUSED.
+            (80u64 | (3u64 << 16), 50 | (3u64 << 16)),
+            // Saturation dominates even a failing score -> REFUSED.
+            (10u64 | (9u64 << 16), 50 | (3u64 << 16)),
+        ]
+    }
+
+    // Weakened: drop the saturation-dominates-readiness rule; a saturated
+    // player still falls through to the readiness decision.
+    fn weakened(s: u64, i: u64) -> u64 {
+        let score = (s & 0xFFFF) as u32;
+        let bar = (i & 0xFFFF) as u32;
+        let below_bar = lt_mask_u32(score, bar);
+        // BUG: no REFUSED select on saturation — cap is ignored entirely.
+        let base = select_u32(below_bar, status::BLOCKED as u32, status::ADMITTED as u32);
+        (base as u64) & 0xFF
+    }
+
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(nps_prompt_gated(s, i), nps_prompt_gated_reference(s, i));
+        }
+    }
+
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(nps_prompt_gated(s, i), nps_prompt_gated_reference(s, i));
+        }
+    }
+
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != nps_prompt_gated_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

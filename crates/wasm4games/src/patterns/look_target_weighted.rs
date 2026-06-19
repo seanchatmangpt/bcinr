@@ -102,6 +102,60 @@ mod tests {
         assert_eq!(out3 & 0xFFFF, 7); // primary target id
         assert_eq!((out3 >> 16) & 0xFFFF, 10); // primary weight
     }
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        // Strict winners: primary (pw=10 > sw=5) and secondary (sw=10 > pw=5).
+        &[
+            (10u64 | (5u64 << 16), 7u64 | (9u64 << 16)),
+            (5u64 | (10u64 << 16), 7u64 | (9u64 << 16)),
+        ]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Ties: the strict-`>` rule must award the primary target.
+        &[
+            (10u64 | (10u64 << 16), 7u64 | (9u64 << 16)),
+            (3u64 | (3u64 << 16), 1u64 | (2u64 << 16)),
+        ]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken: secondary wins on `>=`, so ties wrongly go to secondary.
+        let pw = (s & 0xFFFF) as u32;
+        let sw = ((s >> 16) & 0xFFFF) as u32;
+        let pt = (i & 0xFFFF) as u32;
+        let st = ((i >> 16) & 0xFFFF) as u32;
+        if sw >= pw {
+            (st as u64) | ((sw as u64) << 16)
+        } else {
+            (pt as u64) | ((pw as u64) << 16)
+        }
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                look_target_weighted(s, i),
+                look_target_weighted_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                look_target_weighted(s, i),
+                look_target_weighted_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != look_target_weighted_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

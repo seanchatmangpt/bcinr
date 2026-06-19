@@ -88,6 +88,52 @@ mod tests {
         assert_eq!(physics_value_rendered(5, input), 10);
         assert_eq!(physics_value_rendered(50, input), 50);
     }
+
+    // Two-sided breed-rigor battery.
+    // Legal: raw values already inside [lo, hi] (clamp is a no-op).
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[
+            (50, 10 | (100 << 16)),
+            (10, 10 | (100 << 16)),
+            (100, 10 | (100 << 16)),
+        ]
+    }
+    // Extreme: raw values outside the range, so the kernel must clamp to a bound.
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[(500, 10 | (100 << 16)), (5, 10 | (100 << 16))]
+    }
+    // Weakened: omits the clamp, returning the raw (out-of-range) value.
+    fn weakened(s: u64, i: u64) -> u64 {
+        let _ = i;
+        s & 0xFFFF_FFFF
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                physics_value_rendered(s, i),
+                physics_value_rendered_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                physics_value_rendered(s, i),
+                physics_value_rendered_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != physics_value_rendered_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

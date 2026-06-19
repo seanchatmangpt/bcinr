@@ -130,6 +130,69 @@ mod tests {
         // BLOCKED + MOVE -> MOVING (3+1=1)
         assert_eq!(nav_state_advanced(3, 1), 1);
     }
+
+    // --- two-sided breed-rigor battery ---
+    // DFA framing: admit = legal forward transitions; refuse = inputs that drive
+    // the machine into the BLOCKED sink (or sit in it); weakened = a transition
+    // table that never sinks (obstacles ignored).
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[
+            // IDLE + MOVE -> MOVING.
+            (IDLE as u64, MOVE as u64),
+            // MOVING + ARRIVE -> ARRIVED.
+            (MOVING as u64, ARRIVE as u64),
+        ]
+    }
+
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[
+            // MOVING + OBSTACLE must route into the BLOCKED sink.
+            (MOVING as u64, OBSTACLE as u64),
+            // ARRIVED + OBSTACLE holds in place (no spurious sink) — sink-adjacent.
+            (ARRIVED as u64, OBSTACLE as u64),
+        ]
+    }
+
+    // Weakened: a table that never sinks — MOVING + OBSTACLE stays MOVING instead
+    // of transitioning to BLOCKED, so the obstacle/sink bound disappears.
+    fn weakened(s: u64, i: u64) -> u64 {
+        #[rustfmt::skip]
+        static NO_SINK_TABLE: [usize; 16] = [
+            IDLE,    MOVING,  IDLE,    IDLE,
+            // BUG: OBSTACLE no longer sinks to BLOCKED — it keeps MOVING.
+            IDLE,    MOVING,  ARRIVED, MOVING,
+            ARRIVED, MOVING,  ARRIVED, ARRIVED,
+            IDLE,    MOVING,  IDLE,    IDLE,
+        ];
+        let current = (s & 0xFF) as usize;
+        let symbol = (i & 0xFF) as u8;
+        dfa_advance(current, symbol, &NO_SINK_TABLE, 4) as u64
+    }
+
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(nav_state_advanced(s, i), nav_state_advanced_reference(s, i));
+        }
+    }
+
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(nav_state_advanced(s, i), nav_state_advanced_reference(s, i));
+        }
+    }
+
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != nav_state_advanced_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

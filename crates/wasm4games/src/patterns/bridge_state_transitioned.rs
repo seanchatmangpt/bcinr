@@ -108,6 +108,49 @@ mod tests {
         // ERROR(3) + RETRY(4) -> RECOVERING(4).
         assert_eq!(bridge_state_transitioned(3, 4), 4);
     }
+
+    // Two-sided breed-rigor battery.
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-domain: state and symbol both within [0, ALPHABET).
+        &[(0, 0), (1, 1), (3, 4)]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Out-of-domain: state/symbol beyond the alphabet; kernel reduces them mod ALPHABET.
+        &[(7, 0), (10, 1)]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken variant: saturating-clamps the index instead of reducing modulo ALPHABET.
+        let st = (s as usize).min(ALPHABET - 1);
+        let sym = ((i & 0xFF) as usize).min(ALPHABET - 1);
+        (TABLE[st * ALPHABET + sym] as u64) & 0xFF
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                bridge_state_transitioned(s, i),
+                bridge_state_transitioned_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                bridge_state_transitioned(s, i),
+                bridge_state_transitioned_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != bridge_state_transitioned_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

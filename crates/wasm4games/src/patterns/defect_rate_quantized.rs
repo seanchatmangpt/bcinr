@@ -86,6 +86,50 @@ mod tests {
         // defects=1000, sample=1 -> rate = 1_000_000_000 clamped to 1_000_000
         assert_eq!(defect_rate_quantized(1000, 1), 1_000_000);
     }
+
+    // Two-sided breed-rigor battery.
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-domain: rate stays below the 1_000_000 PPM ceiling (no clamp needed).
+        &[(5, 1000), (0, 100), (50, 1000)]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Out-of-domain: raw rate explodes far past 1_000_000 and must be clamped.
+        &[(1000, 1), (2000, 1)]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken variant: omits the [0, 1_000_000] ceiling clamp.
+        let defects = s & 0xFFFF_FFFF;
+        let raw_sample = i & 0xFFFF_FFFF;
+        let sample = raw_sample.max(1);
+        (defects.saturating_mul(1_000_000) / sample) & 0xFFFF_FFFF
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                defect_rate_quantized(s, i),
+                defect_rate_quantized_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                defect_rate_quantized(s, i),
+                defect_rate_quantized_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != defect_rate_quantized_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

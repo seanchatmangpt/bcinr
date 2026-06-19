@@ -113,6 +113,62 @@ mod tests {
         // all-zero utilities -> index 0.
         assert_eq!(ai_action_selected(0, 0) & 0xFF, 0);
     }
+
+    // Two-sided breed-rigor battery.
+    // Legal: a single, unambiguous maximum (no tie to break).
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[
+            (0, 5 | (9 << 16) | (3 << 32) | (2 << 48)),
+            (0, 1 | (2 << 16) | (4 << 32) | (8 << 48)),
+        ]
+    }
+    // Extreme: tied maxima where the kernel must deterministically keep the first index.
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[
+            (0, 9 | (9 << 16) | (3 << 32) | (9 << 48)),
+            (0, 5 | (9 << 16) | (3 << 32) | (9 << 48)),
+        ]
+    }
+    // Weakened: uses `>=` (last-wins) instead of strict `>`, so ties resolve to the wrong index.
+    fn weakened(s: u64, i: u64) -> u64 {
+        let _ = s;
+        let u = [
+            (i & 0xFFFF) as u32,
+            ((i >> 16) & 0xFFFF) as u32,
+            ((i >> 32) & 0xFFFF) as u32,
+            ((i >> 48) & 0xFFFF) as u32,
+        ];
+        let mut best_val = u[0];
+        let mut best_idx = 0u32;
+        for (idx, &v) in u.iter().enumerate().skip(1) {
+            if v >= best_val {
+                best_val = v;
+                best_idx = idx as u32;
+            }
+        }
+        (best_idx as u64) | ((best_val as u64) << 8)
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(ai_action_selected(s, i), ai_action_selected_reference(s, i));
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(ai_action_selected(s, i), ai_action_selected_reference(s, i));
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != ai_action_selected_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

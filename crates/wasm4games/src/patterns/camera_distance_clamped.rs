@@ -100,6 +100,47 @@ mod tests {
         // dist=25, min=10, max=20 -> clamped to 20 (above ceiling).
         assert_eq!(camera_distance_clamped(25, 10 | (20 << 16)), 20);
     }
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-range distance (min <= max): clamp is a no-op.
+        &[(15, 10 | (20 << 16)), (10, 10 | (20 << 16))]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Out-of-range distance (min <= max): floor and ceiling must fire.
+        &[(5, 10 | (20 << 16)), (25, 10 | (20 << 16))]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken: returns the raw distance, omitting the [min, max] clamp.
+        let _ = i;
+        s & 0xFFFF
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                camera_distance_clamped(s, i),
+                camera_distance_clamped_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                camera_distance_clamped(s, i),
+                camera_distance_clamped_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != camera_distance_clamped_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

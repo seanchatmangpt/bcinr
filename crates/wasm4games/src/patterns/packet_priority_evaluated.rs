@@ -111,6 +111,54 @@ mod tests {
         assert_eq!(out3 & 0xFF, 0);
         assert_eq!((out3 >> 8) & 0xFF, 10);
     }
+
+    // Two-sided breed-rigor battery.
+    fn must_admit() -> &'static [(u64, u64)] {
+        // Queue 0 is already the (first) maximum: the argmax selects queue 0.
+        &[
+            (30 | (10 << 8) | (20 << 16), 0), // q0=30 strict max -> queue 0
+            (10 | (10 << 8) | (10 << 16), 0), // all tied -> first wins -> queue 0
+        ]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // A later queue is strictly higher: the selector must move off queue 0.
+        &[
+            (10 | (30 << 8) | (20 << 16), 0),  // q1=30 -> queue 1
+            (10 | (20 << 8) | (200 << 16), 0), // q2=200 -> queue 2
+        ]
+    }
+    fn weakened(s: u64, _i: u64) -> u64 {
+        // Broken variant: always returns queue 0, omitting the argmax selection.
+        let p0 = (s & 0xFF) as u32;
+        (p0 as u64) << 8
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                packet_priority_evaluated(s, i),
+                packet_priority_evaluated_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                packet_priority_evaluated(s, i),
+                packet_priority_evaluated_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != packet_priority_evaluated_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

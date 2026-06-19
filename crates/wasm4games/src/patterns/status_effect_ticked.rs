@@ -119,6 +119,74 @@ mod tests {
         assert_eq!(out & 0xFFFF, 0b100);
         assert_eq!((out >> 32) & 0xFF, 1);
     }
+
+    // --- two-sided breed-rigor battery ---
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[
+            // Apply+set slot 2 with modest decay 3 against duration 10.
+            ((10u64 << 16), 2u64 | (1 << 4) | (1 << 5) | (3u64 << 8)),
+            // No apply, decay 1 against duration 5.
+            ((0b0101 | (5u64 << 16)), 1u64 << 8),
+        ]
+    }
+
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[
+            // Decay 0xFF overruns duration 1: must saturate at 0, not wrap.
+            ((1u64 << 16), 0xFFu64 << 8),
+            // Zero duration, max decay: floor pins to 0.
+            (0, 0xFFu64 << 8),
+        ]
+    }
+
+    // Weakened: omit the saturation floor, letting duration - decay wrap below 0.
+    fn weakened(s: u64, i: u64) -> u64 {
+        let mask = s & 0xFFFF;
+        let duration = ((s >> 16) & 0xFFFF) as i64;
+        let slot = (i & 0xF) as usize;
+        let set_flag = 0u64.wrapping_sub((i >> 4) & 1);
+        let apply = 0u64.wrapping_sub((i >> 5) & 1);
+        let decay = ((i >> 8) & 0xFF) as i64;
+        let with_set = set_bit_u64(mask, slot);
+        let with_clear = clear_bit_u64(mask, slot);
+        let toggled = select_u64(set_flag, with_set, with_clear);
+        let new_mask = select_u64(apply, toggled, mask) & 0xFFFF;
+        // BUG: raw wrapping subtraction with no .max(0) floor.
+        let new_dur = duration.wrapping_sub(decay) as u64 & 0xFFFF;
+        let count = rank_u64(new_mask, 15) as u64 & 0xFF;
+        new_mask | (new_dur << 16) | (count << 32)
+    }
+
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                status_effect_ticked(s, i),
+                status_effect_ticked_reference(s, i)
+            );
+        }
+    }
+
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                status_effect_ticked(s, i),
+                status_effect_ticked_reference(s, i)
+            );
+        }
+    }
+
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != status_effect_ticked_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

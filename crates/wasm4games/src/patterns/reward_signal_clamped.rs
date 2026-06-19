@@ -89,6 +89,48 @@ mod tests {
         let out3 = reward_signal_clamped(200u64, 100u64);
         assert_eq!(out3 & 0xFFFF, 100u64);
     }
+
+    // Two-sided breed-rigor battery.
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-domain: |raw| <= max_reward, so the clamp is inert.
+        &[(50, 100), ((-50i16) as u16 as u64, 100)]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Out-of-domain: |raw| exceeds max_reward on either side; clamp must engage.
+        &[(200, 100), ((-200i16) as u16 as u64, 100)]
+    }
+    fn weakened(s: u64, _i: u64) -> u64 {
+        // Broken variant: omits the [-max, +max] clamp, returning the raw reward.
+        let r = (s & 0xFFFF) as u16 as i16 as i64;
+        (r as i16 as u16) as u64
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                reward_signal_clamped(s, i),
+                reward_signal_clamped_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                reward_signal_clamped(s, i),
+                reward_signal_clamped_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != reward_signal_clamped_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

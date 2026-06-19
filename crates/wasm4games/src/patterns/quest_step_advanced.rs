@@ -99,6 +99,74 @@ mod tests {
         // abandon resets to step0.
         assert_eq!(quest_step_advanced(2, 2), 0);
     }
+
+    // --- two-sided breed-rigor battery ---
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[
+            // Legal forward transition: step0 + complete -> step1.
+            (0, 1),
+            // Legal reset: step2 + abandon -> step0.
+            (2, 2),
+        ]
+    }
+
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[
+            // Absorbing sink: Done(4) + complete must stay Done, never advance.
+            (4, 1),
+            // Out-of-alphabet symbol must be routed to idle (hold), not indexed raw.
+            (3, 99),
+        ]
+    }
+
+    // Weakened: a table whose Done row escapes (non-absorbing), and no OOB-as-idle
+    // routing — the symbol is used raw, so the sink/illegal-input bounds vanish.
+    fn weakened(s: u64, i: u64) -> u64 {
+        #[rustfmt::skip]
+        const BAD_TABLE: [usize; 15] = [
+            0, 1, 0,
+            1, 2, 0,
+            2, 3, 0,
+            3, 4, 0,
+            // BUG: Done is no longer absorbing — complete advances past it.
+            4, 0, 4,
+        ];
+        let st = ((s & 0xFF) as usize).min(4);
+        // BUG: raw symbol, clamped only to stay in-bounds, not mapped to idle.
+        let sym = ((i & 0xFF) as usize).min(ALPHABET - 1);
+        (BAD_TABLE[st * ALPHABET + sym] as u64) & 0xFF
+    }
+
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                quest_step_advanced(s, i),
+                quest_step_advanced_reference(s, i)
+            );
+        }
+    }
+
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                quest_step_advanced(s, i),
+                quest_step_advanced_reference(s, i)
+            );
+        }
+    }
+
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != quest_step_advanced_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

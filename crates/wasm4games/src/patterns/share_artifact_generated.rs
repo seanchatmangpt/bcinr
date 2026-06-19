@@ -98,6 +98,75 @@ mod tests {
             share_artifact_generated(7, 10)
         );
     }
+
+    // --- two-sided breed-rigor battery ---
+    // The only domain bound here is field extraction: player = low 32 bits of
+    // state, salt = high 32 bits. The refuse corpus exercises states whose high
+    // bits MUST be masked out of the player field before hashing.
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[
+            // In-domain seeds with no high bits to mask.
+            (7, 9),
+            (0x0000_0001_0000_0002, 0xABCD),
+        ]
+    }
+
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[
+            // High bits in state are the salt; player must stay the low 32 bits.
+            (0xFFFF_FFFF_0000_0007, 0),
+            // All-ones state: player and salt are each masked to 0xFFFF_FFFF.
+            (0xFFFF_FFFF_FFFF_FFFF, 0x1234_5678),
+        ]
+    }
+
+    // Weakened: feed the full unmasked state as the player tag, so high bits
+    // leak into the player field instead of being confined to the salt.
+    fn weakened(s: u64, i: u64) -> u64 {
+        const OFFSET: u64 = DeterministicSubstrateReceipt::FNV_OFFSET;
+        const PRIME: u64 = DeterministicSubstrateReceipt::FNV_PRIME;
+        let mix = |h: u64, x: u64| (h ^ x).wrapping_mul(PRIME);
+        // BUG: no `& 0xFFFF_FFFF` mask on the player field.
+        let player = s;
+        let salt = (s >> 32) & 0xFFFF_FFFF;
+        let mut h = OFFSET;
+        h = mix(h, 0);
+        h = mix(h, player);
+        h = mix(h, i);
+        h = mix(h, salt);
+        h
+    }
+
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                share_artifact_generated(s, i),
+                share_artifact_generated_reference(s, i)
+            );
+        }
+    }
+
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                share_artifact_generated(s, i),
+                share_artifact_generated_reference(s, i)
+            );
+        }
+    }
+
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != share_artifact_generated_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

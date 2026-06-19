@@ -23,11 +23,17 @@ fixed probe set into one rolling FNV receipt. This binds "same output + same OCE
 same OTEL span + same receipt" into a single comparable number, frozen as the oracle:
 
 ```text
-GOLDEN_CORPUS_DIGEST = 0x436B_6BFF_B836_DBAF   (20 patterns × 4 probes)
+GOLDEN_CORPUS_DIGEST is pinned in crates/wasm4games/src/corpus.rs.
 ```
 
-Any drift in a kernel, the registry, or the evidence wiring changes it (regression lock),
-and every other projection target must reproduce it to claim portability.
+`GOLDEN_CORPUS_DIGEST` is pinned in `crates/wasm4games/src/corpus.rs` (re-pinned whenever the
+registry changes); the C-ABI leg asserts the C build reproduces whatever value `corpus.rs`
+pins, rather than hardcoding it. The registry currently holds **75 patterns** (70 prior + 5
+anti-cheat); the digest is re-pinned in `corpus.rs` on every registry change, so this receipt
+deliberately does not transcribe its literal value.
+
+Any drift in a kernel, the registry, or the evidence wiring changes the digest (regression
+lock), and every other projection target must reproduce it to claim portability.
 
 ## Verified legs
 
@@ -36,19 +42,24 @@ and every other projection target must reproduce it to claim portability.
 | Rust native | `cargo test -p wasm4games --features std corpus` | `corpus_digest == GOLDEN` ✅ VERIFIED |
 | C ABI (executed) | `crates/wasm4games-capi` staticlib + `harness.c` linked with `cc` | digest reproduced ✅ VERIFIED |
 
-C-ABI proof output (`bash crates/wasm4games-capi/portability_proof.sh`):
+C-ABI proof output (`bash crates/wasm4games-capi/portability_proof.sh`). The harness reads the
+count and both digests dynamically and passes when the C-ABI digest equals the native golden,
+so the literal values below are illustrative of the **shape** only — the live count and digest
+track whatever `corpus.rs` pins:
 
 ```text
-pattern_count = 20
-corpus_digest = 0x436B6BFFB836DBAF (C-ABI execution)
-golden_digest = 0x436B6BFFB836DBAF (native Rust oracle)
+pattern_count = <N>                  # whatever PATTERN_REGISTRY.len() reports (currently 75)
+corpus_digest = 0x................ (C-ABI execution)
+golden_digest = 0x................ (native Rust oracle)   # equals corpus_digest on pass
 damage_applied(100,7) = 93
 PORTABILITY_OK: C-ABI execution reproduces the native golden digest
 ```
 
 This is a genuine cross-language receipt: **one ggen-declared pattern law → Rust rlib (tests)
-and a C-linked staticlib → byte-identical results.** `wasm4games-capi` is offline-pure (only
-depends on the `no_std` `wasm4games` core), so it is a safe workspace member and builds in CI.
+and a C-linked staticlib → byte-identical results.** The harness compares the C-ABI digest
+against the exported native golden (lib-vs-lib), so it stays valid as the registry grows and
+never needs editing when a pattern is added. `wasm4games-capi` is offline-pure (only depends
+on the `no_std` `wasm4games` core), so it is a safe workspace member and builds in CI.
 
 ## Fenced legs (cannot execute here)
 
@@ -63,9 +74,10 @@ target NOT installed**; `wasmtime`/`wasmer` ABSENT.
 
 ## Falsifier status
 
-The user's crown benchmark is `20 patterns × {Rust, WASM, C, …} × engines → same
-I/O/refusal/OCEL/OTel/receipt/replay`. Discharged so far: **2 targets (Rust native, C),
-fully executed and matching.** Remaining (WASM execution, engine adapters, Lua) require an
+The user's crown benchmark is `<all registry patterns> × {Rust, WASM, C, …} × engines → same
+I/O/refusal/OCEL/OTel/receipt/replay` (the registry currently holds 75 patterns). Discharged
+so far: **2 targets (Rust native, C), fully executed and matching** over the whole registry via
+the single corpus digest. Remaining (WASM execution, engine adapters, Lua) require an
 environment with those runtimes; they are recorded here as UNVERIFIED / NOT_STARTED, not
 laundered into a pass.
 

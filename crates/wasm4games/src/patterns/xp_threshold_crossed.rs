@@ -96,6 +96,49 @@ mod tests {
         assert_eq!(out3 & 0xFF, 1);
         assert_eq!((out3 >> 8) & 0xFFFF_FFFF, 0);
     }
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        // Threshold crossed: flag set, overflow reported.
+        &[(100, 50), (50, 50)]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // xp < threshold: the guard must zero both flag and overflow.
+        &[(30, 50), (0, 1)]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken: always reports crossed, dropping the xp >= threshold guard.
+        let xp = (s & 0xFFFF_FFFF) as u32;
+        let threshold = (i & 0xFFFF_FFFF) as u32;
+        let overflow = xp.saturating_sub(threshold) as u64;
+        1u64 | (overflow << 8)
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                xp_threshold_crossed(s, i),
+                xp_threshold_crossed_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                xp_threshold_crossed(s, i),
+                xp_threshold_crossed_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != xp_threshold_crossed_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

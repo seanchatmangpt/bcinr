@@ -92,6 +92,44 @@ mod tests {
         // Out-of-range archetype clamps to last (turret).
         assert_eq!(object_spawned(0, 0xFF) & 0xFFFF, 50);
     }
+
+    // Two-sided breed-rigor battery.
+    // Legal: in-range archetype ids resolve to their table entry directly.
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[(7, 4), (0, 1), (3, 5)]
+    }
+    // Extreme: out-of-range archetype ids the kernel must clamp into the table.
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[(0, 0xFF), (7, 8)]
+    }
+    // Weakened: omits the clamp, wrapping the index instead (a wrong, in-bounds branch).
+    fn weakened(s: u64, i: u64) -> u64 {
+        let next_id = s & 0xFFFF_FFFF;
+        let arch = (i & 0xFF) as usize % ARCHETYPE_LUT.len();
+        let init = ARCHETYPE_LUT[arch] as u64;
+        init | (next_id << 16)
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(object_spawned(s, i), object_spawned_reference(s, i));
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(object_spawned(s, i), object_spawned_reference(s, i));
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != object_spawned_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

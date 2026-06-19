@@ -162,8 +162,9 @@ The authoritative external surfaces are:
 ## Pattern families
 
 The catalog (mirrored by `patterns::PATTERN_REGISTRY` and enumerated in the
-[pattern reference](../reference/wasm4games-patterns.md)) groups patterns into four
-families:
+[pattern reference](../reference/wasm4games-patterns.md)) holds **75 patterns**: ids 1–70
+across 14 families, plus a 15th **Anti-Cheat** family (ids 71–75). The original spine is
+four families:
 
 - **Core sim & combat** — the deterministic spine of a game loop: input admission, fixed
   ticks, entity state machines, AABB collision resolution, damage application, and status
@@ -176,7 +177,49 @@ families:
   generating shareable artifacts, and gating Net-Promoter-Score prompts so they fire only
   at admissible moments.
 
+Ten more families extend the catalog to id 70 — **Pathfinding, Procedural Generation,
+Economy / Progression, Narrative / Dialogue, Camera, Audio, Multiplayer / Network, DfLSS /
+Quality, Engine Bridge,** and **AI Agent / Benchmark** — and the **Anti-Cheat** family
+(ids 71–75) adds the first *detector* kernels (covered below).
+
 Each family is just a tag on the underlying `PatternSpec` data; the families exist so the
 catalog can be browsed, tested, and benchmarked by concern. Every pattern, in every
 family, obeys the same model — bounded byte-class state, a branchless kernel on
 `bcinr-logic`, object-centric evidence — and is **generated, never hand-coded**.
+
+## The breed-rigor battery and the anti-cheat proving case
+
+A pattern's *value* is its claim to be deterministic, branchless, and correct — so every
+generated kernel ships with an in-file battery designed to make that claim falsifiable
+rather than merely asserted. The standard, applied to all 75 patterns, is:
+
+- **A branchful `_reference` oracle** next to the branchless body, with an `equivalence`
+  proptest pinning the two together — the fast form is judged against a readable form, not
+  against itself.
+- **Three value-mutants (`cf1`/`cf2`/`cf3`)** — negate / off-by-one / bit-flip variants the
+  suite must be able to tell apart from the correct answer, proving the tests are sharp
+  enough to *catch* a wrong result.
+- **A two-sided fixture corpus (`must_admit` / `must_refuse`)** — the kernel must accept the
+  legal cases *and* reject the illegal ones; the refuse side is what stops a rubber-stamp
+  kernel from passing.
+- **A `weakened` variant with `weakened_fails_corpus`** — a deliberately broken kernel that
+  the corpus must catch (it admits ≥1 case it should refuse), proving the corpus itself has
+  teeth: removing the check is *observable*.
+- **`boundaries`, a dormant `bench` module, and two Hoare-logic lines** rounding out each
+  file.
+
+All of it folds into one **`GOLDEN_CORPUS_DIGEST`** (pinned in
+`crates/wasm4games/src/corpus.rs`) that every projection target must reproduce. The full
+epistemic argument — how these compose to answer "how do I know it's right / the test
+isn't lying / what I ran is what you ran" — is laid out in
+[The Honest Kernel](wasm4games-the-honest-kernel.md).
+
+The **Anti-Cheat** family is the proving case for this battery. Its kernels do not advance
+state; they render a **verdict bitmask** — `0` = ADMITTED (legal), nonzero = refused, with
+each set bit naming a refusal reason — computed branchlessly so an illegal input takes the
+same path as a legal one. Each detector states its own **authority** in its doc comment
+(the local legality rule it enforces: e.g. "a move is admissible iff the displacement does
+not exceed the actor's max speed"), and that authority is exactly what its two-sided corpus
+admits and refuses. A detector is the clearest case where a one-sided corpus would lie —
+"admit everything" passes any all-legal suite — so the `must_refuse` corpus plus the
+`weakened` falsifier are what give the anti-cheat claim its force.

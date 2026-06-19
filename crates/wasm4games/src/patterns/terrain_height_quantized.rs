@@ -101,6 +101,66 @@ mod tests {
         // raw=250, min=100, max=200 -> clamped to 200 (above ceiling).
         assert_eq!(terrain_height_quantized(250, 100 | (200 << 16)), 200);
     }
+
+    // --- two-sided breed-rigor battery ---
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[
+            // Inside the band: pass through unchanged.
+            (150, 100 | (200 << 16)),
+            // Exactly on the floor: unchanged.
+            (100, 100 | (200 << 16)),
+        ]
+    }
+
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[
+            // Below the floor: must clamp UP to min_h.
+            (50, 100 | (200 << 16)),
+            // Above the ceiling: must clamp DOWN to max_h.
+            (250, 100 | (200 << 16)),
+        ]
+    }
+
+    // Weakened: return the raw sample with no clamp, so out-of-band heights
+    // escape the [min_h, max_h] window.
+    fn weakened(s: u64, i: u64) -> u64 {
+        let raw = (s & 0xFFFF) as u32;
+        let _min_h = (i & 0xFFFF) as u32;
+        let _max_h = ((i >> 16) & 0xFFFF) as u32;
+        // BUG: no clamp_u32 — raw passes through unbounded.
+        raw as u64 & 0xFFFF
+    }
+
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                terrain_height_quantized(s, i),
+                terrain_height_quantized_reference(s, i)
+            );
+        }
+    }
+
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                terrain_height_quantized(s, i),
+                terrain_height_quantized_reference(s, i)
+            );
+        }
+    }
+
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != terrain_height_quantized_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

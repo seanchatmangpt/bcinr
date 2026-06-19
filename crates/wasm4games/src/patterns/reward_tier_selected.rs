@@ -122,6 +122,58 @@ mod tests {
         assert_eq!(out3 & 0xFF, 3);
         assert_eq!((out3 >> 8) & 0xFF, 8);
     }
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        // Low buckets: count below t1 (tier 0) and within [t1, 2t1) (tier 1).
+        &[(0, 2), (0b111, 2)]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Top bucket: count >= 3t, so the highest tier boundary must fire.
+        &[(0xFF, 2), (0xFFFF, 4)]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken: drops the 3t boundary, collapsing tier 3 into tier 2.
+        let flags = s & 0xFFFF_FFFF;
+        let threshold = (i & 0xFF) as u32;
+        let count = flags.count_ones();
+        let t1 = threshold;
+        let t2 = threshold.saturating_mul(2);
+        let tier = if count < t1 {
+            0u32
+        } else if count < t2 {
+            1u32
+        } else {
+            2u32
+        };
+        (tier as u64) | ((count as u64) << 8)
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                reward_tier_selected(s, i),
+                reward_tier_selected_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                reward_tier_selected(s, i),
+                reward_tier_selected_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != reward_tier_selected_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

@@ -90,6 +90,48 @@ mod tests {
         let out3 = spawn_weight_evaluated(50, 50);
         assert_eq!(out3 & 0xFF, 0);
     }
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-domain rolls strictly below the rate: spawn fires legitimately.
+        &[(10, 100), (0, 255)]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // roll >= rate: the strict `<` bound must refuse the spawn (flag 0).
+        &[(100, 10), (50, 50), (255, 0)]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken: always spawns, dropping the roll < rate guard.
+        let _ = i;
+        let roll = (s & 0xFFFF) as u32;
+        1u64 | ((roll as u64) << 8)
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                spawn_weight_evaluated(s, i),
+                spawn_weight_evaluated_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                spawn_weight_evaluated(s, i),
+                spawn_weight_evaluated_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != spawn_weight_evaluated_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

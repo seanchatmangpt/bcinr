@@ -22,3 +22,7 @@ default = []
 alloc = ["bcinr-logic/alloc"]
 std = ["alloc", "bcinr-logic/std"]
 bench = ["dep:criterion", "bcinr-logic/bench"]
+
+[[bench]]
+name = "w4g_bench"
+harness = false

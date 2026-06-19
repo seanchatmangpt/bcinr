@@ -94,6 +94,54 @@ mod tests {
         // far distance clamps to last tier.
         assert_eq!(semantic_lod_selected(0, 0xFFFF_FFFF), 6);
     }
+
+    // Two-sided breed-rigor battery.
+    // Legal: near/mid distances whose bucket lands inside the tier table.
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[(0, 0), (0, 130 | (64 << 32)), (0, 320 | (64 << 32))]
+    }
+    // Extreme: far distances whose bucket overflows the table and must be clamped.
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[(0, 0xFFFF_FFFF), (0, 448 | (64 << 32))]
+    }
+    // Weakened: omits the tier clamp, wrapping the bucket index instead (wrong branch).
+    fn weakened(s: u64, i: u64) -> u64 {
+        let _ = s;
+        let dist = (i & 0xFFFF_FFFF) as u32;
+        let mut step = ((i >> 32) & 0xFFFF) as u32;
+        if step == 0 {
+            step = 64;
+        }
+        let bucket = (dist / step) as usize % LOD_LUT.len();
+        LOD_LUT[bucket] as u64
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                semantic_lod_selected(s, i),
+                semantic_lod_selected_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                semantic_lod_selected(s, i),
+                semantic_lod_selected_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != semantic_lod_selected_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

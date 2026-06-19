@@ -105,6 +105,49 @@ mod tests {
         assert_eq!(out3 & 0xFF, 10);
         assert_eq!((out3 >> 8) & 0xFF, 2);
     }
+
+    // Two-sided breed-rigor battery.
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-domain: raw score already within [0, 10].
+        &[(3, 0), (8, 0), (10, 0)]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Out-of-domain: score exceeds 10 and must be clamped before classification.
+        &[(11, 0), (200, 0)]
+    }
+    fn weakened(s: u64, _i: u64) -> u64 {
+        // Broken variant: omits the clamp to [0, 10].
+        let score = (s & 0xFF) as u32;
+        let cat = if score < 7 {
+            0u32
+        } else if score < 9 {
+            1
+        } else {
+            2
+        };
+        (score as u64) | ((cat as u64) << 8)
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(nps_score_bounded(s, i), nps_score_bounded_reference(s, i));
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(nps_score_bounded(s, i), nps_score_bounded_reference(s, i));
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != nps_score_bounded_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

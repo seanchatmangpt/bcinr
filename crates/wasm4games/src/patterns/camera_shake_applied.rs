@@ -110,6 +110,62 @@ mod tests {
         // Idempotency: same inputs twice -> same output.
         assert_eq!(camera_shake_applied(s2, inp), camera_shake_applied(s2, inp));
     }
+
+    // Two-sided breed-rigor battery. The bound is `% (2*max_amp+1)`, mapping the hash
+    // bytes into [-max_amp, max_amp]. admit: max_amp=128 -> range 257 > 255, so the
+    // modulo is the identity on every byte (in-domain, bound is a no-op). refuse:
+    // max_amp=0 -> range 1, so the modulo collapses every byte to 0 (bound fires hard).
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[
+            (0, 128),              // tick=0, max_amp=128 (range 257, no reduction)
+            (42 | (7 << 16), 128), // tick=42, seed=7, max_amp=128
+        ]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // max_amp=0 forces every offset to 0; raw (un-reduced) hash bytes are nonzero.
+        &[
+            (0, 0), // hash low byte 0xf5, high 0x13 -> must be reduced to 0
+            (1, 0), // hash low byte 0x4a -> must be reduced to 0
+        ]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken variant: omits the `% range` reduction; raw hash bytes leak through.
+        let max_amp = i & 0xFF;
+        let intensity = (i >> 8) & 0xFF;
+        let mut r = DeterministicSubstrateReceipt::new();
+        r.record(s & 0xFFFF, (s >> 16) & 0xFFFF, intensity);
+        let hash = r.finalize();
+        let x = ((hash & 0xFF).wrapping_sub(max_amp)) as u8 as u64;
+        let y = (((hash >> 8) & 0xFF).wrapping_sub(max_amp)) as u8 as u64;
+        (x & 0xFF) | ((y & 0xFF) << 8)
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                camera_shake_applied(s, i),
+                camera_shake_applied_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                camera_shake_applied(s, i),
+                camera_shake_applied_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != camera_shake_applied_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

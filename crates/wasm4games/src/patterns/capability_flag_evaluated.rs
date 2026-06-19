@@ -100,6 +100,51 @@ mod tests {
             capability_flag_evaluated_reference(u64::MAX, 63) >> 8 & 0xFF
         );
     }
+
+    // Two-sided breed-rigor battery.
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-domain: query bit clear, so inclusive and exclusive rank coincide.
+        &[(0b1100, 0), (0b1100, 1)]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Query bit set: inclusive rank counts it, exclusive rank does not — they diverge.
+        &[(0b1100, 2), (u64::MAX, 63)]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken variant: uses EXCLUSIVE rank (positions 0..idx) instead of inclusive (0..=idx).
+        let flags = s;
+        let idx = (i & 0x3F) as u32;
+        let b = (flags >> idx) & 1;
+        let r = (flags & ((1u64 << idx) - 1)).count_ones() as u64 & 0xFF;
+        b | (r << 8)
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                capability_flag_evaluated(s, i),
+                capability_flag_evaluated_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                capability_flag_evaluated(s, i),
+                capability_flag_evaluated_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != capability_flag_evaluated_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

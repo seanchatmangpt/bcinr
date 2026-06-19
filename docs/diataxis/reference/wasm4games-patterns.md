@@ -5,6 +5,11 @@
 > see the [foundry overview](../explanation/wasm4games-overview.md); to add an entry, see
 > the [add-a-pattern tutorial](../tutorials/wasm4games-add-a-pattern.md).
 
+The catalog holds **75 patterns**: ids 1–70 across 14 families, plus the **Anti-Cheat**
+family (ids 71–75). The first tables below name the original Phase 1 families in full; the
+50 Phase 2 patterns (ids 21–70) are summarized by family; and the Anti-Cheat family
+(ids 71–75) gets its own section because its kernels have a distinct *verdict* semantics.
+
 ## How to read this catalog
 
 Every row is one `ir::PatternSpec`, which is itself a faithful projection of one
@@ -76,17 +81,98 @@ Closing the loop with the player.
 | ShareArtifactGenerated | `share_artifact_generated` | Promotion & NPS | `Receipt` | `0x000F` | `player`, `artifact` | `0x001B` | `PROJECTED` ⇒ `REFUSED` |
 | NpsPromptGated | `nps_prompt_gated` | Promotion & NPS | `Mask` | `0x0010` | `player`, `prompt` | `0x001C` | `ADMITTED` ⇒ `BLOCKED` |
 
-## Optional / extended patterns
+## Phase 2 families (ids 21–70)
 
-These are catalog-ready but optional; include them by adding the corresponding
-`w4g:Pattern` individuals to `patterns.ttl` and running `ggen sync`.
+The catalog grows by ten more families past the original four. These are full members of
+`PATTERN_REGISTRY` (not optional), declared in `patterns.ttl` like every other pattern and
+folded into the golden corpus. They are summarized here rather than tabulated row-by-row;
+the authoritative bytes for each are whatever the committed registry holds.
 
-| Pattern | Kernel fn | Family | Lowering | Event code | Object kinds | OTEL span | Admission |
-|---|---|---|---|---|---|---|---|
-| ObjectSpawned | `object_spawned` | Core sim & combat | `Mask` | `0x0011` | `world`, `entity` | `0x001D` | `ADMITTED` ⇒ `REFUSED` |
-| AiActionSelected | `ai_action_selected` | Core sim & combat | `Dfa` | `0x0012` | `agent`, `action` | `0x001E` | `ADMITTED` ⇒ `BLOCKED` |
-| InventoryItemChanged | `inventory_item_changed` | Core sim & combat | `Saturating` | `0x0013` | `player`, `item` | `0x001F` | `ADMITTED` ⇒ `REFUSED` |
-| QuestStepAdvanced | `quest_step_advanced` | Promotion & NPS | `Dfa` | `0x0014` | `player`, `quest` | `0x0020` | `ADMITTED` ⇒ `BLOCKED` |
+| Family | Ids | Patterns (kernel fns) | Typical lowerings |
+|---|---|---|---|
+| Pathfinding | 21–25 | `path_node_expanded`, `waypoint_reached`, `heuristic_distance_estimated`, `path_cost_bounded`, `nav_state_advanced` | `Saturating`, `Dfa` |
+| Procedural Generation | 26–30 | `noise_value_sampled`, `tile_variant_selected`, `terrain_height_quantized`, `spawn_weight_evaluated`, `biome_class_selected` | `Lut`, `Saturating` |
+| Economy / Progression | 31–35 | `currency_delta_applied`, `xp_threshold_crossed`, `level_gate_evaluated`, `purchase_admitted`, `reward_tier_selected` | `Saturating`, `Mask`, `Lut` |
+| Narrative / Dialogue | 36–40 | `dialogue_node_advanced`, `condition_flag_evaluated`, `narrative_branch_selected`, `dialogue_cooldown_bounded`, `choice_weight_selected` | `Dfa`, `Lut`, `Saturating` |
+| Camera | 41–45 | `camera_distance_clamped`, `look_target_weighted`, `fov_adjusted`, `camera_shake_applied`, `camera_follow_lerped` | `Saturating`, `Mask` |
+| Audio | 46–50 | `audio_priority_selected`, `volume_clamped`, `audio_fade_applied`, `audio_trigger_evaluated`, `audio_distance_attenuated` | `Lut`, `Saturating`, `Mask` |
+| Multiplayer / Network | 51–55 | `tick_delta_bounded`, `lag_compensation_applied`, `packet_priority_evaluated`, `prediction_error_bounded`, `sync_state_admitted` | `Saturating`, `Mask`, `Dfa` |
+| DfLSS / Quality | 56–60 | `sigma_level_computed`, `defect_rate_quantized`, `ctq_threshold_evaluated`, `nps_score_bounded`, `quality_gate_evaluated` | `Saturating`, `Lut`, `Mask` |
+| Engine Bridge | 61–65 | `command_opcode_encoded`, `capability_flag_evaluated`, `bridge_state_transitioned`, `payload_size_bounded`, `adapter_priority_ranked` | `Lut`, `Mask`, `Dfa`, `Network` |
+| AI Agent / Benchmark | 66–70 | `reward_signal_clamped`, `policy_action_selected`, `observation_class_selected`, `action_mask_applied`, `episode_return_bounded` | `Saturating`, `Lut`, `Mask` |
+
+## Anti-Cheat (ids 71–75): detector kernels with verdict semantics
+
+The Anti-Cheat family is the catalog's first set of **detector** kernels. Where every
+other family advances bounded state, an anti-cheat kernel *judges* a proposed transition:
+it admits a legal one and refuses an illegal one. The contract is uniform.
+
+> **A detector kernel returns a verdict bitmask: `0` = ADMITTED (legal), nonzero =
+> refused.** Each set bit names a distinct refusal reason (e.g. `bit0 = teleport`), so the
+> return value is both a yes/no decision and a machine-readable cause.
+
+Because the verdict is computed branchlessly (the kernels lower onto
+`bcinr_logic::mask::lt_mask_u32` and `abs_i32`), an illegal input takes exactly the same
+path as a legal one — there is no data-dependent branch a cheat could time or steer.
+
+| Pattern | Kernel fn | Authority (what makes a move legal) | Lowering | Verdict bits |
+|---|---|---|---|---|
+| MovementLegalityChecked | `movement_legality_checked` | displacement ≤ max speed (else teleport) | `Mask` | `bit0 = teleport` |
+| ResourceBoundChecked | `resource_bound_checked` | value ≤ declared capacity (else overflow) | `Mask` | `bit0 = hp_overflow` |
+| CooldownLegalityChecked | `cooldown_legality_checked` | action fires only after its cooldown elapses | `Mask` | `bit0 = cooldown_violation` |
+| ActionRateBounded | `action_rate_bounded` | actions-per-window ≤ the allowed rate | `Mask` | `bit0 = rate_exceeded` |
+| TransitionLegalityChecked | `transition_legality_checked` | the state-machine edge is permitted | `Mask` | `bit0 = illegal_transition` |
+
+### Authority-per-pattern
+
+Each detector carries its **authority** in its own doc comment — the one-line legality spec
+it enforces ("a move is admissible iff the displacement … does not exceed the actor's max
+speed; larger jumps are teleport cheats and are refused"). The authority is *local* to the
+pattern: it is the rule the kernel is the executable form of, and it is exactly what the
+two-sided corpus (below) is built to confirm. Reading the authority line tells you what the
+verdict *means* before you read a single line of arithmetic.
+
+## The breed-rigor battery (every pattern)
+
+Each generated kernel ships with the same in-file battery — this is the breed standard the
+whole catalog is held to, not a property of any one family:
+
+- **Branchless body** — the committed kernel, lowered onto a `bcinr-logic` primitive.
+- **`_reference` oracle** — a deliberately *branchful* re-implementation of the same spec.
+  The branchless body is the optimized form; the oracle is the readable form, and they must
+  agree.
+- **`equivalence` proptest** — asserts the branchless body equals the `_reference` oracle
+  across randomized inputs. This is the falsifier for "the fast version still computes the
+  spec."
+- **Three value-mutants (`cf1`/`cf2`/`cf3`)** — deliberately wrong variants of the oracle
+  (negate, off-by-one, bit-flip). Each `cf` proptest asserts the *correct* result differs
+  from the mutant — proving the test is sharp enough to *catch* a wrong answer, not merely
+  pass a right one.
+- **Two-sided fixture corpus (`must_admit` / `must_refuse`)** — hand-picked cases the
+  kernel must admit and cases it must refuse. A one-sided corpus (only admits) cannot tell a
+  real detector from one that admits everything; the refuse side is what gives the corpus
+  teeth.
+- **A `weakened` variant + `weakened_fails_corpus`** — a deliberately broken kernel (e.g.
+  the teleport check deleted, so everything is admitted). The test asserts this weakened
+  detector **admits at least one case from the refuse corpus** — i.e. the corpus is strong
+  enough that *removing* the check is *observable*. If a weakened kernel could still pass,
+  the corpus would be proving nothing.
+- **`boundaries`** — the inclusive/exclusive edges (e.g. displacement exactly equal to the
+  budget is admitted; one beyond is refused).
+- **A dormant `bench` module** — a Criterion micro-bench behind `#[cfg(feature = "bench")]`,
+  compiled only under the `bench` feature so it never burdens the offline build.
+- **Two Hoare-logic lines** — `// Hoare-logic Verification Line N: …` annotations pinning
+  the kernel's pre/post conditions (e.g. "verdict bit0 is set iff |proposed − current|
+  exceeds max_speed"; "a displacement equal to max_speed is admitted").
+
+The whole catalog then folds into a single **`GOLDEN_CORPUS_DIGEST`** (pinned in
+`crates/wasm4games/src/corpus.rs`): every pattern's id, event code, OTEL span, object
+codes, admission rule, *and* its kernel output over fixed probe vectors are recorded into
+one rolling receipt. Any drift in a kernel, the registry, or the evidence wiring changes
+the digest — and every other projection target (the C ABI, WASM, engine adapters) must
+reproduce it to claim portability. See
+[The Honest Kernel](../explanation/wasm4games-the-honest-kernel.md) for how these pieces
+compose into a single argument that the kernel is right and the test is not lying.
 
 ## Pattern families
 
@@ -101,6 +187,11 @@ browsed, tested, and benchmarked by concern.
   advancement.
 - **Promotion & NPS** — mastery-moment detection, shareable-artifact generation, and
   NPS-prompt gating.
+- **Phase 2 families** — Pathfinding, Procedural Generation, Economy / Progression,
+  Narrative / Dialogue, Camera, Audio, Multiplayer / Network, DfLSS / Quality, Engine
+  Bridge, and AI Agent / Benchmark (ids 21–70).
+- **Anti-Cheat** — detector kernels (ids 71–75) that return a verdict (0 = admitted,
+  nonzero = refused) instead of advancing state.
 
 ## Lowering kinds
 

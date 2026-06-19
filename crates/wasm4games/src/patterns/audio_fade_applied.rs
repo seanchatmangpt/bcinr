@@ -88,6 +88,51 @@ mod tests {
         // vol=0/rate=5 -> 0, silent=1
         assert_eq!(audio_fade_applied(0, 5), audio_fade_applied_reference(0, 5));
     }
+
+    // Two-sided breed-rigor battery.
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-domain: rate < vol, result stays positive, floor does not fire.
+        &[
+            (100, 20), // 80, not silent
+            (255, 1),  // 254, not silent
+        ]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Out-of-domain: rate >= vol, the floor clamps to 0 and silent flag fires.
+        &[
+            (10, 20), // -> 0, silent
+            (0, 5),   // -> 0, silent
+        ]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken variant: omits the .max(0) floor; underflow leaks into the low byte.
+        let vol = (s & 0xFF) as i64;
+        let rate = (i & 0xFF) as i64;
+        let new_vol = vol - rate;
+        let silent = ((new_vol == 0) as u64) << 8;
+        ((new_vol as u64) & 0xFF) | silent
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(audio_fade_applied(s, i), audio_fade_applied_reference(s, i));
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(audio_fade_applied(s, i), audio_fade_applied_reference(s, i));
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != audio_fade_applied_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

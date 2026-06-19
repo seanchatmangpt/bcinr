@@ -95,6 +95,68 @@ mod tests {
         let out2 = mastery_moment_detected(0b0111, 1 | (5u64 << 8));
         assert_eq!((out2 >> 40) & 1, 0);
     }
+
+    // --- two-sided breed-rigor battery ---
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[
+            // Clearly below threshold: window 0b0001, push success -> count 2 < 5.
+            (0b0001, 1u64 | (5u64 << 8)),
+            // Clearly above threshold: window 0b0111, push success -> count 4 >= 2.
+            (0b0111, 1u64 | (2u64 << 8)),
+        ]
+    }
+
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[
+            // Exact equality edge: count 4 == threshold 4 must FIRE (>=, not >).
+            (0b0111, 1u64 | (4u64 << 8)),
+            // Threshold 0 with empty push (success=0, threshold=0): count 0 == 0 must FIRE.
+            (0, 0),
+        ]
+    }
+
+    // Weakened: fire on strict greater-than, dropping the >= equality boundary.
+    fn weakened(s: u64, i: u64) -> u64 {
+        let window = s & 0xFFFF_FFFF;
+        let success = i & 1;
+        let threshold = ((i >> 8) & 0xFF) as u32;
+        let new_window = ((window << 1) | success) & 0xFFFF_FFFF;
+        let count = rank_u64(new_window, 31) as u32;
+        // BUG: strict > instead of >=, missing count == threshold.
+        let detected = (lt_mask_u32(threshold, count) & 1) as u64;
+        new_window | ((count as u64) << 32) | (detected << 40)
+    }
+
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                mastery_moment_detected(s, i),
+                mastery_moment_detected_reference(s, i)
+            );
+        }
+    }
+
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                mastery_moment_detected(s, i),
+                mastery_moment_detected_reference(s, i)
+            );
+        }
+    }
+
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != mastery_moment_detected_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

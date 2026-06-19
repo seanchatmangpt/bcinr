@@ -93,6 +93,12 @@ pub mod episode_return_bounded;
 pub mod observation_class_selected;
 pub mod policy_action_selected;
 pub mod reward_signal_clamped;
+// Phase 3 — ids 71-75: Anti-Cheat
+pub mod action_rate_bounded;
+pub mod cooldown_legality_checked;
+pub mod movement_legality_checked;
+pub mod resource_bound_checked;
+pub mod transition_legality_checked;
 
 // --- Kernel re-exports ----------------------------------------------------------------
 
@@ -166,6 +172,12 @@ pub use tile_variant_selected::tile_variant_selected;
 pub use volume_clamped::volume_clamped;
 pub use waypoint_reached::waypoint_reached;
 pub use xp_threshold_crossed::xp_threshold_crossed;
+// Phase 3 — Anti-Cheat (ids 71-75)
+pub use action_rate_bounded::action_rate_bounded;
+pub use cooldown_legality_checked::cooldown_legality_checked;
+pub use movement_legality_checked::movement_legality_checked;
+pub use resource_bound_checked::resource_bound_checked;
+pub use transition_legality_checked::transition_legality_checked;
 
 // --- Object-kind code map (stable; reused across patterns) ----------------------------
 
@@ -377,6 +389,12 @@ const OBJ_POLICY_ACTION_SELECTED: &[ObjectKind] = &[AGENT];
 const OBJ_OBSERVATION_CLASS_SELECTED: &[ObjectKind] = &[AGENT];
 const OBJ_ACTION_MASK_APPLIED: &[ObjectKind] = &[AGENT, EPISODE];
 const OBJ_EPISODE_RETURN_BOUNDED: &[ObjectKind] = &[AGENT, EPISODE];
+// Phase 3 object slices — Anti-Cheat (ids 71-75)
+const OBJ_MOVEMENT_LEGALITY_CHECKED: &[ObjectKind] = &[PLAYER];
+const OBJ_RESOURCE_BOUND_CHECKED: &[ObjectKind] = &[PLAYER];
+const OBJ_COOLDOWN_LEGALITY_CHECKED: &[ObjectKind] = &[PLAYER];
+const OBJ_ACTION_RATE_BOUNDED: &[ObjectKind] = &[PLAYER];
+const OBJ_TRANSITION_LEGALITY_CHECKED: &[ObjectKind] = &[ENTITY];
 
 /// The standard admission contract: admissible at [`status::ADMITTED`], refused with
 /// [`status::REFUSED`].
@@ -1306,5 +1324,71 @@ pub static PATTERN_REGISTRY: &[PatternSpec] = &[
         objects: OBJ_EPISODE_RETURN_BOUNDED,
         admission: STD_ADMISSION,
         otel_span: 0x0084,
+    },
+    // --- Phase 3: Anti-Cheat (ids 71-75, event codes 0x0085-0x0089) ---
+    PatternSpec {
+        id: PatternId(71),
+        name: "movement_legality_checked",
+        lowering: LoweringKind::Mask,
+        state_card: 2,
+        event: EventKind {
+            code: 0x0085,
+            name: "MovementLegalityChecked",
+        },
+        objects: OBJ_MOVEMENT_LEGALITY_CHECKED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0085,
+    },
+    PatternSpec {
+        id: PatternId(72),
+        name: "resource_bound_checked",
+        lowering: LoweringKind::Mask,
+        state_card: 2,
+        event: EventKind {
+            code: 0x0086,
+            name: "ResourceBoundChecked",
+        },
+        objects: OBJ_RESOURCE_BOUND_CHECKED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0086,
+    },
+    PatternSpec {
+        id: PatternId(73),
+        name: "cooldown_legality_checked",
+        lowering: LoweringKind::Bitset,
+        state_card: 2,
+        event: EventKind {
+            code: 0x0087,
+            name: "CooldownLegalityChecked",
+        },
+        objects: OBJ_COOLDOWN_LEGALITY_CHECKED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0087,
+    },
+    PatternSpec {
+        id: PatternId(74),
+        name: "action_rate_bounded",
+        lowering: LoweringKind::Mask,
+        state_card: 2,
+        event: EventKind {
+            code: 0x0088,
+            name: "ActionRateBounded",
+        },
+        objects: OBJ_ACTION_RATE_BOUNDED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0088,
+    },
+    PatternSpec {
+        id: PatternId(75),
+        name: "transition_legality_checked",
+        lowering: LoweringKind::Dfa,
+        state_card: 5,
+        event: EventKind {
+            code: 0x0089,
+            name: "TransitionLegalityChecked",
+        },
+        objects: OBJ_TRANSITION_LEGALITY_CHECKED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0089,
     },
 ];

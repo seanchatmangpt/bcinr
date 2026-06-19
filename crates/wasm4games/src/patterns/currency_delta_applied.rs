@@ -92,6 +92,50 @@ mod tests {
         // balance=0xFFFF_FFFE, earn=5 -> ceiling at 0xFFFF_FFFF.
         assert_eq!(currency_delta_applied(0xFFFF_FFFE, 5), 0xFFFF_FFFF);
     }
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-range transitions that neither floor nor ceil.
+        &[(100, 50), (1000, 100 | (1u64 << 31))]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Spend past 0 (floor fires) and earn past max (ceiling fires).
+        &[(50, 100 | (1u64 << 31)), (0xFFFF_FFFE, 5)]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken: applies the signed delta with no [0, 0xFFFF_FFFF] clamp.
+        let balance = (s & 0xFFFF_FFFF) as i64;
+        let sign_bit = ((i >> 31) & 1) as i64;
+        let magnitude = (i & 0x7FFF_FFFF) as i64;
+        let delta = magnitude - sign_bit * 2 * magnitude;
+        (balance.wrapping_add(delta) as u64) & 0xFFFF_FFFF
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                currency_delta_applied(s, i),
+                currency_delta_applied_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                currency_delta_applied(s, i),
+                currency_delta_applied_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != currency_delta_applied_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

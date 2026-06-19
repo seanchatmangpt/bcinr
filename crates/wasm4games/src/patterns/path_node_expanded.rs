@@ -102,6 +102,66 @@ mod tests {
             path_node_expanded_reference(state_c, input_c)
         );
     }
+
+    // --- two-sided breed-rigor battery ---
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[
+            // Curr strictly cheaper: keep curr cost/id.
+            (10u64 | (7u64 << 32), 20u64 | (99u64 << 32)),
+            // Candidate strictly cheaper: take candidate cost/id.
+            (20u64 | (7u64 << 32), 10u64 | (99u64 << 32)),
+        ]
+    }
+
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[
+            // Exact tie: strict-less-than bound must KEEP curr (id 7), not swap.
+            (10u64 | (7u64 << 32), 10u64 | (99u64 << 32)),
+            // Tie at u32::MAX cost: still keeps curr id under the strict bound.
+            (
+                0xFFFF_FFFFu64 | (5u64 << 32),
+                0xFFFF_FFFFu64 | (42u64 << 32),
+            ),
+        ]
+    }
+
+    // Weakened: candidate wins on <= instead of <, so ties wrongly swap the id.
+    fn weakened(s: u64, i: u64) -> u64 {
+        let curr_cost = (s & 0xFFFF_FFFF) as u32;
+        let cand_cost = (i & 0xFFFF_FFFF) as u32;
+        let cand_id = ((i >> 32) & 0xFFFF) as u32;
+        let curr_id = ((s >> 32) & 0xFFFF) as u32;
+        // BUG: cand_cost <= curr_cost (ties go to candidate).
+        let cand_wins = !lt_mask_u32(curr_cost, cand_cost);
+        let win_cost = select_u32(cand_wins, cand_cost, curr_cost);
+        let win_id = select_u32(cand_wins, cand_id, curr_id);
+        (win_cost as u64) | ((win_id as u64) << 32)
+    }
+
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(path_node_expanded(s, i), path_node_expanded_reference(s, i));
+        }
+    }
+
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(path_node_expanded(s, i), path_node_expanded_reference(s, i));
+        }
+    }
+
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != path_node_expanded_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

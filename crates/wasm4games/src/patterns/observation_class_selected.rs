@@ -94,6 +94,50 @@ mod tests {
         let out3 = observation_class_selected(255, 10 | (8 << 8));
         assert_eq!(out3 & 0xFF, 7);
     }
+
+    // Two-sided breed-rigor battery.
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-domain: raw bin index already inside [0, max_bins-1].
+        &[(50, 10 | (8 << 8)), (0, 10 | (8 << 8))]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Out-of-domain: raw bin index overshoots max_bins-1 and must be clamped.
+        &[(255, 10 | (8 << 8)), (200, 1 | (4 << 8))]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken variant: omits the clamp to [0, max_bins-1].
+        let obs = (s & 0xFFFF) as u32;
+        let bin_width = (i & 0xFF) as u32;
+        let safe_width = bin_width.max(1);
+        (obs / safe_width) as u64
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                observation_class_selected(s, i),
+                observation_class_selected_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                observation_class_selected(s, i),
+                observation_class_selected_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != observation_class_selected_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

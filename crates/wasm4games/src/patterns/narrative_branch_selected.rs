@@ -115,6 +115,66 @@ mod tests {
         assert_eq!(out3 & 0xFF, 2);
         assert_eq!((out3 >> 8) & 0xFFFF, 9);
     }
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        // Distinct maxima: (5,9,3) -> branch 1; (9,5,3) -> branch 0.
+        &[
+            (0, 5u64 | (9u64 << 16) | (3u64 << 32)),
+            (0, 9u64 | (5u64 << 16) | (3u64 << 32)),
+        ]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Ties: the strict-`<` rule must keep the lowest-index branch.
+        &[
+            (0, 9u64 | (9u64 << 16) | (3u64 << 32)),
+            (0, 4u64 | (4u64 << 16) | (4u64 << 32)),
+        ]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken: replaces on `>=`, so ties drift to the highest index.
+        let _ = s;
+        let w_a = (i & 0xFFFF) as u32;
+        let w_b = ((i >> 16) & 0xFFFF) as u32;
+        let w_c = ((i >> 32) & 0xFFFF) as u32;
+        let mut best_val = w_a;
+        let mut best_idx = 0u32;
+        if w_b >= best_val {
+            best_val = w_b;
+            best_idx = 1;
+        }
+        if w_c >= best_val {
+            best_val = w_c;
+            best_idx = 2;
+        }
+        (best_idx as u64) | ((best_val as u64) << 8)
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                narrative_branch_selected(s, i),
+                narrative_branch_selected_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                narrative_branch_selected(s, i),
+                narrative_branch_selected_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != narrative_branch_selected_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

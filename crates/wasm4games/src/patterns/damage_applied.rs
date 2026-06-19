@@ -86,6 +86,46 @@ mod tests {
         );
         assert_eq!(damage_applied(100, 7), damage_applied_reference(100, 7));
     }
+
+    // Two-sided breed-rigor battery.
+    // Legal, in-domain hits: damage strictly below current HP (no flooring needed).
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[(100, 7), (100, 7 | (1 << 16)), (5000, 1000)]
+    }
+    // Extreme overkill: damage exceeds HP so the kernel must floor the result at 0.
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[(0, 5), (10, 100 | (1 << 16))]
+    }
+    // Weakened: omits the HP floor (drops `.max(0)`), so overkill underflows the lane.
+    fn weakened(s: u64, i: u64) -> u64 {
+        let hp = (s & 0xFFFF) as i64;
+        let dmg = (i & 0xFFFF) as i64;
+        let crit_mask = 0u64.wrapping_sub((i >> 16) & 1);
+        let dmg_eff = select_u64(crit_mask, (dmg as u64).wrapping_mul(2), dmg as u64) as i64;
+        let new_hp = saturating_sub_i64(hp, dmg_eff);
+        (new_hp as u64) & 0xFFFF
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(damage_applied(s, i), damage_applied_reference(s, i));
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(damage_applied(s, i), damage_applied_reference(s, i));
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != damage_applied_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

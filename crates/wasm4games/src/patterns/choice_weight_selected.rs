@@ -108,6 +108,54 @@ mod tests {
         // roll=200, b=[64,128,192] -> 200>=192 -> choice 3
         assert_eq!(choice_weight_selected(200, input), 3);
     }
+
+    const BOUNDS: u64 = 64u64 | (128u64 << 8) | (192u64 << 16);
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        // Interior buckets: roll < b0 -> 0; b0 <= roll < b1 -> 1.
+        &[(10, BOUNDS), (100, BOUNDS)]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // roll >= b2: the top bucket (choice 3) must be selected.
+        &[(200, BOUNDS), (192, BOUNDS)]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken: caps the default at bucket 2, dropping the roll >= b2 boundary.
+        let roll = (s & 0xFF) as u32;
+        let b0 = (i & 0xFF) as u32;
+        let b1 = ((i >> 8) & 0xFF) as u32;
+        let choice = 2u32;
+        let choice = select_u32(lt_mask_u32(roll, b1), 1, choice);
+        let choice = select_u32(lt_mask_u32(roll, b0), 0, choice);
+        choice as u64
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                choice_weight_selected(s, i),
+                choice_weight_selected_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                choice_weight_selected(s, i),
+                choice_weight_selected_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != choice_weight_selected_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

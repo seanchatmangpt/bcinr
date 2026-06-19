@@ -84,6 +84,50 @@ mod tests {
         // cooldown=0, delta=5 -> new_cd=0, ready=1
         assert_eq!(dialogue_cooldown_bounded(0, 5), (1u64 << 16));
     }
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        // delta < cooldown: counter decrements without underflow, not ready.
+        &[(10, 3), (100, 1)]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // delta >= cooldown: the saturating floor must clamp to 0 and set ready.
+        &[(3, 10), (0, 5)]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken: wrapping subtraction with no floor, so underflow escapes the clamp.
+        let cooldown = (s & 0xFFFF) as u32;
+        let delta = (i & 0xFFFF) as u32;
+        let nc = cooldown.wrapping_sub(delta) & 0xFFFF;
+        let ready = (nc == 0) as u64;
+        (nc as u64) | (ready << 16)
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                dialogue_cooldown_bounded(s, i),
+                dialogue_cooldown_bounded_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                dialogue_cooldown_bounded(s, i),
+                dialogue_cooldown_bounded_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != dialogue_cooldown_bounded_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

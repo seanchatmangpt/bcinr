@@ -109,6 +109,57 @@ mod tests {
         assert_eq!(out3 & 0xFFFF, 255);
         assert_eq!((out3 >> 16) & 0xFFFF, 0);
     }
+
+    // Two-sided breed-rigor battery.
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-domain: inputs already sorted descending, or all-equal (sort is a no-op).
+        &[
+            (9u64 | (5u64 << 16) | (3u64 << 32) | (1u64 << 48), 0),
+            (10u64 | (10u64 << 16) | (10u64 << 32) | (10u64 << 48), 0),
+        ]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Out-of-order: the network must reorder these into descending priority.
+        &[
+            (5u64 | (9u64 << 16) | (3u64 << 32) | (1u64 << 48), 0),
+            (255u64 << 48, 0),
+        ]
+    }
+    fn weakened(s: u64, _i: u64) -> u64 {
+        // Broken variant: skips the sort, returning the priorities in their original order.
+        let p0 = s & 0xFFFF;
+        let p1 = (s >> 16) & 0xFFFF;
+        let p2 = (s >> 32) & 0xFFFF;
+        let p3 = (s >> 48) & 0xFFFF;
+        p0 | (p1 << 16) | (p2 << 32) | (p3 << 48)
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                adapter_priority_ranked(s, i),
+                adapter_priority_ranked_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                adapter_priority_ranked(s, i),
+                adapter_priority_ranked_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != adapter_priority_ranked_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

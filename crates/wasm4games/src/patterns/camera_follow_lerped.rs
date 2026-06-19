@@ -97,6 +97,59 @@ mod tests {
         let i3 = 100u64 | (255u64 << 16);
         assert_eq!(camera_follow_lerped(s3, i3), 100);
     }
+
+    // Two-sided breed-rigor battery. The lerp factor alpha/256 < 1 bounds the step so
+    // the result never overshoots target; admit = small diffs, refuse = large diffs where
+    // a step-doubling weakening overshoots past the oracle's bounded interpolation.
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[
+            (100, 200 | (128 << 16)), // curr 100 -> 150 (half-step toward 200)
+            (200, 100 | (64 << 16)),  // curr 200 -> 175 (quarter-step toward 100)
+        ]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Extreme diffs: doubling the lerp step overshoots the bounded result.
+        &[
+            (0, 60000 | (200 << 16)), // huge upward diff
+            (60000, 200 << 16),       // huge downward diff (target = 0)
+        ]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken variant: doubles the lerp step (alpha/128), omitting the no-overshoot bound.
+        let current = (s & 0xFFFF) as i64;
+        let target = (i & 0xFFFF) as i64;
+        let alpha = ((i >> 16) & 0xFF) as i64;
+        let step = (target - current) * alpha / 128;
+        let new_pos = (current + step).clamp(0, 0xFFFF);
+        (new_pos as u64) & 0xFFFF
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                camera_follow_lerped(s, i),
+                camera_follow_lerped_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                camera_follow_lerped(s, i),
+                camera_follow_lerped_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != camera_follow_lerped_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

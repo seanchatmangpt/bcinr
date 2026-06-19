@@ -115,6 +115,63 @@ mod tests {
         // dpmo=999999 -> sigma 1 (>= 308538)
         assert_eq!(sigma_level_computed(999_999, 0), 1);
     }
+
+    // Two-sided breed-rigor battery. The kernel selects a sigma bucket from DPMO
+    // thresholds; admit = mid-range buckets, refuse = the extreme top bucket
+    // (dpmo < 3 -> sigma 6) whose threshold a weakening drops.
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[
+            (1000, 0),    // 233 <= 1000 < 6210 -> sigma 4
+            (999_999, 0), // >= 308538 -> sigma 1
+        ]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Extreme low-defect bucket: only the dpmo < 3 threshold yields sigma 6.
+        &[
+            (0, 0), // sigma 6
+            (2, 0), // sigma 6
+        ]
+    }
+    fn weakened(s: u64, _i: u64) -> u64 {
+        // Broken variant: drops the top (sigma 6) threshold; the best bucket caps at 5.
+        let dpmo = (s & 0xFFFF_FFFF) as u32;
+        let b5 = lt_mask_u32(dpmo, 233);
+        let b4 = lt_mask_u32(dpmo, 6_210);
+        let b3 = lt_mask_u32(dpmo, 66_807);
+        let b2 = lt_mask_u32(dpmo, 308_538);
+        let r = select_u32(b2, 2, 1);
+        let r = select_u32(b3, 3, r);
+        let r = select_u32(b4, 4, r);
+        let r = select_u32(b5, 5, r);
+        (r as u64) & 0xFF
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                sigma_level_computed(s, i),
+                sigma_level_computed_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                sigma_level_computed(s, i),
+                sigma_level_computed_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != sigma_level_computed_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

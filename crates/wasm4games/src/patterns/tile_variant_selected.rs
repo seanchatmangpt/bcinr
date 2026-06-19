@@ -89,6 +89,66 @@ mod tests {
         // weight=255 -> variant 3 (last bucket).
         assert_eq!(tile_variant_selected(0, 255), 3);
     }
+
+    // --- two-sided breed-rigor battery ---
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[
+            // Low band: variant 0.
+            (0, 10),
+            // Second band lower edge: variant 1.
+            (0, 64),
+        ]
+    }
+
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[
+            // Top band lower edge: must resolve to variant 2, not collapse low.
+            (0, 192),
+            // Saturated weight: must select the highest band, variant 3.
+            (0, 255),
+        ]
+    }
+
+    // Weakened: bucketize with the wrong step (128), collapsing the four bands
+    // into two so the upper variants are never selected.
+    fn weakened(s: u64, i: u64) -> u64 {
+        let _ = s;
+        let weight = (i & 0xFF) as u32;
+        // BUG: step 128 yields only buckets 0 and 1, dropping variants 2 and 3.
+        let bucket = bucketize_u32(weight, 128) / 128;
+        clamp_u32(bucket, 0, 3) as u64
+    }
+
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                tile_variant_selected(s, i),
+                tile_variant_selected_reference(s, i)
+            );
+        }
+    }
+
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                tile_variant_selected(s, i),
+                tile_variant_selected_reference(s, i)
+            );
+        }
+    }
+
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != tile_variant_selected_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

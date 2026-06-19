@@ -103,6 +103,53 @@ mod tests {
             status::REFUSED as u64
         );
     }
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        // Not banned, level met -> ADMITTED.
+        &[(10, 5), (5, 5)]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Banned (REFUSED, overrides level) and level-not-met (BLOCKED).
+        &[(10 | (1u64 << 8), 5), (3, 5)]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken: ignores the ban flag, so banned-but-eligible escapes refusal.
+        let player_level = (s & 0xFF) as u32;
+        let required = (i & 0xFF) as u32;
+        let code = if player_level >= required {
+            status::ADMITTED
+        } else {
+            status::BLOCKED
+        };
+        (code as u64) & 0xFF
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                level_gate_evaluated(s, i),
+                level_gate_evaluated_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                level_gate_evaluated(s, i),
+                level_gate_evaluated_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != level_gate_evaluated_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

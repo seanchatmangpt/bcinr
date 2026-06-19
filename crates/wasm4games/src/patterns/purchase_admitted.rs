@@ -117,6 +117,44 @@ mod tests {
             FAILED as u64
         );
     }
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-domain (state, symbol) transitions.
+        &[(IDLE as u64, ADD as u64), (CHECKOUT as u64, CONFIRM as u64)]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Out-of-domain symbols (and state): the kernel masks OOB symbols to
+        // ADD and clamps the state, holding the default transition.
+        &[(CHECKOUT as u64, 200), (200, 200)]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken: clamps OOB symbols to the last column (FAIL) instead of
+        // masking them to ADD, diverging on out-of-domain events.
+        let st = ((s & 0xFF) as usize).min(FAILED);
+        let sym = ((i & 0xFF) as usize).min(ALPHABET - 1);
+        (TABLE[st * ALPHABET + sym] as u64) & 0xFF
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(purchase_admitted(s, i), purchase_admitted_reference(s, i));
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(purchase_admitted(s, i), purchase_admitted_reference(s, i));
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != purchase_admitted_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

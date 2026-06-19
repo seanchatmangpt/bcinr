@@ -95,6 +95,55 @@ mod tests {
             volume_clamped_reference(10, 30 | (1 << 8))
         );
     }
+
+    // Two-sided breed-rigor battery.
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-domain: vol +/- delta stays inside [0, 255], clamp does not fire.
+        &[
+            (100, 20),            // up 100+20 -> 120
+            (100, 20 | (1 << 8)), // down 100-20 -> 80
+        ]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Out-of-domain: delta overflows/underflows the [0, 255] window, clamp fires.
+        &[
+            (200, 100),          // up 300 -> clamp 255
+            (10, 30 | (1 << 8)), // down -20 -> clamp 0
+        ]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken variant: omits the [0, 255] clamp (raw wrapping arithmetic).
+        let vol = (s & 0xFF) as u32;
+        let delta = (i & 0xFF) as u32;
+        let dir = ((i >> 8) & 1) as u32;
+        let result = if dir == 1 {
+            vol.wrapping_sub(delta)
+        } else {
+            vol.wrapping_add(delta)
+        };
+        (result as u64) & 0xFFFF
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(volume_clamped(s, i), volume_clamped_reference(s, i));
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(volume_clamped(s, i), volume_clamped_reference(s, i));
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != volume_clamped_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

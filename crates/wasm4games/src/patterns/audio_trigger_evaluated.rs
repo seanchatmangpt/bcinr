@@ -105,6 +105,57 @@ mod tests {
         // PAUSED(2) + RESUME(3) -> PLAYING(1)
         assert_eq!(audio_trigger_evaluated(2, 3), 1);
     }
+
+    // Two-sided breed-rigor battery. The bound here is index reduction (state % 4,
+    // symbol % 5) keeping table access in range; admit = already-in-range indices,
+    // refuse = out-of-range state ids that wrap onto the distinct STOPPED row.
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[
+            (0, 0), // STOPPED + PLAY -> PLAYING(1)
+            (1, 2), // PLAYING + PAUSE -> PAUSED(2)
+        ]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Out-of-range state ids: modulo maps them back onto row 0 (STOPPED).
+        &[
+            (4, 2), // 4 % 4 = 0 (STOPPED) + PAUSE -> STOPPED(0)
+            (8, 4), // 8 % 4 = 0 (STOPPED) + FADE  -> STOPPED(0)
+        ]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken variant: clamps the state index instead of reducing it modulo NUM_STATES,
+        // so out-of-range ids land on the last row rather than wrapping to STOPPED.
+        let state_idx = ((s & 0xFF) as usize).min(NUM_STATES - 1);
+        let sym_idx = (i & 0xFF) as u8 % (ALPHABET_SIZE as u8);
+        dfa_advance(state_idx, sym_idx, &TABLE, ALPHABET_SIZE) as u64
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                audio_trigger_evaluated(s, i),
+                audio_trigger_evaluated_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                audio_trigger_evaluated(s, i),
+                audio_trigger_evaluated_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != audio_trigger_evaluated_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

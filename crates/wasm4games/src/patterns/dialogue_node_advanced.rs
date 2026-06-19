@@ -152,6 +152,52 @@ mod tests {
         // LOCKED + UNLOCK -> START
         assert_eq!(dialogue_node_advanced(5, 5), 0);
     }
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-domain advancing transitions.
+        &[(0, 0), (3, 0)]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // LOCKED is an absorbing trap: every symbol except UNLOCK stays LOCKED.
+        &[(5, 0), (5, 2)]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken: drops the LOCKED absorbing trap, letting it escape on any symbol.
+        let st = ((s & 0xFF) as usize).min(5);
+        let r = dialogue_node_advanced_reference(s, i);
+        if st == 5 {
+            0
+        } else {
+            r
+        }
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                dialogue_node_advanced(s, i),
+                dialogue_node_advanced_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                dialogue_node_advanced(s, i),
+                dialogue_node_advanced_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != dialogue_node_advanced_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

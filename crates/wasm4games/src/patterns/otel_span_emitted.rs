@@ -91,6 +91,43 @@ mod tests {
         // Out-of-range clamps to the last entry.
         assert_eq!(otel_span_emitted(0, 0xFF), 0x0050);
     }
+
+    // Two-sided breed-rigor battery.
+    // Legal: in-range slots resolve to their table entry directly.
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[(0, 0), (0, 6), (0, 3)]
+    }
+    // Extreme: out-of-range slots the kernel must clamp to the last entry.
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[(0, 8), (0, 100)]
+    }
+    // Weakened: omits the clamp, wrapping the index instead (a wrong, in-bounds branch).
+    fn weakened(s: u64, i: u64) -> u64 {
+        let _ = s;
+        let slot = (i & 0xFF) as usize % SPAN_LUT.len();
+        SPAN_LUT[slot] as u64
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(otel_span_emitted(s, i), otel_span_emitted_reference(s, i));
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(otel_span_emitted(s, i), otel_span_emitted_reference(s, i));
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != otel_span_emitted_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

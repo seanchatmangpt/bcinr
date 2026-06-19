@@ -103,6 +103,49 @@ mod tests {
         assert_eq!(out3 & 0xFF, 3);
         assert_eq!((out3 >> 8) & 0xFF, 100);
     }
+
+    // Two-sided breed-rigor battery.
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-domain: command in the lower opcode classes (below the top threshold).
+        &[(10, 0), (50, 0), (70, 0)]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Out-of-domain for a 3-threshold ladder: commands at/above 96 land in class 3.
+        &[(100, 0), (127, 0)]
+    }
+    fn weakened(s: u64, _i: u64) -> u64 {
+        // Broken variant: drops the highest threshold (96), so class saturates at 2.
+        let cmd = s & 0x7F;
+        let o = (cmd >= 32) as u64 + (cmd >= 64) as u64;
+        o | (cmd << 8)
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                command_opcode_encoded(s, i),
+                command_opcode_encoded_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                command_opcode_encoded(s, i),
+                command_opcode_encoded_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != command_opcode_encoded_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

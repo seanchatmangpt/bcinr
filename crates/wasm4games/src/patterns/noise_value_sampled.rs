@@ -89,6 +89,71 @@ mod tests {
         // Same inputs produce the same result (determinism).
         assert_eq!(noise_value_sampled(0, 0), noise_value_sampled(0, 0));
     }
+
+    // --- two-sided breed-rigor battery ---
+    // The domain bound is the `& 0xFF` range reduction to [0, 255]; the refuse
+    // corpus uses seeds/coords whose raw FNV digest has high bits set, so the
+    // mask is load-bearing.
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[
+            // In-domain sample at the origin.
+            (0, 0),
+            // In-domain sample at a typical tile.
+            (42, 7 | (3 << 16)),
+        ]
+    }
+
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[
+            // Raw digest has high bits set: result MUST be reduced to [0, 255].
+            (1, 1 | (1 << 16)),
+            // Max seed and coordinates: still bounded into a single byte.
+            (0xFFFF_FFFF, 0xFFFF | (0xFFFF << 16)),
+        ]
+    }
+
+    // Weakened: omit the `& 0xFF` range reduction, leaking the full 64-bit digest
+    // instead of a bounded noise value.
+    fn weakened(s: u64, i: u64) -> u64 {
+        let seed = s & 0xFFFF_FFFF;
+        let x = i & 0xFFFF;
+        let y = (i >> 16) & 0xFFFF;
+        let mut r = DeterministicSubstrateReceipt::new();
+        r.record(seed, x, y);
+        // BUG: no `& 0xFF` mask — unbounded digest escapes the [0, 255] range.
+        r.finalize()
+    }
+
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                noise_value_sampled(s, i),
+                noise_value_sampled_reference(s, i)
+            );
+        }
+    }
+
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                noise_value_sampled(s, i),
+                noise_value_sampled_reference(s, i)
+            );
+        }
+    }
+
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != noise_value_sampled_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

@@ -13,6 +13,8 @@ extern uint64_t w4g_corpus_digest(void);
 extern uint64_t w4g_golden_corpus_digest(void);
 
 int main(void) {
+    /* Count-agnostic: we never hardcode how many patterns the registry holds. The
+     * cross-language check is digest-vs-digest, so it stays correct as the registry grows. */
     uint32_t count = w4g_pattern_count();
     uint64_t got = w4g_corpus_digest();
     uint64_t want = w4g_golden_corpus_digest();
@@ -24,7 +26,11 @@ int main(void) {
     /* spot-check one kernel too: damage_applied(100, 7) */
     printf("damage_applied(100,7) = %llu\n", (unsigned long long)w4g_kernel(14, 100, 7));
 
-    if (count == 20 && got == want) {
+    if (count == 0) {
+        printf("PORTABILITY_FAIL: empty pattern registry (count == 0)\n");
+        return 1;
+    }
+    if (got == want) {
         printf("PORTABILITY_OK: C-ABI execution reproduces the native golden digest\n");
         return 0;
     }

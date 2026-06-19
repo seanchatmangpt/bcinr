@@ -99,6 +99,50 @@ mod tests {
             tick_delta_bounded_reference(s3, i3)
         );
     }
+
+    // Two-sided breed-rigor battery.
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-domain: raw delta <= max_delta, the bound does not fire (bounded == raw).
+        &[
+            (100, 105 | (10 << 16)), // delta 5 <= 10
+            (100, 100 | (10 << 16)), // delta 0 <= 10
+        ]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Out-of-domain: raw delta exceeds max_delta (incl. wrap), the bound clamps it.
+        &[
+            (100, 120 | (10 << 16)), // delta 20 -> clamp 10
+            (100, 99 | (10 << 16)),  // wraps to 0xFFFF -> clamp 10
+        ]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken variant: omits the .min(max_delta) bound; raw delta passes through.
+        let prev = (s & 0xFFFF) as u32;
+        let curr = (i & 0xFFFF) as u32;
+        let rd = curr.wrapping_sub(prev) & 0xFFFF;
+        (rd as u64) | ((rd as u64) << 16)
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(tick_delta_bounded(s, i), tick_delta_bounded_reference(s, i));
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(tick_delta_bounded(s, i), tick_delta_bounded_reference(s, i));
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != tick_delta_bounded_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

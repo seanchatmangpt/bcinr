@@ -82,6 +82,48 @@ mod tests {
         // flags=0, idx=0 -> bit=0, rank=0
         assert_eq!(condition_flag_evaluated(0, 0), 0);
     }
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        // Rank trivially 0: no set bits below the queried index.
+        &[(0b1010, 1), (0, 0)]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Non-trivial rank: set bits below the index must be counted.
+        &[(0b1010, 3), (0xFFFF_FFFF, 31)]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken: reports only flag presence, omitting the rank field.
+        let flags = s & 0xFFFF_FFFF;
+        let idx = i & 0x1F;
+        (flags >> idx) & 1
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                condition_flag_evaluated(s, i),
+                condition_flag_evaluated_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                condition_flag_evaluated(s, i),
+                condition_flag_evaluated_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != condition_flag_evaluated_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

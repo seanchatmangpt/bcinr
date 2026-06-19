@@ -99,6 +99,59 @@ mod tests {
             replay_frame_recorded(seed, 7)
         );
     }
+
+    // Two-sided breed-rigor battery.
+    // NOTE: this kernel is a pure FNV-1a fold with no value bound to clamp/saturate; its
+    // invariant is "every frame field participates in the mix", so the weakening drops a
+    // field (a wrong-branch omission) rather than removing a numeric bound.
+    // Legal: ordinary in-domain frames (any prior digest folds deterministically).
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[(0xCBF2_9CE4_8422_2325, 7), (0, 0), (0x1234, 42)]
+    }
+    // Extreme: all-bits-set frames where every field is saturated/nonzero.
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[(0, u64::MAX), (0x1234_5678, u64::MAX)]
+    }
+    // Weakened: omits the in_word fold step, so a nonzero input word no longer mixes in.
+    fn weakened(s: u64, i: u64) -> u64 {
+        const PRIME: u64 = DeterministicSubstrateReceipt::FNV_PRIME;
+        let mix = |h: u64, x: u64| (h ^ x).wrapping_mul(PRIME);
+        let tick = i & 0xFFFF;
+        let st_digest = (i >> 40) & 0xFF_FFFF;
+        let mut h = s;
+        h = mix(h, tick);
+        // (in_word fold deliberately omitted here)
+        h = mix(h, st_digest);
+        h = mix(h, s);
+        h
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                replay_frame_recorded(s, i),
+                replay_frame_recorded_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                replay_frame_recorded(s, i),
+                replay_frame_recorded_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != replay_frame_recorded_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

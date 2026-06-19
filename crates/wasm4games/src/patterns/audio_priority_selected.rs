@@ -99,6 +99,55 @@ mod tests {
             audio_priority_selected_reference(5 | (1 << 8), 5 | (2 << 8))
         );
     }
+
+    // Two-sided breed-rigor battery.
+    fn must_admit() -> &'static [(u64, u64)] {
+        // Channel 0 already wins (>=): the selector keeps channel 0.
+        &[
+            (5 | (1 << 8), 3 | (2 << 8)), // p0=5 > p1=3 -> ch0
+            (5 | (1 << 8), 5 | (2 << 8)), // tie -> ch0
+        ]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Channel 1 strictly higher: the selector must switch away from channel 0.
+        &[
+            (3 | (1 << 8), 5 | (2 << 8)), // p1=5 > p0=3 -> ch1
+            (7 << 8, 255 | (9 << 8)),     // p0=0, p1=255 dominates -> ch1
+        ]
+    }
+    fn weakened(s: u64, _i: u64) -> u64 {
+        // Broken variant: always keeps channel 0, omitting the priority selection.
+        let p0 = (s & 0xFF) as u32;
+        let id0 = ((s >> 8) & 0xFF) as u32;
+        (id0 as u64) | ((p0 as u64) << 8)
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                audio_priority_selected(s, i),
+                audio_priority_selected_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                audio_priority_selected(s, i),
+                audio_priority_selected_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != audio_priority_selected_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

@@ -108,6 +108,12 @@ pub fn dispatch(pattern_id: u16, state: u64, input: u64) -> u64 {
         68 => patterns::observation_class_selected(state, input),
         69 => patterns::action_mask_applied(state, input),
         70 => patterns::episode_return_bounded(state, input),
+        // Phase 3 — Anti-Cheat
+        71 => patterns::movement_legality_checked(state, input),
+        72 => patterns::resource_bound_checked(state, input),
+        73 => patterns::cooldown_legality_checked(state, input),
+        74 => patterns::action_rate_bounded(state, input),
+        75 => patterns::transition_legality_checked(state, input),
         _ => 0,
     }
 }
@@ -152,7 +158,7 @@ pub fn corpus_digest() -> u64 {
 
 /// Pinned golden value of [`corpus_digest`]. Frozen so any kernel/registry/evidence drift
 /// fails loudly, and so every other projection target has one fixed number to reproduce.
-pub const GOLDEN_CORPUS_DIGEST: u64 = 0x2D26_7F72_6A8B_F791;
+pub const GOLDEN_CORPUS_DIGEST: u64 = 0x0501_B4DE_76D8_78C0;
 
 #[cfg(test)]
 mod tests {
@@ -160,7 +166,7 @@ mod tests {
 
     #[test]
     fn dispatch_total_and_deterministic_over_registry() {
-        assert_eq!(PATTERN_REGISTRY.len(), 70, "expected 70 patterns");
+        assert_eq!(PATTERN_REGISTRY.len(), 75, "expected 75 patterns");
         for (idx, spec) in PATTERN_REGISTRY.iter().enumerate() {
             assert_eq!(spec.id.0 as usize, idx + 1, "ids must be 1..=20 in order");
             assert_eq!(

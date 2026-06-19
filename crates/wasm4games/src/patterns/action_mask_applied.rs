@@ -93,6 +93,52 @@ mod tests {
         assert_eq!(out3 & 0xFFFF, 100);
         assert_eq!((out3 >> 16) & 0xFF, 1);
     }
+
+    // Two-sided breed-rigor battery.
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-domain: legal actions, so the Q-value passes through unmasked.
+        &[(0b1010, 1 | (50 << 8)), (0xFFFF, 15 | (100 << 8))]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Illegal action (bit clear) and an out-of-range index (masked to 5 bits) that is illegal:
+        // both must force the Q-value to zero.
+        &[(0b1010, 50 << 8), (0b0010, 32 | (50 << 8))]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken variant: drops the legality mask, leaking the Q-value for illegal actions.
+        let valid = s & 0xFFFF_FFFF;
+        let idx = i & 0x1F;
+        let q_val = (i >> 8) & 0xFFFF;
+        let legal_bit = (valid >> idx) & 1;
+        q_val | (legal_bit << 16)
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                action_mask_applied(s, i),
+                action_mask_applied_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                action_mask_applied(s, i),
+                action_mask_applied_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != action_mask_applied_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

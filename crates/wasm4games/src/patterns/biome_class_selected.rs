@@ -94,6 +94,50 @@ mod tests {
         assert_eq!(out2 & 0xFF, 3);
         assert_eq!((out2 >> 8) & 0xFF, 1);
     }
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        // pos=0 (rank is trivially 0) and a small in-domain bitset query.
+        &[(0, 0), (0b0101, 2)]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // High-rank queries: the below-pos rank count is the substance the
+        // kernel must compute (a rank-dropping impl diverges here).
+        &[(0xF, 3), (0xFFFF_FFFF, 31)]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken: omits the rank computation, reporting only flag presence.
+        let flags = s & 0xFFFF_FFFF;
+        let pos = i & 0x1F;
+        let bit_set = (flags >> pos) & 1;
+        bit_set << 8
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                biome_class_selected(s, i),
+                biome_class_selected_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                biome_class_selected(s, i),
+                biome_class_selected_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != biome_class_selected_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

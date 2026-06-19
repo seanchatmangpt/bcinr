@@ -91,6 +91,50 @@ mod tests {
         assert_eq!(out3 & 0xFFFF, 200);
         assert_eq!((out3 >> 16) & 0xFF, 0);
     }
+
+    // Two-sided breed-rigor battery.
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-domain: request fits within the MTU (no clamp, no overflow).
+        &[(100, 200), (200, 200)]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Out-of-domain: request exceeds the MTU and must be clamped down.
+        &[(300, 200), (65535, 1)]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken variant: omits the min() clamp, passing the request through unbounded.
+        let requested = (s & 0xFFFF) as u32;
+        let mtu = (i & 0xFFFF) as u32;
+        let o = (requested > mtu) as u64;
+        (requested as u64) | (o << 16)
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                payload_size_bounded(s, i),
+                payload_size_bounded_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                payload_size_bounded(s, i),
+                payload_size_bounded_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != payload_size_bounded_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

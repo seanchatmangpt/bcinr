@@ -103,6 +103,52 @@ mod tests {
         assert_eq!(out3 & 0xFF, 0);
         assert_eq!((out3 >> 8) & 0xFF, 1);
     }
+
+    // Two-sided breed-rigor battery.
+    fn must_admit() -> &'static [(u64, u64)] {
+        // In-domain: value sits inside or below the spec window [LSL, USL].
+        &[(50, 30 | (70 << 16)), (20, 30 | (70 << 16))]
+    }
+    fn must_refuse() -> &'static [(u64, u64)] {
+        // Out-of-domain: value strictly above USL, where the upper-bound check matters.
+        &[(80, 30 | (70 << 16)), (100, 30 | (70 << 16))]
+    }
+    fn weakened(s: u64, i: u64) -> u64 {
+        // Broken variant: drops the USL upper-bound clamp from in_spec.
+        let value = (s & 0xFFFF) as u32;
+        let lsl = (i & 0xFFFF) as u32;
+        let usl = ((i >> 16) & 0xFFFF) as u32;
+        let in_spec = (value >= lsl) as u64;
+        let dir = (value > usl) as u64;
+        (in_spec & 0xFF) | ((dir & 0xFF) << 8)
+    }
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(
+                ctq_threshold_evaluated(s, i),
+                ctq_threshold_evaluated_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(
+                ctq_threshold_evaluated(s, i),
+                ctq_threshold_evaluated_reference(s, i)
+            );
+        }
+    }
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != ctq_threshold_evaluated_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]

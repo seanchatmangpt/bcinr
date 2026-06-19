@@ -82,6 +82,62 @@ mod tests {
         // dist=5/tol=5 -> reached=1, remaining=0
         assert_eq!(waypoint_reached(5, 5), waypoint_reached_reference(5, 5));
     }
+
+    // --- two-sided breed-rigor battery ---
+
+    fn must_admit() -> &'static [(u64, u64)] {
+        &[
+            // Within tolerance: reached, remaining 0.
+            (5, 5),
+            // Beyond tolerance: not reached, positive remaining.
+            (100, 5),
+        ]
+    }
+
+    fn must_refuse() -> &'static [(u64, u64)] {
+        &[
+            // dist far below tol: remainder must FLOOR to 0, not underflow-wrap.
+            (0, 5),
+            // dist well under a large tol: floor still pins remaining to 0.
+            (3, 1000),
+        ]
+    }
+
+    // Weakened: raw dist - tol with no saturating floor, so under-tolerance
+    // distances wrap to a huge remainder instead of clamping to 0.
+    fn weakened(s: u64, i: u64) -> u64 {
+        let dist = (s & 0xFFFF_FFFF) as u32;
+        let tol = (i & 0xFFFF_FFFF) as u32;
+        let tol_lt_dist = lt_mask_u32(tol, dist);
+        let reached = ((!tol_lt_dist) & 1) as u64;
+        // BUG: no .max(0) floor — i64 difference can go negative and wrap.
+        let remaining = (dist as i64 - tol as i64) as u64 & 0xFFFF_FFFF;
+        reached | (remaining << 8)
+    }
+
+    #[test]
+    fn corpus_admit_matches_oracle() {
+        for &(s, i) in must_admit() {
+            assert_eq!(waypoint_reached(s, i), waypoint_reached_reference(s, i));
+        }
+    }
+
+    #[test]
+    fn corpus_refuse_matches_oracle() {
+        for &(s, i) in must_refuse() {
+            assert_eq!(waypoint_reached(s, i), waypoint_reached_reference(s, i));
+        }
+    }
+
+    #[test]
+    fn weakened_fails_refuse_corpus() {
+        assert!(
+            must_refuse()
+                .iter()
+                .any(|&(s, i)| weakened(s, i) != waypoint_reached_reference(s, i)),
+            "a weakened impl must diverge from the oracle on >=1 refuse case"
+        );
+    }
 }
 
 #[cfg(feature = "bench")]
