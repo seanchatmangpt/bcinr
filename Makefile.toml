@@ -93,6 +93,22 @@ workspace = false
 command = "cargo"
 args = ["run", "--manifest-path", "tools/bcinr-contract-gate/Cargo.toml", "--release", "--quiet"]
 
+[tasks.wasm-check]
+category = "Build"
+description = "Compile the wasm4games alloc-free core to wasm32 (requires the target)"
+workspace = false
+command = "cargo"
+args = ["build", "-p", "wasm4games", "--target", "wasm32-unknown-unknown", "--no-default-features"]
+
+[tasks.ggen-sync]
+category = "Codegen"
+description = "Regenerate wasm4games kernels via ggen, then format (developer-only; requires ggen)"
+workspace = false
+script = [
+    "cd crates/wasm4games/ggen && ggen sync",
+    "cargo fmt -p wasm4games",
+]
+
 [tasks.ci]
 category = "CI"
 description = "Comprehensive CI pipeline"
