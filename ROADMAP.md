@@ -79,6 +79,16 @@ targets; `wasm4pm` admits the evidence each platform emits.
 - Roblox verified maneuver → UE5 unlocks a cinematic sortie ("Doctrine: Encirclement admitted").
 - UE5 physics feat (e.g. overheating under high-thrust) → Minecraft unlocks a heat-sink recipe.
 
+### Server / enterprise layer (Java)
+
+ggen can also generate the server **control plane**, not just kernels: Java virtual-thread
+orchestration, platform gateways, session/match services, evidence/receipt services, and
+wasm4pm admission packs — `wasm4games` owns the branchless authority, Java owns coordination.
+JDK selection follows Chesterton's Fence: a **Java 21/25 LTS** baseline plus a separate
+`java-server-27` future-conformance target justified by Java-27-only fences (chiefly **JEP 527
+PQ-hybrid TLS** for evidence transport), not by virtual threads/FFM (which are older). Full
+detail: [Server / Enterprise Architecture](docs/diataxis/explanation/wasm4games-server-architecture.md).
+
 ### Commercial posture
 
 Fund the **canon/law stack**, not one game: it projects into whichever platform an audience
