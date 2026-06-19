@@ -45,9 +45,15 @@ mod tests {
             cost as u64
         }
     }
-    fn mutant_1(s: u64, i: u64) -> u64 { !path_cost_bounded_reference(s, i) }
-    fn mutant_2(s: u64, i: u64) -> u64 { path_cost_bounded_reference(s, i).wrapping_add(1) }
-    fn mutant_3(s: u64, i: u64) -> u64 { path_cost_bounded_reference(s, i) ^ 0xFFFF }
+    fn mutant_1(s: u64, i: u64) -> u64 {
+        !path_cost_bounded_reference(s, i)
+    }
+    fn mutant_2(s: u64, i: u64) -> u64 {
+        path_cost_bounded_reference(s, i).wrapping_add(1)
+    }
+    fn mutant_3(s: u64, i: u64) -> u64 {
+        path_cost_bounded_reference(s, i) ^ 0xFFFF
+    }
 
     proptest! {
         #[test] fn equivalence(s in any::<u64>(), i in any::<u64>()) {
@@ -70,11 +76,20 @@ mod tests {
     #[test]
     fn boundaries() {
         // cost=50/budget=100 -> clamped=50, over=0
-        assert_eq!(path_cost_bounded(50, 100), path_cost_bounded_reference(50, 100));
+        assert_eq!(
+            path_cost_bounded(50, 100),
+            path_cost_bounded_reference(50, 100)
+        );
         // cost=150/budget=100 -> clamped=100, over=1
-        assert_eq!(path_cost_bounded(150, 100), path_cost_bounded_reference(150, 100));
+        assert_eq!(
+            path_cost_bounded(150, 100),
+            path_cost_bounded_reference(150, 100)
+        );
         // cost=100/budget=100 -> clamped=100, over=0
-        assert_eq!(path_cost_bounded(100, 100), path_cost_bounded_reference(100, 100));
+        assert_eq!(
+            path_cost_bounded(100, 100),
+            path_cost_bounded_reference(100, 100)
+        );
     }
 }
 

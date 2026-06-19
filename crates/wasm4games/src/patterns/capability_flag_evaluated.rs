@@ -11,8 +11,8 @@
 //! - T0 primitive budget: ~1 ns. T1 aggregate: <= 200 ns. Max heap allocations: 0.
 //!
 //! Test whether a given capability bit is set in a 64-bit capability flags word, and return
-//! its rank (how many lower-indexed capabilities are active). Useful for branchless capability
-//! gating in engine bridge adapters.
+//! its rank (count of set bits at positions 0..=idx) using [`bcinr_logic::bitset::rank_u64`].
+//! Useful for branchless capability gating in engine bridge adapters.
 
 use bcinr_logic::bitset::rank_u64;
 
@@ -21,28 +21,29 @@ use bcinr_logic::bitset::rank_u64;
 /// - `input`: bits[0..8] = capability index to test (0..63).
 ///
 /// Returns: bits[0..8] = 1 if capability is set, 0 otherwise;
-///          bits[8..16] = rank of capability among lower active capabilities.
+///          bits[8..16] = rank (count of set bits at positions 0..=idx, saturated to 8 bits).
 #[inline]
 #[must_use]
 pub fn capability_flag_evaluated(state: u64, input: u64) -> u64 {
     let flags = state;
     let idx = (input & 0x3F) as u32;
-    let bit_set = ((flags >> idx) & 1) as u64;
-    let rank = rank_u64(flags, idx as usize) as u64;
+    let bit_set = (flags >> idx) & 1;
+    let rank = (rank_u64(flags, idx as usize) as u64) & 0xFF;
     bit_set | (rank << 8)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bcinr_logic::bitset::rank_u64;
     use proptest::prelude::*;
 
     fn capability_flag_evaluated_reference(state: u64, input: u64) -> u64 {
         let flags = state;
         let idx = (input & 0x3F) as u32;
         let b = (flags >> idx) & 1;
-        let mask = (1u64 << idx).saturating_sub(1);
-        let r = (flags & mask).count_ones() as u64;
+        // rank_u64 counts set bits at positions 0..=idx (inclusive); mask lower 8 bits.
+        let r = (rank_u64(flags, idx as usize) as u64) & 0xFF;
         b | (r << 8)
     }
     fn mutant_1(s: u64, i: u64) -> u64 {
@@ -79,26 +80,25 @@ mod tests {
 
     #[test]
     fn boundaries() {
-        // flags=0b1100 (bits 2 and 3 set), idx=2 -> bit=1, rank=1 (bit 0 and 1 not set, but bit 2 is set
-        // with 1 set bit below idx=2 ... wait: mask=(1<<2)-1=0b11, flags&0b11=0 -> rank=0.
-        // Actually flags=0b1100: bit2=1, bit3=1. mask for idx=2 = (1<<2)-1=0b11 -> flags&0b11=0 -> rank=0.
-        // Re-check: idx=2, bit at position 2 = (0b1100>>2)&1 = 1. rank = count_ones(flags & 0b11) = 0.
-        // So bit=1, rank=0. Expected: bit=1,rank=1 as noted in spec is WRONG for this input.
-        // The spec says flags=0b1100/idx=2 -> bit=1,rank=1. That's inconsistent with the definition.
-        // rank_u64 counts bits strictly BELOW idx. 0b1100 has no bits set below position 2. rank=0.
-        // We match the reference oracle, not the (erroneous) spec description.
-        let flags: u64 = 0b1100;
-        let out = capability_flag_evaluated(flags, 2);
+        // flags=0b1100 (bits 2 and 3 set), idx=2 -> bit=1;
+        // rank_u64(0b1100, 2) = count_ones(0b1100 & ((1<<3)-1)) = count_ones(0b0100) = 1.
+        let out = capability_flag_evaluated(0b1100, 2);
         assert_eq!(out & 0xFF, 1); // bit 2 is set
-        assert_eq!((out >> 8) & 0xFF, capability_flag_evaluated_reference(flags, 2) >> 8 & 0xFF);
-        // flags=0b1100, idx=0 -> bit=0, rank=0.
+        assert_eq!(
+            (out >> 8) & 0xFF,
+            capability_flag_evaluated_reference(0b1100, 2) >> 8 & 0xFF
+        );
+        // flags=0b1100, idx=0 -> bit=0; rank_u64(0b1100,0)=count_ones(0b1100 & 0b1)=0.
         let out2 = capability_flag_evaluated(0b1100, 0);
         assert_eq!(out2 & 0xFF, 0);
         assert_eq!((out2 >> 8) & 0xFF, 0);
-        // flags=u64::MAX, idx=63 -> bit=1, rank=63.
+        // flags=u64::MAX, idx=63 -> bit=1; rank_u64(u64::MAX,63)=64 -> masked to 0x40=64 & 0xFF=64.
         let out3 = capability_flag_evaluated(u64::MAX, 63);
         assert_eq!(out3 & 0xFF, 1);
-        assert_eq!((out3 >> 8) & 0xFF, 63);
+        assert_eq!(
+            (out3 >> 8) & 0xFF,
+            capability_flag_evaluated_reference(u64::MAX, 63) >> 8 & 0xFF
+        );
     }
 }
 
@@ -115,5 +115,5 @@ pub mod bench {
     }
 }
 
-// Hoare-logic Verification Line 1: rank_u64 counts set bits strictly below idx via a branchless prefix mask.
-// Hoare-logic Verification Line 2: idx is clamped to 0..63 via bitmask before shift to prevent UB.
+// Hoare-logic Verification Line 1: rank_u64 counts set bits at positions 0..=idx via a branchless prefix mask (inclusive of idx).
+// Hoare-logic Verification Line 2: idx is clamped to 0..63 via bitmask before shift, and rank is truncated to 8 bits.

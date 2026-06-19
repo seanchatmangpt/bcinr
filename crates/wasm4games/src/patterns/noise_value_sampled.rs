@@ -25,8 +25,8 @@ use bcinr_logic::patterns::integrity_receipt::DeterministicSubstrateReceipt;
 #[must_use]
 pub fn noise_value_sampled(state: u64, input: u64) -> u64 {
     let seed = state & 0xFFFF_FFFF;
-    let x = (input & 0xFFFF) as u64;
-    let y = ((input >> 16) & 0xFFFF) as u64;
+    let x = input & 0xFFFF;
+    let y = (input >> 16) & 0xFFFF;
     let mut r = DeterministicSubstrateReceipt::new();
     r.record(seed, x, y);
     r.finalize() & 0xFF
@@ -40,8 +40,8 @@ mod tests {
     fn noise_value_sampled_reference(state: u64, input: u64) -> u64 {
         use bcinr_logic::patterns::integrity_receipt::DeterministicSubstrateReceipt;
         let seed = state & 0xFFFF_FFFF;
-        let x = (input & 0xFFFF) as u64;
-        let y = ((input >> 16) & 0xFFFF) as u64;
+        let x = input & 0xFFFF;
+        let y = (input >> 16) & 0xFFFF;
         let mut r = DeterministicSubstrateReceipt::new();
         r.record(seed, x, y);
         r.finalize() & 0xFF

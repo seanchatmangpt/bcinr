@@ -76,9 +76,15 @@ mod tests {
     #[test]
     fn boundaries() {
         // vol=100/rate=20 -> 80, silent=0
-        assert_eq!(audio_fade_applied(100, 20), audio_fade_applied_reference(100, 20));
+        assert_eq!(
+            audio_fade_applied(100, 20),
+            audio_fade_applied_reference(100, 20)
+        );
         // vol=10/rate=20 -> 0, silent=1
-        assert_eq!(audio_fade_applied(10, 20), audio_fade_applied_reference(10, 20));
+        assert_eq!(
+            audio_fade_applied(10, 20),
+            audio_fade_applied_reference(10, 20)
+        );
         // vol=0/rate=5 -> 0, silent=1
         assert_eq!(audio_fade_applied(0, 5), audio_fade_applied_reference(0, 5));
     }

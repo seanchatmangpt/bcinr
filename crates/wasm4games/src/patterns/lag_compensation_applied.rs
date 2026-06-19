@@ -90,7 +90,7 @@ mod tests {
         assert_eq!(lag_compensation_applied(s2, i2), 0);
 
         // pos=200, vel=0, lag=99 -> 200 - 0*99 = 200
-        let s3 = 200u64 | (0u64 << 16);
+        let s3 = 200u64;
         let i3 = 99u64;
         assert_eq!(lag_compensation_applied(s3, i3), 200);
     }

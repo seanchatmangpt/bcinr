@@ -23,11 +23,11 @@ use bcinr_logic::fix::clamp_u32;
 #[inline]
 #[must_use]
 pub fn defect_rate_quantized(state: u64, input: u64) -> u64 {
-    let defects = (state & 0xFFFF_FFFF) as u64;
+    let defects = state & 0xFFFF_FFFF;
     // Ensure sample >= 1 branchlessly: (sample | (sample == 0) as u64) gives 1 when 0.
-    let raw_sample = (input & 0xFFFF_FFFF) as u64;
+    let raw_sample = input & 0xFFFF_FFFF;
     let is_zero = ((raw_sample == 0) as u64).wrapping_neg(); // all-ones if zero
-    let sample = raw_sample | (is_zero & 1u64);              // substitute 1 when zero
+    let sample = raw_sample | (is_zero & 1u64); // substitute 1 when zero
     let rate = (defects.saturating_mul(1_000_000)) / sample;
     let clamped = clamp_u32(rate.min(1_000_000) as u32, 0, 1_000_000);
     (clamped as u64) & 0xFFFF_FFFF
@@ -39,8 +39,8 @@ mod tests {
     use proptest::prelude::*;
 
     fn defect_rate_quantized_reference(state: u64, input: u64) -> u64 {
-        let defects = (state & 0xFFFF_FFFF) as u64;
-        let raw_sample = (input & 0xFFFF_FFFF) as u64;
+        let defects = state & 0xFFFF_FFFF;
+        let raw_sample = input & 0xFFFF_FFFF;
         let sample = if raw_sample == 0 { 1u64 } else { raw_sample };
         let rate = (defects * 1_000_000) / sample;
         rate.min(1_000_000) & 0xFFFF_FFFF

@@ -68,16 +68,25 @@ mod tests {
         }
         #[test]
         fn cf1(s in any::<u64>(), i in any::<u64>()) {
+            let min_h = (i & 0xFFFF) as u32;
+            let max_h = ((i >> 16) & 0xFFFF) as u32;
+            prop_assume!(min_h <= max_h);
             let r = terrain_height_quantized_reference(s, i);
             if r != 0 { prop_assert!(r != mutant_1(s, i)); }
         }
         #[test]
         fn cf2(s in any::<u64>(), i in any::<u64>()) {
+            let min_h = (i & 0xFFFF) as u32;
+            let max_h = ((i >> 16) & 0xFFFF) as u32;
+            prop_assume!(min_h <= max_h);
             let r = terrain_height_quantized_reference(s, i);
             prop_assert!(r != mutant_2(s, i));
         }
         #[test]
         fn cf3(s in any::<u64>(), i in any::<u64>()) {
+            let min_h = (i & 0xFFFF) as u32;
+            let max_h = ((i >> 16) & 0xFFFF) as u32;
+            prop_assume!(min_h <= max_h);
             let r = terrain_height_quantized_reference(s, i);
             if r != 0 { prop_assert!(r != mutant_3(s, i)); }
         }

@@ -13,8 +13,6 @@
 //! Test whether a specific condition flag is set in a 32-bit flags bitset and return its
 //! rank among active flags. Useful for branchless prerequisite checks in dialogue systems.
 
-use bcinr_logic::bitset::rank_u64;
-
 /// ConditionFlagEvaluated kernel. Packed-u64 ABI:
 /// - `state`: bits[0..32] = condition flags bitset (32 flags).
 /// - `input`: bits[0..8] = flag index to test (0..31).
@@ -24,9 +22,10 @@ use bcinr_logic::bitset::rank_u64;
 #[must_use]
 pub fn condition_flag_evaluated(state: u64, input: u64) -> u64 {
     let flags = state & 0xFFFF_FFFF;
-    let idx = (input & 0x1F) as u32;
-    let bit_set = ((flags >> idx) & 1) as u64;
-    let rank = rank_u64(flags, idx as usize) as u64;
+    let idx = input & 0x1F; // 5-bit index; safe to shift
+    let bit_set = (flags >> idx) & 1;
+    // Count set bits strictly below idx (rank_u64 is inclusive so use mask directly).
+    let rank = (flags & (1u64 << idx).wrapping_sub(1)).count_ones() as u64;
     bit_set | (rank << 8)
 }
 
@@ -42,9 +41,15 @@ mod tests {
         let r = (flags & ((1u64 << idx).wrapping_sub(1))).count_ones() as u64;
         b | (r << 8)
     }
-    fn mutant_1(s: u64, i: u64) -> u64 { !condition_flag_evaluated_reference(s, i) }
-    fn mutant_2(s: u64, i: u64) -> u64 { condition_flag_evaluated_reference(s, i).wrapping_add(1) }
-    fn mutant_3(s: u64, i: u64) -> u64 { condition_flag_evaluated_reference(s, i) ^ 0xFFFF }
+    fn mutant_1(s: u64, i: u64) -> u64 {
+        !condition_flag_evaluated_reference(s, i)
+    }
+    fn mutant_2(s: u64, i: u64) -> u64 {
+        condition_flag_evaluated_reference(s, i).wrapping_add(1)
+    }
+    fn mutant_3(s: u64, i: u64) -> u64 {
+        condition_flag_evaluated_reference(s, i) ^ 0xFFFF
+    }
 
     proptest! {
         #[test]
@@ -71,7 +76,7 @@ mod tests {
     #[test]
     fn boundaries() {
         // flags=0b1010, idx=1 -> bit=1, rank=0 (no set bits below index 1)
-        assert_eq!(condition_flag_evaluated(0b1010, 1), 1 | (0 << 8));
+        assert_eq!(condition_flag_evaluated(0b1010, 1), 1);
         // flags=0b1010, idx=3 -> bit=1, rank=1 (bit 1 is set below index 3)
         assert_eq!(condition_flag_evaluated(0b1010, 3), 1 | (1 << 8));
         // flags=0, idx=0 -> bit=0, rank=0

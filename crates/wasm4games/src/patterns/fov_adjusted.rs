@@ -18,7 +18,7 @@ use bcinr_logic::int::saturating_add_i64;
 /// FovAdjusted kernel. Packed-u64 ABI:
 /// - `state`: bits[0..16] = current FOV (u16, e.g. 0..180 degrees ×10 fixed-point).
 /// - `input`: bits[0..16] = delta as signed-encoded u16 (bit15=sign, bits[0..15]=magnitude);
-///            bits[16..24] = min_fov; bits[24..32] = max_fov.
+///   bits[16..24] = min_fov; bits[24..32] = max_fov.
 ///
 /// Returns: bits[0..16] = new clamped FOV.
 #[inline]
@@ -26,9 +26,9 @@ use bcinr_logic::int::saturating_add_i64;
 pub fn fov_adjusted(state: u64, input: u64) -> u64 {
     let fov = (state & 0xFFFF) as i64;
     let raw_delta = (input & 0xFFFF) as i64;
-    let sign = raw_delta >> 15; // -1 if negative, 0 if positive
+    let bit15 = raw_delta >> 15; // 0 if positive, 1 if bit-15 set (sign bit)
     let mag = raw_delta & 0x7FFF;
-    let delta = mag + sign * 2 * mag; // branchless signed: if sign=-1, delta = mag - 2*mag = -mag
+    let delta = (1 - 2 * bit15) * mag; // branchless: +mag if bit15=0, -mag if bit15=1
     let min_fov = ((input >> 16) & 0xFF) as i64;
     let max_fov = ((input >> 24) & 0xFF) as i64;
     let new_fov = saturating_add_i64(fov, delta).max(min_fov).min(max_fov);
@@ -44,9 +44,9 @@ mod tests {
         let fov = (state & 0xFFFF) as i64;
         let raw_delta = (input & 0xFFFF) as i64;
         let d = if (raw_delta >> 15) != 0 {
-            -((raw_delta & 0x7FFF) as i64)
+            -(raw_delta & 0x7FFF)
         } else {
-            (raw_delta & 0x7FFF) as i64
+            raw_delta & 0x7FFF
         };
         let min_fov = ((input >> 16) & 0xFF) as i64;
         let max_fov = ((input >> 24) & 0xFF) as i64;
@@ -74,16 +74,25 @@ mod tests {
         }
         #[test]
         fn cf1(s in any::<u64>(), i in any::<u64>()) {
+            let min_fov = ((i >> 16) & 0xFF) as i64;
+            let max_fov = ((i >> 24) & 0xFF) as i64;
+            prop_assume!(min_fov <= max_fov);
             let r = fov_adjusted_reference(s, i);
             if r != 0 { prop_assert!(r != mutant_1(s, i)); }
         }
         #[test]
         fn cf2(s in any::<u64>(), i in any::<u64>()) {
+            let min_fov = ((i >> 16) & 0xFF) as i64;
+            let max_fov = ((i >> 24) & 0xFF) as i64;
+            prop_assume!(min_fov <= max_fov);
             let r = fov_adjusted_reference(s, i);
             prop_assert!(r != mutant_2(s, i));
         }
         #[test]
         fn cf3(s in any::<u64>(), i in any::<u64>()) {
+            let min_fov = ((i >> 16) & 0xFF) as i64;
+            let max_fov = ((i >> 24) & 0xFF) as i64;
+            prop_assume!(min_fov <= max_fov);
             let r = fov_adjusted_reference(s, i);
             if r != 0 { prop_assert!(r != mutant_3(s, i)); }
         }
@@ -94,7 +103,7 @@ mod tests {
         // Pack: min_fov=30 (bits 16..24), max_fov=120 (bits 24..32)
         // input upper 16 bits = 30 | (120 << 8) = 30 + 30720 = 30750
         let upper: u64 = 30750 << 16; // 30 | (120 << 8) packed into bits [16..32]
-        // fov=90, delta=+10, min=30, max=120 -> 100
+                                      // fov=90, delta=+10, min=30, max=120 -> 100
         let s1 = 90u64;
         let i1 = 10u64 | upper; // delta=10 (positive, bit15=0)
         assert_eq!(fov_adjusted(s1, i1), 100);

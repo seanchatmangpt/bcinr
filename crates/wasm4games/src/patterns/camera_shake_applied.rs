@@ -24,10 +24,10 @@ use bcinr_logic::patterns::integrity_receipt::DeterministicSubstrateReceipt;
 #[inline]
 #[must_use]
 pub fn camera_shake_applied(state: u64, input: u64) -> u64 {
-    let tick = (state & 0xFFFF) as u64;
-    let seed = ((state >> 16) & 0xFFFF) as u64;
-    let max_amp = (input & 0xFF) as u64;
-    let intensity = ((input >> 8) & 0xFF) as u64;
+    let tick = state & 0xFFFF;
+    let seed = (state >> 16) & 0xFFFF;
+    let max_amp = input & 0xFF;
+    let intensity = (input >> 8) & 0xFF;
     let mut r = DeterministicSubstrateReceipt::new();
     r.record(tick, seed, intensity);
     let hash = r.finalize();
@@ -47,10 +47,10 @@ mod tests {
     use proptest::prelude::*;
 
     fn camera_shake_applied_reference(state: u64, input: u64) -> u64 {
-        let tick = (state & 0xFFFF) as u64;
-        let seed = ((state >> 16) & 0xFFFF) as u64;
-        let max_amp = (input & 0xFF) as u64;
-        let intensity = ((input >> 8) & 0xFF) as u64;
+        let tick = state & 0xFFFF;
+        let seed = (state >> 16) & 0xFFFF;
+        let max_amp = input & 0xFF;
+        let intensity = (input >> 8) & 0xFF;
         let mut r = DeterministicSubstrateReceipt::new();
         r.record(tick, seed, intensity);
         let hash = r.finalize();
@@ -102,7 +102,10 @@ mod tests {
         let s1 = 0u64; // tick=0, seed=0
         let s2 = 1u64; // tick=1, seed=0
         let inp = 10u64 | (128u64 << 8); // max_amp=10, intensity=128
-        assert_eq!(camera_shake_applied(s1, inp), camera_shake_applied_reference(s1, inp));
+        assert_eq!(
+            camera_shake_applied(s1, inp),
+            camera_shake_applied_reference(s1, inp)
+        );
         assert_ne!(camera_shake_applied(s1, inp), camera_shake_applied(s2, inp));
         // Idempotency: same inputs twice -> same output.
         assert_eq!(camera_shake_applied(s2, inp), camera_shake_applied(s2, inp));

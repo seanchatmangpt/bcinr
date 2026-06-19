@@ -39,7 +39,9 @@ mod tests {
         let max_vol = (state & 0xFF) as u32;
         let atten = ((state >> 8) & 0xFF) as u32;
         let dist = (input & 0xFFFF) as u32;
-        max_vol.saturating_sub(atten.saturating_mul(dist)).min(max_vol) as u64
+        max_vol
+            .saturating_sub(atten.saturating_mul(dist))
+            .min(max_vol) as u64
     }
     fn mutant_1(s: u64, i: u64) -> u64 {
         !audio_distance_attenuated_reference(s, i)
@@ -76,14 +78,20 @@ mod tests {
     #[test]
     fn boundaries() {
         // max=200/atten=2/dist=10 -> 180
-        assert_eq!(audio_distance_attenuated(200 | (2 << 8), 10),
-                   audio_distance_attenuated_reference(200 | (2 << 8), 10));
+        assert_eq!(
+            audio_distance_attenuated(200 | (2 << 8), 10),
+            audio_distance_attenuated_reference(200 | (2 << 8), 10)
+        );
         // max=200/atten=2/dist=200 -> 0
-        assert_eq!(audio_distance_attenuated(200 | (2 << 8), 200),
-                   audio_distance_attenuated_reference(200 | (2 << 8), 200));
+        assert_eq!(
+            audio_distance_attenuated(200 | (2 << 8), 200),
+            audio_distance_attenuated_reference(200 | (2 << 8), 200)
+        );
         // max=100/atten=0/dist=999 -> 100
-        assert_eq!(audio_distance_attenuated(100 | (0 << 8), 999),
-                   audio_distance_attenuated_reference(100 | (0 << 8), 999));
+        assert_eq!(
+            audio_distance_attenuated(100, 999),
+            audio_distance_attenuated_reference(100, 999)
+        );
     }
 }
 

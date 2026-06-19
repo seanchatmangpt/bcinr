@@ -43,9 +43,15 @@ mod tests {
         let nc = cooldown.saturating_sub(delta);
         nc as u64 | (((nc == 0) as u64) << 16)
     }
-    fn mutant_1(s: u64, i: u64) -> u64 { !dialogue_cooldown_bounded_reference(s, i) }
-    fn mutant_2(s: u64, i: u64) -> u64 { dialogue_cooldown_bounded_reference(s, i).wrapping_add(1) }
-    fn mutant_3(s: u64, i: u64) -> u64 { dialogue_cooldown_bounded_reference(s, i) ^ 0xFFFF }
+    fn mutant_1(s: u64, i: u64) -> u64 {
+        !dialogue_cooldown_bounded_reference(s, i)
+    }
+    fn mutant_2(s: u64, i: u64) -> u64 {
+        dialogue_cooldown_bounded_reference(s, i).wrapping_add(1)
+    }
+    fn mutant_3(s: u64, i: u64) -> u64 {
+        dialogue_cooldown_bounded_reference(s, i) ^ 0xFFFF
+    }
 
     proptest! {
         #[test]
@@ -72,11 +78,11 @@ mod tests {
     #[test]
     fn boundaries() {
         // cooldown=10, delta=3 -> new_cd=7, ready=0
-        assert_eq!(dialogue_cooldown_bounded(10, 3), 7u64 | (0u64 << 16));
+        assert_eq!(dialogue_cooldown_bounded(10, 3), 7u64);
         // cooldown=3, delta=10 -> new_cd=0, ready=1
-        assert_eq!(dialogue_cooldown_bounded(3, 10), 0u64 | (1u64 << 16));
+        assert_eq!(dialogue_cooldown_bounded(3, 10), (1u64 << 16));
         // cooldown=0, delta=5 -> new_cd=0, ready=1
-        assert_eq!(dialogue_cooldown_bounded(0, 5), 0u64 | (1u64 << 16));
+        assert_eq!(dialogue_cooldown_bounded(0, 5), (1u64 << 16));
     }
 }
 

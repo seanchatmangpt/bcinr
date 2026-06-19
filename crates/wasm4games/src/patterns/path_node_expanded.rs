@@ -50,9 +50,15 @@ mod tests {
             (curr_cost as u64) | ((curr_id as u64) << 32)
         }
     }
-    fn mutant_1(s: u64, i: u64) -> u64 { !path_node_expanded_reference(s, i) }
-    fn mutant_2(s: u64, i: u64) -> u64 { path_node_expanded_reference(s, i).wrapping_add(1) }
-    fn mutant_3(s: u64, i: u64) -> u64 { path_node_expanded_reference(s, i) ^ 0xFFFF }
+    fn mutant_1(s: u64, i: u64) -> u64 {
+        !path_node_expanded_reference(s, i)
+    }
+    fn mutant_2(s: u64, i: u64) -> u64 {
+        path_node_expanded_reference(s, i).wrapping_add(1)
+    }
+    fn mutant_3(s: u64, i: u64) -> u64 {
+        path_node_expanded_reference(s, i) ^ 0xFFFF
+    }
 
     proptest! {
         #[test] fn equivalence(s in any::<u64>(), i in any::<u64>()) {
@@ -77,15 +83,24 @@ mod tests {
         // curr=10/cand=20: curr wins (cost=10, id from state)
         let state_a = 10u64 | (7u64 << 32);
         let input_a = 20u64 | (99u64 << 32);
-        assert_eq!(path_node_expanded(state_a, input_a), path_node_expanded_reference(state_a, input_a));
+        assert_eq!(
+            path_node_expanded(state_a, input_a),
+            path_node_expanded_reference(state_a, input_a)
+        );
         // curr=20/cand=10: cand wins (cost=10, id from input)
         let state_b = 20u64 | (7u64 << 32);
         let input_b = 10u64 | (99u64 << 32);
-        assert_eq!(path_node_expanded(state_b, input_b), path_node_expanded_reference(state_b, input_b));
+        assert_eq!(
+            path_node_expanded(state_b, input_b),
+            path_node_expanded_reference(state_b, input_b)
+        );
         // tie: curr keeps (cost=10, id from state)
         let state_c = 10u64 | (7u64 << 32);
         let input_c = 10u64 | (99u64 << 32);
-        assert_eq!(path_node_expanded(state_c, input_c), path_node_expanded_reference(state_c, input_c));
+        assert_eq!(
+            path_node_expanded(state_c, input_c),
+            path_node_expanded_reference(state_c, input_c)
+        );
     }
 }
 
@@ -95,7 +110,12 @@ pub mod bench {
     use criterion::{black_box, Criterion};
     pub fn bench_path_node_expanded(c: &mut Criterion) {
         c.bench_function("path_node_expanded", |b| {
-            b.iter(|| black_box(path_node_expanded(black_box(10u64 | (7u64 << 32)), black_box(20u64 | (99u64 << 32)))))
+            b.iter(|| {
+                black_box(path_node_expanded(
+                    black_box(10u64 | (7u64 << 32)),
+                    black_box(20u64 | (99u64 << 32)),
+                ))
+            })
         });
     }
 }

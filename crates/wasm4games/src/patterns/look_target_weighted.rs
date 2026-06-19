@@ -91,12 +91,12 @@ mod tests {
         let out = look_target_weighted(s, i);
         assert_eq!(out & 0xFFFF, 7); // primary target id
         assert_eq!((out >> 16) & 0xFFFF, 10); // primary weight
-        // pw=5, sw=10 -> secondary wins (st).
+                                              // pw=5, sw=10 -> secondary wins (st).
         let s2 = 5u64 | (10u64 << 16);
         let out2 = look_target_weighted(s2, i);
         assert_eq!(out2 & 0xFFFF, 9); // secondary target id
         assert_eq!((out2 >> 16) & 0xFFFF, 10); // secondary weight
-        // pw=10, sw=10 -> tie goes to primary.
+                                               // pw=10, sw=10 -> tie goes to primary.
         let s3 = 10u64 | (10u64 << 16);
         let out3 = look_target_weighted(s3, i);
         assert_eq!(out3 & 0xFFFF, 7); // primary target id

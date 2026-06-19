@@ -94,7 +94,10 @@ mod tests {
         // prev=100, curr=99, max=10 -> raw delta wraps: (99-100)&0xFFFF = 0xFFFF, bounded=10
         let s3 = 100u64;
         let i3 = 99u64 | (10u64 << 16);
-        assert_eq!(tick_delta_bounded(s3, i3), tick_delta_bounded_reference(s3, i3));
+        assert_eq!(
+            tick_delta_bounded(s3, i3),
+            tick_delta_bounded_reference(s3, i3)
+        );
     }
 }
 

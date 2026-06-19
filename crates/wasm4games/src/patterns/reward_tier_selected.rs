@@ -130,7 +130,7 @@ pub mod bench {
     use criterion::{black_box, Criterion};
 
     const STATE: u64 = 0b1111_1111; // 8 prestige flags set
-    const INPUT: u64 = 2;           // threshold = 2 per tier
+    const INPUT: u64 = 2; // threshold = 2 per tier
 
     pub fn bench_reward_tier_selected(c: &mut Criterion) {
         c.bench_function("reward_tier_selected", |b| {

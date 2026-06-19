@@ -85,9 +85,15 @@ mod tests {
         // vol=100/delta=20/dir=0 -> 120
         assert_eq!(volume_clamped(100, 20), volume_clamped_reference(100, 20));
         // vol=100/delta=20/dir=1 -> 80
-        assert_eq!(volume_clamped(100, 20 | (1 << 8)), volume_clamped_reference(100, 20 | (1 << 8)));
+        assert_eq!(
+            volume_clamped(100, 20 | (1 << 8)),
+            volume_clamped_reference(100, 20 | (1 << 8))
+        );
         // vol=10/delta=30/dir=1 -> 0 (floor)
-        assert_eq!(volume_clamped(10, 30 | (1 << 8)), volume_clamped_reference(10, 30 | (1 << 8)));
+        assert_eq!(
+            volume_clamped(10, 30 | (1 << 8)),
+            volume_clamped_reference(10, 30 | (1 << 8))
+        );
     }
 }
 

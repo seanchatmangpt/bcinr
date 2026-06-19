@@ -49,7 +49,13 @@ mod tests {
         let _ = input;
         let score = (state & 0xFF) as u32;
         let c = score.min(10);
-        let cat = if c < 7 { 0u32 } else if c < 9 { 1 } else { 2 };
+        let cat = if c < 7 {
+            0u32
+        } else if c < 9 {
+            1
+        } else {
+            2
+        };
         (c as u64) | ((cat as u64) << 8)
     }
     fn mutant_1(s: u64, i: u64) -> u64 {

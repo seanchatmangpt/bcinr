@@ -14,7 +14,7 @@
 //! boundary comparison. Four command families defined by thresholds [32, 64, 96] map
 //! to opcode classes 0/1/2/3. The original command type is packed into the upper byte.
 
-use bcinr_logic::mask::{lt_mask_u32, select_u32};
+use bcinr_logic::mask::lt_mask_u32;
 
 /// CommandOpcodeEncoded kernel. Packed-u64 ABI:
 /// - `state`: bits[0..8] = semantic command type (0..=127).
@@ -32,7 +32,7 @@ pub fn command_opcode_encoded(state: u64, input: u64) -> u64 {
     let ge32 = (!lt_mask_u32(cmd, 32) >> 31) as u32; // 1 if cmd >= 32
     let ge64 = (!lt_mask_u32(cmd, 64) >> 31) as u32; // 1 if cmd >= 64
     let ge96 = (!lt_mask_u32(cmd, 96) >> 31) as u32; // 1 if cmd >= 96
-    // opcode_class = number of thresholds crossed = 0, 1, 2, or 3.
+                                                     // opcode_class = number of thresholds crossed = 0, 1, 2, or 3.
     let opcode_class = ge32 + ge64 + ge96;
     (opcode_class as u64) | ((cmd as u64) << 8)
 }

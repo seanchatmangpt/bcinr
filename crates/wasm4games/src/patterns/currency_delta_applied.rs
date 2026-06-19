@@ -48,7 +48,7 @@ mod tests {
         } else {
             balance.saturating_add(magnitude)
         };
-        let clamped = new_balance.max(0).min(0xFFFF_FFFF);
+        let clamped = new_balance.clamp(0, 0xFFFF_FFFF);
         (clamped as u64) & 0xFFFF_FFFF
     }
     fn mutant_1(s: u64, i: u64) -> u64 {

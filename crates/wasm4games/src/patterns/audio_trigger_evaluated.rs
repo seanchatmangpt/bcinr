@@ -60,7 +60,7 @@ mod tests {
             (_, 2) => 2, // * + PAUSE -> PAUSED
             (_, 3) => 1, // * + RESUME -> PLAYING
             (_, 4) => 3, // * + FADE -> FADING
-            _      => 0,
+            _ => 0,
         };
         next as u64
     }

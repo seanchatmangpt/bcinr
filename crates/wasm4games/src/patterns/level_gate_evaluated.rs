@@ -98,7 +98,10 @@ mod tests {
         // level=3, required=5, ban=0 -> BLOCKED.
         assert_eq!(level_gate_evaluated(3, 5), status::BLOCKED as u64);
         // level=10, required=5, ban=1 -> REFUSED.
-        assert_eq!(level_gate_evaluated(10 | (1u64 << 8), 5), status::REFUSED as u64);
+        assert_eq!(
+            level_gate_evaluated(10 | (1u64 << 8), 5),
+            status::REFUSED as u64
+        );
     }
 }
 

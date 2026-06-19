@@ -33,29 +33,139 @@ pub mod replay_frame_recorded;
 pub mod semantic_lod_selected;
 pub mod share_artifact_generated;
 pub mod status_effect_ticked;
+// Phase 2 — ids 21-25: Pathfinding
+pub mod heuristic_distance_estimated;
+pub mod nav_state_advanced;
+pub mod path_cost_bounded;
+pub mod path_node_expanded;
+pub mod waypoint_reached;
+// Phase 2 — ids 26-30: Procedural Generation
+pub mod biome_class_selected;
+pub mod noise_value_sampled;
+pub mod spawn_weight_evaluated;
+pub mod terrain_height_quantized;
+pub mod tile_variant_selected;
+// Phase 2 — ids 31-35: Economy / Progression
+pub mod currency_delta_applied;
+pub mod level_gate_evaluated;
+pub mod purchase_admitted;
+pub mod reward_tier_selected;
+pub mod xp_threshold_crossed;
+// Phase 2 — ids 36-40: Narrative / Dialogue
+pub mod choice_weight_selected;
+pub mod condition_flag_evaluated;
+pub mod dialogue_cooldown_bounded;
+pub mod dialogue_node_advanced;
+pub mod narrative_branch_selected;
+// Phase 2 — ids 41-45: Camera
+pub mod camera_distance_clamped;
+pub mod camera_follow_lerped;
+pub mod camera_shake_applied;
+pub mod fov_adjusted;
+pub mod look_target_weighted;
+// Phase 2 — ids 46-50: Audio
+pub mod audio_distance_attenuated;
+pub mod audio_fade_applied;
+pub mod audio_priority_selected;
+pub mod audio_trigger_evaluated;
+pub mod volume_clamped;
+// Phase 2 — ids 51-55: Multiplayer / Network
+pub mod lag_compensation_applied;
+pub mod packet_priority_evaluated;
+pub mod prediction_error_bounded;
+pub mod sync_state_admitted;
+pub mod tick_delta_bounded;
+// Phase 2 — ids 56-60: DfLSS / Quality
+pub mod ctq_threshold_evaluated;
+pub mod defect_rate_quantized;
+pub mod nps_score_bounded;
+pub mod quality_gate_evaluated;
+pub mod sigma_level_computed;
+// Phase 2 — ids 61-65: Engine Bridge
+pub mod adapter_priority_ranked;
+pub mod bridge_state_transitioned;
+pub mod capability_flag_evaluated;
+pub mod command_opcode_encoded;
+pub mod payload_size_bounded;
+// Phase 2 — ids 66-70: AI Agent / Benchmark
+pub mod action_mask_applied;
+pub mod episode_return_bounded;
+pub mod observation_class_selected;
+pub mod policy_action_selected;
+pub mod reward_signal_clamped;
 
 // --- Kernel re-exports ----------------------------------------------------------------
 
 pub use aabb_collision_resolved::aabb_collision_resolved;
+pub use action_mask_applied::action_mask_applied;
+pub use adapter_priority_ranked::adapter_priority_ranked;
 pub use ai_action_selected::ai_action_selected;
+pub use audio_distance_attenuated::audio_distance_attenuated;
+pub use audio_fade_applied::audio_fade_applied;
+pub use audio_priority_selected::audio_priority_selected;
+pub use audio_trigger_evaluated::audio_trigger_evaluated;
+pub use biome_class_selected::biome_class_selected;
+pub use bridge_state_transitioned::bridge_state_transitioned;
+pub use camera_distance_clamped::camera_distance_clamped;
+pub use camera_follow_lerped::camera_follow_lerped;
+pub use camera_shake_applied::camera_shake_applied;
+pub use capability_flag_evaluated::capability_flag_evaluated;
+pub use choice_weight_selected::choice_weight_selected;
+pub use command_opcode_encoded::command_opcode_encoded;
+pub use condition_flag_evaluated::condition_flag_evaluated;
+pub use ctq_threshold_evaluated::ctq_threshold_evaluated;
+pub use currency_delta_applied::currency_delta_applied;
 pub use damage_applied::damage_applied;
+pub use defect_rate_quantized::defect_rate_quantized;
+pub use dialogue_cooldown_bounded::dialogue_cooldown_bounded;
+pub use dialogue_node_advanced::dialogue_node_advanced;
 pub use entity_state_transitioned::entity_state_transitioned;
+pub use episode_return_bounded::episode_return_bounded;
 pub use fixed_tick_advanced::fixed_tick_advanced;
+pub use fov_adjusted::fov_adjusted;
+pub use heuristic_distance_estimated::heuristic_distance_estimated;
 pub use input_admitted::input_admitted;
 pub use inventory_item_changed::inventory_item_changed;
+pub use lag_compensation_applied::lag_compensation_applied;
+pub use level_gate_evaluated::level_gate_evaluated;
+pub use look_target_weighted::look_target_weighted;
 pub use mastery_moment_detected::mastery_moment_detected;
+pub use narrative_branch_selected::narrative_branch_selected;
+pub use nav_state_advanced::nav_state_advanced;
+pub use noise_value_sampled::noise_value_sampled;
 pub use nps_prompt_gated::nps_prompt_gated;
+pub use nps_score_bounded::nps_score_bounded;
 pub use object_spawned::object_spawned;
+pub use observation_class_selected::observation_class_selected;
 pub use ocel_event_linked::ocel_event_linked;
 pub use otel_span_emitted::otel_span_emitted;
+pub use packet_priority_evaluated::packet_priority_evaluated;
+pub use path_cost_bounded::path_cost_bounded;
+pub use path_node_expanded::path_node_expanded;
+pub use payload_size_bounded::payload_size_bounded;
 pub use physics_value_rendered::physics_value_rendered;
+pub use policy_action_selected::policy_action_selected;
+pub use prediction_error_bounded::prediction_error_bounded;
 pub use projectile_advanced::projectile_advanced;
+pub use purchase_admitted::purchase_admitted;
+pub use quality_gate_evaluated::quality_gate_evaluated;
 pub use quest_step_advanced::quest_step_advanced;
 pub use receipt_appended::receipt_appended;
 pub use replay_frame_recorded::replay_frame_recorded;
+pub use reward_signal_clamped::reward_signal_clamped;
+pub use reward_tier_selected::reward_tier_selected;
 pub use semantic_lod_selected::semantic_lod_selected;
 pub use share_artifact_generated::share_artifact_generated;
+pub use sigma_level_computed::sigma_level_computed;
+pub use spawn_weight_evaluated::spawn_weight_evaluated;
 pub use status_effect_ticked::status_effect_ticked;
+pub use sync_state_admitted::sync_state_admitted;
+pub use terrain_height_quantized::terrain_height_quantized;
+pub use tick_delta_bounded::tick_delta_bounded;
+pub use tile_variant_selected::tile_variant_selected;
+pub use volume_clamped::volume_clamped;
+pub use waypoint_reached::waypoint_reached;
+pub use xp_threshold_crossed::xp_threshold_crossed;
 
 // --- Object-kind code map (stable; reused across patterns) ----------------------------
 
@@ -143,6 +253,47 @@ const QUEST: ObjectKind = ObjectKind {
     code: 0x0015,
     name: "quest",
 };
+// Phase 2 object kinds (ids 0x0016–0x001F)
+const NAV_NODE: ObjectKind = ObjectKind {
+    code: 0x0016,
+    name: "nav_node",
+};
+const TILE: ObjectKind = ObjectKind {
+    code: 0x0017,
+    name: "tile",
+};
+const TERRAIN: ObjectKind = ObjectKind {
+    code: 0x0018,
+    name: "terrain",
+};
+const NPC: ObjectKind = ObjectKind {
+    code: 0x0019,
+    name: "npc",
+};
+const CAMERA_OBJ: ObjectKind = ObjectKind {
+    code: 0x001A,
+    name: "camera",
+};
+const AUDIO_SOURCE: ObjectKind = ObjectKind {
+    code: 0x001B,
+    name: "audio_source",
+};
+const PEER: ObjectKind = ObjectKind {
+    code: 0x001C,
+    name: "peer",
+};
+const QUALITY_METRIC: ObjectKind = ObjectKind {
+    code: 0x001D,
+    name: "quality_metric",
+};
+const ENGINE_CMD: ObjectKind = ObjectKind {
+    code: 0x001E,
+    name: "engine_cmd",
+};
+const EPISODE: ObjectKind = ObjectKind {
+    code: 0x001F,
+    name: "episode",
+};
 
 // --- Per-pattern object slices --------------------------------------------------------
 
@@ -166,6 +317,66 @@ const OBJ_QUEST_STEP_ADVANCED: &[ObjectKind] = &[PLAYER, QUEST];
 const OBJ_MASTERY_MOMENT_DETECTED: &[ObjectKind] = &[PLAYER, SESSION];
 const OBJ_SHARE_ARTIFACT_GENERATED: &[ObjectKind] = &[PLAYER, ARTIFACT];
 const OBJ_NPS_PROMPT_GATED: &[ObjectKind] = &[PLAYER, PROMPT];
+// Phase 2 object slices — Pathfinding
+const OBJ_PATH_NODE_EXPANDED: &[ObjectKind] = &[NAV_NODE];
+const OBJ_WAYPOINT_REACHED: &[ObjectKind] = &[PLAYER, NAV_NODE];
+const OBJ_HEURISTIC_DISTANCE_ESTIMATED: &[ObjectKind] = &[NAV_NODE];
+const OBJ_PATH_COST_BOUNDED: &[ObjectKind] = &[NAV_NODE];
+const OBJ_NAV_STATE_ADVANCED: &[ObjectKind] = &[PLAYER, NAV_NODE];
+// Phase 2 object slices — Procedural Generation
+const OBJ_NOISE_VALUE_SAMPLED: &[ObjectKind] = &[WORLD];
+const OBJ_TILE_VARIANT_SELECTED: &[ObjectKind] = &[TILE];
+const OBJ_TERRAIN_HEIGHT_QUANTIZED: &[ObjectKind] = &[TERRAIN];
+const OBJ_SPAWN_WEIGHT_EVALUATED: &[ObjectKind] = &[ENTITY];
+const OBJ_BIOME_CLASS_SELECTED: &[ObjectKind] = &[TERRAIN];
+// Phase 2 object slices — Economy / Progression
+const OBJ_CURRENCY_DELTA_APPLIED: &[ObjectKind] = &[PLAYER];
+const OBJ_XP_THRESHOLD_CROSSED: &[ObjectKind] = &[PLAYER];
+const OBJ_LEVEL_GATE_EVALUATED: &[ObjectKind] = &[PLAYER];
+const OBJ_PURCHASE_ADMITTED: &[ObjectKind] = &[PLAYER, ITEM];
+const OBJ_REWARD_TIER_SELECTED: &[ObjectKind] = &[PLAYER];
+// Phase 2 object slices — Narrative / Dialogue
+const OBJ_DIALOGUE_NODE_ADVANCED: &[ObjectKind] = &[NPC, PLAYER];
+const OBJ_CONDITION_FLAG_EVALUATED: &[ObjectKind] = &[PLAYER];
+const OBJ_NARRATIVE_BRANCH_SELECTED: &[ObjectKind] = &[NPC];
+const OBJ_DIALOGUE_COOLDOWN_BOUNDED: &[ObjectKind] = &[PLAYER, NPC];
+const OBJ_CHOICE_WEIGHT_SELECTED: &[ObjectKind] = &[PLAYER];
+// Phase 2 object slices — Camera
+const OBJ_CAMERA_DISTANCE_CLAMPED: &[ObjectKind] = &[CAMERA_OBJ];
+const OBJ_LOOK_TARGET_WEIGHTED: &[ObjectKind] = &[CAMERA_OBJ, TARGET];
+const OBJ_FOV_ADJUSTED: &[ObjectKind] = &[CAMERA_OBJ];
+const OBJ_CAMERA_SHAKE_APPLIED: &[ObjectKind] = &[CAMERA_OBJ];
+const OBJ_CAMERA_FOLLOW_LERPED: &[ObjectKind] = &[CAMERA_OBJ, PLAYER];
+// Phase 2 object slices — Audio
+const OBJ_AUDIO_PRIORITY_SELECTED: &[ObjectKind] = &[AUDIO_SOURCE];
+const OBJ_VOLUME_CLAMPED: &[ObjectKind] = &[AUDIO_SOURCE];
+const OBJ_AUDIO_FADE_APPLIED: &[ObjectKind] = &[AUDIO_SOURCE];
+const OBJ_AUDIO_TRIGGER_EVALUATED: &[ObjectKind] = &[AUDIO_SOURCE, ENTITY];
+const OBJ_AUDIO_DISTANCE_ATTENUATED: &[ObjectKind] = &[AUDIO_SOURCE, PLAYER];
+// Phase 2 object slices — Multiplayer / Network
+const OBJ_TICK_DELTA_BOUNDED: &[ObjectKind] = &[PEER];
+const OBJ_LAG_COMPENSATION_APPLIED: &[ObjectKind] = &[PEER, PLAYER];
+const OBJ_PACKET_PRIORITY_EVALUATED: &[ObjectKind] = &[PEER];
+const OBJ_PREDICTION_ERROR_BOUNDED: &[ObjectKind] = &[PEER, PLAYER];
+const OBJ_SYNC_STATE_ADMITTED: &[ObjectKind] = &[PEER, SESSION];
+// Phase 2 object slices — DfLSS / Quality
+const OBJ_SIGMA_LEVEL_COMPUTED: &[ObjectKind] = &[QUALITY_METRIC];
+const OBJ_DEFECT_RATE_QUANTIZED: &[ObjectKind] = &[QUALITY_METRIC];
+const OBJ_CTQ_THRESHOLD_EVALUATED: &[ObjectKind] = &[QUALITY_METRIC];
+const OBJ_NPS_SCORE_BOUNDED: &[ObjectKind] = &[PROMPT, PLAYER];
+const OBJ_QUALITY_GATE_EVALUATED: &[ObjectKind] = &[QUALITY_METRIC];
+// Phase 2 object slices — Engine Bridge
+const OBJ_COMMAND_OPCODE_ENCODED: &[ObjectKind] = &[ENGINE_CMD];
+const OBJ_CAPABILITY_FLAG_EVALUATED: &[ObjectKind] = &[ENGINE_CMD, PLAYER];
+const OBJ_BRIDGE_STATE_TRANSITIONED: &[ObjectKind] = &[ENGINE_CMD];
+const OBJ_PAYLOAD_SIZE_BOUNDED: &[ObjectKind] = &[ENGINE_CMD];
+const OBJ_ADAPTER_PRIORITY_RANKED: &[ObjectKind] = &[ENGINE_CMD];
+// Phase 2 object slices — AI Agent / Benchmark
+const OBJ_REWARD_SIGNAL_CLAMPED: &[ObjectKind] = &[AGENT];
+const OBJ_POLICY_ACTION_SELECTED: &[ObjectKind] = &[AGENT];
+const OBJ_OBSERVATION_CLASS_SELECTED: &[ObjectKind] = &[AGENT];
+const OBJ_ACTION_MASK_APPLIED: &[ObjectKind] = &[AGENT, EPISODE];
+const OBJ_EPISODE_RETURN_BOUNDED: &[ObjectKind] = &[AGENT, EPISODE];
 
 /// The standard admission contract: admissible at [`status::ADMITTED`], refused with
 /// [`status::REFUSED`].
@@ -435,5 +646,665 @@ pub static PATTERN_REGISTRY: &[PatternSpec] = &[
         objects: OBJ_NPS_PROMPT_GATED,
         admission: STD_ADMISSION,
         otel_span: 0x0052,
+    },
+    // --- Phase 2: Pathfinding (ids 21-25, event codes 0x0053-0x0057) ---
+    PatternSpec {
+        id: PatternId(21),
+        name: "path_node_expanded",
+        lowering: LoweringKind::Mask,
+        state_card: 2,
+        event: EventKind {
+            code: 0x0053,
+            name: "PathNodeExpanded",
+        },
+        objects: OBJ_PATH_NODE_EXPANDED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0053,
+    },
+    PatternSpec {
+        id: PatternId(22),
+        name: "waypoint_reached",
+        lowering: LoweringKind::Saturating,
+        state_card: 16,
+        event: EventKind {
+            code: 0x0054,
+            name: "WaypointReached",
+        },
+        objects: OBJ_WAYPOINT_REACHED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0054,
+    },
+    PatternSpec {
+        id: PatternId(23),
+        name: "heuristic_distance_estimated",
+        lowering: LoweringKind::Mask,
+        state_card: 2,
+        event: EventKind {
+            code: 0x0055,
+            name: "HeuristicDistanceEstimated",
+        },
+        objects: OBJ_HEURISTIC_DISTANCE_ESTIMATED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0055,
+    },
+    PatternSpec {
+        id: PatternId(24),
+        name: "path_cost_bounded",
+        lowering: LoweringKind::Lut,
+        state_card: 8,
+        event: EventKind {
+            code: 0x0056,
+            name: "PathCostBounded",
+        },
+        objects: OBJ_PATH_COST_BOUNDED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0056,
+    },
+    PatternSpec {
+        id: PatternId(25),
+        name: "nav_state_advanced",
+        lowering: LoweringKind::Dfa,
+        state_card: 4,
+        event: EventKind {
+            code: 0x0057,
+            name: "NavStateAdvanced",
+        },
+        objects: OBJ_NAV_STATE_ADVANCED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0057,
+    },
+    // --- Phase 2: Procedural Generation (ids 26-30, event codes 0x0058-0x005C) ---
+    PatternSpec {
+        id: PatternId(26),
+        name: "noise_value_sampled",
+        lowering: LoweringKind::Receipt,
+        state_card: 64,
+        event: EventKind {
+            code: 0x0058,
+            name: "NoiseValueSampled",
+        },
+        objects: OBJ_NOISE_VALUE_SAMPLED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0058,
+    },
+    PatternSpec {
+        id: PatternId(27),
+        name: "tile_variant_selected",
+        lowering: LoweringKind::Lut,
+        state_card: 8,
+        event: EventKind {
+            code: 0x0059,
+            name: "TileVariantSelected",
+        },
+        objects: OBJ_TILE_VARIANT_SELECTED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0059,
+    },
+    PatternSpec {
+        id: PatternId(28),
+        name: "terrain_height_quantized",
+        lowering: LoweringKind::Lut,
+        state_card: 8,
+        event: EventKind {
+            code: 0x005A,
+            name: "TerrainHeightQuantized",
+        },
+        objects: OBJ_TERRAIN_HEIGHT_QUANTIZED,
+        admission: STD_ADMISSION,
+        otel_span: 0x005A,
+    },
+    PatternSpec {
+        id: PatternId(29),
+        name: "spawn_weight_evaluated",
+        lowering: LoweringKind::Mask,
+        state_card: 2,
+        event: EventKind {
+            code: 0x005B,
+            name: "SpawnWeightEvaluated",
+        },
+        objects: OBJ_SPAWN_WEIGHT_EVALUATED,
+        admission: STD_ADMISSION,
+        otel_span: 0x005B,
+    },
+    PatternSpec {
+        id: PatternId(30),
+        name: "biome_class_selected",
+        lowering: LoweringKind::Bitset,
+        state_card: 16,
+        event: EventKind {
+            code: 0x005C,
+            name: "BiomeClassSelected",
+        },
+        objects: OBJ_BIOME_CLASS_SELECTED,
+        admission: STD_ADMISSION,
+        otel_span: 0x005C,
+    },
+    // --- Phase 2: Economy / Progression (ids 31-35, event codes 0x005D-0x0061) ---
+    PatternSpec {
+        id: PatternId(31),
+        name: "currency_delta_applied",
+        lowering: LoweringKind::Saturating,
+        state_card: 64,
+        event: EventKind {
+            code: 0x005D,
+            name: "CurrencyDeltaApplied",
+        },
+        objects: OBJ_CURRENCY_DELTA_APPLIED,
+        admission: STD_ADMISSION,
+        otel_span: 0x005D,
+    },
+    PatternSpec {
+        id: PatternId(32),
+        name: "xp_threshold_crossed",
+        lowering: LoweringKind::Mask,
+        state_card: 2,
+        event: EventKind {
+            code: 0x005E,
+            name: "XpThresholdCrossed",
+        },
+        objects: OBJ_XP_THRESHOLD_CROSSED,
+        admission: STD_ADMISSION,
+        otel_span: 0x005E,
+    },
+    PatternSpec {
+        id: PatternId(33),
+        name: "level_gate_evaluated",
+        lowering: LoweringKind::Mask,
+        state_card: 2,
+        event: EventKind {
+            code: 0x005F,
+            name: "LevelGateEvaluated",
+        },
+        objects: OBJ_LEVEL_GATE_EVALUATED,
+        admission: STD_ADMISSION,
+        otel_span: 0x005F,
+    },
+    PatternSpec {
+        id: PatternId(34),
+        name: "purchase_admitted",
+        lowering: LoweringKind::Dfa,
+        state_card: 4,
+        event: EventKind {
+            code: 0x0060,
+            name: "PurchaseAdmitted",
+        },
+        objects: OBJ_PURCHASE_ADMITTED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0060,
+    },
+    PatternSpec {
+        id: PatternId(35),
+        name: "reward_tier_selected",
+        lowering: LoweringKind::Bitset,
+        state_card: 16,
+        event: EventKind {
+            code: 0x0061,
+            name: "RewardTierSelected",
+        },
+        objects: OBJ_REWARD_TIER_SELECTED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0061,
+    },
+    // --- Phase 2: Narrative / Dialogue (ids 36-40, event codes 0x0062-0x0066) ---
+    PatternSpec {
+        id: PatternId(36),
+        name: "dialogue_node_advanced",
+        lowering: LoweringKind::Dfa,
+        state_card: 5,
+        event: EventKind {
+            code: 0x0062,
+            name: "DialogueNodeAdvanced",
+        },
+        objects: OBJ_DIALOGUE_NODE_ADVANCED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0062,
+    },
+    PatternSpec {
+        id: PatternId(37),
+        name: "condition_flag_evaluated",
+        lowering: LoweringKind::Bitset,
+        state_card: 32,
+        event: EventKind {
+            code: 0x0063,
+            name: "ConditionFlagEvaluated",
+        },
+        objects: OBJ_CONDITION_FLAG_EVALUATED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0063,
+    },
+    PatternSpec {
+        id: PatternId(38),
+        name: "narrative_branch_selected",
+        lowering: LoweringKind::Mask,
+        state_card: 2,
+        event: EventKind {
+            code: 0x0064,
+            name: "NarrativeBranchSelected",
+        },
+        objects: OBJ_NARRATIVE_BRANCH_SELECTED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0064,
+    },
+    PatternSpec {
+        id: PatternId(39),
+        name: "dialogue_cooldown_bounded",
+        lowering: LoweringKind::Lut,
+        state_card: 8,
+        event: EventKind {
+            code: 0x0065,
+            name: "DialogueCooldownBounded",
+        },
+        objects: OBJ_DIALOGUE_COOLDOWN_BOUNDED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0065,
+    },
+    PatternSpec {
+        id: PatternId(40),
+        name: "choice_weight_selected",
+        lowering: LoweringKind::Lut,
+        state_card: 8,
+        event: EventKind {
+            code: 0x0066,
+            name: "ChoiceWeightSelected",
+        },
+        objects: OBJ_CHOICE_WEIGHT_SELECTED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0066,
+    },
+    // --- Phase 2: Camera (ids 41-45, event codes 0x0067-0x006B) ---
+    PatternSpec {
+        id: PatternId(41),
+        name: "camera_distance_clamped",
+        lowering: LoweringKind::Lut,
+        state_card: 8,
+        event: EventKind {
+            code: 0x0067,
+            name: "CameraDistanceClamped",
+        },
+        objects: OBJ_CAMERA_DISTANCE_CLAMPED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0067,
+    },
+    PatternSpec {
+        id: PatternId(42),
+        name: "look_target_weighted",
+        lowering: LoweringKind::Mask,
+        state_card: 2,
+        event: EventKind {
+            code: 0x0068,
+            name: "LookTargetWeighted",
+        },
+        objects: OBJ_LOOK_TARGET_WEIGHTED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0068,
+    },
+    PatternSpec {
+        id: PatternId(43),
+        name: "fov_adjusted",
+        lowering: LoweringKind::Saturating,
+        state_card: 32,
+        event: EventKind {
+            code: 0x0069,
+            name: "FovAdjusted",
+        },
+        objects: OBJ_FOV_ADJUSTED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0069,
+    },
+    PatternSpec {
+        id: PatternId(44),
+        name: "camera_shake_applied",
+        lowering: LoweringKind::Receipt,
+        state_card: 64,
+        event: EventKind {
+            code: 0x006A,
+            name: "CameraShakeApplied",
+        },
+        objects: OBJ_CAMERA_SHAKE_APPLIED,
+        admission: STD_ADMISSION,
+        otel_span: 0x006A,
+    },
+    PatternSpec {
+        id: PatternId(45),
+        name: "camera_follow_lerped",
+        lowering: LoweringKind::Lut,
+        state_card: 8,
+        event: EventKind {
+            code: 0x006B,
+            name: "CameraFollowLerped",
+        },
+        objects: OBJ_CAMERA_FOLLOW_LERPED,
+        admission: STD_ADMISSION,
+        otel_span: 0x006B,
+    },
+    // --- Phase 2: Audio (ids 46-50, event codes 0x006C-0x0070) ---
+    PatternSpec {
+        id: PatternId(46),
+        name: "audio_priority_selected",
+        lowering: LoweringKind::Mask,
+        state_card: 2,
+        event: EventKind {
+            code: 0x006C,
+            name: "AudioPrioritySelected",
+        },
+        objects: OBJ_AUDIO_PRIORITY_SELECTED,
+        admission: STD_ADMISSION,
+        otel_span: 0x006C,
+    },
+    PatternSpec {
+        id: PatternId(47),
+        name: "volume_clamped",
+        lowering: LoweringKind::Lut,
+        state_card: 8,
+        event: EventKind {
+            code: 0x006D,
+            name: "VolumeClamped",
+        },
+        objects: OBJ_VOLUME_CLAMPED,
+        admission: STD_ADMISSION,
+        otel_span: 0x006D,
+    },
+    PatternSpec {
+        id: PatternId(48),
+        name: "audio_fade_applied",
+        lowering: LoweringKind::Saturating,
+        state_card: 32,
+        event: EventKind {
+            code: 0x006E,
+            name: "AudioFadeApplied",
+        },
+        objects: OBJ_AUDIO_FADE_APPLIED,
+        admission: STD_ADMISSION,
+        otel_span: 0x006E,
+    },
+    PatternSpec {
+        id: PatternId(49),
+        name: "audio_trigger_evaluated",
+        lowering: LoweringKind::Dfa,
+        state_card: 4,
+        event: EventKind {
+            code: 0x006F,
+            name: "AudioTriggerEvaluated",
+        },
+        objects: OBJ_AUDIO_TRIGGER_EVALUATED,
+        admission: STD_ADMISSION,
+        otel_span: 0x006F,
+    },
+    PatternSpec {
+        id: PatternId(50),
+        name: "audio_distance_attenuated",
+        lowering: LoweringKind::Lut,
+        state_card: 8,
+        event: EventKind {
+            code: 0x0070,
+            name: "AudioDistanceAttenuated",
+        },
+        objects: OBJ_AUDIO_DISTANCE_ATTENUATED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0070,
+    },
+    // --- Phase 2: Multiplayer / Network (ids 51-55, event codes 0x0071-0x0075) ---
+    PatternSpec {
+        id: PatternId(51),
+        name: "tick_delta_bounded",
+        lowering: LoweringKind::Lut,
+        state_card: 8,
+        event: EventKind {
+            code: 0x0071,
+            name: "TickDeltaBounded",
+        },
+        objects: OBJ_TICK_DELTA_BOUNDED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0071,
+    },
+    PatternSpec {
+        id: PatternId(52),
+        name: "lag_compensation_applied",
+        lowering: LoweringKind::Saturating,
+        state_card: 32,
+        event: EventKind {
+            code: 0x0072,
+            name: "LagCompensationApplied",
+        },
+        objects: OBJ_LAG_COMPENSATION_APPLIED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0072,
+    },
+    PatternSpec {
+        id: PatternId(53),
+        name: "packet_priority_evaluated",
+        lowering: LoweringKind::Mask,
+        state_card: 2,
+        event: EventKind {
+            code: 0x0073,
+            name: "PacketPriorityEvaluated",
+        },
+        objects: OBJ_PACKET_PRIORITY_EVALUATED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0073,
+    },
+    PatternSpec {
+        id: PatternId(54),
+        name: "prediction_error_bounded",
+        lowering: LoweringKind::Lut,
+        state_card: 8,
+        event: EventKind {
+            code: 0x0074,
+            name: "PredictionErrorBounded",
+        },
+        objects: OBJ_PREDICTION_ERROR_BOUNDED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0074,
+    },
+    PatternSpec {
+        id: PatternId(55),
+        name: "sync_state_admitted",
+        lowering: LoweringKind::Dfa,
+        state_card: 4,
+        event: EventKind {
+            code: 0x0075,
+            name: "SyncStateAdmitted",
+        },
+        objects: OBJ_SYNC_STATE_ADMITTED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0075,
+    },
+    // --- Phase 2: DfLSS / Quality (ids 56-60, event codes 0x0076-0x007A) ---
+    PatternSpec {
+        id: PatternId(56),
+        name: "sigma_level_computed",
+        lowering: LoweringKind::Lut,
+        state_card: 7,
+        event: EventKind {
+            code: 0x0076,
+            name: "SigmaLevelComputed",
+        },
+        objects: OBJ_SIGMA_LEVEL_COMPUTED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0076,
+    },
+    PatternSpec {
+        id: PatternId(57),
+        name: "defect_rate_quantized",
+        lowering: LoweringKind::Lut,
+        state_card: 8,
+        event: EventKind {
+            code: 0x0077,
+            name: "DefectRateQuantized",
+        },
+        objects: OBJ_DEFECT_RATE_QUANTIZED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0077,
+    },
+    PatternSpec {
+        id: PatternId(58),
+        name: "ctq_threshold_evaluated",
+        lowering: LoweringKind::Mask,
+        state_card: 2,
+        event: EventKind {
+            code: 0x0078,
+            name: "CtqThresholdEvaluated",
+        },
+        objects: OBJ_CTQ_THRESHOLD_EVALUATED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0078,
+    },
+    PatternSpec {
+        id: PatternId(59),
+        name: "nps_score_bounded",
+        lowering: LoweringKind::Lut,
+        state_card: 11,
+        event: EventKind {
+            code: 0x0079,
+            name: "NpsScoreBounded",
+        },
+        objects: OBJ_NPS_SCORE_BOUNDED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0079,
+    },
+    PatternSpec {
+        id: PatternId(60),
+        name: "quality_gate_evaluated",
+        lowering: LoweringKind::Dfa,
+        state_card: 4,
+        event: EventKind {
+            code: 0x007A,
+            name: "QualityGateEvaluated",
+        },
+        objects: OBJ_QUALITY_GATE_EVALUATED,
+        admission: STD_ADMISSION,
+        otel_span: 0x007A,
+    },
+    // --- Phase 2: Engine Bridge (ids 61-65, event codes 0x007B-0x007F) ---
+    PatternSpec {
+        id: PatternId(61),
+        name: "command_opcode_encoded",
+        lowering: LoweringKind::Lut,
+        state_card: 4,
+        event: EventKind {
+            code: 0x007B,
+            name: "CommandOpcodeEncoded",
+        },
+        objects: OBJ_COMMAND_OPCODE_ENCODED,
+        admission: STD_ADMISSION,
+        otel_span: 0x007B,
+    },
+    PatternSpec {
+        id: PatternId(62),
+        name: "capability_flag_evaluated",
+        lowering: LoweringKind::Bitset,
+        state_card: 32,
+        event: EventKind {
+            code: 0x007C,
+            name: "CapabilityFlagEvaluated",
+        },
+        objects: OBJ_CAPABILITY_FLAG_EVALUATED,
+        admission: STD_ADMISSION,
+        otel_span: 0x007C,
+    },
+    PatternSpec {
+        id: PatternId(63),
+        name: "bridge_state_transitioned",
+        lowering: LoweringKind::Dfa,
+        state_card: 5,
+        event: EventKind {
+            code: 0x007D,
+            name: "BridgeStateTransitioned",
+        },
+        objects: OBJ_BRIDGE_STATE_TRANSITIONED,
+        admission: STD_ADMISSION,
+        otel_span: 0x007D,
+    },
+    PatternSpec {
+        id: PatternId(64),
+        name: "payload_size_bounded",
+        lowering: LoweringKind::Lut,
+        state_card: 8,
+        event: EventKind {
+            code: 0x007E,
+            name: "PayloadSizeBounded",
+        },
+        objects: OBJ_PAYLOAD_SIZE_BOUNDED,
+        admission: STD_ADMISSION,
+        otel_span: 0x007E,
+    },
+    PatternSpec {
+        id: PatternId(65),
+        name: "adapter_priority_ranked",
+        lowering: LoweringKind::Network,
+        state_card: 8,
+        event: EventKind {
+            code: 0x007F,
+            name: "AdapterPriorityRanked",
+        },
+        objects: OBJ_ADAPTER_PRIORITY_RANKED,
+        admission: STD_ADMISSION,
+        otel_span: 0x007F,
+    },
+    // --- Phase 2: AI Agent / Benchmark (ids 66-70, event codes 0x0080-0x0084) ---
+    PatternSpec {
+        id: PatternId(66),
+        name: "reward_signal_clamped",
+        lowering: LoweringKind::Lut,
+        state_card: 8,
+        event: EventKind {
+            code: 0x0080,
+            name: "RewardSignalClamped",
+        },
+        objects: OBJ_REWARD_SIGNAL_CLAMPED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0080,
+    },
+    PatternSpec {
+        id: PatternId(67),
+        name: "policy_action_selected",
+        lowering: LoweringKind::Mask,
+        state_card: 2,
+        event: EventKind {
+            code: 0x0081,
+            name: "PolicyActionSelected",
+        },
+        objects: OBJ_POLICY_ACTION_SELECTED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0081,
+    },
+    PatternSpec {
+        id: PatternId(68),
+        name: "observation_class_selected",
+        lowering: LoweringKind::Lut,
+        state_card: 8,
+        event: EventKind {
+            code: 0x0082,
+            name: "ObservationClassSelected",
+        },
+        objects: OBJ_OBSERVATION_CLASS_SELECTED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0082,
+    },
+    PatternSpec {
+        id: PatternId(69),
+        name: "action_mask_applied",
+        lowering: LoweringKind::Bitset,
+        state_card: 32,
+        event: EventKind {
+            code: 0x0083,
+            name: "ActionMaskApplied",
+        },
+        objects: OBJ_ACTION_MASK_APPLIED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0083,
+    },
+    PatternSpec {
+        id: PatternId(70),
+        name: "episode_return_bounded",
+        lowering: LoweringKind::Saturating,
+        state_card: 64,
+        event: EventKind {
+            code: 0x0084,
+            name: "EpisodeReturnBounded",
+        },
+        objects: OBJ_EPISODE_RETURN_BOUNDED,
+        admission: STD_ADMISSION,
+        otel_span: 0x0084,
     },
 ];

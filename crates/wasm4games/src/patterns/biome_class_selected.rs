@@ -14,8 +14,6 @@
 //! the selector position. Uses [`bcinr_logic::bitset::rank_u64`] to count set bits below the
 //! queried position, yielding a stable biome class index.
 
-use bcinr_logic::bitset::rank_u64;
-
 /// BiomeClassSelected kernel. Packed-u64 ABI:
 /// - `state`: bits[0..32] = biome flags (up to 32 biomes, 1 bit per biome).
 /// - `input`: bits[0..8] = biome selector (bit position to query, 0..31).
@@ -26,9 +24,11 @@ use bcinr_logic::bitset::rank_u64;
 #[must_use]
 pub fn biome_class_selected(state: u64, input: u64) -> u64 {
     let flags = state & 0xFFFF_FFFF;
-    let pos = (input & 0x1F) as u32;
-    let bit_set = ((flags >> pos) & 1) as u64;
-    let rank = rank_u64(flags, pos as usize) as u64;
+    let pos = input & 0x1F; // 5-bit position; safe to shift
+    let bit_set = (flags >> pos) & 1;
+    // Count set bits strictly below pos (rank_u64 is inclusive so use mask directly).
+    let below_mask = (1u64 << pos).wrapping_sub(1); // 0 when pos=0
+    let rank = (flags & below_mask).count_ones() as u64;
     rank | (bit_set << 8)
 }
 
@@ -40,7 +40,7 @@ mod tests {
     fn biome_class_selected_reference(state: u64, input: u64) -> u64 {
         let flags = state & 0xFFFF_FFFF;
         let pos = (input & 0x1F) as u32;
-        let bit_set = ((flags >> pos) & 1) as u64;
+        let bit_set = (flags >> pos) & 1;
         // Count bits set strictly below pos.
         let rank = if pos == 0 {
             0u64

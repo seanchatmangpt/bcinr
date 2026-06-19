@@ -107,9 +107,15 @@ mod tests {
         // IDLE + ADD -> CART.
         assert_eq!(purchase_admitted(IDLE as u64, ADD as u64), CART as u64);
         // CHECKOUT + CONFIRM -> PAID.
-        assert_eq!(purchase_admitted(CHECKOUT as u64, CONFIRM as u64), PAID as u64);
+        assert_eq!(
+            purchase_admitted(CHECKOUT as u64, CONFIRM as u64),
+            PAID as u64
+        );
         // CHECKOUT + FAIL -> FAILED.
-        assert_eq!(purchase_admitted(CHECKOUT as u64, FAIL as u64), FAILED as u64);
+        assert_eq!(
+            purchase_admitted(CHECKOUT as u64, FAIL as u64),
+            FAILED as u64
+        );
     }
 }
 

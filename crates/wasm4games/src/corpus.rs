@@ -48,6 +48,66 @@ pub fn dispatch(pattern_id: u16, state: u64, input: u64) -> u64 {
         18 => patterns::mastery_moment_detected(state, input),
         19 => patterns::share_artifact_generated(state, input),
         20 => patterns::nps_prompt_gated(state, input),
+        // Phase 2 — Pathfinding
+        21 => patterns::path_node_expanded(state, input),
+        22 => patterns::waypoint_reached(state, input),
+        23 => patterns::heuristic_distance_estimated(state, input),
+        24 => patterns::path_cost_bounded(state, input),
+        25 => patterns::nav_state_advanced(state, input),
+        // Phase 2 — Procedural Generation
+        26 => patterns::noise_value_sampled(state, input),
+        27 => patterns::tile_variant_selected(state, input),
+        28 => patterns::terrain_height_quantized(state, input),
+        29 => patterns::spawn_weight_evaluated(state, input),
+        30 => patterns::biome_class_selected(state, input),
+        // Phase 2 — Economy / Progression
+        31 => patterns::currency_delta_applied(state, input),
+        32 => patterns::xp_threshold_crossed(state, input),
+        33 => patterns::level_gate_evaluated(state, input),
+        34 => patterns::purchase_admitted(state, input),
+        35 => patterns::reward_tier_selected(state, input),
+        // Phase 2 — Narrative / Dialogue
+        36 => patterns::dialogue_node_advanced(state, input),
+        37 => patterns::condition_flag_evaluated(state, input),
+        38 => patterns::narrative_branch_selected(state, input),
+        39 => patterns::dialogue_cooldown_bounded(state, input),
+        40 => patterns::choice_weight_selected(state, input),
+        // Phase 2 — Camera
+        41 => patterns::camera_distance_clamped(state, input),
+        42 => patterns::look_target_weighted(state, input),
+        43 => patterns::fov_adjusted(state, input),
+        44 => patterns::camera_shake_applied(state, input),
+        45 => patterns::camera_follow_lerped(state, input),
+        // Phase 2 — Audio
+        46 => patterns::audio_priority_selected(state, input),
+        47 => patterns::volume_clamped(state, input),
+        48 => patterns::audio_fade_applied(state, input),
+        49 => patterns::audio_trigger_evaluated(state, input),
+        50 => patterns::audio_distance_attenuated(state, input),
+        // Phase 2 — Multiplayer / Network
+        51 => patterns::tick_delta_bounded(state, input),
+        52 => patterns::lag_compensation_applied(state, input),
+        53 => patterns::packet_priority_evaluated(state, input),
+        54 => patterns::prediction_error_bounded(state, input),
+        55 => patterns::sync_state_admitted(state, input),
+        // Phase 2 — DfLSS / Quality
+        56 => patterns::sigma_level_computed(state, input),
+        57 => patterns::defect_rate_quantized(state, input),
+        58 => patterns::ctq_threshold_evaluated(state, input),
+        59 => patterns::nps_score_bounded(state, input),
+        60 => patterns::quality_gate_evaluated(state, input),
+        // Phase 2 — Engine Bridge
+        61 => patterns::command_opcode_encoded(state, input),
+        62 => patterns::capability_flag_evaluated(state, input),
+        63 => patterns::bridge_state_transitioned(state, input),
+        64 => patterns::payload_size_bounded(state, input),
+        65 => patterns::adapter_priority_ranked(state, input),
+        // Phase 2 — AI Agent / Benchmark
+        66 => patterns::reward_signal_clamped(state, input),
+        67 => patterns::policy_action_selected(state, input),
+        68 => patterns::observation_class_selected(state, input),
+        69 => patterns::action_mask_applied(state, input),
+        70 => patterns::episode_return_bounded(state, input),
         _ => 0,
     }
 }
@@ -92,7 +152,7 @@ pub fn corpus_digest() -> u64 {
 
 /// Pinned golden value of [`corpus_digest`]. Frozen so any kernel/registry/evidence drift
 /// fails loudly, and so every other projection target has one fixed number to reproduce.
-pub const GOLDEN_CORPUS_DIGEST: u64 = 0x436B_6BFF_B836_DBAF;
+pub const GOLDEN_CORPUS_DIGEST: u64 = 0x2D26_7F72_6A8B_F791;
 
 #[cfg(test)]
 mod tests {
@@ -100,7 +160,7 @@ mod tests {
 
     #[test]
     fn dispatch_total_and_deterministic_over_registry() {
-        assert_eq!(PATTERN_REGISTRY.len(), 20, "expected 20 patterns");
+        assert_eq!(PATTERN_REGISTRY.len(), 70, "expected 70 patterns");
         for (idx, spec) in PATTERN_REGISTRY.iter().enumerate() {
             assert_eq!(spec.id.0 as usize, idx + 1, "ids must be 1..=20 in order");
             assert_eq!(

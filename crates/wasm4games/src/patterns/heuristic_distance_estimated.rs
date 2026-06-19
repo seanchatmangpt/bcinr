@@ -25,8 +25,8 @@ pub fn heuristic_distance_estimated(state: u64, input: u64) -> u64 {
     let dx_raw = (state & 0xFFFF) as i32;
     let dy_raw = (input & 0xFFFF) as i32;
     // Sign-extend from 16-bit to 32-bit
-    let dx = ((dx_raw << 16) >> 16) as i32;
-    let dy = ((dy_raw << 16) >> 16) as i32;
+    let dx = (dx_raw << 16) >> 16;
+    let dy = (dy_raw << 16) >> 16;
     // Branchless abs: (v ^ (v >> 31)) - (v >> 31)
     let abs_dx = (dx ^ (dx >> 31)).wrapping_sub(dx >> 31) as u32;
     let abs_dy = (dy ^ (dy >> 31)).wrapping_sub(dy >> 31) as u32;
@@ -43,9 +43,15 @@ mod tests {
         let dy = (input & 0xFFFF) as u16 as i16;
         dx.unsigned_abs().max(dy.unsigned_abs()) as u64
     }
-    fn mutant_1(s: u64, i: u64) -> u64 { !heuristic_distance_estimated_reference(s, i) }
-    fn mutant_2(s: u64, i: u64) -> u64 { heuristic_distance_estimated_reference(s, i).wrapping_add(1) }
-    fn mutant_3(s: u64, i: u64) -> u64 { heuristic_distance_estimated_reference(s, i) ^ 0xFFFF }
+    fn mutant_1(s: u64, i: u64) -> u64 {
+        !heuristic_distance_estimated_reference(s, i)
+    }
+    fn mutant_2(s: u64, i: u64) -> u64 {
+        heuristic_distance_estimated_reference(s, i).wrapping_add(1)
+    }
+    fn mutant_3(s: u64, i: u64) -> u64 {
+        heuristic_distance_estimated_reference(s, i) ^ 0xFFFF
+    }
 
     proptest! {
         #[test] fn equivalence(s in any::<u64>(), i in any::<u64>()) {
@@ -69,13 +75,19 @@ mod tests {
     fn boundaries() {
         // dx=3, dy=-4 (packed as i16 two's complement) -> Chebyshev = 4
         let dy_neg4 = ((-4i16) as u16) as u64;
-        assert_eq!(heuristic_distance_estimated(3, dy_neg4), heuristic_distance_estimated_reference(3, dy_neg4));
+        assert_eq!(
+            heuristic_distance_estimated(3, dy_neg4),
+            heuristic_distance_estimated_reference(3, dy_neg4)
+        );
         // dx=0, dy=0 -> 0
         assert_eq!(heuristic_distance_estimated(0, 0), 0);
         // dx=-5, dy=-5 -> 5
         let dx_neg5 = ((-5i16) as u16) as u64;
         let dy_neg5 = ((-5i16) as u16) as u64;
-        assert_eq!(heuristic_distance_estimated(dx_neg5, dy_neg5), heuristic_distance_estimated_reference(dx_neg5, dy_neg5));
+        assert_eq!(
+            heuristic_distance_estimated(dx_neg5, dy_neg5),
+            heuristic_distance_estimated_reference(dx_neg5, dy_neg5)
+        );
     }
 }
 
@@ -85,7 +97,12 @@ pub mod bench {
     use criterion::{black_box, Criterion};
     pub fn bench_heuristic_distance_estimated(c: &mut Criterion) {
         c.bench_function("heuristic_distance_estimated", |b| {
-            b.iter(|| black_box(heuristic_distance_estimated(black_box(3), black_box(0xFFFC_u64))))
+            b.iter(|| {
+                black_box(heuristic_distance_estimated(
+                    black_box(3),
+                    black_box(0xFFFC_u64),
+                ))
+            })
         });
     }
 }

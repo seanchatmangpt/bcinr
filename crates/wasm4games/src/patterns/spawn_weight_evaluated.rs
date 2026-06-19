@@ -42,7 +42,7 @@ mod tests {
         if roll < rate {
             1 | ((roll as u64) << 8)
         } else {
-            0 | ((roll as u64) << 8)
+            (roll as u64) << 8
         }
     }
     fn mutant_1(s: u64, i: u64) -> u64 {

@@ -84,14 +84,20 @@ mod tests {
     #[test]
     fn boundaries() {
         // p0=5/p1=3 -> id0 wins (state: p0=5,id0=1; input: p1=3,id1=2)
-        assert_eq!(audio_priority_selected(5 | (1 << 8), 3 | (2 << 8)),
-                   audio_priority_selected_reference(5 | (1 << 8), 3 | (2 << 8)));
+        assert_eq!(
+            audio_priority_selected(5 | (1 << 8), 3 | (2 << 8)),
+            audio_priority_selected_reference(5 | (1 << 8), 3 | (2 << 8))
+        );
         // p0=3/p1=5 -> id1 wins
-        assert_eq!(audio_priority_selected(3 | (1 << 8), 5 | (2 << 8)),
-                   audio_priority_selected_reference(3 | (1 << 8), 5 | (2 << 8)));
+        assert_eq!(
+            audio_priority_selected(3 | (1 << 8), 5 | (2 << 8)),
+            audio_priority_selected_reference(3 | (1 << 8), 5 | (2 << 8))
+        );
         // p0=5/p1=5 -> tie goes to id0
-        assert_eq!(audio_priority_selected(5 | (1 << 8), 5 | (2 << 8)),
-                   audio_priority_selected_reference(5 | (1 << 8), 5 | (2 << 8)));
+        assert_eq!(
+            audio_priority_selected(5 | (1 << 8), 5 | (2 << 8)),
+            audio_priority_selected_reference(5 | (1 << 8), 5 | (2 << 8))
+        );
     }
 }
 
