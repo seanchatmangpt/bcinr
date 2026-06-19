@@ -31,9 +31,9 @@ fn main() {
 
     let mut awarded: [u32; 8] = [0; 8];
     for (i, &s) in scores.iter().enumerate() {
-        let hit_mask = eq_mask_u32(s, target);            // 0xFFFFFFFF or 0
-        let with_bonus = add_sat(s, bonus);               // saturating add
-        // select: if mask set, take with_bonus; otherwise keep original score
+        let hit_mask = eq_mask_u32(s, target); // 0xFFFFFFFF or 0
+        let with_bonus = add_sat(s, bonus); // saturating add
+                                            // select: if mask set, take with_bonus; otherwise keep original score
         awarded[i] = select_u32(hit_mask, with_bonus, s);
     }
     println!("scores:   {scores:?}");
@@ -82,7 +82,10 @@ fn main() {
     // select_bit: position of the 1st high scorer
     if let Some(first_high) = select_bit_u64(bitset, 0) {
         println!("first high scorer at index: {first_high}");
-        assert!(clamped[first_high] >= threshold, "selected position must actually be high");
+        assert!(
+            clamped[first_high] >= threshold,
+            "selected position must actually be high"
+        );
     }
 
     // hamming distance between original scores (as bitsets) and clamped scores

@@ -23,7 +23,11 @@ fn main() {
     // --- count_codepoints: UTF-8 codepoint count (not byte count) ---
 
     // Pure ASCII: one byte per codepoint
-    assert_eq!(count_codepoints(b"hello"), 5, "5 ASCII chars = 5 codepoints");
+    assert_eq!(
+        count_codepoints(b"hello"),
+        5,
+        "5 ASCII chars = 5 codepoints"
+    );
     assert_eq!(count_codepoints(b""), 0, "empty = 0 codepoints");
 
     // 2-byte UTF-8: 'é' = 0xC3 0xA9 (two bytes, one codepoint)
@@ -37,13 +41,26 @@ fn main() {
     // Mixed: "héllo" = h + é + l + l + o = 5 codepoints, 6 bytes
     let mixed = b"h\xC3\xA9llo";
     assert_eq!(count_codepoints(mixed), 5, "héllo = 5 codepoints");
-    assert_ne!(count_codepoints(mixed), mixed.len(), "codepoints ≠ byte length for multi-byte");
+    assert_ne!(
+        count_codepoints(mixed),
+        mixed.len(),
+        "codepoints ≠ byte length for multi-byte"
+    );
 
     // 4-byte: '𝄞' (musical symbol) = 0xF0 0x9D 0x84 0x9E
     let musical = b"\xF0\x9D\x84\x9E";
     assert_eq!(count_codepoints(musical), 1, "4-byte emoji = 1 codepoint");
-    println!("count_codepoints(héllo bytes={})={}", mixed.len(), count_codepoints(mixed));
-    println!("count_codepoints(é)={}, cjk={}  musical={}", count_codepoints(e_acute), count_codepoints(cjk), count_codepoints(musical));
+    println!(
+        "count_codepoints(héllo bytes={})={}",
+        mixed.len(),
+        count_codepoints(mixed)
+    );
+    println!(
+        "count_codepoints(é)={}, cjk={}  musical={}",
+        count_codepoints(e_acute),
+        count_codepoints(cjk),
+        count_codepoints(musical)
+    );
 
     // --- count_min_sketch_update: approximate frequency counter ---
     // depth=3, width=16 → table of 48 u32 cells
@@ -61,17 +78,29 @@ fn main() {
         let mut row_max = 0u32;
         for col in 0..WIDTH {
             let v = table[row * WIDTH + col];
-            if v > row_max { row_max = v; }
+            if v > row_max {
+                row_max = v;
+            }
         }
-        assert!(row_max >= 2, "each row must have at least one cell with count ≥ 2 after 2 updates");
-        if row_max == 2 { saw_two += 1; }
+        assert!(
+            row_max >= 2,
+            "each row must have at least one cell with count ≥ 2 after 2 updates"
+        );
+        if row_max == 2 {
+            saw_two += 1;
+        }
     }
-    println!("count_min_sketch: {saw_two}/{DEPTH} rows have max=2 (expected when no hash collision)");
+    println!(
+        "count_min_sketch: {saw_two}/{DEPTH} rows have max=2 (expected when no hash collision)"
+    );
 
     // Update a different hash — cells should be independent
     count_min_sketch_update(&mut table, 999, DEPTH, WIDTH);
     let sum_before: u32 = table.iter().sum();
-    assert!(sum_before >= 2 * DEPTH as u32 + DEPTH as u32, "3 total updates × depth rows = at least 9 increments");
+    assert!(
+        sum_before >= 2 * DEPTH as u32 + DEPTH as u32,
+        "3 total updates × depth rows = at least 9 increments"
+    );
     println!("total cell increments after 3 updates across hashes: {sum_before}");
 
     // Saturation: a cell already at u32::MAX must not wrap to 0
@@ -80,8 +109,14 @@ fn main() {
     let mut probe_table = vec![u32::MAX; DEPTH * WIDTH];
     count_min_sketch_update(&mut probe_table, 7, DEPTH, WIDTH);
     // After updating cells already at MAX, they must stay at MAX (saturating_add)
-    assert!(probe_table.iter().all(|&v| v == u32::MAX), "saturating_add at MAX must not wrap");
-    println!("saturation: updating MAX cells stays at u32::MAX = {}", probe_table.iter().all(|&v| v == u32::MAX));
+    assert!(
+        probe_table.iter().all(|&v| v == u32::MAX),
+        "saturating_add at MAX must not wrap"
+    );
+    println!(
+        "saturation: updating MAX cells stays at u32::MAX = {}",
+        probe_table.iter().all(|&v| v == u32::MAX)
+    );
     let _ = sat_table; // suppress unused warning
 
     println!("\nAll UTF-8 and sketch assertions passed.");

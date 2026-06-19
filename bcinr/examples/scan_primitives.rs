@@ -37,22 +37,41 @@ fn main() {
     assert_eq!(skip_spaces(b"hello"), 0, "no leading spaces");
     assert_eq!(skip_spaces(b""), 0, "empty → 0");
     assert_eq!(skip_spaces(b"   "), 3, "all spaces");
-    assert_eq!(skip_spaces(b" a b"), 1, "one leading space then non-space stops count");
+    assert_eq!(
+        skip_spaces(b" a b"),
+        1,
+        "one leading space then non-space stops count"
+    );
     println!("skip_spaces(b\"   hello\") = {}", skip_spaces(b"   hello"));
     println!("skip_spaces(b\"hello\") = {}", skip_spaces(b"hello"));
 
     // --- is_ascii_u64_slice: all bytes must have high bit clear ---
-    assert!(is_ascii_u64_slice(b"hello world"), "pure ASCII must return true");
+    assert!(
+        is_ascii_u64_slice(b"hello world"),
+        "pure ASCII must return true"
+    );
     assert!(is_ascii_u64_slice(b""), "empty slice is trivially ASCII");
-    assert!(is_ascii_u64_slice(&[0x7F, 0x00, 0x41]), "0x7F is ASCII (DEL)");
+    assert!(
+        is_ascii_u64_slice(&[0x7F, 0x00, 0x41]),
+        "0x7F is ASCII (DEL)"
+    );
     // High bit set → not ASCII
-    assert!(!is_ascii_u64_slice(&[0x80]), "0x80 has high bit set → not ASCII");
+    assert!(
+        !is_ascii_u64_slice(&[0x80]),
+        "0x80 has high bit set → not ASCII"
+    );
     assert!(!is_ascii_u64_slice(b"\xFF"), "0xFF → not ASCII");
     // Slice with non-ASCII embedded
     let mixed = b"abc\xC3\xA9xyz"; // 'é' in UTF-8 has bytes 0xC3, 0xA9
     assert!(!is_ascii_u64_slice(mixed), "UTF-8 multibyte → not ASCII");
-    println!("is_ascii_u64_slice(b\"hello world\")={}", is_ascii_u64_slice(b"hello world"));
-    println!("is_ascii_u64_slice(&[0x80])={}", is_ascii_u64_slice(&[0x80]));
+    println!(
+        "is_ascii_u64_slice(b\"hello world\")={}",
+        is_ascii_u64_slice(b"hello world")
+    );
+    println!(
+        "is_ascii_u64_slice(&[0x80])={}",
+        is_ascii_u64_slice(&[0x80])
+    );
 
     // --- cross-product: find then skip ---
     // In a tokenizer pipeline: skip leading spaces, then find next space to get token length
@@ -63,7 +82,10 @@ fn main() {
     let token_end = space_mask.trailing_zeros() as usize;
     let token = &remainder[..token_end];
     assert_eq!(token, b"token", "extracted token must be 'token'");
-    println!("tokenizer: skipped {offset} spaces, token={}", core::str::from_utf8(token).unwrap());
+    println!(
+        "tokenizer: skipped {offset} spaces, token={}",
+        core::str::from_utf8(token).unwrap()
+    );
 
     println!("\nAll scan primitive assertions passed.");
 }
