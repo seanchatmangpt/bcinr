@@ -9,6 +9,15 @@
 //! Offline-pure: depends only on the `no_std` `wasm4games` core (no git/network deps), so
 //! it is a safe workspace member and builds in CI (unlike the excluded `wasm4games-wasm4pm`
 //! bridge, which pulls external git repos).
+//!
+//! # Unsafe-code policy
+//!
+//! This crate intentionally omits `#![forbid(unsafe_code)]` because `#[no_mangle]` — which
+//! is required to export C symbols from a `staticlib` — is classified by the Rust
+//! `unsafe_code` lint as an unsafe attribute. There are no `unsafe` blocks, `unsafe fn`
+//! definitions, or raw-pointer operations anywhere in this file. Every exported function
+//! delegates unconditionally to the safe, `#![forbid(unsafe_code)]`-guarded `wasm4games`
+//! core. The exemption is structural (C ABI export), not algorithmic.
 
 use wasm4games::corpus;
 use wasm4games::patterns::PATTERN_REGISTRY;
