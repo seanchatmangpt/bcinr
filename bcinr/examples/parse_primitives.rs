@@ -16,13 +16,20 @@ use bcinr::parse::{parse_hex_u32, skip_whitespace};
 fn main() {
     // --- skip_whitespace: all bytes ≤ 32 are whitespace (space, tab, newline, ...) ---
     assert_eq!(skip_whitespace(b"   hello"), 3, "three spaces");
-    assert_eq!(skip_whitespace(b"\t\nhello"), 2, "tab + newline = 2 whitespace chars");
+    assert_eq!(
+        skip_whitespace(b"\t\nhello"),
+        2,
+        "tab + newline = 2 whitespace chars"
+    );
     assert_eq!(skip_whitespace(b"hello"), 0, "no leading whitespace");
     assert_eq!(skip_whitespace(b""), 0, "empty = 0");
     assert_eq!(skip_whitespace(b"   "), 3, "all whitespace");
     // Unlike skip_spaces, byte 9 (tab) and 10 (newline) are also skipped
     assert_eq!(skip_whitespace(&[b'\t', b'x']), 1, "tab is whitespace");
-    println!("skip_whitespace(b\"\\t\\nhello\")={}", skip_whitespace(b"\t\nhello"));
+    println!(
+        "skip_whitespace(b\"\\t\\nhello\")={}",
+        skip_whitespace(b"\t\nhello")
+    );
 
     // --- parse_hex_u32: decode hex string to u32 ---
     // Basic hex values
@@ -36,7 +43,10 @@ fn main() {
     assert_eq!(parse_hex_u32(b"deadbeef"), Ok(0xDEAD_BEEF), "lowercase");
     assert_eq!(parse_hex_u32(b"00000000"), Ok(0), "8 zeros");
     assert_eq!(parse_hex_u32(b"FFFFFFFF"), Ok(u32::MAX), "max u32");
-    println!("parse_hex_u32(b\"DEADBEEF\")={:?}", parse_hex_u32(b"DEADBEEF"));
+    println!(
+        "parse_hex_u32(b\"DEADBEEF\")={:?}",
+        parse_hex_u32(b"DEADBEEF")
+    );
 
     // Error cases: must return Err(())
     assert_eq!(parse_hex_u32(b""), Err(()), "empty input is Err");
@@ -44,11 +54,23 @@ fn main() {
     assert_eq!(parse_hex_u32(b"GG"), Err(()), "G is not hex");
     assert_eq!(parse_hex_u32(b"123456789"), Err(()), "9 digits > 8 → Err");
     assert_eq!(parse_hex_u32(b"1G"), Err(()), "mixed valid + invalid");
-    println!("parse_hex_u32(b\"\")={:?}, parse_hex_u32(b\"xyz\")={:?}", parse_hex_u32(b""), parse_hex_u32(b"xyz"));
+    println!(
+        "parse_hex_u32(b\"\")={:?}, parse_hex_u32(b\"xyz\")={:?}",
+        parse_hex_u32(b""),
+        parse_hex_u32(b"xyz")
+    );
 
     // Case insensitivity
-    assert_eq!(parse_hex_u32(b"AbCdEf"), parse_hex_u32(b"abcdef"), "case insensitive");
-    assert_eq!(parse_hex_u32(b"AbCdEf"), parse_hex_u32(b"ABCDEF"), "case insensitive");
+    assert_eq!(
+        parse_hex_u32(b"AbCdEf"),
+        parse_hex_u32(b"abcdef"),
+        "case insensitive"
+    );
+    assert_eq!(
+        parse_hex_u32(b"AbCdEf"),
+        parse_hex_u32(b"ABCDEF"),
+        "case insensitive"
+    );
 
     // --- cross-product: skip_whitespace then parse_hex_u32 ---
     // Simulate parsing "  0xDEAD" (whitespace + '0x' prefix + hex)

@@ -33,7 +33,7 @@ mod tests {
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
-    fn blsr_u64_reference(val: u64, aux: u64) -> u64 {
+    fn blsr_u64_reference(val: u64, _aux: u64) -> u64 {
         // Independent: clear exactly the lowest set bit by its index (0 stays 0).
         if val == 0 {
             0

@@ -40,7 +40,11 @@ fn main() {
     assert_eq!(max_u32(5, 8), 8);
     assert_eq!(max_u32(8, 5), 8);
     assert_eq!(min_u32(u32::MAX, u32::MAX), u32::MAX, "identity at MAX");
-    println!("min_u32(5,8)={}, max_u32(5,8)={}", min_u32(5, 8), max_u32(5, 8));
+    println!(
+        "min_u32(5,8)={}, max_u32(5,8)={}",
+        min_u32(5, 8),
+        max_u32(5, 8)
+    );
 
     // --- abs_i32: edge cases (note: i32::MIN has no positive representation) ---
     assert_eq!(abs_i32(0), 0);

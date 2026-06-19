@@ -1,0 +1,23 @@
+# wasm4games-wasm4pm: the ONLINE-ONLY admission bridge.
+#
+# This crate is intentionally EXCLUDED from the root workspace (`[workspace] exclude`) so the
+# offline build never resolves git dependencies. It is the only place that depends on the real
+# upstream wasm4pm / wasm4pm-compat repositories.
+#
+# Before any real use, PIN the git revisions below to exact commit hashes (`rev = "..."`).
+# Tags and branches are mutable; pinning a commit is required for reproducible admission.
+[package]
+name = "wasm4games-wasm4pm"
+version = "26.6.13"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Online-only admission bridge: maps wasm4games evidence onto wasm4pm-compat and submits it to wasm4pm"
+publish = false
+
+[dependencies]
+# Local, offline, dependency-free source of the evidence types.
+wasm4games = { path = "../wasm4games", features = ["std"] }
+
+# Upstream, online-only. PIN to a commit (`rev = "<hash>"`) before use.
+wasm4pm = { git = "https://github.com/seanchatmangpt/wasm4pm" }
+wasm4pm-compat = { git = "https://github.com/seanchatmangpt/wasm4pm-compat", tag = "v26.6.13" }

@@ -19,7 +19,11 @@ fn main() {
     assert_eq!(add_sat(u32::MAX, 1), u32::MAX, "MAX+1 must stay at MAX");
     assert_eq!(add_sat(u32::MAX, u32::MAX), u32::MAX, "MAX+MAX saturates");
     assert_eq!(add_sat(0, 0), 0);
-    println!("add_sat: 200+100={}, MAX+1={}", add_sat(200, 100), add_sat(u32::MAX, 1));
+    println!(
+        "add_sat: 200+100={}, MAX+1={}",
+        add_sat(200, 100),
+        add_sat(u32::MAX, 1)
+    );
 
     // --- clamp_u32: returns u32 directly (not Result) ---
     assert_eq!(clamp_u32(150, 0, 100), 100, "150 above hi clamps to 100");

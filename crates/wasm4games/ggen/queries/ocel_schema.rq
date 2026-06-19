@@ -1,0 +1,18 @@
+# ocel_schema.rq — the object-centric event schema: one row per (event, linked object) pair.
+# Drives templates/ocel_schema.rs.tera, which emits per-pattern event-type and object-type
+# consts mirroring crate::evidence::ocel. ORDER BY (?id, ?objectCode) for stable output.
+
+PREFIX w4g: <https://wasm4games.dev/ontology#>
+
+SELECT ?id ?patternName ?eventCode ?eventName ?objectCode ?objectName
+WHERE {
+    ?pattern a w4g:Pattern ;
+        w4g:id            ?id ;
+        w4g:name          ?patternName ;
+        w4g:eventCode     ?eventCode ;
+        w4g:eventName     ?eventName ;
+        w4g:touchesObject ?obj .
+    ?obj w4g:code ?objectCode ;
+         w4g:name ?objectName .
+}
+ORDER BY ?id ?objectCode

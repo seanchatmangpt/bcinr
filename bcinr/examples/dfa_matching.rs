@@ -39,27 +39,35 @@ fn main() {
     assert_eq!(s0_on_one, 1, "S0 + 1 → S1");
     let s1_on_one = dfa_advance(1, 1, PARITY_TABLE, ALPHABET_SIZE);
     assert_eq!(s1_on_one, 0, "S1 + 1 → S0 (two 1s = even)");
-    println!(
-        "dfa_advance: S0+0={s0_on_zero}, S0+1={s0_on_one}, S1+1={s1_on_one}"
-    );
+    println!("dfa_advance: S0+0={s0_on_zero}, S0+1={s0_on_one}, S1+1={s1_on_one}");
 
     // --- dfa_is_accepting: correct state recognition ---
     assert!(!dfa_is_accepting(0, ACCEPTING), "state 0 is not accepting");
     assert!(dfa_is_accepting(1, ACCEPTING), "state 1 is accepting");
-    println!("dfa_is_accepting(0)={}, dfa_is_accepting(1)={}", dfa_is_accepting(0, ACCEPTING), dfa_is_accepting(1, ACCEPTING));
+    println!(
+        "dfa_is_accepting(0)={}, dfa_is_accepting(1)={}",
+        dfa_is_accepting(0, ACCEPTING),
+        dfa_is_accepting(1, ACCEPTING)
+    );
 
     // --- dfa_run on concrete sequences ---
     // [1, 1, 1] → 3 ones → odd count → state 1 (accept)
     let s = dfa_run(PARITY_TABLE, ALPHABET_SIZE, 0, &[1, 1, 1]);
     assert_eq!(s, 1, "three 1-bytes → odd count → state 1");
     assert!(dfa_is_accepting(s, ACCEPTING));
-    println!("dfa_run([1,1,1]) → state {s} (accepted={})", dfa_is_accepting(s, ACCEPTING));
+    println!(
+        "dfa_run([1,1,1]) → state {s} (accepted={})",
+        dfa_is_accepting(s, ACCEPTING)
+    );
 
     // [1, 1] → 2 ones → even count → state 0 (reject)
     let s = dfa_run(PARITY_TABLE, ALPHABET_SIZE, 0, &[1, 1]);
     assert_eq!(s, 0, "two 1-bytes → even count → state 0");
     assert!(!dfa_is_accepting(s, ACCEPTING));
-    println!("dfa_run([1,1]) → state {s} (accepted={})", dfa_is_accepting(s, ACCEPTING));
+    println!(
+        "dfa_run([1,1]) → state {s} (accepted={})",
+        dfa_is_accepting(s, ACCEPTING)
+    );
 
     // empty input → stays in initial state (not accepting)
     let s = dfa_run(PARITY_TABLE, ALPHABET_SIZE, 0, &[]);

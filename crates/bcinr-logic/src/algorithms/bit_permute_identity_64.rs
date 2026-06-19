@@ -34,7 +34,7 @@ mod tests {
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
     // -------------------------------------------------------------------------
-    fn bit_permute_identity_64_reference(val: u64, aux: u64) -> u64 {
+    fn bit_permute_identity_64_reference(val: u64, _aux: u64) -> u64 {
         // Independent: relocate each bit to its own (identity-mapped) position.
         let mut out = 0u64;
         for i in 0..64u32 {

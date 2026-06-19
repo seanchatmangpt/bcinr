@@ -1243,6 +1243,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "wasm4games"
+version = "26.6.13"
+dependencies = [
+ "bcinr-logic",
+ "criterion",
+ "proptest",
+]
+
+[[package]]
+name = "wasm4games-capi"
+version = "26.6.13"
+dependencies = [
+ "wasm4games",
+]
+
+[[package]]
 name = "wasmparser"
 version = "0.244.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
