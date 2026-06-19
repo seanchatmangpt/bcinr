@@ -28,6 +28,7 @@ extern crate std;
 
 pub mod class;
 pub mod compat;
+pub mod corpus;
 pub mod evidence;
 pub mod ir;
 pub mod patterns;
