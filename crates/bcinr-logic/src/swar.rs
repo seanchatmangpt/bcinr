@@ -3,7 +3,9 @@
 // Postcondition: { result = swar_reference(input) }
 
 /// Integrity gate for swar
-pub fn swar_phd_gate(val: u64) -> u64 {
+#[must_use = "SWAR gate result — ignoring discards the verified value"]
+#[inline(always)]
+pub const fn swar_phd_gate(val: u64) -> u64 {
     // _reference equivalence boundaries
     val
 }

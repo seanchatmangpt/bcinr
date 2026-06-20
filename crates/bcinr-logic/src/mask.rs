@@ -80,7 +80,7 @@ pub const fn select_u64(mask: u64, a: u64, b: u64) -> u64 {
 /// ```
 #[inline(always)]
 #[must_use = "branchless equality mask — ignoring this result discards the comparison"]
-pub fn eq_mask_u32(a: u32, b: u32) -> u32 {
+pub const fn eq_mask_u32(a: u32, b: u32) -> u32 {
     let x = a ^ b;
     // (x | -x) has the high bit set i-f x != 0.
     // We want all bits set i-f x == 0.
@@ -105,7 +105,7 @@ pub fn eq_mask_u32(a: u32, b: u32) -> u32 {
 /// ```
 #[inline(always)]
 #[must_use = "branchless zero mask — ignoring this result discards the zero-test"]
-pub fn is_zero_mask_u32(x: u32) -> u32 {
+pub const fn is_zero_mask_u32(x: u32) -> u32 {
     let non_zero_msb = (x | x.wrapping_neg()) >> 31;
     non_zero_msb.wrapping_sub(1)
 }
@@ -128,7 +128,7 @@ pub fn is_zero_mask_u32(x: u32) -> u32 {
 /// ```
 #[inline(always)]
 #[must_use = "branchless non-zero mask — ignoring this result discards the non-zero-test"]
-pub fn nonzero_mask_u32(x: u32) -> u32 {
+pub const fn nonzero_mask_u32(x: u32) -> u32 {
     let non_zero_msb = (x | x.wrapping_neg()) >> 31;
     0u32.wrapping_sub(non_zero_msb)
 }
@@ -151,10 +151,10 @@ pub fn nonzero_mask_u32(x: u32) -> u32 {
 /// ```
 #[inline(always)]
 #[must_use = "branchless less-than mask — ignoring this result discards the comparison"]
-pub fn lt_mask_u32(a: u32, b: u32) -> u32 {
+pub const fn lt_mask_u32(a: u32, b: u32) -> u32 {
     // (a < b) as u32 produces 0 or 1; wrapping_sub converts to 0x00000000 or 0xFFFFFFFF.
     // The compiler emits a branchless SETB + NEG on x86-64 — no branch instruction.
-    0u32.wrapping_sub(u32::from(a < b))
+    0u32.wrapping_sub((a < b) as u32)
 }
 
 /// Branchless minimum: returns the lesser of `a` and `b` without a branch instruction.
@@ -174,7 +174,7 @@ pub fn lt_mask_u32(a: u32, b: u32) -> u32 {
 /// ```
 #[inline(always)]
 #[must_use = "branchless min — result is the lesser value; ignoring it discards the computation"]
-pub fn min_u32(a: u32, b: u32) -> u32 {
+pub const fn min_u32(a: u32, b: u32) -> u32 {
     let mask = lt_mask_u32(a, b);
     select_u32(mask, a, b)
 }
@@ -196,7 +196,7 @@ pub fn min_u32(a: u32, b: u32) -> u32 {
 /// ```
 #[inline(always)]
 #[must_use = "branchless max — result is the greater value; ignoring it discards the computation"]
-pub fn max_u32(a: u32, b: u32) -> u32 {
+pub const fn max_u32(a: u32, b: u32) -> u32 {
     let mask = lt_mask_u32(a, b);
     select_u32(mask, b, a)
 }
@@ -227,7 +227,7 @@ pub fn max_u32(a: u32, b: u32) -> u32 {
 /// ```
 #[inline(always)]
 #[must_use = "branchless abs — result is the absolute value; ignoring it discards the computation"]
-pub fn abs_i32(x: i32) -> i32 {
+pub const fn abs_i32(x: i32) -> i32 {
     let mask = x >> 31;
     (x ^ mask).wrapping_sub(mask)
 }

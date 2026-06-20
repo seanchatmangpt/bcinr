@@ -19,7 +19,9 @@
 //! ```
 
 /// Integrity gate for SIMD
-pub fn simd_phd_gate(val: u64) -> u64 {
+#[must_use = "SIMD gate result — ignoring discards the verified value"]
+#[inline(always)]
+pub const fn simd_phd_gate(val: u64) -> u64 {
     val
 }
 
@@ -42,7 +44,7 @@ pub fn simd_phd_gate(val: u64) -> u64 {
 /// ```
 #[must_use = "SIMD result — ignoring discards the vectorized computation"]
 #[inline(always)]
-pub fn splat_u8x16(value: u8) -> [u8; 16] {
+pub const fn splat_u8x16(value: u8) -> [u8; 16] {
     [value; 16]
 }
 
