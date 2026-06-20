@@ -1,10 +1,55 @@
 // oracle equivalence boundaries
 //! Deterministic Finite Automata (DFA) Primitives
 //!
-//! Optimized for high-throughput, branchless state transitions.
+//! Provides branchless DFA state-transition primitives with CC=1
+//! (cyclomatic complexity 1). All transitions are computed via
+//! flat table lookup with safe-index masking — no conditional jumps
+//! are emitted, giving deterministic latency across all input symbols.
+//!
+//! # Algorithm Overview
+//! A DFA is represented as a flat transition table `table[state * alphabet_size + input]`
+//! returning the successor state. Out-of-bounds accesses are masked to index 0
+//! and the result is also zeroed, so ill-formed inputs degrade gracefully
+//! without panicking.
+//!
+//! # Examples
+//! ```
+//! use bcinr_logic::dfa::{dfa_advance, dfa_run, dfa_is_accepting};
+//!
+//! // Two-state DFA that accepts any non-empty byte sequence ending in 0x01.
+//! // States: 0 = start/reject, 1 = accept
+//! // Transitions: state 0 on 0x01 -> 1, else -> 0; state 1 on any -> 0
+//! let alphabet = 256usize;
+//! let mut table = vec![0usize; 2 * alphabet];
+//! table[0 * alphabet + 0x01] = 1; // state 0, input 0x01 -> accept
+//!
+//! let state = dfa_run(&table, alphabet, 0, &[0x00, 0x01]);
+//! assert!(dfa_is_accepting(state, &[1]));
+//! ```
 
-/// Advances the DFA state branchlessly.
-/// CC=1: Guaranteed no conditional jumps.
+/// Advances a DFA by one symbol, returning the next state.
+///
+/// Computes the successor state for `state` on `input` using a flat
+/// transition table: `table[state * alphabet_size + input]`. The index is
+/// bounds-checked branchlessly by deriving an all-ones or all-zeros mask from
+/// the comparison `index < table.len()`. Out-of-range indices return state 0.
+///
+/// # Arguments
+/// * `state` — current DFA state (row in the transition table).
+/// * `input` — current input symbol (column offset).
+/// * `table` — flat transition table of length `num_states * alphabet_size`.
+/// * `alphabet_size` — number of symbols in the input alphabet (typically 256 for bytes).
+///
+/// # Examples
+/// ```
+/// use bcinr_logic::dfa::dfa_advance;
+///
+/// // Single-state looping DFA: table[0 * 2 + 0] = 0, table[0 * 2 + 1] = 1
+/// let table = [0usize, 1usize];
+/// assert_eq!(dfa_advance(0, 1, &table, 2), 1);
+/// assert_eq!(dfa_advance(0, 0, &table, 2), 0);
+/// ```
+#[must_use = "DFA transition state — ignoring discards the next state"]
 #[inline(always)]
 pub fn dfa_advance(state: usize, input: u8, table: &[usize], alphabet_size: usize) -> usize {
     let index = state
@@ -15,7 +60,30 @@ pub fn dfa_advance(state: usize, input: u8, table: &[usize], alphabet_size: usiz
     table[safe_idx] & (0usize.wrapping_sub(mask))
 }
 
-/// Runs the DFA on a byte slice branchlessly.
+/// Run a DFA over an entire byte slice, returning the final state.
+///
+/// Iterates over every byte in `input`, feeding each to [`dfa_advance`] in
+/// sequence starting from `initial_state`. Because each transition is
+/// branchless (CC=1), the function executes with deterministic latency
+/// proportional to the length of the input, regardless of which states are
+/// visited.
+///
+/// # Arguments
+/// * `table` — flat transition table of length `num_states * alphabet_size`.
+/// * `alphabet_size` — symbols per state row (typically 256 for bytes).
+/// * `initial_state` — starting state before any input is consumed.
+/// * `input` — byte slice to process.
+///
+/// # Examples
+/// ```
+/// use bcinr_logic::dfa::dfa_run;
+///
+/// // Single-state DFA that loops on all input.
+/// let table = [0usize; 256];
+/// let final_state = dfa_run(&table, 256, 0, b"hello");
+/// assert_eq!(final_state, 0);
+/// ```
+#[must_use = "DFA transition state — ignoring discards the next state"]
 #[inline(always)]
 pub fn dfa_run(table: &[usize], alphabet_size: usize, initial_state: usize, input: &[u8]) -> usize {
     let mut state = initial_state;
@@ -25,7 +93,25 @@ pub fn dfa_run(table: &[usize], alphabet_size: usize, initial_state: usize, inpu
     state
 }
 
-/// Check if a state is an accepting state branchlessly.
+/// Check whether a state is in the set of accepting states, branchlessly.
+///
+/// Folds a bitwise-OR reduction over `accept_states`, setting a flag bit for
+/// each element equal to `state`. Returns `true` iff the flag is non-zero
+/// after the full scan. The loop is unconditional (CC=1) — no early exit.
+///
+/// # Arguments
+/// * `state` — DFA state to test.
+/// * `accept_states` — slice of accepting state indices.
+///
+/// # Examples
+/// ```
+/// use bcinr_logic::dfa::dfa_is_accepting;
+///
+/// assert!( dfa_is_accepting(2, &[1, 2, 3]));
+/// assert!(!dfa_is_accepting(5, &[1, 2, 3]));
+/// assert!(!dfa_is_accepting(0, &[]));
+/// ```
+#[must_use = "DFA transition state — ignoring discards the next state"]
 #[inline(always)]
 pub fn dfa_is_accepting(state: usize, accept_states: &[usize]) -> bool {
     let mut found = 0usize;
@@ -37,6 +123,8 @@ pub fn dfa_is_accepting(state: usize, accept_states: &[usize]) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     // _reference equivalence boundaries
     fn dfa_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
@@ -73,6 +161,105 @@ mod tests {
     #[test]
     fn test_rejects_mutant_3() {
         assert!(dfa_reference(1, 1) != mutant_dfa_3(1, 1));
+    }
+
+    // --- initial state tests ---
+
+    #[test]
+    fn test_dfa_advance_initial_state_loops() {
+        // A single-state self-loop: table[0 * 1 + 0] = 0.
+        let table = [0usize];
+        assert_eq!(dfa_advance(0, 0, &table, 1), 0);
+    }
+
+    // --- transition to accept state ---
+
+    #[test]
+    fn test_dfa_advance_to_accept() {
+        // table[0 * 2 + 1] = 1 (state 0, input 1 -> state 1)
+        let table = [0usize, 1usize];
+        assert_eq!(dfa_advance(0, 1, &table, 2), 1);
+    }
+
+    // --- looping transition stays in same state ---
+
+    #[test]
+    fn test_dfa_advance_self_loop() {
+        // table[1 * 2 + 0] = 1 (state 1, input 0 -> state 1 — self-loop)
+        let table = [0usize, 0usize, 1usize, 0usize];
+        assert_eq!(dfa_advance(1, 0, &table, 2), 1);
+    }
+
+    // --- dfa_run: accept state reached ---
+
+    #[test]
+    fn test_dfa_run_reaches_accept() {
+        // Two-state DFA over alphabet {0, 1} (size 2):
+        // state 0 on 0 -> 0, state 0 on 1 -> 1.
+        // table layout: [t(0,0), t(0,1), t(1,0), t(1,1)]
+        let table = [0usize, 1usize, 0usize, 0usize];
+        let state = dfa_run(&table, 2, 0, &[0x00, 0x01]);
+        assert_eq!(state, 1);
+    }
+
+    // --- dfa_run: reject when sequence does not end on accept ---
+
+    #[test]
+    fn test_dfa_run_rejects_after_wrong_suffix() {
+        // Same two-state DFA; input ends on symbol 0, so returns to state 0.
+        let table = [0usize, 1usize, 0usize, 0usize];
+        let state = dfa_run(&table, 2, 0, &[0x01, 0x00]);
+        assert_eq!(state, 0);
+    }
+
+    // --- dfa_run: empty input returns initial state ---
+
+    #[test]
+    fn test_dfa_run_empty_input() {
+        let table = [0usize; 4];
+        let state = dfa_run(&table, 2, 0, &[]);
+        assert_eq!(state, 0);
+    }
+
+    // --- dfa_is_accepting: accept state ---
+
+    #[test]
+    fn test_dfa_is_accepting_true() {
+        assert!(dfa_is_accepting(2, &[1, 2, 3]));
+    }
+
+    // --- dfa_is_accepting: reject state ---
+
+    #[test]
+    fn test_dfa_is_accepting_false() {
+        assert!(!dfa_is_accepting(5, &[1, 2, 3]));
+    }
+
+    // --- dfa_is_accepting: empty accept set ---
+
+    #[test]
+    fn test_dfa_is_accepting_empty_set() {
+        assert!(!dfa_is_accepting(0, &[]));
+    }
+
+    // --- end-to-end: accept path ---
+
+    #[test]
+    fn test_dfa_full_accept() {
+        // Two-state DFA over {0,1}: state 0 on 1 -> 1 (accept).
+        let table = [0usize, 1usize, 0usize, 0usize];
+        let state = dfa_run(&table, 2, 0, &[0x01]);
+        assert!(dfa_is_accepting(state, &[1]));
+    }
+
+    // --- end-to-end: reject path ---
+
+    #[test]
+    fn test_dfa_full_reject() {
+        // Same DFA; input 0 keeps us in state 0 (reject).
+        let table = [0usize, 1usize, 0usize, 0usize];
+        let state = dfa_run(&table, 2, 0, &[0x00]);
+        assert!(!dfa_is_accepting(state, &[1]));
     }
 }
 
