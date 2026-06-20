@@ -4,6 +4,10 @@
 > them. This mirrors `patterns::PATTERN_REGISTRY` (a `&[ir::PatternSpec]`). For the *why*,
 > see the [foundry overview](../explanation/wasm4games-overview.md); to add an entry, see
 > the [add-a-pattern tutorial](../tutorials/wasm4games-add-a-pattern.md).
+>
+> **Pattern language guides:** Each pattern has a dedicated [Alexander-style guide](../../../crates/wasm4games/docs/patterns/INDEX.md)
+> with Context / Forces / Solution / Consequences narrative, a Mermaid diagram, and a usage
+> example. See the [full index](../../../crates/wasm4games/docs/patterns/INDEX.md).
 
 The catalog holds **75 patterns**: ids 1–70 across 14 families, plus the **Anti-Cheat**
 family (ids 71–75). The first tables below name the original Phase 1 families in full; the

@@ -1,0 +1,140 @@
+<!-- SCAFFOLDED BY ggen — fill in Context/Forces/Solution/Consequences below, then commit. -->
+<!-- Source: ggen/schema/patterns.ttl (waypoint_reached). Re-scaffold: `ggen sync`. -->
+
+# Pattern: WaypointReached
+
+> **Family:** Pathfinding · **Kernel:** `waypoint_reached` · **Lowering:** `Saturating` · **Id:** 22
+
+Check if remaining distance to a waypoint is within tolerance and compute saturating remainder.
+
+---
+
+## Context
+
+<!-- TODO: Describe the game situation that makes WaypointReached necessary.
+     Why does this pattern exist? What breaks — or becomes unpredictably slow —
+     without it? Seed from the authority line below, then expand:
+     Authority: oracle predicate: matches waypoint_reached_reference for all inputs -->
+
+_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+
+## Forces
+
+<!-- TODO: List the tensions this pattern must hold in balance. Consider:
+     - Branch misprediction: every WaypointReached call that branches adds jitter
+     - Deterministic latency: the Saturating lowering gives O(1) constant time
+     - Bounded state: stateCard = 16 (16 distinct states)
+     - Auditability: the OCEL event code 84 ties the transition to an object trace
+     Authority to defend: oracle predicate: matches waypoint_reached_reference for all inputs -->
+
+_Replace this placeholder with the forces — what pulls in opposite directions here._
+
+## Solution
+
+<!-- TODO: Explain how waypoint_reached resolves the forces.
+     It lowers onto `bcinr_logic::int::saturating_sub_i64` to compute without conditional branches.
+     Describe the bit-field ABI (how state and input are packed into u64),
+     the branchless arithmetic, and why `Saturating` was the right lowering choice. -->
+
+**Branchless primitive:** `bcinr_logic::int::saturating_sub_i64`
+
+_Replace this placeholder with the solution description._
+
+## Consequences
+
+<!-- TODO: What trade-offs follow from applying this pattern?
+     Gains: predictable latency, side-channel resistance, OCEL audit trail.
+     Costs: fixed bit-field ABI, state space bounded to 16 classes.
+     What patterns naturally compose with this one (see Related Patterns below)? -->
+
+_Replace this placeholder with consequences and trade-offs._
+
+---
+
+## Structure Diagram
+
+```mermaid
+graph LR
+    state["state\n(u64)"]
+    input["input\n(u64)"]
+    kernel["waypoint_reached\nSaturating: bcinr_logic::int::saturating_sub_i64"]
+    result["result\n(u64)"]
+    state --> kernel
+    input --> kernel
+    kernel --> result
+    ocel_0["OCEL: player"]
+    result --> ocel_0
+    ocel_1["OCEL: nav_node"]
+    result --> ocel_1
+```
+
+<!-- TODO: Improve this structural data-flow diagram:
+     - Annotate bit-field layout on the state/input/result nodes
+     - Label the arithmetic operation on the kernel node
+     - Add state machine nodes if this pattern has meaningful internal states
+     - Or replace with a more specific diagram tailored to this pattern -->
+
+---
+
+## Evidence Model
+
+| Field | Value |
+|---|---|
+| OCEL activity | `WaypointReached` |
+| Event code | `84` |
+| OTEL span | `84` |
+| Object kinds | `player`, `nav_node` |
+| Required status | `4` |
+| Refusal status | `7` |
+| Authority | oracle predicate: matches waypoint_reached_reference for all inputs |
+
+---
+
+## Metadata
+
+| Field | Value |
+|---|---|
+| Pattern id | 22 |
+| Family | Pathfinding |
+| Lowering | `Saturating` |
+| State cardinality | 16 |
+| Primitive | `bcinr_logic::int::saturating_sub_i64` |
+| Kernel signature | `waypoint_reached(state: u64, input: u64) -> u64` |
+| Source kernel | `src/patterns/waypoint_reached.rs` |
+
+---
+
+## How to Use
+
+```rust
+use wasm4games::patterns::waypoint_reached;
+
+// Pack state and input into u64 fields as documented in the kernel source.
+let result = waypoint_reached(state, input);
+```
+
+The kernel is a pure `fn(u64, u64) -> u64` — no side effects, no allocation, no branches.
+Pair with the evidence layer to emit OCEL events, OTEL spans, and receipt folds:
+
+```rust
+use wasm4games::evidence::{ocel::OcelEvent, otel};
+
+let result = waypoint_reached(state, input);
+otel::emit(84);
+let ev = OcelEvent::new(84, logical_tick, admission_status);
+```
+
+<!-- TODO: Add a concrete game-loop example showing this kernel in context:
+     how is the state packed? what does the caller do with the result?
+     what does the OCEL event represent in the game world? -->
+
+---
+
+## Related Patterns
+
+<!-- TODO: Add links to related patterns in this directory. Examples:
+     - [PatternName](pattern_name.md) — brief relationship note
+     Suggestions: look for patterns in the same family, same lowering, or that
+     compose naturally (one pattern's output feeds another's input). -->
+
+_No related patterns linked yet — fill in and remove this placeholder._
