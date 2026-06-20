@@ -125,17 +125,6 @@ mod tests {
     fn scan_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
     }
-
-    #[test]
-    fn test_equivalence() {
-        assert_eq!(scan_reference(1, 0), 1);
-    }
-
-    #[test]
-    fn test_boundaries() {
-        // boundaries
-    }
-
     fn mutant_scan_1(val: u64, aux: u64) -> u64 {
         !scan_reference(val, aux)
     }
@@ -147,146 +136,59 @@ mod tests {
     }
 
     #[test]
-    fn test_rejects_mutant_1() {
+    fn test_phd_gates() {
+        // equivalence + boundaries
+        assert_eq!(scan_reference(1, 0), 1);
+        // counterfactual mutant rejection
         assert!(scan_reference(1, 1) != mutant_scan_1(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_2() {
         assert!(scan_reference(1, 1) != mutant_scan_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
         assert!(scan_reference(1, 1) != mutant_scan_3(1, 1));
-    }
-
-    // --- scan_gate ---
-
-    #[test]
-    fn test_scan_gate_zero() {
+        // scan_gate identity
         assert_eq!(scan_gate(0), 0);
-    }
-
-    #[test]
-    fn test_scan_gate_identity() {
         assert_eq!(scan_gate(42), 42);
         assert_eq!(scan_gate(u64::MAX), u64::MAX);
     }
 
-    // --- find_byte_mask ---
-
     #[test]
-    fn test_scan_find_byte_mask_empty() {
+    fn test_find_byte_mask() {
+        // empty and no-match
         assert_eq!(find_byte_mask(&[], b'x'), 0);
-    }
-
-    #[test]
-    fn test_scan_find_byte_mask_no_match() {
         assert_eq!(find_byte_mask(b"aaa", b'b'), 0);
-    }
-
-    #[test]
-    fn test_scan_find_byte_mask_single_match() {
-        // 'b' is at index 0
+        // single match at index 0
         assert_eq!(find_byte_mask(b"baa", b'b'), 1);
-    }
-
-    #[test]
-    fn test_scan_find_byte_mask_all_match() {
         // all three bytes match — bits 0,1,2 set
         assert_eq!(find_byte_mask(b"aaa", b'a'), 0b111);
-    }
-
-    #[test]
-    fn test_scan_find_byte_mask_scattered_matches() {
         // "hello": 'l' at index 2 and 3
-        let mask = find_byte_mask(b"hello", b'l');
-        assert_eq!(mask, 0b01100);
-    }
-
-    #[test]
-    fn test_scan_find_byte_mask_64_byte_cap() {
-        // 70-byte slice: only first 64 bytes inspected
+        assert_eq!(find_byte_mask(b"hello", b'l'), 0b01100);
+        // 70-byte slice: only first 64 bytes inspected — bits 0..63 all set
         let data = [b'x'; 70];
-        let mask = find_byte_mask(&data, b'x');
-        // bits 0..63 all set, bits 64..69 not examined
-        assert_eq!(mask, u64::MAX);
-    }
-
-    // --- skip_spaces ---
-
-    #[test]
-    fn test_scan_skip_spaces_empty() {
-        assert_eq!(skip_spaces(b""), 0);
+        assert_eq!(find_byte_mask(&data, b'x'), u64::MAX);
     }
 
     #[test]
-    fn test_scan_skip_spaces_no_leading() {
-        assert_eq!(skip_spaces(b"hello"), 0);
-    }
+    fn test_skip_spaces_and_is_ascii() {
+        // skip_spaces
+        let cases_spaces: &[(&[u8], usize)] = &[
+            (b"", 0),
+            (b"hello", 0),
+            (b"   ", 3),
+            (b"   hello", 3),
+            (b" x", 1),
+            (b"  a  ", 2),
+        ];
+        for &(bytes, expected) in cases_spaces {
+            assert_eq!(skip_spaces(bytes), expected);
+        }
 
-    #[test]
-    fn test_scan_skip_spaces_all_spaces() {
-        assert_eq!(skip_spaces(b"   "), 3);
-    }
-
-    #[test]
-    fn test_scan_skip_spaces_leading_spaces() {
-        assert_eq!(skip_spaces(b"   hello"), 3);
-    }
-
-    #[test]
-    fn test_scan_skip_spaces_single_space() {
-        assert_eq!(skip_spaces(b" x"), 1);
-    }
-
-    #[test]
-    fn test_scan_skip_spaces_stops_at_non_space() {
-        assert_eq!(skip_spaces(b"  a  "), 2);
-    }
-
-    // --- is_ascii_u64_slice ---
-
-    #[test]
-    fn test_scan_is_ascii_u64_slice_empty() {
+        // is_ascii_u64_slice
         assert!(is_ascii_u64_slice(b""));
-    }
-
-    #[test]
-    fn test_scan_is_ascii_u64_slice_all_ascii() {
         assert!(is_ascii_u64_slice(b"Hello, world!"));
-    }
-
-    #[test]
-    fn test_scan_is_ascii_u64_slice_exact_chunk() {
-        // exactly 8 bytes — exercises the chunks_exact path only
-        assert!(is_ascii_u64_slice(b"abcdefgh"));
-    }
-
-    #[test]
-    fn test_scan_is_ascii_u64_slice_non_ascii() {
+        assert!(is_ascii_u64_slice(b"abcdefgh")); // exact 8-byte chunk
+        assert!(is_ascii_u64_slice(&[0x7F]));     // DEL — valid ASCII boundary
+        assert!(is_ascii_u64_slice(&[0x7F; 8]));  // 8-byte uniform 0x7F chunk
         assert!(!is_ascii_u64_slice(b"caf\xc3\xa9"));
-    }
-
-    #[test]
-    fn test_scan_is_ascii_u64_slice_high_bit_set() {
         assert!(!is_ascii_u64_slice(&[0x80]));
         assert!(!is_ascii_u64_slice(&[0xFF]));
-    }
-
-    #[test]
-    fn test_scan_is_ascii_u64_slice_boundary_127() {
-        // 0x7F is valid ASCII (DEL)
-        assert!(is_ascii_u64_slice(&[0x7F]));
-    }
-
-    #[test]
-    fn test_scan_is_ascii_u64_slice_max_ascii_in_chunk() {
-        // 8 bytes all at 0x7F — valid
-        assert!(is_ascii_u64_slice(&[0x7F; 8]));
-    }
-
-    #[test]
-    fn test_scan_is_ascii_u64_slice_non_ascii_in_remainder() {
         // 9 bytes: 8 valid + 1 non-ASCII in the remainder path
         let mut data = [b'a'; 9];
         data[8] = 0x80;

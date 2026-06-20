@@ -273,12 +273,6 @@ mod tests_phd_bitset {
     fn bitset_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
     }
-    #[test]
-    fn test_phd_equivalence() {
-        assert_eq!(bitset_reference(1, 0), 1);
-    }
-    #[test]
-    fn test_phd_boundaries() {}
     fn mutant_bitset_1(val: u64, aux: u64) -> u64 {
         !bitset_reference(val, aux)
     }
@@ -288,312 +282,163 @@ mod tests_phd_bitset {
     fn mutant_bitset_3(val: u64, aux: u64) -> u64 {
         bitset_reference(val, aux) ^ 0xFF
     }
+
     #[test]
-    fn test_phd_counterfactual_mutant_1() {
+    fn test_phd_gates() {
+        // equivalence
+        assert_eq!(bitset_reference(1, 0), 1);
+        // counterfactual mutant rejection
         assert!(bitset_reference(1, 1) != mutant_bitset_1(1, 1));
-    }
-    #[test]
-    fn test_phd_counterfactual_mutant_2() {
         assert!(bitset_reference(1, 1) != mutant_bitset_2(1, 1));
-    }
-    #[test]
-    fn test_phd_counterfactual_mutant_3() {
         assert!(bitset_reference(1, 1) != mutant_bitset_3(1, 1));
     }
 
-    // --- set_bit_u64 ---
-
     #[test]
-    fn set_bit_zero_input_sets_bit() {
-        assert_eq!(set_bit_u64(0, 0), 1);
-        assert_eq!(set_bit_u64(0, 3), 0b1000);
-        assert_eq!(set_bit_u64(0, 63), 1u64 << 63);
-    }
+    fn test_set_and_clear_bit() {
+        // set_bit_u64: zero base, high bit, idempotent on all-ones
+        let cases_set: &[(u64, usize, u64)] = &[
+            (0, 0, 1),
+            (0, 3, 0b1000),
+            (0, 63, 1u64 << 63),
+            (u64::MAX, 0, u64::MAX),
+            (u64::MAX, 31, u64::MAX),
+            (u64::MAX, 63, u64::MAX),
+            (1u64, 1, 0b11),
+            (0xAAAA_AAAA_AAAA_AAAAu64, 0, 0xAAAA_AAAA_AAAA_AAAAu64 | 1),
+        ];
+        for &(x, pos, expected) in cases_set {
+            assert_eq!(set_bit_u64(x, pos), expected);
+        }
 
-    #[test]
-    fn set_bit_all_ones_is_idempotent() {
-        assert_eq!(set_bit_u64(u64::MAX, 0), u64::MAX);
-        assert_eq!(set_bit_u64(u64::MAX, 31), u64::MAX);
-        assert_eq!(set_bit_u64(u64::MAX, 63), u64::MAX);
-    }
-
-    #[test]
-    fn set_bit_single_bit_word() {
-        assert_eq!(set_bit_u64(1u64, 1), 0b11);
-    }
-
-    #[test]
-    fn set_bit_alternating_bits() {
+        // clear_bit_u64: zero stays zero, all-ones clears one, alternating
         let alternating = 0xAAAA_AAAA_AAAA_AAAAu64;
-        // bit 0 is clear in alternating pattern
-        assert_eq!(set_bit_u64(alternating, 0), alternating | 1);
-    }
-
-    // --- clear_bit_u64 ---
-
-    #[test]
-    fn clear_bit_zero_input_stays_zero() {
-        assert_eq!(clear_bit_u64(0, 0), 0);
-        assert_eq!(clear_bit_u64(0, 63), 0);
-    }
-
-    #[test]
-    fn clear_bit_all_ones_clears_one_bit() {
-        assert_eq!(clear_bit_u64(u64::MAX, 0), u64::MAX - 1);
-        assert_eq!(clear_bit_u64(u64::MAX, 63), u64::MAX >> 1);
+        let cases_clear: &[(u64, usize, u64)] = &[
+            (0, 0, 0),
+            (0, 63, 0),
+            (u64::MAX, 0, u64::MAX - 1),
+            (u64::MAX, 63, u64::MAX >> 1),
+            (1u64, 0, 0),
+            (alternating, 1, alternating & !(1u64 << 1)),
+        ];
+        for &(x, pos, expected) in cases_clear {
+            assert_eq!(clear_bit_u64(x, pos), expected);
+        }
     }
 
     #[test]
-    fn clear_bit_single_bit_word() {
-        assert_eq!(clear_bit_u64(1u64, 0), 0);
-    }
-
-    #[test]
-    fn clear_bit_alternating_bits_clears_set_bit() {
+    fn test_rank_and_select() {
+        // rank_u64 cases
         let alternating = 0xAAAA_AAAA_AAAA_AAAAu64;
-        // bit 1 is set in alternating pattern
-        assert_eq!(clear_bit_u64(alternating, 1), alternating & !(1u64 << 1));
-    }
+        let cases_rank: &[(u64, usize, usize)] = &[
+            (0, 0, 0),
+            (0, 63, 0),
+            (u64::MAX, 63, 64),
+            (1, 0, 1),
+            (1, 1, 1),
+            (alternating, 63, 32),
+            (alternating, 1, 1),
+            (alternating, 0, 0),
+            (0b1010_1010, 7, 4),
+            (0b1010_1010, 3, 2),
+        ];
+        for &(x, pos, expected) in cases_rank {
+            assert_eq!(rank_u64(x, pos), expected);
+        }
 
-    // --- rank_u64 ---
-
-    #[test]
-    fn rank_zero_is_zero() {
-        assert_eq!(rank_u64(0, 0), 0);
-        assert_eq!(rank_u64(0, 63), 0);
-    }
-
-    #[test]
-    fn rank_all_ones_full_width() {
-        assert_eq!(rank_u64(u64::MAX, 63), 64);
-    }
-
-    #[test]
-    fn rank_single_bit() {
-        assert_eq!(rank_u64(1, 0), 1);
-        assert_eq!(rank_u64(1, 1), 1);
-    }
-
-    #[test]
-    fn rank_alternating_bits() {
-        // 0xAAAA... has bits set at positions 1,3,5,...,63 — 32 bits
-        let alternating = 0xAAAA_AAAA_AAAA_AAAAu64;
-        assert_eq!(rank_u64(alternating, 63), 32);
-        // Up to pos=1: bit 1 is set
-        assert_eq!(rank_u64(alternating, 1), 1);
-        // Up to pos=0: bit 0 is clear
-        assert_eq!(rank_u64(alternating, 0), 0);
-    }
-
-    #[test]
-    fn rank_example_from_docs() {
-        assert_eq!(rank_u64(0b1010_1010, 7), 4);
-        assert_eq!(rank_u64(0b1010_1010, 3), 2);
-    }
-
-    // --- select_bit_u64 ---
-
-    #[test]
-    fn select_bit_empty_returns_none() {
-        assert_eq!(select_bit_u64(0, 0), None);
-    }
-
-    #[test]
-    fn select_bit_single_bit() {
-        assert_eq!(select_bit_u64(1u64, 0), Some(0));
-        assert_eq!(select_bit_u64(1u64 << 63, 0), Some(63));
-    }
-
-    #[test]
-    fn select_bit_all_ones() {
+        // select_bit_u64 cases
+        let cases_select: &[(u64, usize, Option<usize>)] = &[
+            (0, 0, None),
+            (1u64, 0, Some(0)),
+            (1u64 << 63, 0, Some(63)),
+            (0b0001, 0, Some(0)),
+            (0b1010, 0, Some(1)),
+            (0b1010, 1, Some(3)),
+            (u64::MAX, 63, Some(63)),
+            (alternating, 0, Some(1)),
+            (alternating, 1, Some(3)),
+            (alternating, 32, None),
+        ];
+        for &(x, n, expected) in cases_select {
+            assert_eq!(select_bit_u64(x, n), expected);
+        }
+        // all-ones: every index 0..64 maps to itself
         for i in 0..64usize {
             assert_eq!(select_bit_u64(u64::MAX, i), Some(i));
         }
     }
 
     #[test]
-    fn select_bit_alternating_bits() {
-        let alternating = 0xAAAA_AAAA_AAAA_AAAAu64;
-        // 0th set bit is at position 1
-        assert_eq!(select_bit_u64(alternating, 0), Some(1));
-        // 1st set bit at position 3
-        assert_eq!(select_bit_u64(alternating, 1), Some(3));
-        // only 32 bits set — asking for 32nd returns None
-        assert_eq!(select_bit_u64(alternating, 32), None);
-    }
+    fn test_parity_jaccard_hamming() {
+        // parity_u64_slice
+        let cases_parity: &[(&[u64], u64)] = &[
+            (&[], 0),
+            (&[1u64], 1),
+            (&[0b11u64], 0),
+            (&[u64::MAX], 0),
+            (&[0xAAAA_AAAA_AAAA_AAAAu64], 0),
+        ];
+        for &(slice, expected) in cases_parity {
+            assert_eq!(parity_u64_slice(slice), expected);
+        }
 
-    #[test]
-    fn select_bit_example_from_docs() {
-        assert_eq!(select_bit_u64(0b0001, 0), Some(0));
-        assert_eq!(select_bit_u64(0b1010, 0), Some(1));
-        assert_eq!(select_bit_u64(0b1010, 1), Some(3));
-        assert_eq!(select_bit_u64(u64::MAX, 63), Some(63));
-    }
-
-    // --- parity_u64_slice ---
-
-    #[test]
-    fn parity_empty_slice_is_zero() {
-        assert_eq!(parity_u64_slice(&[]), 0);
-    }
-
-    #[test]
-    fn parity_single_bit_is_one() {
-        assert_eq!(parity_u64_slice(&[1u64]), 1);
-    }
-
-    #[test]
-    fn parity_two_bits_set_is_even() {
-        assert_eq!(parity_u64_slice(&[0b11u64]), 0);
-    }
-
-    #[test]
-    fn parity_all_ones_is_even() {
-        // 64 set bits — even
-        assert_eq!(parity_u64_slice(&[u64::MAX]), 0);
-    }
-
-    #[test]
-    fn parity_alternating_bits() {
-        // 0xAAAA... has 32 set bits — even
-        assert_eq!(parity_u64_slice(&[0xAAAA_AAAA_AAAA_AAAAu64]), 0);
-    }
-
-    // --- jaccard_u64_slices ---
-
-    #[test]
-    fn jaccard_empty_slices_is_zero() {
+        // jaccard_u64_slices
         assert_eq!(jaccard_u64_slices(&[], &[]), 0.0);
-    }
-
-    #[test]
-    fn jaccard_identical_non_zero_is_one() {
         assert_eq!(jaccard_u64_slices(&[0xFF], &[0xFF]), 1.0);
-    }
-
-    #[test]
-    fn jaccard_disjoint_is_zero() {
         assert_eq!(jaccard_u64_slices(&[0b1100], &[0b0011]), 0.0);
-    }
-
-    #[test]
-    fn jaccard_half_overlap() {
+        assert_eq!(jaccard_u64_slices(&[u64::MAX], &[u64::MAX]), 1.0);
+        assert_eq!(jaccard_u64_slices(&[0xAAAA_AAAA_AAAA_AAAAu64], &[0x5555_5555_5555_5555u64]), 0.0);
         let j = jaccard_u64_slices(&[0b1110], &[0b0111]);
         assert!((j - 0.5).abs() < 1e-6);
-    }
 
-    #[test]
-    fn jaccard_all_ones_vs_all_ones() {
-        assert_eq!(jaccard_u64_slices(&[u64::MAX], &[u64::MAX]), 1.0);
-    }
-
-    #[test]
-    fn jaccard_alternating_vs_complement() {
+        // hamming_u64_slices
         let a = 0xAAAA_AAAA_AAAA_AAAAu64;
         let b = 0x5555_5555_5555_5555u64;
-        assert_eq!(jaccard_u64_slices(&[a], &[b]), 0.0);
-    }
-
-    // --- hamming_u64_slices ---
-
-    #[test]
-    fn hamming_empty_slices_is_zero() {
-        assert_eq!(hamming_u64_slices(&[], &[]), 0);
-    }
-
-    #[test]
-    fn hamming_identical_is_zero() {
-        assert_eq!(hamming_u64_slices(&[u64::MAX], &[u64::MAX]), 0);
-        assert_eq!(hamming_u64_slices(&[0], &[0]), 0);
+        let cases_hamming: &[(&[u64], &[u64], usize)] = &[
+            (&[], &[], 0),
+            (&[u64::MAX], &[u64::MAX], 0),
+            (&[0], &[0], 0),
+            (&[u64::MAX], &[0], 64),
+            (&[a], &[b], 64),
+            (&[0b0001], &[0b0000], 1),
+        ];
+        for &(sa, sb, expected) in cases_hamming {
+            assert_eq!(hamming_u64_slices(sa, sb), expected);
+        }
     }
 
     #[test]
-    fn hamming_all_ones_vs_zero_is_64() {
-        assert_eq!(hamming_u64_slices(&[u64::MAX], &[0]), 64);
-    }
-
-    #[test]
-    fn hamming_alternating_bits() {
-        let a = 0xAAAA_AAAA_AAAA_AAAAu64;
-        let b = 0x5555_5555_5555_5555u64;
-        assert_eq!(hamming_u64_slices(&[a], &[b]), 64);
-    }
-
-    #[test]
-    fn hamming_single_bit_differ() {
-        assert_eq!(hamming_u64_slices(&[0b0001], &[0b0000]), 1);
-    }
-
-    // --- intersect_u64_slices ---
-
-    #[test]
-    fn intersect_produces_bitwise_and() {
+    fn test_intersect_union_any() {
+        // intersect_u64_slices
         let mut a = [0b1111u64, 0b1010u64];
         intersect_u64_slices(&mut a, &[0b0101u64, 0b1100u64]);
         assert_eq!(a, [0b0101u64, 0b1000u64]);
-    }
 
-    #[test]
-    fn intersect_all_ones_with_zero_yields_zero() {
         let mut a = [u64::MAX];
         intersect_u64_slices(&mut a, &[0u64]);
         assert_eq!(a, [0u64]);
-    }
 
-    #[test]
-    fn intersect_alternating_bits_with_complement_yields_zero() {
         let mut a = [0xAAAA_AAAA_AAAA_AAAAu64];
         intersect_u64_slices(&mut a, &[0x5555_5555_5555_5555u64]);
         assert_eq!(a, [0u64]);
-    }
 
-    // --- union_u64_slices ---
-
-    #[test]
-    fn union_produces_bitwise_or() {
+        // union_u64_slices
         let mut a = [0b0101u64, 0b1010u64];
         union_u64_slices(&mut a, &[0b1010u64, 0b0101u64]);
         assert_eq!(a, [0b1111u64, 0b1111u64]);
-    }
 
-    #[test]
-    fn union_zero_with_all_ones_yields_all_ones() {
         let mut a = [0u64];
         union_u64_slices(&mut a, &[u64::MAX]);
         assert_eq!(a, [u64::MAX]);
-    }
 
-    #[test]
-    fn union_alternating_bits_with_complement_yields_all_ones() {
         let mut a = [0xAAAA_AAAA_AAAA_AAAAu64];
         union_u64_slices(&mut a, &[0x5555_5555_5555_5555u64]);
         assert_eq!(a, [u64::MAX]);
-    }
 
-    // --- any_bit_set_u64_slice ---
-
-    #[test]
-    fn any_bit_set_empty_is_false() {
+        // any_bit_set_u64_slice
         assert!(!any_bit_set_u64_slice(&[]));
-    }
-
-    #[test]
-    fn any_bit_set_all_zeros_is_false() {
         assert!(!any_bit_set_u64_slice(&[0u64, 0u64, 0u64]));
-    }
-
-    #[test]
-    fn any_bit_set_single_bit_is_true() {
         assert!(any_bit_set_u64_slice(&[0u64, 1u64]));
-    }
-
-    #[test]
-    fn any_bit_set_all_ones_is_true() {
         assert!(any_bit_set_u64_slice(&[u64::MAX]));
-    }
-
-    #[test]
-    fn any_bit_set_alternating_bits_is_true() {
         assert!(any_bit_set_u64_slice(&[0xAAAA_AAAA_AAAA_AAAAu64]));
     }
 }

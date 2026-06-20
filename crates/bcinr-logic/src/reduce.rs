@@ -175,12 +175,6 @@ mod tests_phd_reduce {
     fn reduce_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
     }
-    #[test]
-    fn test_equivalence() {
-        assert_eq!(reduce_reference(1, 0), 1);
-    }
-    #[test]
-    fn test_boundaries() {}
     fn mutant_reduce_1(val: u64, aux: u64) -> u64 {
         !reduce_reference(val, aux)
     }
@@ -190,164 +184,86 @@ mod tests_phd_reduce {
     fn mutant_reduce_3(val: u64, aux: u64) -> u64 {
         reduce_reference(val, aux) ^ 0xFF
     }
+
     #[test]
-    fn test_rejects_mutant_1() {
+    fn test_phd_gates() {
+        // equivalence + boundaries
+        assert_eq!(reduce_reference(1, 0), 1);
+        // counterfactual mutant rejection
         assert!(reduce_reference(1, 1) != mutant_reduce_1(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_2() {
         assert!(reduce_reference(1, 1) != mutant_reduce_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
         assert!(reduce_reference(1, 1) != mutant_reduce_3(1, 1));
     }
 
-    // --- horizontal_or_u32 ---
-
     #[test]
-    fn or_empty_slice_returns_zero() {
-        assert_eq!(horizontal_or_u32(&[]), 0);
+    fn test_horizontal_or_and_xor() {
+        // horizontal_or_u32
+        let cases_or: &[(&[u32], u32)] = &[
+            (&[], 0),
+            (&[0], 0),
+            (&[0b1010_1010], 0b1010_1010),
+            (&[u32::MAX], u32::MAX),
+            (&[0u32, 0u32, 0u32], 0),
+            (&[u32::MAX, u32::MAX], u32::MAX),
+            (&[0xAAAA_AAAA, 0x5555_5555], u32::MAX),
+        ];
+        for &(slice, expected) in cases_or {
+            assert_eq!(horizontal_or_u32(slice), expected);
+        }
+
+        // horizontal_and_u32
+        let cases_and: &[(&[u32], u32)] = &[
+            (&[], 0),
+            (&[0b1010_1010], 0b1010_1010),
+            (&[u32::MAX], u32::MAX),
+            (&[u32::MAX, u32::MAX], u32::MAX),
+            (&[u32::MAX, 0u32], 0),
+            (&[0xAAAA_AAAA, 0x5555_5555], 0),
+        ];
+        for &(slice, expected) in cases_and {
+            assert_eq!(horizontal_and_u32(slice), expected);
+        }
+
+        // horizontal_xor_u32
+        let cases_xor: &[(&[u32], u32)] = &[
+            (&[], 0),
+            (&[0b1010_1010], 0b1010_1010),
+            (&[u32::MAX], u32::MAX),
+            (&[0xDEAD_BEEF, 0xDEAD_BEEF], 0),
+            (&[u32::MAX, u32::MAX], 0),
+            (&[0xAAAA_AAAA], 0xAAAA_AAAA),
+        ];
+        for &(slice, expected) in cases_xor {
+            assert_eq!(horizontal_xor_u32(slice), expected);
+        }
     }
 
     #[test]
-    fn or_single_element_returns_itself() {
-        assert_eq!(horizontal_or_u32(&[0b1010_1010]), 0b1010_1010);
-        assert_eq!(horizontal_or_u32(&[0]), 0);
-        assert_eq!(horizontal_or_u32(&[u32::MAX]), u32::MAX);
-    }
+    fn test_swar_sum_max_min() {
+        // horizontal_sum_u8x8
+        let cases_sum: &[(u64, u64)] = &[
+            (0, 0),
+            (u64::MAX, 8 * 255),
+            (0x01_01_01_01_01_01_01_01, 8),
+            (5u64, 5),
+            (0x03_00_00_00_00_00_00_00, 3),
+        ];
+        for &(v, expected) in cases_sum {
+            assert_eq!(horizontal_sum_u8x8(v), expected);
+        }
 
-    #[test]
-    fn or_all_zeros_returns_zero() {
-        assert_eq!(horizontal_or_u32(&[0u32, 0u32, 0u32]), 0);
-    }
+        // horizontal_max_u8x8 (uniform-lane inputs only)
+        let cases_max: &[(u64, u8)] = &[
+            (0, 0),
+            (u64::MAX, 255),
+            (0x07_07_07_07_07_07_07_07, 7),
+            (0x05_05_05_05_05_05_05_05, 5),
+        ];
+        for &(v, expected) in cases_max {
+            assert_eq!(horizontal_max_u8x8(v), expected);
+        }
 
-    #[test]
-    fn or_all_ones_returns_all_ones() {
-        assert_eq!(horizontal_or_u32(&[u32::MAX, u32::MAX]), u32::MAX);
-    }
-
-    #[test]
-    fn or_alternating_bits_with_complement_yields_all_ones() {
-        assert_eq!(horizontal_or_u32(&[0xAAAA_AAAA, 0x5555_5555]), u32::MAX);
-    }
-
-    // --- horizontal_and_u32 ---
-
-    #[test]
-    fn and_empty_slice_returns_zero() {
-        assert_eq!(horizontal_and_u32(&[]), 0);
-    }
-
-    #[test]
-    fn and_single_element_returns_itself() {
-        assert_eq!(horizontal_and_u32(&[0b1010_1010]), 0b1010_1010);
-        assert_eq!(horizontal_and_u32(&[u32::MAX]), u32::MAX);
-    }
-
-    #[test]
-    fn and_all_ones_returns_all_ones() {
-        assert_eq!(horizontal_and_u32(&[u32::MAX, u32::MAX]), u32::MAX);
-    }
-
-    #[test]
-    fn and_with_zero_returns_zero() {
-        assert_eq!(horizontal_and_u32(&[u32::MAX, 0u32]), 0);
-    }
-
-    #[test]
-    fn and_alternating_with_complement_is_zero() {
-        assert_eq!(horizontal_and_u32(&[0xAAAA_AAAA, 0x5555_5555]), 0);
-    }
-
-    // --- horizontal_xor_u32 ---
-
-    #[test]
-    fn xor_empty_slice_returns_zero() {
-        assert_eq!(horizontal_xor_u32(&[]), 0);
-    }
-
-    #[test]
-    fn xor_single_element_returns_itself() {
-        assert_eq!(horizontal_xor_u32(&[0b1010_1010]), 0b1010_1010);
-        assert_eq!(horizontal_xor_u32(&[u32::MAX]), u32::MAX);
-    }
-
-    #[test]
-    fn xor_same_value_twice_returns_zero() {
-        assert_eq!(horizontal_xor_u32(&[0xDEAD_BEEF, 0xDEAD_BEEF]), 0);
-    }
-
-    #[test]
-    fn xor_all_ones_twice_is_zero() {
-        assert_eq!(horizontal_xor_u32(&[u32::MAX, u32::MAX]), 0);
-    }
-
-    #[test]
-    fn xor_alternating_bits() {
-        assert_eq!(horizontal_xor_u32(&[0xAAAA_AAAA]), 0xAAAA_AAAA);
-    }
-
-    // --- horizontal_sum_u8x8 ---
-
-    #[test]
-    fn sum_zero_word_is_zero() {
-        assert_eq!(horizontal_sum_u8x8(0), 0);
-    }
-
-    #[test]
-    fn sum_all_ones_bytes() {
-        // 8 lanes each = 0xFF = 255; sum = 8 * 255 = 2040
-        assert_eq!(horizontal_sum_u8x8(u64::MAX), 8 * 255);
-    }
-
-    #[test]
-    fn sum_all_ones_lanes() {
-        // all lanes = 1; sum = 8
-        assert_eq!(horizontal_sum_u8x8(0x01_01_01_01_01_01_01_01), 8);
-    }
-
-    #[test]
-    fn sum_single_byte_in_lane0() {
-        assert_eq!(horizontal_sum_u8x8(5u64), 5);
-    }
-
-    #[test]
-    fn sum_single_byte_in_high_lane() {
-        // lane 7 = 0x03, all others 0
-        assert_eq!(horizontal_sum_u8x8(0x03_00_00_00_00_00_00_00), 3);
-    }
-
-    // --- horizontal_max_u8x8 ---
-    // Note: valid only for uniform-lane inputs (all bytes identical), 0, or u64::MAX.
-
-    #[test]
-    fn max_zero_word_is_zero() {
-        assert_eq!(horizontal_max_u8x8(0), 0);
-    }
-
-    #[test]
-    fn max_all_ones_is_255() {
-        assert_eq!(horizontal_max_u8x8(u64::MAX), 255);
-    }
-
-    #[test]
-    fn max_uniform_lanes_seven() {
-        // All 8 lanes = 7; max = 7
-        assert_eq!(horizontal_max_u8x8(0x07_07_07_07_07_07_07_07), 7);
-    }
-
-    #[test]
-    fn max_uniform_lanes_five() {
-        assert_eq!(horizontal_max_u8x8(0x05_05_05_05_05_05_05_05), 5);
-    }
-
-    // --- horizontal_min_u8x8 ---
-    // Note: the carry-trick addition overflows for non-zero inputs in debug builds.
-    // Only v=0 is safe to test in debug mode.
-
-    #[test]
-    fn min_zero_word_is_zero() {
+        // horizontal_min_u8x8 — only v=0 safe in debug builds (carry-trick overflow)
         assert_eq!(horizontal_min_u8x8(0), 0);
     }
 }
