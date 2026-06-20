@@ -1,6 +1,65 @@
-//! Branchless Scan Primitives
+//! # Branchless Scan Primitives (`scan`)
 //!
-//! CC=1 for all scanning operations.
+//! Scanning and searching operations that process byte sequences without
+//! data-dependent branches. All operations have cyclomatic complexity CC=1,
+//! meaning a single straight-line execution path regardless of input content.
+//!
+//! ## What is a Scan?
+//!
+//! A *scan* in this context is any operation that traverses a byte slice
+//! looking for a pattern: a specific byte value, the first space, the end
+//! of an ASCII run, etc. Naive implementations use `for` loops with early
+//! `return` or `break`, which introduce data-dependent branches. This module
+//! instead accumulates results arithmetically so the loop body never branches.
+//!
+//! ## SWAR Acceleration
+//!
+//! Several primitives use SWAR (SIMD Within A Register) to process 8 bytes
+//! at a time inside a single `u64`. The key trick is the zero-byte detection
+//! formula: for a word `v`, the expression
+//! `v.wrapping_sub(0x0101_0101_0101_0101) & !v & 0x8080_8080_8080_8080`
+//! has the high bit set in any byte position where `v` held a zero byte.
+//! By XORing with a broadcast of the target byte first, we can locate any
+//! specific byte value with the same technique.
+//!
+//! ## Function Overview
+//!
+//! | Function | Description |
+//! |----------|-------------|
+//! | `find_byte_mask` | Bitmask of positions where a byte equals a target |
+//! | `skip_spaces` | Branchless count of leading spaces |
+//! | `is_ascii_u64_slice` | SWAR check that all bytes are valid 7-bit ASCII |
+//!
+//! ## Example: Finding All Commas
+//!
+//! ```rust
+//! use bcinr_logic::scan::find_byte_mask;
+//!
+//! let input = b"hello,world,foo";
+//! let mask = find_byte_mask(input, b',');
+//! // Bit 5 and bit 11 are set (positions of the commas)
+//! assert_ne!(mask, 0);
+//! assert!(mask & (1 << 5) != 0);
+//! assert!(mask & (1 << 11) != 0);
+//! ```
+//!
+//! ## Example: ASCII Validation
+//!
+//! ```rust
+//! use bcinr_logic::scan::is_ascii_u64_slice;
+//!
+//! assert!(is_ascii_u64_slice(b"Hello, world!"));
+//! assert!(!is_ascii_u64_slice(b"caf\xc3\xa9")); // contains non-ASCII bytes
+//! ```
+//!
+//! ## Performance Notes
+//!
+//! - `is_ascii_u64_slice` processes 8 bytes per iteration via SWAR; the loop
+//!   body executes `bytes.len() / 8` times with no conditional branches.
+//! - `find_byte_mask` is limited to the first 64 bytes of the input slice
+//!   (one bit per position in the returned `u64`).
+//! - All scalar fallback paths are branchless: loop bodies use arithmetic
+//!   instead of `if`/`break` to accumulate results.
 
 /// Integrity gate for scan.
 pub fn scan_gate(val: u64) -> u64 {
