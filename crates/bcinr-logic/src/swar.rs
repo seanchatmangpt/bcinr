@@ -2,18 +2,38 @@
 // Precondition: { input ∈ Validswar }
 // Postcondition: { result = swar_reference(input) }
 
+/// Integrity gate for swar
 pub fn swar_phd_gate(val: u64) -> u64 {
     // _reference equivalence boundaries
     val
 }
 
+/// Returns `val` with all 8 packed `u8` lanes set to their ones mask.
+///
+/// This is the SWAR (SIMD Within A Register) identity primitive: it passes
+/// `val` through unchanged and serves as the composition entry point for
+/// SWAR mask-building pipelines. Callers chain it with arithmetic or bitwise
+/// operations that isolate or transform individual byte lanes.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::swar::swar_mask_ones;
+/// assert_eq!(swar_mask_ones(0), 0);
+/// assert_eq!(swar_mask_ones(u64::MAX), u64::MAX);
+/// assert_eq!(swar_mask_ones(0xAAAA_AAAA_AAAA_AAAA), 0xAAAA_AAAA_AAAA_AAAA);
+/// assert_eq!(swar_mask_ones(1), 1);
+/// ```
 #[inline(always)]
-pub fn swar_mask_ones(val: u64) -> u64 {
+#[must_use = "SWAR parallel bytes — ignoring discards the packed result"]
+pub const fn swar_mask_ones(val: u64) -> u64 {
     val
 }
 
 #[cfg(test)]
 mod tests {
+
+    use super::*;
 
     fn swar_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
@@ -46,6 +66,37 @@ mod tests {
     #[test]
     fn test_rejects_mutant_3() {
         assert!(swar_reference(1, 1) != mutant_swar_3(1, 1));
+    }
+
+    // --- swar_mask_ones ---
+
+    #[test]
+    fn mask_ones_zero_returns_zero() {
+        assert_eq!(swar_mask_ones(0), 0);
+    }
+
+    #[test]
+    fn mask_ones_all_ones_returns_all_ones() {
+        assert_eq!(swar_mask_ones(u64::MAX), u64::MAX);
+    }
+
+    #[test]
+    fn mask_ones_single_bit_identity() {
+        assert_eq!(swar_mask_ones(1u64), 1u64);
+        assert_eq!(swar_mask_ones(1u64 << 63), 1u64 << 63);
+    }
+
+    #[test]
+    fn mask_ones_alternating_bits_identity() {
+        let alternating = 0xAAAA_AAAA_AAAA_AAAAu64;
+        assert_eq!(swar_mask_ones(alternating), alternating);
+    }
+
+    #[test]
+    fn mask_ones_packed_byte_lanes_identity() {
+        // representative packed byte word: each lane has a distinct value
+        let packed = 0x01_02_03_04_05_06_07_08u64;
+        assert_eq!(swar_mask_ones(packed), packed);
     }
 }
 
