@@ -1,5 +1,77 @@
 #![forbid(unsafe_code)]
 
+//! # Mask Calculus (`mask`)
+//!
+//! Branchless conditional selection and masking primitives forming the foundation
+//! of the B-Calculus framework.
+//!
+//! ## Core Idea
+//!
+//! Traditional code uses `if` branches which cause CPU pipeline stalls on misprediction.
+//! Mask calculus replaces branches with arithmetic:
+//!
+//! ```rust
+//! // Branching version (can mispredict):
+//! // let result = if condition { a } else { b };
+//!
+//! // Branchless version (always same latency):
+//! use bcinr_logic::mask::select_u32;
+//! let mask = 0xFFFF_FFFFu32; // all-ones = true
+//! let result = select_u32(mask, 42u32, 99u32);
+//! assert_eq!(result, 42);
+//! ```
+//!
+//! ## Mask Convention
+//!
+//! All masks in this module follow the **all-ones/all-zeros convention**:
+//! - `0xFFFFFFFF` (all ones) — condition is **true**, select `a`
+//! - `0x00000000` (all zeros) — condition is **false**, select `b`
+//!
+//! Use the `eq_mask_*`, `lt_mask_*`, and `gt_mask_*` families to generate masks
+//! from comparisons, then pass them to `select_*` for conditional selection.
+//!
+//! ## B-Calculus Notation
+//!
+//! In the formal B-Calculus framework, a mask operation is written:
+//! `M(c, a, b) = (c & a) | (~c & b)` where `c` is either `0` or `!0`.
+//!
+//! This identity is the core of every conditional in this library. All higher-level
+//! primitives (`min`, `max`, `abs`, `clamp`) are expressed in terms of `M`.
+//!
+//! ## Function Families
+//!
+//! | Family | Description |
+//! |--------|-------------|
+//! | `select_u32` / `select_u64` | Conditional selection using an existing mask |
+//! | `eq_mask_u32` | Produces all-ones if `a == b`, all-zeros otherwise |
+//! | `lt_mask_u32` | Produces all-ones if `a < b` (unsigned), all-zeros otherwise |
+//! | `is_zero_mask_u32` | Produces all-ones if `x == 0` |
+//! | `nonzero_mask_u32` | Produces all-ones if `x != 0` |
+//! | `min_u32` / `max_u32` | Branchless minimum/maximum via mask selection |
+//! | `abs_i32` | Branchless absolute value for signed integers |
+//!
+//! ## Performance
+//!
+//! All operations are `O(1)` with a predictable, data-independent instruction count.
+//! On x86-64, `lt_mask_u32` compiles to a `SETB` + `NEG` sequence — no branch
+//! instruction, no prediction, no pipeline stall. Throughput is typically 1 cycle
+//! when the CPU can issue the instruction alongside unrelated work.
+//!
+//! ## Example: Branchless Clamp
+//!
+//! ```rust
+//! use bcinr_logic::mask::{min_u32, max_u32};
+//!
+//! /// Clamp `value` to `[lo, hi]` without branching.
+//! fn clamp_u32(value: u32, lo: u32, hi: u32) -> u32 {
+//!     min_u32(max_u32(value, lo), hi)
+//! }
+//!
+//! assert_eq!(clamp_u32(5, 0, 10), 5);
+//! assert_eq!(clamp_u32(15, 0, 10), 10);
+//! assert_eq!(clamp_u32(0, 3, 10), 3);
+//! ```
+
 //  # Axiomatic Proof: Hoare-logic verified.
 //  Precondition: { input ∈ Validmask }
 //  Postcondition: { result = mask_reference(input) }

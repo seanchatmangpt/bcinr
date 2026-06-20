@@ -7,6 +7,7 @@ extern crate std;
 
 pub mod abstractions;
 pub mod algorithms;
+pub mod ct;
 pub mod autonomic;
 pub mod bitset;
 pub mod dfa;
@@ -22,8 +23,10 @@ pub mod patterns;
 pub mod reduce;
 pub mod scan;
 pub mod simd;
+pub mod simd_dispatch;
 pub mod sketch;
 pub mod swar;
+pub mod swar_str;
 pub mod utf8;
 pub mod utils;
 

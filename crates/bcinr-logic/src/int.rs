@@ -336,6 +336,237 @@ pub const fn trailing_zeros_u32(x: u32) -> u32 {
     x.trailing_zeros()
 }
 
+// ─── Extended Integer Operations ────────────────────────────────────────────
+
+/// Integer floor division (rounds toward negative infinity).
+///
+/// Unlike Rust's `/` operator (which truncates toward zero), this function
+/// rounds toward -infinity. For non-negative quotients the result is identical.
+///
+/// # Examples
+/// ```
+/// use bcinr_logic::int::div_floor_i64;
+/// assert_eq!(div_floor_i64(7, 2), 3);
+/// assert_eq!(div_floor_i64(-7, 2), -4);
+/// assert_eq!(div_floor_i64(7, -2), -4);
+/// assert_eq!(div_floor_i64(-7, -2), 3);
+/// ```
+#[inline(always)]
+pub const fn div_floor_i64(a: i64, b: i64) -> i64 {
+    let d = a / b;
+    let r = a % b;
+    // Subtract 1 when the remainder is nonzero and has opposite sign to divisor.
+    let adjust = ((r != 0) && ((r ^ b) < 0)) as i64;
+    d - adjust
+}
+
+/// Integer ceiling division (rounds toward positive infinity).
+///
+/// Unlike Rust's `/` operator (which truncates toward zero), this function
+/// rounds toward +infinity.
+///
+/// # Examples
+/// ```
+/// use bcinr_logic::int::div_ceil_i64;
+/// assert_eq!(div_ceil_i64(7, 2), 4);
+/// assert_eq!(div_ceil_i64(-7, 2), -3);
+/// assert_eq!(div_ceil_i64(7, -2), -3);
+/// assert_eq!(div_ceil_i64(-7, -2), 4);
+/// ```
+#[inline(always)]
+pub const fn div_ceil_i64(a: i64, b: i64) -> i64 {
+    let d = a / b;
+    let r = a % b;
+    // Add 1 when the remainder is nonzero and has the same sign as the divisor.
+    let adjust = ((r != 0) && ((r ^ b) >= 0)) as i64;
+    d + adjust
+}
+
+/// Absolute difference between two `u32` values (never wraps).
+///
+/// Computed branchlessly with only `u32` operations.
+///
+/// # Examples
+/// ```
+/// use bcinr_logic::int::abs_diff_u32;
+/// assert_eq!(abs_diff_u32(5, 3), 2);
+/// assert_eq!(abs_diff_u32(3, 5), 2);
+/// assert_eq!(abs_diff_u32(0, u32::MAX), u32::MAX);
+/// assert_eq!(abs_diff_u32(7, 7), 0);
+/// ```
+#[inline(always)]
+pub const fn abs_diff_u32(a: u32, b: u32) -> u32 {
+    // mask is all-ones if a < b, else all-zeros.
+    let mask = 0u32.wrapping_sub((a < b) as u32);
+    // lo = min(a, b), hi = max(a, b) -- branchless select.
+    let lo = (a & mask) | (b & !mask);
+    let hi = (b & mask) | (a & !mask);
+    hi - lo
+}
+
+/// Binary (Stein's) GCD for `u64`.
+///
+/// Uses only shifts and subtractions; no division required.
+/// Terminates in O(log(min(a, b))) iterations.
+///
+/// # Examples
+/// ```
+/// use bcinr_logic::int::gcd_u64;
+/// assert_eq!(gcd_u64(12, 8), 4);
+/// assert_eq!(gcd_u64(0, 5), 5);
+/// assert_eq!(gcd_u64(5, 0), 5);
+/// assert_eq!(gcd_u64(0, 0), 0);
+/// assert_eq!(gcd_u64(1, 1), 1);
+/// assert_eq!(gcd_u64(100, 75), 25);
+/// ```
+#[inline(always)]
+pub fn gcd_u64(mut a: u64, mut b: u64) -> u64 {
+    if a == 0 {
+        return b;
+    }
+    if b == 0 {
+        return a;
+    }
+    // Common factor of 2.
+    let shift = (a | b).trailing_zeros();
+    // Reduce a to odd.
+    a >>= a.trailing_zeros();
+    loop {
+        // Reduce b to odd.
+        b >>= b.trailing_zeros();
+        // Ensure a <= b.
+        if a > b {
+            let tmp = a;
+            a = b;
+            b = tmp;
+        }
+        b -= a;
+        if b == 0 {
+            break;
+        }
+    }
+    a << shift
+}
+
+/// Least common multiple of two `u64` values (saturating on overflow).
+///
+/// Returns 0 if either argument is 0.
+///
+/// # Examples
+/// ```
+/// use bcinr_logic::int::lcm_u64;
+/// assert_eq!(lcm_u64(4, 6), 12);
+/// assert_eq!(lcm_u64(0, 5), 0);
+/// assert_eq!(lcm_u64(7, 7), 7);
+/// assert_eq!(lcm_u64(1, 100), 100);
+/// ```
+#[inline(always)]
+pub fn lcm_u64(a: u64, b: u64) -> u64 {
+    if a == 0 || b == 0 {
+        return 0;
+    }
+    (a / gcd_u64(a, b)).saturating_mul(b)
+}
+
+/// Next power of two `>= n` for `u64`, branchless.
+///
+/// Returns 1 for n == 0 and n == 1.
+///
+/// # Examples
+/// ```
+/// use bcinr_logic::int::next_pow2_u64;
+/// assert_eq!(next_pow2_u64(0), 1);
+/// assert_eq!(next_pow2_u64(1), 1);
+/// assert_eq!(next_pow2_u64(2), 2);
+/// assert_eq!(next_pow2_u64(3), 4);
+/// assert_eq!(next_pow2_u64(5), 8);
+/// assert_eq!(next_pow2_u64(8), 8);
+/// assert_eq!(next_pow2_u64(9), 16);
+/// ```
+#[inline(always)]
+pub const fn next_pow2_u64(n: u64) -> u64 {
+    if n <= 1 {
+        return 1;
+    }
+    let mut v = n - 1;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v |= v >> 32;
+    v.wrapping_add(1)
+}
+
+/// Branchless clamp: returns `min(max(val, lo), hi)` for `u64`.
+///
+/// # Examples
+/// ```
+/// use bcinr_logic::int::clamp_u64;
+/// assert_eq!(clamp_u64(5, 1, 10), 5);
+/// assert_eq!(clamp_u64(0, 1, 10), 1);
+/// assert_eq!(clamp_u64(15, 1, 10), 10);
+/// assert_eq!(clamp_u64(1, 1, 1), 1);
+/// ```
+#[inline(always)]
+pub const fn clamp_u64(val: u64, lo: u64, hi: u64) -> u64 {
+    // Branchless max(val, lo): if val < lo, choose lo, else choose val.
+    let after_lo = {
+        let diff = lo ^ val;
+        let mask = 0u64.wrapping_sub((val < lo) as u64);
+        val ^ (diff & mask)
+    };
+    // Branchless min(after_lo, hi): if hi < after_lo, choose hi, else choose after_lo.
+    {
+        let diff = after_lo ^ hi;
+        let mask = 0u64.wrapping_sub((hi < after_lo) as u64);
+        after_lo ^ (diff & mask)
+    }
+}
+
+/// Number of decimal digits in `n` (e.g., `decimal_digits_u64(0) == 1`).
+///
+/// Uses a threshold comparison tree -- O(1) branchless for the digit count.
+///
+/// # Examples
+/// ```
+/// use bcinr_logic::int::decimal_digits_u64;
+/// assert_eq!(decimal_digits_u64(0), 1);
+/// assert_eq!(decimal_digits_u64(9), 1);
+/// assert_eq!(decimal_digits_u64(10), 2);
+/// assert_eq!(decimal_digits_u64(99), 2);
+/// assert_eq!(decimal_digits_u64(100), 3);
+/// assert_eq!(decimal_digits_u64(u64::MAX), 20);
+/// ```
+#[inline(always)]
+pub const fn decimal_digits_u64(n: u64) -> u32 {
+    // Each comparison casts to u32 (0 or 1) and they are summed.
+    // Sum equals the number of thresholds n meets, which is digit_count - 1.
+    let d1  = (n >= 10u64) as u32;
+    let d2  = (n >= 100u64) as u32;
+    let d3  = (n >= 1_000u64) as u32;
+    let d4  = (n >= 10_000u64) as u32;
+    let d5  = (n >= 100_000u64) as u32;
+    let d6  = (n >= 1_000_000u64) as u32;
+    let d7  = (n >= 10_000_000u64) as u32;
+    let d8  = (n >= 100_000_000u64) as u32;
+    let d9  = (n >= 1_000_000_000u64) as u32;
+    let d10 = (n >= 10_000_000_000u64) as u32;
+    let d11 = (n >= 100_000_000_000u64) as u32;
+    let d12 = (n >= 1_000_000_000_000u64) as u32;
+    let d13 = (n >= 10_000_000_000_000u64) as u32;
+    let d14 = (n >= 100_000_000_000_000u64) as u32;
+    let d15 = (n >= 1_000_000_000_000_000u64) as u32;
+    let d16 = (n >= 10_000_000_000_000_000u64) as u32;
+    let d17 = (n >= 100_000_000_000_000_000u64) as u32;
+    let d18 = (n >= 1_000_000_000_000_000_000u64) as u32;
+    let d19 = (n >= 10_000_000_000_000_000_000u64) as u32;
+    1 + d1 + d2 + d3 + d4 + d5 + d6 + d7 + d8 + d9
+      + d10 + d11 + d12 + d13 + d14 + d15 + d16 + d17 + d18 + d19
+}
+
+// Hoare-logic Verification Line 100: Radon Law verified.
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -372,9 +603,11 @@ mod tests {
         // bit reversal
         assert_eq!(reverse_bits_u64(1), 0x8000_0000_0000_0000);
         assert_eq!(reverse_bits_u32(1), 0x8000_0000);
+        assert_eq!(reverse_bits_u64(0x8000_0000_0000_0000), 1);
         let v64 = 0xDEAD_BEEF_CAFE_1234u64;
         assert_eq!(reverse_bits_u64(reverse_bits_u64(v64)), v64);
         // phd gate boundaries
+
         assert_eq!(int_reference(1, 2), 3);
         assert_eq!(int_reference(0, 0), 0);
     }
@@ -391,5 +624,3 @@ mod tests {
         }
     }
 }
-
-// Hoare-logic Verification Line 100: Radon Law verified.
