@@ -95,6 +95,9 @@ pub fn swar_horizontal_sum(word: u64) -> u32 {
 
 /// Maximum byte value among the 8 bytes packed in a u64 SWAR word.
 ///
+/// Extracts each of the 8 byte lanes from `word` and computes their maximum
+/// using 7 branchless comparisons.
+///
 /// # Examples
 /// ```
 /// use bcinr_logic::reduce::swar_horizontal_max_u8;
@@ -103,8 +106,32 @@ pub fn swar_horizontal_sum(word: u64) -> u32 {
 /// ```
 #[inline(always)]
 pub fn swar_horizontal_max_u8(word: u64) -> u8 {
-    // Delegate to the existing horizontal_max_u8x8.
-    horizontal_max_u8x8(word)
+    // Extract each byte lane explicitly — avoids inter-lane interference.
+    let b = [
+        (word       ) as u8,
+        (word >>  8 ) as u8,
+        (word >> 16 ) as u8,
+        (word >> 24 ) as u8,
+        (word >> 32 ) as u8,
+        (word >> 40 ) as u8,
+        (word >> 48 ) as u8,
+        (word >> 56 ) as u8,
+    ];
+    // 7 branchless max comparisons (linear reduction).
+    let mut m = b[0];
+    (1..8usize).for_each(|i| {
+        let a = m as u32;
+        let c = b[i] as u32;
+        // Branchless max:
+        //   diff = a - c (wrapping); sign = diff >> 31 (1 if a < c)
+        //   mask = sign - 1: 0xFFFF_FFFF if a >= c, 0 if a < c
+        //   result = c + (diff & mask): a if a>=c, c if a<c
+        let diff = a.wrapping_sub(c);
+        let sign = diff >> 31;
+        let mask = sign.wrapping_sub(1);
+        m = c.wrapping_add(diff & mask) as u8;
+    });
+    m
 }
 
 /// Count how many of the 8 byte lanes in `word` equal `target`.
@@ -131,8 +158,9 @@ pub fn swar_count_eq_u8(word: u64, target: u8) -> u32 {
         & !xored
         & 0x8080_8080_8080_8080u64;
 
-    // Each 0x80 bit represents one match; count them.
-    (zero_bytes.count_ones()) / 8
+    // Each matching lane contributes exactly one set bit (the 0x80 sentinel bit).
+    // count_ones() of zero_bytes directly equals the number of matching byte lanes.
+    zero_bytes.count_ones()
 }
 
 // ---------------------------------------------------------------------------
@@ -142,6 +170,10 @@ pub fn swar_count_eq_u8(word: u64, target: u8) -> u32 {
 /// Branchless minimum over a `u32` slice.
 ///
 /// Returns `u32::MAX` for an empty slice (identity element for min).
+///
+/// Uses unsigned borrow detection via `u64` promotion, which correctly handles
+/// the full unsigned range (unlike the `>> 31` signed-overflow trick which
+/// breaks near `u32::MAX`).
 ///
 /// # Examples
 /// ```
@@ -155,18 +187,13 @@ pub fn reduce_min_u32(slice: &[u32]) -> u32 {
     (0..slice.len()).for_each(|i| {
         let a = acc;
         let b = slice[i];
-        // Branchless min:
-        //   diff = a - b
-        //   sign = diff >> 31   (1 if a < b, i.e. underflow)
-        //   if a <  b (sign=1): keep a → acc = a - (diff & 0) = a  ✓
-        //   if a >= b (sign=0): keep b → acc = a - (diff & diff)   = b  ✓
-        // mask = ~(sign - 1):
-        //   sign=0 → mask = 0xFFFF_FFFF  → diff & mask = diff → acc = b
-        //   sign=1 → mask = 0            → diff & mask = 0    → acc = a
-        let diff = a.wrapping_sub(b);
-        let sign = diff >> 31;
-        let mask = sign.wrapping_sub(1); // 0xFFFF_FFFF when a >= b, 0 when a < b
-        acc = a.wrapping_sub(diff & mask);
+        // Unsigned borrow: bit 32 of (a as u64 - b as u64) is 1 iff a < b.
+        let borrow     = ((a as u64).wrapping_sub(b as u64) >> 32) as u32 & 1;
+        // neg_borrow: 0xFFFF_FFFF when a < b (keep a), 0 when a >= b (keep b).
+        let neg_borrow = borrow.wrapping_neg();
+        //   a <  b (neg_borrow = 0xFFFF_FFFF): b + (a-b) = a  ✓
+        //   a >= b (neg_borrow = 0):            b + 0     = b  ✓
+        acc = b.wrapping_add(a.wrapping_sub(b) & neg_borrow);
     });
     acc
 }
@@ -187,16 +214,13 @@ pub fn reduce_max_u32(slice: &[u32]) -> u32 {
     (0..slice.len()).for_each(|i| {
         let a = acc;
         let b = slice[i];
-        // Branchless max (dual of min, swap roles of a and b):
-        //   diff = a - b
-        //   sign = diff >> 31  (1 if a < b)
-        //   neg_sign = -sign   (0xFFFF_FFFF if a < b, 0 otherwise)
-        //   if a <  b (neg_sign=0xFFFF_FFFF): acc = a - (diff & neg_sign) = a - diff = b  ✓
-        //   if a >= b (neg_sign=0):            acc = a - 0                 = a          ✓
-        let diff     = a.wrapping_sub(b);
-        let sign     = diff >> 31;
-        let neg_sign = sign.wrapping_neg();
-        acc = a.wrapping_sub(diff & neg_sign);
+        // Unsigned borrow for (b - a): bit 32 is 1 iff b < a.
+        let borrow     = ((b as u64).wrapping_sub(a as u64) >> 32) as u32 & 1;
+        let not_borrow = 1u32.wrapping_sub(borrow);       // 1 when b >= a
+        let neg_nb     = not_borrow.wrapping_neg();        // 0xFFFF_FFFF when b >= a
+        //   b >= a (neg_nb = 0xFFFF_FFFF): a + (b-a) = b  ✓
+        //   b <  a (neg_nb = 0):           a + 0     = a  ✓
+        acc = a.wrapping_add(b.wrapping_sub(a) & neg_nb);
     });
     acc
 }
