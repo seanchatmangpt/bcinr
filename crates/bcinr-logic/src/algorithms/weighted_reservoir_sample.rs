@@ -67,61 +67,39 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_weighted_reservoir_sample_equivalence(val in any::<u64>(), aux in any::<u64>()) {
+        fn test_weighted_reservoir_sample_all(val in any::<u64>(), aux in any::<u64>()) {
             let expected = weighted_reservoir_sample_reference(val, aux);
             let actual = weighted_reservoir_sample(val, aux);
             prop_assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
-        }
-
-        #[test]
-        fn test_weighted_reservoir_sample_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
-            let expected = weighted_reservoir_sample_reference(val, aux);
+            prop_assert_eq!(
+                weighted_reservoir_sample(0, 0),
+                weighted_reservoir_sample_reference(0, 0)
+            );
+            prop_assert_eq!(
+                weighted_reservoir_sample(u64::MAX, u64::MAX),
+                weighted_reservoir_sample_reference(u64::MAX, u64::MAX)
+            );
+            prop_assert_eq!(
+                weighted_reservoir_sample(u64::MAX, 0),
+                weighted_reservoir_sample_reference(u64::MAX, 0)
+            );
+            prop_assert_eq!(
+                weighted_reservoir_sample(0, u64::MAX),
+                weighted_reservoir_sample_reference(0, u64::MAX)
+            );
             let actual = mutant_weighted_reservoir_sample_1(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
             }
-        }
-
-        #[test]
-        fn test_weighted_reservoir_sample_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
-            let expected = weighted_reservoir_sample_reference(val, aux);
             let actual = mutant_weighted_reservoir_sample_2(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
             }
-        }
-
-        #[test]
-        fn test_weighted_reservoir_sample_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
-            let expected = weighted_reservoir_sample_reference(val, aux);
             let actual = mutant_weighted_reservoir_sample_3(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 3 failed to fail!");
             }
         }
-    }
-
-    // -------------------------------------------------------------------------
-    // BOUNDARY EXAMPLES: Hardcoded edge cases
-    // -------------------------------------------------------------------------
-    #[test]
-    fn test_weighted_reservoir_sample_boundaries() {
-        assert_eq!(
-            weighted_reservoir_sample(0, 0),
-            weighted_reservoir_sample_reference(0, 0)
-        );
-        assert_eq!(
-            weighted_reservoir_sample(u64::MAX, u64::MAX),
-            weighted_reservoir_sample_reference(u64::MAX, u64::MAX)
-        );
-        assert_eq!(
-            weighted_reservoir_sample(u64::MAX, 0),
-            weighted_reservoir_sample_reference(u64::MAX, 0)
-        );
-        assert_eq!(
-            weighted_reservoir_sample(0, u64::MAX),
-            weighted_reservoir_sample_reference(0, u64::MAX)
-        );
     }
 
     // -------------------------------------------------------------------------

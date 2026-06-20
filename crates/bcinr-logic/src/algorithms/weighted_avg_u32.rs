@@ -82,58 +82,36 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_weighted_avg_u32_equivalence(val in any::<u64>(), aux in any::<u64>()) {
+        fn test_weighted_avg_u32_all(val in any::<u64>(), aux in any::<u64>()) {
             let expected = weighted_avg_u32_reference(val, aux);
             let actual = weighted_avg_u32(val, aux);
             prop_assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
-        }
-
-        #[test]
-        fn test_weighted_avg_u32_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
-            let expected = weighted_avg_u32_reference(val, aux);
+            prop_assert_eq!(weighted_avg_u32(0, 0), weighted_avg_u32_reference(0, 0));
+            prop_assert_eq!(
+                weighted_avg_u32(u64::MAX, u64::MAX),
+                weighted_avg_u32_reference(u64::MAX, u64::MAX)
+            );
+            prop_assert_eq!(
+                weighted_avg_u32(u64::MAX, 0),
+                weighted_avg_u32_reference(u64::MAX, 0)
+            );
+            prop_assert_eq!(
+                weighted_avg_u32(0, u64::MAX),
+                weighted_avg_u32_reference(0, u64::MAX)
+            );
             let actual = mutant_weighted_avg_u32_1(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
             }
-        }
-
-        #[test]
-        fn test_weighted_avg_u32_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
-            let expected = weighted_avg_u32_reference(val, aux);
             let actual = mutant_weighted_avg_u32_2(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
             }
-        }
-
-        #[test]
-        fn test_weighted_avg_u32_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
-            let expected = weighted_avg_u32_reference(val, aux);
             let actual = mutant_weighted_avg_u32_3(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 3 failed to fail!");
             }
         }
-    }
-
-    // -------------------------------------------------------------------------
-    // BOUNDARY EXAMPLES: Hardcoded edge cases
-    // -------------------------------------------------------------------------
-    #[test]
-    fn test_weighted_avg_u32_boundaries() {
-        assert_eq!(weighted_avg_u32(0, 0), weighted_avg_u32_reference(0, 0));
-        assert_eq!(
-            weighted_avg_u32(u64::MAX, u64::MAX),
-            weighted_avg_u32_reference(u64::MAX, u64::MAX)
-        );
-        assert_eq!(
-            weighted_avg_u32(u64::MAX, 0),
-            weighted_avg_u32_reference(u64::MAX, 0)
-        );
-        assert_eq!(
-            weighted_avg_u32(0, u64::MAX),
-            weighted_avg_u32_reference(0, u64::MAX)
-        );
     }
 
     // -------------------------------------------------------------------------

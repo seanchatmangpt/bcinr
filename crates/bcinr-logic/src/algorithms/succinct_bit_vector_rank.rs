@@ -71,61 +71,46 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_succinct_bit_vector_rank_equivalence(val in any::<u64>(), aux in any::<u64>()) {
+        fn test_succinct_bit_vector_rank_all(val in any::<u64>(), aux in any::<u64>()) {
             let expected = succinct_bit_vector_rank_reference(val, aux);
             let actual = succinct_bit_vector_rank(val, aux);
             prop_assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
-        }
 
-        #[test]
-        fn test_succinct_bit_vector_rank_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
+            assert_eq!(
+                succinct_bit_vector_rank(0, 0),
+                succinct_bit_vector_rank_reference(0, 0)
+            );
+            assert_eq!(
+                succinct_bit_vector_rank(u64::MAX, u64::MAX),
+                succinct_bit_vector_rank_reference(u64::MAX, u64::MAX)
+            );
+            assert_eq!(
+                succinct_bit_vector_rank(u64::MAX, 0),
+                succinct_bit_vector_rank_reference(u64::MAX, 0)
+            );
+            assert_eq!(
+                succinct_bit_vector_rank(0, u64::MAX),
+                succinct_bit_vector_rank_reference(0, u64::MAX)
+            );
+
             let expected = succinct_bit_vector_rank_reference(val, aux);
             let actual = mutant_succinct_bit_vector_rank_1(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
             }
-        }
 
-        #[test]
-        fn test_succinct_bit_vector_rank_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
             let expected = succinct_bit_vector_rank_reference(val, aux);
             let actual = mutant_succinct_bit_vector_rank_2(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
             }
-        }
 
-        #[test]
-        fn test_succinct_bit_vector_rank_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
             let expected = succinct_bit_vector_rank_reference(val, aux);
             let actual = mutant_succinct_bit_vector_rank_3(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 3 failed to fail!");
             }
         }
-    }
-
-    // -------------------------------------------------------------------------
-    // BOUNDARY EXAMPLES: Hardcoded edge cases
-    // -------------------------------------------------------------------------
-    #[test]
-    fn test_succinct_bit_vector_rank_boundaries() {
-        assert_eq!(
-            succinct_bit_vector_rank(0, 0),
-            succinct_bit_vector_rank_reference(0, 0)
-        );
-        assert_eq!(
-            succinct_bit_vector_rank(u64::MAX, u64::MAX),
-            succinct_bit_vector_rank_reference(u64::MAX, u64::MAX)
-        );
-        assert_eq!(
-            succinct_bit_vector_rank(u64::MAX, 0),
-            succinct_bit_vector_rank_reference(u64::MAX, 0)
-        );
-        assert_eq!(
-            succinct_bit_vector_rank(0, u64::MAX),
-            succinct_bit_vector_rank_reference(0, u64::MAX)
-        );
     }
 
     // -------------------------------------------------------------------------

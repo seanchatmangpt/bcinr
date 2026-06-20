@@ -61,58 +61,36 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_xoroshiro128_plus_equivalence(val in any::<u64>(), aux in any::<u64>()) {
+        fn test_xoroshiro128_plus_all(val in any::<u64>(), aux in any::<u64>()) {
             let expected = xoroshiro128_plus_reference(val, aux);
             let actual = xoroshiro128_plus(val, aux);
             prop_assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
-        }
-
-        #[test]
-        fn test_xoroshiro128_plus_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
-            let expected = xoroshiro128_plus_reference(val, aux);
+            prop_assert_eq!(xoroshiro128_plus(0, 0), xoroshiro128_plus_reference(0, 0));
+            prop_assert_eq!(
+                xoroshiro128_plus(u64::MAX, u64::MAX),
+                xoroshiro128_plus_reference(u64::MAX, u64::MAX)
+            );
+            prop_assert_eq!(
+                xoroshiro128_plus(u64::MAX, 0),
+                xoroshiro128_plus_reference(u64::MAX, 0)
+            );
+            prop_assert_eq!(
+                xoroshiro128_plus(0, u64::MAX),
+                xoroshiro128_plus_reference(0, u64::MAX)
+            );
             let actual = mutant_xoroshiro128_plus_1(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
             }
-        }
-
-        #[test]
-        fn test_xoroshiro128_plus_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
-            let expected = xoroshiro128_plus_reference(val, aux);
             let actual = mutant_xoroshiro128_plus_2(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
             }
-        }
-
-        #[test]
-        fn test_xoroshiro128_plus_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
-            let expected = xoroshiro128_plus_reference(val, aux);
             let actual = mutant_xoroshiro128_plus_3(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 3 failed to fail!");
             }
         }
-    }
-
-    // -------------------------------------------------------------------------
-    // BOUNDARY EXAMPLES: Hardcoded edge cases
-    // -------------------------------------------------------------------------
-    #[test]
-    fn test_xoroshiro128_plus_boundaries() {
-        assert_eq!(xoroshiro128_plus(0, 0), xoroshiro128_plus_reference(0, 0));
-        assert_eq!(
-            xoroshiro128_plus(u64::MAX, u64::MAX),
-            xoroshiro128_plus_reference(u64::MAX, u64::MAX)
-        );
-        assert_eq!(
-            xoroshiro128_plus(u64::MAX, 0),
-            xoroshiro128_plus_reference(u64::MAX, 0)
-        );
-        assert_eq!(
-            xoroshiro128_plus(0, u64::MAX),
-            xoroshiro128_plus_reference(0, u64::MAX)
-        );
     }
 
     // -------------------------------------------------------------------------

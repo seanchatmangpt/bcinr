@@ -60,52 +60,37 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_select_u128_equivalence(val in any::<u64>(), aux in any::<u64>()) {
+        fn test_select_u128_all(val in any::<u64>(), aux in any::<u64>()) {
             let expected = select_u128_reference(val, aux);
             let actual = select_u128(val, aux);
             prop_assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
-        }
 
-        #[test]
-        fn test_select_u128_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
             let expected = select_u128_reference(val, aux);
             let actual = mutant_select_u128_1(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
             }
-        }
 
-        #[test]
-        fn test_select_u128_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
             let expected = select_u128_reference(val, aux);
             let actual = mutant_select_u128_2(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
             }
-        }
 
-        #[test]
-        fn test_select_u128_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
             let expected = select_u128_reference(val, aux);
             let actual = mutant_select_u128_3(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 3 failed to fail!");
             }
-        }
-    }
 
-    // -------------------------------------------------------------------------
-    // BOUNDARY EXAMPLES: Hardcoded edge cases
-    // -------------------------------------------------------------------------
-    #[test]
-    fn test_select_u128_boundaries() {
-        assert_eq!(select_u128(0, 0), select_u128_reference(0, 0));
-        assert_eq!(
-            select_u128(u64::MAX, u64::MAX),
-            select_u128_reference(u64::MAX, u64::MAX)
-        );
-        assert_eq!(select_u128(u64::MAX, 0), select_u128_reference(u64::MAX, 0));
-        assert_eq!(select_u128(0, u64::MAX), select_u128_reference(0, u64::MAX));
+            assert_eq!(select_u128(0, 0), select_u128_reference(0, 0));
+            assert_eq!(
+                select_u128(u64::MAX, u64::MAX),
+                select_u128_reference(u64::MAX, u64::MAX)
+            );
+            assert_eq!(select_u128(u64::MAX, 0), select_u128_reference(u64::MAX, 0));
+            assert_eq!(select_u128(0, u64::MAX), select_u128_reference(0, u64::MAX));
+        }
     }
 
     // -------------------------------------------------------------------------

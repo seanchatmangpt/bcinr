@@ -74,61 +74,46 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_set_intersection_branchless_equivalence(val in any::<u64>(), aux in any::<u64>()) {
+        fn test_set_intersection_branchless_all(val in any::<u64>(), aux in any::<u64>()) {
             let expected = set_intersection_branchless_reference(val, aux);
             let actual = set_intersection_branchless(val, aux);
             prop_assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
-        }
 
-        #[test]
-        fn test_set_intersection_branchless_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
             let expected = set_intersection_branchless_reference(val, aux);
             let actual = mutant_set_intersection_branchless_1(val, aux);
             if expected != actual {
                 prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
             }
-        }
 
-        #[test]
-        fn test_set_intersection_branchless_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
             let expected = set_intersection_branchless_reference(val, aux);
             let actual = mutant_set_intersection_branchless_2(val, aux);
             if expected != actual {
                 prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
             }
-        }
 
-        #[test]
-        fn test_set_intersection_branchless_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
             let expected = set_intersection_branchless_reference(val, aux);
             let actual = mutant_set_intersection_branchless_3(val, aux);
             if expected != actual {
                 prop_assert!(expected != actual, "Counterfactual Mutant 3 failed to fail!");
             }
-        }
-    }
 
-    // -------------------------------------------------------------------------
-    // BOUNDARY EXAMPLES: Hardcoded edge cases
-    // -------------------------------------------------------------------------
-    #[test]
-    fn test_set_intersection_branchless_boundaries() {
-        assert_eq!(
-            set_intersection_branchless(0, 0),
-            set_intersection_branchless_reference(0, 0)
-        );
-        assert_eq!(
-            set_intersection_branchless(u64::MAX, u64::MAX),
-            set_intersection_branchless_reference(u64::MAX, u64::MAX)
-        );
-        assert_eq!(
-            set_intersection_branchless(u64::MAX, 0),
-            set_intersection_branchless_reference(u64::MAX, 0)
-        );
-        assert_eq!(
-            set_intersection_branchless(0, u64::MAX),
-            set_intersection_branchless_reference(0, u64::MAX)
-        );
+            assert_eq!(
+                set_intersection_branchless(0, 0),
+                set_intersection_branchless_reference(0, 0)
+            );
+            assert_eq!(
+                set_intersection_branchless(u64::MAX, u64::MAX),
+                set_intersection_branchless_reference(u64::MAX, u64::MAX)
+            );
+            assert_eq!(
+                set_intersection_branchless(u64::MAX, 0),
+                set_intersection_branchless_reference(u64::MAX, 0)
+            );
+            assert_eq!(
+                set_intersection_branchless(0, u64::MAX),
+                set_intersection_branchless_reference(0, u64::MAX)
+            );
+        }
     }
 
     // -------------------------------------------------------------------------
