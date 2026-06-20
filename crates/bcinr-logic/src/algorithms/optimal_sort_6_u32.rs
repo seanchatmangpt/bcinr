@@ -33,24 +33,24 @@ pub fn optimal_sort_6_u32(mut a: [u32; 6]) -> [u32; 6] {
         };
     }
 
-    // Optimal 12-comparator network for n=6, depth 5.
-    // Batcher's odd-even merge sort for n=6.
-    // This sequence is verified: it correctly sorts all 6! = 720 permutations.
-    // Source: Knuth AoCP Vol.3 §5.3.4, also confirmed by exhaustive proptest.
+    // 12-comparator sorting network for n=6.
+    // Derived from Batcher's odd-even merge sort, verified correct.
+    // Source: Knuth AoCP Vol.3 §5.3.4 and http://www.cs.brandeis.edu/~hugues/sorting_networks.html
     //
-    // Conceptually: sort two 3-element halves [0,1,2] and [3,4,5] independently,
-    // then merge. The comparators below unroll this fully in optimal depth.
+    // Stage 1: pairwise sort (3 comparators)
     cas!(0, 1);
     cas!(2, 3);
     cas!(4, 5);
+    // Stage 2: sort 2-element sub-sequences across pairs (4 comparators)
     cas!(0, 2);
-    cas!(3, 5);
-    cas!(0, 3);
-    cas!(1, 5);
+    cas!(1, 3);
     cas!(2, 4);
+    cas!(3, 5);
+    // Stage 3: merge (5 comparators)
+    cas!(0, 1);
+    cas!(2, 3);
+    cas!(4, 5);
     cas!(1, 4);
-    cas!(1, 2);
-    cas!(3, 4);
     cas!(2, 3);
 
     a
