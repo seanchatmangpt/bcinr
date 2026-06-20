@@ -40,3 +40,21 @@ name = "ocel_schema"
 query = { file = "queries/ocel_schema.rq" }
 template = { file = "templates/ocel_schema.rs.tera" }
 output_file = "src/evidence/ocel_schema.rs"
+
+# Alexander pattern-language docs: one scaffold .md per pattern (scaffold-then-edit).
+# The generated files carry a SCAFFOLDED banner — users SHOULD hand-edit them to fill
+# in Context/Forces/Solution/Consequences. Re-running `ggen sync` overwrites structural
+# sections; commit narrative edits before re-scaffolding.
+[[generation.rules]]
+name = "pattern_docs"
+query = { file = "queries/pattern_docs.rq" }
+template = { file = "templates/pattern_doc.md.tera" }
+output_file = "docs/patterns/{name}.md"
+fanout = "name"
+
+# Alexander pattern-language index: single INDEX.md listing all 75 patterns by family.
+[[generation.rules]]
+name = "patterns_index"
+query = { file = "queries/pattern_index_docs.rq" }
+template = { file = "templates/patterns_index.md.tera" }
+output_file = "docs/patterns/INDEX.md"
