@@ -10,8 +10,8 @@ name = "wasm4games-patterns"
 description = "Branchless game-pattern kernels and OCEL/OTEL evidence surface, generated from an RDF ontology."
 
 [rdf]
-# The single source ontology. Mirrors crate::ir::PatternSpec as data.
-files = ["schema/patterns.ttl"]
+# patterns.ttl: the 75 branchless kernel ontology. chains.ttl: 8 JTBD test chains.
+files = ["schema/patterns.ttl", "schema/chains.ttl"]
 base = "https://wasm4games.dev/ontology#"
 
 [generation]

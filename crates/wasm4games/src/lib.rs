@@ -34,6 +34,9 @@ pub mod ir;
 pub mod patterns;
 pub mod verify;
 
+#[cfg(test)]
+pub mod chain_tests;
+
 /// Re-export of the marker trait so downstream code uses a single `Branchless` notion.
 pub use bcinr_logic::Branchless;
 
