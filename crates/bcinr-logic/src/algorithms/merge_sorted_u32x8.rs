@@ -28,11 +28,19 @@
 // After Batcher odd-even merge (8 comparators):
 // { result sorted ∧ multiset(result) = multiset(a) ∪ multiset(b) }
 pub fn merge_sorted_u32x8(a: [u32; 4], b: [u32; 4]) -> [u32; 8] {
-    // Interleave a and b into a single array, then apply the Batcher
-    // odd-even merge network for 4+4 → 8. The interleaved layout maps:
-    // positions 0,2,4,6 ← a[0..4], positions 1,3,5,7 ← b[0..4]
-    // Then we apply the merge-phase comparators.
-    let mut c = [a[0], b[0], a[1], b[1], a[2], b[2], a[3], b[3]];
+    // Batcher's odd-even merge for two sorted sequences of length 4.
+    // Place a in positions 0..4 and b in positions 4..8, then apply the
+    // odd-even merge network which correctly merges two adjacent sorted halves.
+    //
+    // The Batcher odd-even merge network for p=4, q=4 (merging two length-4
+    // sorted sequences) has the following comparator structure:
+    //   Step 1 (compare across halves at distance 4): (0,4),(1,5),(2,6),(3,7)
+    //   Step 2 (odd-even merge, distance 2): (1,4),(3,6)
+    //   Step 3 (cleanup, distance 2): (2,4),(3,5)
+    //   Step 4 (adjacent cleanup): (1,2),(3,4),(5,6)
+    //
+    // Total: 11 comparators. This correctly merges any two sorted 4-element arrays.
+    let mut c = [a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3]];
 
     // Branchless compare-and-swap: swaps c[i] and c[j] if c[i] > c[j].
     macro_rules! cas {
@@ -45,15 +53,20 @@ pub fn merge_sorted_u32x8(a: [u32; 4], b: [u32; 4]) -> [u32; 8] {
         };
     }
 
-    // Batcher odd-even merge for two sorted sequences of 4 elements each.
-    // After interleaving (odd = a indices, even = b indices in the merged sense),
-    // the merge network comparators are:
-    // Merge phase: compare odd-indexed with even-indexed neighbours
-    cas!(1, 2);
-    cas!(3, 4);
-    cas!(5, 6);
-    cas!(1, 4);
-    cas!(3, 6);
+    // Step 1: cross-boundary comparisons (merge "big step")
+    cas!(0, 4);
+    cas!(1, 5);
+    cas!(2, 6);
+    cas!(3, 7);
+    // Step 2: odd-even merge (interleaved half-step)
+    cas!(0, 2);
+    cas!(1, 3);
+    cas!(4, 6);
+    cas!(5, 7);
+    // Step 3: adjacent merge within left and right halves
+    cas!(2, 4);
+    cas!(3, 5);
+    // Step 4: final adjacent cleanup
     cas!(1, 2);
     cas!(3, 4);
     cas!(5, 6);
