@@ -10,7 +10,7 @@ mod audio_cascade_chain {
         // Step 1: Audio FSM: STOPPED(0) + PLAY(0) → PLAYING(1).
         let step1 = audio_trigger_evaluated(0u64, 0u64);
         // Step 2: Priority select: ch0 p=80 id=0 vs ch1 p=75 id=1 → ch0 wins (p0>p1).
-        let step2 = audio_priority_selected(80u64 | (0u64 << 8), 75u64 | (1u64 << 8));
+        let step2 = audio_priority_selected(80u64, 75u64 | (1u64 << 8));
         // Step 3: Volume clamp: vol=200, delta=20 up → 220 (≤255).
         let step3 = volume_clamped(200u64, 20u64);
         // Step 4: Fade: vol=220, rate=30 → max(220-30,0)=190.
