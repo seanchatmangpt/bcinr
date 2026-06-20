@@ -55,6 +55,9 @@ pub fn bitonic_sort_16u32(a: &mut [u32; 16]) {
 
 #[cfg(test)]
 mod tests {
+
+    use super::*;
+
     // _reference equivalence boundaries
     fn network_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
@@ -91,6 +94,72 @@ mod tests {
     #[test]
     fn test_rejects_mutant_3() {
         assert!(network_reference(1, 1) != mutant_network_3(1, 1));
+    }
+
+    // --- compare_exchange ---
+
+    #[test]
+    fn test_compare_exchange() {
+        // already sorted — no change
+        let mut arr = [1u32, 2u32];
+        compare_exchange(&mut arr, 0, 1);
+        assert_eq!(arr, [1u32, 2u32], "identity");
+
+        // needs swap
+        let mut arr = [2u32, 1u32];
+        compare_exchange(&mut arr, 0, 1);
+        assert_eq!(arr, [1u32, 2u32], "swap");
+
+        // equal elements — no change
+        let mut arr = [7u32, 7u32];
+        compare_exchange(&mut arr, 0, 1);
+        assert_eq!(arr, [7u32, 7u32], "equal");
+    }
+
+    // --- bitonic_sort_8u32 ---
+
+    #[test]
+    fn test_bitonic_sort_8u32() {
+        // identity permutation
+        let mut arr = [1u32, 2, 3, 4, 5, 6, 7, 8];
+        bitonic_sort_8u32(&mut arr);
+        assert_eq!(arr, [1u32, 2, 3, 4, 5, 6, 7, 8], "identity");
+
+        // single repeated value
+        let mut arr = [42u32; 8];
+        bitonic_sort_8u32(&mut arr);
+        assert_eq!(arr, [42u32; 8], "uniform");
+
+        // near-sorted (two-element swap)
+        let mut arr = [2u32, 1, 3, 4, 5, 6, 7, 8];
+        bitonic_sort_8u32(&mut arr);
+        assert_eq!(arr, [1u32, 2, 3, 4, 5, 6, 7, 8], "swap_two");
+
+        // full reverse permutation
+        let mut arr = [8u32, 7, 6, 5, 4, 3, 2, 1];
+        bitonic_sort_8u32(&mut arr);
+        assert_eq!(arr, [1u32, 2, 3, 4, 5, 6, 7, 8], "reverse");
+    }
+
+    // --- bitonic_sort_16u32 ---
+
+    #[test]
+    fn test_bitonic_sort_16u32() {
+        // identity permutation
+        let mut arr: [u32; 16] = core::array::from_fn(|i| (i + 1) as u32);
+        bitonic_sort_16u32(&mut arr);
+        let expected: [u32; 16] = core::array::from_fn(|i| (i + 1) as u32);
+        assert_eq!(arr, expected, "identity");
+
+        // full reverse permutation
+        let mut arr: [u32; 16] = core::array::from_fn(|i| (16 - i) as u32);
+        bitonic_sort_16u32(&mut arr);
+        assert_eq!(arr, expected, "reverse");
+
+        // single repeated value
+        let mut arr = [99u32; 16];
+        bitonic_sort_16u32(&mut arr);
+        assert_eq!(arr, [99u32; 16], "uniform");
     }
 }
 

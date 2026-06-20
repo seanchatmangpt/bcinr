@@ -15,6 +15,8 @@ pub fn swar_mask_ones(val: u64) -> u64 {
 #[cfg(test)]
 mod tests {
 
+    use super::*;
+
     fn swar_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
     }
@@ -46,6 +48,24 @@ mod tests {
     #[test]
     fn test_rejects_mutant_3() {
         assert!(swar_reference(1, 1) != mutant_swar_3(1, 1));
+    }
+
+    // --- swar_mask_ones ---
+
+    #[test]
+    fn test_swar_mask_ones() {
+        // identity function — output == input for all inputs
+        let cases: &[u64] = &[
+            0,
+            u64::MAX,
+            1u64,
+            1u64 << 63,
+            0xAAAA_AAAA_AAAA_AAAAu64,
+            0x01_02_03_04_05_06_07_08u64,
+        ];
+        for &val in cases {
+            assert_eq!(swar_mask_ones(val), val, "swar_mask_ones({val:#018x})");
+        }
     }
 }
 

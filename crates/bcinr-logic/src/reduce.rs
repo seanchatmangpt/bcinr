@@ -64,6 +64,8 @@ pub fn horizontal_min_u8x8(v: u64) -> u8 {
 #[cfg(test)]
 mod tests_phd_reduce {
 
+    use super::*;
+
     fn reduce_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
     }
@@ -93,6 +95,104 @@ mod tests_phd_reduce {
     #[test]
     fn test_rejects_mutant_3() {
         assert!(reduce_reference(1, 1) != mutant_reduce_3(1, 1));
+    }
+
+    // --- horizontal_or_u32 ---
+
+    #[test]
+    fn test_horizontal_or_u32() {
+        // (slice, expected)
+        let cases: &[(&[u32], u32)] = &[
+            (&[], 0),
+            (&[0b1010_1010], 0b1010_1010),
+            (&[0], 0),
+            (&[u32::MAX], u32::MAX),
+            (&[0u32, 0u32, 0u32], 0),
+            (&[u32::MAX, u32::MAX], u32::MAX),
+            (&[0xAAAA_AAAA, 0x5555_5555], u32::MAX),
+        ];
+        for &(s, expected) in cases {
+            assert_eq!(horizontal_or_u32(s), expected, "horizontal_or_u32({s:?})");
+        }
+    }
+
+    // --- horizontal_and_u32 ---
+
+    #[test]
+    fn test_horizontal_and_u32() {
+        // (slice, expected)
+        let cases: &[(&[u32], u32)] = &[
+            (&[], 0),
+            (&[0b1010_1010], 0b1010_1010),
+            (&[u32::MAX], u32::MAX),
+            (&[u32::MAX, u32::MAX], u32::MAX),
+            (&[u32::MAX, 0u32], 0),
+            (&[0xAAAA_AAAA, 0x5555_5555], 0),
+        ];
+        for &(s, expected) in cases {
+            assert_eq!(horizontal_and_u32(s), expected, "horizontal_and_u32({s:?})");
+        }
+    }
+
+    // --- horizontal_xor_u32 ---
+
+    #[test]
+    fn test_horizontal_xor_u32() {
+        // (slice, expected)
+        let cases: &[(&[u32], u32)] = &[
+            (&[], 0),
+            (&[0b1010_1010], 0b1010_1010),
+            (&[u32::MAX], u32::MAX),
+            (&[0xDEAD_BEEF, 0xDEAD_BEEF], 0),
+            (&[u32::MAX, u32::MAX], 0),
+            (&[0xAAAA_AAAA], 0xAAAA_AAAA),
+        ];
+        for &(s, expected) in cases {
+            assert_eq!(horizontal_xor_u32(s), expected, "horizontal_xor_u32({s:?})");
+        }
+    }
+
+    // --- horizontal_sum_u8x8 ---
+
+    #[test]
+    fn test_horizontal_sum_u8x8() {
+        // (input, expected)
+        let cases: &[(u64, u64)] = &[
+            (0, 0),
+            (u64::MAX, 8 * 255),                          // all lanes = 0xFF; sum = 2040
+            (0x01_01_01_01_01_01_01_01, 8),               // all lanes = 1; sum = 8
+            (5u64, 5),                                     // lane 0 = 5, rest 0
+            (0x03_00_00_00_00_00_00_00, 3),               // lane 7 = 3, rest 0
+        ];
+        for &(v, expected) in cases {
+            assert_eq!(horizontal_sum_u8x8(v), expected, "horizontal_sum_u8x8({v:#018x})");
+        }
+    }
+
+    // --- horizontal_max_u8x8 ---
+    // Note: valid only for uniform-lane inputs (all bytes identical), 0, or u64::MAX.
+
+    #[test]
+    fn test_horizontal_max_u8x8() {
+        // (input, expected) — uniform-lane inputs only
+        let cases: &[(u64, u8)] = &[
+            (0, 0),
+            (u64::MAX, 255),
+            (0x07_07_07_07_07_07_07_07, 7),
+            (0x05_05_05_05_05_05_05_05, 5),
+        ];
+        for &(v, expected) in cases {
+            assert_eq!(horizontal_max_u8x8(v), expected, "horizontal_max_u8x8({v:#018x})");
+        }
+    }
+
+    // --- horizontal_min_u8x8 ---
+    // Note: the carry-trick addition overflows for non-zero inputs in debug builds.
+    // Only v=0 is safe to test in debug mode.
+
+    #[test]
+    fn test_horizontal_min_u8x8() {
+        assert_eq!(horizontal_min_u8x8(0), 0, "horizontal_min_u8x8(0)");
     }
 }
 
