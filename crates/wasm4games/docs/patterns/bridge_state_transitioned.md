@@ -11,43 +11,29 @@ Advance a platform bridge adapter FSM (DISCONNECTED/CONNECTING/CONNECTED/ERROR/R
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes BridgeStateTransitioned necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches bridge_state_transitioned_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Platform bridge adapters (graphics, audio, input) go through a multi-step lifecycle: they start DISCONNECTED, progress to CONNECTING when a connection attempt begins, reach CONNECTED when the handshake completes, transition to ERROR on failures, and move to RECOVERING during reconnect attempts. Game engine hot paths (command submission, capability queries, payload dispatch) must know the bridge state at every frame. A switch-on-state implementation in this hot path branches at every state check, adding latency variance directly proportional to the branch misprediction rate — which spikes precisely when connection loss occurs during active gameplay.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every BridgeStateTransitioned call that branches adds jitter
-     - Deterministic latency: the Dfa lowering gives O(1) constant time
-     - Bounded state: stateCard = 5 (5 distinct states)
-     - Auditability: the OCEL event code 125 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches bridge_state_transitioned_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — switch-on-state for five states mispredicts during state transitions, which occur at the highest-stress moments (connection loss, timeout, reconnect).
+- **Deterministic latency** — the Dfa lowering via `dfa_advance` gives O(1) constant time: one flat table lookup per event, independent of which state the bridge is in.
+- **Five-state completeness** — all five states must be reachable and all 25 (state, symbol) pairs must be defined; missing transitions must be made explicit (e.g., DISCONNECT from CONNECTED lands in DISCONNECTED=0).
+- **ERROR isolation** — once in ERROR, only a RETRY can progress to RECOVERING; all other events must keep the bridge in ERROR to prevent spurious recovery.
+- **OCEL auditability** — OCEL event code 125 ties each bridge transition to an `engine_cmd` object trace for adapter lifecycle monitoring.
 
 ## Solution
 
-<!-- TODO: Explain how bridge_state_transitioned resolves the forces.
-     It lowers onto `bcinr_logic::dfa::dfa_advance` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Dfa` was the right lowering choice. -->
+The kernel packs `state` bits[0..8] as the current bridge state (0..=4, reduced mod 5 for out-of-range values) and `input` bits[0..8] as the event symbol (0..=4, reduced mod 5). The flat 5×5 table encodes all 25 transitions: rows are DISCONNECTED=0, CONNECTING=1, CONNECTED=2, ERROR=3, RECOVERING=4; columns are CONNECT=0, ACK=1, DISCONNECT=2, ERROR_EVT=3, RETRY=4. `dfa_advance(st, sym, &TABLE, ALPHABET)` performs a single branchless array index read. The next state (bits[0..8]) is returned. This is the Dfa lowering: the entire bridge lifecycle is a constant-time flat table with no conditional logic in the transition path.
 
 **Branchless primitive:** `bcinr_logic::dfa::dfa_advance`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 5 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
+**Gains:** All 25 transitions execute at identical latency. DISCONNECT from any state always returns to DISCONNECTED=0 (a safe, total reset). ERROR_EVT from any state always reaches ERROR=3, ensuring failures are captured universally. The table is auditable at a glance: adding a new event or state requires extending rows/columns, not restructuring branch logic.
 
-_Replace this placeholder with consequences and trade-offs._
+**Costs:** The bit-field ABI is fixed. The transition table is a compile-time constant; runtime-configurable adapter policies (e.g., disabling RECOVERING for certain adapter types) require a kernel variant. Out-of-range state/symbol values are silently reduced modulo 5.
+
+**Compositions:** Bridge state is prerequisite for `command_opcode_encoded` (encoding only in CONNECTED=2) and `capability_flag_evaluated` (queries only in CONNECTED=2). `adapter_priority_ranked` determines which adapter to attempt first before CONNECT is issued. The same multi-state lifecycle idiom appears in `sync_state_admitted`.
 
 ---
 
@@ -58,22 +44,25 @@ _Replace this placeholder with consequences and trade-offs._
 title: BridgeStateTransitioned — DFA (5 states)
 ---
 stateDiagram-v2
-    [*] --> S0
-    S0: State_0
-    S1: State_1
-    S2: State_2
-    S3: State_3
-    S4: State_4
-    S0 --> S0 : TODO_symbol
-    S1 --> S1 : TODO_symbol
-    S2 --> S2 : TODO_symbol
-    S3 --> S3 : TODO_symbol
-    S4 --> S4 : TODO_symbol
+    [*] --> DISCONNECTED
+    DISCONNECTED --> CONNECTING : CONNECT / RETRY
+    DISCONNECTED --> DISCONNECTED : ACK / DISCONNECT
+    DISCONNECTED --> ERROR : ERROR_EVT
+    CONNECTING --> CONNECTING : CONNECT / RETRY
+    CONNECTING --> CONNECTED : ACK
+    CONNECTING --> DISCONNECTED : DISCONNECT
+    CONNECTING --> ERROR : ERROR_EVT
+    CONNECTED --> CONNECTED : CONNECT / ACK / RETRY
+    CONNECTED --> DISCONNECTED : DISCONNECT
+    CONNECTED --> ERROR : ERROR_EVT
+    ERROR --> ERROR : CONNECT / ACK / ERROR_EVT
+    ERROR --> DISCONNECTED : DISCONNECT
+    ERROR --> RECOVERING : RETRY
+    RECOVERING --> RECOVERING : CONNECT / RETRY
+    RECOVERING --> CONNECTED : ACK
+    RECOVERING --> DISCONNECTED : DISCONNECT
+    RECOVERING --> ERROR : ERROR_EVT
 ```
-
-<!-- TODO: Replace State_N labels and TODO_symbol edges with the actual state names
-     and alphabet symbols from src/patterns/bridge_state_transitioned.rs (see the DFA table
-     comment and the _reference oracle for the canonical state/symbol vocabulary). -->
 
 ---
 
@@ -125,17 +114,11 @@ otel::emit(125);
 let ev = OcelEvent::new(125, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [CommandOpcodeEncoded](command_opcode_encoded.md) — command encoding is gated on bridge being in CONNECTED state.
+- [CapabilityFlagEvaluated](capability_flag_evaluated.md) — capability queries are valid only in CONNECTED state.
+- [AdapterPriorityRanked](adapter_priority_ranked.md) — adapter ranking precedes connection attempt; highest-priority adapter receives CONNECT first.
+- [PayloadSizeBounded](payload_size_bounded.md) — payload is bounded before transmission to a CONNECTED bridge.

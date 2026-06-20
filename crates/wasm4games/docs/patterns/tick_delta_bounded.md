@@ -11,43 +11,25 @@ Clamp a tick delta to a max_jitter window to prevent large desync jumps.
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes TickDeltaBounded necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches tick_delta_bounded_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Multiplayer game servers receive tick-counter deltas from clients over unreliable UDP networks. Network jitter, packet loss, and re-ordering can produce tick deltas that are many times larger than a normal frame — a client reconnecting after a stall may send a delta of 300 ticks when the server expects 1 to 3. Applying such a spike naively to game state causes players to teleport, inventories to skip multiple accumulation cycles, and cooldown timers to expire in a single frame. Clamping the delta to `max_jitter` limits how much state can advance in a single network event.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every TickDeltaBounded call that branches adds jitter
-     - Deterministic latency: the Lut lowering gives O(1) constant time
-     - Bounded state: stateCard = 8 (8 distinct states)
-     - Auditability: the OCEL event code 113 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches tick_delta_bounded_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — a naïve `if raw_delta > max_delta { max_delta } else { raw_delta }` branches every time a jitter spike arrives, adding latency precisely when network conditions are worst.
+- **Deterministic latency** — the Lut lowering uses `clamp_u32(raw_delta, 0, max_d)`, an O(1) branchless primitive that executes in constant time regardless of whether the bound fires.
+- **Wrapping subtraction** — tick counters are u16 and may wrap; `curr.wrapping_sub(prev) & 0xFFFF` computes the unsigned wrapping delta correctly without a conditional, handling counter rollover transparently.
+- **Dual output for audit** — the raw (unclamped) delta is preserved in bits[16..32] of the result for OCEL audit, allowing the server to detect and log jitter spikes without discarding the evidence.
+- **OCEL auditability** — event code 113 ties each bounded delta to the `peer` object trace, enabling per-client jitter analysis and anticheat monitoring.
 
 ## Solution
 
-<!-- TODO: Explain how tick_delta_bounded resolves the forces.
-     It lowers onto `bcinr_logic::fix::clamp_u32` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Lut` was the right lowering choice. -->
-
 **Branchless primitive:** `bcinr_logic::fix::clamp_u32`
 
-_Replace this placeholder with the solution description._
+State bits[0..16] carry the previous tick; input bits[0..16] carry the current tick and bits[16..32] carry `max_delta`. The raw delta is computed as `curr.wrapping_sub(prev) & 0xFFFF` — a branchless wrapping subtraction clamped to u16 range. `clamp_u32(raw_delta, 0, max_d)` then bounds the delta without branching. The result packs the bounded delta in bits[0..16] and the raw delta in bits[16..32]. The Lut lowering was chosen because the output is an absolute scalar bounded from above, exactly matching `clamp_u32`'s semantics.
 
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 8 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** Game state can advance by at most `max_delta` ticks per network event regardless of actual network conditions; the raw delta is preserved for audit without extra cost; wrapping tick arithmetic is handled correctly. **Costs:** A bounded delta means a client recovering from a long stall must catch up over multiple frames rather than instantly; the `max_delta` must be tuned per game (too small causes legitimate lag spikes to be under-applied). **Compositions:** The bounded delta feeds `lag_compensation_applied` (determines rewind depth); `sync_state_admitted` uses tick delta magnitude to trigger DRIFTED transitions; `fixed_tick_advanced` accumulates bounded deltas for the tick loop.
 
 ---
 
@@ -55,22 +37,16 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["tick_delta_bounded\nLut: bcinr_logic::fix::clamp_u32"]
-    result["result\n(u64)"]
+    state["state (u64)\nbits[0..16] = prev_tick (u16)"]
+    input["input (u64)\nbits[0..16] = curr_tick\nbits[16..32] = max_delta"]
+    kernel["tick_delta_bounded\nLut: wrapping_sub & 0xFFFF → clamp_u32(raw, 0, max_d)"]
+    result["result (u64)\nbits[0..16] = bounded delta\nbits[16..32] = raw delta (audit)"]
     state --> kernel
     input --> kernel
     kernel --> result
-    ocel_0["OCEL: peer"]
+    ocel_0["OCEL: peer (code 113)"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +98,10 @@ otel::emit(113);
 let ev = OcelEvent::new(113, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [LagCompensationApplied](lag_compensation_applied.md) — the bounded delta limits the maximum rewind depth the lag compensation kernel will apply.
+- [SyncStateAdmitted](sync_state_admitted.md) — large tick deltas (raw > bounded) signal drift, which drives the DRIFTED state transition.
+- [PredictionErrorBounded](prediction_error_bounded.md) — bounded tick delta reduces the maximum prediction error by constraining state divergence per frame.

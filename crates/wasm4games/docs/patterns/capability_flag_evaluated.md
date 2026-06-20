@@ -11,43 +11,29 @@ Test whether a capability bit is set in a 64-bit capability flags word and retur
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes CapabilityFlagEvaluated necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches capability_flag_evaluated_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Platform bridge adapters expose a 64-bit capability flags word encoding available hardware features: ray tracing, mesh shaders, compute dispatch, audio DSP acceleration, hardware video decode, and so on. Game systems must test individual capabilities before submitting command types that require them, and must also rank adapters by the number of capabilities they expose up to and including the queried feature (for priority-based adapter selection). A naïve capability check with an if-statement on a bit test is not the bottleneck, but the rank computation — counting set bits below a given index — requires an additional popcount that a branchy implementation typically gates behind the same if, adding a data-dependent branch.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every CapabilityFlagEvaluated call that branches adds jitter
-     - Deterministic latency: the Bitset lowering gives O(1) constant time
-     - Bounded state: stateCard = 32 (32 distinct states)
-     - Auditability: the OCEL event code 124 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches capability_flag_evaluated_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — testing a capability bit and conditionally computing its rank in the same if-block means the rank computation's presence depends on the capability, introducing a data-dependent branch in the adapter selection hot path.
+- **Deterministic latency** — the Bitset lowering via `rank_u64` gives O(1) constant time; bit test and rank are computed unconditionally in parallel.
+- **Inclusive rank semantics** — rank must count set bits at positions 0..=idx (inclusive of the queried bit), not 0..idx; the distinction matters for adapter priority: an adapter that has the capability contributes its own bit to its rank.
+- **64-bit flag space** — the full 64-bit flags word must be accessible without truncation; the idx input is restricted to [0, 63] via 6-bit mask.
+- **OCEL auditability** — OCEL event code 124 ties each capability evaluation to both `engine_cmd` and `player` object traces.
 
 ## Solution
 
-<!-- TODO: Explain how capability_flag_evaluated resolves the forces.
-     It lowers onto `bcinr_logic::bitset::rank_u64` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Bitset` was the right lowering choice. -->
+The kernel takes `state` as the full 64-bit capability flags word and `input` bits[0..5] as the capability index (0..63, masked via `& 0x3F`). The bit test is `(flags >> idx) & 1` — a single branchless shift and mask. The inclusive rank is `rank_u64(flags, idx as usize)`, which counts set bits at positions 0..=idx using a branchless prefix mask and popcount. Both results are packed into the return u64: bit test in bits[0..8] and rank (saturated to 8 bits) in bits[8..16]. This is the Bitset lowering: the capability check and priority rank are computed simultaneously in one pass without any branching.
 
 **Branchless primitive:** `bcinr_logic::bitset::rank_u64`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 32 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
+**Gains:** Both the binary capability test and the numeric rank are available in a single kernel call. The rank is always computed, so callers that only need the bit test pay a small fixed cost for the rank computation — this is the correct trade-off in a branchless design. The inclusive semantics (0..=idx) mean an adapter with the capability gets credit for it in its own rank.
 
-_Replace this placeholder with consequences and trade-offs._
+**Costs:** The bit-field ABI is fixed — flags in state (full u64), idx in input bits[0..5], bit test in result bits[0..8], rank in result bits[8..16]. The rank is truncated to 8 bits; a flags word with more than 255 set bits below idx saturates silently (not a concern for 64-bit flags in practice, since 64 < 255).
+
+**Compositions:** The bit test output gates `command_opcode_encoded` — only encode commands for capabilities that are set. The rank output feeds `adapter_priority_ranked` — capability count is a component of adapter priority. The same test+rank idiom appears in `action_mask_applied` in the anti-cheat family.
 
 ---
 
@@ -55,24 +41,18 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["capability_flag_evaluated\nBitset: bcinr_logic::bitset::rank_u64"]
-    result["result\n(u64)"]
+    state["state (u64)\nbits[0..64] = capability flags word"]
+    input["input (u64)\nbits[0..6] = capability idx (0..=63)"]
+    kernel["capability_flag_evaluated\nBitset: (flags >> idx) & 1\n+ rank_u64(flags, idx)\n(inclusive rank 0..=idx)"]
+    result["result (u64)\nbits[0..8] = 1 if capability set\nbits[8..16] = rank (set bits 0..=idx)"]
     state --> kernel
     input --> kernel
     kernel --> result
-    ocel_0["OCEL: engine_cmd"]
+    ocel_0["OCEL: engine_cmd\nevent code 124"]
     result --> ocel_0
     ocel_1["OCEL: player"]
     result --> ocel_1
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -124,17 +104,10 @@ otel::emit(124);
 let ev = OcelEvent::new(124, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [CommandOpcodeEncoded](command_opcode_encoded.md) — capability bit test gates which command types are valid before encoding.
+- [AdapterPriorityRanked](adapter_priority_ranked.md) — capability rank contributes to the adapter's priority score for dispatch ordering.
+- [BridgeStateTransitioned](bridge_state_transitioned.md) — capabilities are queried in CONNECTED state; bridge state must be checked first.

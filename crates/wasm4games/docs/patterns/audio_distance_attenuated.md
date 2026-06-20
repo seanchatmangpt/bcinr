@@ -11,43 +11,25 @@ Compute attenuated volume from distance: max(0, max_vol - distance * attenuation
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes AudioDistanceAttenuated necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches audio_distance_attenuated_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+3D audio volume scales inversely with listener distance — footsteps are loud nearby and inaudible far away. The linear attenuation formula `max(0, max_vol - dist * factor)` is evaluated every tick for every active audio source. Naïvely, the `max(0, ...)` test is a conditional that branches when `dist * factor > max_vol` — exactly when the listener crosses the audibility threshold, which can happen many times per second in a mobile scene.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every AudioDistanceAttenuated call that branches adds jitter
-     - Deterministic latency: the Lut lowering gives O(1) constant time
-     - Bounded state: stateCard = 8 (8 distinct states)
-     - Auditability: the OCEL event code 112 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches audio_distance_attenuated_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — a naïve `if dist * factor > max_vol` guard branches at the audibility boundary for every source whose distance crosses the threshold during listener movement.
+- **Deterministic latency** — the Lut lowering uses `saturating_mul`, `saturating_sub`, and `clamp_u32`, all branchless primitives, giving O(1) fixed throughput for every distance value.
+- **Overflow safety** — `attenuation_factor * distance` can exceed u32::MAX for large distances and high factors; `saturating_mul` prevents the product from wrapping to a small value that would incorrectly boost volume.
+- **Two-sided output invariant** — `clamp_u32(vol, 0, max_vol)` ensures the result is in [0, max_vol] even when the saturating subtraction undershoots zero; volume can never exceed the channel's maximum or go negative.
+- **OCEL auditability** — event code 112 ties each attenuation result to both the `audio_source` and `player` object traces, enabling spatial audio reconstruction for replay.
 
 ## Solution
 
-<!-- TODO: Explain how audio_distance_attenuated resolves the forces.
-     It lowers onto `bcinr_logic::fix::clamp_u32` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Lut` was the right lowering choice. -->
-
 **Branchless primitive:** `bcinr_logic::fix::clamp_u32`
 
-_Replace this placeholder with the solution description._
+State bits[0..8] carry `max_volume` (0..255) and bits[8..16] carry `attenuation_factor` (volume units per distance unit). Input bits[0..16] carry the listener distance as a u16. The kernel computes `reduction = atten.saturating_mul(dist)` — safe against u32 overflow — then `vol = max_vol.saturating_sub(reduction)` — floors at zero without underflow — and finally `clamp_u32(vol, 0, max_vol)` enforces the ceiling. The Lut lowering was chosen because the output is a bounded scalar with a two-sided range invariant and no signed arithmetic or state machine is required.
 
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 8 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** Attenuated volume is provably in [0, max_vol] after every call; overflow in `factor * distance` cannot produce a boosted volume; the OCEL trace enables spatial audio forensics. **Costs:** Attenuation is linear in distance — no inverse-square or logarithmic models without a pre-computed lookup table; both factor and max_vol are 8-bit fields, limiting their range to 0..255. **Compositions:** The attenuated volume feeds `audio_priority_selected` (closer sources have higher effective priority); `volume_clamped` applies additional deltas within the same [0, 255] range; `semantic_lod_selected` applies the same distance-to-bounded-value idiom to LOD tier selection.
 
 ---
 
@@ -55,24 +37,18 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["audio_distance_attenuated\nLut: bcinr_logic::fix::clamp_u32"]
-    result["result\n(u64)"]
+    state["state (u64)\nbits[0..8] = max_volume\nbits[8..16] = attenuation_factor"]
+    input["input (u64)\nbits[0..16] = distance (u16)"]
+    kernel["audio_distance_attenuated\nLut: sat_mul(atten,dist) → sat_sub(max_vol) → clamp_u32"]
+    result["result (u64)\nbits[0..8] = attenuated volume\nin [0, max_vol]"]
     state --> kernel
     input --> kernel
     kernel --> result
-    ocel_0["OCEL: audio_source"]
+    ocel_0["OCEL: audio_source (code 112)"]
     result --> ocel_0
     ocel_1["OCEL: player"]
     result --> ocel_1
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -124,17 +100,10 @@ otel::emit(112);
 let ev = OcelEvent::new(112, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [AudioPrioritySelected](audio_priority_selected.md) — attenuated volume feeds the priority comparison; closer sources naturally rank higher.
+- [VolumeClamped](volume_clamped.md) — attenuation and volume clamping both enforce the [0, 255] output range; this pattern produces the initial bounded value.
+- [SemanticLodSelected](semantic_lod_selected.md) — applies the same distance-to-bounded-integer pattern to LOD tier selection rather than volume.

@@ -11,43 +11,25 @@ Advance an audio playback FSM (STOPPED/PLAYING/PAUSED/FADING) via DFA table look
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes AudioTriggerEvaluated necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches audio_trigger_evaluated_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Audio playback is naturally a finite state machine: a channel starts STOPPED, transitions to PLAYING on a play event, can be PAUSED or sent to FADING by game events, and eventually returns to STOPPED. Game events (play, stop, pause, resume, fade) arrive from multiple systems each tick. A switch-on-state implementation branches on both the current state and the incoming symbol, producing O(states * symbols) branch paths that mispredict every time the playback lifecycle progresses through a new state.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every AudioTriggerEvaluated call that branches adds jitter
-     - Deterministic latency: the Dfa lowering gives O(1) constant time
-     - Bounded state: stateCard = 4 (4 distinct states)
-     - Auditability: the OCEL event code 111 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches audio_trigger_evaluated_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — a `match (state, symbol)` with 20 arms (4 states × 5 symbols) branches heavily when playback transitions are clustered (e.g., rapid play/stop cycles at scene transitions).
+- **Deterministic latency** — the Dfa lowering flattens all transitions into a 20-entry flat array; `dfa_advance` performs a single index computation `state * 5 + symbol` and a table read, giving O(1) fixed latency independent of which transition fires.
+- **State-space completeness** — every (state, symbol) pair must have a defined next state; the flat table enforces totality at compile time, eliminating the risk of a missing arm silently defaulting to 0.
+- **Out-of-range safety** — both `state` and `symbol` are reduced modulo their respective cardinalities (`% NUM_STATES`, `% ALPHABET_SIZE`) before the table lookup, keeping the index in bounds for any u64 input.
+- **OCEL auditability** — event code 111 ties every state transition to both the `audio_source` and `entity` object traces, enabling complete FSM history reconstruction for replay and debugging.
 
 ## Solution
 
-<!-- TODO: Explain how audio_trigger_evaluated resolves the forces.
-     It lowers onto `bcinr_logic::dfa::dfa_advance` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Dfa` was the right lowering choice. -->
-
 **Branchless primitive:** `bcinr_logic::dfa::dfa_advance`
 
-_Replace this placeholder with the solution description._
+State bits[0..8] carry the current playback state (STOPPED=0, PLAYING=1, PAUSED=2, FADING=3); input bits[0..8] carry the trigger symbol (PLAY=0, STOP=1, PAUSE=2, RESUME=3, FADE=4). The 20-entry `TABLE` encodes transitions row-major: row 0 is STOPPED (only PLAY escapes), rows 1–3 are PLAYING/PAUSED/FADING (all share the same transition structure: PLAY→PLAYING, STOP→STOPPED, PAUSE→PAUSED, RESUME→PLAYING, FADE→FADING). `dfa_advance(state_idx, sym_idx, &TABLE, ALPHABET_SIZE)` computes `TABLE[state_idx * 5 + sym_idx]` — a branchless array access — and returns the next state. The Dfa lowering was chosen because the problem is literally a finite automaton; table lookup is both the canonical and the most efficient branchless encoding.
 
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 4 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** All 20 transitions are provably correct (proptest exhaustively covers the 4×5 space); no missing-arm silent failure is possible; latency is constant regardless of state or symbol. **Costs:** The table occupies 20 × 8 bytes = 160 bytes in memory; adding a new state or symbol requires rebuilding the table and regenerating the DFA. **Compositions:** The FADING state is entered on a FADE symbol, after which `audio_fade_applied` drives the volume to zero and emits a silent flag; volume is set on PLAY events via `volume_clamped`; priority changes on state transitions feed `audio_priority_selected`.
 
 ---
 
@@ -55,23 +37,39 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 ---
-title: AudioTriggerEvaluated — DFA (4 states)
+title: AudioTriggerEvaluated — DFA (4 states, 5 symbols)
 ---
 stateDiagram-v2
-    [*] --> S0
-    S0: State_0
-    S1: State_1
-    S2: State_2
-    S3: State_3
-    S0 --> S0 : TODO_symbol
-    S1 --> S1 : TODO_symbol
-    S2 --> S2 : TODO_symbol
-    S3 --> S3 : TODO_symbol
-```
+    [*] --> STOPPED
+    STOPPED: STOPPED (0)
+    PLAYING: PLAYING (1)
+    PAUSED: PAUSED (2)
+    FADING: FADING (3)
 
-<!-- TODO: Replace State_N labels and TODO_symbol edges with the actual state names
-     and alphabet symbols from src/patterns/audio_trigger_evaluated.rs (see the DFA table
-     comment and the _reference oracle for the canonical state/symbol vocabulary). -->
+    STOPPED --> PLAYING : PLAY
+    STOPPED --> STOPPED : STOP
+    STOPPED --> STOPPED : PAUSE
+    STOPPED --> STOPPED : RESUME
+    STOPPED --> STOPPED : FADE
+
+    PLAYING --> PLAYING : PLAY
+    PLAYING --> STOPPED : STOP
+    PLAYING --> PAUSED : PAUSE
+    PLAYING --> PLAYING : RESUME
+    PLAYING --> FADING : FADE
+
+    PAUSED --> PLAYING : PLAY
+    PAUSED --> STOPPED : STOP
+    PAUSED --> PAUSED : PAUSE
+    PAUSED --> PLAYING : RESUME
+    PAUSED --> FADING : FADE
+
+    FADING --> PLAYING : PLAY
+    FADING --> STOPPED : STOP
+    FADING --> PAUSED : PAUSE
+    FADING --> PLAYING : RESUME
+    FADING --> FADING : FADE
+```
 
 ---
 
@@ -123,17 +121,10 @@ otel::emit(111);
 let ev = OcelEvent::new(111, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [AudioFadeApplied](audio_fade_applied.md) — the FADING state corresponds to the fade kernel driving volume to zero; the silent flag from that kernel should trigger a STOP symbol into this FSM.
+- [VolumeClamped](volume_clamped.md) — volume is set or adjusted on PLAY and RESUME events that drive this FSM.
+- [AudioPrioritySelected](audio_priority_selected.md) — priority changes based on FSM state (FADING channels drop priority); selection feeds back into which channel receives events.

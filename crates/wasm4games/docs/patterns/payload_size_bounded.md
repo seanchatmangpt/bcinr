@@ -11,43 +11,29 @@ Clamp a payload size request to the adapter's maximum MTU via branchless min; re
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes PayloadSizeBounded necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches payload_size_bounded_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Platform bridge adapters impose Maximum Transmission Unit (MTU) limits on command payloads; WebGPU, WebGL, and audio DSP adapters each have different MTU values. Oversized payloads corrupt the bridge's internal buffer ring and cause silent data loss or adapter faults; undersized payloads are always safe. Every command submission must clamp the requested payload size to the adapter's MTU before the payload is serialized. A naïve `if requested > mtu { clamped = mtu; overflow = true; }` guard branches on the size comparison at high frequency in the command submission path, creating misprediction pressure whenever a large batch of commands is split at the MTU boundary.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every PayloadSizeBounded call that branches adds jitter
-     - Deterministic latency: the Lut lowering gives O(1) constant time
-     - Bounded state: stateCard = 8 (8 distinct states)
-     - Auditability: the OCEL event code 126 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches payload_size_bounded_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — a conditional clamp on payload size mispredicts at the MTU boundary, which is hit systematically during large batch submissions.
+- **Deterministic latency** — the Lut lowering via `min_u32` and `lt_mask_u32` gives O(1) constant time; the clamped size and overflow flag are computed unconditionally in parallel.
+- **Overflow signaling** — callers must know whether the payload was truncated (overflow=1) so they can split the remainder into a second transmission; this signal must be computed without a separate branch.
+- **Equality is not overflow** — a request exactly equal to the MTU is legal and must not set the overflow flag; only strict excess (request > MTU) overflows.
+- **OCEL auditability** — OCEL event code 126 ties each payload bound check to an `engine_cmd` object trace for adapter buffer utilization auditing.
 
 ## Solution
 
-<!-- TODO: Explain how payload_size_bounded resolves the forces.
-     It lowers onto `bcinr_logic::mask::min_u32` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Lut` was the right lowering choice. -->
+The kernel packs `state` bits[0..15] as the requested payload size (u16) and `input` bits[0..15] as the adapter MTU (u16). `min_u32(requested, mtu)` computes the clamped size branchlessly — it is implemented via a mask selecting the smaller value without a conditional. The overflow flag is `(lt_mask_u32(mtu, requested) >> 31) as u64`: all-ones when `mtu < requested` (strict overflow), shifted to 1. Both are packed into the return u64: clamped size in bits[0..15], overflow flag in bits[16..24]. This is the Lut lowering: a two-output arithmetic transform on a single comparison that produces both the bounded value and the violation signal in one pass.
 
 **Branchless primitive:** `bcinr_logic::mask::min_u32`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 8 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
+**Gains:** The clamped size and overflow flag are computed in parallel in one pipeline pass. The strict-overflow invariant (equal-to-MTU is not overflow) is verified by the Hoare-logic annotation and tested by the boundary corpus. The caller can use the overflow flag to split payloads without any additional comparison.
 
-_Replace this placeholder with consequences and trade-offs._
+**Costs:** The bit-field ABI is fixed — requested in state bits[0..15], MTU in input bits[0..15], clamped size in result bits[0..15], overflow in result bits[16..24]. MTU and payload sizes are limited to 16 bits (64 KB); larger transfer units require a kernel variant.
+
+**Compositions:** Payload size is bounded before the payload is transmitted over a CONNECTED bridge (`bridge_state_transitioned`). The bounded payload carries the encoded opcode from `command_opcode_encoded`. Higher-priority adapters (from `adapter_priority_ranked`) may have larger MTUs, so priority ranking can serve as an implicit MTU maximizer.
 
 ---
 
@@ -55,22 +41,16 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["payload_size_bounded\nLut: bcinr_logic::mask::min_u32"]
-    result["result\n(u64)"]
+    state["state (u64)\nbits[0..15] = requested size (u16)"]
+    input["input (u64)\nbits[0..15] = adapter MTU (u16)"]
+    kernel["payload_size_bounded\nLut: min_u32(requested, mtu)\n+ lt_mask_u32(mtu, requested) >> 31\noverflow iff mtu < requested"]
+    result["result (u64)\nbits[0..15] = clamped size\nbits[16..24] = overflow flag (1 if truncated)"]
     state --> kernel
     input --> kernel
     kernel --> result
-    ocel_0["OCEL: engine_cmd"]
+    ocel_0["OCEL: engine_cmd\nevent code 126"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +102,10 @@ otel::emit(126);
 let ev = OcelEvent::new(126, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [BridgeStateTransitioned](bridge_state_transitioned.md) — payload is bounded immediately before transmission in CONNECTED state.
+- [CommandOpcodeEncoded](command_opcode_encoded.md) — the bounded payload carries the opcode class and original command type.
+- [AdapterPriorityRanked](adapter_priority_ranked.md) — higher-priority adapters are tried first; they may offer larger MTUs.
