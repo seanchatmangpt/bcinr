@@ -267,20 +267,19 @@ pub fn prefix_max_u32x16(arr: [u32; 16]) -> [u32; 16] {
     (1..16usize).for_each(|i| {
         let prev = out[i - 1];
         let cur  = out[i];
-        // Branchless max via signed underflow detection:
-        //   diff = prev - cur
-        //   if prev >= cur: diff does not underflow → high bit 0 → sign = 0
-        //     neg_sign = 0xFFFF_FFFF → keep prev
-        //   if prev < cur: diff underflows → high bit 1 → sign = 1
-        //     neg_sign = 0 → keep cur (no change)
-        let diff     = prev.wrapping_sub(cur);
-        let sign     = diff >> 31;              // 1 if prev < cur
-        let neg_sign = sign.wrapping_neg();     // 0xFFFF_FFFF if prev < cur, 0 otherwise
-        // When prev >= cur (sign=0, neg_sign=0xFFFF_FFFF):
-        //   diff & neg_sign = diff → cur + diff = prev  ✓
-        // When prev < cur (sign=1, neg_sign=0):
-        //   diff & neg_sign = 0  → cur + 0    = cur   ✓
-        out[i] = cur.wrapping_add(diff & neg_sign);
+        // Branchless max:
+        //   diff = prev - cur (wrapping)
+        //   sign = diff >> 31  (1 if prev < cur due to underflow, 0 if prev >= cur)
+        //   mask = sign - 1
+        //     sign=0 (prev >= cur): mask = 0xFFFF_FFFF → keep prev
+        //     sign=1 (prev <  cur): mask = 0            → keep cur (no change)
+        //   out[i] = cur + (diff & mask)
+        //     prev>=cur: cur + (prev-cur) = prev  ✓
+        //     prev< cur: cur + 0          = cur   ✓
+        let diff = prev.wrapping_sub(cur);
+        let sign = diff >> 31;
+        let mask = sign.wrapping_sub(1); // 0xFFFF_FFFF when prev >= cur
+        out[i] = cur.wrapping_add(diff & mask);
     });
     out
 }
