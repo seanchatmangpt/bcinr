@@ -340,345 +340,119 @@ pub const fn trailing_zeros_u32(x: u32) -> u32 {
 mod tests {
     use super::*;
 
-    // --- popcount_u64 ---
-
     #[test]
-    fn test_popcount_u64_zero() {
-        assert_eq!(popcount_u64(0), 0);
+    fn test_int_basics() {
+        // popcount_u64
+        let cases_pc64: &[(u64, u64)] = &[
+            (0, 0),
+            (1, 1),
+            (u64::MAX, 64),
+            (0b1010_1010, 4),
+            (0x5555_5555_5555_5555, 32),
+        ];
+        for &(input, expected) in cases_pc64 {
+            assert_eq!(popcount_u64(input), expected, "popcount_u64({input:#x})");
+        }
+        // popcount_u32
+        let cases_pc32: &[(u32, u32)] = &[(0, 0), (1, 1), (u32::MAX, 32), (0b1010_1010, 4)];
+        for &(input, expected) in cases_pc32 {
+            assert_eq!(popcount_u32(input), expected, "popcount_u32({input:#x})");
+        }
+        // parity_u32
+        let cases_par: &[(u32, u32)] = &[
+            (0, 0),
+            (1, 1),
+            (0b11, 0),
+            (0b111, 1),
+            (u32::MAX, 0),
+        ];
+        for &(input, expected) in cases_par {
+            assert_eq!(parity_u32(input), expected, "parity_u32({input:#b})");
+        }
     }
 
     #[test]
-    fn test_popcount_u64_one() {
-        assert_eq!(popcount_u64(1), 1);
-    }
-
-    #[test]
-    fn test_popcount_u64_max() {
-        assert_eq!(popcount_u64(u64::MAX), 64);
-    }
-
-    #[test]
-    fn test_popcount_u64_nontrivial() {
-        assert_eq!(popcount_u64(0b1010_1010), 4);
-        assert_eq!(popcount_u64(0x5555_5555_5555_5555), 32); // alternating bits
-    }
-
-    // --- leading_zeros_u64 ---
-
-    #[test]
-    fn test_leading_zeros_u64_zero() {
+    fn test_int_boundaries() {
+        // leading_zeros_u64
         assert_eq!(leading_zeros_u64(0), 64);
-    }
-
-    #[test]
-    fn test_leading_zeros_u64_one() {
         assert_eq!(leading_zeros_u64(1), 63);
-    }
-
-    #[test]
-    fn test_leading_zeros_u64_max() {
         assert_eq!(leading_zeros_u64(u64::MAX), 0);
-    }
-
-    #[test]
-    fn test_leading_zeros_u64_msb_set() {
         assert_eq!(leading_zeros_u64(0x8000_0000_0000_0000), 0);
-    }
-
-    // --- trailing_zeros_u64 ---
-
-    #[test]
-    fn test_trailing_zeros_u64_zero() {
+        // trailing_zeros_u64
         assert_eq!(trailing_zeros_u64(0), 64);
-    }
-
-    #[test]
-    fn test_trailing_zeros_u64_one() {
         assert_eq!(trailing_zeros_u64(1), 0);
-    }
-
-    #[test]
-    fn test_trailing_zeros_u64_two() {
         assert_eq!(trailing_zeros_u64(2), 1);
-    }
-
-    #[test]
-    fn test_trailing_zeros_u64_max() {
         assert_eq!(trailing_zeros_u64(u64::MAX), 0);
-    }
-
-    // --- reverse_bits_u64 ---
-
-    #[test]
-    fn test_reverse_bits_u64_zero() {
-        assert_eq!(reverse_bits_u64(0), 0);
-    }
-
-    #[test]
-    fn test_reverse_bits_u64_lsb_to_msb() {
-        assert_eq!(reverse_bits_u64(1), 0x8000_0000_0000_0000);
-    }
-
-    #[test]
-    fn test_reverse_bits_u64_msb_to_lsb() {
-        assert_eq!(reverse_bits_u64(0x8000_0000_0000_0000), 1);
-    }
-
-    #[test]
-    fn test_reverse_bits_u64_max() {
-        assert_eq!(reverse_bits_u64(u64::MAX), u64::MAX);
-    }
-
-    #[test]
-    fn test_reverse_bits_u64_involution() {
-        // reverse_bits is its own inverse
-        let v = 0xDEAD_BEEF_CAFE_1234u64;
-        assert_eq!(reverse_bits_u64(reverse_bits_u64(v)), v);
-    }
-
-    // --- saturating_add_i64 ---
-
-    #[test]
-    fn test_saturating_add_i64_zero() {
-        assert_eq!(saturating_add_i64(0, 0), 0);
-    }
-
-    #[test]
-    fn test_saturating_add_i64_nontrivial() {
-        assert_eq!(saturating_add_i64(1, 2), 3);
-        assert_eq!(saturating_add_i64(-5, 3), -2);
-    }
-
-    #[test]
-    fn test_saturating_add_i64_max_overflow() {
-        assert_eq!(saturating_add_i64(i64::MAX, 1), i64::MAX);
-        assert_eq!(saturating_add_i64(i64::MAX, i64::MAX), i64::MAX);
-    }
-
-    #[test]
-    fn test_saturating_add_i64_min_overflow() {
-        assert_eq!(saturating_add_i64(i64::MIN, -1), i64::MIN);
-        assert_eq!(saturating_add_i64(i64::MIN, i64::MIN), i64::MIN);
-    }
-
-    // --- saturating_sub_i64 ---
-
-    #[test]
-    fn test_saturating_sub_i64_zero() {
-        assert_eq!(saturating_sub_i64(0, 0), 0);
-    }
-
-    #[test]
-    fn test_saturating_sub_i64_nontrivial() {
-        assert_eq!(saturating_sub_i64(5, 3), 2);
-        assert_eq!(saturating_sub_i64(3, 5), -2);
-    }
-
-    #[test]
-    fn test_saturating_sub_i64_min_overflow() {
-        assert_eq!(saturating_sub_i64(i64::MIN, 1), i64::MIN);
-    }
-
-    #[test]
-    fn test_saturating_sub_i64_max_overflow() {
-        assert_eq!(saturating_sub_i64(i64::MAX, -1), i64::MAX);
-    }
-
-    // --- saturating_mul_i64 ---
-
-    #[test]
-    fn test_saturating_mul_i64_zero() {
-        assert_eq!(saturating_mul_i64(0, 0), 0);
-        assert_eq!(saturating_mul_i64(i64::MAX, 0), 0);
-        assert_eq!(saturating_mul_i64(0, i64::MIN), 0);
-    }
-
-    #[test]
-    fn test_saturating_mul_i64_identity() {
-        assert_eq!(saturating_mul_i64(1, 42), 42);
-        assert_eq!(saturating_mul_i64(42, 1), 42);
-    }
-
-    #[test]
-    fn test_saturating_mul_i64_max_overflow() {
-        assert_eq!(saturating_mul_i64(i64::MAX, 2), i64::MAX);
-    }
-
-    #[test]
-    fn test_saturating_mul_i64_min_overflow() {
-        assert_eq!(saturating_mul_i64(i64::MIN, 2), i64::MIN);
-    }
-
-    // --- popcount_u32 ---
-
-    #[test]
-    fn test_popcount_u32_zero() {
-        assert_eq!(popcount_u32(0), 0);
-    }
-
-    #[test]
-    fn test_popcount_u32_one() {
-        assert_eq!(popcount_u32(1), 1);
-    }
-
-    #[test]
-    fn test_popcount_u32_max() {
-        assert_eq!(popcount_u32(u32::MAX), 32);
-    }
-
-    #[test]
-    fn test_popcount_u32_nontrivial() {
-        assert_eq!(popcount_u32(0b1010_1010), 4);
-    }
-
-    // --- leading_zeros_u32 ---
-
-    #[test]
-    fn test_leading_zeros_u32_zero() {
+        // leading_zeros_u32
         assert_eq!(leading_zeros_u32(0), 32);
-    }
-
-    #[test]
-    fn test_leading_zeros_u32_one() {
         assert_eq!(leading_zeros_u32(1), 31);
-    }
-
-    #[test]
-    fn test_leading_zeros_u32_max() {
         assert_eq!(leading_zeros_u32(u32::MAX), 0);
-    }
-
-    #[test]
-    fn test_leading_zeros_u32_msb_set() {
         assert_eq!(leading_zeros_u32(0x8000_0000), 0);
-    }
-
-    // --- next_power_of_two_u32 ---
-
-    #[test]
-    fn test_next_power_of_two_u32_zero() {
-        assert_eq!(next_power_of_two_u32(0), 1);
-    }
-
-    #[test]
-    fn test_next_power_of_two_u32_one() {
-        assert_eq!(next_power_of_two_u32(1), 1);
-    }
-
-    #[test]
-    fn test_next_power_of_two_u32_exact_power() {
-        assert_eq!(next_power_of_two_u32(8), 8);
-        assert_eq!(next_power_of_two_u32(0x8000_0000), 0x8000_0000);
-    }
-
-    #[test]
-    fn test_next_power_of_two_u32_nontrivial() {
-        assert_eq!(next_power_of_two_u32(5), 8);
-        assert_eq!(next_power_of_two_u32(100), 128);
-    }
-
-    #[test]
-    fn test_next_power_of_two_u32_max_wraps() {
-        assert_eq!(next_power_of_two_u32(u32::MAX), 0);
-    }
-
-    // --- is_pow2_u32 ---
-
-    #[test]
-    fn test_is_pow2_u32_zero() {
+        // trailing_zeros_u32
+        assert_eq!(trailing_zeros_u32(0), 32);
+        assert_eq!(trailing_zeros_u32(1), 0);
+        assert_eq!(trailing_zeros_u32(2), 1);
+        assert_eq!(trailing_zeros_u32(u32::MAX), 0);
+        // is_pow2_u32
         assert!(!is_pow2_u32(0));
-    }
-
-    #[test]
-    fn test_is_pow2_u32_one() {
         assert!(is_pow2_u32(1));
-    }
-
-    #[test]
-    fn test_is_pow2_u32_powers() {
         assert!(is_pow2_u32(2));
         assert!(is_pow2_u32(4));
         assert!(is_pow2_u32(0x8000_0000));
-    }
-
-    #[test]
-    fn test_is_pow2_u32_non_powers() {
         assert!(!is_pow2_u32(3));
         assert!(!is_pow2_u32(u32::MAX));
-    }
-
-    // --- parity_u32 ---
-
-    #[test]
-    fn test_parity_u32_zero() {
-        assert_eq!(parity_u32(0), 0); // 0 set bits — even
-    }
-
-    #[test]
-    fn test_parity_u32_one() {
-        assert_eq!(parity_u32(1), 1); // 1 set bit — odd
+        // next_power_of_two_u32
+        let cases_npt: &[(u32, u32)] = &[
+            (0, 1), (1, 1), (5, 8), (8, 8), (100, 128), (0x8000_0000, 0x8000_0000),
+        ];
+        for &(input, expected) in cases_npt {
+            assert_eq!(next_power_of_two_u32(input), expected, "next_pow2({input})");
+        }
+        assert_eq!(next_power_of_two_u32(u32::MAX), 0); // wraps
     }
 
     #[test]
-    fn test_parity_u32_max() {
-        assert_eq!(parity_u32(u32::MAX), 0); // 32 set bits — even
+    fn test_int_saturating() {
+        // saturating_add_i64
+        assert_eq!(saturating_add_i64(0, 0), 0);
+        assert_eq!(saturating_add_i64(1, 2), 3);
+        assert_eq!(saturating_add_i64(-5, 3), -2);
+        assert_eq!(saturating_add_i64(i64::MAX, 1), i64::MAX);
+        assert_eq!(saturating_add_i64(i64::MAX, i64::MAX), i64::MAX);
+        assert_eq!(saturating_add_i64(i64::MIN, -1), i64::MIN);
+        assert_eq!(saturating_add_i64(i64::MIN, i64::MIN), i64::MIN);
+        // saturating_sub_i64
+        assert_eq!(saturating_sub_i64(0, 0), 0);
+        assert_eq!(saturating_sub_i64(5, 3), 2);
+        assert_eq!(saturating_sub_i64(3, 5), -2);
+        assert_eq!(saturating_sub_i64(i64::MIN, 1), i64::MIN);
+        assert_eq!(saturating_sub_i64(i64::MAX, -1), i64::MAX);
+        // saturating_mul_i64
+        assert_eq!(saturating_mul_i64(0, 0), 0);
+        assert_eq!(saturating_mul_i64(i64::MAX, 0), 0);
+        assert_eq!(saturating_mul_i64(0, i64::MIN), 0);
+        assert_eq!(saturating_mul_i64(1, 42), 42);
+        assert_eq!(saturating_mul_i64(42, 1), 42);
+        assert_eq!(saturating_mul_i64(i64::MAX, 2), i64::MAX);
+        assert_eq!(saturating_mul_i64(i64::MIN, 2), i64::MIN);
     }
 
     #[test]
-    fn test_parity_u32_nontrivial() {
-        assert_eq!(parity_u32(0b11), 0); // 2 bits — even
-        assert_eq!(parity_u32(0b111), 1); // 3 bits — odd
-    }
-
-    // --- reverse_bits_u32 ---
-
-    #[test]
-    fn test_reverse_bits_u32_zero() {
+    fn test_int_bit_ops() {
+        // reverse_bits_u64
+        assert_eq!(reverse_bits_u64(0), 0);
+        assert_eq!(reverse_bits_u64(1), 0x8000_0000_0000_0000);
+        assert_eq!(reverse_bits_u64(0x8000_0000_0000_0000), 1);
+        assert_eq!(reverse_bits_u64(u64::MAX), u64::MAX);
+        let v64 = 0xDEAD_BEEF_CAFE_1234u64;
+        assert_eq!(reverse_bits_u64(reverse_bits_u64(v64)), v64);
+        // reverse_bits_u32
         assert_eq!(reverse_bits_u32(0), 0);
-    }
-
-    #[test]
-    fn test_reverse_bits_u32_lsb_to_msb() {
         assert_eq!(reverse_bits_u32(1), 0x8000_0000);
-    }
-
-    #[test]
-    fn test_reverse_bits_u32_msb_to_lsb() {
         assert_eq!(reverse_bits_u32(0x8000_0000), 1);
-    }
-
-    #[test]
-    fn test_reverse_bits_u32_max() {
         assert_eq!(reverse_bits_u32(u32::MAX), u32::MAX);
-    }
-
-    #[test]
-    fn test_reverse_bits_u32_involution() {
-        // reverse_bits is its own inverse
-        let v = 0xDEAD_BEEFu32;
-        assert_eq!(reverse_bits_u32(reverse_bits_u32(v)), v);
-    }
-
-    // --- trailing_zeros_u32 ---
-
-    #[test]
-    fn test_trailing_zeros_u32_zero() {
-        assert_eq!(trailing_zeros_u32(0), 32);
-    }
-
-    #[test]
-    fn test_trailing_zeros_u32_one() {
-        assert_eq!(trailing_zeros_u32(1), 0);
-    }
-
-    #[test]
-    fn test_trailing_zeros_u32_two() {
-        assert_eq!(trailing_zeros_u32(2), 1);
-    }
-
-    #[test]
-    fn test_trailing_zeros_u32_max() {
-        assert_eq!(trailing_zeros_u32(u32::MAX), 0);
+        let v32 = 0xDEAD_BEEFu32;
+        assert_eq!(reverse_bits_u32(reverse_bits_u32(v32)), v32);
     }
 }
 #[cfg(test)]

@@ -236,253 +236,93 @@ pub fn abs_i32(x: i32) -> i32 {
 mod tests {
     use super::*;
 
-    // --- select_u32 ---
-
     #[test]
-    fn test_select_u32_all_ones() {
+    fn test_mask_select() {
+        // select_u32
         assert_eq!(select_u32(0xFFFF_FFFF, 10, 20), 10);
-    }
-
-    #[test]
-    fn test_select_u32_all_zeros() {
         assert_eq!(select_u32(0, 10, 20), 20);
-    }
-
-    #[test]
-    fn test_select_u32_zero_inputs() {
         assert_eq!(select_u32(0xFFFF_FFFF, 0, 0), 0);
         assert_eq!(select_u32(0, 0, 0), 0);
-    }
-
-    #[test]
-    fn test_select_u32_max_value_inputs() {
         assert_eq!(select_u32(0xFFFF_FFFF, u32::MAX, 0), u32::MAX);
         assert_eq!(select_u32(0, u32::MAX, 0), 0);
         assert_eq!(select_u32(0xFFFF_FFFF, 0, u32::MAX), 0);
         assert_eq!(select_u32(0, 0, u32::MAX), u32::MAX);
-    }
-
-    #[test]
-    fn test_select_u32_identity_case() {
-        // Selecting the same value regardless of mask is identity
         assert_eq!(select_u32(0xFFFF_FFFF, 42, 42), 42);
         assert_eq!(select_u32(0, 42, 42), 42);
-    }
-
-    // --- select_u64 ---
-
-    #[test]
-    fn test_select_u64_all_ones() {
+        // select_u64
         assert_eq!(select_u64(0xFFFF_FFFF_FFFF_FFFF, 10, 20), 10);
-    }
-
-    #[test]
-    fn test_select_u64_all_zeros() {
         assert_eq!(select_u64(0, 10, 20), 20);
-    }
-
-    #[test]
-    fn test_select_u64_zero_inputs() {
         assert_eq!(select_u64(0xFFFF_FFFF_FFFF_FFFF, 0, 0), 0);
         assert_eq!(select_u64(0, 0, 0), 0);
-    }
-
-    #[test]
-    fn test_select_u64_max_value_inputs() {
         assert_eq!(select_u64(0xFFFF_FFFF_FFFF_FFFF, u64::MAX, 0), u64::MAX);
         assert_eq!(select_u64(0, u64::MAX, 0), 0);
     }
 
-    // --- eq_mask_u32 ---
-
     #[test]
-    fn test_eq_mask_u32_equal() {
-        assert_eq!(eq_mask_u32(5, 5), 0xFFFF_FFFF);
-        assert_eq!(eq_mask_u32(0, 0), 0xFFFF_FFFF);
-        assert_eq!(eq_mask_u32(u32::MAX, u32::MAX), 0xFFFF_FFFF);
-    }
-
-    #[test]
-    fn test_eq_mask_u32_not_equal() {
+    fn test_mask_comparison() {
+        const ALL: u32 = 0xFFFF_FFFF;
+        // eq_mask_u32
+        assert_eq!(eq_mask_u32(5, 5), ALL);
+        assert_eq!(eq_mask_u32(0, 0), ALL);
+        assert_eq!(eq_mask_u32(u32::MAX, u32::MAX), ALL);
         assert_eq!(eq_mask_u32(5, 6), 0);
         assert_eq!(eq_mask_u32(0, u32::MAX), 0);
         assert_eq!(eq_mask_u32(u32::MAX, 0), 0);
-    }
-
-    #[test]
-    fn test_eq_mask_u32_zero_inputs() {
-        assert_eq!(eq_mask_u32(0, 0), 0xFFFF_FFFF);
         assert_eq!(eq_mask_u32(0, 1), 0);
-    }
-
-    // --- is_zero_mask_u32 ---
-
-    #[test]
-    fn test_is_zero_mask_u32_zero() {
-        assert_eq!(is_zero_mask_u32(0), 0xFFFF_FFFF);
-    }
-
-    #[test]
-    fn test_is_zero_mask_u32_one() {
-        assert_eq!(is_zero_mask_u32(1), 0);
-    }
-
-    #[test]
-    fn test_is_zero_mask_u32_max() {
-        assert_eq!(is_zero_mask_u32(u32::MAX), 0);
-    }
-
-    #[test]
-    fn test_is_zero_mask_u32_nontrivial() {
-        assert_eq!(is_zero_mask_u32(42), 0);
-        assert_eq!(is_zero_mask_u32(0x8000_0000), 0);
-    }
-
-    // --- nonzero_mask_u32 ---
-
-    #[test]
-    fn test_nonzero_mask_u32_zero() {
-        assert_eq!(nonzero_mask_u32(0), 0);
-    }
-
-    #[test]
-    fn test_nonzero_mask_u32_one() {
-        assert_eq!(nonzero_mask_u32(1), 0xFFFF_FFFF);
-    }
-
-    #[test]
-    fn test_nonzero_mask_u32_max() {
-        assert_eq!(nonzero_mask_u32(u32::MAX), 0xFFFF_FFFF);
-    }
-
-    #[test]
-    fn test_nonzero_mask_u32_nontrivial() {
-        assert_eq!(nonzero_mask_u32(42), 0xFFFF_FFFF);
-        assert_eq!(nonzero_mask_u32(0x8000_0000), 0xFFFF_FFFF);
-    }
-
-    // --- lt_mask_u32 ---
-
-    #[test]
-    fn test_lt_mask_u32_less_than() {
-        assert_eq!(lt_mask_u32(0, 1), 0xFFFF_FFFF);
-        assert_eq!(lt_mask_u32(3, 5), 0xFFFF_FFFF);
-        assert_eq!(lt_mask_u32(0, u32::MAX), 0xFFFF_FFFF);
-    }
-
-    #[test]
-    fn test_lt_mask_u32_greater_than() {
+        // lt_mask_u32
+        assert_eq!(lt_mask_u32(0, 1), ALL);
+        assert_eq!(lt_mask_u32(3, 5), ALL);
+        assert_eq!(lt_mask_u32(0, u32::MAX), ALL);
         assert_eq!(lt_mask_u32(1, 0), 0);
         assert_eq!(lt_mask_u32(5, 3), 0);
         assert_eq!(lt_mask_u32(u32::MAX, 0), 0);
-    }
-
-    #[test]
-    fn test_lt_mask_u32_equal() {
         assert_eq!(lt_mask_u32(0, 0), 0);
         assert_eq!(lt_mask_u32(7, 7), 0);
         assert_eq!(lt_mask_u32(u32::MAX, u32::MAX), 0);
     }
 
     #[test]
-    fn test_lt_mask_u32_zero_inputs() {
-        assert_eq!(lt_mask_u32(0, 0), 0);
+    fn test_mask_zero_nonzero() {
+        const ALL: u32 = 0xFFFF_FFFF;
+        // is_zero_mask_u32
+        assert_eq!(is_zero_mask_u32(0), ALL);
+        assert_eq!(is_zero_mask_u32(1), 0);
+        assert_eq!(is_zero_mask_u32(u32::MAX), 0);
+        assert_eq!(is_zero_mask_u32(42), 0);
+        assert_eq!(is_zero_mask_u32(0x8000_0000), 0);
+        // nonzero_mask_u32
+        assert_eq!(nonzero_mask_u32(0), 0);
+        assert_eq!(nonzero_mask_u32(1), ALL);
+        assert_eq!(nonzero_mask_u32(u32::MAX), ALL);
+        assert_eq!(nonzero_mask_u32(42), ALL);
+        assert_eq!(nonzero_mask_u32(0x8000_0000), ALL);
     }
 
-    // --- min_u32 ---
-
     #[test]
-    fn test_min_u32_a_less() {
+    fn test_mask_min_max_abs() {
+        // min_u32
         assert_eq!(min_u32(3, 5), 3);
-    }
-
-    #[test]
-    fn test_min_u32_b_less() {
         assert_eq!(min_u32(5, 3), 3);
-    }
-
-    #[test]
-    fn test_min_u32_equal_inputs() {
         assert_eq!(min_u32(7, 7), 7);
-    }
-
-    #[test]
-    fn test_min_u32_zero_inputs() {
         assert_eq!(min_u32(0, 0), 0);
         assert_eq!(min_u32(0, u32::MAX), 0);
         assert_eq!(min_u32(u32::MAX, 0), 0);
-    }
-
-    #[test]
-    fn test_min_u32_max_value() {
         assert_eq!(min_u32(u32::MAX, u32::MAX), u32::MAX);
-    }
-
-    // --- max_u32 ---
-
-    #[test]
-    fn test_max_u32_a_greater() {
+        // max_u32
         assert_eq!(max_u32(5, 3), 5);
-    }
-
-    #[test]
-    fn test_max_u32_b_greater() {
         assert_eq!(max_u32(3, 5), 5);
-    }
-
-    #[test]
-    fn test_max_u32_equal_inputs() {
         assert_eq!(max_u32(7, 7), 7);
-    }
-
-    #[test]
-    fn test_max_u32_zero_inputs() {
         assert_eq!(max_u32(0, 0), 0);
         assert_eq!(max_u32(0, u32::MAX), u32::MAX);
         assert_eq!(max_u32(u32::MAX, 0), u32::MAX);
-    }
-
-    #[test]
-    fn test_max_u32_max_value() {
         assert_eq!(max_u32(u32::MAX, u32::MAX), u32::MAX);
-    }
-
-    // --- abs_i32 ---
-
-    #[test]
-    fn test_abs_i32_positive() {
+        // abs_i32
         assert_eq!(abs_i32(5), 5);
-    }
-
-    #[test]
-    fn test_abs_i32_negative() {
         assert_eq!(abs_i32(-5), 5);
-    }
-
-    #[test]
-    fn test_abs_i32_zero() {
         assert_eq!(abs_i32(0), 0);
-    }
-
-    #[test]
-    fn test_abs_i32_max() {
         assert_eq!(abs_i32(i32::MAX), i32::MAX);
-    }
-
-    #[test]
-    fn test_abs_i32_min_plus_one() {
-        // i32::MIN + 1 is the most negative representable value that has a positive counterpart
         assert_eq!(abs_i32(i32::MIN + 1), i32::MAX);
-    }
-
-    #[test]
-    fn test_abs_i32_min_wraps() {
-        // i32::MIN.wrapping_abs() == i32::MIN — documented wrapping behavior
-        assert_eq!(abs_i32(i32::MIN), i32::MIN);
-    }
-
-    #[test]
-    fn test_abs_i32_nontrivial() {
+        assert_eq!(abs_i32(i32::MIN), i32::MIN); // documented wrapping behavior
         assert_eq!(abs_i32(-100), 100);
         assert_eq!(abs_i32(100), 100);
     }
