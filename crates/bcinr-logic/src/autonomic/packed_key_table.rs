@@ -4,6 +4,7 @@
 //! Optimized for no_std, zero-allocation, and branchless execution.
 
 /// Integrity gate for packed_key_table
+#[must_use]
 pub fn packed_key_table_gate(val: u64) -> u64 {
     val
 }
