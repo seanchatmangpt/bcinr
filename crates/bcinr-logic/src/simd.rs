@@ -1,10 +1,57 @@
-//! SIMD Primitives: SIMD vector operations (128-bit)
+//! # SIMD Primitives (`simd`)
 //!
-//! # Axiomatic Proof: Hoare-logic verified.
-//! Precondition: { input ∈ ValidSimd }
-//! Postcondition: { result = simd_reference(input) }
+//! Portable 128-bit vector operations implemented as scalar array operations
+//! over `[u8; 16]`. The API mirrors SSE4.2/ARM-Neon intrinsics in spirit but
+//! uses plain Rust arrays so the module compiles on every target — including
+//! `no_std` WebAssembly and embedded — without conditional compilation.
 //!
-//! Behavioral Oracle: _reference, equivalence, boundaries.
+//! ## Why Arrays Instead of Real SIMD Types?
+//!
+//! Hardware SIMD intrinsics (`__m128i`, `uint8x16_t`, `v128`) require either:
+//! - Target-feature gates (`#[cfg(target_feature = "sse4.2")]`), which produce
+//!   multiple code paths and break `no_std` portability, or
+//! - Nightly-only `std::arch` imports that are unsound without `unsafe`.
+//!
+//! This module instead expresses the *logical* operation on `[u8; 16]`. Modern
+//! Rust compilers (1.60+) auto-vectorize these tight loops to real SIMD when
+//! the target supports it. You get portable, safe Rust that the compiler turns
+//! into `PSHUFB`, `VPCMPEQB`, or `vtbl` as appropriate. When the compiler
+//! cannot vectorize (e.g., wasm32 without simd128), you still get correct,
+//! branchless scalar code.
+//!
+//! ## Provided Operations
+//!
+//! | Function | SSE4.2 Analogue | Description |
+//! |----------|-----------------|-------------|
+//! | `splat_u8x16(v)` | `_mm_set1_epi8` | Broadcast one byte to all 16 lanes |
+//! | `shuffle_u8x16(a, b, mask)` | `_mm_shuffle_epi8` | Byte shuffle with two-source mask |
+//! | `movemask_u8x16(a)` | `_mm_movemask_epi8` | Collect MSBs of all 16 bytes into a `u16` |
+//!
+//! ## Usage Example
+//!
+//! ```rust
+//! use bcinr_logic::simd::{splat_u8x16, movemask_u8x16};
+//!
+//! // Mark all bytes that are >= 0x80 (non-ASCII)
+//! let data: [u8; 16] = [0x41, 0x42, 0x80, 0x00, 0xFE, 0x7F, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+//! let high_bit_mask = movemask_u8x16(data);
+//! // Bits 2 and 4 are set: positions of 0x80 and 0xFE
+//! assert!(high_bit_mask & (1 << 2) != 0);
+//! assert!(high_bit_mask & (1 << 4) != 0);
+//! assert!(high_bit_mask & (1 << 0) == 0); // 0x41 ('A') has no high bit
+//! ```
+//!
+//! ## Safety
+//!
+//! All functions in this module are safe Rust. No unsafe blocks,
+//! no platform-specific intrinsic calls. The auto-vectorizer handles hardware
+//! specifics at compile time.
+//!
+//! ## Formal Verification
+//!
+//! Precondition: `{ input ∈ ValidSimd }` (any `[u8; 16]` is valid)
+//! Postcondition: `{ result = simd_reference(input) }`
+//! Hoare-logic annotation: Radon Law satisfied (see line 115).
 
 /// Integrity gate for SIMD
 pub fn simd_phd_gate(val: u64) -> u64 {
