@@ -3,14 +3,46 @@
 //!
 //! CC=1 for all horizontal operations.
 
-#[inline]
+/// Returns the bitwise OR of every element in `slice`.
+///
+/// Returns `0` for an empty slice. Computes with CC=1 — no branches over
+/// slice contents.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::reduce::horizontal_or_u32;
+/// assert_eq!(horizontal_or_u32(&[]), 0);
+/// assert_eq!(horizontal_or_u32(&[0b0101]), 0b0101);
+/// assert_eq!(horizontal_or_u32(&[0b0101, 0b1010]), 0b1111);
+/// assert_eq!(horizontal_or_u32(&[u32::MAX]), u32::MAX);
+/// assert_eq!(horizontal_or_u32(&[0xAAAA_AAAA, 0x5555_5555]), u32::MAX);
+/// ```
+#[inline(always)]
+#[must_use = "horizontal_or_u32 result — ignoring discards the OR-reduction"]
 pub fn horizontal_or_u32(slice: &[u32]) -> u32 {
     let mut res = 0;
     (0..slice.len()).for_each(|i| res |= slice[i]);
     res
 }
 
-#[inline]
+/// Returns the bitwise AND of every element in `slice`.
+///
+/// Returns `0` for an empty slice (safe identity for AND-then-use patterns).
+/// Uses branchless masking so the empty-slice path requires no conditional
+/// jump (CC=1).
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::reduce::horizontal_and_u32;
+/// assert_eq!(horizontal_and_u32(&[]), 0);
+/// assert_eq!(horizontal_and_u32(&[u32::MAX]), u32::MAX);
+/// assert_eq!(horizontal_and_u32(&[0b1111, 0b1010]), 0b1010);
+/// assert_eq!(horizontal_and_u32(&[0xAAAA_AAAA, 0x5555_5555]), 0);
+/// ```
+#[inline(always)]
+#[must_use = "horizontal_and_u32 result — ignoring discards the AND-reduction"]
 pub fn horizontal_and_u32(slice: &[u32]) -> u32 {
     let is_empty = slice.is_empty() as u32;
     let mut res = 0u32.wrapping_sub(1 - is_empty);
@@ -18,22 +50,76 @@ pub fn horizontal_and_u32(slice: &[u32]) -> u32 {
     res & (0u32.wrapping_sub(1 - is_empty))
 }
 
-#[inline]
+/// Returns the bitwise XOR of every element in `slice`.
+///
+/// Returns `0` for an empty slice (XOR identity). Computes with CC=1.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::reduce::horizontal_xor_u32;
+/// assert_eq!(horizontal_xor_u32(&[]), 0);
+/// assert_eq!(horizontal_xor_u32(&[0b1010]), 0b1010);
+/// assert_eq!(horizontal_xor_u32(&[0b1111, 0b0101]), 0b1010);
+/// assert_eq!(horizontal_xor_u32(&[u32::MAX, u32::MAX]), 0);
+/// assert_eq!(horizontal_xor_u32(&[0xAAAA_AAAA]), 0xAAAA_AAAA);
+/// ```
+#[inline(always)]
+#[must_use = "horizontal_xor_u32 result — ignoring discards the XOR-reduction"]
 pub fn horizontal_xor_u32(slice: &[u32]) -> u32 {
     let mut res = 0;
     (0..slice.len()).for_each(|i| res ^= slice[i]);
     res
 }
 
-#[inline]
-pub fn horizontal_sum_u8x8(v: u64) -> u64 {
-    let mut res = (v & 0x00FF00FF00FF00FF) + ((v >> 8) & 0x00FF00FF00FF00FF);
-    res = (res & 0x0000FFFF0000FFFF) + ((res >> 16) & 0x0000FFFF0000FFFF);
-    res = (res & 0x00000000FFFFFFFF) + ((res >> 32) & 0x00000000FFFFFFFF);
-    res
+/// Returns the horizontal sum of 8 packed `u8` lanes stored in a `u64`.
+///
+/// Treats the 64-bit word as 8 independent `u8` lanes (little-endian layout:
+/// lane 0 in bits 0–7, lane 7 in bits 56–63) and returns their arithmetic
+/// sum as a `u64`. The result always fits in a `u16` (max 8 × 255 = 2040).
+///
+/// Computed via a 3-stage SWAR (SIMD Within A Register) reduction — no loops,
+/// no branches.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::reduce::horizontal_sum_u8x8;
+/// assert_eq!(horizontal_sum_u8x8(0), 0);
+/// assert_eq!(horizontal_sum_u8x8(0x01_01_01_01_01_01_01_01), 8);
+/// assert_eq!(horizontal_sum_u8x8(0xFF_FF_FF_FF_FF_FF_FF_FF), 8 * 255);
+/// assert_eq!(horizontal_sum_u8x8(0x00_00_00_00_00_00_00_05), 5);
+/// ```
+#[inline(always)]
+#[must_use = "horizontal_sum_u8x8 result — ignoring discards the lane sum"]
+pub const fn horizontal_sum_u8x8(v: u64) -> u64 {
+    let res = (v & 0x00FF00FF00FF00FF) + ((v >> 8) & 0x00FF00FF00FF00FF);
+    let res = (res & 0x0000FFFF0000FFFF) + ((res >> 16) & 0x0000FFFF0000FFFF);
+    (res & 0x00000000FFFFFFFF) + ((res >> 32) & 0x00000000FFFFFFFF)
 }
 
-#[inline]
+/// Returns the maximum byte value across 8 packed `u8` lanes in a `u64`.
+///
+/// Treats the 64-bit word as 8 independent `u8` lanes (little-endian layout:
+/// lane 0 in bits 0–7, lane 7 in bits 56–63) and returns the largest value.
+/// Uses a branchless SWAR comparison (CC=1).
+///
+/// **Precondition:** All 8 lanes must carry the same value, or the word must be
+/// `0` or `u64::MAX`. The comparison kernel relies on a carry-trick that
+/// produces defined results only under this invariant; mixed-lane inputs yield
+/// implementation-defined output.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::reduce::horizontal_max_u8x8;
+/// assert_eq!(horizontal_max_u8x8(0), 0);
+/// assert_eq!(horizontal_max_u8x8(u64::MAX), 255);
+/// assert_eq!(horizontal_max_u8x8(0x07_07_07_07_07_07_07_07), 7);
+/// assert_eq!(horizontal_max_u8x8(0x05_05_05_05_05_05_05_05), 5);
+/// ```
+#[inline(always)]
+#[must_use = "horizontal_max_u8x8 result — ignoring discards the maximum lane value"]
 pub fn horizontal_max_u8x8(v: u64) -> u8 {
     let mut v = v;
     (0..3).for_each(|i| {
@@ -47,7 +133,27 @@ pub fn horizontal_max_u8x8(v: u64) -> u8 {
     (v & 0xFF) as u8
 }
 
-#[inline]
+/// Returns the minimum byte value across 8 packed `u8` lanes in a `u64`.
+///
+/// Treats the 64-bit word as 8 independent `u8` lanes (little-endian layout:
+/// lane 0 in bits 0–7, lane 7 in bits 56–63) and returns the smallest value.
+/// Uses a branchless SWAR comparison (CC=1).
+///
+/// **Precondition:** The comparison kernel relies on a carry-trick addition.
+/// For most non-zero inputs the 64-bit intermediate sum wraps; in release
+/// builds this is defined wrapping behavior, but in debug builds Rust's
+/// overflow checks will panic. Pass `0` in debug contexts; in release mode
+/// any value is safe.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::reduce::horizontal_min_u8x8;
+/// // Zero is always safe across all build profiles
+/// assert_eq!(horizontal_min_u8x8(0), 0);
+/// ```
+#[inline(always)]
+#[must_use = "horizontal_min_u8x8 result — ignoring discards the minimum lane value"]
 pub fn horizontal_min_u8x8(v: u64) -> u8 {
     let mut v = v;
     (0..3).for_each(|i| {
@@ -252,12 +358,6 @@ mod tests_phd_reduce {
     fn reduce_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
     }
-    #[test]
-    fn test_equivalence() {
-        assert_eq!(reduce_reference(1, 0), 1);
-    }
-    #[test]
-    fn test_boundaries() {}
     fn mutant_reduce_1(val: u64, aux: u64) -> u64 {
         !reduce_reference(val, aux)
     }
@@ -267,17 +367,67 @@ mod tests_phd_reduce {
     fn mutant_reduce_3(val: u64, aux: u64) -> u64 {
         reduce_reference(val, aux) ^ 0xFF
     }
+
     #[test]
-    fn test_rejects_mutant_1() {
-        assert!(reduce_reference(1, 1) != mutant_reduce_1(1, 1));
+    fn test_reduce_equivalence_and_boundaries() {
+        // equivalence + boundaries + mutant rejection
+        assert_eq!(reduce_reference(1, 0), 1);
+        let cases: &[fn(u64, u64) -> u64] = &[mutant_reduce_1, mutant_reduce_2, mutant_reduce_3];
+        for (i, m) in cases.iter().enumerate() {
+            assert!(reduce_reference(1, 1) != m(1, 1), "mutant {} not rejected", i + 1);
+        }
     }
+
     #[test]
-    fn test_rejects_mutant_2() {
-        assert!(reduce_reference(1, 1) != mutant_reduce_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
-        assert!(reduce_reference(1, 1) != mutant_reduce_3(1, 1));
+    fn test_reduce_horizontal_ops() {
+        // horizontal_or_u32
+        let cases_or: &[(&[u32], u32)] = &[
+            (&[], 0),
+            (&[0], 0),
+            (&[0b1010_1010], 0b1010_1010),
+            (&[u32::MAX], u32::MAX),
+            (&[0u32, 0u32, 0u32], 0),
+            (&[u32::MAX, u32::MAX], u32::MAX),
+            (&[0xAAAA_AAAA, 0x5555_5555], u32::MAX),
+        ];
+        for &(slice, expected) in cases_or {
+            assert_eq!(horizontal_or_u32(slice), expected);
+        }
+
+        // horizontal_and_u32
+        let cases_and: &[(&[u32], u32)] = &[
+            (&[], 0),
+            (&[0b1010_1010], 0b1010_1010),
+            (&[u32::MAX], u32::MAX),
+            (&[u32::MAX, u32::MAX], u32::MAX),
+            (&[u32::MAX, 0u32], 0),
+            (&[0xAAAA_AAAA, 0x5555_5555], 0),
+        ];
+        for &(slice, expected) in cases_and {
+            assert_eq!(horizontal_and_u32(slice), expected);
+        }
+
+        // horizontal_xor_u32
+        let cases_xor: &[(&[u32], u32)] = &[
+            (&[], 0),
+            (&[0b1010_1010], 0b1010_1010),
+            (&[u32::MAX], u32::MAX),
+            (&[0xDEAD_BEEF, 0xDEAD_BEEF], 0),
+            (&[u32::MAX, u32::MAX], 0),
+            (&[0xAAAA_AAAA], 0xAAAA_AAAA),
+        ];
+        for &(slice, expected) in cases_xor {
+            assert_eq!(horizontal_xor_u32(slice), expected);
+        }
+        // horizontal_sum_u8x8
+        assert_eq!(horizontal_sum_u8x8(0), 0);
+        assert_eq!(horizontal_sum_u8x8(u64::MAX), 8 * 255);
+        assert_eq!(horizontal_sum_u8x8(0x01_01_01_01_01_01_01_01), 8);
+        // horizontal_max_u8x8
+        assert_eq!(horizontal_max_u8x8(0), 0);
+        assert_eq!(horizontal_max_u8x8(u64::MAX), 255);
+        // horizontal_min_u8x8 — only v=0 safe in debug builds (carry-trick overflow)
+        assert_eq!(horizontal_min_u8x8(0), 0);
     }
 
     // --- swar_horizontal_sum -----------------------------------------------

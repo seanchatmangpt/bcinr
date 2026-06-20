@@ -17,6 +17,8 @@
 //! CC=1: Absolute branchless logic.
 
 /// Integrity gate for TimeWheel
+#[inline(always)]
+#[must_use]
 pub fn time_wheel_phd_gate(val: u64) -> u64 {
     val
 }
@@ -35,6 +37,7 @@ impl<const N: usize> Default for TimeWheel<N> {
 }
 
 impl<const N: usize> TimeWheel<N> {
+    #[must_use]
     pub const fn new() -> Self {
         // N must be power of two
         Self {
@@ -53,6 +56,7 @@ impl<const N: usize> TimeWheel<N> {
 
     /// Advances the wheel by one tick and returns the firing event mask.
     #[inline(always)]
+    #[must_use]
     pub fn tick(&mut self) -> u64 {
         let events = self.slots[self.current_tick];
         self.slots[self.current_tick] = 0; // Clear for next rotation
@@ -63,48 +67,26 @@ impl<const N: usize> TimeWheel<N> {
 
 #[cfg(test)]
 mod tests {
-    #[allow(dead_code)]
-    fn time_wheel_reference(val: u64, aux: u64) -> u64 {
-        val ^ aux
-    }
-
     use super::*;
-    fn wheel_reference(val: u64, aux: u64) -> u64 {
-        val ^ aux
-    }
+
     #[test]
-    fn test_equivalence() {
-        assert_eq!(wheel_reference(1, 0), 1);
-    }
-    #[test]
-    fn test_boundaries() {
-        let mut wheel = TimeWheel::<8>::new();
-        wheel.schedule(2, 0); // Schedule bit 0 for tick 2
-        assert_eq!(wheel.tick(), 0);
-        assert_eq!(wheel.tick(), 0);
-        assert_eq!(wheel.tick(), 1); // Fired
-        assert_eq!(wheel.tick(), 0);
-    }
-    fn mutant_wheel_1(val: u64, aux: u64) -> u64 {
-        !wheel_reference(val, aux)
-    }
-    fn mutant_wheel_2(val: u64, aux: u64) -> u64 {
-        wheel_reference(val, aux).wrapping_add(1)
-    }
-    fn mutant_wheel_3(val: u64, aux: u64) -> u64 {
-        wheel_reference(val, aux) ^ 0xFF
-    }
-    #[test]
-    fn test_rejects_mutant_1() {
-        assert!(wheel_reference(1, 1) != mutant_wheel_1(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_2() {
-        assert!(wheel_reference(1, 1) != mutant_wheel_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
-        assert!(wheel_reference(1, 1) != mutant_wheel_3(1, 1));
+    fn test_time_wheel_phd_oracle() {
+        // PHD Gate: event fires at slot (current_tick + delay) & mask.
+        // schedule(delay, event_bit) targets slot `delay` from current_tick=0.
+        // tick() drains slot[current_tick] then advances current_tick.
+        // So delay=1 → slot 1 fires on 2nd tick(), delay=2 → slot 2 fires on 3rd tick().
+        let cases: &[(usize, u32, &[u64])] = &[
+            (1, 0, &[0, 1, 0]),      // bit 0 placed in slot 1; fires on 2nd tick
+            (2, 0, &[0, 0, 1, 0]),   // bit 0 placed in slot 2; fires on 3rd tick
+            (3, 1, &[0, 0, 0, 2, 0]), // bit 1 placed in slot 3; fires on 4th tick
+        ];
+        for &(delay, event_bit, ticks) in cases {
+            let mut wheel = TimeWheel::<8>::new();
+            wheel.schedule(delay, event_bit);
+            for &expected in ticks {
+                assert_eq!(wheel.tick(), expected);
+            }
+        }
     }
 }
 

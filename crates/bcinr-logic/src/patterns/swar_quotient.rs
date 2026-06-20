@@ -17,6 +17,8 @@
 //! CC=1: Absolute branchless logic.
 
 /// Integrity gate for SwarQuotient
+#[inline(always)]
+#[must_use]
 pub fn swar_quotient_phd_gate(val: u64) -> u64 {
     val
 }
@@ -33,12 +35,14 @@ impl<const N: usize> Default for SwarQuotientFilter<N> {
 }
 
 impl<const N: usize> SwarQuotientFilter<N> {
+    #[must_use]
     pub const fn new() -> Self {
         Self { table: [0u64; N] }
     }
 
     /// Checks for membership of an 8-bit tag at index `idx` branchlessly.
     #[inline(always)]
+    #[must_use]
     pub fn contains(&self, idx: usize, tag: u8) -> bool {
         let word = self.table[idx & (N - 1)];
         // SWAR: Broadcast tag to all 8 lanes
@@ -71,48 +75,18 @@ impl<const N: usize> SwarQuotientFilter<N> {
 
 #[cfg(test)]
 mod tests {
-    #[allow(dead_code)]
-    fn swar_quotient_reference(val: u64, aux: u64) -> u64 {
-        val ^ aux
-    }
-
     use super::*;
-    fn quotient_reference(val: u64, aux: u64) -> u64 {
-        val ^ aux
-    }
+
     #[test]
-    fn test_equivalence() {
-        assert_eq!(quotient_reference(1, 0), 1);
-    }
-    #[test]
-    fn test_boundaries() {
+    fn test_swar_quotient_phd_oracle() {
+        // PHD Gate: insert then contains returns true; uninserted fingerprint returns false
         let mut q = SwarQuotientFilter::<4>::new();
-        assert!(q.insert(0, 0xAB));
-        assert!(q.contains(0, 0xAB));
-        assert!(!q.contains(0, 0xCD));
-        assert!(q.insert(0, 0xCD));
-        assert!(q.contains(0, 0xCD));
-    }
-    fn mutant_quotient_1(val: u64, aux: u64) -> u64 {
-        !quotient_reference(val, aux)
-    }
-    fn mutant_quotient_2(val: u64, aux: u64) -> u64 {
-        quotient_reference(val, aux).wrapping_add(1)
-    }
-    fn mutant_quotient_3(val: u64, aux: u64) -> u64 {
-        quotient_reference(val, aux) ^ 0xFF
-    }
-    #[test]
-    fn test_rejects_mutant_1() {
-        assert!(quotient_reference(1, 1) != mutant_quotient_1(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_2() {
-        assert!(quotient_reference(1, 1) != mutant_quotient_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
-        assert!(quotient_reference(1, 1) != mutant_quotient_3(1, 1));
+        let cases: &[(usize, u8)] = &[(0, 0xAB), (1, 0xCD), (2, 0xEF), (0, 0x12)];
+        for &(slot, fp) in cases {
+            assert!(!q.contains(slot, fp), "not yet inserted");
+            assert!(q.insert(slot, fp));
+            assert!(q.contains(slot, fp), "should be found after insert");
+        }
     }
 }
 

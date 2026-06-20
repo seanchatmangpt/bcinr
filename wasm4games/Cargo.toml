@@ -1,0 +1,11 @@
+[workspace]
+members = ["crates/wasm4games", "crates/wasm4games-capi"]
+# wasm4games-wasm4pm is the online-only admission bridge to the external wasm4pm /
+# wasm4pm-compat repos. It is excluded so the offline build never resolves git dependencies.
+exclude = ["crates/wasm4games-wasm4pm"]
+resolver = "2"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"

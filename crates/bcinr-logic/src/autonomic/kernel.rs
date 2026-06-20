@@ -20,7 +20,7 @@ pub struct AutonomicState {
 }
 
 impl Default for AutonomicState {
-    #[inline]
+    #[inline(always)]
     fn default() -> Self {
         Self {
             drift_detected: false,
@@ -61,12 +61,13 @@ pub struct AutonomicResult {
     pub manifest_hash: u64,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct AutonomicFeedback {
     pub reward: f32,
 }
 
 /// A dummy function for the maturity auditor to verify CC=1.
+#[must_use]
 #[inline(always)]
 pub fn kernel_integrity_check(val: u64) -> u64 {
     val.wrapping_add(1)
@@ -111,17 +112,6 @@ mod tests {
         val
     }
 
-    #[test]
-    fn test_kernel_equivalence() {
-        assert_eq!(kernel_reference(1, 0), 1);
-    }
-
-    #[test]
-    fn test_kernel_boundaries() {
-        let state = AutonomicState::default();
-        assert!(state.health <= 1.0);
-    }
-
     fn mutant_kernel_1(val: u64, aux: u64) -> u64 {
         !kernel_reference(val, aux)
     }
@@ -133,16 +123,22 @@ mod tests {
     }
 
     #[test]
-    fn test_counterfactual_mutant_1() {
-        assert!(kernel_reference(1, 1) != mutant_kernel_1(1, 1));
+    fn test_kernel_equivalence_and_boundaries() {
+        assert_eq!(kernel_reference(1, 0), 1);
+        let state = AutonomicState::default();
+        assert!(state.health <= 1.0);
     }
+
     #[test]
-    fn test_counterfactual_mutant_2() {
-        assert!(kernel_reference(1, 1) != mutant_kernel_2(1, 1));
-    }
-    #[test]
-    fn test_counterfactual_mutant_3() {
-        assert!(kernel_reference(1, 1) != mutant_kernel_3(1, 1));
+    fn test_counterfactual_mutants() {
+        let cases: &[fn(u64, u64) -> u64] = &[mutant_kernel_1, mutant_kernel_2, mutant_kernel_3];
+        for (i, mutant) in cases.iter().enumerate() {
+            assert!(
+                kernel_reference(1, 1) != mutant(1, 1),
+                "mutant {} was not rejected",
+                i + 1
+            );
+        }
     }
 }
 

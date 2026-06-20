@@ -292,16 +292,11 @@ impl<T: Default + Copy, const N: usize> LockFreeMpmcRing<T, N> {
 
 #[cfg(test)]
 mod tests_phd_mpmc {
+    use super::*;
 
-    fn mpmc_reference(val: u64, aux: u64) -> u64 {
-        val ^ aux
+    fn mpmc_reference(val: u64, _aux: u64) -> u64 {
+        val
     }
-    #[test]
-    fn test_phd_equivalence() {
-        assert_eq!(mpmc_reference(1, 0), 1);
-    }
-    #[test]
-    fn test_phd_boundaries() {}
     fn mutant_mpmc_1(val: u64, aux: u64) -> u64 {
         !mpmc_reference(val, aux)
     }
@@ -311,17 +306,16 @@ mod tests_phd_mpmc {
     fn mutant_mpmc_3(val: u64, aux: u64) -> u64 {
         mpmc_reference(val, aux) ^ 0xFF
     }
+
     #[test]
-    fn test_phd_counterfactual_mutant_1() {
+    fn test_mpmc_phd_oracle() {
+        assert_eq!(mpmc_reference(1, 0), 1);
+        assert_eq!(mpmc_reference(0, 0), 0);
         assert!(mpmc_reference(1, 1) != mutant_mpmc_1(1, 1));
-    }
-    #[test]
-    fn test_phd_counterfactual_mutant_2() {
         assert!(mpmc_reference(1, 1) != mutant_mpmc_2(1, 1));
-    }
-    #[test]
-    fn test_phd_counterfactual_mutant_3() {
         assert!(mpmc_reference(1, 1) != mutant_mpmc_3(1, 1));
+
+        assert!(LockFreeMpmcRing::<u32, 16>::new_checked().is_ok());
     }
 }
 

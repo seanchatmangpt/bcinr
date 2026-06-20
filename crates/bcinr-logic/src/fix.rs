@@ -10,16 +10,47 @@
 // # AXIOMATIC PROOF: Hoare-logic Analysis
 // Hoare-logic Verification Line 100: Radon Law verified.
 
-/// Saturating addition for u32.
+/// Saturating addition for `u32` values without branches.
+///
+/// Returns `u32::MAX` if the addition would overflow, otherwise the
+/// exact sum. The computation uses only wrapping arithmetic and a
+/// branchless carry-out mask, giving constant-time behaviour on every
+/// micro-architecture.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::fix::add_sat;
+/// assert_eq!(add_sat(10, 20), 30);
+/// assert_eq!(add_sat(u32::MAX, 1), u32::MAX);
+/// assert_eq!(add_sat(0, 0), 0);
+/// ```
+#[must_use = "saturating sum — ignoring it discards the computed result"]
 #[inline(always)]
-pub fn add_sat(a: u32, b: u32) -> u32 {
+pub const fn add_sat(a: u32, b: u32) -> u32 {
     let res = a.wrapping_add(b);
     res | 0u32.wrapping_sub((res < a) as u32)
 }
 
-/// Clamp a u32 value to [min, max] branchlessly.
+/// Clamp a `u32` value to the closed interval `[min, max]` branchlessly.
+///
+/// If `val < min` the function returns `min`; if `val > max` it returns
+/// `max`; otherwise it returns `val` unchanged. Both substitutions are
+/// performed with bitwise masks so the generated code contains no
+/// conditional branches.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::fix::clamp_u32;
+/// assert_eq!(clamp_u32(5, 0, 10), 5);
+/// assert_eq!(clamp_u32(0, 3, 10), 3);
+/// assert_eq!(clamp_u32(15, 0, 10), 10);
+/// assert_eq!(clamp_u32(0, 0, 0), 0);
+/// ```
+#[must_use = "clamped value — ignoring it discards the computed result"]
 #[inline(always)]
-pub fn clamp_u32(val: u32, min: u32, max: u32) -> u32 {
+pub const fn clamp_u32(val: u32, min: u32, max: u32) -> u32 {
     let mut res = val;
     let lt_min = (res < min) as u32;
     res = (min & 0u32.wrapping_sub(lt_min)) | (res & !0u32.wrapping_sub(lt_min));
@@ -28,9 +59,25 @@ pub fn clamp_u32(val: u32, min: u32, max: u32) -> u32 {
     res
 }
 
-/// Simple bucketization branchlessly.
+/// Round a `u32` value down to the nearest multiple of `step` (bucketize).
+///
+/// Equivalent to `(val / step) * step` but branchless: a zero `step` is
+/// guarded against division-by-zero by using an effective divisor of `1`,
+/// but the subsequent multiplication by the original `step` (which is `0`)
+/// yields `0` for any `val`.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::fix::bucketize_u32;
+/// assert_eq!(bucketize_u32(17, 5), 15);
+/// assert_eq!(bucketize_u32(0, 8), 0);
+/// assert_eq!(bucketize_u32(8, 8), 8);
+/// assert_eq!(bucketize_u32(9, 0), 0); // zero step: result is 0 (no division-by-zero trap)
+/// ```
+#[must_use = "bucket index — ignoring it discards the computed result"]
 #[inline(always)]
-pub fn bucketize_u32(val: u32, step: u32) -> u32 {
+pub const fn bucketize_u32(val: u32, step: u32) -> u32 {
     val.wrapping_div(step.wrapping_add((step == 0) as u32))
         .wrapping_mul(step)
 }
@@ -177,7 +224,8 @@ pub fn isqrt_u32(n: u32) -> u32 {
     x = (x + n / x.max(1)) / 2;
 
     // Correct for overshoot (branchless): subtract 1 if x*x > n.
-    let too_big = (x.saturating_mul(x) > n) as u32;
+    // Use u64 to avoid saturating_mul overflow when x = 65536 (u32::MAX case).
+    let too_big = ((x as u64) * (x as u64) > n as u64) as u32;
     x - too_big
 }
 
@@ -263,17 +311,16 @@ pub mod trig_const {
 /// ```
 #[inline(always)]
 pub fn q16_sin_bhaskara(theta: i32) -> i32 {
-    use trig_const::{FIVE_PI_SQ, PI};
-    // Numerator: 16 * theta * (PI - theta), kept in i64 to avoid overflow.
+    use trig_const::PI;
     let pi_minus_theta = PI - theta;
+    // Numerator: 16 * theta * (PI - theta) in Q32.32.
     let numer: i64 = 16 * (theta as i64) * (pi_minus_theta as i64);
-    // Denominator: 5*pi^2 - 4 * theta * (pi - theta).
-    let denom: i64 = (FIVE_PI_SQ as i64) - 4 * (theta as i64) * (pi_minus_theta as i64);
-    // Guard: if denom == 0 return 0 (only happens at degenerate inputs).
+    // Denominator: 5*PI² - 4*theta*(PI-theta), all in Q32.32.
+    // FIVE_PI_SQ from trig_const is in Q16.16; compute 5*PI*PI inline in Q32.32
+    // to avoid the scale mismatch (product is Q32.32, but old constant was Q16.16).
+    let five_pi_sq: i64 = 5 * (PI as i64) * (PI as i64);
+    let denom: i64 = five_pi_sq - 4 * (theta as i64) * (pi_minus_theta as i64);
     let safe_denom = denom + (denom == 0) as i64;
-    // Result is a Q16.16 value in [0, 1]; numer/denom already gives the ratio.
-    // Scale: numer and denom are both in "Q32" (squared Q16 units), so the
-    // ratio numer/denom is dimensionless. Multiply by 65536 for Q16.16 output.
     ((numer * 65536) / safe_denom) as i32
 }
 
@@ -418,36 +465,69 @@ mod tests {
     }
 
     #[test]
-    fn test_equivalence() {
+    fn test_fix_equivalence_and_boundaries() {
         assert_eq!(fix_reference(1, 2), 3);
-    }
-
-    #[test]
-    fn test_boundaries() {
         assert_eq!(fix_reference(0, 0), 0);
+        // counterfactual mutants
+        let mutants: &[fn(u64, u64) -> u64] = &[
+            |v, a| !fix_reference(v, a),
+            |v, a| fix_reference(v, a).wrapping_add(1),
+            |v, a| fix_reference(v, a) ^ 0xFF,
+        ];
+        for (i, m) in mutants.iter().enumerate() {
+            assert_ne!(fix_reference(1, 1), m(1, 1), "mutant {i} did not diverge");
+        }
+        // (a, b, expected)
+        let cases: &[(u32, u32, u32)] = &[
+            (0, 0, 0),
+            (42, 0, 42),
+            (0, 42, 42),
+            (10, 20, 30),
+            (u32::MAX, 1, u32::MAX),
+            (u32::MAX, u32::MAX, u32::MAX),
+            (u32::MAX - 1, 1, u32::MAX),
+            (u32::MAX - 5, 5, u32::MAX),
+        ];
+        for &(a, b, expected) in cases {
+            assert_eq!(add_sat(a, b), expected, "add_sat({a}, {b})");
+        }
     }
 
-    fn mutant_fix_1(val: u64, aux: u64) -> u64 {
-        !fix_reference(val, aux)
-    }
-    fn mutant_fix_2(val: u64, aux: u64) -> u64 {
-        fix_reference(val, aux).wrapping_add(1)
-    }
-    fn mutant_fix_3(val: u64, aux: u64) -> u64 {
-        fix_reference(val, aux) ^ 0xFF
-    }
+    #[test]
+    fn test_clamp_and_bucketize_table() {
+        // clamp_u32: (val, min, max, expected)
+        let clamp_cases: &[(u32, u32, u32, u32)] = &[
+            (0, 0, 0, 0),
+            (5, 0, 10, 5),
+            (0, 3, 10, 3),
+            (15, 0, 10, 10),
+            (3, 3, 10, 3),
+            (10, 3, 10, 10),
+            (u32::MAX, 0, 100, 100),
+            (u32::MAX, 0, u32::MAX, u32::MAX),
+        ];
+        for &(val, lo, hi, expected) in clamp_cases {
+            assert_eq!(clamp_u32(val, lo, hi), expected, "clamp_u32({val}, {lo}, {hi})");
+        }
 
-    #[test]
-    fn test_rejects_mutant_1() {
-        assert!(fix_reference(1, 1) != mutant_fix_1(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_2() {
-        assert!(fix_reference(1, 1) != mutant_fix_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
-        assert!(fix_reference(1, 1) != mutant_fix_3(1, 1));
+        // bucketize_u32: (val, step, expected)
+        let bucket_cases: &[(u32, u32, u32)] = &[
+            (0, 8, 0),
+            (16, 8, 16),
+            (8, 8, 8),
+            (17, 5, 15),
+            (9, 5, 5),
+            (42, 1, 42),
+            (0, 1, 0),
+            (9, 0, 0),
+            (0, 0, 0),
+        ];
+        for &(val, step, expected) in bucket_cases {
+            assert_eq!(bucketize_u32(val, step), expected, "bucketize_u32({val}, {step})");
+        }
+        let v = bucketize_u32(u32::MAX, 100);
+        assert!(v <= u32::MAX);
+        assert_eq!(v % 100, 0);
     }
 
     // ── Q16.16 mul/div ──────────────────────────────────────────────────────

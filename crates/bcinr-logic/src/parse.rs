@@ -3,7 +3,27 @@
 //!
 //! CC=1 for all parsing operations.
 
-/// Skip whitespace branchlessly using a fixed-width scan.
+/// Advances past all leading ASCII whitespace bytes in `bytes` and returns
+/// the number of bytes skipped.
+///
+/// The implementation is branchless: whitespace detection uses a comparison
+/// cast to `usize`, and the cursor advance uses a bitwise mask, eliminating
+/// all conditional branches (CC=1).
+///
+/// A byte is considered whitespace if its value is ≤ 32 (covers SP, HT, LF,
+/// VT, FF, CR, and NUL).
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::parse::skip_whitespace;
+///
+/// assert_eq!(skip_whitespace(b"   hello"), 3);
+/// assert_eq!(skip_whitespace(b"hello"),    0);
+/// assert_eq!(skip_whitespace(b""),         0);
+/// assert_eq!(skip_whitespace(b"\t\n\rhi"), 3);
+/// ```
+#[must_use = "parse result — ignoring discards the parsed value and cursor"]
 #[inline(always)]
 pub fn skip_whitespace(bytes: &[u8]) -> usize {
     let mut offset = 0;
@@ -15,7 +35,31 @@ pub fn skip_whitespace(bytes: &[u8]) -> usize {
     offset
 }
 
-/// Parse a hex string branchlessly.
+/// Parses a hexadecimal ASCII string of 1–8 characters into a `u32` branchlessly.
+///
+/// Accepts uppercase (`A`–`F`), lowercase (`a`–`f`), and digit (`0`–`9`) characters.
+/// Returns `Err(())` if:
+/// - `bytes` is empty
+/// - `bytes` has more than 8 characters
+/// - any character is not a valid hex digit
+///
+/// The implementation uses branchless arithmetic (masks and multiplication) to
+/// classify each digit, keeping cyclomatic complexity at CC=1.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::parse::parse_hex_u32;
+///
+/// assert_eq!(parse_hex_u32(b"0"),        Ok(0x0));
+/// assert_eq!(parse_hex_u32(b"FF"),       Ok(0xFF));
+/// assert_eq!(parse_hex_u32(b"deadbeef"), Ok(0xDEADBEEF));
+/// assert_eq!(parse_hex_u32(b"DEADBEEF"), Ok(0xDEADBEEF));
+/// assert_eq!(parse_hex_u32(b""),         Err(()));
+/// assert_eq!(parse_hex_u32(b"123456789"),Err(()));  // > 8 chars
+/// assert_eq!(parse_hex_u32(b"XY"),       Err(()));  // invalid chars
+/// ```
+#[must_use = "parse result — ignoring discards the parsed value and cursor"]
 #[inline(always)]
 pub fn parse_hex_u32(bytes: &[u8]) -> Result<u32, ()> {
     let mut res = 0u32;
@@ -41,17 +85,6 @@ mod tests {
     fn parse_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
     }
-
-    #[test]
-    fn test_equivalence() {
-        assert_eq!(parse_reference(1, 2), 3);
-    }
-
-    #[test]
-    fn test_boundaries() {
-        assert_eq!(parse_reference(0, 0), 0);
-    }
-
     fn mutant_parse_1(val: u64, aux: u64) -> u64 {
         !parse_reference(val, aux)
     }
@@ -62,17 +95,52 @@ mod tests {
         parse_reference(val, aux) ^ 0xFF
     }
 
+    use super::*;
+
+    // ── skip_whitespace ───────────────────────────────────────────────────────
     #[test]
-    fn test_rejects_mutant_1() {
-        assert!(parse_reference(1, 1) != mutant_parse_1(1, 1));
+    fn test_parse_equivalence_and_whitespace() {
+        // PHD gate
+        assert_eq!(parse_reference(1, 2), 3);
+        assert_eq!(parse_reference(0, 0), 0);
+        let cases: &[fn(u64, u64) -> u64] = &[mutant_parse_1, mutant_parse_2, mutant_parse_3];
+        for (i, m) in cases.iter().enumerate() {
+            assert!(parse_reference(1, 1) != m(1, 1), "mutant {} not rejected", i + 1);
+        }
+        // (input, expected_skip_count)
+        let cases: &[(&[u8], usize)] = &[
+            (b"",           0), // empty
+            (b"hello",      0), // no leading whitespace
+            (b" x",         1), // single space
+            (b"\t\n\rword", 3), // tab, newline, carriage-return
+            (b"   ",        3), // all spaces
+        ];
+        for &(input, expected) in cases {
+            assert_eq!(skip_whitespace(input), expected, "input={:?}", input);
+        }
     }
+
+    // ── parse_hex_u32 ─────────────────────────────────────────────────────────
     #[test]
-    fn test_rejects_mutant_2() {
-        assert!(parse_reference(1, 1) != mutant_parse_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
-        assert!(parse_reference(1, 1) != mutant_parse_3(1, 1));
+    fn test_parse_hex_u32() {
+        // (input, expected result)
+        let cases: &[(&[u8], Result<u32, ()>)] = &[
+            (b"",           Err(())),           // empty
+            (b"0",          Ok(0x0)),
+            (b"F",          Ok(15)),
+            (b"f",          Ok(15)),
+            (b"FF",         Ok(0xFF)),
+            (b"FFFFFFFF",   Ok(u32::MAX)),      // max 8 hex digits
+            (b"deadbeef",   Ok(0xDEADBEEF)),    // lowercase
+            (b"DEADBEEF",   Ok(0xDEADBEEF)),    // uppercase
+            (b"DeAdBeEf",   Ok(0xDEADBEEF)),    // mixed case
+            (b"123456789",  Err(())),           // > 8 chars
+            (b"XY",         Err(())),           // invalid chars
+            (b"0G",         Err(())),           // partially invalid
+        ];
+        for &(input, expected) in cases {
+            assert_eq!(parse_hex_u32(input), expected, "input={:?}", input);
+        }
     }
 }
 

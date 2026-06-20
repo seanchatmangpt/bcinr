@@ -61,12 +61,42 @@
 //! - All scalar fallback paths are branchless: loop bodies use arithmetic
 //!   instead of `if`/`break` to accumulate results.
 
-/// Integrity gate for scan.
-pub fn scan_gate(val: u64) -> u64 {
+/// Integrity gate for scan: returns its input unchanged.
+///
+/// Used as a formal verification anchor. The gate asserts the identity
+/// postcondition `result == val` and serves as a no-op passthrough in
+/// composed pipelines.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::scan::scan_gate;
+/// assert_eq!(scan_gate(42), 42);
+/// assert_eq!(scan_gate(0), 0);
+/// ```
+#[must_use = "scan integrity value — ignoring it discards the passthrough result"]
+#[inline(always)]
+pub const fn scan_gate(val: u64) -> u64 {
     val
 }
 
-/// Create a 64-bit mask where each bit represents if the corresponding byte matches the target.
+/// Build a 64-bit bitmask indicating which of the first 64 bytes equal `target`.
+///
+/// Bit `i` of the returned mask is set to `1` if `bytes[i] == target`, and `0`
+/// otherwise. At most the first 64 bytes are scanned; if `bytes` is shorter
+/// only `bytes.len()` bits are examined and the rest remain `0`.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::scan::find_byte_mask;
+/// let data = b"hello world";
+/// let mask = find_byte_mask(data, b'l');
+/// assert_eq!(mask, 0b0000_0100_1000); // bits 2 and 3 for "ll", bit 9 for last 'l'
+/// assert_eq!(find_byte_mask(&[], b'x'), 0);
+/// assert_eq!(find_byte_mask(b"aaa", b'b'), 0);
+/// ```
+#[must_use = "byte-match bitmask — ignoring it discards the computed scan result"]
 #[inline(always)]
 pub fn find_byte_mask(bytes: &[u8], target: u8) -> u64 {
     let mut mask = 0u64;
@@ -81,7 +111,23 @@ pub fn find_byte_mask(bytes: &[u8], target: u8) -> u64 {
     mask
 }
 
-/// Skip spaces branchlessly using a fixed-width scan.
+/// Count leading spaces in `bytes` using a branchless fixed-width scan.
+///
+/// Returns the number of consecutive ASCII space characters (`0x20`) at the
+/// start of the slice. The scan is branchless: the offset accumulates only
+/// while the current position equals the running count, stopping at the
+/// first non-space byte without a conditional jump.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::scan::skip_spaces;
+/// assert_eq!(skip_spaces(b"   hello"), 3);
+/// assert_eq!(skip_spaces(b"hello"), 0);
+/// assert_eq!(skip_spaces(b""), 0);
+/// assert_eq!(skip_spaces(b"   "), 3);
+/// ```
+#[must_use = "leading-space count — ignoring it discards the computed offset"]
 #[inline(always)]
 pub fn skip_spaces(bytes: &[u8]) -> usize {
     let mut offset = 0;
@@ -93,7 +139,23 @@ pub fn skip_spaces(bytes: &[u8]) -> usize {
     offset
 }
 
-/// Check if the byte slice is ASCII using 64-bit SWAR branchlessly.
+/// Return `true` if every byte in `bytes` is a valid 7-bit ASCII character.
+///
+/// Uses 64-bit SWAR (SIMD Within A Register) to process eight bytes at a
+/// time by checking the high bit of each byte lane simultaneously. Falls back
+/// to a per-byte loop for any trailing bytes that do not fill a full 8-byte
+/// chunk. The entire computation is branchless within each chunk.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::scan::is_ascii_u64_slice;
+/// assert!(is_ascii_u64_slice(b"Hello, world!"));
+/// assert!(!is_ascii_u64_slice(b"caf\xc3\xa9")); // UTF-8 encoded 'é'
+/// assert!(is_ascii_u64_slice(b""));
+/// assert!(is_ascii_u64_slice(b"abcdefgh")); // exact 8-byte chunk
+/// ```
+#[must_use = "ASCII validity flag — ignoring it discards the computed result"]
 #[inline(always)]
 pub fn is_ascii_u64_slice(bytes: &[u8]) -> bool {
     let mut accumulator = 0u64;
@@ -439,17 +501,6 @@ mod tests {
     fn scan_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
     }
-
-    #[test]
-    fn test_equivalence() {
-        assert_eq!(scan_reference(1, 0), 1);
-    }
-
-    #[test]
-    fn test_boundaries() {
-        // boundaries
-    }
-
     fn mutant_scan_1(val: u64, aux: u64) -> u64 {
         !scan_reference(val, aux)
     }
@@ -461,16 +512,42 @@ mod tests {
     }
 
     #[test]
-    fn test_rejects_mutant_1() {
-        assert!(scan_reference(1, 1) != mutant_scan_1(1, 1));
+    fn test_scan_equivalence_and_boundaries() {
+        // equivalence + boundaries
+        assert_eq!(scan_reference(1, 0), 1);
+        assert_eq!(scan_gate(0), 0);
+        assert_eq!(scan_gate(u64::MAX), u64::MAX);
+        // counterfactual mutant rejection
+        let cases: &[fn(u64, u64) -> u64] = &[mutant_scan_1, mutant_scan_2, mutant_scan_3];
+        for (i, m) in cases.iter().enumerate() {
+            assert!(scan_reference(1, 1) != m(1, 1), "mutant {} not rejected", i + 1);
+        }
     }
+
     #[test]
-    fn test_rejects_mutant_2() {
-        assert!(scan_reference(1, 1) != mutant_scan_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
-        assert!(scan_reference(1, 1) != mutant_scan_3(1, 1));
+    fn test_scan_find_byte_and_ascii() {
+        // empty and no-match
+        assert_eq!(find_byte_mask(&[], b'x'), 0);
+        assert_eq!(find_byte_mask(b"aaa", b'b'), 0);
+        // single match at index 0
+        assert_eq!(find_byte_mask(b"baa", b'b'), 1);
+        // all three bytes match — bits 0,1,2 set
+        assert_eq!(find_byte_mask(b"aaa", b'a'), 0b111);
+        // "hello": 'l' at index 2 and 3
+        assert_eq!(find_byte_mask(b"hello", b'l'), 0b01100);
+        // 70-byte slice: only first 64 bytes inspected — bits 0..63 all set
+        let data = [b'x'; 70];
+        assert_eq!(find_byte_mask(&data, b'x'), u64::MAX);
+        // skip_spaces
+        assert_eq!(skip_spaces(b""), 0);
+        assert_eq!(skip_spaces(b"   hello"), 3);
+        assert_eq!(skip_spaces(b"hello"), 0);
+        // is_ascii_u64_slice
+        assert!(is_ascii_u64_slice(b"Hello, world!"));
+        assert!(!is_ascii_u64_slice(&[0x80]));
+        let mut non_ascii = [b'a'; 9];
+        non_ascii[8] = 0x80;
+        assert!(!is_ascii_u64_slice(&non_ascii));
     }
 
     // --- prefix_sum_u32x16 -------------------------------------------------
