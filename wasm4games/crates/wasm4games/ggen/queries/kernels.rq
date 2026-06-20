@@ -1,0 +1,34 @@
+# kernels.rq — one row per pattern with every field needed to render a kernel file.
+# Drives templates/kernel.rs.tera. ORDER BY ?id so output is stable.
+#
+# The two-sided breed corpus (w4g:mustAdmit / w4g:mustRefuse) is OPTIONAL and
+# aggregated into comma-joined lists so patterns without a seeded corpus still
+# render; the template falls back to its representative corpus when they are empty.
+
+PREFIX w4g: <https://wasm4games.dev/ontology#>
+
+SELECT ?id ?name ?lowering ?stateCard ?eventCode ?eventName ?otelSpan
+       ?requiredStatus ?refusalStatus ?primitive ?doc ?authority
+       (GROUP_CONCAT(DISTINCT ?mustAdmit; SEPARATOR=" || ") AS ?mustAdmit)
+       (GROUP_CONCAT(DISTINCT ?mustRefuse; SEPARATOR=" || ") AS ?mustRefuse)
+WHERE {
+    ?pattern a w4g:Pattern ;
+        w4g:id            ?id ;
+        w4g:name          ?name ;
+        w4g:lowering      ?loweringNode ;
+        w4g:stateCard     ?stateCard ;
+        w4g:eventCode     ?eventCode ;
+        w4g:eventName     ?eventName ;
+        w4g:otelSpan      ?otelSpan ;
+        w4g:requiredStatus ?requiredStatus ;
+        w4g:refusalStatus ?refusalStatus ;
+        w4g:primitive     ?primitive ;
+        w4g:doc           ?doc ;
+        w4g:authority     ?authority .
+    ?loweringNode w4g:name ?lowering .
+    OPTIONAL { ?pattern w4g:mustAdmit  ?mustAdmit  . }
+    OPTIONAL { ?pattern w4g:mustRefuse ?mustRefuse . }
+}
+GROUP BY ?id ?name ?lowering ?stateCard ?eventCode ?eventName ?otelSpan
+         ?requiredStatus ?refusalStatus ?primitive ?doc ?authority
+ORDER BY ?id
