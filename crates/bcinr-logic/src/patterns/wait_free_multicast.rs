@@ -31,6 +31,7 @@ impl<const CONSUMERS: usize> BoundedSpscMulticast<CONSUMERS> {
     }
 
     #[inline(always)]
+    #[must_use]
     fn ring_full_mask(ring: &SpscRingState) -> u64 {
         let next_head = ring.head.wrapping_add(1) & ring.mask;
         0u64.wrapping_sub((next_head == ring.tail) as u64)
@@ -38,6 +39,7 @@ impl<const CONSUMERS: usize> BoundedSpscMulticast<CONSUMERS> {
 
     /// T1 Admission: T_f < 200ns.
     #[inline(always)]
+    #[must_use]
     pub fn any_full_mask(&self) -> u64 {
         let mut any_full = 0u64;
         (0..CONSUMERS).for_each(|i| {
@@ -48,6 +50,7 @@ impl<const CONSUMERS: usize> BoundedSpscMulticast<CONSUMERS> {
 
     /// Partial broadcast attempts delivery to every consumer.
     #[inline(always)]
+    #[must_use]
     pub fn broadcast_partial(&mut self) -> u64 {
         let mut delivery_mask = 0u64;
         (0..CONSUMERS).for_each(|i| {
@@ -60,6 +63,7 @@ impl<const CONSUMERS: usize> BoundedSpscMulticast<CONSUMERS> {
 
     /// All-or-none broadcast succeeds only i-f global capacity exists.
     #[inline(always)]
+    #[must_use]
     pub fn broadcast_all_or_none(&mut self) -> u64 {
         let can_deliver_mask = !self.any_full_mask();
         let mut delivery_mask = 0u64;

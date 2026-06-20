@@ -17,6 +17,8 @@
 //! CC=1: Absolute branchless logic.
 
 /// Integrity gate for MatrixLRU
+#[inline(always)]
+#[must_use]
 pub fn matrix_lru_phd_gate(val: u64) -> u64 {
     val
 }
@@ -34,6 +36,7 @@ impl<const N: usize> Default for MatrixLru<N> {
 }
 
 impl<const N: usize> MatrixLru<N> {
+    #[must_use]
     pub const fn new() -> Self {
         Self { matrix: [0u64; N] }
     }
@@ -59,6 +62,7 @@ impl<const N: usize> MatrixLru<N> {
     /// Finds the Least Recently Used index branchlessly.
     /// The LRU is the row with all zeros (among occupied slots).
     #[inline(always)]
+    #[must_use]
     pub fn find_lru(&self) -> usize {
         let mut lru_idx = 0usize;
         let mut found_mask = 0u64;

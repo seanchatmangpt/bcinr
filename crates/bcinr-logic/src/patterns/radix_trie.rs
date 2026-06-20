@@ -17,6 +17,8 @@
 //! CC=1: Absolute branchless logic.
 
 /// Integrity gate for RadixTrie
+#[inline(always)]
+#[must_use]
 pub fn radix_trie_phd_gate(val: u64) -> u64 {
     val
 }
@@ -35,6 +37,7 @@ impl<const N: usize> Default for RadixTrieNode<N> {
 }
 
 impl<const N: usize> RadixTrieNode<N> {
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             bitmap: [0u64; 4],
@@ -45,6 +48,7 @@ impl<const N: usize> RadixTrieNode<N> {
     /// Retrieves the child index for byte `b` branchlessly.
     /// Returns (child_idx, exists_mask).
     #[inline(always)]
+    #[must_use]
     pub fn lookup(&self, b: u8) -> (u32, u32) {
         let word_idx = (b >> 6) as usize;
         let bit_idx = (b & 63) as u32;

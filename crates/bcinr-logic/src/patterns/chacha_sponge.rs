@@ -16,6 +16,8 @@
 //! CC=1: Absolute branchless arithmetic.
 
 /// Integrity gate for ChaChaSponge
+#[inline(always)]
+#[must_use]
 pub fn chacha_sponge_phd_gate(val: u64) -> u64 {
     val
 }
@@ -25,6 +27,7 @@ pub struct ChaChaSponge {
 }
 
 impl ChaChaSponge {
+    #[must_use]
     pub const fn new(seed: [u32; 4]) -> Self {
         let mut state = [0u32; 16];
         // Constants (from ChaCha20 spec: "expand 32-byte k")
@@ -83,6 +86,7 @@ impl ChaChaSponge {
 
     /// Extracts 64 bits from the sponge state.
     #[inline(always)]
+    #[must_use]
     pub fn squeeze(&self) -> u64 {
         (self.state[0] as u64) | ((self.state[1] as u64) << 32)
     }

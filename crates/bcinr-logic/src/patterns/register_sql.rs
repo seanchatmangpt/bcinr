@@ -31,6 +31,7 @@ impl RegisterEngine {
     /// Sorts and filters branchlessly.
     /// T1 Admission: T_f < 200ns.
     #[inline(always)]
+    #[must_use]
     pub fn sort_and_filter(data: &mut [u32; 8], threshold: u32) -> u8 {
         bitonic_sort_8u32(data);
 
@@ -46,6 +47,7 @@ impl RegisterEngine {
     /// Selects only matching elements and packs them via sorting.
     /// T1 Admission: T_f < 200ns.
     #[inline(always)]
+    #[must_use]
     pub fn select_and_pack(data: &[u32; 8], target: u32) -> [u32; 8] {
         let mut result = [0u32; 8];
 

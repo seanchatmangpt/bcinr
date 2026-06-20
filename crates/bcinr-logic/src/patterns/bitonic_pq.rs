@@ -19,6 +19,8 @@
 use crate::network::bitonic_sort_8u32;
 
 /// Integrity gate for BitonicPQ
+#[inline(always)]
+#[must_use]
 pub fn bitonic_pq_phd_gate(val: u64) -> u64 {
     val
 }
@@ -34,6 +36,7 @@ impl Default for BitonicPriorityQueue8 {
 }
 
 impl BitonicPriorityQueue8 {
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             data: [u32::MAX; 8],
@@ -52,6 +55,7 @@ impl BitonicPriorityQueue8 {
     /// Pops the highest priority (min value) branchlessly.
     /// Returns (priority, success_mask).
     #[inline(always)]
+    #[must_use]
     pub fn pop(&mut self) -> (u32, u32) {
         let val = self.data[0];
         let has_data = (val != u32::MAX) as u32;

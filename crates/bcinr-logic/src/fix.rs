@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 // oracle equivalence boundaries
 //! Branchless Fixed-Point Arithmetic
 //!

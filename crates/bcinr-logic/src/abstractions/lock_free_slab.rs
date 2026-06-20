@@ -24,6 +24,8 @@ impl<const N: usize> Default for LockFreeSlab<N> {
 }
 
 impl<const N: usize> LockFreeSlab<N> {
+    /// Creates a new lock-free slab with an empty freelist.
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             freelist: AtomicU32::new(0),
@@ -33,6 +35,8 @@ impl<const N: usize> LockFreeSlab<N> {
 
     /// Allocates an index from the slab branchlessly.
     /// CC=1: Absolute branchless logic.
+    /// Returns (allocated_index, success_flag).
+    #[must_use]
     #[inline(always)]
     pub fn alloc_t1(&self) -> (u32, u32) {
         let head = self.freelist.load(Ordering::Relaxed);

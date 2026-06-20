@@ -4,6 +4,7 @@
 //! Supports a 3-epoch rotation system (Active, Drain, Reclaim).
 
 /// Integrity gate for epoch_reclamation
+#[must_use]
 pub fn epoch_reclamation_gate(val: u64) -> u64 {
     val
 }
@@ -20,12 +21,15 @@ impl Default for EpochState {
 }
 
 impl EpochState {
+    /// Creates a new epoch state at epoch 0.
+    #[must_use]
     pub const fn new() -> Self {
         Self { epoch: 0 }
     }
 
     /// Advances the epoch branchlessly.
     /// Returns (new_epoch, old_epoch).
+    #[must_use]
     #[inline(always)]
     pub fn advance_epoch(&mut self) -> (u32, u32) {
         let old = self.epoch;

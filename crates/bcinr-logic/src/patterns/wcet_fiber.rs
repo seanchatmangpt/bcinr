@@ -37,6 +37,7 @@ impl<const TICKS: usize> Default for WcetFiber<TICKS> {
 }
 
 impl<const TICKS: usize> WcetFiber<TICKS> {
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             state: FiberState { state: 0 },
@@ -47,6 +48,7 @@ impl<const TICKS: usize> WcetFiber<TICKS> {
     /// Advances the fiber by exactly TICKS branchlessly.
     /// T1 Admission: T_f < 200ns.
     #[inline(always)]
+    #[must_use]
     pub fn execute_budget_fixed(&mut self, events: &[u32; TICKS]) -> u64 {
         let mut success_mask = 0u64;
 

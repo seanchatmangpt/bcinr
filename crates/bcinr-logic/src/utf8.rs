@@ -10,7 +10,9 @@
 /// use bcinr_logic::utf8::utf8_phd_gate;
 /// assert_eq!(utf8_phd_gate(42), 42);
 /// ```
-pub fn utf8_phd_gate(val: u64) -> u64 {
+#[must_use = "UTF-8 gate result — ignoring discards the verified value"]
+#[inline(always)]
+pub const fn utf8_phd_gate(val: u64) -> u64 {
     // _reference equivalence boundaries
     val
 }

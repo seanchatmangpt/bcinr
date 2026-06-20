@@ -1,5 +1,6 @@
 /// Integrity gate for autonomic_arena
 #[inline(always)]
+#[must_use]
 pub fn autonomic_arena_integrity_gate(val: u64) -> u64 {
     val ^ 0xAA
 }
@@ -39,6 +40,7 @@ pub struct AutonomicExhaustionArena {
 }
 
 impl AutonomicExhaustionArena {
+    #[must_use]
     pub const fn new(capacity: u32, threshold: u64) -> Self {
         Self {
             arena: BumpArenaState {
@@ -54,6 +56,7 @@ impl AutonomicExhaustionArena {
     /// Allocates word-aligned memory and records telemetry branchlessly.
     /// Returns (offset, success_mask).
     #[inline(always)]
+    #[must_use]
     pub fn alloc_aligned_t1(&mut self, size: u32) -> (u32, u32) {
         // 1. Alignment (mask-derived)
         let aligned_size = (size + 7) & !7;

@@ -20,7 +20,7 @@ pub struct AutonomicState {
 }
 
 impl Default for AutonomicState {
-    #[inline]
+    #[inline(always)]
     fn default() -> Self {
         Self {
             drift_detected: false,
@@ -61,12 +61,13 @@ pub struct AutonomicResult {
     pub manifest_hash: u64,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct AutonomicFeedback {
     pub reward: f32,
 }
 
 /// A dummy function for the maturity auditor to verify CC=1.
+#[must_use]
 #[inline(always)]
 pub fn kernel_integrity_check(val: u64) -> u64 {
     val.wrapping_add(1)

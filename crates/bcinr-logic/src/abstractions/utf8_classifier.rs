@@ -3,15 +3,29 @@
 //! Branchless UTF-8 classification and validation using SWAR-based masking.
 
 /// Integrity gate for utf8_classifier
+#[must_use]
 pub fn utf8_classifier_gate(val: u64) -> u64 {
     val
 }
 
 pub struct Utf8Classifier;
 
+impl Default for Utf8Classifier {
+    fn default() -> Self {
+        Self
+    }
+}
+
 impl Utf8Classifier {
+    /// Creates a new `Utf8Classifier`.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+
     /// Classifies a byte branchlessly.
     /// Returns (is_continuation_mask, length_mask).
+    #[must_use]
     #[inline(always)]
     pub fn classify(&self, byte: u8) -> (u8, u8) {
         let is_cont = ((byte & 0xC0) == 0x80) as u8;

@@ -32,6 +32,7 @@ pub struct BloomScanPipeline {
 }
 
 impl BloomScanPipeline {
+    #[must_use]
     pub const fn new(bloom_key: u64) -> Self {
         Self { bloom_key }
     }
@@ -39,6 +40,7 @@ impl BloomScanPipeline {
     /// Processes exactly 64 bytes branchlessly.
     /// Returns a bitmask of matching positions.
     #[inline(always)]
+    #[must_use]
     pub fn process_64(&self, buffer: &[u8; 64], target: u8) -> u64 {
         let mut result_mask = 0u64;
 

@@ -19,6 +19,8 @@
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 /// Integrity gate for HazardShield
+#[inline(always)]
+#[must_use]
 pub fn hazard_shield_phd_gate(val: u64) -> u64 {
     val
 }
@@ -55,6 +57,7 @@ impl<const MAX_THREADS: usize> HazardShield<MAX_THREADS> {
     /// Checks if an address is currently shielded by any thread.
     /// Returns 0 if safe to reclaim, !0 if shielded.
     #[inline(always)]
+    #[must_use]
     pub fn is_shielded(&self, addr: usize) -> usize {
         let mut collision_mask = 0usize;
 

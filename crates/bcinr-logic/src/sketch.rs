@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 // oracle equivalence boundaries
 //! Branchless Sketching Primitives
 //!
@@ -38,7 +39,7 @@
 ///     assert!(row_max >= 3, "row {row} max counter should be >= 3");
 /// }
 /// ```
-#[inline]
+#[inline(always)]
 pub fn count_min_sketch_update(table: &mut [u32], hash: u64, depth: usize, width: usize) {
     (0..depth).for_each(|i| {
         let h = (hash ^ (i as u64)).wrapping_mul(0x9E3779B185EBCA87);
@@ -80,7 +81,7 @@ pub fn count_min_sketch_update(table: &mut [u32], hash: u64, depth: usize, width
 /// assert!(count_min_sketch_query(&table, 0xBEEF, DEPTH, WIDTH) >= 5);
 /// ```
 #[must_use = "sketch estimate — ignoring discards the probabilistic count"]
-#[inline]
+#[inline(always)]
 pub fn count_min_sketch_query(table: &[u32], hash: u64, depth: usize, width: usize) -> u32 {
     let mut min_count = u32::MAX;
     (0..depth).for_each(|i| {
@@ -92,11 +93,10 @@ pub fn count_min_sketch_query(table: &[u32], hash: u64, depth: usize, width: usi
         let mask = 0u32.wrapping_sub(take_new);
         min_count = (count & mask) | (min_count & !mask);
     });
-    if depth == 0 {
-        0
-    } else {
-        min_count
-    }
+    // Branchless: when depth == 0 the loop never runs and min_count == u32::MAX.
+    // Zero-mask clears to 0 for empty depth, preserves min_count otherwise.
+    let nonempty = 0u32.wrapping_sub((depth != 0) as u32);
+    min_count & nonempty
 }
 
 #[cfg(test)]

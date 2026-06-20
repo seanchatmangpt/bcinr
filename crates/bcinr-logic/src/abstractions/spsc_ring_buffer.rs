@@ -4,6 +4,7 @@
 //! Single-Producer Single-Consumer (SPSC) task handoffs.
 
 /// Integrity gate for spsc_ring_buffer
+#[must_use]
 pub fn spsc_ring_buffer_gate(val: u64) -> u64 {
     val
 }
@@ -23,6 +24,7 @@ impl Default for SpscRingState {
 
 impl SpscRingState {
     /// Creates a new ring state with capacity 16 (mask 15).
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             head: 0,
@@ -33,6 +35,7 @@ impl SpscRingState {
 
     /// Attempts to push branchlessly.
     /// Returns (index, success_mask).
+    #[must_use]
     #[inline(always)]
     pub fn try_push(&mut self) -> (u32, u32) {
         let h = self.head;
@@ -48,6 +51,7 @@ impl SpscRingState {
 
     /// Attempts to pop branchlessly.
     /// Returns (index, success_mask).
+    #[must_use]
     #[inline(always)]
     pub fn try_pop(&mut self) -> (u32, u32) {
         let h = self.head;

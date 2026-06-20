@@ -86,6 +86,8 @@ where
     K: Copy + Default + PartialEq,
     V: Copy + Default,
 {
+    /// Creates a new empty packed key table.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             hashes: [u64::MAX; N],
@@ -111,6 +113,7 @@ where
     K: Copy + Default + PartialEq,
     V: Copy + Default,
 {
+    #[must_use]
     #[inline(always)]
     pub fn get(&self, key: K) -> Option<V> {
         let hash = hash_key(&key);
@@ -124,6 +127,7 @@ where
         [None, Some(result)][found]
     }
 
+    #[must_use]
     pub fn insert(&mut self, key: K, _value: V) -> bool {
         let hash = hash_key(&key);
         let mut exists = 0usize;

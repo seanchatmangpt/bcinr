@@ -4,6 +4,7 @@
 //! deterministic execution and zero-allocation fiber state transitions.
 
 /// Integrity gate for resumable_fiber
+#[must_use]
 pub fn resumable_fiber_gate(val: u64) -> u64 {
     val
 }
@@ -20,12 +21,15 @@ impl Default for FiberState {
 }
 
 impl FiberState {
+    /// Creates a new fiber at state 0.
+    #[must_use]
     pub const fn new() -> Self {
         Self { state: 0 }
     }
 
     /// Advances the fiber branchlessly.
     /// Returns (new_state, success_mask).
+    #[must_use]
     #[inline(always)]
     pub fn advance(&mut self, event: u32) -> (u32, u32) {
         let old = self.state;

@@ -41,6 +41,7 @@ impl<const WORDS: usize, const TRANSITIONS: usize> PriorityPetriEngine<WORDS, TR
 
     /// Executes one deterministic priority-ordered cycle branchlessly.
     #[inline(always)]
+    #[must_use]
     pub fn step(&mut self) -> u64 {
         let mut firing_mask = 0u64;
 

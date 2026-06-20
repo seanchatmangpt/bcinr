@@ -25,6 +25,7 @@ pub struct ConstantShapePolicyDfa {
 }
 
 impl ConstantShapePolicyDfa {
+    #[must_use]
     pub fn new_checked(
         table: &'static [usize],
         alphabet_size: usize,
@@ -53,6 +54,7 @@ impl ConstantShapePolicyDfa {
     /// Runs one step of the DFA branchlessly.
     /// T1 Admission: T_f < 200ns.
     #[inline(always)]
+    #[must_use]
     pub fn step(&self, current_state: usize, input: u8) -> (usize, u64) {
         let next = dfa_advance(current_state, input, self.table, self.alphabet_size);
         let state_bit = 1u64.wrapping_shl((next as u32) & 0x3F);
@@ -66,6 +68,7 @@ impl ConstantShapePolicyDfa {
     /// Processes a buffer branchlessly.
     /// T2 Admission (Orchestration): T_f is O(len). Each step is T1.
     #[inline(always)]
+    #[must_use]
     pub fn run(&self, input: &[u8], initial_state: usize) -> usize {
         let mut state = initial_state;
         input.iter().for_each(|&b| {

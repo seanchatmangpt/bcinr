@@ -41,7 +41,8 @@ where
     K: Copy + Default + PartialEq,
     V: Copy + Default,
 {
-    #[inline]
+    /// Creates a new autonomic substrate with default knowledge and state.
+    #[inline(always)]
     pub fn new() -> Self {
         Self {
             knowledge: PackedKeyTable::new(),
@@ -49,17 +50,22 @@ where
         }
     }
 
-    #[inline]
+    /// Resets the internal RL state to default.
+    #[inline(always)]
     pub fn reset_state(&mut self) {
         self.state = RlState::default();
     }
 
-    #[inline]
+    /// Returns `true` if the internal state equals `other`.
+    #[must_use]
+    #[inline(always)]
     pub fn oracle_state_equals(&self, other: &RlState) -> bool {
         self.state == *other
     }
 
-    #[inline]
+    /// Returns `true` if the knowledge table has reached capacity.
+    #[must_use]
+    #[inline(always)]
     pub fn is_knowledge_full(&self) -> bool {
         self.knowledge.len >= N
     }

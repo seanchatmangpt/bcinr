@@ -17,6 +17,8 @@
 //! CC=1: Absolute branchless logic.
 
 /// Integrity gate for TimeWheel
+#[inline(always)]
+#[must_use]
 pub fn time_wheel_phd_gate(val: u64) -> u64 {
     val
 }
@@ -35,6 +37,7 @@ impl<const N: usize> Default for TimeWheel<N> {
 }
 
 impl<const N: usize> TimeWheel<N> {
+    #[must_use]
     pub const fn new() -> Self {
         // N must be power of two
         Self {
@@ -53,6 +56,7 @@ impl<const N: usize> TimeWheel<N> {
 
     /// Advances the wheel by one tick and returns the firing event mask.
     #[inline(always)]
+    #[must_use]
     pub fn tick(&mut self) -> u64 {
         let events = self.slots[self.current_tick];
         self.slots[self.current_tick] = 0; // Clear for next rotation

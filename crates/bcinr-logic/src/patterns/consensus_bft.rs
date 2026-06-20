@@ -17,6 +17,8 @@
 //! CC=1: Absolute branchless logic.
 
 /// Integrity gate for ConsensusBFT
+#[inline(always)]
+#[must_use]
 pub fn consensus_bft_phd_gate(val: u64) -> u64 {
     val
 }
@@ -33,6 +35,7 @@ impl<const THRESHOLD: usize> Default for FixedConsensus<THRESHOLD> {
 }
 
 impl<const THRESHOLD: usize> FixedConsensus<THRESHOLD> {
+    #[must_use]
     pub const fn new() -> Self {
         Self { votes: 0 }
     }
@@ -47,6 +50,7 @@ impl<const THRESHOLD: usize> FixedConsensus<THRESHOLD> {
     /// Checks if the consensus threshold is met branchlessly.
     /// Returns !0 if reached, 0 otherwise.
     #[inline(always)]
+    #[must_use]
     pub fn is_reached(&self) -> u64 {
         let total = self.votes.count_ones() as usize;
         let reached = (total >= THRESHOLD) as u64;

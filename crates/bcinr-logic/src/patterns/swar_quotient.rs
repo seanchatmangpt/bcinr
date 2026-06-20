@@ -17,6 +17,8 @@
 //! CC=1: Absolute branchless logic.
 
 /// Integrity gate for SwarQuotient
+#[inline(always)]
+#[must_use]
 pub fn swar_quotient_phd_gate(val: u64) -> u64 {
     val
 }
@@ -33,12 +35,14 @@ impl<const N: usize> Default for SwarQuotientFilter<N> {
 }
 
 impl<const N: usize> SwarQuotientFilter<N> {
+    #[must_use]
     pub const fn new() -> Self {
         Self { table: [0u64; N] }
     }
 
     /// Checks for membership of an 8-bit tag at index `idx` branchlessly.
     #[inline(always)]
+    #[must_use]
     pub fn contains(&self, idx: usize, tag: u8) -> bool {
         let word = self.table[idx & (N - 1)];
         // SWAR: Broadcast tag to all 8 lanes

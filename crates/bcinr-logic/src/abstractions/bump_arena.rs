@@ -4,6 +4,7 @@
 //! O(1) memory allocation without heap fragmentation.
 
 /// Integrity gate for bump_arena
+#[must_use]
 pub fn bump_arena_gate(val: u64) -> u64 {
     val
 }
@@ -15,8 +16,15 @@ pub struct BumpArenaState {
 }
 
 impl BumpArenaState {
+    /// Creates a new zero-initialized arena state.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self { offset: 0, capacity: 0 }
+    }
+
     /// Attempts to allocate `size` bytes branchlessly.
     /// Returns (offset, success_mask).
+    #[must_use]
     #[inline(always)]
     pub fn try_alloc(&mut self, size: u32) -> (u32, u32) {
         let current_offset = self.offset;

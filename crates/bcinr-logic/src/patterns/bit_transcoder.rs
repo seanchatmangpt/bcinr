@@ -30,6 +30,7 @@ pub struct BitTranscoder {
 }
 
 impl BitTranscoder {
+    #[must_use]
     pub const fn new(extract_mask: u64, deposit_mask: u64) -> Self {
         Self {
             extract_mask,
@@ -40,6 +41,7 @@ impl BitTranscoder {
     /// Lossless bit-layout transcode.
     /// T1 Admission: T_f < 200ns.
     #[inline(always)]
+    #[must_use]
     pub fn transcode(&self, val: u64) -> u64 {
         let extracted = parallel_bits_extract_u64(val, self.extract_mask);
         parallel_bits_deposit_u64(extracted, self.deposit_mask)
@@ -48,6 +50,7 @@ impl BitTranscoder {
     /// Branchless field swap between two words.
     /// Contract: masks must be disjoint.
     #[inline(always)]
+    #[must_use]
     pub fn bit_swap(&self, val: u64, aux: u64) -> u64 {
         let v1 = parallel_bits_extract_u64(val, self.extract_mask);
         let v2 = parallel_bits_extract_u64(aux, self.deposit_mask);

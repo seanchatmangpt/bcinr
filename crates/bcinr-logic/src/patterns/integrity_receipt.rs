@@ -36,6 +36,7 @@ impl DeterministicSubstrateReceipt {
     pub const FNV_OFFSET: u64 = 0xcbf29ce484222325;
     pub const FNV_PRIME: u64 = 0x100000001b3;
 
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             current_hash: Self::FNV_OFFSET,
@@ -44,6 +45,7 @@ impl DeterministicSubstrateReceipt {
     }
 
     #[inline(always)]
+    #[must_use]
     fn mix(mut h: u64, x: u64) -> u64 {
         h ^= x;
         h = h.wrapping_mul(Self::FNV_PRIME);
@@ -66,6 +68,7 @@ impl DeterministicSubstrateReceipt {
     }
 
     #[inline(always)]
+    #[must_use]
     pub fn finalize(&self) -> u64 {
         self.current_hash
     }

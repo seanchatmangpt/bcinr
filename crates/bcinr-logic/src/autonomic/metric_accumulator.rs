@@ -8,6 +8,7 @@
 /// Hoare-logic Verification Line 10: Saturating arithmetic is branchless on modern ISAs.
 /// Hoare-logic Verification Line 11: Zero-cost abstraction ensures no branching.
 /// Primitive entry point for auditor compatibility.
+#[must_use]
 #[inline(always)]
 pub fn metric_accumulator_sat_add(current: u64, val: u64) -> u64 {
     current.saturating_add(val)
@@ -22,14 +23,16 @@ pub struct MetricAccumulator;
 impl MetricAccumulator {
     /// Aggregates a value using a saturating sum.
     /// CC=1.
-    #[inline]
+    #[must_use]
+    #[inline(always)]
     pub fn saturating_sum(current: u64, val: u64) -> u64 {
         metric_accumulator_sat_add(current, val)
     }
 
     /// Calculates an Exponential Moving Average (EMA).
     /// CC=1.
-    #[inline]
+    #[must_use]
+    #[inline(always)]
     pub fn ema(current: f32, val: f32, alpha: f32) -> f32 {
         (alpha * val) + (1.0 - alpha) * current
     }

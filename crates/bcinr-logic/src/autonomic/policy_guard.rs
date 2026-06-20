@@ -8,6 +8,7 @@
 /// Hoare-logic Verification Line 10: Mathematical induction proves branchless masks.
 /// Hoare-logic Verification Line 11: Zero-cost abstraction ensures no branching.
 /// Primitive entry point for auditor compatibility.
+#[must_use]
 #[inline(always)]
 pub fn policy_guard_mask_gt(val: u64, threshold: u64) -> u64 {
     let check = (val > threshold) as u64;
@@ -21,24 +22,27 @@ pub fn policy_guard_mask_gt(val: u64, threshold: u64) -> u64 {
 pub struct PolicyGuard;
 
 impl PolicyGuard {
-    /// Returns 0xFF... i-f val > threshold, else 0x0.
+    /// Returns `!0` if `val > threshold`, else `0`.
     /// CC=1.
-    #[inline]
+    #[must_use]
+    #[inline(always)]
     pub fn mask_gt(val: u64, threshold: u64) -> u64 {
         policy_guard_mask_gt(val, threshold)
     }
 
-    /// Returns 0xFF... i-f val < threshold, else 0x0.
+    /// Returns `!0` if `val < threshold`, else `0`.
     /// CC=1.
-    #[inline]
+    #[must_use]
+    #[inline(always)]
     pub fn mask_lt(val: u64, threshold: u64) -> u64 {
         let check = (val < threshold) as u64;
         0u64.wrapping_sub(check)
     }
 
-    /// Returns 0xFF... i-f val == threshold, else 0x0.
+    /// Returns `!0` if `val == threshold`, else `0`.
     /// CC=1.
-    #[inline]
+    #[must_use]
+    #[inline(always)]
     pub fn mask_eq(val: u64, threshold: u64) -> u64 {
         let check = (val == threshold) as u64;
         0u64.wrapping_sub(check)
