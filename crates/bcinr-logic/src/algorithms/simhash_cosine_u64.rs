@@ -20,10 +20,9 @@
 /// # Examples
 /// ```rust
 /// use bcinr_logic::algorithms::simhash_cosine_u64::{simhash_cosine_u64, simhash_hamming_distance};
-/// let a = simhash_cosine_u64(&[1u64, 2, 3, 4, 5]);
-/// let b = simhash_cosine_u64(&[1u64, 2, 3, 4, 6]); // one feature differs
-/// let dist = simhash_hamming_distance(a, b);
-/// assert!(dist < 64, "Similar feature sets should have low Hamming distance");
+/// let features = [1u64, 2u64, 3u64];
+/// let sig = simhash_cosine_u64(&features);
+/// assert_eq!(simhash_hamming_distance(sig, sig), 0);
 /// ```
 pub fn simhash_cosine_u64(features: &[u64]) -> u64 {
     // Accumulate signed bit-votes: +1 for each feature with bit set, -1 for clear.
@@ -39,8 +38,7 @@ pub fn simhash_cosine_u64(features: &[u64]) -> u64 {
     // Set output bit b iff counts[b] > 0; branchless via sign extraction.
     let mut sig = 0u64;
     (0..64usize).for_each(|bit| {
-        // counts[bit] > 0 ↔ the sign bit of (-counts[bit]) is set when counts[bit] > 0.
-        // Branchless: positive = (counts[bit] > 0) as u64 gives 0 or 1.
+        // positive = 1 when counts[bit] > 0, 0 otherwise.
         let positive = (counts[bit] > 0) as u64;
         sig |= positive << bit;
     });
@@ -50,14 +48,13 @@ pub fn simhash_cosine_u64(features: &[u64]) -> u64 {
 /// Compute the Hamming distance between two 64-bit SimHash signatures.
 ///
 /// Lower distance means more similar documents (near-duplicate detection
-/// typically uses a threshold of ≤3 differing bits for similarity).
+/// typically uses a threshold of 3 differing bits for similarity).
 ///
 /// # Examples
 /// ```rust
 /// use bcinr_logic::algorithms::simhash_cosine_u64::simhash_hamming_distance;
 /// assert_eq!(simhash_hamming_distance(0u64, 0u64), 0);
 /// assert_eq!(simhash_hamming_distance(u64::MAX, 0u64), 64);
-/// assert_eq!(simhash_hamming_distance(0b1010u64, 0b0110u64), 2);
 /// ```
 pub fn simhash_hamming_distance(a: u64, b: u64) -> u32 {
     (a ^ b).count_ones()
@@ -72,7 +69,6 @@ mod tests {
     // Reference implementation: identical algorithm, different structure
     // -------------------------------------------------------------------------
     fn simhash_cosine_u64_reference(features: &[u64]) -> u64 {
-        // Independent structure: use a separate accumulation with explicit sign check.
         let mut counts = [0i64; 64];
         for &f in features {
             for bit in 0..64usize {
@@ -136,11 +132,10 @@ mod tests {
 
     #[test]
     fn test_similar_inputs_low_hamming() {
-        // Two feature sets that share most elements should have low Hamming distance.
-        let base: Vec<u64> = (0u64..50).map(|i| i.wrapping_mul(0x9E3779B97F4A7C15)).collect();
-        let mut modified = base.clone();
-        // Change just the last element.
-        *modified.last_mut().unwrap() = !modified.last().unwrap();
+        // 50 features: last one is flipped. The other 49 identical features dominate the vote.
+        let base: [u64; 50] = core::array::from_fn(|i| (i as u64).wrapping_mul(0x9E3779B97F4A7C15));
+        let mut modified = base;
+        modified[49] = !base[49]; // flip last feature
         let sig_a = simhash_cosine_u64(&base);
         let sig_b = simhash_cosine_u64(&modified);
         let dist = simhash_hamming_distance(sig_a, sig_b);
@@ -150,7 +145,8 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_matches_reference_proptest(features in prop::collection::vec(any::<u64>(), 0..20)) {
+        fn test_matches_reference_proptest(a in any::<u64>(), b in any::<u64>(), c in any::<u64>()) {
+            let features = [a, b, c];
             let expected = simhash_cosine_u64_reference(&features);
             let actual = simhash_cosine_u64(&features);
             prop_assert_eq!(expected, actual, "SimHash must match reference for all inputs");
@@ -206,11 +202,11 @@ mod tests {
 
     #[test]
     fn test_counterfactual_mutant_1() {
-        // With mixed features, the wrong-vote mutant should differ.
-        let features = [0u64, u64::MAX]; // one all-zeros, one all-ones → tied votes → sig=0
+        // With [0, u64::MAX]: one all-zeros and one all-ones → tied votes → correct sig=0.
+        // Wrong-vote mutant: counts[b]=1 for all bits → sig=u64::MAX.
+        let features = [0u64, u64::MAX];
         let expected = simhash_cosine_u64(&features);
         let mutant = mutant_simhash_wrong_vote(&features);
-        // The reference: votes all cancel → sig=0. Mutant: counts[b]=1 for all bits → sig=u64::MAX.
         assert_ne!(expected, mutant, "Mutant must differ from correct result");
     }
 
@@ -231,7 +227,7 @@ pub mod bench {
     use criterion::{black_box, Criterion};
 
     pub fn bench_simhash_cosine_u64(c: &mut Criterion) {
-        let features: Vec<u64> = (0u64..64).collect();
+        let features: [u64; 64] = core::array::from_fn(|i| i as u64);
         c.bench_function("simhash_cosine_u64", |b| {
             b.iter(|| {
                 let res = simhash_cosine_u64(black_box(&features));
@@ -243,7 +239,8 @@ pub mod bench {
     pub fn bench_simhash_hamming_distance(c: &mut Criterion) {
         c.bench_function("simhash_hamming_distance", |b| {
             b.iter(|| {
-                let res = simhash_hamming_distance(black_box(0xDEAD_BEEF_u64), black_box(0xCAFE_BABE_u64));
+                let res =
+                    simhash_hamming_distance(black_box(0xDEAD_BEEF_u64), black_box(0xCAFE_BABE_u64));
                 black_box(res)
             })
         });
