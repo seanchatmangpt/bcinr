@@ -1,5 +1,9 @@
 //! # wasm4games-wasm4pm — the admission bridge
 //!
+//! **IMPORTANT: This crate is EXCLUDED from the offline workspace. It requires network
+//! access to fetch `wasm4pm` and `wasm4pm-compat` from their git repositories. It will
+//! not build as part of the normal workspace commands (`make build`, `make test`, etc.).**
+//!
 //! This crate is the **online-only** bridge between the offline, dependency-free
 //! [`wasm4games`] evidence types and the upstream **wasm4pm** process miner (via its stable
 //! `wasm4pm-compat` surface). It maps candidate evidence emitted by wasm4games kernels onto
@@ -11,6 +15,36 @@
 //!
 //! wasm4games never decides admissibility; it emits candidate evidence. This crate carries
 //! that evidence across the boundary to the authority.
+//!
+//! ## Pre-use checklist
+//!
+//! Before activating this bridge, complete these steps in order:
+//!
+//! 1. **Pin git revisions** — replace branch/tag references in `Cargo.toml` with exact
+//!    `rev = "<commit-hash>"` values. Tags and branches are mutable; only commit hashes
+//!    guarantee reproducible builds.
+//! 2. **Reconcile stubs** — replace each `/* wasm4pm_compat::Type */` placeholder and each
+//!    `W4pm*Stub` type with the confirmed upstream path from `wasm4pm-compat`. Delete the
+//!    stub types once replaced.
+//! 3. **Confirm every TODO** — search for `// TODO: confirm against wasm4pm-compat` and
+//!    verify field names, variant sets, and builder APIs match the real types.
+//! 4. **Build online** — `cargo build -p wasm4games-wasm4pm` (requires network access).
+//! 5. **Test roundtrip** — `cargo test -p wasm4games-wasm4pm` to verify evidence conversion.
+//!
+//! ## Usage example (scaffold — compile-time only until wired)
+//!
+//! ```rust,ignore
+//! use wasm4games_wasm4pm::{Bridge, AdmissionOutcome};
+//! use wasm4games::evidence::ocel::OcelLog;
+//!
+//! let bridge = Bridge::new(42);
+//! let log = OcelLog::default();
+//! match bridge.admit_log(&log) {
+//!     AdmissionOutcome::Admitted     => println!("admitted"),
+//!     AdmissionOutcome::Refused(code) => println!("refused: {code}"),
+//!     AdmissionOutcome::Inconclusive  => println!("inconclusive"),
+//! }
+//! ```
 //!
 //! ## Status: scaffolding pinned against the canonical types
 //!
@@ -64,6 +98,16 @@ pub enum AdmissionOutcome {
     Inconclusive,
 }
 
+impl core::fmt::Display for AdmissionOutcome {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Admitted => write!(f, "Admitted"),
+            Self::Refused(code) => write!(f, "Refused({code})"),
+            Self::Inconclusive => write!(f, "Inconclusive"),
+        }
+    }
+}
+
 /// Bridge configuration: endpoint / scope handle for the upstream miner.
 ///
 // TODO: confirm against wasm4pm `Miner` / session-handle constructor. The real type likely
@@ -87,6 +131,7 @@ impl Bridge {
     /// This is the primary entry point: it composes [`to_w4pm_log`] with [`admit`].
     ///
     // TODO: confirm against wasm4pm-compat `OcelLog` ingestion + `wasm4pm` admit call.
+    #[must_use = "admission verdict — check before proceeding"]
     pub fn admit_log(&self, log: &OcelLog) -> AdmissionOutcome {
         let w4pm_log = to_w4pm_log(log.as_slice());
         admit(self, w4pm_log)
@@ -167,7 +212,7 @@ pub fn seal_w4pm_receipt(chain: &ReceiptChain) -> W4pmReceiptStub {
 ///
 // TODO: confirm against wasm4pm `admit`/`conform` entry point and `wasm4pm_compat::Evidence
 // <T, State, W>` typestate transitions; then return `wasm4pm_compat::ConformanceResult`.
-#[must_use]
+#[must_use = "admission verdict — check before proceeding"]
 pub fn admit(
     _bridge: &Bridge,
     _log: /* wasm4pm_compat::OcelLog */ W4pmLogStub,
@@ -187,6 +232,9 @@ pub fn admit(
 // ---------------------------------------------------------------------------------------------
 
 /// Stand-in for `wasm4pm_compat::OcelLog`. See module docs.
+///
+/// Placeholder for the real `wasm4pm_compat::OcelLog` type.
+/// Replace this with the actual type after adding the git dependency.
 // TODO: replace with `wasm4pm_compat::OcelLog`.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct W4pmLogStub {
@@ -195,6 +243,9 @@ pub struct W4pmLogStub {
 }
 
 /// Stand-in for `wasm4pm_compat::OcelEvent` (+ its `LinkedOcel` object edges).
+///
+/// Placeholder for the real `wasm4pm_compat::OcelEvent` type.
+/// Replace this with the actual type after adding the git dependency.
 // TODO: replace with `wasm4pm_compat::OcelEvent` / `LinkedOcel`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct W4pmEventStub {
@@ -211,6 +262,9 @@ pub struct W4pmEventStub {
 }
 
 /// Stand-in for `wasm4pm_compat::ReceiptEnvelope`. See module docs.
+///
+/// Placeholder for the real `wasm4pm_compat::ReceiptEnvelope` type.
+/// Replace this with the actual type after adding the git dependency.
 // TODO: replace with `wasm4pm_compat::ReceiptEnvelope`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct W4pmReceiptStub {

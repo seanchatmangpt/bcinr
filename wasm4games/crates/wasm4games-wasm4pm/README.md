@@ -3,6 +3,14 @@
 The **online-only admission bridge** between [`wasm4games`](../wasm4games) and the upstream
 **wasm4pm** process miner.
 
+## Quick Setup Checklist
+
+- [ ] Pin `wasm4pm` to a specific `rev = "..."` commit in Cargo.toml
+- [ ] Pin `wasm4pm-compat` to a specific `rev = "..."` commit in Cargo.toml
+- [ ] Replace stub types (`W4pmLogStub`, `W4pmEventStub`, `W4pmReceiptStub`) with real types from `wasm4pm-compat`
+- [ ] Run `cargo check -p wasm4games-wasm4pm` to verify the bridge compiles
+- [ ] Run `cargo test -p wasm4games-wasm4pm` to verify roundtrip evidence conversion
+
 > Engines project worlds; wasm4games operates patterns; **wasm4pm admits evidence.**
 
 wasm4games emits candidate, object-centric process evidence but never decides admissibility.
