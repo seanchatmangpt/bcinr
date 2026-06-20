@@ -74,6 +74,73 @@ mod tests {
     fn test_rejects_mutant_3() {
         assert!(dfa_reference(1, 1) != mutant_dfa_3(1, 1));
     }
+
+    use super::*;
+
+    // --- single-step transitions: dfa_advance + dfa_is_accepting ---
+
+    #[test]
+    fn test_dfa_single_step_transitions() {
+        // (state, input, table, alphabet_size, expected_next_state)
+        let advance_cases: &[(usize, u8, &[usize], usize, usize)] = &[
+            // self-loop: table[0*1+0] = 0
+            (0, 0, &[0usize], 1, 0),
+            // advance to accept: table[0*2+1] = 1
+            (0, 1, &[0usize, 1usize], 2, 1),
+            // self-loop in state 1: table[1*2+0] = 1
+            (1, 0, &[0usize, 0usize, 1usize, 0usize], 2, 1),
+        ];
+        for &(state, input, table, alpha, expected) in advance_cases {
+            assert_eq!(dfa_advance(state, input, table, alpha), expected,
+                "state={state} input={input:#04x}");
+        }
+
+        // dfa_is_accepting: (state, accept_states, expected)
+        assert!( dfa_is_accepting(2, &[1, 2, 3]),  "state 2 in {{1,2,3}}");
+        assert!(!dfa_is_accepting(5, &[1, 2, 3]),  "state 5 not in {{1,2,3}}");
+        assert!(!dfa_is_accepting(0, &[]),          "empty accept set");
+    }
+
+    // --- full runs: dfa_run end-to-end ---
+
+    #[test]
+    fn test_dfa_full_runs() {
+        // Two-state DFA over {0,1} (alphabet size 2):
+        // table layout: [t(0,0), t(0,1), t(1,0), t(1,1)]
+        //               [   0,      1,      0,      0  ]
+        let table = [0usize, 1usize, 0usize, 0usize];
+        let empty_table = [0usize; 4];
+
+        // (input, table_to_use, initial_state, expected_final, accept_set, expect_accept)
+        struct RunCase {
+            input: &'static [u8],
+            use_empty: bool,
+            init: usize,
+            expected_state: usize,
+            accept_set: &'static [usize],
+            expect_accept: bool,
+        }
+        let cases: &[RunCase] = &[
+            // empty input returns initial state
+            RunCase { input: &[], use_empty: true,  init: 0, expected_state: 0, accept_set: &[1], expect_accept: false },
+            // [0x00, 0x01] reaches accept state 1
+            RunCase { input: &[0x00, 0x01], use_empty: false, init: 0, expected_state: 1, accept_set: &[1], expect_accept: true },
+            // [0x01, 0x00] ends in reject state 0
+            RunCase { input: &[0x01, 0x00], use_empty: false, init: 0, expected_state: 0, accept_set: &[1], expect_accept: false },
+            // single 0x01 -> accept
+            RunCase { input: &[0x01], use_empty: false, init: 0, expected_state: 1, accept_set: &[1], expect_accept: true },
+            // single 0x00 -> reject
+            RunCase { input: &[0x00], use_empty: false, init: 0, expected_state: 0, accept_set: &[1], expect_accept: false },
+        ];
+        for c in cases {
+            let t = if c.use_empty { &empty_table[..] } else { &table[..] };
+            let state = dfa_run(t, 2, c.init, c.input);
+            assert_eq!(state, c.expected_state,
+                "input={:?} init={}", c.input, c.init);
+            assert_eq!(dfa_is_accepting(state, c.accept_set), c.expect_accept,
+                "input={:?} init={}", c.input, c.init);
+        }
+    }
 }
 
 // # AXIOMATIC PROOF: Hoare-logic Analysis

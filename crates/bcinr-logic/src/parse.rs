@@ -74,6 +74,56 @@ mod tests {
     fn test_rejects_mutant_3() {
         assert!(parse_reference(1, 1) != mutant_parse_3(1, 1));
     }
+
+    use super::*;
+
+    // --- skip_whitespace: table-driven ---
+
+    #[test]
+    fn test_skip_whitespace() {
+        // (input, expected_skip, description)
+        let cases: &[(&[u8], usize, &str)] = &[
+            (b"",            0, "empty input"),
+            (b"hello",       0, "no leading space"),
+            (b" x",          1, "single space"),
+            (b"\t\n\rword",  3, "tabs and newlines"),
+            (b"   ",         3, "all spaces"),
+            (b"   hello",    3, "three spaces then text"),
+        ];
+        for &(input, expected, desc) in cases {
+            assert_eq!(skip_whitespace(input), expected, "{desc}");
+        }
+    }
+
+    // --- parse_hex_u32: table-driven ---
+
+    #[test]
+    fn test_parse_hex_u32() {
+        // (input, expected_result, description)
+        let ok_cases: &[(&[u8], u32, &str)] = &[
+            (b"0",        0x0,        "single zero"),
+            (b"F",        15,         "single uppercase F"),
+            (b"f",        15,         "single lowercase f"),
+            (b"FF",       0xFF,       "two uppercase"),
+            (b"FFFFFFFF", u32::MAX,   "max 8 chars"),
+            (b"deadbeef", 0xDEADBEEF, "lowercase deadbeef"),
+            (b"DEADBEEF", 0xDEADBEEF, "uppercase DEADBEEF"),
+            (b"DeAdBeEf", 0xDEADBEEF, "mixed case"),
+        ];
+        for &(input, expected, desc) in ok_cases {
+            assert_eq!(parse_hex_u32(input), Ok(expected), "{desc}");
+        }
+
+        let err_cases: &[(&[u8], &str)] = &[
+            (b"",          "empty"),
+            (b"123456789", "too long (9 chars)"),
+            (b"XY",        "invalid chars XY"),
+            (b"0G",        "invalid char G"),
+        ];
+        for &(input, desc) in err_cases {
+            assert_eq!(parse_hex_u32(input), Err(()), "{desc}");
+        }
+    }
 }
 
 // # AXIOMATIC PROOF: Hoare-logic Analysis

@@ -110,6 +110,64 @@ mod tests_phd_simd {
     fn test_simd_phd_counterfactual_mutant_3() {
         assert!(simd_reference(1, 1) != mutant_simd_3(1, 1));
     }
+
+    use super::*;
+
+    // --- splat_u8x16 + movemask_u8x16: table-driven ---
+
+    #[test]
+    fn test_splat_and_movemask() {
+        // (value, expected_splat_all_equal, expected_movemask)
+        let cases: &[(u8, u16)] = &[
+            (0x00, 0x0000),  // all lanes clear
+            (0x7F, 0x0000),  // MSB clear in all lanes
+            (0x80, 0xFFFF),  // MSB set in all lanes
+            (0xFF, 0xFFFF),  // MSB set in all lanes
+            (42,   0x0000),  // arbitrary non-MSB value
+        ];
+        for &(value, expected_mask) in cases {
+            let v = splat_u8x16(value);
+            assert!(v.iter().all(|&x| x == value), "splat({value:#04x})");
+            assert_eq!(movemask_u8x16(v), expected_mask,
+                "movemask(splat({value:#04x}))");
+        }
+
+        // per-lane movemask: first lane and last lane individually
+        let mut v0 = [0u8; 16]; v0[0]  = 0x80;
+        let mut v15 = [0u8; 16]; v15[15] = 0x80;
+        assert_eq!(movemask_u8x16(v0),  0x0001, "movemask first lane");
+        assert_eq!(movemask_u8x16(v15), 0x8000, "movemask last lane");
+    }
+
+    // --- shuffle_u8x16: table-driven ---
+
+    #[test]
+    fn test_shuffle() {
+        let a: [u8; 16] = core::array::from_fn(|i| i as u8);
+        let b: [u8; 16] = core::array::from_fn(|i| (i as u8) + 100);
+
+        // zero mask: all select a[0] = 0
+        let zero_mask = [0u8; 16];
+        let r = shuffle_u8x16(a, b, zero_mask);
+        assert!(r.iter().all(|&x| x == 0), "zero mask: all a[0]");
+
+        // skip mask (bit 7): output zeroed regardless of source
+        let skip_mask = [0x80u8; 16];
+        assert_eq!(shuffle_u8x16([0xFF; 16], [0xFF; 16], skip_mask), [0u8; 16],
+            "skip mask: all zeros");
+
+        // select from b: mask[0] = 0x10 | 0 => b[0] = 100
+        let mut sel_b_mask = [0u8; 16];
+        sel_b_mask[0] = 0x10;
+        let r = shuffle_u8x16(a, b, sel_b_mask);
+        assert_eq!(r[0], 100, "select b[0]");
+
+        // select a[15] via mask[0] = 15
+        let mut sel_a15_mask = [0u8; 16];
+        sel_a15_mask[0] = 15;
+        let r = shuffle_u8x16(a, b, sel_a15_mask);
+        assert_eq!(r[0], 15, "select a[15]");
+    }
 }
 
 // Hoare-logic Verification Line 100: Radon Law satisfied.

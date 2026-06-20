@@ -51,6 +51,35 @@ mod tests_phd_utf8 {
     fn test_phd_counterfactual_mutant_3() {
         assert!(utf8_reference(1, 1) != mutant_utf8_3(1, 1));
     }
+
+    use super::*;
+
+    // --- count_codepoints: table-driven ---
+
+    #[test]
+    fn test_count_codepoints() {
+        // (bytes, expected_codepoints, description)
+        let cases: &[(&[u8], usize, &str)] = &[
+            // empty
+            (b"",                           0, "empty"),
+            // ASCII
+            (b"hello",                      5, "ascii hello"),
+            (b"x",                          1, "ascii single"),
+            // 2-byte sequence: U+00E9 "é" = [0xC3, 0xA9]
+            (&[0xC3, 0xA9],                 1, "2-byte é"),
+            // 3-byte sequence: U+4E16 "世" = [0xE4, 0xB8, 0x96]
+            (&[0xE4, 0xB8, 0x96],           1, "3-byte 世"),
+            // 4-byte sequence: U+1F600 "😀" = [0xF0, 0x9F, 0x98, 0x80]
+            (&[0xF0, 0x9F, 0x98, 0x80],     1, "4-byte 😀"),
+            // mixed: "A" + "é" + "世" = 3 codepoints, 6 bytes
+            (&[b'A', 0xC3, 0xA9, 0xE4, 0xB8, 0x96], 3, "mixed A+é+世"),
+            // 0xFF has bits 1111_1111; not a continuation byte, counted as lead
+            (&[0xFF],                       1, "invalid 0xFF as lead"),
+        ];
+        for &(bytes, expected, desc) in cases {
+            assert_eq!(count_codepoints(bytes), expected, "{desc}");
+        }
+    }
 }
 
 // Hoare-logic Verification Line 100: Radon Law satisfied.
