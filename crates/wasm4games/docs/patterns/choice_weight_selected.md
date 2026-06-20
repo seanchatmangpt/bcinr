@@ -11,43 +11,24 @@ Select a dialogue choice by bucketing a roll against 3 cumulative weight boundar
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes ChoiceWeightSelected necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches choice_weight_selected_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Dialogue choice menus in RPGs and visual novels offer weighted options to create probabilistic NPC responses or weighted random events: "Agree (60%), Neutral (30%), Hostile (10%)". A random roll is drawn from [0,255] and compared against cumulative weight boundaries [60, 90, 100] to select the outcome bucket. The naïve implementation is a chain of `if roll < b0 / else if roll < b1 / else if roll < b2 / else` — three conditional branches that mispredicts at every bucket boundary and is difficult to extend. The branchless alternative replaces all three comparisons with parallel lt_mask computations and cascaded selects.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every ChoiceWeightSelected call that branches adds jitter
-     - Deterministic latency: the Lut lowering gives O(1) constant time
-     - Bounded state: stateCard = 8 (8 distinct states)
-     - Auditability: the OCEL event code 102 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches choice_weight_selected_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — three chained `if roll < bN` comparisons introduce three mispredictable branches per choice selection, all of which mispredict when the roll falls near a boundary.
+- **Deterministic latency** — the Lut lowering computes three `lt_mask_u32` comparisons and three `select_u32` calls in O(1) with no branch.
+- **Ordered bucket semantics** — the cumulative boundaries must be treated as ordered partitions; the cascaded select from bucket 3 downward ensures that the lowest matching boundary wins, preserving `[0,b0) -> 0; [b0,b1) -> 1; [b1,b2) -> 2; [b2,∞) -> 3`.
+- **Four-outcome coverage** — three boundaries define four buckets; all four must be reachable, including bucket 3 (roll >= b2), which is the default when no boundary matches.
+- **Boundary configuration** — bucket boundaries are runtime parameters (not compile-time constants), allowing dialogue designers to tune weights without code changes.
+- **OCEL auditability** — OCEL event code 102 ties every choice outcome to an auditable `player` object trace, enabling probabilistic dialogue replay.
 
 ## Solution
 
-<!-- TODO: Explain how choice_weight_selected resolves the forces.
-     It lowers onto `bcinr_logic::mask::select_u32` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Lut` was the right lowering choice. -->
-
-**Branchless primitive:** `bcinr_logic::mask::select_u32`
-
-_Replace this placeholder with the solution description._
+The kernel packs state as bits[0..8] = roll (0..255) and input as bits[0..8] = b0, bits[8..16] = b1, bits[16..24] = b2. Three `lt_mask_u32` comparisons are computed in parallel: `m_lt_b0`, `m_lt_b1`, `m_lt_b2`. The cascaded select builds the result bottom-up, starting with the default bucket 3 and overriding downward: `choice = select_u32(m_lt_b2, 2, 3)`, then `choice = select_u32(m_lt_b1, 1, choice)`, then `choice = select_u32(m_lt_b0, 0, choice)`. Because each pass overrides only when the roll is strictly less than the boundary, the lowest-boundary match wins, which is correct ordered-partition semantics. The `Lut` lowering is used because the bucket lookup is a small, bounded table-style operation: three thresholds partition the 256-value roll space into four named outputs.
 
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 8 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** all four buckets are reachable; ordered partition semantics are enforced by the cascaded-select order without sorting or loop; bucket boundaries are runtime-configurable; OCEL event 102 provides a per-outcome audit. **Costs:** the design is fixed to four buckets (three boundaries); extending to N buckets requires N-1 comparisons (still O(N) but requires code changes); boundaries are 8-bit (max 255), matching the roll range. **Compositions:** the choice index (0/1/2/3) drives the symbol input to [NarrativeBranchSelected](narrative_branch_selected.md) or [DialogueNodeAdvanced](dialogue_node_advanced.md); the same bucket idiom appears in [TileVariantSelected](tile_variant_selected.md) for weighted tile generation.
 
 ---
 
@@ -55,22 +36,26 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["choice_weight_selected\nLut: bcinr_logic::mask::select_u32"]
-    result["result\n(u64)"]
-    state --> kernel
-    input --> kernel
-    kernel --> result
+    state["state (u64)\nbits[0..8]: roll (0..255)"]
+    input["input (u64)\nbits[0..8]: b0\nbits[8..16]: b1\nbits[16..24]: b2"]
+    m0["lt_mask_u32(roll, b0)\n0xFFFF_FFFF if roll<b0"]
+    m1["lt_mask_u32(roll, b1)\n0xFFFF_FFFF if roll<b1"]
+    m2["lt_mask_u32(roll, b2)\n0xFFFF_FFFF if roll<b2"]
+    sel["cascaded select_u32\ndefault=3 -> 2 if <b2 -> 1 if <b1 -> 0 if <b0"]
+    result["result (u64)\nbits[0..8]: choice index (0/1/2/3)"]
+    state --> m0
+    state --> m1
+    state --> m2
+    input --> m0
+    input --> m1
+    input --> m2
+    m0 --> sel
+    m1 --> sel
+    m2 --> sel
+    sel --> result
     ocel_0["OCEL: player"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +107,10 @@ otel::emit(102);
 let ev = OcelEvent::new(102, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [TileVariantSelected](tile_variant_selected.md) — uses the same LUT bucketize idiom for weighted tile variant selection.
+- [NarrativeBranchSelected](narrative_branch_selected.md) — the chosen bucket index can drive narrative branch selection via weight comparison.
+- [RewardTierSelected](reward_tier_selected.md) — tier selection uses a bitset popcount as a weight proxy bucketed against thresholds, an analogous structure.
