@@ -64,42 +64,33 @@ mod tests {
     }
 
     #[test]
-    fn test_metric_accumulator_sat_add_equivalence() {
-        let expected = metric_accumulator_sat_add_reference(100, 50);
-        let actual = metric_accumulator_sat_add(100, 50);
-        assert_eq!(expected, actual);
-
-        let expected2 = metric_accumulator_sat_add_reference(u64::MAX - 10, 20);
-        let actual2 = metric_accumulator_sat_add(u64::MAX - 10, 20);
-        assert_eq!(expected2, actual2);
-    }
-
-    #[test]
-    fn test_metric_accumulator_sat_add_counterfactual_mutant_1() {
-        let expected = metric_accumulator_sat_add_reference(u64::MAX, 1);
-        let actual = mutant_metric_accumulator_sat_add_1(u64::MAX, 1);
-        assert_ne!(expected, actual, "rejects_mutant 1");
-    }
-
-    #[test]
-    fn test_metric_accumulator_sat_add_counterfactual_mutant_2() {
-        let expected = metric_accumulator_sat_add_reference(100, 50);
-        let actual = mutant_metric_accumulator_sat_add_2(100, 50);
-        assert_ne!(expected, actual, "rejects_mutant 2");
-    }
-
-    #[test]
-    fn test_metric_accumulator_sat_add_counterfactual_mutant_3() {
-        let expected = metric_accumulator_sat_add_reference(100, 50);
-        let actual = mutant_metric_accumulator_sat_add_3(100, 50);
-        assert_ne!(expected, actual, "rejects_mutant 3");
-    }
-
-    #[test]
-    fn test_metric_accumulator_sat_add_boundaries() {
+    fn test_metric_accumulator_sat_add_equivalence_and_boundaries() {
+        assert_eq!(
+            metric_accumulator_sat_add_reference(100, 50),
+            metric_accumulator_sat_add(100, 50)
+        );
+        assert_eq!(
+            metric_accumulator_sat_add_reference(u64::MAX - 10, 20),
+            metric_accumulator_sat_add(u64::MAX - 10, 20)
+        );
         assert_eq!(metric_accumulator_sat_add(0, 0), 0);
         assert_eq!(metric_accumulator_sat_add(u64::MAX, 0), u64::MAX);
         assert_eq!(metric_accumulator_sat_add(0, u64::MAX), u64::MAX);
+    }
+
+    #[test]
+    fn test_metric_accumulator_sat_add_counterfactual_mutants() {
+        // Each entry: (mutant_fn, current, val, label)
+        let cases: &[(fn(u64, u64) -> u64, u64, u64, &str)] = &[
+            (mutant_metric_accumulator_sat_add_1, u64::MAX, 1, "rejects_mutant 1"),
+            (mutant_metric_accumulator_sat_add_2, 100, 50, "rejects_mutant 2"),
+            (mutant_metric_accumulator_sat_add_3, 100, 50, "rejects_mutant 3"),
+        ];
+        for (mutant, current, val, label) in cases.iter().copied() {
+            let expected = metric_accumulator_sat_add_reference(current, val);
+            let actual = mutant(current, val);
+            assert_ne!(expected, actual, "{}", label);
+        }
     }
 
     // Hoare-logic Verification Line 100: Structural integrity confirmed.

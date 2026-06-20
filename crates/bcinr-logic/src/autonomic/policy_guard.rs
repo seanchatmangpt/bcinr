@@ -86,42 +86,33 @@ mod tests {
     }
 
     #[test]
-    fn test_policy_guard_mask_gt_equivalence() {
-        let expected = policy_guard_mask_gt_reference(10, 5);
-        let actual = policy_guard_mask_gt(10, 5);
-        assert_eq!(expected, actual);
-
-        let expected2 = policy_guard_mask_gt_reference(5, 10);
-        let actual2 = policy_guard_mask_gt(5, 10);
-        assert_eq!(expected2, actual2);
-    }
-
-    #[test]
-    fn test_policy_guard_mask_gt_counterfactual_mutant_1() {
-        let expected = policy_guard_mask_gt_reference(5, 5);
-        let actual = mutant_policy_guard_mask_gt_1(5, 5);
-        assert_ne!(expected, actual, "rejects_mutant 1");
-    }
-
-    #[test]
-    fn test_policy_guard_mask_gt_counterfactual_mutant_2() {
-        let expected = policy_guard_mask_gt_reference(10, 5);
-        let actual = mutant_policy_guard_mask_gt_2(10, 5);
-        assert_ne!(expected, actual, "rejects_mutant 2");
-    }
-
-    #[test]
-    fn test_policy_guard_mask_gt_counterfactual_mutant_3() {
-        let expected = policy_guard_mask_gt_reference(10, 5);
-        let actual = mutant_policy_guard_mask_gt_3(10, 5);
-        assert_ne!(expected, actual, "rejects_mutant 3");
-    }
-
-    #[test]
-    fn test_policy_guard_mask_gt_boundaries() {
+    fn test_policy_guard_mask_gt_equivalence_and_boundaries() {
+        assert_eq!(
+            policy_guard_mask_gt_reference(10, 5),
+            policy_guard_mask_gt(10, 5)
+        );
+        assert_eq!(
+            policy_guard_mask_gt_reference(5, 10),
+            policy_guard_mask_gt(5, 10)
+        );
         assert_eq!(policy_guard_mask_gt(0, 0), 0);
         assert_eq!(policy_guard_mask_gt(u64::MAX, u64::MAX), 0);
         assert_eq!(policy_guard_mask_gt(u64::MAX, u64::MAX - 1), !0);
+    }
+
+    #[test]
+    fn test_policy_guard_mask_gt_counterfactual_mutants() {
+        // Each entry: (mutant_fn, val, threshold, label)
+        let cases: &[(fn(u64, u64) -> u64, u64, u64, &str)] = &[
+            (mutant_policy_guard_mask_gt_1, 5, 5, "rejects_mutant 1"),
+            (mutant_policy_guard_mask_gt_2, 10, 5, "rejects_mutant 2"),
+            (mutant_policy_guard_mask_gt_3, 10, 5, "rejects_mutant 3"),
+        ];
+        for (mutant, val, threshold, label) in cases.iter().copied() {
+            let expected = policy_guard_mask_gt_reference(val, threshold);
+            let actual = mutant(val, threshold);
+            assert_ne!(expected, actual, "{}", label);
+        }
     }
 
     // Hoare-logic Verification Line 100: Structural integrity confirmed.

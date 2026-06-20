@@ -68,12 +68,7 @@ mod tests_slab {
     fn slab_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
     }
-    #[test]
-    fn test_equivalence() {
-        assert_eq!(slab_reference(1, 0), 1);
-    }
-    #[test]
-    fn test_boundaries() {}
+
     fn mutant_slab_1(val: u64, aux: u64) -> u64 {
         !slab_reference(val, aux)
     }
@@ -83,17 +78,23 @@ mod tests_slab {
     fn mutant_slab_3(val: u64, aux: u64) -> u64 {
         slab_reference(val, aux) ^ 0xFF
     }
+
     #[test]
-    fn test_rejects_mutant_1() {
-        assert!(slab_reference(1, 1) != mutant_slab_1(1, 1));
+    fn test_equivalence_and_boundaries() {
+        assert_eq!(slab_reference(1, 0), 1);
+        // boundaries (structural placeholder, preserved)
     }
+
     #[test]
-    fn test_rejects_mutant_2() {
-        assert!(slab_reference(1, 1) != mutant_slab_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
-        assert!(slab_reference(1, 1) != mutant_slab_3(1, 1));
+    fn test_rejects_mutants() {
+        let cases: &[fn(u64, u64) -> u64] = &[mutant_slab_1, mutant_slab_2, mutant_slab_3];
+        for (i, mutant) in cases.iter().enumerate() {
+            assert!(
+                slab_reference(1, 1) != mutant(1, 1),
+                "mutant {} was not rejected",
+                i + 1
+            );
+        }
     }
 }
 

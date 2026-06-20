@@ -73,17 +73,6 @@ mod tests {
         val
     }
 
-    #[test]
-    fn test_substrate_equivalence() {
-        assert_eq!(substrate_reference(42, 0), 42);
-    }
-
-    #[test]
-    fn test_substrate_boundaries() {
-        let substrate: AutonomicSubstrate<u32, u32, 1> = AutonomicSubstrate::new();
-        assert!(!substrate.is_knowledge_full());
-    }
-
     fn mutant_substrate_1(val: u64, aux: u64) -> u64 {
         !substrate_reference(val, aux)
     }
@@ -95,16 +84,23 @@ mod tests {
     }
 
     #[test]
-    fn test_counterfactual_mutant_1() {
-        assert!(substrate_reference(1, 1) != mutant_substrate_1(1, 1));
+    fn test_substrate_equivalence_and_boundaries() {
+        assert_eq!(substrate_reference(42, 0), 42);
+        let substrate: AutonomicSubstrate<u32, u32, 1> = AutonomicSubstrate::new();
+        assert!(!substrate.is_knowledge_full());
     }
+
     #[test]
-    fn test_counterfactual_mutant_2() {
-        assert!(substrate_reference(1, 1) != mutant_substrate_2(1, 1));
-    }
-    #[test]
-    fn test_counterfactual_mutant_3() {
-        assert!(substrate_reference(1, 1) != mutant_substrate_3(1, 1));
+    fn test_counterfactual_mutants() {
+        let cases: &[fn(u64, u64) -> u64] =
+            &[mutant_substrate_1, mutant_substrate_2, mutant_substrate_3];
+        for (i, mutant) in cases.iter().enumerate() {
+            assert!(
+                substrate_reference(1, 1) != mutant(1, 1),
+                "mutant {} was not rejected",
+                i + 1
+            );
+        }
     }
 }
 
