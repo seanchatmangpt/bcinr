@@ -21,9 +21,8 @@
 /// # Examples
 /// ```rust
 /// use bcinr_logic::algorithms::xor_filter_lookup::xor_filter_lookup;
-/// // A table of all-zeros passes any key whose fingerprint is 0.
-/// let table = vec![0u8; 12]; // 3 blocks of 4
-/// // For key 0 with seed 0 the fingerprint also collapses to 0, so it matches.
+/// // A table of all-zeros with n=1 per block:
+/// let table = [0u8; 3];
 /// let _ = xor_filter_lookup(0, &table, 0);
 /// ```
 pub fn xor_filter_lookup(key: u64, table: &[u8], seed: u64) -> bool {
@@ -56,22 +55,18 @@ pub fn xor_filter_fingerprint(key: u64, seed: u64) -> u8 {
     h ^= h >> 33;
     h = h.wrapping_mul(0xC4CEB9FE1A85EC53);
     h ^= h >> 33;
-    // Use a combination of high and low bits for a good 8-bit fingerprint;
-    // ensure non-zero by ORing bit 0 of the upper byte to guard the zero sentinel.
-    let fp = ((h >> 32) ^ h) as u8;
-    // A fingerprint of 0 is valid; no fixup needed for correctness.
-    fp
+    // Use a combination of high and low bits for a good 8-bit fingerprint.
+    ((h >> 32) ^ h) as u8
 }
 
 /// Compute one of three independent block hashes for a key.
 ///
-/// `block` ∈ {0, 1, 2} selects which hash function to use.
+/// `block` in {0, 1, 2} selects which hash function to use.
 /// Each block hash uses a different additive rotation of the seed.
 #[inline]
 pub fn xor_filter_hash(key: u64, seed: u64, block: u64) -> u64 {
     // Derive a per-block seed by rotating and adding to differentiate hash families.
-    let block_seed = seed
-        .wrapping_add(block.wrapping_mul(0x6C62272E07BB0142));
+    let block_seed = seed.wrapping_add(block.wrapping_mul(0x6C62272E07BB0142));
     let mut h = key ^ block_seed;
     // splitmix64 finaliser
     h = h.wrapping_add(0x9E3779B97F4A7C15);
@@ -89,22 +84,13 @@ mod tests {
     use proptest::prelude::*;
 
     // -------------------------------------------------------------------------
-    // Reference: build a valid XOR filter for a small set and verify lookups.
+    // Reference: build a valid XOR filter for a single key (n=1 per block).
+    // For n=1: h0%1=0, h1%1=0, h2%1=0 → indices 0, 1, 2.
+    // XOR decomposition: fp = f0 ^ f1 ^ f2; choose f0=fp, f1=0, f2=0.
     // -------------------------------------------------------------------------
-
-    /// Build a minimal XOR filter for a single key (degenerate case).
-    /// For a single-element set of size n=1 each block has 1 slot.
-    /// We set table[h0] = fp, table[h1+1] = 0, table[h2+2] = 0.
-    fn build_single_key_table(key: u64, seed: u64) -> Vec<u8> {
-        // n=1: 3 blocks each of length 1.
-        let mut table = vec![0u8; 3];
+    fn build_single_key_table(key: u64, seed: u64) -> [u8; 3] {
         let fp = xor_filter_fingerprint(key, seed);
-        // XOR decomposition: fp = f0 ^ f1 ^ f2; choose f0=fp, f1=0, f2=0.
-        // h0 % 1 = 0, h1 % 1 = 0, h2 % 1 = 0 → indices 0,1,2.
-        table[0] = fp;
-        table[1] = 0;
-        table[2] = 0;
-        table
+        [fp, 0, 0]
     }
 
     #[test]
@@ -132,7 +118,6 @@ mod tests {
         let fp0 = xor_filter_fingerprint(key, 0);
         let fp1 = xor_filter_fingerprint(key, 1);
         // Different seeds should produce different fingerprints (with high probability).
-        // This is not guaranteed for every pair but holds for the chosen constants.
         assert_ne!(
             fp0, fp1,
             "Different seeds should yield different fingerprints for this key"
@@ -146,7 +131,6 @@ mod tests {
         let h0 = xor_filter_hash(key, seed, 0);
         let h1 = xor_filter_hash(key, seed, 1);
         let h2 = xor_filter_hash(key, seed, 2);
-        // The three hashes should differ (with overwhelming probability).
         assert_ne!(h0, h1);
         assert_ne!(h1, h2);
     }
@@ -154,10 +138,9 @@ mod tests {
     #[test]
     fn test_all_zero_table_matches_zero_fingerprint() {
         // If the fingerprint of a key is 0 and the table is all zeros, lookup returns true.
-        let table = vec![0u8; 6]; // n=2
+        let table = [0u8; 6]; // n=2, 3 blocks of 2
         let seed = 0u64;
-        // Find a key whose fingerprint is 0 with seed 0.
-        // Brute-force search for the test:
+        // Brute-force search: find a key with fingerprint 0.
         let mut found = false;
         for k in 0u64..10_000 {
             if xor_filter_fingerprint(k, seed) == 0 {
@@ -186,9 +169,9 @@ mod tests {
         }
 
         #[test]
-        fn test_lookup_no_panic(key in any::<u64>(), seed in any::<u64>(), n in 1usize..20) {
-            let table = vec![0u8; n * 3];
-            // Must not panic regardless of inputs.
+        fn test_lookup_no_panic_fixed_table(key in any::<u64>(), seed in any::<u64>()) {
+            // Use a fixed-size table to avoid vec! in no_std context.
+            let table = [0u8; 12]; // n=4 per block
             let _ = xor_filter_lookup(key, &table, seed);
         }
     }
@@ -198,7 +181,7 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_boundaries() {
-        let table = vec![0u8; 3];
+        let table = [0u8; 3];
         let _ = xor_filter_lookup(0, &table, 0);
         let _ = xor_filter_lookup(u64::MAX, &table, u64::MAX);
         let _ = xor_filter_lookup(u64::MAX, &table, 0);
@@ -241,10 +224,11 @@ pub mod bench {
     use criterion::{black_box, Criterion};
 
     pub fn bench_xor_filter_lookup(c: &mut Criterion) {
-        let table = vec![0xAAu8; 30];
+        let table = [0xAAu8; 30];
         c.bench_function("xor_filter_lookup", |b| {
             b.iter(|| {
-                let res = xor_filter_lookup(black_box(42u64), black_box(&table), black_box(1337u64));
+                let res =
+                    xor_filter_lookup(black_box(42u64), black_box(&table), black_box(1337u64));
                 black_box(res)
             })
         });

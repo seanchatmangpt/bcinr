@@ -88,8 +88,8 @@ fn bench_popcount(c: &mut Criterion) {
 
 fn bench_hash_throughput(c: &mut Criterion) {
     use bcinr_logic::algorithms::adler32_branchless::adler32_branchless;
-    use bcinr_logic::algorithms::crc32c_branchless::crc32c_branchless;
-    use bcinr_logic::algorithms::fnv1a_64_hash::fnv1a_64_hash;
+    use bcinr_logic::algorithms::farmhash64::farmhash64;
+    use bcinr_logic::algorithms::siphash_2_4_branchless::siphash_2_4_branchless;
     use bcinr_logic::algorithms::xxhash64::xxhash64;
 
     let mut group = c.benchmark_group("hash_throughput");
@@ -107,7 +107,7 @@ fn bench_hash_throughput(c: &mut Criterion) {
             },
         );
 
-        // adler32: takes packed u64 word
+        // adler32: checksum over packed 8-byte word
         group.bench_with_input(
             BenchmarkId::new("adler32", size),
             &data,
@@ -116,21 +116,23 @@ fn bench_hash_throughput(c: &mut Criterion) {
             },
         );
 
-        // fnv1a: takes a byte slice — true throughput benchmark
+        // farmhash64: fast non-cryptographic hash
         group.bench_with_input(
-            BenchmarkId::new("fnv1a_64", size),
+            BenchmarkId::new("farmhash64", size),
             &data,
             |b, data| {
-                b.iter(|| fnv1a_64_hash(black_box(data)));
+                b.iter(|| farmhash64(black_box(data.len() as u64), black_box(0)));
             },
         );
 
-        // crc32c: takes a byte slice and initial seed
+        // siphash_2_4: authenticated, non-cryptographic, DoS-resistant
         group.bench_with_input(
-            BenchmarkId::new("crc32c", size),
+            BenchmarkId::new("siphash_2_4", size),
             &data,
             |b, data| {
-                b.iter(|| crc32c_branchless(black_box(data), black_box(0)));
+                b.iter(|| {
+                    siphash_2_4_branchless(black_box(data.len() as u64), black_box(0))
+                });
             },
         );
     }

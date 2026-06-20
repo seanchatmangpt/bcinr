@@ -298,9 +298,10 @@ pub fn ct_min_u32(a: u32, b: u32) -> u32 {
 #[inline(always)]
 #[must_use]
 pub fn ct_max_u32(a: u32, b: u32) -> u32 {
-    // If b < a: mask = all-ones, selects b side; a + (b - a) = b... wait.
-    // max(a,b) = a + ((b - a) & mask) where mask is all-ones when b > a.
-    let mask = 0u32.wrapping_sub(ct_lt_u32(b, a));
+    // max(a, b) = a + ((b - a) & mask) where mask is all-ones when a < b.
+    // When a < b: ct_lt_u32(a,b) = 1 => mask = 0xFFFFFFFF => result = a + (b-a) = b.
+    // When a >= b: ct_lt_u32(a,b) = 0 => mask = 0 => result = a + 0 = a.
+    let mask = 0u32.wrapping_sub(ct_lt_u32(a, b));
     a.wrapping_add(b.wrapping_sub(a) & mask)
 }
 
