@@ -65,32 +65,23 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_mask_from_bool_slice_equivalence(val in any::<u64>(), aux in any::<u64>()) {
+        fn test_mask_from_bool_slice_all(val in any::<u64>(), aux in any::<u64>()) {
             let expected = mask_from_bool_slice_reference(val, aux);
             let actual = mask_from_bool_slice(val, aux);
             prop_assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
-        }
 
-        #[test]
-        fn test_mask_from_bool_slice_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
             let expected = mask_from_bool_slice_reference(val, aux);
             let actual = mutant_mask_from_bool_slice_1(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
             }
-        }
 
-        #[test]
-        fn test_mask_from_bool_slice_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
             let expected = mask_from_bool_slice_reference(val, aux);
             let actual = mutant_mask_from_bool_slice_2(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
             }
-        }
 
-        #[test]
-        fn test_mask_from_bool_slice_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
             let expected = mask_from_bool_slice_reference(val, aux);
             let actual = mutant_mask_from_bool_slice_3(val, aux);
             if val != aux && val != 0 && aux != 0 {

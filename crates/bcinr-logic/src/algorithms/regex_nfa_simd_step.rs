@@ -67,32 +67,23 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_regex_nfa_simd_step_equivalence(val in any::<u64>(), aux in any::<u64>()) {
+        fn test_regex_nfa_simd_step_all(val in any::<u64>(), aux in any::<u64>()) {
             let expected = regex_nfa_simd_step_reference(val, aux);
             let actual = regex_nfa_simd_step(val, aux);
             prop_assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
-        }
 
-        #[test]
-        fn test_regex_nfa_simd_step_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
             let expected = regex_nfa_simd_step_reference(val, aux);
             let actual = mutant_regex_nfa_simd_step_1(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
             }
-        }
 
-        #[test]
-        fn test_regex_nfa_simd_step_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
             let expected = regex_nfa_simd_step_reference(val, aux);
             let actual = mutant_regex_nfa_simd_step_2(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
             }
-        }
 
-        #[test]
-        fn test_regex_nfa_simd_step_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
             let expected = regex_nfa_simd_step_reference(val, aux);
             let actual = mutant_regex_nfa_simd_step_3(val, aux);
             if val != aux && val != 0 && aux != 0 {

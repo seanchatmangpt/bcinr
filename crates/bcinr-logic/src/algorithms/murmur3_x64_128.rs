@@ -103,32 +103,23 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_murmur3_x64_128_equivalence(val in any::<u64>(), aux in any::<u64>()) {
+        fn test_murmur3_x64_128_all(val in any::<u64>(), aux in any::<u64>()) {
             let expected = murmur3_x64_128_reference(val, aux);
             let actual = murmur3_x64_128(val, aux);
             prop_assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
-        }
 
-        #[test]
-        fn test_murmur3_x64_128_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
             let expected = murmur3_x64_128_reference(val, aux);
             let actual = mutant_murmur3_x64_128_1(val, aux);
             if expected != actual {
                 prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
             }
-        }
 
-        #[test]
-        fn test_murmur3_x64_128_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
             let actual = mutant_murmur3_x64_128_2(val, aux);
             let expected_ref = murmur3_x64_128_reference(val, aux);
             if expected_ref != actual {
                 prop_assert!(expected_ref != actual, "Counterfactual Mutant 2 failed to fail!");
             }
-        }
 
-        #[test]
-        fn test_murmur3_x64_128_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
             let actual = mutant_murmur3_x64_128_3(val, aux);
             let expected_ref = murmur3_x64_128_reference(val, aux);
             if expected_ref != actual {

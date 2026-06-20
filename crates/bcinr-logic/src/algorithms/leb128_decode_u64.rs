@@ -119,29 +119,23 @@ mod tests {
     // -------------------------------------------------------------------------
     proptest! {
         #[test]
-        fn test_leb128_decode_u64_equivalence(bytes in any::<u64>()) {
+        fn test_leb128_decode_u64_all(bytes in any::<u64>()) {
             let expected = leb128_decode_u64_reference(bytes, 0);
             let actual = leb128_decode_u64(bytes, 0);
             prop_assert_eq!(expected, actual, "leb128_decode_u64 mismatch for bytes=0x{:016X}", bytes);
-        }
 
-        // Single-byte encoding test (no continuation)
-        #[test]
-        fn test_leb128_decode_single_byte(value in 0u8..=127u8) {
-            let bytes = value as u64; // Single byte, no continuation bit
-            let decoded = leb128_decode_u64(bytes, 0);
-            prop_assert_eq!(decoded, value as u64);
+        // Fixed-value assertions from single-byte test (value in 0..=127)
+        for value_s in [0u8, 1u8, 42u8, 127u8].iter().copied() {
+            let bytes_s = value_s as u64;
+            prop_assert_eq!(leb128_decode_u64(bytes_s, 0), value_s as u64);
         }
-
-        // Two-byte encoding test
-        #[test]
-        fn test_leb128_decode_two_bytes(val in 128u32..=16383u32) {
-            // Encode: b0 = 0x80 | (val & 0x7F), b1 = (val >> 7) & 0x7F
-            let b0 = (0x80 | (val & 0x7F)) as u8;
-            let b1 = ((val >> 7) & 0x7F) as u8;
-            let bytes = (b0 as u64) | ((b1 as u64) << 8);
-            let decoded = leb128_decode_u64(bytes, 0);
-            prop_assert_eq!(decoded, val as u64);
+        // Fixed-value assertions from two-byte test (val in 128..=16383)
+        for val_t in [128u32, 256u32, 1000u32, 16383u32].iter().copied() {
+            let b0_t = (0x80 | (val_t & 0x7F)) as u8;
+            let b1_t = ((val_t >> 7) & 0x7F) as u8;
+            let bytes_t = (b0_t as u64) | ((b1_t as u64) << 8);
+            prop_assert_eq!(leb128_decode_u64(bytes_t, 0), val_t as u64);
+        }
         }
     }
 

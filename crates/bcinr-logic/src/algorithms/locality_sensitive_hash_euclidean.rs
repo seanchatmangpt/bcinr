@@ -65,32 +65,23 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_locality_sensitive_hash_euclidean_equivalence(val in any::<u64>(), aux in any::<u64>()) {
+        fn test_locality_sensitive_hash_euclidean_all(val in any::<u64>(), aux in any::<u64>()) {
             let expected = locality_sensitive_hash_euclidean_reference(val, aux);
             let actual = locality_sensitive_hash_euclidean(val, aux);
             prop_assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
-        }
 
-        #[test]
-        fn test_locality_sensitive_hash_euclidean_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
             let expected = locality_sensitive_hash_euclidean_reference(val, aux);
             let actual = mutant_locality_sensitive_hash_euclidean_1(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
             }
-        }
 
-        #[test]
-        fn test_locality_sensitive_hash_euclidean_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
             let expected = locality_sensitive_hash_euclidean_reference(val, aux);
             let actual = mutant_locality_sensitive_hash_euclidean_2(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
             }
-        }
 
-        #[test]
-        fn test_locality_sensitive_hash_euclidean_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
             let expected = locality_sensitive_hash_euclidean_reference(val, aux);
             let actual = mutant_locality_sensitive_hash_euclidean_3(val, aux);
             if val != aux && val != 0 && aux != 0 {

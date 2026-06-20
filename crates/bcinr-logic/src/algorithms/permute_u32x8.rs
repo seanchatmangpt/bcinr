@@ -56,32 +56,23 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_permute_u32x8_equivalence(val in any::<u64>(), aux in any::<u64>()) {
+        fn test_permute_u32x8_all(val in any::<u64>(), aux in any::<u64>()) {
             let expected = permute_u32x8_reference(val, aux);
             let actual = permute_u32x8(val, aux);
             prop_assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
-        }
 
-        #[test]
-        fn test_permute_u32x8_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
             let expected = permute_u32x8_reference(val, aux);
             let actual = mutant_permute_u32x8_1(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
             }
-        }
 
-        #[test]
-        fn test_permute_u32x8_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
             let expected = permute_u32x8_reference(val, aux);
             let actual = mutant_permute_u32x8_2(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
             }
-        }
 
-        #[test]
-        fn test_permute_u32x8_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
             let expected = permute_u32x8_reference(val, aux);
             let actual = mutant_permute_u32x8_3(val, aux);
             if val != aux && val != 0 && aux != 0 {

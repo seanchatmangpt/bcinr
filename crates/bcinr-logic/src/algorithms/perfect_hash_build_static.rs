@@ -77,32 +77,23 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_perfect_hash_build_static_equivalence(val in any::<u64>(), aux in any::<u64>()) {
+        fn test_perfect_hash_build_static_all(val in any::<u64>(), aux in any::<u64>()) {
             let expected = perfect_hash_build_static_reference(val, aux);
             let actual = perfect_hash_build_static(val, aux);
             prop_assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
-        }
 
-        #[test]
-        fn test_perfect_hash_build_static_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
             let expected = perfect_hash_build_static_reference(val, aux);
             let actual = mutant_perfect_hash_build_static_1(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
             }
-        }
 
-        #[test]
-        fn test_perfect_hash_build_static_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
             let expected = perfect_hash_build_static_reference(val, aux);
             let actual = mutant_perfect_hash_build_static_2(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
             }
-        }
 
-        #[test]
-        fn test_perfect_hash_build_static_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
             let expected = perfect_hash_build_static_reference(val, aux);
             let actual = mutant_perfect_hash_build_static_3(val, aux);
             if val != aux && val != 0 && aux != 0 {

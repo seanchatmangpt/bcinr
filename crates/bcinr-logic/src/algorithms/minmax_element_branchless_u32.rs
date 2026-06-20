@@ -73,32 +73,23 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_minmax_element_branchless_u32_equivalence(val in any::<u64>(), aux in any::<u64>()) {
+        fn test_minmax_element_branchless_u32_all(val in any::<u64>(), aux in any::<u64>()) {
             let expected = minmax_element_branchless_u32_reference(val, aux);
             let actual = minmax_element_branchless_u32(val, aux);
             prop_assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
-        }
 
-        #[test]
-        fn test_minmax_element_branchless_u32_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
             let expected = minmax_element_branchless_u32_reference(val, aux);
             let actual = mutant_minmax_element_branchless_u32_1(val, aux);
             if expected != actual {
                 prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
             }
-        }
 
-        #[test]
-        fn test_minmax_element_branchless_u32_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
             let actual = mutant_minmax_element_branchless_u32_2(val, aux);
             let expected_ref = minmax_element_branchless_u32_reference(val, aux);
             if expected_ref != actual {
                 prop_assert!(expected_ref != actual, "Counterfactual Mutant 2 failed to fail!");
             }
-        }
 
-        #[test]
-        fn test_minmax_element_branchless_u32_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
             let actual = mutant_minmax_element_branchless_u32_3(val, aux);
             let expected_ref = minmax_element_branchless_u32_reference(val, aux);
             if expected_ref != actual {

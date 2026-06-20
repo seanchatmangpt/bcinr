@@ -72,7 +72,7 @@ mod tests {
     // -------------------------------------------------------------------------
     proptest! {
         #[test]
-        fn test_mul_sat_u64_equivalence(a in any::<u64>(), b in any::<u64>()) {
+        fn test_mul_sat_u64_all(a in any::<u64>(), b in any::<u64>()) {
             let expected = mul_sat_u64_reference(a, b);
             let actual = mul_sat_u64(a, b);
             prop_assert_eq!(
@@ -80,26 +80,14 @@ mod tests {
                 "mul_sat_u64({}, {}) = {} but reference = {}",
                 a, b, actual, expected
             );
-        }
 
-        // Commutative: a * b == b * a
-        #[test]
-        fn test_mul_sat_u64_commutative(a in any::<u64>(), b in any::<u64>()) {
             let ab = mul_sat_u64(a, b);
             let ba = mul_sat_u64(b, a);
             prop_assert_eq!(ab, ba, "mul_sat_u64 not commutative");
-        }
 
-        // Identity: a * 1 == a
-        #[test]
-        fn test_mul_sat_u64_identity(a in any::<u64>()) {
             let result = mul_sat_u64(a, 1);
             prop_assert_eq!(result, a, "mul_sat_u64(a, 1) != a");
-        }
 
-        // Zero: a * 0 == 0
-        #[test]
-        fn test_mul_sat_u64_zero(a in any::<u64>()) {
             let result = mul_sat_u64(a, 0);
             prop_assert_eq!(result, 0, "mul_sat_u64(a, 0) != 0");
         }

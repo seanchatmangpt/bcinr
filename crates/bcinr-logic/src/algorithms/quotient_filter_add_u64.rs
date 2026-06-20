@@ -87,31 +87,19 @@ mod tests {
     // -------------------------------------------------------------------------
     proptest! {
         #[test]
-        fn test_quotient_filter_add_u64_equivalence(val in any::<u64>(), aux in any::<u64>()) {
+        fn test_quotient_filter_add_u64_all(val in any::<u64>(), aux in any::<u64>()) {
             let expected = quotient_filter_add_u64_reference(val, aux);
             let actual = quotient_filter_add_u64(val, aux);
             prop_assert_eq!(expected, actual, "quotient_filter_add_u64({:016X}, {:016X}) mismatch", val, aux);
-        }
 
-        // Avalanche: small input change = big output change
-        #[test]
-        fn test_quotient_filter_add_u64_avalanche(val in any::<u64>(), aux in any::<u64>()) {
             let fp1 = quotient_filter_add_u64(val, aux);
             let fp2 = quotient_filter_add_u64(val ^ 1, aux);
             prop_assert_ne!(fp1, fp2, "1-bit change should affect fingerprint");
-        }
 
-        // Consistency: same input = same output
-        #[test]
-        fn test_quotient_filter_add_u64_consistent(val in any::<u64>(), aux in any::<u64>()) {
             let fp1 = quotient_filter_add_u64(val, aux);
             let fp2 = quotient_filter_add_u64(val, aux);
             prop_assert_eq!(fp1, fp2, "deterministic fingerprinting required");
-        }
 
-        // Input order matters (not symmetric)
-        #[test]
-        fn test_quotient_filter_add_u64_order_dependent(val in any::<u64>(), aux in any::<u64>()) {
             let fp_ab = quotient_filter_add_u64(val, aux);
             let fp_ba = quotient_filter_add_u64(aux, val);
             // Most cases should differ, but allow for rare collisions

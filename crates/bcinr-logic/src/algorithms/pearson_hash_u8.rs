@@ -86,31 +86,19 @@ mod tests {
     // -------------------------------------------------------------------------
     proptest! {
         #[test]
-        fn test_pearson_hash_u8_equivalence(input in any::<u64>(), seed in any::<u64>()) {
+        fn test_pearson_hash_u8_all(input in any::<u64>(), seed in any::<u64>()) {
             let expected = pearson_hash_u8_reference(input, seed);
             let actual = pearson_hash_u8(input, seed);
             prop_assert_eq!(expected, actual, "pearson_hash_u8({}, {}) mismatch", input, seed);
-        }
 
-        // Output is always in [0, 255] (u8 range)
-        #[test]
-        fn test_pearson_hash_u8_in_range(input in any::<u64>(), seed in any::<u64>()) {
             let hash = pearson_hash_u8(input, seed);
             prop_assert!(hash < 256, "pearson_hash_u8 out of u8 range: {}", hash);
-        }
 
-        // Avalanche: changing seed significantly changes output
-        #[test]
-        fn test_pearson_hash_u8_avalanche_seed(input in any::<u64>(), seed in any::<u64>()) {
             let hash1 = pearson_hash_u8(input, seed);
             let hash2 = pearson_hash_u8(input, seed ^ 1);
             // At least 10% of the time, they should differ (statistical check)
             prop_assert_ne!(hash1, hash2, "seed variation should affect hash");
-        }
 
-        // Avalanche: changing input significantly changes output
-        #[test]
-        fn test_pearson_hash_u8_avalanche_input(input in any::<u64>(), seed in any::<u64>()) {
             let hash1 = pearson_hash_u8(input, seed);
             let hash2 = pearson_hash_u8(input ^ 1, seed);
             prop_assert_ne!(hash1, hash2, "input variation should affect hash");

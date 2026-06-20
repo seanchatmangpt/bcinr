@@ -118,32 +118,23 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_hilbert_curve_encode_u32_equivalence(val in any::<u64>(), aux in any::<u64>()) {
+        fn test_hilbert_curve_encode_u32_all(val in any::<u64>(), aux in any::<u64>()) {
             let expected = hilbert_curve_encode_u32_reference(val, aux);
             let actual = hilbert_curve_encode_u32(val, aux);
             prop_assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
-        }
 
-        #[test]
-        fn test_hilbert_curve_encode_u32_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
             let expected = hilbert_curve_encode_u32_reference(val, aux);
             let actual = mutant_hilbert_curve_encode_u32_1(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
             }
-        }
 
-        #[test]
-        fn test_hilbert_curve_encode_u32_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
             let expected = hilbert_curve_encode_u32_reference(val, aux);
             let actual = mutant_hilbert_curve_encode_u32_2(val, aux);
             if val != aux && val != 0 && aux != 0 {
                 prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
             }
-        }
 
-        #[test]
-        fn test_hilbert_curve_encode_u32_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
             let expected = hilbert_curve_encode_u32_reference(val, aux);
             let actual = mutant_hilbert_curve_encode_u32_3(val, aux);
             if val != aux && val != 0 && aux != 0 {
