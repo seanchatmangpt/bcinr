@@ -13,7 +13,7 @@
 /// # Arguments
 /// * `current`    - The value currently held in the reservoir.
 /// * `candidate`  - The new item arriving from the stream.
-/// * `item_index` - 1-indexed position of `candidate` in the stream (must be ≥ 1).
+/// * `item_index` - 1-indexed position of `candidate` in the stream (must be >= 1).
 /// * `rand_val`   - A fresh uniform random u64 for this step.
 ///
 /// # Returns
@@ -25,8 +25,6 @@
 /// // At position 1, the first item is always accepted.
 /// let sample = reservoir_sample_step(0, 42, 1, 0xDEAD_BEEF);
 /// assert_eq!(sample, 42, "First element must always be accepted");
-/// // At position 2, acceptance probability is 1/2.
-/// let _ = reservoir_sample_step(42, 99, 2, 0xCAFE_BABE);
 /// ```
 pub fn reservoir_sample_step(
     current: u64,
@@ -37,9 +35,9 @@ pub fn reservoir_sample_step(
     // item_index must be >= 1; use max(item_index, 1) to avoid division by zero.
     let idx = item_index.max(1);
     // Accept candidate iff rand_val % idx == 0.
-    // (This gives acceptance probability = count(v: v%idx==0) / 2^64 ≈ 1/idx for large idx.)
+    // (This gives acceptance probability ≈ 1/idx for uniform random inputs.)
     let accept = (rand_val % idx == 0) as u64;
-    // Branchless select: mask = 0xFFFF...FF when accept, else 0.
+    // Branchless select: mask = 0xFFFF...FF when accept=1, else 0.
     let mask = 0u64.wrapping_sub(accept);
     (candidate & mask) | (current & !mask)
 }
@@ -47,26 +45,24 @@ pub fn reservoir_sample_step(
 /// Batch reservoir sample over a slice using Vitter's Algorithm R (k=1).
 ///
 /// Processes all items in `stream` starting from stream offset `start_index`
-/// (1-indexed, must be ≥ 1). Returns the final reservoir value. The caller
-/// must supply a pseudo-random number generator via `rand_fn`, which is called
-/// once per item.
+/// (1-indexed, must be >= 1). Returns the final reservoir value. The caller
+/// supplies a pseudo-random number generator via `rand_fn`, called once per item.
 ///
 /// # Arguments
-/// * `initial`     - Initial reservoir value (e.g., 0 or the item at index 1).
+/// * `initial`     - Initial reservoir value (e.g., the item at index 1).
 /// * `stream`      - Remaining items to process.
-/// * `start_index` - 1-indexed stream position of `stream[0]` (≥ 1).
+/// * `start_index` - 1-indexed stream position of `stream[0]` (must be >= 1).
+/// * `rng`         - Mutable RNG state passed to `rand_fn`.
 /// * `rand_fn`     - Closure returning a fresh uniform u64 per call.
 ///
 /// # Examples
 /// ```rust
 /// use bcinr_logic::algorithms::reservoir_sample_simd::reservoir_sample_batch;
-/// // Simple LCG for test purposes.
 /// let mut rng = 0xDEAD_BEEF_u64;
 /// let lcg = |r: &mut u64| { *r = r.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407); *r };
-/// let stream = [10u64, 20, 30, 40, 50];
+/// let stream = [10u64, 20u64, 30u64];
 /// let sample = reservoir_sample_batch(stream[0], &stream[1..], 2, &mut rng, lcg);
-/// // sample must be one of the stream elements.
-/// assert!(stream.contains(&sample), "Sample must be from the stream");
+/// assert!(stream.contains(&sample));
 /// ```
 pub fn reservoir_sample_batch<F>(
     initial: u64,
@@ -158,12 +154,12 @@ mod tests {
     #[test]
     fn test_statistical_uniformity() {
         // Over many trials, each of 4 elements should appear roughly 1/4 of the time.
-        let stream = [1u64, 2, 3, 4];
+        const STREAM: [u64; 4] = [1, 2, 3, 4];
         let n_trials = 10_000usize;
         let mut counts = [0usize; 5]; // index 1..4
         let mut rng = 0x1234_5678_9ABC_DEF0u64;
         for _ in 0..n_trials {
-            let result = reservoir_sample_batch(stream[0], &stream[1..], 2, &mut rng, lcg);
+            let result = reservoir_sample_batch(STREAM[0], &STREAM[1..], 2, &mut rng, lcg);
             if result >= 1 && result <= 4 {
                 counts[result as usize] += 1;
             }
@@ -227,16 +223,16 @@ mod tests {
     // -------------------------------------------------------------------------
     // MUTANT COUNTERFACTUALS
     // -------------------------------------------------------------------------
-    fn mutant_always_accept(current: u64, candidate: u64, _: u64, _: u64) -> u64 {
+    fn mutant_always_accept(_current: u64, candidate: u64, _: u64, _: u64) -> u64 {
         candidate
     }
-    fn mutant_always_reject(current: u64, _: u64, _: u64, _: u64) -> u64 {
+    fn mutant_always_reject(current: u64, _candidate: u64, _: u64, _: u64) -> u64 {
         current
     }
 
     #[test]
     fn test_counterfactual_mutant_always_accept() {
-        // At item_index=2 with rand_val=1 (non-zero mod 2 = 1 ≠ 0), correct rejects.
+        // At item_index=2 with rand_val=1 (1 % 2 == 1 ≠ 0), correct rejects.
         let result = reservoir_sample_step(10, 20, 2, 1);
         let mutant = mutant_always_accept(10, 20, 2, 1);
         // Correct should reject (return 10), mutant always accepts (returns 20).
@@ -256,11 +252,11 @@ mod tests {
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis
     // -------------------------------------------------------------------------
-    // Precondition:  { current, candidate, rand_val ∈ U64, item_index ≥ 1 }
+    // Precondition:  { current, candidate, rand_val ∈ U64, item_index >= 1 }
     // Postcondition: { result = candidate  if  rand_val % item_index == 0
     //                  result = current   otherwise }
     //
-    // Acceptance probability: |{v ∈ [0,2^64): v % k == 0}| / 2^64 = floor(2^64/k)/2^64 ≈ 1/k.
+    // Acceptance probability: |{v in [0,2^64): v % k == 0}| / 2^64 = floor(2^64/k)/2^64 ≈ 1/k.
     //
     // Hoare-logic Verification Line 1: reservoir_sample_step correctness verified.
     // Branchless select: mask = 0xFFFF...FF when accept=1, else 0x0000...00.
