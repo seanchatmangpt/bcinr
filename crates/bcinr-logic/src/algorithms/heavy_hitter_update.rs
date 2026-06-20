@@ -93,14 +93,11 @@ pub fn heavy_hitter_update(table: &mut [(u64, u64)], key: u64) {
         table[empty_idx] = (key, 1);
     } else if case_c {
         // Misra-Gries decrement: subtract min_count from all occupied entries.
-        // Entries that drop to zero become available (we leave key=old, count=0).
         for i in 0..k {
             let count = table[i].1;
-            // Saturating subtraction: if count <= min_count → 0.
             table[i].1 = count.saturating_sub(min_count);
         }
         // Insert key into the vacated min slot (now has count 0 after decrement).
-        // After decrement, table[min_idx].1 == 0 (since count == min_count).
         table[min_idx] = (key, 1);
     }
 }
@@ -118,20 +115,38 @@ mod tests {
             return;
         }
         // Check for existing key.
-        if let Some(idx) = table.iter().position(|&(ek, ec)| ek == key && ec > 0) {
-            table[idx].1 += 1;
+        let mut found_idx = k;
+        for i in 0..k {
+            if table[i].0 == key && table[i].1 > 0 && found_idx == k {
+                found_idx = i;
+            }
+        }
+        if found_idx < k {
+            table[found_idx].1 += 1;
             return;
         }
         // Check for empty slot.
-        if let Some(idx) = table.iter().position(|&(_, ec)| ec == 0) {
-            table[idx] = (key, 1);
+        let mut empty_idx = k;
+        for i in 0..k {
+            if table[i].1 == 0 && empty_idx == k {
+                empty_idx = i;
+            }
+        }
+        if empty_idx < k {
+            table[empty_idx] = (key, 1);
             return;
         }
         // Decrement all and reuse min slot.
-        let min_count = table.iter().map(|&(_, c)| c).min().unwrap_or(0);
-        let min_idx = table.iter().position(|&(_, c)| c == min_count).unwrap_or(0);
-        for entry in table.iter_mut() {
-            entry.1 = entry.1.saturating_sub(min_count);
+        let mut min_count = u64::MAX;
+        let mut min_idx = 0;
+        for i in 0..k {
+            if table[i].1 < min_count {
+                min_count = table[i].1;
+                min_idx = i;
+            }
+        }
+        for i in 0..k {
+            table[i].1 = table[i].1.saturating_sub(min_count);
         }
         table[min_idx] = (key, 1);
     }
@@ -167,8 +182,7 @@ mod tests {
     #[test]
     fn test_heavy_element_survives() {
         // Insert key 1 many more times than key 2.
-        let k = 4;
-        let mut table = vec![(0u64, 0u64); k];
+        let mut table = [(0u64, 0u64); 4];
         for _ in 0..100 {
             heavy_hitter_update(&mut table, 1);
         }
@@ -185,9 +199,9 @@ mod tests {
     #[test]
     fn test_matches_reference_sequence() {
         let keys = [1u64, 2, 1, 3, 1, 2, 4, 1, 5, 1];
-        let k = 3;
-        let mut a = vec![(0u64, 0u64); k];
-        let mut r = vec![(0u64, 0u64); k];
+        const K: usize = 3;
+        let mut a = [(0u64, 0u64); K];
+        let mut r = [(0u64, 0u64); K];
         for &key in &keys {
             heavy_hitter_update(&mut a, key);
             heavy_hitter_update_reference(&mut r, key);
@@ -197,7 +211,7 @@ mod tests {
 
     #[test]
     fn test_increment_existing() {
-        let mut table = vec![(0u64, 0u64); 4];
+        let mut table = [(0u64, 0u64); 4];
         // Insert key 7 multiple times.
         for _ in 0..5 {
             heavy_hitter_update(&mut table, 7);
@@ -208,8 +222,7 @@ mod tests {
 
     #[test]
     fn test_boundary_all_slots_same_key() {
-        // Fill all slots with same key via repeated updates.
-        let mut table = vec![(0u64, 0u64); 4];
+        let mut table = [(0u64, 0u64); 4];
         for _ in 0..8 {
             heavy_hitter_update(&mut table, 42);
         }
@@ -236,7 +249,7 @@ pub mod bench {
     use criterion::{black_box, Criterion};
 
     pub fn bench_heavy_hitter_update(c: &mut Criterion) {
-        let mut table = vec![(0u64, 0u64); 16];
+        let mut table = [(0u64, 0u64); 16];
         c.bench_function("heavy_hitter_update", |b| {
             b.iter(|| {
                 heavy_hitter_update(black_box(&mut table), black_box(42u64));
