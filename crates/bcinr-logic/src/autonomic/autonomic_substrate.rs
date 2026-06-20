@@ -11,6 +11,7 @@ use super::packed_key_table::PackedKeyTable;
 use super::rl_state::RlState;
 
 /// A dummy function for the maturity auditor.
+#[must_use]
 #[inline(always)]
 pub fn check_substrate_integrity(val: u64) -> u64 {
     val.wrapping_add(1)
