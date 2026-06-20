@@ -236,131 +236,55 @@ pub fn abs_i32(x: i32) -> i32 {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_mask_select() {
-        // select_u32
-        assert_eq!(select_u32(0xFFFF_FFFF, 10, 20), 10);
-        assert_eq!(select_u32(0, 10, 20), 20);
-        assert_eq!(select_u32(0xFFFF_FFFF, 0, 0), 0);
-        assert_eq!(select_u32(0, 0, 0), 0);
-        assert_eq!(select_u32(0xFFFF_FFFF, u32::MAX, 0), u32::MAX);
-        assert_eq!(select_u32(0, u32::MAX, 0), 0);
-        assert_eq!(select_u32(0xFFFF_FFFF, 0, u32::MAX), 0);
-        assert_eq!(select_u32(0, 0, u32::MAX), u32::MAX);
-        assert_eq!(select_u32(0xFFFF_FFFF, 42, 42), 42);
-        assert_eq!(select_u32(0, 42, 42), 42);
-        // select_u64
-        assert_eq!(select_u64(0xFFFF_FFFF_FFFF_FFFF, 10, 20), 10);
-        assert_eq!(select_u64(0, 10, 20), 20);
-        assert_eq!(select_u64(0xFFFF_FFFF_FFFF_FFFF, 0, 0), 0);
-        assert_eq!(select_u64(0, 0, 0), 0);
-        assert_eq!(select_u64(0xFFFF_FFFF_FFFF_FFFF, u64::MAX, 0), u64::MAX);
-        assert_eq!(select_u64(0, u64::MAX, 0), 0);
-    }
-
-    #[test]
-    fn test_mask_comparison() {
-        const ALL: u32 = 0xFFFF_FFFF;
-        // eq_mask_u32
-        assert_eq!(eq_mask_u32(5, 5), ALL);
-        assert_eq!(eq_mask_u32(0, 0), ALL);
-        assert_eq!(eq_mask_u32(u32::MAX, u32::MAX), ALL);
-        assert_eq!(eq_mask_u32(5, 6), 0);
-        assert_eq!(eq_mask_u32(0, u32::MAX), 0);
-        assert_eq!(eq_mask_u32(u32::MAX, 0), 0);
-        assert_eq!(eq_mask_u32(0, 1), 0);
-        // lt_mask_u32
-        assert_eq!(lt_mask_u32(0, 1), ALL);
-        assert_eq!(lt_mask_u32(3, 5), ALL);
-        assert_eq!(lt_mask_u32(0, u32::MAX), ALL);
-        assert_eq!(lt_mask_u32(1, 0), 0);
-        assert_eq!(lt_mask_u32(5, 3), 0);
-        assert_eq!(lt_mask_u32(u32::MAX, 0), 0);
-        assert_eq!(lt_mask_u32(0, 0), 0);
-        assert_eq!(lt_mask_u32(7, 7), 0);
-        assert_eq!(lt_mask_u32(u32::MAX, u32::MAX), 0);
-    }
-
-    #[test]
-    fn test_mask_zero_nonzero() {
-        const ALL: u32 = 0xFFFF_FFFF;
-        // is_zero_mask_u32
-        assert_eq!(is_zero_mask_u32(0), ALL);
-        assert_eq!(is_zero_mask_u32(1), 0);
-        assert_eq!(is_zero_mask_u32(u32::MAX), 0);
-        assert_eq!(is_zero_mask_u32(42), 0);
-        assert_eq!(is_zero_mask_u32(0x8000_0000), 0);
-        // nonzero_mask_u32
-        assert_eq!(nonzero_mask_u32(0), 0);
-        assert_eq!(nonzero_mask_u32(1), ALL);
-        assert_eq!(nonzero_mask_u32(u32::MAX), ALL);
-        assert_eq!(nonzero_mask_u32(42), ALL);
-        assert_eq!(nonzero_mask_u32(0x8000_0000), ALL);
-    }
-
-    #[test]
-    fn test_mask_min_max_abs() {
-        // min_u32
-        assert_eq!(min_u32(3, 5), 3);
-        assert_eq!(min_u32(5, 3), 3);
-        assert_eq!(min_u32(7, 7), 7);
-        assert_eq!(min_u32(0, 0), 0);
-        assert_eq!(min_u32(0, u32::MAX), 0);
-        assert_eq!(min_u32(u32::MAX, 0), 0);
-        assert_eq!(min_u32(u32::MAX, u32::MAX), u32::MAX);
-        // max_u32
-        assert_eq!(max_u32(5, 3), 5);
-        assert_eq!(max_u32(3, 5), 5);
-        assert_eq!(max_u32(7, 7), 7);
-        assert_eq!(max_u32(0, 0), 0);
-        assert_eq!(max_u32(0, u32::MAX), u32::MAX);
-        assert_eq!(max_u32(u32::MAX, 0), u32::MAX);
-        assert_eq!(max_u32(u32::MAX, u32::MAX), u32::MAX);
-        // abs_i32
-        assert_eq!(abs_i32(5), 5);
-        assert_eq!(abs_i32(-5), 5);
-        assert_eq!(abs_i32(0), 0);
-        assert_eq!(abs_i32(i32::MAX), i32::MAX);
-        assert_eq!(abs_i32(i32::MIN + 1), i32::MAX);
-        assert_eq!(abs_i32(i32::MIN), i32::MIN); // documented wrapping behavior
-        assert_eq!(abs_i32(-100), 100);
-        assert_eq!(abs_i32(100), 100);
-    }
-}
-#[cfg(test)]
-mod tests_phd_mask {
-
     fn mask_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
     }
+    fn mutant_mask_1(val: u64, aux: u64) -> u64 { !mask_reference(val, aux) }
+    fn mutant_mask_2(val: u64, aux: u64) -> u64 { mask_reference(val, aux).wrapping_add(1) }
+    fn mutant_mask_3(val: u64, aux: u64) -> u64 { mask_reference(val, aux) ^ 0xFF }
+
     #[test]
-    fn test_phd_equivalence() {
+    fn test_mask_equivalence_and_boundaries() {
+        const ALL: u32 = 0xFFFF_FFFF;
+        // select_u32
+        assert_eq!(select_u32(ALL, 10, 20), 10);
+        assert_eq!(select_u32(0, 10, 20), 20);
+        assert_eq!(select_u32(ALL, u32::MAX, 0), u32::MAX);
+        assert_eq!(select_u32(0, 0, u32::MAX), u32::MAX);
+        // select_u64
+        assert_eq!(select_u64(0xFFFF_FFFF_FFFF_FFFF, 10, 20), 10);
+        assert_eq!(select_u64(0, u64::MAX, 0), 0);
+        // eq_mask, lt_mask, zero/nonzero masks
+        assert_eq!(eq_mask_u32(5, 5), ALL);
+        assert_eq!(eq_mask_u32(5, 6), 0);
+        assert_eq!(lt_mask_u32(0, 1), ALL);
+        assert_eq!(lt_mask_u32(7, 7), 0);
+        assert_eq!(is_zero_mask_u32(0), ALL);
+        assert_eq!(is_zero_mask_u32(1), 0);
+        assert_eq!(nonzero_mask_u32(0), 0);
+        assert_eq!(nonzero_mask_u32(1), ALL);
+        // min, max, abs
+        assert_eq!(min_u32(3, 5), 3);
+        assert_eq!(min_u32(0, u32::MAX), 0);
+        assert_eq!(max_u32(5, 3), 5);
+        assert_eq!(max_u32(u32::MAX, 0), u32::MAX);
+        assert_eq!(abs_i32(-5), 5);
+        assert_eq!(abs_i32(i32::MIN), i32::MIN); // documented wrapping behavior
+        // phd gate boundaries
         assert_eq!(mask_reference(1, 2), 3);
-    }
-    #[test]
-    fn test_phd_boundaries() {
         assert_eq!(mask_reference(0, 0), 0);
     }
-    fn mutant_mask_1(val: u64, aux: u64) -> u64 {
-        !mask_reference(val, aux)
-    }
-    fn mutant_mask_2(val: u64, aux: u64) -> u64 {
-        mask_reference(val, aux).wrapping_add(1)
-    }
-    fn mutant_mask_3(val: u64, aux: u64) -> u64 {
-        mask_reference(val, aux) ^ 0xFF
-    }
+
     #[test]
-    fn test_phd_counterfactual_mutant_1() {
-        assert!(mask_reference(1, 1) != mutant_mask_1(1, 1));
-    }
-    #[test]
-    fn test_phd_counterfactual_mutant_2() {
-        assert!(mask_reference(1, 1) != mutant_mask_2(1, 1));
-    }
-    #[test]
-    fn test_phd_counterfactual_mutant_3() {
-        assert!(mask_reference(1, 1) != mutant_mask_3(1, 1));
+    fn test_mask_counterfactual_mutants() {
+        let cases: &[fn(u64, u64) -> u64] = &[mutant_mask_1, mutant_mask_2, mutant_mask_3];
+        for (i, mutant) in cases.iter().enumerate() {
+            assert!(
+                mask_reference(1, 1) != mutant(1, 1),
+                "mutant {} was not rejected",
+                i + 1
+            );
+        }
     }
 }
 

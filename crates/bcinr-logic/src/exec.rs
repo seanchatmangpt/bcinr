@@ -133,36 +133,10 @@ impl PipelineStage for EdgeConfidencePlan {
 #[cfg(feature = "alloc")]
 mod tests {
     use super::*;
-    #[cfg(feature = "alloc")]
     use alloc::vec;
-
-    #[test]
-    #[cfg(feature = "alloc")]
-    fn test_edge_confidence_cell() {
-        let plan = EdgeConfidencePlan { activity_count: 10 };
-        let state = vec![0u32; 100];
-        let mut cell = ExecutionCell::new(plan, state);
-
-        let mut out = 0u32;
-        cell.process(&(1, 2), &mut out);
-        assert_eq!(out, 1);
-        cell.process(&(1, 2), &mut out);
-        assert_eq!(out, 2);
-    }
-}
-#[cfg(test)]
-mod tests_phd_exec {
 
     fn exec_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
-    }
-    #[test]
-    fn test_phd_equivalence() {
-        assert_eq!(exec_reference(1, 2), 3);
-    }
-    #[test]
-    fn test_phd_boundaries() {
-        assert_eq!(exec_reference(0, 0), 0);
     }
     fn mutant_exec_1(val: u64, aux: u64) -> u64 {
         !exec_reference(val, aux)
@@ -173,17 +147,33 @@ mod tests_phd_exec {
     fn mutant_exec_3(val: u64, aux: u64) -> u64 {
         exec_reference(val, aux) ^ 0xFF
     }
+
     #[test]
-    fn test_phd_counterfactual_mutant_1() {
-        assert!(exec_reference(1, 1) != mutant_exec_1(1, 1));
+    fn test_exec_equivalence_and_boundaries() {
+        // edge confidence cell
+        let plan = EdgeConfidencePlan { activity_count: 10 };
+        let state = vec![0u32; 100];
+        let mut cell = ExecutionCell::new(plan, state);
+        let mut out = 0u32;
+        cell.process(&(1, 2), &mut out);
+        assert_eq!(out, 1);
+        cell.process(&(1, 2), &mut out);
+        assert_eq!(out, 2);
+        // phd gate boundaries
+        assert_eq!(exec_reference(1, 2), 3);
+        assert_eq!(exec_reference(0, 0), 0);
     }
+
     #[test]
-    fn test_phd_counterfactual_mutant_2() {
-        assert!(exec_reference(1, 1) != mutant_exec_2(1, 1));
-    }
-    #[test]
-    fn test_phd_counterfactual_mutant_3() {
-        assert!(exec_reference(1, 1) != mutant_exec_3(1, 1));
+    fn test_exec_counterfactual_mutants() {
+        let cases: &[fn(u64, u64) -> u64] = &[mutant_exec_1, mutant_exec_2, mutant_exec_3];
+        for (i, mutant) in cases.iter().enumerate() {
+            assert!(
+                exec_reference(1, 1) != mutant(1, 1),
+                "mutant {} was not rejected",
+                i + 1
+            );
+        }
     }
 }
 

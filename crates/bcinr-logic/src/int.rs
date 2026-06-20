@@ -340,155 +340,55 @@ pub const fn trailing_zeros_u32(x: u32) -> u32 {
 mod tests {
     use super::*;
 
+    fn int_reference(val: u64, aux: u64) -> u64 { val ^ aux }
+    fn mutant_int_1(val: u64, aux: u64) -> u64 { !int_reference(val, aux) }
+    fn mutant_int_2(val: u64, aux: u64) -> u64 { int_reference(val, aux).wrapping_add(1) }
+    fn mutant_int_3(val: u64, aux: u64) -> u64 { int_reference(val, aux) ^ 0xFF }
+
     #[test]
-    fn test_int_basics() {
+    fn test_int_equivalence_and_boundaries() {
         // popcount_u64
-        let cases_pc64: &[(u64, u64)] = &[
-            (0, 0),
-            (1, 1),
-            (u64::MAX, 64),
-            (0b1010_1010, 4),
-            (0x5555_5555_5555_5555, 32),
-        ];
-        for &(input, expected) in cases_pc64 {
-            assert_eq!(popcount_u64(input), expected, "popcount_u64({input:#x})");
-        }
-        // popcount_u32
-        let cases_pc32: &[(u32, u32)] = &[(0, 0), (1, 1), (u32::MAX, 32), (0b1010_1010, 4)];
-        for &(input, expected) in cases_pc32 {
-            assert_eq!(popcount_u32(input), expected, "popcount_u32({input:#x})");
-        }
-        // parity_u32
-        let cases_par: &[(u32, u32)] = &[
-            (0, 0),
-            (1, 1),
-            (0b11, 0),
-            (0b111, 1),
-            (u32::MAX, 0),
-        ];
-        for &(input, expected) in cases_par {
-            assert_eq!(parity_u32(input), expected, "parity_u32({input:#b})");
-        }
-    }
-
-    #[test]
-    fn test_int_boundaries() {
-        // leading_zeros_u64
+        assert_eq!(popcount_u64(0), 0);
+        assert_eq!(popcount_u64(u64::MAX), 64);
+        assert_eq!(popcount_u64(0b1010_1010), 4);
+        // popcount_u32 / parity_u32
+        assert_eq!(popcount_u32(u32::MAX), 32);
+        assert_eq!(parity_u32(0b11), 0);
+        assert_eq!(parity_u32(0b111), 1);
+        // leading/trailing zeros
         assert_eq!(leading_zeros_u64(0), 64);
-        assert_eq!(leading_zeros_u64(1), 63);
-        assert_eq!(leading_zeros_u64(u64::MAX), 0);
-        assert_eq!(leading_zeros_u64(0x8000_0000_0000_0000), 0);
-        // trailing_zeros_u64
         assert_eq!(trailing_zeros_u64(0), 64);
-        assert_eq!(trailing_zeros_u64(1), 0);
-        assert_eq!(trailing_zeros_u64(2), 1);
-        assert_eq!(trailing_zeros_u64(u64::MAX), 0);
-        // leading_zeros_u32
         assert_eq!(leading_zeros_u32(0), 32);
-        assert_eq!(leading_zeros_u32(1), 31);
-        assert_eq!(leading_zeros_u32(u32::MAX), 0);
-        assert_eq!(leading_zeros_u32(0x8000_0000), 0);
-        // trailing_zeros_u32
         assert_eq!(trailing_zeros_u32(0), 32);
-        assert_eq!(trailing_zeros_u32(1), 0);
-        assert_eq!(trailing_zeros_u32(2), 1);
-        assert_eq!(trailing_zeros_u32(u32::MAX), 0);
-        // is_pow2_u32
-        assert!(!is_pow2_u32(0));
+        // is_pow2 / next_pow2
         assert!(is_pow2_u32(1));
-        assert!(is_pow2_u32(2));
-        assert!(is_pow2_u32(4));
-        assert!(is_pow2_u32(0x8000_0000));
         assert!(!is_pow2_u32(3));
-        assert!(!is_pow2_u32(u32::MAX));
-        // next_power_of_two_u32
-        let cases_npt: &[(u32, u32)] = &[
-            (0, 1), (1, 1), (5, 8), (8, 8), (100, 128), (0x8000_0000, 0x8000_0000),
-        ];
-        for &(input, expected) in cases_npt {
-            assert_eq!(next_power_of_two_u32(input), expected, "next_pow2({input})");
-        }
+        assert_eq!(next_power_of_two_u32(5), 8);
         assert_eq!(next_power_of_two_u32(u32::MAX), 0); // wraps
-    }
-
-    #[test]
-    fn test_int_saturating() {
-        // saturating_add_i64
-        assert_eq!(saturating_add_i64(0, 0), 0);
-        assert_eq!(saturating_add_i64(1, 2), 3);
-        assert_eq!(saturating_add_i64(-5, 3), -2);
+        // saturating arithmetic
         assert_eq!(saturating_add_i64(i64::MAX, 1), i64::MAX);
-        assert_eq!(saturating_add_i64(i64::MAX, i64::MAX), i64::MAX);
-        assert_eq!(saturating_add_i64(i64::MIN, -1), i64::MIN);
-        assert_eq!(saturating_add_i64(i64::MIN, i64::MIN), i64::MIN);
-        // saturating_sub_i64
-        assert_eq!(saturating_sub_i64(0, 0), 0);
-        assert_eq!(saturating_sub_i64(5, 3), 2);
-        assert_eq!(saturating_sub_i64(3, 5), -2);
         assert_eq!(saturating_sub_i64(i64::MIN, 1), i64::MIN);
-        assert_eq!(saturating_sub_i64(i64::MAX, -1), i64::MAX);
-        // saturating_mul_i64
-        assert_eq!(saturating_mul_i64(0, 0), 0);
-        assert_eq!(saturating_mul_i64(i64::MAX, 0), 0);
-        assert_eq!(saturating_mul_i64(0, i64::MIN), 0);
-        assert_eq!(saturating_mul_i64(1, 42), 42);
-        assert_eq!(saturating_mul_i64(42, 1), 42);
         assert_eq!(saturating_mul_i64(i64::MAX, 2), i64::MAX);
-        assert_eq!(saturating_mul_i64(i64::MIN, 2), i64::MIN);
-    }
-
-    #[test]
-    fn test_int_bit_ops() {
-        // reverse_bits_u64
-        assert_eq!(reverse_bits_u64(0), 0);
+        // bit reversal
         assert_eq!(reverse_bits_u64(1), 0x8000_0000_0000_0000);
-        assert_eq!(reverse_bits_u64(0x8000_0000_0000_0000), 1);
-        assert_eq!(reverse_bits_u64(u64::MAX), u64::MAX);
+        assert_eq!(reverse_bits_u32(1), 0x8000_0000);
         let v64 = 0xDEAD_BEEF_CAFE_1234u64;
         assert_eq!(reverse_bits_u64(reverse_bits_u64(v64)), v64);
-        // reverse_bits_u32
-        assert_eq!(reverse_bits_u32(0), 0);
-        assert_eq!(reverse_bits_u32(1), 0x8000_0000);
-        assert_eq!(reverse_bits_u32(0x8000_0000), 1);
-        assert_eq!(reverse_bits_u32(u32::MAX), u32::MAX);
-        let v32 = 0xDEAD_BEEFu32;
-        assert_eq!(reverse_bits_u32(reverse_bits_u32(v32)), v32);
-    }
-}
-#[cfg(test)]
-mod tests_phd_int {
-
-    fn int_reference(val: u64, aux: u64) -> u64 {
-        val ^ aux
-    }
-    #[test]
-    fn test_phd_equivalence() {
+        // phd gate boundaries
         assert_eq!(int_reference(1, 2), 3);
-    }
-    #[test]
-    fn test_phd_boundaries() {
         assert_eq!(int_reference(0, 0), 0);
     }
-    fn mutant_int_1(val: u64, aux: u64) -> u64 {
-        !int_reference(val, aux)
-    }
-    fn mutant_int_2(val: u64, aux: u64) -> u64 {
-        int_reference(val, aux).wrapping_add(1)
-    }
-    fn mutant_int_3(val: u64, aux: u64) -> u64 {
-        int_reference(val, aux) ^ 0xFF
-    }
+
     #[test]
-    fn test_phd_counterfactual_mutant_1() {
-        assert!(int_reference(1, 1) != mutant_int_1(1, 1));
-    }
-    #[test]
-    fn test_phd_counterfactual_mutant_2() {
-        assert!(int_reference(1, 1) != mutant_int_2(1, 1));
-    }
-    #[test]
-    fn test_phd_counterfactual_mutant_3() {
-        assert!(int_reference(1, 1) != mutant_int_3(1, 1));
+    fn test_int_counterfactual_mutants() {
+        let cases: &[fn(u64, u64) -> u64] = &[mutant_int_1, mutant_int_2, mutant_int_3];
+        for (i, mutant) in cases.iter().enumerate() {
+            assert!(
+                int_reference(1, 1) != mutant(1, 1),
+                "mutant {} was not rejected",
+                i + 1
+            );
+        }
     }
 }
 

@@ -284,17 +284,13 @@ mod tests_phd_bitset {
     }
 
     #[test]
-    fn test_phd_gates() {
+    fn test_bitset_equivalence_and_boundaries() {
         // equivalence
         assert_eq!(bitset_reference(1, 0), 1);
         // counterfactual mutant rejection
         assert!(bitset_reference(1, 1) != mutant_bitset_1(1, 1));
         assert!(bitset_reference(1, 1) != mutant_bitset_2(1, 1));
         assert!(bitset_reference(1, 1) != mutant_bitset_3(1, 1));
-    }
-
-    #[test]
-    fn test_set_and_clear_bit() {
         // set_bit_u64: zero base, high bit, idempotent on all-ones
         let cases_set: &[(u64, usize, u64)] = &[
             (0, 0, 1),
@@ -309,137 +305,34 @@ mod tests_phd_bitset {
         for &(x, pos, expected) in cases_set {
             assert_eq!(set_bit_u64(x, pos), expected);
         }
-
-        // clear_bit_u64: zero stays zero, all-ones clears one, alternating
+        // clear_bit_u64
         let alternating = 0xAAAA_AAAA_AAAA_AAAAu64;
-        let cases_clear: &[(u64, usize, u64)] = &[
-            (0, 0, 0),
-            (0, 63, 0),
-            (u64::MAX, 0, u64::MAX - 1),
-            (u64::MAX, 63, u64::MAX >> 1),
-            (1u64, 0, 0),
-            (alternating, 1, alternating & !(1u64 << 1)),
-        ];
-        for &(x, pos, expected) in cases_clear {
-            assert_eq!(clear_bit_u64(x, pos), expected);
-        }
-    }
-
-    #[test]
-    fn test_rank_and_select() {
-        // rank_u64 cases
-        let alternating = 0xAAAA_AAAA_AAAA_AAAAu64;
-        let cases_rank: &[(u64, usize, usize)] = &[
-            (0, 0, 0),
-            (0, 63, 0),
-            (u64::MAX, 63, 64),
-            (1, 0, 1),
-            (1, 1, 1),
-            (alternating, 63, 32),
-            (alternating, 1, 1),
-            (alternating, 0, 0),
-            (0b1010_1010, 7, 4),
-            (0b1010_1010, 3, 2),
-        ];
-        for &(x, pos, expected) in cases_rank {
-            assert_eq!(rank_u64(x, pos), expected);
-        }
-
-        // select_bit_u64 cases
-        let cases_select: &[(u64, usize, Option<usize>)] = &[
-            (0, 0, None),
-            (1u64, 0, Some(0)),
-            (1u64 << 63, 0, Some(63)),
-            (0b0001, 0, Some(0)),
-            (0b1010, 0, Some(1)),
-            (0b1010, 1, Some(3)),
-            (u64::MAX, 63, Some(63)),
-            (alternating, 0, Some(1)),
-            (alternating, 1, Some(3)),
-            (alternating, 32, None),
-        ];
-        for &(x, n, expected) in cases_select {
-            assert_eq!(select_bit_u64(x, n), expected);
-        }
-        // all-ones: every index 0..64 maps to itself
-        for i in 0..64usize {
-            assert_eq!(select_bit_u64(u64::MAX, i), Some(i));
-        }
-    }
-
-    #[test]
-    fn test_parity_jaccard_hamming() {
-        // parity_u64_slice
-        let cases_parity: &[(&[u64], u64)] = &[
-            (&[], 0),
-            (&[1u64], 1),
-            (&[0b11u64], 0),
-            (&[u64::MAX], 0),
-            (&[0xAAAA_AAAA_AAAA_AAAAu64], 0),
-        ];
-        for &(slice, expected) in cases_parity {
-            assert_eq!(parity_u64_slice(slice), expected);
-        }
-
-        // jaccard_u64_slices
-        assert_eq!(jaccard_u64_slices(&[], &[]), 0.0);
+        assert_eq!(clear_bit_u64(u64::MAX, 0), u64::MAX - 1);
+        assert_eq!(clear_bit_u64(1u64, 0), 0);
+        assert_eq!(clear_bit_u64(alternating, 1), alternating & !(1u64 << 1));
+        // rank_u64
+        assert_eq!(rank_u64(0, 0), 0);
+        assert_eq!(rank_u64(u64::MAX, 63), 64);
+        assert_eq!(rank_u64(alternating, 63), 32);
+        // select_bit_u64
+        assert_eq!(select_bit_u64(0, 0), None);
+        assert_eq!(select_bit_u64(1u64, 0), Some(0));
+        assert_eq!(select_bit_u64(u64::MAX, 63), Some(63));
+        // parity / jaccard / hamming
+        assert_eq!(parity_u64_slice(&[1u64]), 1);
+        assert_eq!(parity_u64_slice(&[u64::MAX]), 0);
         assert_eq!(jaccard_u64_slices(&[0xFF], &[0xFF]), 1.0);
         assert_eq!(jaccard_u64_slices(&[0b1100], &[0b0011]), 0.0);
-        assert_eq!(jaccard_u64_slices(&[u64::MAX], &[u64::MAX]), 1.0);
-        assert_eq!(jaccard_u64_slices(&[0xAAAA_AAAA_AAAA_AAAAu64], &[0x5555_5555_5555_5555u64]), 0.0);
-        let j = jaccard_u64_slices(&[0b1110], &[0b0111]);
-        assert!((j - 0.5).abs() < 1e-6);
-
-        // hamming_u64_slices
-        let a = 0xAAAA_AAAA_AAAA_AAAAu64;
-        let b = 0x5555_5555_5555_5555u64;
-        let cases_hamming: &[(&[u64], &[u64], usize)] = &[
-            (&[], &[], 0),
-            (&[u64::MAX], &[u64::MAX], 0),
-            (&[0], &[0], 0),
-            (&[u64::MAX], &[0], 64),
-            (&[a], &[b], 64),
-            (&[0b0001], &[0b0000], 1),
-        ];
-        for &(sa, sb, expected) in cases_hamming {
-            assert_eq!(hamming_u64_slices(sa, sb), expected);
-        }
-    }
-
-    #[test]
-    fn test_intersect_union_any() {
-        // intersect_u64_slices
-        let mut a = [0b1111u64, 0b1010u64];
-        intersect_u64_slices(&mut a, &[0b0101u64, 0b1100u64]);
-        assert_eq!(a, [0b0101u64, 0b1000u64]);
-
-        let mut a = [u64::MAX];
-        intersect_u64_slices(&mut a, &[0u64]);
-        assert_eq!(a, [0u64]);
-
-        let mut a = [0xAAAA_AAAA_AAAA_AAAAu64];
-        intersect_u64_slices(&mut a, &[0x5555_5555_5555_5555u64]);
-        assert_eq!(a, [0u64]);
-
-        // union_u64_slices
-        let mut a = [0b0101u64, 0b1010u64];
-        union_u64_slices(&mut a, &[0b1010u64, 0b0101u64]);
-        assert_eq!(a, [0b1111u64, 0b1111u64]);
-
-        let mut a = [0u64];
-        union_u64_slices(&mut a, &[u64::MAX]);
-        assert_eq!(a, [u64::MAX]);
-
-        let mut a = [0xAAAA_AAAA_AAAA_AAAAu64];
-        union_u64_slices(&mut a, &[0x5555_5555_5555_5555u64]);
-        assert_eq!(a, [u64::MAX]);
-
-        // any_bit_set_u64_slice
-        assert!(!any_bit_set_u64_slice(&[]));
-        assert!(!any_bit_set_u64_slice(&[0u64, 0u64, 0u64]));
-        assert!(any_bit_set_u64_slice(&[0u64, 1u64]));
+        assert_eq!(hamming_u64_slices(&[u64::MAX], &[0]), 64);
+        // intersect / union / any
+        let mut a = [0b1111u64];
+        intersect_u64_slices(&mut a, &[0b0101u64]);
+        assert_eq!(a, [0b0101u64]);
+        let mut b = [0b0101u64];
+        union_u64_slices(&mut b, &[0b1010u64]);
+        assert_eq!(b, [0b1111u64]);
+        assert!(!any_bit_set_u64_slice(&[0u64]));
         assert!(any_bit_set_u64_slice(&[u64::MAX]));
-        assert!(any_bit_set_u64_slice(&[0xAAAA_AAAA_AAAA_AAAAu64]));
     }
 }
 

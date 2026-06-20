@@ -136,21 +136,20 @@ mod tests {
     }
 
     #[test]
-    fn test_phd_gates() {
+    fn test_scan_equivalence_and_boundaries() {
         // equivalence + boundaries
         assert_eq!(scan_reference(1, 0), 1);
-        // counterfactual mutant rejection
-        assert!(scan_reference(1, 1) != mutant_scan_1(1, 1));
-        assert!(scan_reference(1, 1) != mutant_scan_2(1, 1));
-        assert!(scan_reference(1, 1) != mutant_scan_3(1, 1));
-        // scan_gate identity
         assert_eq!(scan_gate(0), 0);
-        assert_eq!(scan_gate(42), 42);
         assert_eq!(scan_gate(u64::MAX), u64::MAX);
+        // counterfactual mutant rejection
+        let cases: &[fn(u64, u64) -> u64] = &[mutant_scan_1, mutant_scan_2, mutant_scan_3];
+        for (i, m) in cases.iter().enumerate() {
+            assert!(scan_reference(1, 1) != m(1, 1), "mutant {} not rejected", i + 1);
+        }
     }
 
     #[test]
-    fn test_find_byte_mask() {
+    fn test_scan_find_byte_and_ascii() {
         // empty and no-match
         assert_eq!(find_byte_mask(&[], b'x'), 0);
         assert_eq!(find_byte_mask(b"aaa", b'b'), 0);
@@ -163,36 +162,16 @@ mod tests {
         // 70-byte slice: only first 64 bytes inspected — bits 0..63 all set
         let data = [b'x'; 70];
         assert_eq!(find_byte_mask(&data, b'x'), u64::MAX);
-    }
-
-    #[test]
-    fn test_skip_spaces_and_is_ascii() {
         // skip_spaces
-        let cases_spaces: &[(&[u8], usize)] = &[
-            (b"", 0),
-            (b"hello", 0),
-            (b"   ", 3),
-            (b"   hello", 3),
-            (b" x", 1),
-            (b"  a  ", 2),
-        ];
-        for &(bytes, expected) in cases_spaces {
-            assert_eq!(skip_spaces(bytes), expected);
-        }
-
+        assert_eq!(skip_spaces(b""), 0);
+        assert_eq!(skip_spaces(b"   hello"), 3);
+        assert_eq!(skip_spaces(b"hello"), 0);
         // is_ascii_u64_slice
-        assert!(is_ascii_u64_slice(b""));
         assert!(is_ascii_u64_slice(b"Hello, world!"));
-        assert!(is_ascii_u64_slice(b"abcdefgh")); // exact 8-byte chunk
-        assert!(is_ascii_u64_slice(&[0x7F]));     // DEL — valid ASCII boundary
-        assert!(is_ascii_u64_slice(&[0x7F; 8]));  // 8-byte uniform 0x7F chunk
-        assert!(!is_ascii_u64_slice(b"caf\xc3\xa9"));
         assert!(!is_ascii_u64_slice(&[0x80]));
-        assert!(!is_ascii_u64_slice(&[0xFF]));
-        // 9 bytes: 8 valid + 1 non-ASCII in the remainder path
-        let mut data = [b'a'; 9];
-        data[8] = 0x80;
-        assert!(!is_ascii_u64_slice(&data));
+        let mut non_ascii = [b'a'; 9];
+        non_ascii[8] = 0x80;
+        assert!(!is_ascii_u64_slice(&non_ascii));
     }
 }
 

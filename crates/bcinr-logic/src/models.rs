@@ -34,15 +34,11 @@ pub mod vision_2030;
 #[cfg(test)]
 mod tests_models {
 
+    use super::*;
+
     fn models_reference(val: u64, _aux: u64) -> u64 {
         val
     }
-    #[test]
-    fn test_models_equivalence() {
-        assert_eq!(models_reference(1, 0), 1);
-    }
-    #[test]
-    fn test_models_boundaries() {}
     fn mutant_models_1(val: u64, aux: u64) -> u64 {
         !models_reference(val, aux)
     }
@@ -52,31 +48,26 @@ mod tests_models {
     fn mutant_models_3(val: u64, aux: u64) -> u64 {
         models_reference(val, aux) ^ 0xFF
     }
-    #[test]
-    fn test_models_counterfactual_mutant_1() {
-        assert!(models_reference(1, 1) != mutant_models_1(1, 1));
-    }
-    #[test]
-    fn test_models_counterfactual_mutant_2() {
-        assert!(models_reference(1, 1) != mutant_models_2(1, 1));
-    }
-    #[test]
-    fn test_models_counterfactual_mutant_3() {
-        assert!(models_reference(1, 1) != mutant_models_3(1, 1));
-    }
-
-    use super::*;
 
     #[test]
-    fn test_integrity_gate_xor_identity() {
+    fn test_models_equivalence_and_boundaries() {
+        assert_eq!(models_reference(1, 0), 1);
         // Applying the gate twice should be an identity (XOR is its own inverse)
         let v = 0xDEAD_BEEF_CAFE_BABEu64;
         assert_eq!(models_integrity_gate(models_integrity_gate(v)), v);
+        assert_eq!(models_integrity_gate(0), 0xAA);
     }
 
     #[test]
-    fn test_integrity_gate_zero() {
-        assert_eq!(models_integrity_gate(0), 0xAA);
+    fn test_models_counterfactual_mutants() {
+        let cases: &[fn(u64, u64) -> u64] = &[mutant_models_1, mutant_models_2, mutant_models_3];
+        for (i, mutant) in cases.iter().enumerate() {
+            assert!(
+                models_reference(1, 1) != mutant(1, 1),
+                "mutant {} was not rejected",
+                i + 1
+            );
+        }
     }
 }
 

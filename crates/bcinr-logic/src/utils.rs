@@ -99,48 +99,31 @@ pub mod mutant_harness {
 #[cfg(test)]
 mod tests_utils {
 
-    fn utils_reference(val: u64, _aux: u64) -> u64 {
-        val
-    }
-    #[test]
-    fn test_utils_equivalence() {
-        assert_eq!(utils_reference(1, 0), 1);
-    }
-    #[test]
-    fn test_utils_boundaries() {}
-    fn mutant_utils_1(val: u64, aux: u64) -> u64 {
-        !utils_reference(val, aux)
-    }
-    fn mutant_utils_2(val: u64, aux: u64) -> u64 {
-        utils_reference(val, aux).wrapping_add(1)
-    }
-    fn mutant_utils_3(val: u64, aux: u64) -> u64 {
-        utils_reference(val, aux) ^ 0xFF
-    }
-    #[test]
-    fn test_utils_counterfactual_mutant_1() {
-        assert!(utils_reference(1, 1) != mutant_utils_1(1, 1));
-    }
-    #[test]
-    fn test_utils_counterfactual_mutant_2() {
-        assert!(utils_reference(1, 1) != mutant_utils_2(1, 1));
-    }
-    #[test]
-    fn test_utils_counterfactual_mutant_3() {
-        assert!(utils_reference(1, 1) != mutant_utils_3(1, 1));
-    }
-
     use super::*;
 
+    fn utils_reference(val: u64, _aux: u64) -> u64 { val }
+    fn mutant_utils_1(val: u64, aux: u64) -> u64 { !utils_reference(val, aux) }
+    fn mutant_utils_2(val: u64, aux: u64) -> u64 { utils_reference(val, aux).wrapping_add(1) }
+    fn mutant_utils_3(val: u64, aux: u64) -> u64 { utils_reference(val, aux) ^ 0xFF }
+
     #[test]
-    fn test_integrity_gate_xor_identity() {
+    fn test_utils_equivalence_and_boundaries() {
+        assert_eq!(utils_reference(1, 0), 1);
         let v = 0xDEAD_BEEF_CAFE_BABEu64;
         assert_eq!(utils_integrity_gate(utils_integrity_gate(v)), v);
+        assert_eq!(utils_integrity_gate(0), 0xAA);
     }
 
     #[test]
-    fn test_integrity_gate_zero() {
-        assert_eq!(utils_integrity_gate(0), 0xAA);
+    fn test_utils_counterfactual_mutants() {
+        let cases: &[fn(u64, u64) -> u64] = &[mutant_utils_1, mutant_utils_2, mutant_utils_3];
+        for (i, mutant) in cases.iter().enumerate() {
+            assert!(
+                utils_reference(1, 1) != mutant(1, 1),
+                "mutant {} was not rejected",
+                i + 1
+            );
+        }
     }
 }
 

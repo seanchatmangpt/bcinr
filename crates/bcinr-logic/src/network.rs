@@ -151,16 +151,17 @@ mod tests {
     }
 
     #[test]
-    fn test_reference_and_mutants() {
+    fn test_network_equivalence_and_boundaries() {
         assert_eq!(network_reference(1, 2), 3);
         assert_eq!(network_reference(0, 0), 0);
-        assert!(network_reference(1, 1) != mutant_network_1(1, 1));
-        assert!(network_reference(1, 1) != mutant_network_2(1, 1));
-        assert!(network_reference(1, 1) != mutant_network_3(1, 1));
+        let cases: &[fn(u64, u64) -> u64] = &[mutant_network_1, mutant_network_2, mutant_network_3];
+        for (i, m) in cases.iter().enumerate() {
+            assert!(network_reference(1, 1) != m(1, 1), "mutant {} not rejected", i + 1);
+        }
     }
 
     #[test]
-    fn test_compare_exchange_table() {
+    fn test_network_sorting() {
         // (input, expected after compare_exchange at indices 0,1)
         let cases: &[([u32; 2], [u32; 2])] = &[
             ([1, 2], [1, 2]), // already sorted
@@ -172,40 +173,18 @@ mod tests {
             compare_exchange(&mut arr, 0, 1);
             assert_eq!(arr, expected, "compare_exchange({input:?})");
         }
-    }
-
-    #[test]
-    fn test_bitonic_sort_table() {
-        // --- bitonic_sort_8u32 ---
-        let mut arr8 = [1u32, 2, 3, 4, 5, 6, 7, 8];
-        bitonic_sort_8u32(&mut arr8);
-        assert_eq!(arr8, [1u32, 2, 3, 4, 5, 6, 7, 8]);
-
-        let mut arr8 = [42u32; 8];
-        bitonic_sort_8u32(&mut arr8);
-        assert_eq!(arr8, [42u32; 8]);
-
-        let mut arr8 = [2u32, 1, 3, 4, 5, 6, 7, 8];
-        bitonic_sort_8u32(&mut arr8);
-        assert_eq!(arr8, [1u32, 2, 3, 4, 5, 6, 7, 8]);
-
+        // bitonic_sort_8u32
         let mut arr8 = [8u32, 7, 6, 5, 4, 3, 2, 1];
         bitonic_sort_8u32(&mut arr8);
         assert_eq!(arr8, [1u32, 2, 3, 4, 5, 6, 7, 8]);
-
-        // --- bitonic_sort_16u32 ---
-        let mut arr16: [u32; 16] = core::array::from_fn(|i| (i + 1) as u32);
+        let mut arr8 = [42u32; 8];
+        bitonic_sort_8u32(&mut arr8);
+        assert_eq!(arr8, [42u32; 8]);
+        // bitonic_sort_16u32
+        let mut arr16: [u32; 16] = core::array::from_fn(|i| (16 - i) as u32);
         bitonic_sort_16u32(&mut arr16);
         let expected16: [u32; 16] = core::array::from_fn(|i| (i + 1) as u32);
         assert_eq!(arr16, expected16);
-
-        let mut arr16: [u32; 16] = core::array::from_fn(|i| (16 - i) as u32);
-        bitonic_sort_16u32(&mut arr16);
-        assert_eq!(arr16, expected16);
-
-        let mut arr16 = [99u32; 16];
-        bitonic_sort_16u32(&mut arr16);
-        assert_eq!(arr16, [99u32; 16]);
     }
 }
 

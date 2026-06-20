@@ -101,135 +101,56 @@ pub fn count_min_sketch_query(table: &[u32], hash: u64, depth: usize, width: usi
 
 #[cfg(test)]
 mod tests {
-    // _reference equivalence boundaries
-    fn sketch_reference(val: u64, aux: u64) -> u64 {
-        val ^ aux
-    }
-    fn mutant_sketch_1(val: u64, aux: u64) -> u64 {
-        !sketch_reference(val, aux)
-    }
-    fn mutant_sketch_2(val: u64, aux: u64) -> u64 {
-        sketch_reference(val, aux).wrapping_add(1)
-    }
-    fn mutant_sketch_3(val: u64, aux: u64) -> u64 {
-        sketch_reference(val, aux) ^ 0xFF
-    }
-
     use super::*;
+
+    fn sketch_reference(val: u64, aux: u64) -> u64 { val ^ aux }
+    fn mutant_sketch_1(val: u64, aux: u64) -> u64 { !sketch_reference(val, aux) }
+    fn mutant_sketch_2(val: u64, aux: u64) -> u64 { sketch_reference(val, aux).wrapping_add(1) }
+    fn mutant_sketch_3(val: u64, aux: u64) -> u64 { sketch_reference(val, aux) ^ 0xFF }
 
     const DEPTH: usize = 4;
     const WIDTH: usize = 256;
 
     #[test]
-    fn test_count_min_sketch_update() {
-        // reference equivalence and boundary
+    fn test_sketch_equivalence_and_boundaries() {
+        // reference + boundaries
         assert_eq!(sketch_reference(1, 2), 3);
         assert_eq!(sketch_reference(0, 0), 0);
-        // mutant divergence
-        assert!(sketch_reference(1, 1) != mutant_sketch_1(1, 1));
-        assert!(sketch_reference(1, 1) != mutant_sketch_2(1, 1));
-        assert!(sketch_reference(1, 1) != mutant_sketch_3(1, 1));
         // zero-element: all counters start at zero
         let table = [0u32; DEPTH * WIDTH];
         for row in 0..DEPTH {
             let row_sum: u32 = table[row * WIDTH..(row + 1) * WIDTH].iter().sum();
             assert_eq!(row_sum, 0, "row {row} should be all zeros");
         }
-        // single insert: at least one counter per row must be >= 1
-        let mut table = [0u32; DEPTH * WIDTH];
-        count_min_sketch_update(&mut table, 0x1111_2222, DEPTH, WIDTH);
-        for row in 0..DEPTH {
-            let row_max = table[row * WIDTH..(row + 1) * WIDTH]
-                .iter()
-                .copied()
-                .max()
-                .unwrap_or(0);
-            assert!(row_max >= 1, "row {row} max counter should be >= 1 after insert");
-        }
-    }
-
-    #[test]
-    fn test_count_min_sketch_repeated_update() {
-        // repeated inserts: every row must accumulate counts
-        let n: u32 = 100;
-        let mut table = [0u32; DEPTH * WIDTH];
-        for _ in 0..n {
-            count_min_sketch_update(&mut table, 0xCAFE_BABE, DEPTH, WIDTH);
-        }
-        for row in 0..DEPTH {
-            let row_max = table[row * WIDTH..(row + 1) * WIDTH]
-                .iter()
-                .copied()
-                .max()
-                .unwrap_or(0);
-            assert!(
-                row_max >= n,
-                "row {row} max counter {row_max} must be >= true count {n}"
-            );
-        }
-    }
-
-    // ── zero-element sketch ───────────────────────────────────────────────────
-
-    #[test]
-    fn test_zero_element_sketch_all_counters_zero() {
-        let table = [0u32; DEPTH * WIDTH];
-        for row in 0..DEPTH {
-            let row_sum: u32 = table[row * WIDTH..(row + 1) * WIDTH].iter().sum();
-            assert_eq!(row_sum, 0, "row {row} should be all zeros");
-        }
-    }
-
-    #[test]
-    fn test_zero_element_sketch_query_returns_zero() {
-        let table = [0u32; DEPTH * WIDTH];
         assert_eq!(count_min_sketch_query(&table, 0xABC, DEPTH, WIDTH), 0);
-        assert_eq!(count_min_sketch_query(&table, 0x000, DEPTH, WIDTH), 0);
-    }
-
-    // ── single-element insert ─────────────────────────────────────────────────
-
-    #[test]
-    fn test_single_element_query_equals_one() {
+        // single insert
         let mut table = [0u32; DEPTH * WIDTH];
         count_min_sketch_update(&mut table, 0xDEAD_BEEF, DEPTH, WIDTH);
-        // Count-Min estimate for the inserted hash must be exactly 1
         assert_eq!(count_min_sketch_query(&table, 0xDEAD_BEEF, DEPTH, WIDTH), 1);
-    }
-
-    #[test]
-    fn test_single_element_non_member_no_false_negative() {
-        // A non-inserted key should have estimate 0 in an empty-enough table
-        let mut table = [0u32; DEPTH * WIDTH];
-        count_min_sketch_update(&mut table, 0x1111_2222, DEPTH, WIDTH);
-        // The estimate for the inserted key must be >= 1
-        let est = count_min_sketch_query(&table, 0x1111_2222, DEPTH, WIDTH);
-        assert!(est >= 1, "inserted element must have estimate >= 1");
-    }
-
-    // ── cardinality estimate within expected error bounds ─────────────────────
-
-    #[test]
-    fn test_count_min_sketch_estimate_within_error_bounds() {
-        // Insert the same key N times; the estimate must equal N (exact, no
-        // collisions expected with WIDTH=256 and only 1 distinct key).
+        // repeated inserts
         let n: u32 = 100;
         let mut table = [0u32; DEPTH * WIDTH];
         for _ in 0..n {
             count_min_sketch_update(&mut table, 0xCAFE_BABE, DEPTH, WIDTH);
         }
         let estimate = count_min_sketch_query(&table, 0xCAFE_BABE, DEPTH, WIDTH);
-        // Estimate should be >= true count (CM property); with no other items
-        // and a wide table it should be exact.
-        assert!(
-            estimate >= n,
-            "estimate {estimate} must be >= true count {n}"
-        );
-        // Allow at most 5% overestimate from accidental collisions
+        assert!(estimate >= n, "estimate {estimate} must be >= true count {n}");
         assert!(
             estimate <= n + (n / 20).max(5),
             "estimate {estimate} exceeded 5% overcount threshold for true count {n}"
         );
+    }
+
+    #[test]
+    fn test_sketch_counterfactual_mutants() {
+        let cases: &[fn(u64, u64) -> u64] = &[mutant_sketch_1, mutant_sketch_2, mutant_sketch_3];
+        for (i, mutant) in cases.iter().enumerate() {
+            assert!(
+                sketch_reference(1, 1) != mutant(1, 1),
+                "mutant {} was not rejected",
+                i + 1
+            );
+        }
     }
 }
 

@@ -78,36 +78,21 @@ impl ConstantShapePolicyDfa {
 
 #[cfg(test)]
 mod tests_policy_dfa {
+    use super::*;
 
-    fn policy_dfa_reference(val: u64, aux: u64) -> u64 {
-        val ^ aux
-    }
     #[test]
-    fn test_equivalence() {
-        assert_eq!(policy_dfa_reference(1, 0), 1);
-    }
-    #[test]
-    fn test_boundaries() {}
-    fn mutant_policy_dfa_1(val: u64, aux: u64) -> u64 {
-        !policy_dfa_reference(val, aux)
-    }
-    fn mutant_policy_dfa_2(val: u64, aux: u64) -> u64 {
-        policy_dfa_reference(val, aux).wrapping_add(1)
-    }
-    fn mutant_policy_dfa_3(val: u64, aux: u64) -> u64 {
-        policy_dfa_reference(val, aux) ^ 0xFF
-    }
-    #[test]
-    fn test_rejects_mutant_1() {
-        assert!(policy_dfa_reference(1, 1) != mutant_policy_dfa_1(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_2() {
-        assert!(policy_dfa_reference(1, 1) != mutant_policy_dfa_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
-        assert!(policy_dfa_reference(1, 1) != mutant_policy_dfa_3(1, 1));
+    fn test_policy_dfa_phd_oracle() {
+        // PHD Gate: DFA run on trivial table stays at state 0; table-driven oracle
+        static TABLE: [usize; 3 * 256] = [0; 3 * 256];
+        let dfa = ConstantShapePolicyDfa::new_checked(&TABLE, 256, 3, 0, 0).unwrap();
+        let cases: &[(&[u8], usize)] = &[
+            (b"", 0),
+            (b"abc", 0),
+            (b"xyz", 0),
+        ];
+        for &(input, expected_state) in cases {
+            assert_eq!(dfa.run(input, 0), expected_state);
+        }
     }
 }
 

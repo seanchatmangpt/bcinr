@@ -79,32 +79,23 @@ pub const fn bucketize_u32(val: u32, step: u32) -> u32 {
 mod tests {
     use super::*;
 
-    // _reference equivalence boundaries
     fn fix_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
     }
 
-    fn mutant_fix_1(val: u64, aux: u64) -> u64 {
-        !fix_reference(val, aux)
-    }
-    fn mutant_fix_2(val: u64, aux: u64) -> u64 {
-        fix_reference(val, aux).wrapping_add(1)
-    }
-    fn mutant_fix_3(val: u64, aux: u64) -> u64 {
-        fix_reference(val, aux) ^ 0xFF
-    }
-
     #[test]
-    fn test_reference_and_mutants() {
+    fn test_fix_equivalence_and_boundaries() {
         assert_eq!(fix_reference(1, 2), 3);
         assert_eq!(fix_reference(0, 0), 0);
-        assert!(fix_reference(1, 1) != mutant_fix_1(1, 1));
-        assert!(fix_reference(1, 1) != mutant_fix_2(1, 1));
-        assert!(fix_reference(1, 1) != mutant_fix_3(1, 1));
-    }
-
-    #[test]
-    fn test_add_sat_table() {
+        // counterfactual mutants
+        let mutants: &[fn(u64, u64) -> u64] = &[
+            |v, a| !fix_reference(v, a),
+            |v, a| fix_reference(v, a).wrapping_add(1),
+            |v, a| fix_reference(v, a) ^ 0xFF,
+        ];
+        for (i, m) in mutants.iter().enumerate() {
+            assert_ne!(fix_reference(1, 1), m(1, 1), "mutant {i} did not diverge");
+        }
         // (a, b, expected)
         let cases: &[(u32, u32, u32)] = &[
             (0, 0, 0),

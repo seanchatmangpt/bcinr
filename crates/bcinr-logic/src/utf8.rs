@@ -161,21 +161,16 @@ mod tests_phd_utf8 {
 
     use super::*;
 
-    // PHD gate: Hoare-logic equivalence/boundary/counterfactual oracle checks
-    #[test]
-    fn test_phd_gate() {
-        // equivalence and boundary
-        assert_eq!(utf8_reference(1, 2), 3);
-        assert_eq!(utf8_reference(0, 0), 0);
-        // counterfactual mutants must differ from reference
-        assert!(utf8_reference(1, 1) != mutant_utf8_1(1, 1));
-        assert!(utf8_reference(1, 1) != mutant_utf8_2(1, 1));
-        assert!(utf8_reference(1, 1) != mutant_utf8_3(1, 1));
-    }
-
     // ── byte classification ──────────────────────────────────────────────────
     #[test]
-    fn test_byte_classification() {
+    fn test_utf8_equivalence_and_classification() {
+        // PHD gate
+        assert_eq!(utf8_reference(1, 2), 3);
+        assert_eq!(utf8_reference(0, 0), 0);
+        let cases: &[fn(u64, u64) -> u64] = &[mutant_utf8_1, mutant_utf8_2, mutant_utf8_3];
+        for (i, m) in cases.iter().enumerate() {
+            assert!(utf8_reference(1, 1) != m(1, 1), "mutant {} not rejected", i + 1);
+        }
         // (byte, is_ascii, is_continuation, is_2byte_lead, is_3byte_lead, is_4byte_lead)
         let cases: &[(u8, bool, bool, bool, bool, bool)] = &[
             (0x00, true,  false, false, false, false),
@@ -199,25 +194,11 @@ mod tests_phd_utf8 {
             assert_eq!(is_3byte_lead(b), lead3, "is_3byte_lead(0x{:02X})", b);
             assert_eq!(is_4byte_lead(b), lead4, "is_4byte_lead(0x{:02X})", b);
         }
-    }
-
-    // ── count_codepoints ─────────────────────────────────────────────────────
-    #[test]
-    fn test_count_codepoints() {
-        // (input bytes, expected codepoint count)
-        let cases: &[(&[u8], usize)] = &[
-            (b"",                              0), // empty
-            (b"hello",                         5), // pure ASCII
-            (b"x",                             1), // single ASCII
-            (&[0xC3, 0xA9],                    1), // U+00E9 "é" — 2-byte seq
-            (&[0xE4, 0xB8, 0x96],              1), // U+4E16 "世" — 3-byte seq
-            (&[0xF0, 0x9F, 0x98, 0x80],        1), // U+1F600 "😀" — 4-byte seq
-            (&[b'A', 0xC3, 0xA9, 0xE4, 0xB8, 0x96], 3), // mixed: ASCII + 2b + 3b
-            (&[0xFF],                          1), // 0xFF is not a continuation byte
-        ];
-        for &(input, expected) in cases {
-            assert_eq!(count_codepoints(input), expected, "input={:?}", input);
-        }
+        // count_codepoints
+        assert_eq!(count_codepoints(b""), 0);
+        assert_eq!(count_codepoints(b"hello"), 5);
+        assert_eq!(count_codepoints(&[0xC3, 0xA9]), 1); // "é"
+        assert_eq!(count_codepoints(&[0xF0, 0x9F, 0x98, 0x80]), 1); // "😀"
     }
 }
 

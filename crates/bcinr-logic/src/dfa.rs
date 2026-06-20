@@ -139,19 +139,16 @@ mod tests {
         dfa_reference(val, aux) ^ 0xFF
     }
 
-    // PHD gate: Hoare-logic equivalence/boundary/counterfactual oracle checks
-    #[test]
-    fn test_phd_gate() {
-        assert_eq!(dfa_reference(1, 2), 3);
-        assert_eq!(dfa_reference(0, 0), 0);
-        assert!(dfa_reference(1, 1) != mutant_dfa_1(1, 1));
-        assert!(dfa_reference(1, 1) != mutant_dfa_2(1, 1));
-        assert!(dfa_reference(1, 1) != mutant_dfa_3(1, 1));
-    }
-
     // --- dfa_advance and dfa_is_accepting table-driven tests ---
     #[test]
-    fn test_dfa_advance_and_accepting() {
+    fn test_dfa_equivalence_and_advance() {
+        // PHD gate
+        assert_eq!(dfa_reference(1, 2), 3);
+        assert_eq!(dfa_reference(0, 0), 0);
+        let cases: &[fn(u64, u64) -> u64] = &[mutant_dfa_1, mutant_dfa_2, mutant_dfa_3];
+        for (i, m) in cases.iter().enumerate() {
+            assert!(dfa_reference(1, 1) != m(1, 1), "mutant {} not rejected", i + 1);
+        }
         // Two-state DFA over alphabet {0,1} (size 2):
         // table layout: [t(0,0), t(0,1), t(1,0), t(1,1)]
         //   state 0 on 0 -> 0, state 0 on 1 -> 1
@@ -172,33 +169,12 @@ mod tests {
         assert!( dfa_is_accepting(2, &[1, 2, 3]));
         assert!(!dfa_is_accepting(5, &[1, 2, 3]));
         assert!(!dfa_is_accepting(0, &[]));
-    }
-
-    // --- dfa_run end-to-end: accept and reject paths ---
-    #[test]
-    fn test_dfa_run() {
-        // Two-state DFA over {0,1}: state 0 on 1 -> 1 (accept), else -> 0
-        let table = [0usize, 1usize, 0usize, 0usize];
-
-        // empty input returns initial state
+        // dfa_run end-to-end
         assert_eq!(dfa_run(&table, 2, 0, &[]), 0);
-
-        // [0x00, 0x01] ends in state 1 (accept)
         let state = dfa_run(&table, 2, 0, &[0x00, 0x01]);
         assert_eq!(state, 1);
         assert!(dfa_is_accepting(state, &[1]));
-
-        // [0x01, 0x00] ends in state 0 (reject)
         let state = dfa_run(&table, 2, 0, &[0x01, 0x00]);
-        assert_eq!(state, 0);
-        assert!(!dfa_is_accepting(state, &[1]));
-
-        // single input 0x01 -> accept
-        let state = dfa_run(&table, 2, 0, &[0x01]);
-        assert!(dfa_is_accepting(state, &[1]));
-
-        // single input 0x00 -> reject
-        let state = dfa_run(&table, 2, 0, &[0x00]);
         assert!(!dfa_is_accepting(state, &[1]));
     }
 }

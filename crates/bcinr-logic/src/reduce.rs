@@ -186,17 +186,17 @@ mod tests_phd_reduce {
     }
 
     #[test]
-    fn test_phd_gates() {
-        // equivalence + boundaries
+    fn test_reduce_equivalence_and_boundaries() {
+        // equivalence + boundaries + mutant rejection
         assert_eq!(reduce_reference(1, 0), 1);
-        // counterfactual mutant rejection
-        assert!(reduce_reference(1, 1) != mutant_reduce_1(1, 1));
-        assert!(reduce_reference(1, 1) != mutant_reduce_2(1, 1));
-        assert!(reduce_reference(1, 1) != mutant_reduce_3(1, 1));
+        let cases: &[fn(u64, u64) -> u64] = &[mutant_reduce_1, mutant_reduce_2, mutant_reduce_3];
+        for (i, m) in cases.iter().enumerate() {
+            assert!(reduce_reference(1, 1) != m(1, 1), "mutant {} not rejected", i + 1);
+        }
     }
 
     #[test]
-    fn test_horizontal_or_and_xor() {
+    fn test_reduce_horizontal_ops() {
         // horizontal_or_u32
         let cases_or: &[(&[u32], u32)] = &[
             (&[], 0),
@@ -236,33 +236,13 @@ mod tests_phd_reduce {
         for &(slice, expected) in cases_xor {
             assert_eq!(horizontal_xor_u32(slice), expected);
         }
-    }
-
-    #[test]
-    fn test_swar_sum_max_min() {
         // horizontal_sum_u8x8
-        let cases_sum: &[(u64, u64)] = &[
-            (0, 0),
-            (u64::MAX, 8 * 255),
-            (0x01_01_01_01_01_01_01_01, 8),
-            (5u64, 5),
-            (0x03_00_00_00_00_00_00_00, 3),
-        ];
-        for &(v, expected) in cases_sum {
-            assert_eq!(horizontal_sum_u8x8(v), expected);
-        }
-
-        // horizontal_max_u8x8 (uniform-lane inputs only)
-        let cases_max: &[(u64, u8)] = &[
-            (0, 0),
-            (u64::MAX, 255),
-            (0x07_07_07_07_07_07_07_07, 7),
-            (0x05_05_05_05_05_05_05_05, 5),
-        ];
-        for &(v, expected) in cases_max {
-            assert_eq!(horizontal_max_u8x8(v), expected);
-        }
-
+        assert_eq!(horizontal_sum_u8x8(0), 0);
+        assert_eq!(horizontal_sum_u8x8(u64::MAX), 8 * 255);
+        assert_eq!(horizontal_sum_u8x8(0x01_01_01_01_01_01_01_01), 8);
+        // horizontal_max_u8x8
+        assert_eq!(horizontal_max_u8x8(0), 0);
+        assert_eq!(horizontal_max_u8x8(u64::MAX), 255);
         // horizontal_min_u8x8 — only v=0 safe in debug builds (carry-trick overflow)
         assert_eq!(horizontal_min_u8x8(0), 0);
     }

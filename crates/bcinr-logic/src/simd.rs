@@ -136,19 +136,16 @@ mod tests_phd_simd {
         simd_reference(val, aux) ^ 0xFF
     }
 
-    // PHD gate: Hoare-logic equivalence/boundary/counterfactual oracle checks
-    #[test]
-    fn test_phd_gate() {
-        assert_eq!(simd_reference(1, 2), 3);
-        assert_eq!(simd_reference(0, 0), 0);
-        assert!(simd_reference(1, 1) != mutant_simd_1(1, 1));
-        assert!(simd_reference(1, 1) != mutant_simd_2(1, 1));
-        assert!(simd_reference(1, 1) != mutant_simd_3(1, 1));
-    }
-
     // --- splat_u8x16 and movemask_u8x16 correctness + round-trip ---
     #[test]
-    fn test_splat_and_movemask() {
+    fn test_simd_equivalence_and_splat() {
+        // PHD gate
+        assert_eq!(simd_reference(1, 2), 3);
+        assert_eq!(simd_reference(0, 0), 0);
+        let cases: &[fn(u64, u64) -> u64] = &[mutant_simd_1, mutant_simd_2, mutant_simd_3];
+        for (i, m) in cases.iter().enumerate() {
+            assert!(simd_reference(1, 1) != m(1, 1), "mutant {} not rejected", i + 1);
+        }
         // splat: boundary values and arbitrary
         assert_eq!(splat_u8x16(0), [0u8; 16]);
         assert_eq!(splat_u8x16(255), [255u8; 16]);

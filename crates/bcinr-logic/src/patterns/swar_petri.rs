@@ -58,36 +58,25 @@ impl<const WORDS: usize, const TRANSITIONS: usize> PriorityPetriEngine<WORDS, TR
 
 #[cfg(test)]
 mod tests_petri_engine {
+    use super::*;
+    use crate::models::petri::KBitSet;
 
-    fn petri_engine_reference(val: u64, aux: u64) -> u64 {
-        val ^ aux
-    }
     #[test]
-    fn test_equivalence() {
-        assert_eq!(petri_engine_reference(1, 0), 1);
-    }
-    #[test]
-    fn test_boundaries() {}
-    fn mutant_petri_engine_1(val: u64, aux: u64) -> u64 {
-        !petri_engine_reference(val, aux)
-    }
-    fn mutant_petri_engine_2(val: u64, aux: u64) -> u64 {
-        petri_engine_reference(val, aux).wrapping_add(1)
-    }
-    fn mutant_petri_engine_3(val: u64, aux: u64) -> u64 {
-        petri_engine_reference(val, aux) ^ 0xFF
-    }
-    #[test]
-    fn test_rejects_mutant_1() {
-        assert!(petri_engine_reference(1, 1) != mutant_petri_engine_1(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_2() {
-        assert!(petri_engine_reference(1, 1) != mutant_petri_engine_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
-        assert!(petri_engine_reference(1, 1) != mutant_petri_engine_3(1, 1));
+    fn test_swar_petri_phd_oracle() {
+        // PHD Gate: step transitions state from input to output mask
+        let cases: &[(u64, u64, u64)] = &[
+            (0b01, 0b01, 0b10),
+            (0b10, 0b10, 0b01),
+        ];
+        for &(init, inp, out) in cases {
+            let initial = KBitSet { words: [init] };
+            let inputs = [KBitSet { words: [inp] }];
+            let outputs = [KBitSet { words: [out] }];
+            let mut engine = PriorityPetriEngine::new_checked(initial, inputs, outputs).unwrap();
+            let mask = engine.step();
+            assert_eq!(mask & 1, 1);
+            assert_eq!(engine.state.current.words[0], out);
+        }
     }
 }
 

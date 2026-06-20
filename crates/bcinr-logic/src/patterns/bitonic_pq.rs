@@ -67,50 +67,26 @@ impl BitonicPriorityQueue8 {
 
 #[cfg(test)]
 mod tests {
-    #[allow(dead_code)]
-    fn bitonic_pq_reference(val: u64, aux: u64) -> u64 {
-        val ^ aux
-    }
-
     use super::*;
-    fn pq_reference(val: u64, aux: u64) -> u64 {
-        val ^ aux
-    }
+
     #[test]
-    fn test_equivalence() {
-        assert_eq!(pq_reference(1, 0), 1);
-    }
-    #[test]
-    fn test_boundaries() {
-        let mut pq = BitonicPriorityQueue8::new();
-        pq.push(100);
-        pq.push(50);
-        pq.push(150);
-        let (v1, _) = pq.pop();
-        assert_eq!(v1, 50);
-        let (v2, _) = pq.pop();
-        assert_eq!(v2, 100);
-    }
-    fn mutant_pq_1(val: u64, aux: u64) -> u64 {
-        !pq_reference(val, aux)
-    }
-    fn mutant_pq_2(val: u64, aux: u64) -> u64 {
-        pq_reference(val, aux).wrapping_add(1)
-    }
-    fn mutant_pq_3(val: u64, aux: u64) -> u64 {
-        pq_reference(val, aux) ^ 0xFF
-    }
-    #[test]
-    fn test_rejects_mutant_1() {
-        assert!(pq_reference(1, 1) != mutant_pq_1(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_2() {
-        assert!(pq_reference(1, 1) != mutant_pq_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
-        assert!(pq_reference(1, 1) != mutant_pq_3(1, 1));
+    fn test_bitonic_pq_phd_oracle() {
+        // PHD Gate: min-heap ordering maintained branchlessly; table-driven push/pop
+        let cases: &[(&[u32], &[u32])] = &[
+            (&[100, 50, 150], &[50, 100, 150]),
+            (&[1, 2, 3], &[1, 2, 3]),
+            (&[9, 3, 6], &[3, 6, 9]),
+        ];
+        for &(pushes, pops) in cases {
+            let mut pq = BitonicPriorityQueue8::new();
+            for &v in pushes {
+                pq.push(v);
+            }
+            for &expected in pops {
+                let (v, _) = pq.pop();
+                assert_eq!(v, expected);
+            }
+        }
     }
 }
 

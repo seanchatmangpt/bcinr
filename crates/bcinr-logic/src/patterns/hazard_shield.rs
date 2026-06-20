@@ -70,48 +70,20 @@ impl<const MAX_THREADS: usize> HazardShield<MAX_THREADS> {
 
 #[cfg(test)]
 mod tests {
-    #[allow(dead_code)]
-    fn hazard_shield_reference(val: u64, aux: u64) -> u64 {
-        val ^ aux
-    }
-
     use super::*;
-    fn hazard_reference(val: u64, aux: u64) -> u64 {
-        val ^ aux
-    }
+
     #[test]
-    fn test_equivalence() {
-        assert_eq!(hazard_reference(1, 0), 1);
-    }
-    #[test]
-    fn test_boundaries() {
+    fn test_hazard_shield_phd_oracle() {
+        // PHD Gate: protect sets shielded, release clears it; table-driven addresses
         let shield = HazardShield::<4>::new();
-        shield.protect(0, 0x1234);
-        assert_ne!(shield.is_shielded(0x1234), 0);
-        assert_eq!(shield.is_shielded(0x5678), 0);
-        shield.release(0);
-        assert_eq!(shield.is_shielded(0x1234), 0);
-    }
-    fn mutant_hazard_1(val: u64, aux: u64) -> u64 {
-        !hazard_reference(val, aux)
-    }
-    fn mutant_hazard_2(val: u64, aux: u64) -> u64 {
-        hazard_reference(val, aux).wrapping_add(1)
-    }
-    fn mutant_hazard_3(val: u64, aux: u64) -> u64 {
-        hazard_reference(val, aux) ^ 0xFF
-    }
-    #[test]
-    fn test_rejects_mutant_1() {
-        assert!(hazard_reference(1, 1) != mutant_hazard_1(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_2() {
-        assert!(hazard_reference(1, 1) != mutant_hazard_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
-        assert!(hazard_reference(1, 1) != mutant_hazard_3(1, 1));
+        let cases: &[(usize, usize)] = &[(0, 0x1234), (1, 0xDEAD), (2, 0xBEEF), (3, 0xCAFE)];
+        for &(slot, addr) in cases {
+            shield.protect(slot, addr);
+            assert_ne!(shield.is_shielded(addr), 0);
+            assert_eq!(shield.is_shielded(addr ^ 0xFF), 0);
+            shield.release(slot);
+            assert_eq!(shield.is_shielded(addr), 0);
+        }
     }
 }
 

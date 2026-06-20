@@ -97,19 +97,16 @@ mod tests {
 
     use super::*;
 
-    // PHD gate: Hoare-logic equivalence/boundary/counterfactual oracle checks
-    #[test]
-    fn test_phd_gate() {
-        assert_eq!(parse_reference(1, 2), 3);
-        assert_eq!(parse_reference(0, 0), 0);
-        assert!(parse_reference(1, 1) != mutant_parse_1(1, 1));
-        assert!(parse_reference(1, 1) != mutant_parse_2(1, 1));
-        assert!(parse_reference(1, 1) != mutant_parse_3(1, 1));
-    }
-
     // ── skip_whitespace ───────────────────────────────────────────────────────
     #[test]
-    fn test_skip_whitespace() {
+    fn test_parse_equivalence_and_whitespace() {
+        // PHD gate
+        assert_eq!(parse_reference(1, 2), 3);
+        assert_eq!(parse_reference(0, 0), 0);
+        let cases: &[fn(u64, u64) -> u64] = &[mutant_parse_1, mutant_parse_2, mutant_parse_3];
+        for (i, m) in cases.iter().enumerate() {
+            assert!(parse_reference(1, 1) != m(1, 1), "mutant {} not rejected", i + 1);
+        }
         // (input, expected_skip_count)
         let cases: &[(&[u8], usize)] = &[
             (b"",           0), // empty
