@@ -38,14 +38,6 @@ mod tests {
     fn swar_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
     }
-    #[test]
-    fn test_equivalence() {
-        assert_eq!(swar_reference(1, 2), 3);
-    }
-    #[test]
-    fn test_boundaries() {
-        assert_eq!(swar_reference(0, 0), 0);
-    }
     fn mutant_swar_1(val: u64, aux: u64) -> u64 {
         !swar_reference(val, aux)
     }
@@ -55,48 +47,30 @@ mod tests {
     fn mutant_swar_3(val: u64, aux: u64) -> u64 {
         swar_reference(val, aux) ^ 0xFF
     }
+
     #[test]
-    fn test_rejects_mutant_1() {
+    fn test_reference_and_mutants() {
+        assert_eq!(swar_reference(1, 2), 3);
+        assert_eq!(swar_reference(0, 0), 0);
         assert!(swar_reference(1, 1) != mutant_swar_1(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_2() {
         assert!(swar_reference(1, 1) != mutant_swar_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
         assert!(swar_reference(1, 1) != mutant_swar_3(1, 1));
     }
 
-    // --- swar_mask_ones ---
-
     #[test]
-    fn mask_ones_zero_returns_zero() {
-        assert_eq!(swar_mask_ones(0), 0);
-    }
-
-    #[test]
-    fn mask_ones_all_ones_returns_all_ones() {
-        assert_eq!(swar_mask_ones(u64::MAX), u64::MAX);
-    }
-
-    #[test]
-    fn mask_ones_single_bit_identity() {
-        assert_eq!(swar_mask_ones(1u64), 1u64);
-        assert_eq!(swar_mask_ones(1u64 << 63), 1u64 << 63);
-    }
-
-    #[test]
-    fn mask_ones_alternating_bits_identity() {
-        let alternating = 0xAAAA_AAAA_AAAA_AAAAu64;
-        assert_eq!(swar_mask_ones(alternating), alternating);
-    }
-
-    #[test]
-    fn mask_ones_packed_byte_lanes_identity() {
-        // representative packed byte word: each lane has a distinct value
-        let packed = 0x01_02_03_04_05_06_07_08u64;
-        assert_eq!(swar_mask_ones(packed), packed);
+    fn test_mask_ones_table() {
+        // swar_mask_ones is an identity function; verify across representative values
+        let cases: &[u64] = &[
+            0,
+            1,
+            1u64 << 63,
+            u64::MAX,
+            0xAAAA_AAAA_AAAA_AAAAu64,
+            0x01_02_03_04_05_06_07_08u64,
+        ];
+        for &val in cases {
+            assert_eq!(swar_mask_ones(val), val, "swar_mask_ones({val:#x})");
+        }
     }
 }
 

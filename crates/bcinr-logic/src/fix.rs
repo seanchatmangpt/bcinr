@@ -84,16 +84,6 @@ mod tests {
         val ^ aux
     }
 
-    #[test]
-    fn test_equivalence() {
-        assert_eq!(fix_reference(1, 2), 3);
-    }
-
-    #[test]
-    fn test_boundaries() {
-        assert_eq!(fix_reference(0, 0), 0);
-    }
-
     fn mutant_fix_1(val: u64, aux: u64) -> u64 {
         !fix_reference(val, aux)
     }
@@ -105,134 +95,67 @@ mod tests {
     }
 
     #[test]
-    fn test_rejects_mutant_1() {
+    fn test_reference_and_mutants() {
+        assert_eq!(fix_reference(1, 2), 3);
+        assert_eq!(fix_reference(0, 0), 0);
         assert!(fix_reference(1, 1) != mutant_fix_1(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_2() {
         assert!(fix_reference(1, 1) != mutant_fix_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
         assert!(fix_reference(1, 1) != mutant_fix_3(1, 1));
     }
 
-    // --- add_sat ---
-
     #[test]
-    fn test_fix_add_sat_zero_zero() {
-        assert_eq!(add_sat(0, 0), 0);
+    fn test_add_sat_table() {
+        // (a, b, expected)
+        let cases: &[(u32, u32, u32)] = &[
+            (0, 0, 0),
+            (42, 0, 42),
+            (0, 42, 42),
+            (10, 20, 30),
+            (u32::MAX, 1, u32::MAX),
+            (u32::MAX, u32::MAX, u32::MAX),
+            (u32::MAX - 1, 1, u32::MAX),
+            (u32::MAX - 5, 5, u32::MAX),
+        ];
+        for &(a, b, expected) in cases {
+            assert_eq!(add_sat(a, b), expected, "add_sat({a}, {b})");
+        }
     }
 
     #[test]
-    fn test_fix_add_sat_identity() {
-        assert_eq!(add_sat(42, 0), 42);
-        assert_eq!(add_sat(0, 42), 42);
-    }
+    fn test_clamp_and_bucketize_table() {
+        // clamp_u32: (val, min, max, expected)
+        let clamp_cases: &[(u32, u32, u32, u32)] = &[
+            (0, 0, 0, 0),
+            (5, 0, 10, 5),
+            (0, 3, 10, 3),
+            (15, 0, 10, 10),
+            (3, 3, 10, 3),
+            (10, 3, 10, 10),
+            (u32::MAX, 0, 100, 100),
+            (u32::MAX, 0, u32::MAX, u32::MAX),
+        ];
+        for &(val, lo, hi, expected) in clamp_cases {
+            assert_eq!(clamp_u32(val, lo, hi), expected, "clamp_u32({val}, {lo}, {hi})");
+        }
 
-    #[test]
-    fn test_fix_add_sat_normal_sum() {
-        assert_eq!(add_sat(10, 20), 30);
-    }
-
-    #[test]
-    fn test_fix_add_sat_overflow_saturates_to_max() {
-        assert_eq!(add_sat(u32::MAX, 1), u32::MAX);
-        assert_eq!(add_sat(u32::MAX, u32::MAX), u32::MAX);
-    }
-
-    #[test]
-    fn test_fix_add_sat_near_max_no_overflow() {
-        // u32::MAX - 1 + 1 == u32::MAX, no overflow
-        assert_eq!(add_sat(u32::MAX - 1, 1), u32::MAX);
-    }
-
-    #[test]
-    fn test_fix_add_sat_near_max_exact_boundary() {
-        // u32::MAX - 5 + 5 is exactly u32::MAX, still no overflow
-        assert_eq!(add_sat(u32::MAX - 5, 5), u32::MAX);
-    }
-
-    // --- clamp_u32 ---
-
-    #[test]
-    fn test_fix_clamp_u32_zero_all() {
-        assert_eq!(clamp_u32(0, 0, 0), 0);
-    }
-
-    #[test]
-    fn test_fix_clamp_u32_within_range() {
-        assert_eq!(clamp_u32(5, 0, 10), 5);
-    }
-
-    #[test]
-    fn test_fix_clamp_u32_below_min() {
-        assert_eq!(clamp_u32(0, 3, 10), 3);
-    }
-
-    #[test]
-    fn test_fix_clamp_u32_above_max() {
-        assert_eq!(clamp_u32(15, 0, 10), 10);
-    }
-
-    #[test]
-    fn test_fix_clamp_u32_at_min_boundary() {
-        assert_eq!(clamp_u32(3, 3, 10), 3);
-    }
-
-    #[test]
-    fn test_fix_clamp_u32_at_max_boundary() {
-        assert_eq!(clamp_u32(10, 3, 10), 10);
-    }
-
-    #[test]
-    fn test_fix_clamp_u32_max_value_above_range() {
-        assert_eq!(clamp_u32(u32::MAX, 0, 100), 100);
-    }
-
-    #[test]
-    fn test_fix_clamp_u32_max_value_at_ceiling() {
-        assert_eq!(clamp_u32(u32::MAX, 0, u32::MAX), u32::MAX);
-    }
-
-    // --- bucketize_u32 ---
-
-    #[test]
-    fn test_fix_bucketize_u32_zero_val() {
-        assert_eq!(bucketize_u32(0, 8), 0);
-    }
-
-    #[test]
-    fn test_fix_bucketize_u32_exact_multiple() {
-        assert_eq!(bucketize_u32(16, 8), 16);
-        assert_eq!(bucketize_u32(8, 8), 8);
-    }
-
-    #[test]
-    fn test_fix_bucketize_u32_rounds_down() {
-        assert_eq!(bucketize_u32(17, 5), 15);
-        assert_eq!(bucketize_u32(9, 5), 5);
-    }
-
-    #[test]
-    fn test_fix_bucketize_u32_step_one_identity() {
-        assert_eq!(bucketize_u32(42, 1), 42);
-        assert_eq!(bucketize_u32(0, 1), 0);
-    }
-
-    #[test]
-    fn test_fix_bucketize_u32_zero_step_safe() {
-        // zero step: wrapping_div uses effective step=1, then wrapping_mul(0) gives 0
-        // this avoids a division-by-zero trap while producing a defined result
-        assert_eq!(bucketize_u32(9, 0), 0);
-        assert_eq!(bucketize_u32(0, 0), 0);
-    }
-
-    #[test]
-    fn test_fix_bucketize_u32_max_value() {
+        // bucketize_u32: (val, step, expected)
+        let bucket_cases: &[(u32, u32, u32)] = &[
+            (0, 8, 0),
+            (16, 8, 16),
+            (8, 8, 8),
+            (17, 5, 15),
+            (9, 5, 5),
+            (42, 1, 42),
+            (0, 1, 0),
+            (9, 0, 0),
+            (0, 0, 0),
+        ];
+        for &(val, step, expected) in bucket_cases {
+            assert_eq!(bucketize_u32(val, step), expected, "bucketize_u32({val}, {step})");
+        }
         let v = bucketize_u32(u32::MAX, 100);
-        debug_assert!(v <= u32::MAX);
-        debug_assert_eq!(v % 100, 0);
+        assert!(v <= u32::MAX);
+        assert_eq!(v % 100, 0);
     }
 }
 
