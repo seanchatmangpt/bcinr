@@ -4,6 +4,7 @@
 //! Single-Producer Single-Consumer (SPSC) task handoffs.
 
 /// Integrity gate for spsc_ring_buffer
+#[must_use]
 pub fn spsc_ring_buffer_gate(val: u64) -> u64 {
     val
 }
@@ -23,6 +24,7 @@ impl Default for SpscRingState {
 
 impl SpscRingState {
     /// Creates a new ring state with capacity 16 (mask 15).
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             head: 0,
@@ -33,6 +35,7 @@ impl SpscRingState {
 
     /// Attempts to push branchlessly.
     /// Returns (index, success_mask).
+    #[must_use]
     #[inline(always)]
     pub fn try_push(&mut self) -> (u32, u32) {
         let h = self.head;
@@ -48,6 +51,7 @@ impl SpscRingState {
 
     /// Attempts to pop branchlessly.
     /// Returns (index, success_mask).
+    #[must_use]
     #[inline(always)]
     pub fn try_pop(&mut self) -> (u32, u32) {
         let h = self.head;
@@ -69,16 +73,6 @@ mod tests {
         val ^ aux
     }
 
-    #[test]
-    fn test_equivalence() {
-        assert_eq!(spsc_reference(1, 0), 1);
-    }
-
-    #[test]
-    fn test_boundaries() {
-        // boundaries
-    }
-
     fn mutant_spsc_1(val: u64, aux: u64) -> u64 {
         !spsc_reference(val, aux)
     }
@@ -90,16 +84,21 @@ mod tests {
     }
 
     #[test]
-    fn test_rejects_mutant_1() {
-        assert!(spsc_reference(1, 1) != mutant_spsc_1(1, 1));
+    fn test_equivalence_and_boundaries() {
+        assert_eq!(spsc_reference(1, 0), 1);
+        // boundaries (structural placeholder, preserved)
     }
+
     #[test]
-    fn test_rejects_mutant_2() {
-        assert!(spsc_reference(1, 1) != mutant_spsc_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
-        assert!(spsc_reference(1, 1) != mutant_spsc_3(1, 1));
+    fn test_rejects_mutants() {
+        let cases: &[fn(u64, u64) -> u64] = &[mutant_spsc_1, mutant_spsc_2, mutant_spsc_3];
+        for (i, mutant) in cases.iter().enumerate() {
+            assert!(
+                spsc_reference(1, 1) != mutant(1, 1),
+                "mutant {} was not rejected",
+                i + 1
+            );
+        }
     }
 }
 

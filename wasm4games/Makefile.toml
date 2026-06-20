@@ -1,0 +1,79 @@
+[config]
+skip_core_tasks = false
+default_to_workspace = true
+
+[env]
+CARGO_INCREMENTAL = "0"
+RUSTFLAGS = "-D warnings"
+
+[tasks.check]
+category = "Build"
+description = "Verify workspace compiles"
+command = "cargo"
+args = ["check", "--workspace", "--all-targets", "--all-features"]
+
+[tasks.build]
+category = "Build"
+description = "Build the workspace in release mode"
+command = "cargo"
+args = ["build", "--workspace", "--release", "--all-features"]
+
+[tasks.test]
+category = "Test"
+description = "Run all workspace tests"
+command = "cargo"
+args = ["test", "--workspace", "--all-features", "--all-targets"]
+
+[tasks.clippy]
+category = "Lint"
+description = "Run clippy with strict lints"
+command = "cargo"
+args = ["clippy", "--workspace", "--all-targets", "--all-features", "--", "-D", "warnings"]
+
+[tasks.fmt]
+category = "Lint"
+description = "Check formatting"
+command = "cargo"
+args = ["fmt", "--all", "--", "--check"]
+
+[tasks.audit]
+category = "Security"
+description = "Run cargo audit for vulnerabilities"
+command = "cargo"
+args = ["audit"]
+
+[tasks.docs]
+category = "Documentation"
+description = "Build all documentation"
+command = "cargo"
+args = ["doc", "--workspace", "--all-features", "--no-deps", "--document-private-items"]
+
+[tasks.clean]
+category = "Cleanup"
+description = "Clean build artifacts"
+command = "cargo"
+args = ["clean"]
+
+[tasks.wasm-check]
+category = "Build"
+description = "Compile the wasm4games alloc-free core to wasm32 (requires the target)"
+workspace = false
+command = "cargo"
+args = ["build", "-p", "wasm4games", "--target", "wasm32-unknown-unknown", "--no-default-features"]
+
+[tasks.ggen-sync]
+category = "Codegen"
+description = "Regenerate wasm4games kernels via ggen, then format (developer-only; requires ggen)"
+workspace = false
+script = [
+    "cd crates/wasm4games/ggen && ggen sync",
+    "cargo fmt -p wasm4games",
+]
+
+[tasks.ci]
+category = "CI"
+description = "Comprehensive CI pipeline"
+dependencies = ["fmt", "check", "clippy", "test", "audit"]
+
+[tasks.default]
+alias = "ci"

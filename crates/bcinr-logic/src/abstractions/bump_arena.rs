@@ -4,6 +4,7 @@
 //! O(1) memory allocation without heap fragmentation.
 
 /// Integrity gate for bump_arena
+#[must_use]
 pub fn bump_arena_gate(val: u64) -> u64 {
     val
 }
@@ -15,8 +16,15 @@ pub struct BumpArenaState {
 }
 
 impl BumpArenaState {
+    /// Creates a new zero-initialized arena state.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self { offset: 0, capacity: 0 }
+    }
+
     /// Attempts to allocate `size` bytes branchlessly.
     /// Returns (offset, success_mask).
+    #[must_use]
     #[inline(always)]
     pub fn try_alloc(&mut self, size: u32) -> (u32, u32) {
         let current_offset = self.offset;
@@ -36,16 +44,6 @@ mod tests {
         val ^ aux
     }
 
-    #[test]
-    fn test_equivalence() {
-        assert_eq!(bump_arena_reference(1, 0), 1);
-    }
-
-    #[test]
-    fn test_boundaries() {
-        // boundaries
-    }
-
     fn mutant_bump_1(val: u64, aux: u64) -> u64 {
         !bump_arena_reference(val, aux)
     }
@@ -57,16 +55,21 @@ mod tests {
     }
 
     #[test]
-    fn test_rejects_mutant_1() {
-        assert!(bump_arena_reference(1, 1) != mutant_bump_1(1, 1));
+    fn test_equivalence_and_boundaries() {
+        assert_eq!(bump_arena_reference(1, 0), 1);
+        // boundaries (structural placeholder, preserved)
     }
+
     #[test]
-    fn test_rejects_mutant_2() {
-        assert!(bump_arena_reference(1, 1) != mutant_bump_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
-        assert!(bump_arena_reference(1, 1) != mutant_bump_3(1, 1));
+    fn test_rejects_mutants() {
+        let cases: &[fn(u64, u64) -> u64] = &[mutant_bump_1, mutant_bump_2, mutant_bump_3];
+        for (i, mutant) in cases.iter().enumerate() {
+            assert!(
+                bump_arena_reference(1, 1) != mutant(1, 1),
+                "mutant {} was not rejected",
+                i + 1
+            );
+        }
     }
 }
 

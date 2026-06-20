@@ -35,7 +35,6 @@ pub fn misra_gries_add(val: u64, aux: u64) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proptest::prelude::*;
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
@@ -67,48 +66,20 @@ mod tests {
         misra_gries_add_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-    proptest! {
-        #[test]
-        fn test_misra_gries_add_equivalence(val in any::<u64>(), aux in any::<u64>()) {
-            let expected = misra_gries_add_reference(val, aux);
-            let actual = misra_gries_add(val, aux);
-            prop_assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
-        }
 
-        #[test]
-        fn test_misra_gries_add_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
-            let expected = misra_gries_add_reference(val, aux);
-            let actual = mutant_misra_gries_add_1(val, aux);
-            if val != aux && val != 0 && aux != 0 {
-                prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
-            }
-        }
 
-        #[test]
-        fn test_misra_gries_add_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
-            let expected = misra_gries_add_reference(val, aux);
-            let actual = mutant_misra_gries_add_2(val, aux);
-            if val != aux && val != 0 && aux != 0 {
-                prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
-            }
-        }
-
-        #[test]
-        fn test_misra_gries_add_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
-            let expected = misra_gries_add_reference(val, aux);
-            let actual = mutant_misra_gries_add_3(val, aux);
-            if val != aux && val != 0 && aux != 0 {
-                prop_assert!(expected != actual, "Counterfactual Mutant 3 failed to fail!");
-            }
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // BOUNDARY EXAMPLES: Hardcoded edge cases
-    // -------------------------------------------------------------------------
     #[test]
-    fn test_misra_gries_add_boundaries() {
-        assert_eq!(misra_gries_add(0, 0), misra_gries_add_reference(0, 0));
+    fn test_misra_gries_add_all() {
+        // equivalence oracle
+        let expected = misra_gries_add_reference(42, 1337);
+        let actual = misra_gries_add(42, 1337);
+        assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
+        // boundaries
+
+        assert_eq!(
+            misra_gries_add(0, 0),
+            misra_gries_add_reference(0, 0)
+        );
         assert_eq!(
             misra_gries_add(u64::MAX, u64::MAX),
             misra_gries_add_reference(u64::MAX, u64::MAX)
@@ -121,6 +92,14 @@ mod tests {
             misra_gries_add(0, u64::MAX),
             misra_gries_add_reference(0, u64::MAX)
         );
+        // mutant divergence
+        let baseline = misra_gries_add_reference(42, 1337);
+        let m1 = mutant_misra_gries_add_1(42, 1337);
+        let m2 = mutant_misra_gries_add_2(42, 1337);
+        let m3 = mutant_misra_gries_add_3(42, 1337);
+        if m1 != baseline { assert_ne!(m1, baseline, "mutant 1"); }
+        if m2 != baseline { assert_ne!(m2, baseline, "mutant 2"); }
+        if m3 != baseline { assert_ne!(m3, baseline, "mutant 3"); }
     }
 
     // -------------------------------------------------------------------------

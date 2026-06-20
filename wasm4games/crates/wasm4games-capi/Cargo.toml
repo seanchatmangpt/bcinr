@@ -1,0 +1,19 @@
+[package]
+name = "wasm4games-capi"
+version = "26.6.13"
+edition = "2021"
+rust-version = "1.70"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/seanchatmangpt/wasm4games"
+description = "C ABI staticlib surface over wasm4games kernels — the cross-language portability proof"
+readme = "README.md"
+publish = false
+
+[lib]
+crate-type = ["lib", "staticlib"]
+
+[dependencies]
+# Offline-pure: only the no_std wasm4games core (no git/network deps), so this is safe
+# as a workspace member and builds in CI. Contrast with wasm4games-wasm4pm (excluded:
+# it pulls the external wasm4pm git repos).
+wasm4games = { path = "../wasm4games" }

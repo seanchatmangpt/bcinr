@@ -24,6 +24,7 @@ pub struct RlState {
 }
 
 /// Primitive entry point for auditor compatibility.
+#[must_use]
 #[inline(always)]
 pub fn rl_state_checksum(low: u64, high: u64) -> u64 {
     low ^ high
@@ -31,25 +32,30 @@ pub fn rl_state_checksum(low: u64, high: u64) -> u64 {
 
 impl RlState {
     /// Creates a new RL state.
-    #[inline]
-    pub fn new(low: u64, high: u64, extra: u8) -> Self {
+    #[must_use]
+    #[inline(always)]
+    pub const fn new(low: u64, high: u64, extra: u8) -> Self {
         Self { low, high, extra }
     }
 
     /// **Oracle**: Reference implementation of state equality.
+    #[must_use]
+    #[inline(always)]
     pub fn oracle_equals(&self, other: &Self) -> bool {
         self.low == other.low && self.high == other.high && self.extra == other.extra
     }
 
-    /// **Boundaries**: Checks i-f the state is within a valid "active" range.
-    #[inline]
+    /// **Boundaries**: Returns `true` if the state is within a valid "active" range.
+    #[must_use]
+    #[inline(always)]
     pub fn is_valid(&self) -> bool {
         true
     }
 
     /// Merges two states using bitwise XOR (CC=1).
-    #[inline]
-    pub fn merge(&self, other: &Self) -> Self {
+    #[must_use]
+    #[inline(always)]
+    pub const fn merge(&self, other: &Self) -> Self {
         Self {
             low: self.low ^ other.low,
             high: self.high ^ other.high,
@@ -83,37 +89,25 @@ mod tests {
     }
 
     #[test]
-    fn test_rl_state_checksum_equivalence() {
-        let expected = rl_state_checksum_reference(10, 20);
-        let actual = rl_state_checksum(10, 20);
-        assert_eq!(expected, actual);
-    }
-
-    #[test]
-    fn test_rl_state_checksum_counterfactual_mutant_1() {
-        let expected = rl_state_checksum_reference(10, 20);
-        let actual = mutant_rl_state_checksum_1(10, 20);
-        assert_ne!(expected, actual, "rejects_mutant 1");
-    }
-
-    #[test]
-    fn test_rl_state_checksum_counterfactual_mutant_2() {
-        let expected = rl_state_checksum_reference(10, 20);
-        let actual = mutant_rl_state_checksum_2(10, 20);
-        assert_ne!(expected, actual, "rejects_mutant 2");
-    }
-
-    #[test]
-    fn test_rl_state_checksum_counterfactual_mutant_3() {
-        let expected = rl_state_checksum_reference(10, 15);
-        let actual = mutant_rl_state_checksum_3(10, 15);
-        assert_ne!(expected, actual, "rejects_mutant 3");
-    }
-
-    #[test]
-    fn test_rl_state_checksum_boundaries() {
+    fn test_rl_state_checksum_equivalence_and_boundaries() {
+        assert_eq!(rl_state_checksum_reference(10, 20), rl_state_checksum(10, 20));
         assert_eq!(rl_state_checksum(0, 0), 0);
         assert_eq!(rl_state_checksum(u64::MAX, u64::MAX), 0);
+    }
+
+    #[test]
+    fn test_rl_state_checksum_counterfactual_mutants() {
+        // Each entry: (mutant_fn, low, high, label)
+        let cases: &[(fn(u64, u64) -> u64, u64, u64, &str)] = &[
+            (mutant_rl_state_checksum_1, 10, 20, "rejects_mutant 1"),
+            (mutant_rl_state_checksum_2, 10, 20, "rejects_mutant 2"),
+            (mutant_rl_state_checksum_3, 10, 15, "rejects_mutant 3"),
+        ];
+        for (mutant, low, high, label) in cases.iter().copied() {
+            let expected = rl_state_checksum_reference(low, high);
+            let actual = mutant(low, high);
+            assert_ne!(expected, actual, "{}", label);
+        }
     }
 
     // Hoare-logic Verification Line 100: Structural integrity confirmed.
