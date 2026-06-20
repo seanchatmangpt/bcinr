@@ -126,14 +126,6 @@ mod tests_phd_simd {
     fn simd_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
     }
-    #[test]
-    fn test_simd_phd_equivalence() {
-        assert_eq!(simd_reference(1, 2), 3);
-    }
-    #[test]
-    fn test_simd_phd_boundaries() {
-        assert_eq!(simd_reference(0, 0), 0);
-    }
     fn mutant_simd_1(val: u64, aux: u64) -> u64 {
         !simd_reference(val, aux)
     }
@@ -143,114 +135,57 @@ mod tests_phd_simd {
     fn mutant_simd_3(val: u64, aux: u64) -> u64 {
         simd_reference(val, aux) ^ 0xFF
     }
+
+    // PHD gate: Hoare-logic equivalence/boundary/counterfactual oracle checks
     #[test]
-    fn test_simd_phd_counterfactual_mutant_1() {
+    fn test_phd_gate() {
+        assert_eq!(simd_reference(1, 2), 3);
+        assert_eq!(simd_reference(0, 0), 0);
         assert!(simd_reference(1, 1) != mutant_simd_1(1, 1));
-    }
-    #[test]
-    fn test_simd_phd_counterfactual_mutant_2() {
         assert!(simd_reference(1, 1) != mutant_simd_2(1, 1));
-    }
-    #[test]
-    fn test_simd_phd_counterfactual_mutant_3() {
         assert!(simd_reference(1, 1) != mutant_simd_3(1, 1));
     }
 
-    // --- splat_u8x16: correctness ---
-
+    // --- splat_u8x16 and movemask_u8x16 correctness + round-trip ---
     #[test]
-    fn test_splat_zero() {
+    fn test_splat_and_movemask() {
+        // splat: boundary values and arbitrary
         assert_eq!(splat_u8x16(0), [0u8; 16]);
-    }
-
-    #[test]
-    fn test_splat_max() {
         assert_eq!(splat_u8x16(255), [255u8; 16]);
-    }
+        assert!(splat_u8x16(42).iter().all(|&x| x == 42));
 
-    #[test]
-    fn test_splat_arbitrary() {
-        let v = splat_u8x16(42);
-        assert!(v.iter().all(|&x| x == 42));
-    }
-
-    // --- movemask_u8x16: correctness ---
-
-    #[test]
-    fn test_movemask_none_set() {
+        // movemask: no lanes, all lanes, first lane, last lane
         assert_eq!(movemask_u8x16([0x00; 16]), 0x0000);
-    }
-
-    #[test]
-    fn test_movemask_all_set() {
         assert_eq!(movemask_u8x16([0xFF; 16]), 0xFFFF);
-    }
-
-    #[test]
-    fn test_movemask_first_lane() {
-        let mut v = [0u8; 16];
-        v[0] = 0x80;
+        let mut v = [0u8; 16]; v[0] = 0x80;
         assert_eq!(movemask_u8x16(v), 0x0001);
-    }
-
-    #[test]
-    fn test_movemask_last_lane() {
-        let mut v = [0u8; 16];
-        v[15] = 0x80;
+        let mut v = [0u8; 16]; v[15] = 0x80;
         assert_eq!(movemask_u8x16(v), 0x8000);
+
+        // round-trip: splat(0x80) → movemask == 0xFFFF; splat(0x7F) → 0x0000
+        assert_eq!(movemask_u8x16(splat_u8x16(0x80)), 0xFFFF);
+        assert_eq!(movemask_u8x16(splat_u8x16(0x7F)), 0x0000);
     }
 
-    // --- shuffle_u8x16: zero-mask (pass-through from a at index 0) ---
-
+    // --- shuffle_u8x16 correctness ---
     #[test]
-    fn test_shuffle_zero_mask() {
-        let a = [0u8, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-        let b = [16u8; 16];
-        let mask = [0u8; 16]; // all select a[0]
-        let result = shuffle_u8x16(a, b, mask);
+    fn test_shuffle() {
+        let a: [u8; 16] = core::array::from_fn(|i| i as u8);          // 0..15
+        let b: [u8; 16] = core::array::from_fn(|i| (i as u8) + 100); // 100..115
+
+        // zero mask: all lanes select a[0] = 0
+        let result = shuffle_u8x16(a, b, [0u8; 16]);
         assert!(result.iter().all(|&x| x == 0));
-    }
 
-    // --- shuffle_u8x16: skip mask zeroes output ---
-
-    #[test]
-    fn test_shuffle_skip_mask() {
-        let a = [0xFFu8; 16];
-        let b = [0xFFu8; 16];
-        let mask = [0x80u8; 16]; // bit 7 set in every lane → output all zero
-        let result = shuffle_u8x16(a, b, mask);
+        // skip mask (bit 7): output zeroed regardless of source
+        let result = shuffle_u8x16([0xFFu8; 16], [0xFFu8; 16], [0x80u8; 16]);
         assert_eq!(result, [0u8; 16]);
-    }
 
-    // --- shuffle_u8x16: select from b ---
-
-    #[test]
-    fn test_shuffle_selects_b() {
-        let a = [0u8; 16];
-        let b: [u8; 16] = core::array::from_fn(|i| (i as u8) + 100);
-        // mask[0] = 0x10 | 0 => bit 4 set, index 0 => b[0] = 100
+        // bit 4 selects from b: mask[0] = 0x10 | 0 => b[0] = 100
         let mut mask = [0u8; 16];
         mask[0] = 0x10;
         let result = shuffle_u8x16(a, b, mask);
         assert_eq!(result[0], 100);
-    }
-
-    // --- fallback vs SIMD path produce identical results ---
-    // (This crate's SIMD functions ARE the fallback path, so we verify
-    // internal consistency: splat then movemask round-trips correctly.)
-
-    #[test]
-    fn test_splat_then_movemask_all_set() {
-        // Splat 0x80 fills all lanes with the MSB; movemask should return 0xFFFF.
-        let v = splat_u8x16(0x80);
-        assert_eq!(movemask_u8x16(v), 0xFFFF);
-    }
-
-    #[test]
-    fn test_splat_then_movemask_none_set() {
-        // Splat 0x7F — MSB clear in all lanes; movemask should return 0.
-        let v = splat_u8x16(0x7F);
-        assert_eq!(movemask_u8x16(v), 0x0000);
     }
 }
 

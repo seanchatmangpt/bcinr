@@ -85,17 +85,6 @@ mod tests {
     fn parse_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
     }
-
-    #[test]
-    fn test_equivalence() {
-        assert_eq!(parse_reference(1, 2), 3);
-    }
-
-    #[test]
-    fn test_boundaries() {
-        assert_eq!(parse_reference(0, 0), 0);
-    }
-
     fn mutant_parse_1(val: u64, aux: u64) -> u64 {
         !parse_reference(val, aux)
     }
@@ -106,84 +95,55 @@ mod tests {
         parse_reference(val, aux) ^ 0xFF
     }
 
+    use super::*;
+
+    // PHD gate: Hoare-logic equivalence/boundary/counterfactual oracle checks
     #[test]
-    fn test_rejects_mutant_1() {
+    fn test_phd_gate() {
+        assert_eq!(parse_reference(1, 2), 3);
+        assert_eq!(parse_reference(0, 0), 0);
         assert!(parse_reference(1, 1) != mutant_parse_1(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_2() {
         assert!(parse_reference(1, 1) != mutant_parse_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
         assert!(parse_reference(1, 1) != mutant_parse_3(1, 1));
     }
 
-    use super::*;
-
     // ── skip_whitespace ───────────────────────────────────────────────────────
-
     #[test]
-    fn test_skip_whitespace_empty_input() {
-        assert_eq!(skip_whitespace(b""), 0);
-    }
-
-    #[test]
-    fn test_skip_whitespace_no_leading_space() {
-        assert_eq!(skip_whitespace(b"hello"), 0);
-    }
-
-    #[test]
-    fn test_skip_whitespace_single_space() {
-        assert_eq!(skip_whitespace(b" x"), 1);
-    }
-
-    #[test]
-    fn test_skip_whitespace_tabs_and_newlines() {
-        // \t, \n, \r are all <= 32, then 'w' stops the skip
-        assert_eq!(skip_whitespace(b"\t\n\rword"), 3);
-    }
-
-    #[test]
-    fn test_skip_whitespace_all_spaces() {
-        assert_eq!(skip_whitespace(b"   "), 3);
+    fn test_skip_whitespace() {
+        // (input, expected_skip_count)
+        let cases: &[(&[u8], usize)] = &[
+            (b"",           0), // empty
+            (b"hello",      0), // no leading whitespace
+            (b" x",         1), // single space
+            (b"\t\n\rword", 3), // tab, newline, carriage-return
+            (b"   ",        3), // all spaces
+        ];
+        for &(input, expected) in cases {
+            assert_eq!(skip_whitespace(input), expected, "input={:?}", input);
+        }
     }
 
     // ── parse_hex_u32 ─────────────────────────────────────────────────────────
-
     #[test]
-    fn test_parse_hex_u32_empty() {
-        assert_eq!(parse_hex_u32(b""), Err(()));
-    }
-
-    #[test]
-    fn test_parse_hex_u32_single_char() {
-        assert_eq!(parse_hex_u32(b"0"), Ok(0));
-        assert_eq!(parse_hex_u32(b"F"), Ok(15));
-        assert_eq!(parse_hex_u32(b"f"), Ok(15));
-    }
-
-    #[test]
-    fn test_parse_hex_u32_max_length() {
-        // 8 hex chars = full u32
-        assert_eq!(parse_hex_u32(b"FFFFFFFF"), Ok(u32::MAX));
-        assert_eq!(parse_hex_u32(b"deadbeef"), Ok(0xDEADBEEF));
-    }
-
-    #[test]
-    fn test_parse_hex_u32_too_long() {
-        assert_eq!(parse_hex_u32(b"123456789"), Err(()));
-    }
-
-    #[test]
-    fn test_parse_hex_u32_invalid_chars() {
-        assert_eq!(parse_hex_u32(b"XY"), Err(()));
-        assert_eq!(parse_hex_u32(b"0G"), Err(()));
-    }
-
-    #[test]
-    fn test_parse_hex_u32_mixed_case() {
-        assert_eq!(parse_hex_u32(b"DeAdBeEf"), Ok(0xDEADBEEF));
+    fn test_parse_hex_u32() {
+        // (input, expected result)
+        let cases: &[(&[u8], Result<u32, ()>)] = &[
+            (b"",           Err(())),           // empty
+            (b"0",          Ok(0x0)),
+            (b"F",          Ok(15)),
+            (b"f",          Ok(15)),
+            (b"FF",         Ok(0xFF)),
+            (b"FFFFFFFF",   Ok(u32::MAX)),      // max 8 hex digits
+            (b"deadbeef",   Ok(0xDEADBEEF)),    // lowercase
+            (b"DEADBEEF",   Ok(0xDEADBEEF)),    // uppercase
+            (b"DeAdBeEf",   Ok(0xDEADBEEF)),    // mixed case
+            (b"123456789",  Err(())),           // > 8 chars
+            (b"XY",         Err(())),           // invalid chars
+            (b"0G",         Err(())),           // partially invalid
+        ];
+        for &(input, expected) in cases {
+            assert_eq!(parse_hex_u32(input), expected, "input={:?}", input);
+        }
     }
 }
 

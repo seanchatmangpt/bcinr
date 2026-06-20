@@ -149,14 +149,6 @@ mod tests_phd_utf8 {
     fn utf8_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
     }
-    #[test]
-    fn test_phd_equivalence() {
-        assert_eq!(utf8_reference(1, 2), 3);
-    }
-    #[test]
-    fn test_phd_boundaries() {
-        assert_eq!(utf8_reference(0, 0), 0);
-    }
     fn mutant_utf8_1(val: u64, aux: u64) -> u64 {
         !utf8_reference(val, aux)
     }
@@ -166,106 +158,66 @@ mod tests_phd_utf8 {
     fn mutant_utf8_3(val: u64, aux: u64) -> u64 {
         utf8_reference(val, aux) ^ 0xFF
     }
-    #[test]
-    fn test_phd_counterfactual_mutant_1() {
-        assert!(utf8_reference(1, 1) != mutant_utf8_1(1, 1));
-    }
-    #[test]
-    fn test_phd_counterfactual_mutant_2() {
-        assert!(utf8_reference(1, 1) != mutant_utf8_2(1, 1));
-    }
-    #[test]
-    fn test_phd_counterfactual_mutant_3() {
-        assert!(utf8_reference(1, 1) != mutant_utf8_3(1, 1));
-    }
 
     use super::*;
 
+    // PHD gate: Hoare-logic equivalence/boundary/counterfactual oracle checks
+    #[test]
+    fn test_phd_gate() {
+        // equivalence and boundary
+        assert_eq!(utf8_reference(1, 2), 3);
+        assert_eq!(utf8_reference(0, 0), 0);
+        // counterfactual mutants must differ from reference
+        assert!(utf8_reference(1, 1) != mutant_utf8_1(1, 1));
+        assert!(utf8_reference(1, 1) != mutant_utf8_2(1, 1));
+        assert!(utf8_reference(1, 1) != mutant_utf8_3(1, 1));
+    }
+
     // ── byte classification ──────────────────────────────────────────────────
-
     #[test]
-    fn test_ascii_bytes() {
-        assert!(is_ascii_byte(0x00));
-        assert!(is_ascii_byte(b'A'));
-        assert!(is_ascii_byte(0x7F));
-        assert!(!is_ascii_byte(0x80));
-        assert!(!is_ascii_byte(0xFF));
-    }
-
-    #[test]
-    fn test_continuation_bytes() {
-        assert!(is_continuation_byte(0x80));
-        assert!(is_continuation_byte(0xBF));
-        assert!(!is_continuation_byte(0x7F));
-        assert!(!is_continuation_byte(0xC0));
-    }
-
-    #[test]
-    fn test_2byte_lead_bytes() {
-        assert!(is_2byte_lead(0xC2));
-        assert!(is_2byte_lead(0xDF));
-        assert!(!is_2byte_lead(0xE0));
-        assert!(!is_2byte_lead(0x41));
-    }
-
-    #[test]
-    fn test_3byte_lead_bytes() {
-        assert!(is_3byte_lead(0xE0));
-        assert!(is_3byte_lead(0xEF));
-        assert!(!is_3byte_lead(0xDF));
-        assert!(!is_3byte_lead(0xF0));
-    }
-
-    #[test]
-    fn test_4byte_lead_bytes() {
-        assert!(is_4byte_lead(0xF0));
-        assert!(is_4byte_lead(0xF4));
-        assert!(!is_4byte_lead(0xEF));
-        assert!(!is_4byte_lead(0xF8));
+    fn test_byte_classification() {
+        // (byte, is_ascii, is_continuation, is_2byte_lead, is_3byte_lead, is_4byte_lead)
+        let cases: &[(u8, bool, bool, bool, bool, bool)] = &[
+            (0x00, true,  false, false, false, false),
+            (b'A', true,  false, false, false, false),
+            (0x7F, true,  false, false, false, false),
+            (0x80, false, true,  false, false, false),
+            (0xBF, false, true,  false, false, false),
+            (0xC2, false, false, true,  false, false),
+            (0xDF, false, false, true,  false, false),
+            (0xE0, false, false, false, true,  false),
+            (0xEF, false, false, false, true,  false),
+            (0xF0, false, false, false, false, true),
+            (0xF4, false, false, false, false, true),
+            (0xF8, false, false, false, false, false),
+            (0xFF, false, false, false, false, false),
+        ];
+        for &(b, ascii, cont, lead2, lead3, lead4) in cases {
+            assert_eq!(is_ascii_byte(b), ascii, "is_ascii_byte(0x{:02X})", b);
+            assert_eq!(is_continuation_byte(b), cont, "is_continuation_byte(0x{:02X})", b);
+            assert_eq!(is_2byte_lead(b), lead2, "is_2byte_lead(0x{:02X})", b);
+            assert_eq!(is_3byte_lead(b), lead3, "is_3byte_lead(0x{:02X})", b);
+            assert_eq!(is_4byte_lead(b), lead4, "is_4byte_lead(0x{:02X})", b);
+        }
     }
 
     // ── count_codepoints ─────────────────────────────────────────────────────
-
     #[test]
-    fn test_count_empty() {
-        assert_eq!(count_codepoints(b""), 0);
-    }
-
-    #[test]
-    fn test_count_ascii() {
-        assert_eq!(count_codepoints(b"hello"), 5);
-        assert_eq!(count_codepoints(b"x"), 1);
-    }
-
-    #[test]
-    fn test_count_2byte_sequence() {
-        // U+00E9 "é" = [0xC3, 0xA9]
-        assert_eq!(count_codepoints(&[0xC3, 0xA9]), 1);
-    }
-
-    #[test]
-    fn test_count_3byte_sequence() {
-        // U+4E16 "世" = [0xE4, 0xB8, 0x96]
-        assert_eq!(count_codepoints(&[0xE4, 0xB8, 0x96]), 1);
-    }
-
-    #[test]
-    fn test_count_4byte_sequence() {
-        // U+1F600 "😀" = [0xF0, 0x9F, 0x98, 0x80]
-        assert_eq!(count_codepoints(&[0xF0, 0x9F, 0x98, 0x80]), 1);
-    }
-
-    #[test]
-    fn test_count_mixed() {
-        // "A" (1 byte) + "é" (2 bytes) + "世" (3 bytes) = 3 codepoints, 6 bytes
-        let bytes = [b'A', 0xC3, 0xA9, 0xE4, 0xB8, 0x96];
-        assert_eq!(count_codepoints(&bytes), 3);
-    }
-
-    #[test]
-    fn test_count_invalid_byte_treated_as_lead() {
-        // 0xFF has bits 1111_1111; (0xFF & 0xC0) == 0xC0 != 0x80, so counted as a lead
-        assert_eq!(count_codepoints(&[0xFF]), 1);
+    fn test_count_codepoints() {
+        // (input bytes, expected codepoint count)
+        let cases: &[(&[u8], usize)] = &[
+            (b"",                              0), // empty
+            (b"hello",                         5), // pure ASCII
+            (b"x",                             1), // single ASCII
+            (&[0xC3, 0xA9],                    1), // U+00E9 "é" — 2-byte seq
+            (&[0xE4, 0xB8, 0x96],              1), // U+4E16 "世" — 3-byte seq
+            (&[0xF0, 0x9F, 0x98, 0x80],        1), // U+1F600 "😀" — 4-byte seq
+            (&[b'A', 0xC3, 0xA9, 0xE4, 0xB8, 0x96], 3), // mixed: ASCII + 2b + 3b
+            (&[0xFF],                          1), // 0xFF is not a continuation byte
+        ];
+        for &(input, expected) in cases {
+            assert_eq!(count_codepoints(input), expected, "input={:?}", input);
+        }
     }
 }
 

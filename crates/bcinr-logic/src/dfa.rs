@@ -129,17 +129,6 @@ mod tests {
     fn dfa_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
     }
-
-    #[test]
-    fn test_equivalence() {
-        assert_eq!(dfa_reference(1, 2), 3);
-    }
-
-    #[test]
-    fn test_boundaries() {
-        assert_eq!(dfa_reference(0, 0), 0);
-    }
-
     fn mutant_dfa_1(val: u64, aux: u64) -> u64 {
         !dfa_reference(val, aux)
     }
@@ -150,114 +139,65 @@ mod tests {
         dfa_reference(val, aux) ^ 0xFF
     }
 
+    // PHD gate: Hoare-logic equivalence/boundary/counterfactual oracle checks
     #[test]
-    fn test_rejects_mutant_1() {
+    fn test_phd_gate() {
+        assert_eq!(dfa_reference(1, 2), 3);
+        assert_eq!(dfa_reference(0, 0), 0);
         assert!(dfa_reference(1, 1) != mutant_dfa_1(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_2() {
         assert!(dfa_reference(1, 1) != mutant_dfa_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
         assert!(dfa_reference(1, 1) != mutant_dfa_3(1, 1));
     }
 
-    // --- initial state tests ---
-
+    // --- dfa_advance and dfa_is_accepting table-driven tests ---
     #[test]
-    fn test_dfa_advance_initial_state_loops() {
-        // A single-state self-loop: table[0 * 1 + 0] = 0.
-        let table = [0usize];
-        assert_eq!(dfa_advance(0, 0, &table, 1), 0);
-    }
-
-    // --- transition to accept state ---
-
-    #[test]
-    fn test_dfa_advance_to_accept() {
-        // table[0 * 2 + 1] = 1 (state 0, input 1 -> state 1)
-        let table = [0usize, 1usize];
-        assert_eq!(dfa_advance(0, 1, &table, 2), 1);
-    }
-
-    // --- looping transition stays in same state ---
-
-    #[test]
-    fn test_dfa_advance_self_loop() {
-        // table[1 * 2 + 0] = 1 (state 1, input 0 -> state 1 — self-loop)
-        let table = [0usize, 0usize, 1usize, 0usize];
-        assert_eq!(dfa_advance(1, 0, &table, 2), 1);
-    }
-
-    // --- dfa_run: accept state reached ---
-
-    #[test]
-    fn test_dfa_run_reaches_accept() {
-        // Two-state DFA over alphabet {0, 1} (size 2):
-        // state 0 on 0 -> 0, state 0 on 1 -> 1.
+    fn test_dfa_advance_and_accepting() {
+        // Two-state DFA over alphabet {0,1} (size 2):
         // table layout: [t(0,0), t(0,1), t(1,0), t(1,1)]
+        //   state 0 on 0 -> 0, state 0 on 1 -> 1
+        //   state 1 on 0 -> 0, state 1 on 1 -> 0
         let table = [0usize, 1usize, 0usize, 0usize];
-        let state = dfa_run(&table, 2, 0, &[0x00, 0x01]);
-        assert_eq!(state, 1);
-    }
 
-    // --- dfa_run: reject when sequence does not end on accept ---
+        // advance: initial state self-loops on 0
+        let single = [0usize];
+        assert_eq!(dfa_advance(0, 0, &single, 1), 0);
 
-    #[test]
-    fn test_dfa_run_rejects_after_wrong_suffix() {
-        // Same two-state DFA; input ends on symbol 0, so returns to state 0.
-        let table = [0usize, 1usize, 0usize, 0usize];
-        let state = dfa_run(&table, 2, 0, &[0x01, 0x00]);
-        assert_eq!(state, 0);
-    }
+        // advance: state 0 on input 1 -> state 1
+        assert_eq!(dfa_advance(0, 1, &table, 2), 1);
 
-    // --- dfa_run: empty input returns initial state ---
+        // advance: state 1 on input 0 -> state 0 (no self-loop at [1,0])
+        assert_eq!(dfa_advance(1, 0, &table, 2), 0);
 
-    #[test]
-    fn test_dfa_run_empty_input() {
-        let table = [0usize; 4];
-        let state = dfa_run(&table, 2, 0, &[]);
-        assert_eq!(state, 0);
-    }
-
-    // --- dfa_is_accepting: accept state ---
-
-    #[test]
-    fn test_dfa_is_accepting_true() {
-        assert!(dfa_is_accepting(2, &[1, 2, 3]));
-    }
-
-    // --- dfa_is_accepting: reject state ---
-
-    #[test]
-    fn test_dfa_is_accepting_false() {
+        // is_accepting: membership and boundary cases
+        assert!( dfa_is_accepting(2, &[1, 2, 3]));
         assert!(!dfa_is_accepting(5, &[1, 2, 3]));
-    }
-
-    // --- dfa_is_accepting: empty accept set ---
-
-    #[test]
-    fn test_dfa_is_accepting_empty_set() {
         assert!(!dfa_is_accepting(0, &[]));
     }
 
-    // --- end-to-end: accept path ---
-
+    // --- dfa_run end-to-end: accept and reject paths ---
     #[test]
-    fn test_dfa_full_accept() {
-        // Two-state DFA over {0,1}: state 0 on 1 -> 1 (accept).
+    fn test_dfa_run() {
+        // Two-state DFA over {0,1}: state 0 on 1 -> 1 (accept), else -> 0
         let table = [0usize, 1usize, 0usize, 0usize];
+
+        // empty input returns initial state
+        assert_eq!(dfa_run(&table, 2, 0, &[]), 0);
+
+        // [0x00, 0x01] ends in state 1 (accept)
+        let state = dfa_run(&table, 2, 0, &[0x00, 0x01]);
+        assert_eq!(state, 1);
+        assert!(dfa_is_accepting(state, &[1]));
+
+        // [0x01, 0x00] ends in state 0 (reject)
+        let state = dfa_run(&table, 2, 0, &[0x01, 0x00]);
+        assert_eq!(state, 0);
+        assert!(!dfa_is_accepting(state, &[1]));
+
+        // single input 0x01 -> accept
         let state = dfa_run(&table, 2, 0, &[0x01]);
         assert!(dfa_is_accepting(state, &[1]));
-    }
 
-    // --- end-to-end: reject path ---
-
-    #[test]
-    fn test_dfa_full_reject() {
-        // Same DFA; input 0 keeps us in state 0 (reject).
-        let table = [0usize, 1usize, 0usize, 0usize];
+        // single input 0x00 -> reject
         let state = dfa_run(&table, 2, 0, &[0x00]);
         assert!(!dfa_is_accepting(state, &[1]));
     }
