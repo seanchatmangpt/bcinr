@@ -7,13 +7,22 @@
 //! [`GOLDEN_CORPUS_DIGEST`] is the frozen oracle: every other projection target (C ABI,
 //! WASM, engine adapters) must reproduce it to claim portability. That is the executable
 //! form of the falsifier "same input -> same output -> same receipt across targets".
+//!
+//! # Testing Your Port
+//!
+//! Call [`assert_corpus_stable`] in your integration test suite to confirm that the
+//! corpus digest is stable on your target. A mismatch means a kernel, the registry, or
+//! the evidence wiring diverged from the reference build.
 
 use crate::ir::PatternSpec;
 use crate::patterns::{self, PATTERN_REGISTRY};
 use bcinr_logic::patterns::integrity_receipt::DeterministicSubstrateReceipt;
 
-/// Fixed probe vectors applied to every pattern: zero, saturated, a representative
-/// mid-range case, and an arbitrary case.
+/// Fixed probe vectors applied to every pattern.
+///
+/// Covers the boundary cases `(0, 0)` and `(u64::MAX, u64::MAX)`, plus two
+/// representative mid-range inputs. Every kernel is exercised with all four probes
+/// before its contribution is folded into the corpus digest.
 pub const PROBES: [(u64, u64); 4] = [
     (0, 0),
     (u64::MAX, u64::MAX),
@@ -156,9 +165,55 @@ pub fn corpus_digest() -> u64 {
     r.finalize()
 }
 
-/// Pinned golden value of [`corpus_digest`]. Frozen so any kernel/registry/evidence drift
-/// fails loudly, and so every other projection target has one fixed number to reproduce.
+/// Pinned golden value of [`corpus_digest`]. The portability oracle.
+///
+/// Frozen at the commit that introduced or last updated the 75-pattern registry.
+/// Any drift in a kernel implementation, the [`crate::patterns::PATTERN_REGISTRY`]
+/// metadata, or the evidence wiring (event codes, object codes, span codes) will
+/// produce a different [`corpus_digest`] and cause the corpus test to fail loudly.
+///
+/// # Stability
+///
+/// This value **only changes intentionally**, as part of a tracked ggen regeneration
+/// that produces a new set of verified kernels. Incidental changes (e.g., refactoring
+/// a kernel without changing its observable behavior) must NOT change this value — if
+/// they do, that is a portability regression, not a feature.
+///
+/// Other projection targets (C ABI, WASM, engine adapters) must reproduce this exact
+/// `u64` to claim byte-for-byte kernel parity with the reference Rust build.
 pub const GOLDEN_CORPUS_DIGEST: u64 = 0x0501_B4DE_76D8_78C0;
+
+/// Assert that [`corpus_digest`] matches [`GOLDEN_CORPUS_DIGEST`].
+///
+/// Call this in your own test suite to verify that the corpus is stable on your
+/// target platform or after a code change. On mismatch, panics with a diagnostic
+/// message identifying which digest was computed vs. expected.
+///
+/// # Examples
+///
+/// ```
+/// # #[cfg(test)]
+/// wasm4games::corpus::assert_corpus_stable();
+/// ```
+pub fn assert_corpus_stable() {
+    let computed = corpus_digest();
+    assert_eq!(
+        computed, GOLDEN_CORPUS_DIGEST,
+        "corpus digest mismatch: a pattern kernel output changed — \
+         run `cargo test` to see which pattern failed \
+         (computed=0x{:016X}, expected=0x{:016X})",
+        computed, GOLDEN_CORPUS_DIGEST
+    );
+}
+
+/// Check whether [`corpus_digest`] matches [`GOLDEN_CORPUS_DIGEST`] without panicking.
+///
+/// Returns `true` if the corpus is stable. Prefer [`assert_corpus_stable`] in test code;
+/// use this variant where panicking is not acceptable (e.g., embedded runtime diagnostics).
+#[must_use]
+pub fn verify_corpus() -> bool {
+    corpus_digest() == GOLDEN_CORPUS_DIGEST
+}
 
 #[cfg(test)]
 mod tests {
@@ -179,10 +234,21 @@ mod tests {
 
     #[test]
     fn corpus_digest_matches_golden() {
+        let computed = corpus_digest();
         assert_eq!(
-            corpus_digest(),
-            GOLDEN_CORPUS_DIGEST,
-            "corpus drifted: a kernel, the registry, or evidence wiring changed"
+            computed, GOLDEN_CORPUS_DIGEST,
+            "corpus digest mismatch: a pattern kernel output changed — \
+             run `cargo test` to see which pattern failed \
+             (computed=0x{:016X}, expected=0x{:016X})",
+            computed, GOLDEN_CORPUS_DIGEST
+        );
+    }
+
+    #[test]
+    fn verify_corpus_returns_true_when_stable() {
+        assert!(
+            verify_corpus(),
+            "corpus must be stable on the reference build"
         );
     }
 }
