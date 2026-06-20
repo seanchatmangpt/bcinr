@@ -105,17 +105,6 @@ mod tests {
     fn sketch_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
     }
-
-    #[test]
-    fn test_equivalence() {
-        assert_eq!(sketch_reference(1, 2), 3);
-    }
-
-    #[test]
-    fn test_boundaries() {
-        assert_eq!(sketch_reference(0, 0), 0);
-    }
-
     fn mutant_sketch_1(val: u64, aux: u64) -> u64 {
         !sketch_reference(val, aux)
     }
@@ -126,17 +115,58 @@ mod tests {
         sketch_reference(val, aux) ^ 0xFF
     }
 
+    use super::*;
+
+    const DEPTH: usize = 4;
+    const WIDTH: usize = 256;
+
     #[test]
-    fn test_rejects_mutant_1() {
+    fn test_count_min_sketch_update() {
+        // reference equivalence and boundary
+        assert_eq!(sketch_reference(1, 2), 3);
+        assert_eq!(sketch_reference(0, 0), 0);
+        // mutant divergence
         assert!(sketch_reference(1, 1) != mutant_sketch_1(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_2() {
         assert!(sketch_reference(1, 1) != mutant_sketch_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
         assert!(sketch_reference(1, 1) != mutant_sketch_3(1, 1));
+        // zero-element: all counters start at zero
+        let table = [0u32; DEPTH * WIDTH];
+        for row in 0..DEPTH {
+            let row_sum: u32 = table[row * WIDTH..(row + 1) * WIDTH].iter().sum();
+            assert_eq!(row_sum, 0, "row {row} should be all zeros");
+        }
+        // single insert: at least one counter per row must be >= 1
+        let mut table = [0u32; DEPTH * WIDTH];
+        count_min_sketch_update(&mut table, 0x1111_2222, DEPTH, WIDTH);
+        for row in 0..DEPTH {
+            let row_max = table[row * WIDTH..(row + 1) * WIDTH]
+                .iter()
+                .copied()
+                .max()
+                .unwrap_or(0);
+            assert!(row_max >= 1, "row {row} max counter should be >= 1 after insert");
+        }
+    }
+
+    #[test]
+    fn test_count_min_sketch_repeated_update() {
+        // repeated inserts: every row must accumulate counts
+        let n: u32 = 100;
+        let mut table = [0u32; DEPTH * WIDTH];
+        for _ in 0..n {
+            count_min_sketch_update(&mut table, 0xCAFE_BABE, DEPTH, WIDTH);
+        }
+        for row in 0..DEPTH {
+            let row_max = table[row * WIDTH..(row + 1) * WIDTH]
+                .iter()
+                .copied()
+                .max()
+                .unwrap_or(0);
+            assert!(
+                row_max >= n,
+                "row {row} max counter {row_max} must be >= true count {n}"
+            );
+        }
     }
 
     use super::*;
