@@ -193,77 +193,64 @@ mod tests {
     use super::*;
 
     #[test]
-    fn span_code_raw_roundtrip() {
-        let c = SpanCode(0xABCD);
-        assert_eq!(c.raw(), 0xABCD);
-    }
-
-    #[test]
-    fn from_u16_and_into_u16_are_lossless() {
+    fn span_code_conversions_and_predicates() {
+        // raw / From / Into roundtrips
+        assert_eq!(SpanCode(0xABCD).raw(), 0xABCD);
         let raw: u16 = 0x1234;
         let code: SpanCode = raw.into();
         let back: u16 = code.into();
         assert_eq!(back, raw);
-    }
 
-    #[test]
-    fn for_pattern_assigns_above_base() {
+        // for_pattern: base offset and saturation
         assert_eq!(SpanCode::for_pattern(0).raw(), SpanCode::PATTERN_BASE);
         assert_eq!(SpanCode::for_pattern(5).raw(), SpanCode::PATTERN_BASE + 5);
-    }
+        assert_eq!(SpanCode::for_pattern(u16::MAX).raw(), u16::MAX);
+        assert!(SpanCode::for_pattern(u16::MAX).is_pattern());
 
-    #[test]
-    fn for_pattern_saturates_at_max() {
-        let code = SpanCode::for_pattern(u16::MAX);
-        assert_eq!(code.raw(), u16::MAX);
-        assert!(code.is_pattern());
-    }
-
-    #[test]
-    fn lifecycle_and_pattern_predicates() {
-        assert!(SpanCode(span::TICK).is_lifecycle());
-        assert!(SpanCode(span::INPUT_ADMIT).is_lifecycle());
-        assert!(SpanCode(span::RECEIPT_APPEND).is_lifecycle());
-        assert!(!SpanCode(span::TICK).is_pattern());
-
+        // lifecycle / pattern predicates
+        for &lc in &[span::TICK, span::INPUT_ADMIT, span::RECEIPT_APPEND] {
+            assert!(
+                SpanCode(lc).is_lifecycle(),
+                "expected lifecycle for {:#x}",
+                lc
+            );
+            assert!(
+                !SpanCode(lc).is_pattern(),
+                "expected not-pattern for {:#x}",
+                lc
+            );
+            assert!(lc < SpanCode::PATTERN_BASE);
+        }
         assert!(SpanCode::for_pattern(0).is_pattern());
         assert!(!SpanCode::for_pattern(0).is_lifecycle());
+
+        // Copy + Eq
+        let a = SpanCode::for_pattern(7);
+        let b = a;
+        assert_eq!(a, b);
     }
 
     #[test]
     fn span_code_ordering() {
-        let a = SpanCode(1);
-        let b = SpanCode(2);
-        assert!(a < b);
-        assert!(b > a);
-        assert_eq!(a, SpanCode(1));
-    }
-
-    #[test]
-    fn span_code_copy_and_eq() {
-        let a = SpanCode::for_pattern(7);
-        let b = a; // Copy
-        assert_eq!(a, b);
+        assert!(SpanCode(1) < SpanCode(2));
+        assert!(SpanCode(2) > SpanCode(1));
+        assert_eq!(SpanCode(1), SpanCode(1));
     }
 
     #[cfg(feature = "alloc")]
     #[test]
-    fn display_lifecycle_prefix() {
-        let s = alloc::format!("{}", SpanCode(span::TICK));
-        assert!(s.starts_with("lifecycle:"));
-    }
-
-    #[cfg(feature = "alloc")]
-    #[test]
-    fn display_pattern_prefix() {
-        let s = alloc::format!("{}", SpanCode::for_pattern(3));
-        assert!(s.starts_with("pattern:"));
-    }
-
-    #[test]
-    fn span_constants_are_in_lifecycle_range() {
-        assert!(span::TICK < SpanCode::PATTERN_BASE);
-        assert!(span::INPUT_ADMIT < SpanCode::PATTERN_BASE);
-        assert!(span::RECEIPT_APPEND < SpanCode::PATTERN_BASE);
+    fn span_code_display_prefixes() {
+        // (raw_value, expected_prefix)
+        let cases: &[(u16, &str)] = &[
+            (span::TICK, "lifecycle:"),
+            (span::INPUT_ADMIT, "lifecycle:"),
+            (span::RECEIPT_APPEND, "lifecycle:"),
+            (SpanCode::PATTERN_BASE, "pattern:"),
+            (SpanCode::for_pattern(3).raw(), "pattern:"),
+        ];
+        for &(raw, prefix) in cases {
+            let s = alloc::format!("{}", SpanCode(raw));
+            assert!(s.starts_with(prefix), "got: {}", s);
+        }
     }
 }

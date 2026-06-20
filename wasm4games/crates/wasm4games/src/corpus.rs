@@ -220,32 +220,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn dispatch_total_and_deterministic_over_registry() {
+    fn corpus_stable_and_registry_ordered() {
+        // Registry must be exactly 75 entries in id order.
         assert_eq!(PATTERN_REGISTRY.len(), 75, "expected 75 patterns");
         for (idx, spec) in PATTERN_REGISTRY.iter().enumerate() {
-            assert_eq!(spec.id.0 as usize, idx + 1, "ids must be 1..=20 in order");
+            assert_eq!(spec.id.0 as usize, idx + 1, "ids must be 1..=75 in order");
             assert_eq!(
                 pattern_digest(spec),
                 pattern_digest(spec),
                 "per-pattern digest must be deterministic"
             );
         }
-    }
 
-    #[test]
-    fn corpus_digest_matches_golden() {
+        // Golden oracle: corpus_digest must match the pinned value.
         let computed = corpus_digest();
         assert_eq!(
             computed, GOLDEN_CORPUS_DIGEST,
-            "corpus digest mismatch: a pattern kernel output changed — \
-             run `cargo test` to see which pattern failed \
-             (computed=0x{:016X}, expected=0x{:016X})",
+            "corpus digest mismatch (computed=0x{:016X}, expected=0x{:016X})",
             computed, GOLDEN_CORPUS_DIGEST
         );
-    }
-
-    #[test]
-    fn verify_corpus_returns_true_when_stable() {
         assert!(
             verify_corpus(),
             "corpus must be stable on the reference build"

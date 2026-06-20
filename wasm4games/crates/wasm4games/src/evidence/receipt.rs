@@ -220,127 +220,84 @@ mod tests {
     use crate::evidence::ocel::OcelEvent;
 
     #[test]
-    fn fresh_chain_has_zero_count() {
+    fn receipt_chain_behavior() {
+        // fresh chain: zero count, default == new
         let chain = ReceiptChain::new();
         assert_eq!(chain.count(), 0);
-    }
-
-    #[test]
-    fn default_chain_equals_new() {
-        let a = ReceiptChain::new();
         let b = ReceiptChain::default();
-        // They start with the same FNV offset, so their seals must agree.
-        assert_eq!(a.seal(), b.seal());
-        assert_eq!(a.count(), b.count());
-    }
+        assert_eq!(chain.seal(), b.seal());
+        assert_eq!(chain.count(), b.count());
 
-    #[test]
-    fn appending_one_event_increments_count() {
+        // append increments count, each new event changes the hash
         let mut chain = ReceiptChain::new();
         chain.append(&OcelEvent::new(1, 2, 100, 4));
         assert_eq!(chain.count(), 1);
-    }
-
-    #[test]
-    fn appending_two_events_chains_correctly() {
-        let mut chain = ReceiptChain::new();
-        let ev1 = OcelEvent::new(1, 2, 10, 4);
-        let ev2 = OcelEvent::new(3, 4, 20, 4);
-        chain.append(&ev1);
         let hash_after_one = chain.seal();
-        chain.append(&ev2);
-        let hash_after_two = chain.seal();
+        chain.append(&OcelEvent::new(3, 4, 20, 4));
         assert_eq!(chain.count(), 2);
-        // Hashes must differ — the second event changed the chain.
-        assert_ne!(hash_after_one, hash_after_two);
-    }
+        assert_ne!(hash_after_one, chain.seal());
 
-    #[test]
-    fn same_events_produce_same_hash() {
+        // same events → same hash; order matters
         let ev = OcelEvent::new(42, 7, 999, 0);
-        let mut chain_a = ReceiptChain::new();
-        let mut chain_b = ReceiptChain::new();
-        chain_a.append(&ev);
-        chain_b.append(&ev);
-        assert_eq!(chain_a.seal(), chain_b.seal());
-    }
+        let mut ca = ReceiptChain::new();
+        let mut cb = ReceiptChain::new();
+        ca.append(&ev);
+        cb.append(&ev);
+        assert_eq!(ca.seal(), cb.seal());
 
-    #[test]
-    fn different_event_order_produces_different_hash() {
         let ev1 = OcelEvent::new(1, 0, 1, 0);
         let ev2 = OcelEvent::new(2, 0, 2, 0);
-
         let mut fwd = ReceiptChain::new();
         fwd.append(&ev1);
         fwd.append(&ev2);
-
         let mut rev = ReceiptChain::new();
         rev.append(&ev2);
         rev.append(&ev1);
-
         assert_ne!(fwd.seal(), rev.seal());
-    }
 
-    #[test]
-    fn seal_does_not_consume_chain() {
+        // seal is idempotent and non-consuming
         let mut chain = ReceiptChain::new();
         chain.append(&OcelEvent::new(1, 1, 1, 0));
-        let h1 = chain.seal();
-        let h2 = chain.seal();
-        assert_eq!(h1, h2); // idempotent
-                            // Can still append after sealing.
+        assert_eq!(chain.seal(), chain.seal());
         chain.append(&OcelEvent::new(2, 2, 2, 0));
         assert_eq!(chain.count(), 2);
     }
 
     #[test]
-    fn envelope_seal_matches_chain_seal() {
+    fn receipt_envelope_behavior() {
+        // seal matches chain
         let mut chain = ReceiptChain::new();
         chain.append(&OcelEvent::new(10, 20, 30, 4));
         let env: ReceiptEnvelope<4> = ReceiptEnvelope::seal(&chain);
         assert_eq!(env.chain_hash, chain.seal());
         assert_eq!(env.count, chain.count());
-    }
 
-    #[test]
-    fn envelope_new_constructor_roundtrip() {
+        // new constructor and tuple roundtrip
         let env: ReceiptEnvelope<8> = ReceiptEnvelope::new(0xCAFE_BABE_1234_5678, 42);
         assert_eq!(env.chain_hash, 0xCAFE_BABE_1234_5678);
         assert_eq!(env.count, 42);
-    }
 
-    #[test]
-    fn envelope_from_tuple_roundtrip() {
         let orig: ReceiptEnvelope<2> = ReceiptEnvelope::new(0xDEAD_BEEF, 3);
         let tuple: (u64, u32) = orig.into();
         let back: ReceiptEnvelope<2> = tuple.into();
-        assert_eq!(back.chain_hash, orig.chain_hash);
-        assert_eq!(back.count, orig.count);
-    }
+        assert_eq!((back.chain_hash, back.count), (orig.chain_hash, orig.count));
 
-    #[test]
-    fn envelope_copy_and_eq() {
+        // Copy + Eq
         let a: ReceiptEnvelope<4> = ReceiptEnvelope::new(0x1111, 1);
-        let b = a; // Copy
+        let b = a;
         assert_eq!(a, b);
     }
 
     #[cfg(feature = "alloc")]
     #[test]
-    fn chain_display_contains_count_and_hash() {
+    fn display_contains_count_and_hash() {
         let mut chain = ReceiptChain::new();
         chain.append(&OcelEvent::new(1, 2, 3, 4));
         let s = alloc::format!("{}", chain);
-        assert!(s.contains("count=1"));
-        assert!(s.contains("hash="));
-    }
+        assert!(s.contains("count=1") && s.contains("hash="));
 
-    #[cfg(feature = "alloc")]
-    #[test]
-    fn envelope_display_contains_count_and_hash() {
         let env: ReceiptEnvelope<4> = ReceiptEnvelope::new(0xABCD, 5);
         let s = alloc::format!("{}", env);
-        assert!(s.contains("count=5"));
-        assert!(s.contains("hash="));
+        assert!(s.contains("count=5") && s.contains("hash="));
     }
 }

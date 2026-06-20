@@ -559,17 +559,14 @@ mod tests {
     use alloc::collections::BTreeMap;
     use alloc::string::ToString;
 
-    // ── PatternId ────────────────────────────────────────────────────────────────
-
     #[test]
-    fn pattern_id_display() {
+    fn pattern_id_behavior() {
+        // Display
         assert_eq!(PatternId::new(0).to_string(), "pattern#0");
         assert_eq!(PatternId::new(42).to_string(), "pattern#42");
         assert_eq!(PatternId::INVALID.to_string(), "pattern#65535");
-    }
 
-    #[test]
-    fn pattern_id_ord() {
+        // Ord + sort
         assert!(PatternId::MIN < PatternId::new(1));
         assert!(PatternId::new(1) < PatternId::new(2));
         assert!(PatternId::new(99) < PatternId::INVALID);
@@ -579,113 +576,74 @@ mod tests {
             ids,
             [PatternId::new(1), PatternId::new(2), PatternId::new(3)]
         );
-    }
 
-    #[test]
-    fn pattern_id_validity() {
+        // validity / sentinels / default / raw roundtrip
         assert!(PatternId::MIN.is_valid());
         assert!(PatternId::new(1000).is_valid());
         assert!(!PatternId::INVALID.is_valid());
-    }
-
-    #[test]
-    fn pattern_id_default() {
-        // Default should be MIN (0)
-        assert_eq!(PatternId::default(), PatternId::MIN);
-        assert_eq!(PatternId::default().raw(), 0);
-    }
-
-    #[test]
-    fn pattern_id_const_sentinels() {
         assert_eq!(PatternId::MIN.raw(), 0);
         assert_eq!(PatternId::INVALID.raw(), u16::MAX);
-    }
-
-    #[test]
-    fn pattern_id_raw_roundtrip() {
+        assert_eq!(PatternId::default(), PatternId::MIN);
         for v in [0u16, 1, 100, 999, u16::MAX - 1] {
             assert_eq!(PatternId::new(v).raw(), v);
         }
-    }
 
-    // ── LoweringKind ─────────────────────────────────────────────────────────────
-
-    #[test]
-    fn lowering_kind_display() {
-        assert_eq!(LoweringKind::Lut.to_string(), "Lut");
-        assert_eq!(LoweringKind::Mask.to_string(), "Mask");
-        assert_eq!(LoweringKind::Saturating.to_string(), "Saturating");
-        assert_eq!(LoweringKind::Bitset.to_string(), "Bitset");
-        assert_eq!(LoweringKind::Dfa.to_string(), "Dfa");
-        assert_eq!(LoweringKind::Network.to_string(), "Network");
-        assert_eq!(LoweringKind::Receipt.to_string(), "Receipt");
+        // usable as BTreeMap key
+        let mut map = BTreeMap::new();
+        map.insert(PatternId::new(1), "first");
+        map.insert(PatternId::new(2), "second");
+        assert_eq!(map[&PatternId::new(1)], "first");
+        assert_eq!(map[&PatternId::new(2)], "second");
     }
 
     #[test]
-    fn lowering_kind_eq() {
+    fn lowering_object_event_kind_behavior() {
+        // LoweringKind Display + Eq
+        let cases: &[(LoweringKind, &str)] = &[
+            (LoweringKind::Lut, "Lut"),
+            (LoweringKind::Mask, "Mask"),
+            (LoweringKind::Saturating, "Saturating"),
+            (LoweringKind::Bitset, "Bitset"),
+            (LoweringKind::Dfa, "Dfa"),
+            (LoweringKind::Network, "Network"),
+            (LoweringKind::Receipt, "Receipt"),
+        ];
+        for &(ref lk, name) in cases {
+            assert_eq!(lk.to_string(), name);
+        }
         assert_eq!(LoweringKind::Mask, LoweringKind::Mask);
         assert_ne!(LoweringKind::Lut, LoweringKind::Dfa);
-    }
 
-    // ── ObjectKind ───────────────────────────────────────────────────────────────
-
-    #[test]
-    fn object_kind_display() {
+        // ObjectKind Display + accessors + BTreeMap key
         let k = ObjectKind::new(1, "player");
         assert_eq!(k.to_string(), "object[1:player]");
-    }
-
-    #[test]
-    fn object_kind_accessors() {
-        let k = ObjectKind::new(7, "npc");
-        assert_eq!(k.code(), 7);
-        assert_eq!(k.name(), "npc");
-    }
-
-    #[test]
-    fn object_kind_hash_as_key() {
-        // Ensure ObjectKind can be used as a BTreeMap key (requires Ord + Eq).
-        // BTreeMap is available in no_std+alloc; HashMap requires std.
-        // We test the Hash derive separately via the PartialEq + Eq contract.
+        assert_eq!(ObjectKind::new(7, "npc").code(), 7);
+        assert_eq!(ObjectKind::new(7, "npc").name(), "npc");
         let mut map = BTreeMap::new();
         map.insert(ObjectKind::new(1, "player"), "p1");
         assert_eq!(map[&ObjectKind::new(1, "player")], "p1");
-    }
 
-    // ── EventKind ────────────────────────────────────────────────────────────────
-
-    #[test]
-    fn event_kind_display() {
+        // EventKind Display + accessors + BTreeMap key
         let k = EventKind::new(3, "PlayerSpawned");
         assert_eq!(k.to_string(), "event[3:PlayerSpawned]");
-    }
-
-    #[test]
-    fn event_kind_accessors() {
-        let k = EventKind::new(99, "BossDefeated");
-        assert_eq!(k.code(), 99);
-        assert_eq!(k.name(), "BossDefeated");
-    }
-
-    #[test]
-    fn event_kind_hash_as_key() {
+        assert_eq!(EventKind::new(99, "BossDefeated").code(), 99);
+        assert_eq!(EventKind::new(99, "BossDefeated").name(), "BossDefeated");
         let mut map = BTreeMap::new();
         map.insert(EventKind::new(3, "Foo"), "handler");
         assert_eq!(map[&EventKind::new(3, "Foo")], "handler");
     }
 
-    // ── AdmissionRule ────────────────────────────────────────────────────────────
-
     #[test]
-    fn admission_rule_display() {
+    fn admission_rule_behavior() {
         use crate::class::status;
-        let rule = AdmissionRule::new(status::PARTIAL, status::REFUSED);
-        assert_eq!(rule.to_string(), "admit(min=2,refuse=7)");
-    }
 
-    #[test]
-    fn admission_rule_is_admitted() {
-        use crate::class::status;
+        // Display
+        assert_eq!(
+            AdmissionRule::new(status::PARTIAL, status::REFUSED).to_string(),
+            "admit(min=2,refuse=7)"
+        );
+
+        // is_admitted
         let rule = AdmissionRule::new(status::PARTIAL, status::REFUSED);
         assert!(!rule.is_admitted(status::UNKNOWN));
         assert!(!rule.is_admitted(status::BLOCKED));
@@ -693,35 +651,21 @@ mod tests {
         assert!(rule.is_admitted(status::ADMITTED));
         assert!(rule.is_admitted(status::REFUSED));
         assert!(rule.is_admitted(status::RESIDUAL));
-    }
 
-    #[test]
-    fn admission_rule_default() {
-        use crate::class::status;
+        // default is most permissive
         let rule = AdmissionRule::default();
-        // Default is most permissive: any status is admitted
         assert!(rule.is_admitted(status::UNKNOWN));
         assert!(rule.is_admitted(status::PARTIAL));
         assert_eq!(rule.required_status, status::UNKNOWN);
         assert_eq!(rule.refusal_status, status::REFUSED);
-    }
 
-    #[test]
-    fn admission_rule_accessors() {
-        use crate::class::status;
+        // accessors + roundtrip
         let rule = AdmissionRule::new(status::ADMITTED, status::REFUSED);
         assert_eq!(rule.required_status(), status::ADMITTED);
         assert_eq!(rule.refusal_status(), status::REFUSED);
-    }
-
-    #[test]
-    fn admission_rule_new_roundtrip() {
         let rule = AdmissionRule::new(3, 7);
-        assert_eq!(rule.required_status, 3);
-        assert_eq!(rule.refusal_status, 7);
+        assert_eq!((rule.required_status, rule.refusal_status), (3, 7));
     }
-
-    // ── PatternSpec ──────────────────────────────────────────────────────────────
 
     fn make_spec(id: u16, name: &'static str, card: u8) -> PatternSpec {
         PatternSpec {
@@ -737,28 +681,17 @@ mod tests {
     }
 
     #[test]
-    fn pattern_spec_is_valid() {
+    fn pattern_spec_behavior() {
+        use crate::class::status;
+
+        // is_valid: valid / invalid id / empty name / zero card
         assert!(make_spec(1, "coin_collect", 4).is_valid());
         assert!(make_spec(0, "zero_id", 1).is_valid());
-    }
-
-    #[test]
-    fn pattern_spec_invalid_id() {
         assert!(!make_spec(u16::MAX, "bad", 1).is_valid());
-    }
-
-    #[test]
-    fn pattern_spec_invalid_empty_name() {
         assert!(!make_spec(1, "", 1).is_valid());
-    }
-
-    #[test]
-    fn pattern_spec_invalid_zero_card() {
         assert!(!make_spec(1, "bad_card", 0).is_valid());
-    }
 
-    #[test]
-    fn pattern_spec_display() {
+        // Display
         let spec = PatternSpec {
             id: PatternId::new(5),
             name: "demo",
@@ -770,10 +703,8 @@ mod tests {
             otel_span: 0,
         };
         assert_eq!(spec.to_string(), "PatternSpec(pattern#5, demo, Network)");
-    }
 
-    #[test]
-    fn pattern_spec_object_count() {
+        // object_count
         static OBJS: &[ObjectKind] = &[
             ObjectKind {
                 code: 1,
@@ -795,11 +726,8 @@ mod tests {
             otel_span: 0,
         };
         assert_eq!(spec.object_count(), 2);
-    }
 
-    #[test]
-    fn pattern_spec_is_admitted_delegates() {
-        use crate::class::status;
+        // is_admitted delegates to AdmissionRule
         let spec = PatternSpec {
             id: PatternId::new(1),
             name: "s",
@@ -814,18 +742,5 @@ mod tests {
         assert!(spec.is_admitted(status::ADMITTED));
         assert!(!spec.is_admitted(status::UNKNOWN));
         assert!(!spec.is_admitted(status::BLOCKED));
-    }
-
-    // ── map usability ─────────────────────────────────────────────────────────────
-
-    #[test]
-    fn pattern_id_as_btree_key() {
-        // PatternId is Ord + Hash, usable as key in both BTreeMap and HashMap.
-        // Use BTreeMap here (available in no_std+alloc).
-        let mut map = BTreeMap::new();
-        map.insert(PatternId::new(1), "first");
-        map.insert(PatternId::new(2), "second");
-        assert_eq!(map[&PatternId::new(1)], "first");
-        assert_eq!(map[&PatternId::new(2)], "second");
     }
 }

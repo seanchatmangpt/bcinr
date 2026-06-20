@@ -156,56 +156,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn new_stores_all_fields() {
+    fn replay_frame_behavior() {
+        // new / fields / From roundtrip
         let frame = ReplayFrame::new(42, 0xFF, 0xDEAD_BEEF_CAFE_BABE);
-        assert_eq!(frame.tick, 42);
-        assert_eq!(frame.input, 0xFF);
-        assert_eq!(frame.state_digest, 0xDEAD_BEEF_CAFE_BABE);
-    }
-
-    #[test]
-    fn from_tuple_roundtrip() {
+        assert_eq!(
+            (frame.tick, frame.input, frame.state_digest),
+            (42, 0xFF, 0xDEAD_BEEF_CAFE_BABE)
+        );
         let orig = ReplayFrame::new(1, 2, 3);
         let tuple: (u64, u64, u64) = orig.into();
-        let back = ReplayFrame::from(tuple);
-        assert_eq!(orig, back);
-    }
+        assert_eq!(ReplayFrame::from(tuple), orig);
 
-    #[test]
-    fn digest_matches_is_exact() {
+        // digest_matches
         let frame = ReplayFrame::new(0, 0, 0xABCD_EF01);
         assert!(frame.digest_matches(0xABCD_EF01));
         assert!(!frame.digest_matches(0xABCD_EF00));
         assert!(!frame.digest_matches(0));
-    }
 
-    #[test]
-    fn copy_semantics() {
+        // Copy + Eq
         let a = ReplayFrame::new(1, 2, 3);
-        let b = a; // Copy
-        assert_eq!(a, b);
-    }
+        assert_eq!(a, a);
 
-    #[test]
-    fn ordering_is_lexicographic_tick_first() {
-        let early = ReplayFrame::new(1, 0xFF, 0);
-        let late = ReplayFrame::new(2, 0x00, 0);
-        assert!(early < late);
-    }
+        // ordering: lexicographic (tick, input, state_digest)
+        assert!(ReplayFrame::new(1, 0xFF, 0) < ReplayFrame::new(2, 0x00, 0));
+        assert!(ReplayFrame::new(5, 1, 0) < ReplayFrame::new(5, 2, 0));
+        assert!(ReplayFrame::new(5, 1, 0) < ReplayFrame::new(5, 1, 1));
 
-    #[test]
-    fn ordering_breaks_ties_by_input_then_digest() {
-        let a = ReplayFrame::new(5, 1, 0);
-        let b = ReplayFrame::new(5, 2, 0);
-        assert!(a < b);
-
-        let c = ReplayFrame::new(5, 1, 0);
-        let d = ReplayFrame::new(5, 1, 1);
-        assert!(c < d);
-    }
-
-    #[test]
-    fn hash_is_consistent() {
+        // Hash is consistent
         use core::hash::{Hash, Hasher};
         struct SimpleHasher(u64);
         impl Hasher for SimpleHasher {
@@ -228,11 +205,8 @@ mod tests {
 
     #[cfg(feature = "alloc")]
     #[test]
-    fn display_contains_all_fields() {
-        let frame = ReplayFrame::new(7, 0x0F, 0xABCD);
-        let s = alloc::format!("{}", frame);
-        assert!(s.contains("tick=7"));
-        assert!(s.contains("input="));
-        assert!(s.contains("digest="));
+    fn replay_frame_display() {
+        let s = alloc::format!("{}", ReplayFrame::new(7, 0x0F, 0xABCD));
+        assert!(s.contains("tick=7") && s.contains("input=") && s.contains("digest="));
     }
 }
