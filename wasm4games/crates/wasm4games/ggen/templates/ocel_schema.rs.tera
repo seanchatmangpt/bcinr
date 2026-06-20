@@ -10,9 +10,31 @@
 
 //! Object-centric event schema (OCEL): activity codes and the object types each activity
 //! links to, mirrored from the pattern ontology. See [`crate::evidence::ocel`].
+//!
+//! # OCEL Schema Connection
+//!
+//! The Object-Centric Event Log (OCEL) model tracks *which object types* each event
+//! activity involves. This module mirrors that schema as flat Rust data so that
+//! admission-contract checks and replay verification can query schema membership
+//! without deserializing the full ontology at runtime.
+//!
+//! Each [`OcelSchemaEdge`] represents one `(activity, object-type)` edge from the
+//! SPARQL query `ggen/queries/ocel_schema.rq` over `ggen/schema/patterns.ttl`.
+//! The edges are ordered by `(pattern_id, object_type)` for deterministic iteration.
+//!
+//! To check whether a given `(event_code, object_code)` pair is schema-valid:
+//!
+//! ```ignore
+//! use wasm4games::evidence::ocel_schema::OCEL_SCHEMA;
+//! let valid = OCEL_SCHEMA.iter().any(|e| e.activity == event_code && e.object_type == obj_code);
+//! ```
 
 /// One (activity, object-type) edge of the OCEL schema.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+///
+/// Derived from the `w4g:touchesObject` predicate in `ggen/schema/patterns.ttl`.
+/// Each edge asserts that the pattern with `pattern_id` emits events of type
+/// `activity` that link to objects of type `object_type`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OcelSchemaEdge {
     /// Pattern id the edge belongs to.
     pub pattern_id: u16,
@@ -22,7 +44,19 @@ pub struct OcelSchemaEdge {
     pub object_type: u16,
 }
 
+impl OcelSchemaEdge {
+    /// Returns `true` if this edge matches the given activity and object-type codes.
+    #[must_use]
+    #[inline(always)]
+    pub fn matches(&self, activity: u16, object_type: u16) -> bool {
+        self.activity == activity && self.object_type == object_type
+    }
+}
+
 /// The flat OCEL schema: every (activity, object-type) edge in the catalog.
+///
+/// Ordered by `(pattern_id, object_type)` for stable, deterministic iteration.
+/// Generated from `ggen/schema/patterns.ttl` via `ggen/queries/ocel_schema.rq`.
 pub static OCEL_SCHEMA: &[OcelSchemaEdge] = &[
 {%- for row in results %}
     // {{ row.patternName }}: {{ row.eventName }} -> {{ row.objectName }}
