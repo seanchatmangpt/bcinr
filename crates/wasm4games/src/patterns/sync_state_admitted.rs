@@ -98,9 +98,6 @@ mod tests {
     fn mutant_1(s: u64, i: u64) -> u64 {
         !sync_state_admitted_reference(s, i)
     }
-    fn mutant_2(s: u64, i: u64) -> u64 {
-        sync_state_admitted_reference(s, i).wrapping_add(1)
-    }
     fn mutant_3(s: u64, i: u64) -> u64 {
         sync_state_admitted_reference(s, i) ^ 0xFFFF
     }
@@ -114,11 +111,6 @@ mod tests {
         fn cf1(s in 0u64..5, i in 0u64..5) {
             let r = sync_state_admitted_reference(s, i);
             if r != 0 { prop_assert!(r != mutant_1(s, i)); }
-        }
-        #[test]
-        fn cf2(s in 0u64..5, i in 0u64..5) {
-            let r = sync_state_admitted_reference(s, i);
-            prop_assert!(r != mutant_2(s, i));
         }
         #[test]
         fn cf3(s in 0u64..5, i in 0u64..5) {

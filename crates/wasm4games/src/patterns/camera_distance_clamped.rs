@@ -43,9 +43,6 @@ mod tests {
     fn mutant_1(s: u64, i: u64) -> u64 {
         !camera_distance_clamped_reference(s, i)
     }
-    fn mutant_2(s: u64, i: u64) -> u64 {
-        camera_distance_clamped_reference(s, i).wrapping_add(1)
-    }
     fn mutant_3(s: u64, i: u64) -> u64 {
         camera_distance_clamped_reference(s, i) ^ 0xFFFF
     }
@@ -72,14 +69,6 @@ mod tests {
             prop_assume!(min_d <= max_d);
             let r = camera_distance_clamped_reference(s, i);
             if r != 0 { prop_assert!(r != mutant_1(s, i)); }
-        }
-        #[test]
-        fn cf2(s in any::<u64>(), i in any::<u64>()) {
-            let min_d = (i & 0xFFFF) as u32;
-            let max_d = ((i >> 16) & 0xFFFF) as u32;
-            prop_assume!(min_d <= max_d);
-            let r = camera_distance_clamped_reference(s, i);
-            prop_assert!(r != mutant_2(s, i));
         }
         #[test]
         fn cf3(s in any::<u64>(), i in any::<u64>()) {
