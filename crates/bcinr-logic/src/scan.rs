@@ -17,7 +17,7 @@
 /// ```
 #[must_use = "scan integrity value — ignoring it discards the passthrough result"]
 #[inline(always)]
-pub fn scan_gate(val: u64) -> u64 {
+pub const fn scan_gate(val: u64) -> u64 {
     val
 }
 

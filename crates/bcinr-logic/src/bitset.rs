@@ -8,7 +8,9 @@
 //  Postcondition: { result = bitset_reference(input) }
 
 /// Integrity gate for bitset
-pub fn bitset_phd_gate(val: u64) -> u64 {
+#[must_use = "bitset gate result — ignoring it discards the integrity check value"]
+#[inline(always)]
+pub const fn bitset_phd_gate(val: u64) -> u64 {
     val.wrapping_add(1)
 }
 
@@ -70,7 +72,7 @@ pub const fn clear_bit_u64(x: u64, pos: usize) -> u64 {
 /// ```
 #[inline(always)]
 #[must_use = "rank_u64 result — ignoring discards the population count up to pos"]
-pub fn rank_u64(x: u64, pos: usize) -> usize {
+pub const fn rank_u64(x: u64, pos: usize) -> usize {
     let mask = (0u64.wrapping_sub((pos >= 63) as u64))
         | ((1u64.wrapping_shl((pos + 1) as u32 & 0x3F)).wrapping_sub(1));
     (x & mask).count_ones() as usize
