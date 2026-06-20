@@ -118,58 +118,38 @@ pub fn negative_fixture(spec: &PatternSpec) -> OcelEvent {
 mod tests {
     use super::*;
     use crate::evidence::replay::ReplayFrame;
+    use crate::ir::{AdmissionRule, EventKind, LoweringKind, ObjectKind, PatternId, PatternSpec};
     use crate::patterns::PATTERN_REGISTRY;
 
     #[test]
-    fn registry_specs_are_self_consistent() {
+    fn registry_validation_and_replay_determinism() {
+        // All registry specs must pass offline validation (status bounds + negative fixtures).
         for spec in PATTERN_REGISTRY {
-            // Refusal status must be a known code.
             assert!(check_status_bounds(spec, spec.admission.refusal_status));
-            // Negative fixtures must carry the refusal status and link to the activity.
             let ev = negative_fixture(spec);
             assert_eq!(ev.status, spec.admission.refusal_status);
             assert_eq!(ev.activity, spec.id.0);
-        }
-    }
-
-    #[test]
-    fn validate_pattern_passes_for_all_registry_entries() {
-        for spec in PATTERN_REGISTRY {
             let report = validate_pattern(spec);
             assert!(
                 report.is_ok(),
-                "pattern id={} failed offline validation: {:?}",
+                "pattern id={} failed: {:?}",
                 spec.id.0,
                 report
             );
         }
-    }
 
-    #[test]
-    fn valid_replay_frames_pass_determinism_check() {
+        // Replay determinism: non-empty and empty frames.
         let frames = [
             ReplayFrame::new(0, 0x0000_0001, 0xDEAD_BEEF),
             ReplayFrame::new(1, 0x0000_0002, 0xCAFE_BABE),
             ReplayFrame::new(2, 0x0000_0003, 0x1234_5678),
         ];
-        assert!(
-            check_replay_determinism(&frames),
-            "deterministic replay must produce the same digest twice"
-        );
-    }
-
-    #[test]
-    fn empty_replay_is_deterministic() {
+        assert!(check_replay_determinism(&frames));
         assert!(check_replay_determinism(&[]));
     }
 
     #[test]
-    fn negative_fixture_status_out_of_bounds_fails_validation() {
-        // Manually craft a spec whose refusal_status is out-of-bounds to confirm
-        // validate_pattern correctly catches the failure.
-        use crate::ir::{
-            AdmissionRule, EventKind, LoweringKind, ObjectKind, PatternId, PatternSpec,
-        };
+    fn out_of_bounds_refusal_status_fails_validation() {
         let bad_spec = PatternSpec {
             id: PatternId(0xFFFF),
             name: "bad_test_pattern",
@@ -185,15 +165,12 @@ mod tests {
             }],
             admission: AdmissionRule {
                 required_status: 4,
-                refusal_status: 255, // out of bounds: >= status::COUNT (9)
+                refusal_status: 255,
             },
             otel_span: 0x9999,
         };
         let report = validate_pattern(&bad_spec);
-        assert!(
-            !report.refusal_status_in_bounds,
-            "an out-of-bounds refusal status must fail the in-bounds check"
-        );
+        assert!(!report.refusal_status_in_bounds);
         assert!(!report.is_ok());
     }
 }

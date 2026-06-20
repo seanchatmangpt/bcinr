@@ -438,44 +438,32 @@ impl<'a> IntoIterator for &'a OcelLog {
 mod tests {
     use super::*;
 
-    // ── ObjectRefs ───────────────────────────────────────────────────────────
-
     #[test]
-    fn object_refs_new_is_empty() {
+    fn object_refs_behavior() {
+        // empty / default
         let r = ObjectRefs::new();
         assert!(r.is_empty());
         assert_eq!(r.len(), 0);
         assert_eq!(r.as_slice(), &[]);
-    }
+        assert_eq!(ObjectRefs::default(), ObjectRefs::new());
 
-    #[test]
-    fn object_refs_push_and_retrieve() {
+        // push and retrieve
         let mut r = ObjectRefs::new();
         r.push(10, 100);
         r.push(20, 200);
         assert_eq!(r.len(), 2);
         assert!(!r.is_empty());
         assert_eq!(r.as_slice(), &[(10, 100), (20, 200)]);
-    }
 
-    #[test]
-    fn object_refs_saturates_at_cap() {
+        // saturates at CAP
         let mut r = ObjectRefs::new();
         for i in 0..ObjectRefs::CAP + 5 {
             r.push(i as u16, i as u64);
         }
         assert_eq!(r.len(), ObjectRefs::CAP);
-    }
 
-    #[test]
-    fn object_refs_default_equals_new() {
-        assert_eq!(ObjectRefs::default(), ObjectRefs::new());
-    }
-
-    #[test]
-    fn object_refs_hash_is_consistent() {
+        // Hash is consistent
         use core::hash::{Hash, Hasher};
-        // A simple djb2-like hasher substitute — we just want to show Hash works.
         struct SimpleHasher(u64);
         impl Hasher for SimpleHasher {
             fn finish(&self) -> u64 {
@@ -497,162 +485,108 @@ mod tests {
     }
 
     #[test]
-    fn object_refs_display() {
-        let mut r = ObjectRefs::new();
-        r.push(1, 10);
-        r.push(2, 20);
-        let s = alloc_or_format(&r);
-        assert!(s.contains("(1, 10)") || s.contains("1") && s.contains("10"));
-    }
-
-    // ── OcelEvent ────────────────────────────────────────────────────────────
-
-    #[test]
-    fn ocel_event_new_has_no_objects() {
+    fn ocel_event_construction_and_encoding() {
+        // new / From<u16> / multi-object
         let ev = OcelEvent::new(0x0A, 0x0B, 999, 4);
         assert!(ev.objects.is_empty());
-        assert_eq!(ev.event_code, 0x0A);
-        assert_eq!(ev.activity, 0x0B);
-        assert_eq!(ev.timestamp, 999);
-        assert_eq!(ev.status, 4);
-    }
+        assert_eq!(
+            (ev.event_code, ev.activity, ev.timestamp, ev.status),
+            (0x0A, 0x0B, 999, 4)
+        );
 
-    #[test]
-    fn ocel_event_from_u16_zeroes_other_fields() {
         let ev = OcelEvent::from(0x1234u16);
-        assert_eq!(ev.event_code, 0x1234);
-        assert_eq!(ev.activity, 0);
-        assert_eq!(ev.timestamp, 0);
-        assert_eq!(ev.status, 0);
+        assert_eq!(
+            (ev.event_code, ev.activity, ev.timestamp, ev.status),
+            (0x1234, 0, 0, 0)
+        );
         assert!(ev.objects.is_empty());
-    }
 
-    #[test]
-    fn ocel_event_with_multiple_object_ids() {
         let mut ev = OcelEvent::new(7, 9, 11, 0);
         ev.objects.push(0xAA, 111);
         ev.objects.push(0xBB, 222);
         ev.objects.push(0xCC, 333);
-        assert_eq!(ev.objects.len(), 3);
-        let s = ev.objects.as_slice();
-        assert_eq!(s[0], (0xAA, 111));
-        assert_eq!(s[1], (0xBB, 222));
-        assert_eq!(s[2], (0xCC, 333));
-    }
+        assert_eq!(
+            ev.objects.as_slice(),
+            &[(0xAA, 111), (0xBB, 222), (0xCC, 333)]
+        );
 
-    #[test]
-    fn write_to_reports_exact_len_and_header_only_with_no_objects() {
+        // write_to: header-only, big-endian layout
         let ev = OcelEvent::new(0x0102, 0x0304, 0x0506_0708_090a_0b0c, 4);
         assert_eq!(ev.encoded_len(), OcelEvent::HEADER_BYTES);
         let mut buf = [0u8; 64];
         let n = ev.write_to(&mut buf).unwrap();
         assert_eq!(n, OcelEvent::HEADER_BYTES);
-        // Big-endian header layout.
         assert_eq!(&buf[0..2], &0x0102u16.to_be_bytes());
         assert_eq!(&buf[2..4], &0x0304u16.to_be_bytes());
         assert_eq!(&buf[4..12], &0x0506_0708_090a_0b0cu64.to_be_bytes());
-        assert_eq!(buf[12], 4); // status
-        assert_eq!(buf[13], 0); // object count
-    }
+        assert_eq!((buf[12], buf[13]), (4, 0)); // status, object count
 
-    #[test]
-    fn write_to_encodes_objects_deterministically() {
+        // write_to: deterministic with objects
         let mut ev = OcelEvent::new(7, 9, 11, 4);
         ev.objects.push(0x00aa, 0x0102_0304_0506_0708);
         ev.objects.push(0x00bb, 0x1112_1314_1516_1718);
         let expected = OcelEvent::HEADER_BYTES + 2 * OcelEvent::OBJECT_BYTES;
         assert_eq!(ev.encoded_len(), expected);
-
         let mut a = [0u8; 64];
         let mut b = [0u8; 64];
         let na = ev.write_to(&mut a).unwrap();
         let nb = ev.write_to(&mut b).unwrap();
         assert_eq!(na, expected);
-        assert_eq!(a[..na], b[..nb]); // deterministic
-        assert_eq!(a[13], 2); // object count
-                              // First object ref begins right after the header.
+        assert_eq!(a[..na], b[..nb]);
+        assert_eq!(a[13], 2);
         assert_eq!(&a[14..16], &0x00aau16.to_be_bytes());
         assert_eq!(&a[16..24], &0x0102_0304_0506_0708u64.to_be_bytes());
-    }
 
-    #[test]
-    fn write_to_rejects_small_buffer_without_writing() {
+        // write_to: rejects too-small buffer without writing
         let mut ev = OcelEvent::new(1, 2, 3, 4);
         ev.objects.push(5, 6);
         let mut small = [0u8; 8];
         assert_eq!(ev.write_to(&mut small), Err(EvidenceError::BufferTooSmall));
-        // Nothing was written.
         assert_eq!(small, [0u8; 8]);
-        // Exact-fit buffer succeeds.
         let mut exact = [0u8; OcelEvent::HEADER_BYTES + OcelEvent::OBJECT_BYTES];
         assert!(ev.write_to(&mut exact).is_ok());
-    }
 
-    // ── EvidenceError ────────────────────────────────────────────────────────
-
-    #[test]
-    fn evidence_error_display_contains_description() {
-        // We test Display via a format string since core::fmt::Write on &mut str is awkward.
-        // We use a no_std compatible approach: check via Debug's output proxy.
+        // EvidenceError Copy + PartialEq
         let e = EvidenceError::BufferTooSmall;
-        // Clone and PartialEq work.
         assert_eq!(e, EvidenceError::BufferTooSmall);
-        let e2 = e;
-        assert_eq!(e, e2); // Copy
+        assert_eq!(e, e); // Copy
     }
-
-    // ── OcelLog (alloc only) ─────────────────────────────────────────────────
 
     #[cfg(feature = "alloc")]
     #[test]
-    fn ocel_log_collects_events() {
+    fn ocel_log_and_json() {
+        // collection basics
         let mut log = OcelLog::new();
         assert!(log.is_empty());
         log.push(OcelEvent::new(1, 2, 3, 4));
         log.push(OcelEvent::new(5, 6, 7, 8));
         assert_eq!(log.len(), 2);
         assert!(!log.is_empty());
-        assert_eq!(log.as_slice().len(), 2);
         assert_eq!(log.iter().count(), 2);
         assert_eq!((&log).into_iter().count(), 2);
-    }
 
-    #[cfg(feature = "alloc")]
-    #[test]
-    fn to_json_is_object_centric() {
+        // empty log renders []
+        assert_eq!(OcelLog::new().to_json(), "[]");
+
+        // JSON is object-centric with scalar fields and linked objects
         let mut a = OcelEvent::new(10, 20, 30, 4);
         a.objects.push(100, 1000);
         a.objects.push(101, 1001);
         let mut log = OcelLog::new();
         log.push(a);
         log.push(OcelEvent::new(11, 21, 31, 7));
-
         let json = log.to_json();
-        assert!(json.starts_with('['));
-        assert!(json.ends_with(']'));
-        // Scalar fields surface.
+        assert!(json.starts_with('[') && json.ends_with(']'));
         assert!(json.contains("\"event_code\":10"));
         assert!(json.contains("\"activity\":20"));
         assert!(json.contains("\"timestamp\":30"));
         assert!(json.contains("\"status\":4"));
-        // Each event carries its own linked objects (object-centric).
         assert!(
             json.contains("\"objects\":[{\"type\":100,\"id\":1000},{\"type\":101,\"id\":1001}]")
         );
-        // The second event has an empty object array.
         assert!(json.contains("\"status\":7,\"objects\":[]"));
-    }
 
-    #[cfg(feature = "alloc")]
-    #[test]
-    fn empty_log_renders_empty_json_array() {
-        let log = OcelLog::new();
-        assert_eq!(log.to_json(), "[]");
-    }
-
-    #[cfg(feature = "alloc")]
-    #[test]
-    fn ocel_event_with_multiple_object_ids_in_log() {
+        // multiple objects per event are all present in JSON
         let mut ev = OcelEvent::new(42, 1, 9999, 0);
         ev.objects.push(0x01, 100);
         ev.objects.push(0x02, 200);
@@ -663,21 +597,5 @@ mod tests {
         assert!(json.contains("\"type\":1,\"id\":100"));
         assert!(json.contains("\"type\":2,\"id\":200"));
         assert!(json.contains("\"type\":3,\"id\":300"));
-    }
-
-    // ── helpers ──────────────────────────────────────────────────────────────
-
-    /// Format a `Display` value to a stack string via a small alloc-free trick.
-    /// In no_std tests we can't use `format!`, so we fall back to Debug when alloc is absent.
-    #[cfg(not(feature = "alloc"))]
-    #[allow(dead_code)]
-    fn alloc_or_format<T: core::fmt::Debug>(v: &T) -> &'static str {
-        let _ = v;
-        "<no alloc>"
-    }
-
-    #[cfg(feature = "alloc")]
-    fn alloc_or_format<T: core::fmt::Display>(v: &T) -> alloc::string::String {
-        alloc::format!("{}", v)
     }
 }

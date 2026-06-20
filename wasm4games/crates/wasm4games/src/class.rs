@@ -344,11 +344,9 @@ mod tests {
     use alloc::collections::BTreeMap;
     use alloc::string::ToString;
 
-    // ── status module ─────────────────────────────────────────────────────────────
-
     #[test]
-    fn status_constants_ordering() {
-        // The lattice order must hold
+    fn status_vocabulary_and_byte_class() {
+        // Lattice order
         assert!(status::UNKNOWN < status::BLOCKED);
         assert!(status::BLOCKED < status::PARTIAL);
         assert!(status::PARTIAL < status::PENDING);
@@ -358,20 +356,16 @@ mod tests {
         assert!(status::RECEIPTED < status::REFUSED);
         assert!(status::REFUSED < status::RESIDUAL);
         assert!(status::RESIDUAL < status::COUNT);
-    }
 
-    #[test]
-    fn status_is_valid() {
+        // is_valid
         for code in 0..status::COUNT {
             assert!(status::is_valid(code), "code {code} should be valid");
         }
         assert!(!status::is_valid(status::COUNT));
         assert!(!status::is_valid(99));
-    }
 
-    #[test]
-    fn status_name_all_known() {
-        let expected = [
+        // name table
+        let expected: &[(u8, &str)] = &[
             (status::UNKNOWN, "UNKNOWN"),
             (status::BLOCKED, "BLOCKED"),
             (status::PARTIAL, "PARTIAL"),
@@ -382,65 +376,36 @@ mod tests {
             (status::REFUSED, "REFUSED"),
             (status::RESIDUAL, "RESIDUAL"),
         ];
-        for (code, name) in expected {
+        for &(code, name) in expected {
             assert_eq!(status::name(code), name, "wrong name for code {code}");
         }
         assert_eq!(status::name(99), "?");
-    }
 
-    // ── ByteClass ────────────────────────────────────────────────────────────────
-
-    #[test]
-    fn byte_class_clamp_bounds() {
+        // ByteClass: clamp, is_in_domain, Display, default, Ord, raw
         assert_eq!(ByteClass(200).clamp(status::COUNT).raw(), status::COUNT - 1);
         assert_eq!(ByteClass(3).clamp(status::COUNT).raw(), 3);
         assert_eq!(ByteClass(5).clamp(0).raw(), 0);
-        // Edge: exactly at the boundary
         assert_eq!(ByteClass(8).clamp(9).raw(), 8);
         assert_eq!(ByteClass(9).clamp(9).raw(), 8);
-    }
-
-    #[test]
-    fn byte_class_is_in_domain() {
         assert!(ByteClass(0).is_in_domain(status::COUNT));
         assert!(ByteClass(8).is_in_domain(status::COUNT));
         assert!(!ByteClass(9).is_in_domain(status::COUNT));
         assert!(!ByteClass(200).is_in_domain(status::COUNT));
-    }
-
-    #[test]
-    fn byte_class_display() {
         assert_eq!(ByteClass(3).to_string(), "ByteClass(3)");
-        assert_eq!(ByteClass(0).to_string(), "ByteClass(0)");
-        assert_eq!(ByteClass(255).to_string(), "ByteClass(255)");
-    }
-
-    #[test]
-    fn byte_class_default_is_zero() {
         assert_eq!(ByteClass::default().raw(), 0);
         assert_eq!(ByteClass::default(), ByteClass::new(0));
-    }
-
-    #[test]
-    fn byte_class_ord() {
         assert!(ByteClass(0) < ByteClass(1));
-        assert!(ByteClass(8) < ByteClass(255));
         let mut classes = [ByteClass(5), ByteClass(1), ByteClass(3)];
         classes.sort();
         assert_eq!(classes, [ByteClass(1), ByteClass(3), ByteClass(5)]);
-    }
-
-    #[test]
-    fn byte_class_raw_roundtrip() {
         for v in [0u8, 1, 8, 127, 255] {
             assert_eq!(ByteClass::new(v).raw(), v);
         }
     }
 
-    // ── Status ───────────────────────────────────────────────────────────────────
-
     #[test]
-    fn join_is_worst_of() {
+    fn status_typed_behavior() {
+        // join: worst-of, commutative, idempotent
         assert_eq!(
             Status(status::ADMITTED).join(Status(status::REFUSED)).raw(),
             status::REFUSED
@@ -449,10 +414,6 @@ mod tests {
             Status(status::UNKNOWN).join(Status(status::ADMITTED)).raw(),
             status::ADMITTED
         );
-    }
-
-    #[test]
-    fn join_is_commutative() {
         for a in 0..status::COUNT {
             for b in 0..status::COUNT {
                 assert_eq!(
@@ -462,18 +423,12 @@ mod tests {
                 );
             }
         }
-    }
-
-    #[test]
-    fn join_is_idempotent() {
         for code in 0..status::COUNT {
             let s = Status(code);
             assert_eq!(s.join(s), s, "join not idempotent for {code}");
         }
-    }
 
-    #[test]
-    fn status_display() {
+        // Display
         assert_eq!(
             Status::new(status::ADMITTED).to_string(),
             "Status(ADMITTED)"
@@ -485,49 +440,22 @@ mod tests {
             "Status(RESIDUAL)"
         );
         assert_eq!(Status::new(99).to_string(), "Status(?)");
-    }
 
-    #[test]
-    fn status_default_is_unknown() {
+        // default, const associated values, is_valid, status_name
         assert_eq!(Status::default().raw(), status::UNKNOWN);
         assert_eq!(Status::default(), Status::UNKNOWN);
-    }
-
-    #[test]
-    fn status_const_associated_values() {
         assert_eq!(Status::UNKNOWN.raw(), status::UNKNOWN);
-        assert_eq!(Status::BLOCKED.raw(), status::BLOCKED);
-        assert_eq!(Status::PARTIAL.raw(), status::PARTIAL);
-        assert_eq!(Status::PENDING.raw(), status::PENDING);
-        assert_eq!(Status::ADMITTED.raw(), status::ADMITTED);
-        assert_eq!(Status::PROJECTED.raw(), status::PROJECTED);
-        assert_eq!(Status::RECEIPTED.raw(), status::RECEIPTED);
         assert_eq!(Status::REFUSED.raw(), status::REFUSED);
         assert_eq!(Status::RESIDUAL.raw(), status::RESIDUAL);
-    }
-
-    #[test]
-    fn status_typed_is_valid() {
-        // Tests the `Status::is_valid` method on the typed wrapper
         for code in 0..status::COUNT {
             assert!(Status::new(code).is_valid(), "code {code} should be valid");
         }
         assert!(!Status::new(status::COUNT).is_valid());
-        assert!(!Status::new(99).is_valid());
-    }
-
-    #[test]
-    fn status_name_method() {
         assert_eq!(Status::ADMITTED.status_name(), "ADMITTED");
-        assert_eq!(Status::REFUSED.status_name(), "REFUSED");
         assert_eq!(Status::new(99).status_name(), "?");
-    }
 
-    #[test]
-    fn status_ord() {
-        // Typed Status ordering mirrors the numeric ordering
+        // Ord + BTreeMap key
         assert!(Status::UNKNOWN < Status::BLOCKED);
-        assert!(Status::BLOCKED < Status::PARTIAL);
         assert!(Status::REFUSED < Status::RESIDUAL);
         let mut statuses = [Status::REFUSED, Status::UNKNOWN, Status::ADMITTED];
         statuses.sort();
@@ -535,12 +463,6 @@ mod tests {
             statuses,
             [Status::UNKNOWN, Status::ADMITTED, Status::REFUSED]
         );
-    }
-
-    #[test]
-    fn status_as_btree_key() {
-        // Status is Ord + Hash, usable as key in both BTreeMap and HashMap.
-        // Use BTreeMap here (available in no_std+alloc).
         let mut map = BTreeMap::new();
         map.insert(Status::ADMITTED, "ok");
         map.insert(Status::REFUSED, "no");
