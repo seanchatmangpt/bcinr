@@ -11,43 +11,29 @@ Verdict bit0 set iff |proposed - current| exceeds max_speed (teleport cheat); a 
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes MovementLegalityChecked necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: legality spec: |proposed - cur| <= max_speed -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Teleportation cheats work by submitting position updates where the distance from the player's current position to the proposed position exceeds what any human-speed movement could produce in a single game tick. The anti-cheat gate computes `|proposed - current| > max_speed` and refuses the update. A naïve conditional branch on this inequality leaks timing information: cheaters can instrument the branch to measure which direction the comparison goes, probing the exact value of `max_speed` through timing differentials without triggering any observable refusal. Branchless comparison eliminates the timing side channel while maintaining the legality invariant.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every MovementLegalityChecked call that branches adds jitter
-     - Deterministic latency: the Mask lowering gives O(1) constant time
-     - Bounded state: stateCard = 2 (2 distinct states)
-     - Auditability: the OCEL event code 133 ties the transition to an object trace
-     Authority to defend: legality spec: |proposed - cur| <= max_speed -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — a conditional branch on the speed comparison mispredicts at the legality boundary and leaks timing information usable for side-channel speed-limit probing.
+- **Deterministic latency** — the Mask lowering via `lt_mask_u32` gives O(1) constant time; the verdict is computed as pure arithmetic with no conditional branching.
+- **Side-channel resistance** — the execution path must be identical for legal and illegal moves; `lt_mask_u32` achieves this by converting the comparison to an all-ones or all-zeros mask without branching.
+- **Signed displacement** — position values are signed 16-bit coordinates; displacement is `|proposed - current|` as an unsigned magnitude, computed via `abs_i32` without branching on the sign.
+- **OCEL auditability** — OCEL event code 133 ties each movement check to a `player` object trace for anti-cheat audit logs.
 
 ## Solution
 
-<!-- TODO: Explain how movement_legality_checked resolves the forces.
-     It lowers onto `bcinr_logic::mask::lt_mask_u32` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Mask` was the right lowering choice. -->
+The kernel packs `state` bits[0..15] as the current position (u16 interpreted as i32) and `input` bits[0..15] as the proposed position and bits[16..31] as max_speed. The displacement is `abs_i32(prop - cur) as u32`, computed branchlessly. `lt_mask_u32(max, delta)` produces all-ones when `max < delta` (teleport detected), all-zeros otherwise. The result is `u64::from(lt_mask_u32(max, delta)) & 1`: verdict bit0 is 1 on refusal (teleport), 0 on admission. This is the Mask lowering: the legality predicate `delta <= max` is resolved by a single mask operation with no branching.
 
 **Branchless primitive:** `bcinr_logic::mask::lt_mask_u32`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 2 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
+**Gains:** Execution time is identical for legal and illegal moves, closing the timing side channel. Displacement exactly equal to max_speed is admitted (boundary-inclusive invariant verified by Hoare-logic). The verdict is a single bit in the return value, composable with other anti-cheat verdict bits via OR.
 
-_Replace this placeholder with consequences and trade-offs._
+**Costs:** The bit-field ABI is fixed — current position in state bits[0..15], proposed position in input bits[0..15], max_speed in input bits[16..31]. Position values are 16-bit, limiting the coordinate space to 0..=65535 per axis; larger worlds require a kernel variant with 32-bit positions.
+
+**Compositions:** The verdict bit composes with `resource_bound_checked`, `cooldown_legality_checked`, and `action_rate_bounded` via OR to build a full per-tick anti-cheat verdict. Movement legality is one transition input into `transition_legality_checked` when the player's full state machine is under surveillance.
 
 ---
 
@@ -55,22 +41,16 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["movement_legality_checked\nMask: bcinr_logic::mask::lt_mask_u32"]
-    result["result\n(u64)"]
+    state["state (u64)\nbits[0..15] = current pos (i16)"]
+    input["input (u64)\nbits[0..15] = proposed pos (i16)\nbits[16..31] = max_speed (u16)"]
+    kernel["movement_legality_checked\nMask: abs_i32(prop-cur)\n+ lt_mask_u32(max, delta) & 1\nbit0=1 iff delta > max_speed"]
+    result["result (u64)\n0 = ADMITTED (legal move)\nbit0 = 1 (teleport refused)"]
     state --> kernel
     input --> kernel
     kernel --> result
-    ocel_0["OCEL: player"]
+    ocel_0["OCEL: player\nevent code 133"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +102,10 @@ otel::emit(133);
 let ev = OcelEvent::new(133, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [ResourceBoundChecked](resource_bound_checked.md) — same anti-cheat Mask verdict idiom for resource overflow detection.
+- [ActionRateBounded](action_rate_bounded.md) — action rate and movement legality are complementary per-tick anti-cheat gates.
+- [TransitionLegalityChecked](transition_legality_checked.md) — movement legality is one transition input in the full game-state cheat DFA.

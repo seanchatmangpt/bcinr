@@ -11,43 +11,25 @@ Rewind a server-authoritative position by lag*velocity to estimate where the cli
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes LagCompensationApplied necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches lag_compensation_applied_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Server-side hit detection must check collision at the tick when the client fired, not the current server tick — otherwise fast-moving players are unhittable from the client's perspective because the server sees them at a later position. The rewind formula `compensated = server_position - lag_ticks * velocity` computes where the target was. With two's-complement signed velocity (a player moving left has negative velocity) and potentially large lag values (100+ ticks under packet loss), the subtraction can underflow a u16 coordinate to wrap around to near-65535 — placing the rewound position on the opposite side of the map.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every LagCompensationApplied call that branches adds jitter
-     - Deterministic latency: the Saturating lowering gives O(1) constant time
-     - Bounded state: stateCard = 32 (32 distinct states)
-     - Auditability: the OCEL event code 114 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches lag_compensation_applied_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — a naïve `if compensated < 0 { 0 } else { compensated }` floor branches on every lag-spike tick, precisely when network conditions are worst and the branch is least predictable.
+- **Deterministic latency** — the Saturating lowering uses `saturating_sub_i64` + `.max(0)` + `clamp_u32`, all branchless primitives, giving O(1) fixed execution regardless of whether the floor or ceiling fires.
+- **Signed velocity encoding** — velocity is stored as a u16 in two's-complement (i16 reinterpreted as u16) to fit in the packed-u64 ABI; the kernel reinterprets it as `vel_raw as i16` to recover the signed value before multiplication.
+- **Two-sided coordinate bound** — `clamp_u32(rewind.max(0) as u32, 0, 0xFFFF)` ensures the compensated position is always a valid u16 game coordinate, even for extreme lag and velocity combinations.
+- **OCEL auditability** — event code 114 ties each rewound position to both the `peer` and `player` object traces, enabling forensic verification of hit detection decisions.
 
 ## Solution
 
-<!-- TODO: Explain how lag_compensation_applied resolves the forces.
-     It lowers onto `bcinr_logic::fix::clamp_u32` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Saturating` was the right lowering choice. -->
+**Branchless primitive:** `bcinr_logic::int::saturating_sub_i64`
 
-**Branchless primitive:** `bcinr_logic::fix::clamp_u32`
-
-_Replace this placeholder with the solution description._
+State bits[0..16] carry `server_position` (u16) and bits[16..32] carry `velocity` encoded as i16 in u16 two's-complement. Input bits[0..8] carry `lag_ticks` (u8). The kernel extracts velocity as `(vel_raw as i16) as i64` to recover the signed value. `saturating_sub_i64(server_pos, velocity * lag)` performs the rewind without i64 overflow; `.max(0)` floors negative results; `clamp_u32(..., 0, 0xFFFF)` enforces the valid coordinate ceiling. The Saturating lowering was chosen because the rewind is an inherently signed subtraction that must be guarded against both underflow and overflow at the i64 level before the u16 truncation.
 
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 32 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** Rewound position is provably in [0, 0xFFFF]; signed velocity is handled correctly without a sign-extension branch; the result is reproducible for the same (server_pos, velocity, lag) triple. **Costs:** Linear rewind assumes constant velocity over the lag window — if the target changed direction during the lag, the estimate is incorrect; velocity and lag are limited to i16 and u8 respectively. **Compositions:** The bounded delta from `tick_delta_bounded` limits the lag value passed to this kernel; `prediction_error_bounded` computes the difference between the rewound server position and the client's prediction; `aabb_collision_resolved` tests collision at the rewound position.
 
 ---
 
@@ -55,24 +37,18 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["lag_compensation_applied\nSaturating: bcinr_logic::fix::clamp_u32"]
-    result["result\n(u64)"]
+    state["state (u64)\nbits[0..16] = server_position (u16)\nbits[16..32] = velocity (i16 as u16)"]
+    input["input (u64)\nbits[0..8] = lag_ticks (u8)"]
+    kernel["lag_compensation_applied\nSaturating: sat_sub_i64(pos, vel*lag) → max(0) → clamp_u32"]
+    result["result (u64)\nbits[0..16] = compensated position\nin [0, 0xFFFF]"]
     state --> kernel
     input --> kernel
     kernel --> result
-    ocel_0["OCEL: peer"]
+    ocel_0["OCEL: peer (code 114)"]
     result --> ocel_0
     ocel_1["OCEL: player"]
     result --> ocel_1
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -98,7 +74,7 @@ graph LR
 | Family | Multiplayer / Network |
 | Lowering | `Saturating` |
 | State cardinality | 32 |
-| Primitive | `bcinr_logic::fix::clamp_u32` |
+| Primitive | `bcinr_logic::int::saturating_sub_i64` |
 | Kernel signature | `lag_compensation_applied(state: u64, input: u64) -> u64` |
 | Source kernel | `src/patterns/lag_compensation_applied.rs` |
 
@@ -124,17 +100,10 @@ otel::emit(114);
 let ev = OcelEvent::new(114, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [TickDeltaBounded](tick_delta_bounded.md) — bounded tick delta constrains the lag value passed to this kernel, limiting maximum rewind depth.
+- [PredictionErrorBounded](prediction_error_bounded.md) — prediction error is computed after lag compensation to measure how well the client predicted the rewound position.
+- [SyncStateAdmitted](sync_state_admitted.md) — lag compensation is applied in the SYNCED state; excessive rewind depth signals drift and may trigger a DRIFTED transition.

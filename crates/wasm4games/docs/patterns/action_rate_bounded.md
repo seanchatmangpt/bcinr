@@ -11,43 +11,29 @@ Verdict bit0 set iff actions issued this tick strictly exceed the per-tick budge
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes ActionRateBounded necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: legality spec: actions_this_tick <= tick_budget -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Macro and action-spam cheats issue more actions per game tick than human hand speed allows — clicking at 60 Hz on a system that enforces 10 actions per tick, or flooding server inputs during a lag spike. The server counts actions received per tick and refuses the tick's input if the count exceeds the per-tick budget. A naïve conditional `if actions > budget { refuse }` branch on the comparison leaks timing information: an adversary can measure whether their action count causes a branch-taken or branch-not-taken path, probing the exact budget value through timing differentials without being visibly refused.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every ActionRateBounded call that branches adds jitter
-     - Deterministic latency: the Mask lowering gives O(1) constant time
-     - Bounded state: stateCard = 2 (2 distinct states)
-     - Auditability: the OCEL event code 136 ties the transition to an object trace
-     Authority to defend: legality spec: actions_this_tick <= tick_budget -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — a conditional branch on `actions > budget` leaks timing variation correlated with the budget boundary, enabling side-channel probing.
+- **Deterministic latency** — the Mask lowering via `lt_mask_u32` gives O(1) constant time; the verdict is computed as a pure mask operation with no conditional branching.
+- **Side-channel resistance** — action counts below and above the budget must produce execution paths of identical duration; `lt_mask_u32(budget, actions)` achieves this.
+- **Boundary inclusivity** — exactly budget actions in a tick is legal and must be admitted; only strict excess (actions > budget) is refused.
+- **OCEL auditability** — OCEL event code 136 ties each rate check to a `player` object trace for anti-cheat audit logs.
 
 ## Solution
 
-<!-- TODO: Explain how action_rate_bounded resolves the forces.
-     It lowers onto `bcinr_logic::mask::lt_mask_u32` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Mask` was the right lowering choice. -->
+The kernel packs `state` bits[0..15] as the actions-this-tick count (u16) and `input` bits[0..15] as the per-tick budget (u16). `lt_mask_u32(budget, actions)` produces all-ones when `budget < actions` (rate exceeded), all-zeros otherwise. The result is `u64::from(lt_mask_u32(budget, actions)) & 1`: verdict bit0 is 1 on refusal (over-budget), 0 on admission. This is the Mask lowering: the over-budget predicate `actions > budget` is resolved by `lt_mask_u32(budget, actions)` with the arguments reversed — the same standard Mask idiom used by `resource_bound_checked` for analogous greater-than detection.
 
 **Branchless primitive:** `bcinr_logic::mask::lt_mask_u32`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 2 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
+**Gains:** Execution time is identical for legal and illegal action counts, closing the timing side channel. Actions exactly equal to the budget are admitted (boundary-inclusive invariant verified by Hoare-logic). The verdict bit composes with other anti-cheat verdict bits via OR to build a complete per-tick refusal mask.
 
-_Replace this placeholder with consequences and trade-offs._
+**Costs:** The bit-field ABI is fixed — action count in state bits[0..15], budget in input bits[0..15]. Values are limited to 16 bits; games with per-tick budgets above 65535 require a kernel variant.
+
+**Compositions:** Verdict bit composes with `movement_legality_checked`, `resource_bound_checked`, and `cooldown_legality_checked` via OR to form the complete per-tick anti-cheat verdict. Rate bounding and cooldown checking are complementary: cooldown enforces per-ability timing gaps while rate bounding enforces total-actions-per-tick caps.
 
 ---
 
@@ -55,22 +41,16 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["action_rate_bounded\nMask: bcinr_logic::mask::lt_mask_u32"]
-    result["result\n(u64)"]
+    state["state (u64)\nbits[0..15] = actions this tick (u16)"]
+    input["input (u64)\nbits[0..15] = per-tick budget (u16)"]
+    kernel["action_rate_bounded\nMask: lt_mask_u32(budget, actions) & 1\nbit0=1 iff actions > budget"]
+    result["result (u64)\n0 = ADMITTED (actions <= budget)\nbit0 = 1 (spam refused)"]
     state --> kernel
     input --> kernel
     kernel --> result
-    ocel_0["OCEL: player"]
+    ocel_0["OCEL: player\nevent code 136"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +102,10 @@ otel::emit(136);
 let ev = OcelEvent::new(136, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [CooldownLegalityChecked](cooldown_legality_checked.md) — cooldown and rate are complementary anti-cheat gates; cooldown is per-ability, rate is per-tick total.
+- [MovementLegalityChecked](movement_legality_checked.md) — same anti-cheat Mask verdict idiom; all four gates compose via OR.
+- [ResourceBoundChecked](resource_bound_checked.md) — all four anti-cheat checks compose into the complete per-tick anti-cheat verdict bitmask.
