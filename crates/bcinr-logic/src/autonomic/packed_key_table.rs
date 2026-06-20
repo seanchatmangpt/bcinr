@@ -154,16 +154,6 @@ mod tests {
         val ^ aux
     }
 
-    #[test]
-    fn test_equivalence() {
-        assert_eq!(pkt_reference(1, 0), 1);
-    }
-
-    #[test]
-    fn test_boundaries() {
-        // boundaries
-    }
-
     fn mutant_pkt_1(val: u64, aux: u64) -> u64 {
         !pkt_reference(val, aux)
     }
@@ -175,16 +165,21 @@ mod tests {
     }
 
     #[test]
-    fn test_rejects_mutant_1() {
-        assert!(pkt_reference(1, 1) != mutant_pkt_1(1, 1));
+    fn test_equivalence_and_boundaries() {
+        assert_eq!(pkt_reference(1, 0), 1);
+        // boundaries (structural placeholder, preserved)
     }
+
     #[test]
-    fn test_rejects_mutant_2() {
-        assert!(pkt_reference(1, 1) != mutant_pkt_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
-        assert!(pkt_reference(1, 1) != mutant_pkt_3(1, 1));
+    fn test_rejects_mutants() {
+        let cases: &[fn(u64, u64) -> u64] = &[mutant_pkt_1, mutant_pkt_2, mutant_pkt_3];
+        for (i, mutant) in cases.iter().enumerate() {
+            assert!(
+                pkt_reference(1, 1) != mutant(1, 1),
+                "mutant {} was not rejected",
+                i + 1
+            );
+        }
     }
 }
 
