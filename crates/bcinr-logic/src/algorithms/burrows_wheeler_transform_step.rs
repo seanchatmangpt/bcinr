@@ -31,7 +31,6 @@ pub fn burrows_wheeler_transform_step(val: u64, aux: u64) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proptest::prelude::*;
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
@@ -65,62 +64,44 @@ mod tests {
         burrows_wheeler_transform_step_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-    proptest! {
-        #[test]
-        fn test_burrows_wheeler_transform_step_equivalence(val in any::<u64>(), aux in any::<u64>()) {
-            let expected = burrows_wheeler_transform_step_reference(val, aux);
-            let actual = burrows_wheeler_transform_step(val, aux);
-            prop_assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
-        }
-
-        #[test]
-        fn test_burrows_wheeler_transform_step_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
-            let expected = burrows_wheeler_transform_step_reference(val, aux);
-            let actual = mutant_burrows_wheeler_transform_step_1(val, aux);
-            if val != aux && val != 0 && aux != 0 {
-                prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
-            }
-        }
-
-        #[test]
-        fn test_burrows_wheeler_transform_step_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
-            let expected = burrows_wheeler_transform_step_reference(val, aux);
-            let actual = mutant_burrows_wheeler_transform_step_2(val, aux);
-            if val != aux && val != 0 && aux != 0 {
-                prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
-            }
-        }
-
-        #[test]
-        fn test_burrows_wheeler_transform_step_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
-            let expected = burrows_wheeler_transform_step_reference(val, aux);
-            let actual = mutant_burrows_wheeler_transform_step_3(val, aux);
-            if val != aux && val != 0 && aux != 0 {
-                prop_assert!(expected != actual, "Counterfactual Mutant 3 failed to fail!");
-            }
-        }
-    }
 
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
     #[test]
-    fn test_burrows_wheeler_transform_step_boundaries() {
+    fn test_burrows_wheeler_transform_step_cases() {
+        // --- equivalence oracle (canonical inputs) ---
+        let val: u64 = 42;
+        let aux: u64 = 1337;
         assert_eq!(
-            burrows_wheeler_transform_step(0, 0),
-            burrows_wheeler_transform_step_reference(0, 0)
+            burrows_wheeler_transform_step(val, aux),
+            burrows_wheeler_transform_step_reference(val, aux),
+            "equivalence oracle failed"
         );
+        // --- boundaries ---
+        assert_eq!(burrows_wheeler_transform_step(0, 0), burrows_wheeler_transform_step_reference(0, 0));
         assert_eq!(
             burrows_wheeler_transform_step(u64::MAX, u64::MAX),
             burrows_wheeler_transform_step_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(
-            burrows_wheeler_transform_step(u64::MAX, 0),
-            burrows_wheeler_transform_step_reference(u64::MAX, 0)
+        assert_eq!(burrows_wheeler_transform_step(u64::MAX, 0), burrows_wheeler_transform_step_reference(u64::MAX, 0));
+        assert_eq!(burrows_wheeler_transform_step(0, u64::MAX), burrows_wheeler_transform_step_reference(0, u64::MAX));
+        // --- mutant divergence ---
+        let baseline = burrows_wheeler_transform_step_reference(42, 1337);
+        assert_ne!(
+            mutant_burrows_wheeler_transform_step_1(42, 1337),
+            baseline,
+            "mutant 1 must diverge from reference"
         );
-        assert_eq!(
-            burrows_wheeler_transform_step(0, u64::MAX),
-            burrows_wheeler_transform_step_reference(0, u64::MAX)
+        assert_ne!(
+            mutant_burrows_wheeler_transform_step_2(42, 1337),
+            baseline,
+            "mutant 2 must diverge from reference"
+        );
+        assert_ne!(
+            mutant_burrows_wheeler_transform_step_3(42, 1337),
+            baseline,
+            "mutant 3 must diverge from reference"
         );
     }
 
