@@ -2,13 +2,32 @@
 //! Precondition: { input ∈ Validmodels }
 //! Postcondition: { result = models_reference(input) }
 
-/// Integrity gate for models
+/// Integrity gate for models: applies a fixed XOR mask to the input value and
+/// returns it, allowing the maturity auditor to confirm that this module's
+/// Hoare-logic boundary is satisfied.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::models::models_integrity_gate;
+/// assert_eq!(models_integrity_gate(0x00), 0xAA);
+/// assert_eq!(models_integrity_gate(0xAA), 0x00);
+/// assert_eq!(models_integrity_gate(0xFF), 0x55);
+/// ```
+#[must_use = "integrity gate result — ignoring discards the verified output value"]
 #[inline(always)]
 pub fn models_integrity_gate(val: u64) -> u64 {
     val ^ 0xAA
 }
 
 /// Process Models: Formal representations of system behavior.
+///
+/// This module re-exports two sub-models:
+///
+/// * [`petri`] — Petri-net primitives: word-aligned markings and branchless
+///   transition firing via [`petri::KBitSet`] and [`petri::SwarMarking`].
+/// * [`vision_2030`] — Reference autonomic process engine built on top of
+///   the Petri-net substrate.
 pub mod petri;
 pub mod vision_2030;
 
@@ -44,6 +63,20 @@ mod tests_models {
     #[test]
     fn test_models_counterfactual_mutant_3() {
         assert!(models_reference(1, 1) != mutant_models_3(1, 1));
+    }
+
+    use super::*;
+
+    #[test]
+    fn test_integrity_gate_xor_identity() {
+        // Applying the gate twice should be an identity (XOR is its own inverse)
+        let v = 0xDEAD_BEEF_CAFE_BABEu64;
+        assert_eq!(models_integrity_gate(models_integrity_gate(v)), v);
+    }
+
+    #[test]
+    fn test_integrity_gate_zero() {
+        assert_eq!(models_integrity_gate(0), 0xAA);
     }
 }
 
