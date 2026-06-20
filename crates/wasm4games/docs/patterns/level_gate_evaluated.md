@@ -11,43 +11,23 @@ Gate an ability or item unlock: banned->REFUSED, level met->ADMITTED, else BLOCK
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes LevelGateEvaluated necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches level_gate_evaluated_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Game content — abilities, items, zones, shop slots — is routinely gated behind player level to enforce progression pacing. The gate also enforces a permanent ban flag for players who have exploited the economy or violated terms of service; a banned player must be refused regardless of level. Without branchless composition, the gate is a nested if-else: check ban first, then check level, producing two conditional branches per gate evaluation. In a busy frame that evaluates dozens of content gates (UI state, item eligibility, NPC dialogue unlocks), the branch overhead and audit surface both grow proportionally.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every LevelGateEvaluated call that branches adds jitter
-     - Deterministic latency: the Mask lowering gives O(1) constant time
-     - Bounded state: stateCard = 2 (2 distinct states)
-     - Auditability: the OCEL event code 95 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches level_gate_evaluated_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — a nested `if banned / else if level >= required / else BLOCKED` introduces two mispredictable branches per gate call.
+- **Deterministic latency** — the Mask lowering composes two `select_u32` calls in O(1), producing the status code without any conditional.
+- **Ban override** — the ban flag must have strict priority over the level check; a banned-but-eligible player must receive REFUSED, never ADMITTED, and this priority must be structurally enforced, not left to call-site ordering.
+- **Three-way output** — the kernel emits one of three status codes (ADMITTED=4, BLOCKED=1, REFUSED=7) rather than a boolean, enabling downstream patterns to distinguish "not yet" from "never".
+- **OCEL auditability** — OCEL event code 95 ties every gate decision to an auditable `player` object trace, supporting compliance and progression forensics.
 
 ## Solution
 
-<!-- TODO: Explain how level_gate_evaluated resolves the forces.
-     It lowers onto `bcinr_logic::mask::select_u32` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Mask` was the right lowering choice. -->
-
-**Branchless primitive:** `bcinr_logic::mask::select_u32`
-
-_Replace this placeholder with the solution description._
+The kernel packs state as bits[0..8] = player level and bits[8..16] = ban flag, and input as bits[0..8] = required level. `lt_mask_u32(player_level, required)` produces the "below required" mask; its complement is the "meets requirement" mask, which drives the first `select_u32(meets_req, ADMITTED, BLOCKED)` to produce the base result. The ban mask is computed as `0u32.wrapping_sub(banned)` — zero when not banned, all-ones when banned — and a second `select_u32(ban_mask, REFUSED, base)` overrides the base with REFUSED. Because `select_u32` evaluates both arms unconditionally and picks via mask, the ban override is enforced at the arithmetic level rather than at call-site control flow. The `Mask` lowering is correct here because the entire logic reduces to two priority-ordered mask selects.
 
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 2 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** the two-level priority (ban overrides level) is structurally guaranteed, not dependent on call-site ordering; three-way status codes let downstream patterns distinguish permanently refused (REFUSED) from temporarily blocked (BLOCKED); OCEL event 95 provides a complete gate decision audit. **Costs:** the player-level field is 8 bits (max level 255); games with wider level ranges must widen the state field. **Compositions:** this pattern receives its input from [XpThresholdCrossed](xp_threshold_crossed.md) — a level-up event feeds a new level into the gate — and acts as a prerequisite guard before [PurchaseAdmitted](purchase_admitted.md) and [NpsPromptGated](nps_prompt_gated.md).
 
 ---
 
@@ -55,22 +35,21 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["level_gate_evaluated\nMask: bcinr_logic::mask::select_u32"]
-    result["result\n(u64)"]
-    state --> kernel
-    input --> kernel
-    kernel --> result
+    state["state (u64)\nbits[0..8]: player level\nbits[8..16]: ban flag (1=banned)"]
+    input["input (u64)\nbits[0..8]: required level"]
+    meets["meets_req mask\n!lt_mask_u32(player_level, required)"]
+    base["base = select_u32(meets_req,\nADMITTED=4, BLOCKED=1)"]
+    ban["ban_mask = 0u32.wrapping_sub(banned)"]
+    result["result (u64)\nbits[0..8]: status code\nADMITTED=4 / BLOCKED=1 / REFUSED=7"]
+    state --> meets
+    input --> meets
+    meets --> base
+    state --> ban
+    ban --> result
+    base --> result
     ocel_0["OCEL: player"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +101,10 @@ otel::emit(95);
 let ev = OcelEvent::new(95, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [XpThresholdCrossed](xp_threshold_crossed.md) — a level-up event feeds a new level into this gate, unlocking new content.
+- [PurchaseAdmitted](purchase_admitted.md) — the level gate precedes purchase admission; only ADMITTED players may enter the purchase FSM.
+- [NpsPromptGated](nps_prompt_gated.md) — the same two-select gate idiom gates NPS survey prompts by engagement level.

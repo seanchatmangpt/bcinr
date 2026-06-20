@@ -11,43 +11,25 @@ Integrate a projectile by velocity with saturation, then clamp into the field.
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes ProjectileAdvanced necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches projectile_advanced_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Projectiles — bullets, arrows, spells — must be advanced by their velocity vector on every game tick and kept within the play-field boundary. Without saturating arithmetic, a projectile with a large velocity near the field edge produces an integer overflow that wraps the position to the opposite side of the coordinate space, generating ghost hits against collision geometry that was never physically traversed and corrupting every downstream AABB test for that tick. The standard defensive fix is an if-overflow branch, but at hundreds of projectiles per tick those branches thrash the predictor unpredictably.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every ProjectileAdvanced call that branches adds jitter
-     - Deterministic latency: the Saturating lowering gives O(1) constant time
-     - Bounded state: stateCard = 32 (32 distinct states)
-     - Auditability: the OCEL event code 50 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches projectile_advanced_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — the naïve `if new_x > field_max { field_max } else if new_x < 0 { 0 } else { new_x }` guard fires unpredictably as projectiles approach boundaries at arbitrary angles, adding jitter proportional to projectile count.
+- **Deterministic latency** — the Saturating lowering onto `saturating_add_i64` plus `clamp_u32` integrates and bounds both axes in O(1) arithmetic with no data-dependent control flow, giving a constant budget per projectile regardless of position.
+- **Signed velocity** — projectile velocity is signed (can move in either direction); the kernel sign-extends the u16 velocity lanes to i16 then i64 before addition, and floors with `.max(0)` before the field clamp, all branchlessly.
+- **Position integrity** — a position that overflows the i64 intermediate before saturation would silently corrupt the result; `saturating_add_i64` prevents this by clamping at i64::MAX/MIN, which the subsequent `clamp_u32` then brings back within field bounds.
+- **OCEL auditability** — OCEL event code `50` ties each projectile position update to the `projectile` object trace, enabling deterministic replay of hit-detection disputes.
 
 ## Solution
 
-<!-- TODO: Explain how projectile_advanced resolves the forces.
-     It lowers onto `bcinr_logic::int::saturating_add_i64` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Saturating` was the right lowering choice. -->
+The kernel integrates x and y independently using the same saturating pipeline. The packed-u64 ABI places the current position in `state` bits[0..16] (x) and bits[16..32] (y), and the signed velocity in `input` bits[0..16] (vx as i16) and bits[16..32] (vy as i16), with the field maximum in bits[32..48]. For each axis: the u16 velocity lane is reinterpreted as i16 via sign extension, widened to i64, added to the current coordinate with `saturating_add_i64`, floored at 0 with `.max(0)`, cast to u32, and then clamped to `[0, field_max]` with `clamp_u32`. The result packs the two new coordinates into bits[0..16] and bits[16..32]. The Saturating lowering was chosen because every legal projectile position is a finite integer in a bounded field — saturation is the correct semantic for motion that would leave the field.
 
 **Branchless primitive:** `bcinr_logic::int::saturating_add_i64`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 32 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** Every projectile integration costs the same number of cycles regardless of whether the projectile is near a boundary, moving fast, or slow — no misprediction tax. Overflow in the i64 intermediate is silently saturated rather than silently wrapping, eliminating the ghost-hit class of bug. OCEL event `50` makes every projectile step auditable. **Costs:** Both axes share a single `field_max` value; asymmetric field boundaries (different x/y limits) cannot be expressed in the current ABI. Position coordinates are limited to 16 bits (0..65535) per axis. **Compositions:** The output position feeds directly into [AabbCollisionResolved](aabb_collision_resolved.md) for hit detection, and a collision there triggers [DamageApplied](damage_applied.md).
 
 ---
 
@@ -55,22 +37,16 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["projectile_advanced\nSaturating: bcinr_logic::int::saturating_add_i64"]
-    result["result\n(u64)"]
+    state["state\nbits[0..16] = x (u16), bits[16..32] = y (u16)"]
+    input["input\nbits[0..16] = vx (i16), bits[16..32] = vy (i16)\nbits[32..48] = field_max (u16)"]
+    kernel["projectile_advanced\nSaturating: saturating_add_i64(pos, vel).max(0) → clamp_u32(0, field_max)"]
+    result["result\nbits[0..16] = new x (clamped), bits[16..32] = new y (clamped)"]
     state --> kernel
     input --> kernel
     kernel --> result
     ocel_0["OCEL: projectile"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +98,9 @@ otel::emit(50);
 let ev = OcelEvent::new(50, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [AabbCollisionResolved](aabb_collision_resolved.md) — the advanced projectile position enters the AABB hit test on the same tick
+- [DamageApplied](damage_applied.md) — a positive AABB result from a projectile collision triggers damage application

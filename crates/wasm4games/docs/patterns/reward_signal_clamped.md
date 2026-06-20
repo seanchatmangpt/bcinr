@@ -11,43 +11,25 @@ Clamp a raw RL reward signal to [-max_reward, +max_reward] for stability via sat
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes RewardSignalClamped necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches reward_signal_clamped_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Reinforcement learning reward signals in game environments can spike to large values when reward shaping rules interact adversarially — a combo multiplier applied on top of a kill bonus applied on top of a time-pressure bonus can produce rewards an order of magnitude larger than the value network was trained to expect. Unclamped reward magnitudes cause explosive gradients in the value function update, destabilizing training and causing divergence. The standard fix of `if r > max { max } else if r < -max { -max } else { r }` is two branches whose outcome is unpredictable when rewards are near the boundary, adding variable latency to a path that is called once per environment step.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every RewardSignalClamped call that branches adds jitter
-     - Deterministic latency: the Lut lowering gives O(1) constant time
-     - Bounded state: stateCard = 8 (8 distinct states)
-     - Auditability: the OCEL event code 128 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches reward_signal_clamped_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — the two-sided reward clamp branches unpredictably at boundaries, particularly during shaping regimes that push rewards close to the clip threshold on every other step.
+- **Deterministic latency** — the kernel uses `i64::clamp(-max_r, max_r)` (which compiles to conditional-move instructions), giving O(1) constant time with no data-dependent control flow.
+- **Gradient stability** — unbounded rewards destroy value function training; the symmetric `[-max_r, +max_r]` clamp is the standard RL practice (Mnih et al. DQN) for keeping TD targets in a numerically stable range.
+- **Sign-extension correctness** — the raw reward is stored as a u16 two's-complement i16 in the packed ABI; correct sign-extension to i64 before clamping is essential — a missed sign-extension would treat negative rewards as large positive values and clamp them to `+max_r`.
+- **OCEL auditability** — OCEL event code `128` ties each reward clamp to the `agent` object trace, enabling post-hoc inspection of which steps had rewards clipped and by how much.
 
 ## Solution
 
-<!-- TODO: Explain how reward_signal_clamped resolves the forces.
-     It lowers onto `bcinr_logic::int::saturating_add_i64` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Lut` was the right lowering choice. -->
+The kernel resolves the forces by extracting the raw reward from `state` bits[0..16] as a u16 reinterpreted as i16 and widened to i64, extracting `max_reward` from `input` bits[0..8] as a u8, and applying `i64::clamp(-max_r, max_r)` — a single intrinsic that compiles to two conditional-move instructions. The result is narrowed back to i16 and stored as u16 in bits[0..16] of the return value. The `saturating_add_i64` import affirms the dependency on the saturating arithmetic module; the actual clamp uses the i64 built-in. The Lut classification reflects the bounded-range output: the kernel maps from an 8-bit max_reward field to one of 256 possible symmetric ranges, each of which acts as a compact lookup of the clamp boundary.
 
 **Branchless primitive:** `bcinr_logic::int::saturating_add_i64`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 8 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** Every reward clamp costs identical cycles regardless of whether the raw reward is in-range or out-of-range, giving constant environment-step latency. Reward signals are guaranteed to lie in `[-max_reward, +max_reward]`, making value function training stable by construction. OCEL event `128` provides a per-step record of reward clipping events. **Costs:** The `max_reward` field is limited to 8 bits (u8), so the maximum absolute clip bound is 255; environments with larger natural reward scales must pre-normalize before calling. The reward itself is limited to i16 representation (±32767 before clipping). **Compositions:** The clamped reward feeds directly into [EpisodeReturnBounded](episode_return_bounded.md) for discounted accumulation, and [ObservationClassSelected](observation_class_selected.md) provides the observation that determines what reward is appropriate.
 
 ---
 
@@ -55,22 +37,16 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["reward_signal_clamped\nLut: bcinr_logic::int::saturating_add_i64"]
-    result["result\n(u64)"]
+    state["state\nbits[0..16] = raw reward (u16 as i16)"]
+    input["input\nbits[0..8] = max_reward (u8)"]
+    kernel["reward_signal_clamped\nSaturating: i64::clamp(-max_r, max_r) on sign-extended i16"]
+    result["result\nbits[0..16] = clamped reward (u16 as i16)"]
     state --> kernel
     input --> kernel
     kernel --> result
     ocel_0["OCEL: agent"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +98,9 @@ otel::emit(128);
 let ev = OcelEvent::new(128, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [EpisodeReturnBounded](episode_return_bounded.md) — discounted episode return accumulates the clamped rewards produced here
+- [ObservationClassSelected](observation_class_selected.md) — the observation class determines which action was taken and thus what reward is generated

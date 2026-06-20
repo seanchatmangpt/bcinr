@@ -11,43 +11,29 @@ Advance a fixed-step accumulator and emit whole ticks via bucketize.
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes FixedTickAdvanced necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches fixed_tick_advanced_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Game simulations run on a fixed-timestep model: real-time delta (in microseconds) accumulates into an integer accumulator, and one simulation tick fires for each whole multiple of the configured step size that fits in the running total. The naïve implementation uses a `while accumulator >= tick_dt` loop, which branches on every frame. At 60 Hz with a 16 666 µs step, the branch is predictable most frames but mispredicts on the frame where the accumulator crosses the threshold — exactly the frame where timing accuracy matters most. Additionally, if the accumulator or elapsed delta overflows a 32-bit integer due to a long frame or debugger pause, a wrapping add silently corrupts the tick count. This pattern resolves both problems by saturating the addition and computing whole ticks with a branchless bucketize.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every FixedTickAdvanced call that branches adds jitter
-     - Deterministic latency: the Saturating lowering gives O(1) constant time
-     - Bounded state: stateCard = 64 (64 distinct states)
-     - Auditability: the OCEL event code 1 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches fixed_tick_advanced_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction:** The standard `while accumulator >= step` loop branches every frame; on the frame where ticks fire, the predictor misses the loop exit, adding pipeline-flush latency at the exact moment frame work begins.
+- **Deterministic latency:** The Saturating lowering composes `saturating_add_i64` with `bucketize_u32` to produce the tick count in O(1) time for all accumulator and elapsed values, including overflow cases.
+- **Accumulator overflow:** Real-time elapsed deltas can spike to millions of microseconds during a debugger pause or system sleep; a wrapping add would produce a nonsensically large tick count and corrupt the simulation clock — saturating arithmetic caps the total at `0xFFFF_FFFF` µs instead.
+- **Step size zero:** A step of zero would divide-by-zero in a naïve implementation; the kernel branchlessly coerces a zero step to `1` using `step | ((step == 0) as u64)`, so the result is always defined.
+- **OCEL auditability:** Event code `1` ties every tick advance to the `world` object in the OCEL trace, giving replay tools a frame-by-frame record of how many ticks fired from each real-time delta.
 
 ## Solution
 
-<!-- TODO: Explain how fixed_tick_advanced resolves the forces.
-     It lowers onto `bcinr_logic::int::saturating_add_i64` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Saturating` was the right lowering choice. -->
+The kernel unpacks bits[0..32] of `state` as the leftover sub-step accumulator carried in from the previous frame, and bits[0..32] and [32..48] of `input` as elapsed microseconds and step size respectively. It coerces a zero step to `1` with a single bitwise OR, adds the elapsed delta to the accumulator with `saturating_add_i64` (capped at `i64::MAX` to prevent overflow), and passes the masked 32-bit total to `bucketize_u32(total, step)` which returns the largest multiple of `step` that does not exceed `total`. The result in bits[0..32] is the whole-micros consumed this advance — a multiple of `step` — not the new accumulator remainder; callers subtract the result from their accumulator to compute the carry-forward. Saturating arithmetic was the right lowering because the core invariant is a numeric floor (`total >= result >= 0`) rather than a state-machine transition or a table lookup.
 
 **Branchless primitive:** `bcinr_logic::int::saturating_add_i64`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 64 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
+**Gains:** The tick count is computed in O(1) time with no loop, eliminating the loop-exit mispredict that plagues variable-step while-loop implementations. Saturating addition guarantees that even a 30-second pause does not corrupt the accumulator. The `bucketize_u32` snap-down enforces the invariant that the result is always a whole multiple of the step, which downstream tick consumers can rely on unconditionally.
 
-_Replace this placeholder with consequences and trade-offs._
+**Costs:** Callers must pack and unpack the specific bit-field layout (accumulator in state, elapsed + step in input, whole ticks in result). The leftover remainder is not returned — callers must reconstruct it as `accumulator + elapsed - result`. Step sizes are bounded to 16 bits (`[0, 65535]` µs), which constrains the minimum tick rate to ~15 Hz at the 16-bit ceiling; sub-microsecond steps are not representable.
+
+**Composes naturally with:** `input_admitted` (admitted inputs are processed once per tick fired), `entity_state_transitioned` (each emitted tick is the clock signal that drives entity lifecycle events), and `receipt_appended` (tick counts can be sealed into the receipt chain to anchor the simulation clock in the audit trail).
 
 ---
 
@@ -55,22 +41,16 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["fixed_tick_advanced\nSaturating: bcinr_logic::int::saturating_add_i64"]
-    result["result\n(u64)"]
+    state["state\nbits[0..32]=leftover accumulator (sub-step µs)"]
+    input["input\nbits[0..32]=elapsed µs\nbits[32..48]=step size (µs/tick, min 1)"]
+    kernel["fixed_tick_advanced\nSaturating: saturating_add_i64\n+ bucketize_u32(total, step)"]
+    result["result\nbits[0..32]=whole µs consumed\n(always a multiple of step)"]
     state --> kernel
     input --> kernel
     kernel --> result
     ocel_0["OCEL: world"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +102,10 @@ otel::emit(1);
 let ev = OcelEvent::new(1, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [InputAdmitted](input_admitted.md) — admitted inputs are dispatched once per tick emitted by this kernel; the tick count from `fixed_tick_advanced` controls how many times `input_admitted` is called per real-time frame.
+- [EntityStateTransitioned](entity_state_transitioned.md) — each tick fired by this kernel is the clock signal that drives entity lifecycle events; the entity DFA is advanced once per tick consumed.
+- [ReceiptAppended](receipt_appended.md) — the tick word can be sealed into the rolling receipt chain on every advance, anchoring the simulation clock in the tamper-evident audit trail.

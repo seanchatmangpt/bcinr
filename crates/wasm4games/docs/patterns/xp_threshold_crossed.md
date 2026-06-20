@@ -11,43 +11,23 @@ Check whether accumulated XP crosses a level-up threshold and compute overflow X
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes XpThresholdCrossed necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches xp_threshold_crossed_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Leveling systems accumulate XP from kills, quests, and exploration events and fire a level-up when the running total meets or exceeds the threshold for the next level. Overflow XP — the surplus above the threshold — must carry forward to the new level's counter rather than being discarded. The naïve implementation tests `if xp >= threshold` on every XP gain, introducing a conditional branch that mispredicts frequently during burst-XP events (area clears, quest completions). Two separate code paths for the crossed and not-crossed case also complicate replay-log analysis.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every XpThresholdCrossed call that branches adds jitter
-     - Deterministic latency: the Mask lowering gives O(1) constant time
-     - Bounded state: stateCard = 2 (2 distinct states)
-     - Auditability: the OCEL event code 94 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches xp_threshold_crossed_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — a conditional `if xp >= threshold` mispredicts at every level boundary crossing, introducing pipeline stalls during high-XP-rate events.
+- **Deterministic latency** — the Mask lowering reduces the threshold check to a complement of `lt_mask_u32` and a `select_u32`, executing in O(1) regardless of XP or threshold values.
+- **Overflow XP carry** — surplus XP above the threshold must be computed and returned when the threshold is crossed; a naïve subtraction without clamping could underflow when the threshold is not crossed.
+- **Zero-masking** — when the threshold is not crossed, the overflow field must be zero, not `xp - threshold` (which would underflow); `select_u32` applies this mask branchlessly.
+- **OCEL auditability** — OCEL event code 94 ties every XP accumulation event to a `player` object trace, enabling level-up forensics.
 
 ## Solution
 
-<!-- TODO: Explain how xp_threshold_crossed resolves the forces.
-     It lowers onto `bcinr_logic::mask::lt_mask_u32` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Mask` was the right lowering choice. -->
-
-**Branchless primitive:** `bcinr_logic::mask::lt_mask_u32`
-
-_Replace this placeholder with the solution description._
+The kernel packs state as bits[0..32] = current XP (u32) and input as bits[0..32] = XP threshold. `lt_mask_u32(xp, threshold)` produces 0xFFFF_FFFF when xp < threshold, else 0; complement (`!`) yields the "greater-or-equal" mask. The crossed flag is extracted from bit 31 of this mask. Overflow XP is computed with `xp.saturating_sub(threshold)` (safe — result is 0 when xp < threshold) and then zero-masked with `select_u32(not_lt_mask, overflow, 0)`. The result packs the crossed flag into bits[0..8] and the overflow XP into bits[8..40]. The `Mask` lowering is the right choice because the problem reduces to a single comparison whose boolean result gates a downstream value — exactly the select-on-mask idiom.
 
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 2 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** the level-up check and overflow computation complete in O(1) with no branch; the zero-masking of overflow when not-crossed eliminates the second code path; OCEL event 94 provides a per-level-up audit entry. **Costs:** XP and threshold are bounded to u32 (4 billion); games with larger XP ranges must widen the state field. **Compositions:** the crossed flag feeds directly into [LevelGateEvaluated](level_gate_evaluated.md) — a level-up result gates new content access — and the pattern is structurally parallel to [CurrencyDeltaApplied](currency_delta_applied.md), which uses the same saturating accumulation for balances.
 
 ---
 
@@ -55,22 +35,16 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["xp_threshold_crossed\nMask: bcinr_logic::mask::lt_mask_u32"]
-    result["result\n(u64)"]
+    state["state (u64)\nbits[0..32]: current XP (u32)"]
+    input["input (u64)\nbits[0..32]: threshold for next level"]
+    kernel["xp_threshold_crossed\nMask: !lt_mask_u32(xp, threshold)\ncrossed = not_lt >> 31\noverflow = select_u32(not_lt, xp-threshold, 0)"]
+    result["result (u64)\nbits[0..8]: crossed flag (1 if xp>=threshold)\nbits[8..40]: overflow XP"]
     state --> kernel
     input --> kernel
     kernel --> result
     ocel_0["OCEL: player"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +96,10 @@ otel::emit(94);
 let ev = OcelEvent::new(94, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [CurrencyDeltaApplied](currency_delta_applied.md) — XP accumulation uses the same saturating-add pattern before the threshold check.
+- [LevelGateEvaluated](level_gate_evaluated.md) — the crossed flag from this kernel gates ability and content unlocks.
+- [MasteryMomentDetected](mastery_moment_detected.md) — a level-up crossing is the canonical mastery moment event.

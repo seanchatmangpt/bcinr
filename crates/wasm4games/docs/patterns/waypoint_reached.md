@@ -11,43 +11,25 @@ Check if remaining distance to a waypoint is within tolerance and compute satura
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes WaypointReached necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches waypoint_reached_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+An agent following a path must check at each tick whether its current distance to the next waypoint falls within an arrival tolerance, and must compute how much path budget remains after the check. Without saturating subtraction, when the agent is inside the tolerance zone the raw `dist - tol` expression underflows to a large positive remainder, which falsely signals that the agent is still far from the waypoint. The Saturating lowering clamps the difference floor to zero so that any distance within or at the tolerance produces a remainder of exactly zero, while distances beyond tolerance produce the true positive overage — and neither path involves a conditional branch.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every WaypointReached call that branches adds jitter
-     - Deterministic latency: the Saturating lowering gives O(1) constant time
-     - Bounded state: stateCard = 16 (16 distinct states)
-     - Auditability: the OCEL event code 84 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches waypoint_reached_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — a naïve `if dist <= tol { arrived } else { remaining = dist - tol }` branches on every tile, adding latency jitter proportional to the branch prediction error rate.
+- **Underflow correctness** — raw integer subtraction wraps when `dist < tol`, producing a semantically wrong large remainder that would block the ARRIVED transition; saturating subtraction eliminates this class of error without a check.
+- **Deterministic latency** — the Saturating lowering resolves in O(1) constant time: one `lt_mask_u32` and one `saturating_sub_i64` with a `.max(0)` floor.
+- **Dual output** — both the boolean reached flag and the numeric remaining distance are needed by the caller; packing them into a single u64 avoids a second call or a struct allocation.
+- **OCEL auditability** — event code 84 ties each waypoint check to object-centric traces over both `player` and `nav_node`, so arrival events are attributable to the exact agent and node.
 
 ## Solution
 
-<!-- TODO: Explain how waypoint_reached resolves the forces.
-     It lowers onto `bcinr_logic::int::saturating_sub_i64` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Saturating` was the right lowering choice. -->
+The kernel accepts `state` packed as `bits[0..32] = current distance to waypoint (u32, fixed-point units)` and `input` packed as `bits[0..32] = tolerance threshold`. It returns `bits[0..8] = 1 if reached (dist <= tol), 0 otherwise` and `bits[8..40] = saturating remaining distance = max(dist - tol, 0)`. The reached flag is computed as `NOT lt_mask_u32(tol, dist) & 1` — true when `tol` is not strictly less than `dist`, i.e. `dist <= tol`. The remaining is `saturating_sub_i64(dist as i64, tol as i64).max(0)`, which pins to zero whenever the agent is inside or at the tolerance boundary. The Saturating lowering was chosen because the core problem is preventing underflow at the tolerance boundary — exactly what saturating arithmetic was designed for — while keeping the execution path data-independent.
 
 **Branchless primitive:** `bcinr_logic::int::saturating_sub_i64`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 16 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** O(1) latency per tick; the arrived flag and remaining budget are produced atomically with no allocation; underflow at the tolerance boundary is structurally impossible rather than defensively guarded; the OCEL trail at event code 84 provides per-waypoint arrival evidence over `player` and `nav_node` object pairs. **Costs:** the ABI binds distance to 32-bit fixed-point units, which limits the navigable range to 2^32 units; tolerance and remaining occupy specific bit slices and callers must respect the packing contract. **Natural compositions:** `path_node_expanded` produces the node candidates whose distances feed this kernel; arrival triggers the ARRIVE event in `nav_state_advanced`; remaining distance feeds `path_cost_bounded` as the final budget check.
 
 ---
 
@@ -55,24 +37,18 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["waypoint_reached\nSaturating: bcinr_logic::int::saturating_sub_i64"]
-    result["result\n(u64)"]
+    state["state\nbits[0..32]=current distance (u32 fixed-point)"]
+    input["input\nbits[0..32]=tolerance threshold"]
+    kernel["waypoint_reached\nSaturating: NOT lt_mask_u32(tol,dist)\nsaturating_sub_i64(dist,tol).max(0)"]
+    result["result\nbits[0..8]=reached flag (1 if dist<=tol)\nbits[8..40]=remaining=max(dist-tol,0)"]
     state --> kernel
     input --> kernel
     kernel --> result
-    ocel_0["OCEL: player"]
+    ocel_0["OCEL: player (code 84)"]
     result --> ocel_0
-    ocel_1["OCEL: nav_node"]
+    ocel_1["OCEL: nav_node (code 84)"]
     result --> ocel_1
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -124,17 +100,10 @@ otel::emit(84);
 let ev = OcelEvent::new(84, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [path_node_expanded](path_node_expanded.md) — A* node expansion produces the candidate nodes whose distances this kernel tests for arrival
+- [nav_state_advanced](nav_state_advanced.md) — the ARRIVE event that drives MOVING→ARRIVED is issued when this kernel's reached flag is 1
+- [path_cost_bounded](path_cost_bounded.md) — remaining distance from this kernel feeds the path budget check before the next leg begins

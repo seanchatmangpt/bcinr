@@ -11,43 +11,23 @@ Change an inventory: find the first free slot on add, clear a slot on remove.
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes InventoryItemChanged necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches inventory_item_changed_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+RPG and action games model player inventories as fixed-capacity slot arrays. Every time an item is picked up or dropped, the game must locate the first free slot (on add) or clear a specific slot (on remove). Without branchless bitset operations, the slot search loops over each of the 32 occupancy bits with a conditional branch per iteration, introducing up to 32 mispredictions per pickup event. At the volume of item interactions in a loot-heavy game, this compounds into measurable frame-time jitter.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every InventoryItemChanged call that branches adds jitter
-     - Deterministic latency: the Bitset lowering gives O(1) constant time
-     - Bounded state: stateCard = 32 (32 distinct states)
-     - Auditability: the OCEL event code 68 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches inventory_item_changed_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — a naïve loop over occupancy slots branches at each bit, adding up to 32 pipeline flushes per add operation.
+- **Deterministic latency** — the Bitset lowering resolves first-free-slot lookup in O(1) via a single `select_bit_u64` on the inverted occupancy word.
+- **Overflow sentinel** — when all 32 slots are full, the kernel must signal `NO_SLOT` (0xFF) unambiguously rather than silently wrapping to slot 0, which would corrupt inventory state.
+- **State space bounded to 32 slots** — the occupancy bitset is masked to bits[0..32]; higher bits of the state word are ignored, keeping the state representation canonical.
+- **OCEL auditability** — OCEL event code 68 ties every slot mutation to an auditable object trace linking `player` and `item`.
 
 ## Solution
 
-<!-- TODO: Explain how inventory_item_changed resolves the forces.
-     It lowers onto `bcinr_logic::bitset::select_bit_u64` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Bitset` was the right lowering choice. -->
-
-**Branchless primitive:** `bcinr_logic::bitset::select_bit_u64`
-
-_Replace this placeholder with the solution description._
+The kernel packs state as bits[0..32] = occupancy bitset (32 slots; 1 = occupied) and input as bit[0] = add/remove flag, bits[8..16] = slot index for remove. On add, the occupancy word is bitwise-inverted and masked to 32 bits; `select_bit_u64` extracts the index of the lowest set bit in that free-slot word in a single instruction, avoiding any loop. On remove, `clear_bit_u64` zeroes the named slot. The all-ones sentinel `NO_SLOT = 0xFF` is returned in bits[32..40] when the inventory is full, making overflow detectable without a branch. The `Bitset` lowering is the right choice because the core operation is exactly "find first zero in a 32-bit word" — a canonical population-count/bit-select problem.
 
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 32 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** O(1) worst-case slot lookup with no loop; pipeline-predictable execution regardless of occupancy pattern; the NO_SLOT sentinel makes full-inventory detection data-driven rather than conditional; OCEL event 68 provides a complete per-item audit trail. **Costs:** inventory capacity is fixed at 32 slots by the u32 occupancy word; callers that need larger inventories must widen the state field or segment inventories. **Compositions:** this pattern feeds naturally into [CurrencyDeltaApplied](currency_delta_applied.md) when a purchase both spends gold and places an item, and into [LevelGateEvaluated](level_gate_evaluated.md) when level gates determine which item types may occupy slots.
 
 ---
 
@@ -55,10 +35,10 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["inventory_item_changed\nBitset: bcinr_logic::bitset::select_bit_u64"]
-    result["result\n(u64)"]
+    state["state (u64)\nbits[0..32]: occupancy bitset\n(1=occupied, 32 slots)"]
+    input["input (u64)\nbit[0]: add(1)/remove(0)\nbits[8..16]: slot to remove"]
+    kernel["inventory_item_changed\nBitset: select_bit_u64(!occ & 0xFFFF_FFFF)\nset_bit_u64 / clear_bit_u64"]
+    result["result (u64)\nbits[0..32]: new occupancy\nbits[32..40]: affected slot\n(0xFF = NO_SLOT)"]
     state --> kernel
     input --> kernel
     kernel --> result
@@ -67,12 +47,6 @@ graph LR
     ocel_1["OCEL: item"]
     result --> ocel_1
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -124,17 +98,10 @@ otel::emit(68);
 let ev = OcelEvent::new(68, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [CurrencyDeltaApplied](currency_delta_applied.md) — items have purchase costs; a confirmed buy triggers a currency delta alongside the slot change.
+- [LevelGateEvaluated](level_gate_evaluated.md) — level gates item eligibility; the gate result precedes an inventory add.
+- [RewardTierSelected](reward_tier_selected.md) — tier reward bundles include inventory items; tier selection drives the add event.

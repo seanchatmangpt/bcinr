@@ -11,43 +11,25 @@ Select a semantic LOD tier for a HUD widget by quantizing distance.
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes SemanticLodSelected necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches semantic_lod_selected_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+HUD widgets and game entities carry rendering cost proportional to their detail level: a health bar at 400 units away needs neither sub-pixel anti-aliasing nor animated glow effects, but one at 10 units does. Without a branchless tier selector, each entity checks its distance against 6 thresholds via a cascade of `if dist < T1 ... else if dist < T2 ...` guards — 6 branches per entity per tick, each one potentially mispredicting as entities drift across tier boundaries during camera movement. At 200+ visible entities this compounds into measurable render-tick jitter.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every SemanticLodSelected call that branches adds jitter
-     - Deterministic latency: the Lut lowering gives O(1) constant time
-     - Bounded state: stateCard = 7 (7 distinct states)
-     - Auditability: the OCEL event code 49 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches semantic_lod_selected_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — a 7-tier distance cascade branches up to 6 times per entity call; entities clustered near a tier boundary cause the most mispredictions precisely when their rendering cost matters most (camera transitions).
+- **Deterministic latency** — the Lut lowering maps the continuous distance to a tier index via `bucketize_u32` (integer division by step) followed by `clamp_u32` to the table bounds, both O(1) with no data-dependent control flow.
+- **Safe default for zero step** — a `step` field of zero would cause integer division by zero; the kernel branchlessly replaces it with 64 via `raw_step.wrapping_add(64u32.wrapping_mul((raw_step == 0) as u32))`, keeping the kernel total.
+- **Table bounds safety** — the bucket index can exceed the 7-tier table if distance is very large; `clamp_u32(bucket, 0, 6)` ensures the table read is always in-bounds without a conditional guard.
+- **OCEL auditability** — OCEL event code `49` ties each LOD-tier selection to the `hud_widget` object trace, making post-hoc LOD decisions auditable and reproducible for regression testing.
 
 ## Solution
 
-<!-- TODO: Explain how semantic_lod_selected resolves the forces.
-     It lowers onto `bcinr_logic::fix::bucketize_u32` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Lut` was the right lowering choice. -->
+The kernel resolves the forces by converting the continuous distance to a tier index in two O(1) steps with no branches. The packed-u64 ABI places the distance in `input` bits[0..32] and the step (distance units per tier) in bits[32..48]; `state` is reserved for a camera id and unused. First, `bucketize_u32(dist, step) / step` computes the integer bucket index. Second, `clamp_u32(bucket, 0, LOD_LUT.len()-1)` bounds the index to the 7-entry table, then the index is used to read the tier directly from `LOD_LUT`. The Lut lowering was chosen because tier selection is fundamentally a binned lookup: the mapping from distance to tier is a step function, and integer division followed by a table read is the canonical branchless implementation of a step function.
 
 **Branchless primitive:** `bcinr_logic::fix::bucketize_u32`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 7 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** All LOD decisions for all entities in the scene consume identical cycles regardless of where each entity falls relative to tier boundaries. The bounded 7-tier table means the LOD state space is finite and fully testable by enumeration. OCEL event `49` enables replay-based LOD audits. **Costs:** The ABI fixes the tier count to 7; adding tiers requires a kernel regeneration. The step field is limited to 16 bits (u16), capping the maximum tier width at 65535 distance units. **Compositions:** [PhysicsValueRendered](physics_value_rendered.md) clamped values can serve as the distance input; [CameraDistanceClamped](camera_distance_clamped.md) produces the camera-relative distance that drives tier selection.
 
 ---
 
@@ -55,22 +37,16 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["semantic_lod_selected\nLut: bcinr_logic::fix::bucketize_u32"]
-    result["result\n(u64)"]
+    state["state\n(reserved: camera id)"]
+    input["input\nbits[0..32] = distance (u32)\nbits[32..48] = step (u16, default 64)"]
+    kernel["semantic_lod_selected\nLut: bucketize_u32(dist,step)/step → clamp → LOD_LUT[tier]"]
+    result["result\nbits[0..16] = LOD tier (0..6)"]
     state --> kernel
     input --> kernel
     kernel --> result
     ocel_0["OCEL: hud_widget"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +98,9 @@ otel::emit(49);
 let ev = OcelEvent::new(49, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [PhysicsValueRendered](physics_value_rendered.md) — rendered physics values (e.g., clamped distance) drive LOD tier selection
+- [CameraDistanceClamped](camera_distance_clamped.md) — camera distance is the distance input consumed by LOD selection

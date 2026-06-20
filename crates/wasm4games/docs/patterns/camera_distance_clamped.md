@@ -11,43 +11,25 @@ Clamp camera distance to [min_dist, max_dist], producing a bounded 16-bit distan
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes CameraDistanceClamped necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches camera_distance_clamped_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Third-person cameras compute a target follow distance from player input and game state each frame. Without explicit clamping, that distance can go negative — placing the camera inside the player mesh — or exceed the map boundary, clipping through level geometry. The kernel enforces a hard [min_dist, max_dist] window every tick so downstream consumers (lerp, LOD selection) always receive a geometrically valid distance.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every CameraDistanceClamped call that branches adds jitter
-     - Deterministic latency: the Lut lowering gives O(1) constant time
-     - Bounded state: stateCard = 8 (8 distinct states)
-     - Auditability: the OCEL event code 103 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches camera_distance_clamped_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — a naïve `if dist < min || dist > max` pair branches on every call, adding latency jitter that compounds at 60 Hz camera update rates.
+- **Deterministic latency** — the Lut lowering delegates to `clamp_u32`, an O(1) branchless primitive with a fixed instruction count regardless of input value.
+- **Bounded output invariant** — downstream patterns (`camera_follow_lerped`, `semantic_lod_selected`) assume their distance input is in a valid u16 range; an unbounded value breaks those contracts silently.
+- **Overflow safety** — the 16-bit mask on the return value (`& 0xFFFF`) guarantees that even a maximally wide `clamp_u32` result cannot pollute higher bits in the packed u64.
+- **OCEL auditability** — event code 103 ties every clamped distance to the `camera` object trace, enabling deterministic replay and anticheat verification of camera position history.
 
 ## Solution
 
-<!-- TODO: Explain how camera_distance_clamped resolves the forces.
-     It lowers onto `bcinr_logic::fix::clamp_u32` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Lut` was the right lowering choice. -->
-
 **Branchless primitive:** `bcinr_logic::fix::clamp_u32`
 
-_Replace this placeholder with the solution description._
+The kernel uses a packed-u64 ABI: `state` carries the raw current distance in bits[0..16]; `input` carries `min_dist` in bits[0..16] and `max_dist` in bits[16..32]. All three fields are extracted by masking and shifting, then fed directly to `clamp_u32(dist, min_d, max_d)`. `clamp_u32` is the Lut lowering: it uses bitwise arithmetic to compute `min(max(dist, min_d), max_d)` without any conditional branch. The result is masked to 16 bits and returned. The Lut lowering was chosen because distance is a bounded scalar with a two-sided invariant — exactly the domain that `clamp_u32` was designed for — and no signed arithmetic or state machine is required.
 
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 8 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** Camera distance is provably in [min_dist, max_dist] after every call; the OCEL event code 103 creates an auditable record of each clamped value; execution time is O(1) and data-independent, supporting deterministic replay. **Costs:** The packed-u64 ABI requires callers to pre-pack min/max into the input word; both bounds must satisfy min_dist <= max_dist (the kernel does not validate this ordering). **Compositions:** The clamped distance feeds directly into `camera_follow_lerped` (lerp target), `look_target_weighted` (target selection threshold), and `semantic_lod_selected` (LOD tier selection).
 
 ---
 
@@ -55,22 +37,16 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["camera_distance_clamped\nLut: bcinr_logic::fix::clamp_u32"]
-    result["result\n(u64)"]
+    state["state (u64)\nbits[0..16] = dist (u16)"]
+    input["input (u64)\nbits[0..16] = min_dist\nbits[16..32] = max_dist"]
+    kernel["camera_distance_clamped\nLut: clamp_u32(dist, min_d, max_d)"]
+    result["result (u64)\nbits[0..16] = clamped dist\nin [min_dist, max_dist]"]
     state --> kernel
     input --> kernel
     kernel --> result
-    ocel_0["OCEL: camera"]
+    ocel_0["OCEL: camera (code 103)"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +98,10 @@ otel::emit(103);
 let ev = OcelEvent::new(103, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [CameraFollowLerped](camera_follow_lerped.md) — clamped distance is the target for the lerp step; both must agree on the valid distance range.
+- [LookTargetWeighted](look_target_weighted.md) — distance to the selected look target is clamped by this pattern before weighting.
+- [SemanticLodSelected](semantic_lod_selected.md) — camera distance drives LOD tier selection; clamped distance ensures the LOD index stays in the valid table range.

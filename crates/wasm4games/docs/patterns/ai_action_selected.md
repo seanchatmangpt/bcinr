@@ -11,43 +11,25 @@ Select an AI action by utility argmax over four scores (first index wins ties).
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes AiActionSelected necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches ai_action_selected_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+AI NPCs evaluate four utility scores each tick — attack, defend, flee, idle — and must execute the highest-scoring action. A naïve argmax compares best against each candidate with an `if v > best { best = v; idx = i }` guard, branching up to 3 times per NPC. With 100+ active NPCs evaluated sequentially this means up to 300 conditional branches per tick, each one mispredicting whenever two NPCs switch their relative utility rankings simultaneously — a common occurrence during group combat.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every AiActionSelected call that branches adds jitter
-     - Deterministic latency: the Mask lowering gives O(1) constant time
-     - Bounded state: stateCard = 4 (4 distinct states)
-     - Auditability: the OCEL event code 64 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches ai_action_selected_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — the loop-based argmax branches on each comparison, and in group combat the branch outcome changes frequently as utility scores shift, making the predictor's history useless.
+- **Deterministic latency** — the Mask lowering onto `lt_mask_u32` / `select_u32` reduces the 3-comparison argmax to 3 unconditional mask-and-select pairs, all O(1) and branch-free, so every NPC evaluation costs the same cycles regardless of which action wins.
+- **Tie-breaking determinism** — when two utilities are equal, game behavior must be deterministic for replay and fairness; the strict `<` comparison in `lt_mask_u32(best_val, u_i)` ensures the first (lowest-index) maximum always wins, with no random tie-breaking.
+- **Action fairness** — with a deterministic first-wins tie-break, action priority is explicit in the lane ordering (lane 0 = highest-priority default), making the AI policy auditable without inspecting runtime state.
+- **OCEL auditability** — OCEL event code `64` ties each action selection to the `agent` object trace, enabling frame-by-frame NPC decision replay for balance analysis.
 
 ## Solution
 
-<!-- TODO: Explain how ai_action_selected resolves the forces.
-     It lowers onto `bcinr_logic::mask::select_u32` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Mask` was the right lowering choice. -->
+The kernel implements a branchless argmax by maintaining a running `(best_val, best_idx)` pair and updating it with `select_u32` for each of the three remaining candidates. The packed-u64 ABI packs four u16 utility scores into `input` lanes [0..16], [16..32], [32..48], [48..64]; `state` is reserved for an agent id. For each candidate i, `lt_mask_u32(best_val, u_i)` produces an all-ones mask if `best_val < u_i` (strictly), and `select_u32(mask, candidate, current)` updates both `best_idx` and `best_val` in the same branch-free step. The result packs the winning index in bits[0..8] and its utility in bits[8..24]. The Mask lowering was chosen because the argmax decision (`is this candidate better?`) maps directly to a comparison-and-select, the canonical use case for `lt_mask_u32` / `select_u32`.
 
 **Branchless primitive:** `bcinr_logic::mask::select_u32`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 4 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** All NPC action selections cost identical cycles, making total NPC update time proportional to count with no variance from score patterns. The first-wins tie-break is a compile-time invariant, not a runtime decision, so it cannot be perturbed by input. OCEL event `64` enables full NPC decision audit trails. **Costs:** The ABI is fixed to exactly 4 action slots (u16 each); more actions require a kernel extension. Utility scores are limited to 16-bit unsigned values. **Compositions:** This kernel's winning action index feeds into [ActionMaskApplied](action_mask_applied.md) to verify legality before execution, and into [EpisodeReturnBounded](episode_return_bounded.md) through the reward generated by the chosen action.
 
 ---
 
@@ -55,22 +37,16 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["ai_action_selected\nMask: bcinr_logic::mask::select_u32"]
-    result["result\n(u64)"]
+    state["state\n(reserved: agent id)"]
+    input["input\nbits[0..16]=u0, bits[16..32]=u1\nbits[32..48]=u2, bits[48..64]=u3"]
+    kernel["ai_action_selected\nMask: lt_mask_u32 + select_u32 argmax (first-wins)"]
+    result["result\nbits[0..8] = action index (0..3)\nbits[8..24] = winning utility"]
     state --> kernel
     input --> kernel
     kernel --> result
     ocel_0["OCEL: agent"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +98,10 @@ otel::emit(64);
 let ev = OcelEvent::new(64, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [PolicyActionSelected](policy_action_selected.md) — the same argmax structure applied to RL Q-values rather than heuristic utility scores
+- [ActionMaskApplied](action_mask_applied.md) — illegal action slots should be zeroed before passing utility scores to this kernel
+- [EpisodeReturnBounded](episode_return_bounded.md) — the action chosen here generates rewards that accumulate into the episode return
