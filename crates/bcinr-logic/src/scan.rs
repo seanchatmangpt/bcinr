@@ -57,6 +57,8 @@ pub fn is_ascii_u64_slice(bytes: &[u8]) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     // _reference equivalence boundaries
     fn scan_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
@@ -93,6 +95,73 @@ mod tests {
     #[test]
     fn test_rejects_mutant_3() {
         assert!(scan_reference(1, 1) != mutant_scan_3(1, 1));
+    }
+
+    // --- scan_gate ---
+
+    #[test]
+    fn test_scan_gate() {
+        for &x in &[0u64, 1, 42, u64::MAX] {
+            assert_eq!(scan_gate(x), x, "x={x}");
+        }
+    }
+
+    // --- find_byte_mask ---
+
+    #[test]
+    fn test_find_byte_mask() {
+        // empty slice → 0
+        assert_eq!(find_byte_mask(&[], b'x'), 0);
+        // no match → 0
+        assert_eq!(find_byte_mask(b"aaa", b'b'), 0);
+        // single match at index 0
+        assert_eq!(find_byte_mask(b"baa", b'b'), 1);
+        // all three bytes match → bits 0,1,2
+        assert_eq!(find_byte_mask(b"aaa", b'a'), 0b111);
+        // 'l' at index 2 and 3 of "hello"
+        assert_eq!(find_byte_mask(b"hello", b'l'), 0b01100);
+        // 70-byte slice: only first 64 bytes inspected → all 64 bits set
+        let data = [b'x'; 70];
+        assert_eq!(find_byte_mask(&data, b'x'), u64::MAX);
+    }
+
+    // --- skip_spaces ---
+
+    #[test]
+    fn test_skip_spaces() {
+        let cases: &[(&[u8], usize)] = &[
+            (b"", 0),           // empty
+            (b"hello", 0),      // no leading spaces
+            (b"   ", 3),        // all spaces
+            (b"   hello", 3),   // leading spaces then text
+            (b" x", 1),         // single leading space
+            (b"  a  ", 2),      // stops at first non-space
+        ];
+        for &(input, expected) in cases {
+            assert_eq!(skip_spaces(input), expected, "input={input:?}");
+        }
+    }
+
+    // --- is_ascii_u64_slice ---
+
+    #[test]
+    fn test_is_ascii_u64_slice() {
+        // valid ASCII cases
+        assert!(is_ascii_u64_slice(b""));
+        assert!(is_ascii_u64_slice(b"Hello, world!"));
+        assert!(is_ascii_u64_slice(b"abcdefgh")); // exact 8-byte chunk
+        assert!(is_ascii_u64_slice(&[0x7F]));     // DEL is valid ASCII
+        assert!(is_ascii_u64_slice(&[0x7F; 8]));  // 8x DEL — valid
+
+        // invalid ASCII cases
+        assert!(!is_ascii_u64_slice(b"caf\xc3\xa9")); // UTF-8 'é'
+        assert!(!is_ascii_u64_slice(&[0x80]));          // high bit set
+        assert!(!is_ascii_u64_slice(&[0xFF]));          // all bits set
+
+        // non-ASCII in remainder (9th byte, outside 8-byte chunk)
+        let mut data = [b'a'; 9];
+        data[8] = 0x80;
+        assert!(!is_ascii_u64_slice(&data));
     }
 }
 

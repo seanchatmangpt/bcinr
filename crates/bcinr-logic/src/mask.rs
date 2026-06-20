@@ -92,77 +92,148 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_lt_mask_less_than() {
-        assert_eq!(lt_mask_u32(0, 1), 0xFFFF_FFFF);
-        assert_eq!(lt_mask_u32(3, 5), 0xFFFF_FFFF);
-        assert_eq!(lt_mask_u32(0, u32::MAX), 0xFFFF_FFFF);
-    }
-
-    #[test]
-    fn test_lt_mask_greater_than() {
-        assert_eq!(lt_mask_u32(1, 0), 0);
-        assert_eq!(lt_mask_u32(5, 3), 0);
-        assert_eq!(lt_mask_u32(u32::MAX, 0), 0);
-    }
-
-    #[test]
-    fn test_lt_mask_equal() {
-        assert_eq!(lt_mask_u32(0, 0), 0);
-        assert_eq!(lt_mask_u32(7, 7), 0);
-        assert_eq!(lt_mask_u32(u32::MAX, u32::MAX), 0);
-    }
-
-    #[test]
-    fn test_min_u32() {
-        assert_eq!(min_u32(5, 3), 3);
-        assert_eq!(min_u32(3, 5), 3);
-        assert_eq!(min_u32(7, 7), 7);
-        assert_eq!(min_u32(0, u32::MAX), 0);
-        assert_eq!(min_u32(u32::MAX, 0), 0);
-    }
-
-    #[test]
-    fn test_max_u32() {
-        assert_eq!(max_u32(5, 3), 5);
-        assert_eq!(max_u32(3, 5), 5);
-        assert_eq!(max_u32(7, 7), 7);
-        assert_eq!(max_u32(0, u32::MAX), u32::MAX);
-        assert_eq!(max_u32(u32::MAX, 0), u32::MAX);
-    }
-
-    #[test]
     fn test_select_u32() {
-        assert_eq!(select_u32(0xFFFF_FFFF, 10, 20), 10);
-        assert_eq!(select_u32(0, 10, 20), 20);
+        let cases: &[(u32, u32, u32, u32)] = &[
+            (0xFFFF_FFFF, 10, 20, 10),             // all-ones mask → a
+            (0x0000_0000, 10, 20, 20),             // all-zeros mask → b
+            (0xFFFF_FFFF, 0, 0, 0),                // zero inputs, all-ones
+            (0x0000_0000, 0, 0, 0),                // zero inputs, all-zeros
+            (0xFFFF_FFFF, u32::MAX, 0, u32::MAX),  // max a, zero b, all-ones
+            (0x0000_0000, u32::MAX, 0, 0),         // max a, zero b, all-zeros
+            (0xFFFF_FFFF, 0, u32::MAX, 0),         // zero a, max b, all-ones
+            (0x0000_0000, 0, u32::MAX, u32::MAX),  // zero a, max b, all-zeros
+            (0xFFFF_FFFF, 42, 42, 42),             // same value, all-ones
+            (0x0000_0000, 42, 42, 42),             // same value, all-zeros
+        ];
+        for &(mask, a, b, expected) in cases {
+            assert_eq!(select_u32(mask, a, b), expected, "mask={mask:#010x} a={a} b={b}");
+        }
+    }
+
+    #[test]
+    fn test_select_u64() {
+        let cases: &[(u64, u64, u64, u64)] = &[
+            (0xFFFF_FFFF_FFFF_FFFF, 10, 20, 10),            // all-ones → a
+            (0x0000_0000_0000_0000, 10, 20, 20),            // all-zeros → b
+            (0xFFFF_FFFF_FFFF_FFFF, 0, 0, 0),               // zero inputs, all-ones
+            (0x0000_0000_0000_0000, 0, 0, 0),               // zero inputs, all-zeros
+            (0xFFFF_FFFF_FFFF_FFFF, u64::MAX, 0, u64::MAX), // max a, all-ones
+            (0x0000_0000_0000_0000, u64::MAX, 0, 0),        // max a, all-zeros
+        ];
+        for &(mask, a, b, expected) in cases {
+            assert_eq!(select_u64(mask, a, b), expected, "mask={mask:#018x} a={a} b={b}");
+        }
     }
 
     #[test]
     fn test_eq_mask_u32() {
-        assert_eq!(eq_mask_u32(5, 5), 0xFFFF_FFFF);
-        assert_eq!(eq_mask_u32(5, 6), 0);
-        assert_eq!(eq_mask_u32(0, 0), 0xFFFF_FFFF);
+        let cases: &[(u32, u32, u32)] = &[
+            (5, 5, 0xFFFF_FFFF),                // equal non-zero
+            (0, 0, 0xFFFF_FFFF),                // zero equals zero
+            (u32::MAX, u32::MAX, 0xFFFF_FFFF),  // max equals max
+            (5, 6, 0),                          // differ by one
+            (0, u32::MAX, 0),                   // zero vs max
+            (u32::MAX, 0, 0),                   // max vs zero
+            (0, 1, 0),                          // zero vs one
+        ];
+        for &(a, b, expected) in cases {
+            assert_eq!(eq_mask_u32(a, b), expected, "a={a} b={b}");
+        }
     }
 
     #[test]
     fn test_is_zero_mask_u32() {
-        assert_eq!(is_zero_mask_u32(0), 0xFFFF_FFFF);
-        assert_eq!(is_zero_mask_u32(1), 0);
-        assert_eq!(is_zero_mask_u32(u32::MAX), 0);
+        let cases: &[(u32, u32)] = &[
+            (0, 0xFFFF_FFFF),       // zero → all-ones
+            (1, 0),                 // one → all-zeros
+            (u32::MAX, 0),          // max → all-zeros
+            (42, 0),                // nontrivial non-zero
+            (0x8000_0000, 0),       // MSB-only set
+        ];
+        for &(x, expected) in cases {
+            assert_eq!(is_zero_mask_u32(x), expected, "x={x}");
+        }
     }
 
     #[test]
     fn test_nonzero_mask_u32() {
-        assert_eq!(nonzero_mask_u32(0), 0);
-        assert_eq!(nonzero_mask_u32(1), 0xFFFF_FFFF);
-        assert_eq!(nonzero_mask_u32(u32::MAX), 0xFFFF_FFFF);
+        let cases: &[(u32, u32)] = &[
+            (0, 0),                         // zero → all-zeros
+            (1, 0xFFFF_FFFF),               // one → all-ones
+            (u32::MAX, 0xFFFF_FFFF),        // max → all-ones
+            (42, 0xFFFF_FFFF),              // nontrivial non-zero
+            (0x8000_0000, 0xFFFF_FFFF),     // MSB-only set
+        ];
+        for &(x, expected) in cases {
+            assert_eq!(nonzero_mask_u32(x), expected, "x={x}");
+        }
+    }
+
+    #[test]
+    fn test_lt_mask_u32() {
+        let cases: &[(u32, u32, u32)] = &[
+            (0, 1, 0xFFFF_FFFF),            // less than
+            (3, 5, 0xFFFF_FFFF),            // less than
+            (0, u32::MAX, 0xFFFF_FFFF),     // 0 < MAX
+            (1, 0, 0),                      // greater than
+            (5, 3, 0),                      // greater than
+            (u32::MAX, 0, 0),               // MAX > 0
+            (0, 0, 0),                      // equal → not less than
+            (7, 7, 0),                      // equal
+            (u32::MAX, u32::MAX, 0),        // equal max
+        ];
+        for &(a, b, expected) in cases {
+            assert_eq!(lt_mask_u32(a, b), expected, "a={a} b={b}");
+        }
+    }
+
+    #[test]
+    fn test_min_u32() {
+        let cases: &[(u32, u32, u32)] = &[
+            (3, 5, 3),                          // a < b
+            (5, 3, 3),                          // b < a
+            (7, 7, 7),                          // equal
+            (0, 0, 0),                          // zero inputs
+            (0, u32::MAX, 0),                   // zero vs max
+            (u32::MAX, 0, 0),                   // max vs zero
+            (u32::MAX, u32::MAX, u32::MAX),     // both max
+        ];
+        for &(a, b, expected) in cases {
+            assert_eq!(min_u32(a, b), expected, "a={a} b={b}");
+        }
+    }
+
+    #[test]
+    fn test_max_u32() {
+        let cases: &[(u32, u32, u32)] = &[
+            (5, 3, 5),                          // a > b
+            (3, 5, 5),                          // b > a
+            (7, 7, 7),                          // equal
+            (0, 0, 0),                          // zero inputs
+            (0, u32::MAX, u32::MAX),            // zero vs max
+            (u32::MAX, 0, u32::MAX),            // max vs zero
+            (u32::MAX, u32::MAX, u32::MAX),     // both max
+        ];
+        for &(a, b, expected) in cases {
+            assert_eq!(max_u32(a, b), expected, "a={a} b={b}");
+        }
     }
 
     #[test]
     fn test_abs_i32() {
-        assert_eq!(abs_i32(5), 5);
-        assert_eq!(abs_i32(-5), 5);
-        assert_eq!(abs_i32(0), 0);
-        assert_eq!(abs_i32(i32::MIN + 1), i32::MAX);
+        let cases: &[(i32, i32)] = &[
+            (5, 5),                     // positive
+            (-5, 5),                    // negative
+            (0, 0),                     // zero
+            (i32::MAX, i32::MAX),       // max positive
+            (i32::MIN + 1, i32::MAX),   // most-negative with positive counterpart
+            (i32::MIN, i32::MIN),       // wrapping behavior (documented)
+            (-100, 100),                // nontrivial negative
+            (100, 100),                 // nontrivial positive
+        ];
+        for &(x, expected) in cases {
+            assert_eq!(abs_i32(x), expected, "x={x}");
+        }
     }
 }
 #[cfg(test)]

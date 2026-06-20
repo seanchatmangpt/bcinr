@@ -139,15 +139,199 @@ mod tests {
 
     #[test]
     fn test_popcount_u64() {
-        assert_eq!(popcount_u64(0), 0);
-        assert_eq!(popcount_u64(1), 1);
-        assert_eq!(popcount_u64(0xFFFF_FFFF_FFFF_FFFF), 64);
+        let cases: &[(u64, u64)] = &[
+            (0, 0),
+            (1, 1),
+            (0b1010_1010, 4),
+            (0x5555_5555_5555_5555, 32), // alternating bits
+            (u64::MAX, 64),
+        ];
+        for &(x, expected) in cases {
+            assert_eq!(popcount_u64(x), expected, "x={x:#018x}");
+        }
+    }
+
+    #[test]
+    fn test_leading_zeros_u64() {
+        let cases: &[(u64, u64)] = &[
+            (0, 64),
+            (1, 63),
+            (0x8000_0000_0000_0000, 0),
+            (u64::MAX, 0),
+        ];
+        for &(x, expected) in cases {
+            assert_eq!(leading_zeros_u64(x), expected, "x={x:#018x}");
+        }
+    }
+
+    #[test]
+    fn test_trailing_zeros_u64() {
+        let cases: &[(u64, u64)] = &[
+            (0, 64),
+            (1, 0),
+            (2, 1),
+            (u64::MAX, 0),
+        ];
+        for &(x, expected) in cases {
+            assert_eq!(trailing_zeros_u64(x), expected, "x={x:#018x}");
+        }
     }
 
     #[test]
     fn test_reverse_bits_u64() {
-        assert_eq!(reverse_bits_u64(1), 0x8000_0000_0000_0000);
-        assert_eq!(reverse_bits_u64(0x8000_0000_0000_0000), 1);
+        let v = 0xDEAD_BEEF_CAFE_1234u64;
+        let cases: &[(u64, u64)] = &[
+            (0, 0),
+            (1, 0x8000_0000_0000_0000),
+            (0x8000_0000_0000_0000, 1),
+            (u64::MAX, u64::MAX),
+            (reverse_bits_u64(v), v), // involution
+        ];
+        for &(x, expected) in cases {
+            assert_eq!(reverse_bits_u64(x), expected, "x={x:#018x}");
+        }
+    }
+
+    #[test]
+    fn test_saturating_add_i64() {
+        let cases: &[(i64, i64, i64)] = &[
+            (0, 0, 0),
+            (1, 2, 3),
+            (-5, 3, -2),
+            (i64::MAX, 1, i64::MAX),   // positive overflow clamps
+            (i64::MAX, i64::MAX, i64::MAX),
+            (i64::MIN, -1, i64::MIN),  // negative overflow clamps
+            (i64::MIN, i64::MIN, i64::MIN),
+        ];
+        for &(a, b, expected) in cases {
+            assert_eq!(saturating_add_i64(a, b), expected, "a={a} b={b}");
+        }
+    }
+
+    #[test]
+    fn test_saturating_sub_i64() {
+        let cases: &[(i64, i64, i64)] = &[
+            (0, 0, 0),
+            (5, 3, 2),
+            (3, 5, -2),
+            (i64::MIN, 1, i64::MIN),   // negative overflow clamps
+            (i64::MAX, -1, i64::MAX),  // positive overflow clamps
+        ];
+        for &(a, b, expected) in cases {
+            assert_eq!(saturating_sub_i64(a, b), expected, "a={a} b={b}");
+        }
+    }
+
+    #[test]
+    fn test_saturating_mul_i64() {
+        let cases: &[(i64, i64, i64)] = &[
+            (0, 0, 0),
+            (i64::MAX, 0, 0),
+            (0, i64::MIN, 0),
+            (1, 42, 42),
+            (42, 1, 42),
+            (i64::MAX, 2, i64::MAX),   // positive overflow clamps
+            (i64::MIN, 2, i64::MIN),   // negative overflow clamps
+        ];
+        for &(a, b, expected) in cases {
+            assert_eq!(saturating_mul_i64(a, b), expected, "a={a} b={b}");
+        }
+    }
+
+    #[test]
+    fn test_popcount_u32() {
+        let cases: &[(u32, u32)] = &[
+            (0, 0),
+            (1, 1),
+            (0b1010_1010, 4),
+            (u32::MAX, 32),
+        ];
+        for &(x, expected) in cases {
+            assert_eq!(popcount_u32(x), expected, "x={x:#010x}");
+        }
+    }
+
+    #[test]
+    fn test_leading_zeros_u32() {
+        let cases: &[(u32, u32)] = &[
+            (0, 32),
+            (1, 31),
+            (0x8000_0000, 0),
+            (u32::MAX, 0),
+        ];
+        for &(x, expected) in cases {
+            assert_eq!(leading_zeros_u32(x), expected, "x={x:#010x}");
+        }
+    }
+
+    #[test]
+    fn test_next_power_of_two_u32() {
+        let cases: &[(u32, u32)] = &[
+            (0, 1),
+            (1, 1),
+            (5, 8),
+            (8, 8),
+            (0x8000_0000, 0x8000_0000),
+            (100, 128),
+            (u32::MAX, 0), // wraps
+        ];
+        for &(x, expected) in cases {
+            assert_eq!(next_power_of_two_u32(x), expected, "x={x}");
+        }
+    }
+
+    #[test]
+    fn test_is_pow2_u32() {
+        let true_cases: &[u32] = &[1, 2, 4, 0x8000_0000];
+        let false_cases: &[u32] = &[0, 3, u32::MAX];
+        for &x in true_cases {
+            assert!(is_pow2_u32(x), "expected is_pow2_u32({x}) == true");
+        }
+        for &x in false_cases {
+            assert!(!is_pow2_u32(x), "expected is_pow2_u32({x}) == false");
+        }
+    }
+
+    #[test]
+    fn test_parity_u32() {
+        let cases: &[(u32, u32)] = &[
+            (0, 0),        // 0 bits → even
+            (1, 1),        // 1 bit  → odd
+            (0b11, 0),     // 2 bits → even
+            (0b111, 1),    // 3 bits → odd
+            (u32::MAX, 0), // 32 bits → even
+        ];
+        for &(x, expected) in cases {
+            assert_eq!(parity_u32(x), expected, "x={x:#010x}");
+        }
+    }
+
+    #[test]
+    fn test_reverse_bits_u32() {
+        let v = 0xDEAD_BEEFu32;
+        let cases: &[(u32, u32)] = &[
+            (0, 0),
+            (1, 0x8000_0000),
+            (0x8000_0000, 1),
+            (u32::MAX, u32::MAX),
+            (reverse_bits_u32(v), v), // involution
+        ];
+        for &(x, expected) in cases {
+            assert_eq!(reverse_bits_u32(x), expected, "x={x:#010x}");
+        }
+    }
+
+    #[test]
+    fn test_trailing_zeros_u32() {
+        let cases: &[(u32, u32)] = &[
+            (0, 32),
+            (1, 0),
+            (2, 1),
+            (u32::MAX, 0),
+        ];
+        for &(x, expected) in cases {
+            assert_eq!(trailing_zeros_u32(x), expected, "x={x:#010x}");
+        }
     }
 }
 #[cfg(test)]

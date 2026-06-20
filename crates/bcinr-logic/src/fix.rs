@@ -30,6 +30,8 @@ pub fn bucketize_u32(val: u32, step: u32) -> u32 {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     // _reference equivalence boundaries
     fn fix_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
@@ -66,6 +68,68 @@ mod tests {
     #[test]
     fn test_rejects_mutant_3() {
         assert!(fix_reference(1, 1) != mutant_fix_3(1, 1));
+    }
+
+    // --- add_sat ---
+
+    #[test]
+    fn test_add_sat() {
+        let cases: &[(u32, u32, u32)] = &[
+            (0, 0, 0),                          // zero + zero
+            (42, 0, 42),                        // identity (a + 0)
+            (0, 42, 42),                        // identity (0 + b)
+            (10, 20, 30),                       // normal sum
+            (u32::MAX, 1, u32::MAX),            // overflow → saturates to MAX
+            (u32::MAX, u32::MAX, u32::MAX),     // double MAX → saturates
+            (u32::MAX - 1, 1, u32::MAX),        // exact MAX, no overflow
+            (u32::MAX - 5, 5, u32::MAX),        // exact MAX boundary
+        ];
+        for &(a, b, expected) in cases {
+            assert_eq!(add_sat(a, b), expected, "a={a} b={b}");
+        }
+    }
+
+    // --- clamp_u32 ---
+
+    #[test]
+    fn test_clamp_u32() {
+        let cases: &[(u32, u32, u32, u32)] = &[
+            (0, 0, 0, 0),               // all zero
+            (5, 0, 10, 5),              // within range
+            (0, 3, 10, 3),              // below min → clamp to min
+            (15, 0, 10, 10),            // above max → clamp to max
+            (3, 3, 10, 3),              // exactly at min boundary
+            (10, 3, 10, 10),            // exactly at max boundary
+            (u32::MAX, 0, 100, 100),    // MAX above range → clamp to max
+            (u32::MAX, 0, u32::MAX, u32::MAX), // MAX within [0, MAX]
+        ];
+        for &(val, min, max, expected) in cases {
+            assert_eq!(clamp_u32(val, min, max), expected, "val={val} min={min} max={max}");
+        }
+    }
+
+    // --- bucketize_u32 ---
+
+    #[test]
+    fn test_bucketize_u32() {
+        let v = bucketize_u32(u32::MAX, 100);
+        let cases: &[(u32, u32, u32)] = &[
+            (0, 8, 0),          // zero val
+            (8, 8, 8),          // exact multiple
+            (16, 8, 16),        // exact multiple
+            (17, 5, 15),        // rounds down
+            (9, 5, 5),          // rounds down
+            (42, 1, 42),        // step=1 is identity
+            (0, 1, 0),          // step=1, zero val
+            (9, 0, 0),          // zero step → result is 0 (no division-by-zero trap)
+            (0, 0, 0),          // zero step, zero val
+        ];
+        for &(val, step, expected) in cases {
+            assert_eq!(bucketize_u32(val, step), expected, "val={val} step={step}");
+        }
+        // MAX value: result must be a multiple of step and ≤ MAX
+        assert!(v <= u32::MAX);
+        assert_eq!(v % 100, 0);
     }
 }
 
