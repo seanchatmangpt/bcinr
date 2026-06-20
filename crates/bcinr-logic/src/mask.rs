@@ -11,25 +11,75 @@ pub fn mask_phd_gate(val: u64) -> u64 {
 
 //  Mask calculus for branchless selection and arithmetic.
 
-/// Selects between `a` and `b` based on the provided `mask`.
-/// If `mask` is all ones, returns `a`. If `mask` is all zeros, returns `b`.
+/// Branchless conditional select: returns `a` if `mask` is all-ones (`0xFFFF_FFFF`),
+/// or `b` if `mask` is all-zeros (`0x0000_0000`).
+///
+/// `mask` must be either `0x0000_0000` (false) or `0xFFFF_FFFF` (true);
+/// intermediate values produce implementation-defined results.
+///
+/// This primitive eliminates conditional branches from hot paths by
+/// computing the result with pure bitwise arithmetic:
+/// `(mask & a) | (!mask & b)`.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::mask::select_u32;
+/// assert_eq!(select_u32(0xFFFF_FFFF, 42, 99), 42);
+/// assert_eq!(select_u32(0x0000_0000, 42, 99), 99);
+/// assert_eq!(select_u32(0xFFFF_FFFF, 0, u32::MAX), 0);
+/// assert_eq!(select_u32(0x0000_0000, 0, u32::MAX), u32::MAX);
+/// ```
 #[inline(always)]
-#[must_use]
-pub fn select_u32(mask: u32, a: u32, b: u32) -> u32 {
+#[must_use = "branchless select — ignoring this result discards the computed selection"]
+pub const fn select_u32(mask: u32, a: u32, b: u32) -> u32 {
     (mask & a) | (!mask & b)
 }
 
-/// Selects between `a` and `b` based on the provided `mask`.
-/// If `mask` is all ones, returns `a`. If `mask` is all zeros, returns `b`.
+/// Branchless conditional select: returns `a` if `mask` is all-ones (`0xFFFF_FFFF_FFFF_FFFF`),
+/// or `b` if `mask` is all-zeros (`0x0000_0000_0000_0000`).
+///
+/// `mask` must be either `0x0000_0000_0000_0000` (false) or `0xFFFF_FFFF_FFFF_FFFF` (true);
+/// intermediate values produce implementation-defined results.
+///
+/// This primitive eliminates conditional branches from hot paths by
+/// computing the result with pure bitwise arithmetic:
+/// `(mask & a) | (!mask & b)`.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::mask::select_u64;
+/// assert_eq!(select_u64(0xFFFF_FFFF_FFFF_FFFF, 42, 99), 42);
+/// assert_eq!(select_u64(0x0000_0000_0000_0000, 42, 99), 99);
+/// assert_eq!(select_u64(0xFFFF_FFFF_FFFF_FFFF, 0, u64::MAX), 0);
+/// assert_eq!(select_u64(0x0000_0000_0000_0000, 0, u64::MAX), u64::MAX);
+/// ```
 #[inline(always)]
-#[must_use]
-pub fn select_u64(mask: u64, a: u64, b: u64) -> u64 {
+#[must_use = "branchless select — ignoring this result discards the computed selection"]
+pub const fn select_u64(mask: u64, a: u64, b: u64) -> u64 {
     (mask & a) | (!mask & b)
 }
 
-/// Returns an all-ones mask i-f `a == b`, otherwise all-zeros.
+/// Branchless equality mask: returns `0xFFFF_FFFF` if `a == b`, otherwise `0x0000_0000`.
+///
+/// The result is a valid mask suitable for use with [`select_u32`].
+/// The algorithm is branch-free: XOR detects difference, then the
+/// sign of `(x | -x)` is used to collapse all non-zero patterns to
+/// a single distinguishable bit.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::mask::eq_mask_u32;
+/// assert_eq!(eq_mask_u32(5, 5), 0xFFFF_FFFF);
+/// assert_eq!(eq_mask_u32(5, 6), 0x0000_0000);
+/// assert_eq!(eq_mask_u32(0, 0), 0xFFFF_FFFF);
+/// assert_eq!(eq_mask_u32(u32::MAX, u32::MAX), 0xFFFF_FFFF);
+/// assert_eq!(eq_mask_u32(0, u32::MAX), 0x0000_0000);
+/// ```
 #[inline(always)]
-#[must_use]
+#[must_use = "branchless equality mask — ignoring this result discards the comparison"]
 pub fn eq_mask_u32(a: u32, b: u32) -> u32 {
     let x = a ^ b;
     // (x | -x) has the high bit set i-f x != 0.
@@ -38,50 +88,145 @@ pub fn eq_mask_u32(a: u32, b: u32) -> u32 {
     non_zero_msb.wrapping_sub(1)
 }
 
-/// Returns an all-ones mask i-f `x == 0`, otherwise all-zeros.
+/// Branchless zero-test mask: returns `0xFFFF_FFFF` if `x == 0`, otherwise `0x0000_0000`.
+///
+/// The result is a valid mask suitable for use with [`select_u32`].
+/// Uses the identity that `(x | -x)` has its sign bit set for all
+/// non-zero `x`, allowing branch-free zero detection.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::mask::is_zero_mask_u32;
+/// assert_eq!(is_zero_mask_u32(0), 0xFFFF_FFFF);
+/// assert_eq!(is_zero_mask_u32(1), 0x0000_0000);
+/// assert_eq!(is_zero_mask_u32(u32::MAX), 0x0000_0000);
+/// assert_eq!(is_zero_mask_u32(42), 0x0000_0000);
+/// ```
 #[inline(always)]
-#[must_use]
+#[must_use = "branchless zero mask — ignoring this result discards the zero-test"]
 pub fn is_zero_mask_u32(x: u32) -> u32 {
     let non_zero_msb = (x | x.wrapping_neg()) >> 31;
     non_zero_msb.wrapping_sub(1)
 }
 
-/// Returns an all-ones mask i-f `x != 0`, otherwise all-zeros.
+/// Branchless non-zero-test mask: returns `0xFFFF_FFFF` if `x != 0`, otherwise `0x0000_0000`.
+///
+/// The result is a valid mask suitable for use with [`select_u32`].
+/// This is the bitwise complement of [`is_zero_mask_u32`].
+/// Uses `(x | -x)` to detect whether any bit is set, then propagates
+/// the sign bit to fill all 32 positions.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::mask::nonzero_mask_u32;
+/// assert_eq!(nonzero_mask_u32(0), 0x0000_0000);
+/// assert_eq!(nonzero_mask_u32(1), 0xFFFF_FFFF);
+/// assert_eq!(nonzero_mask_u32(u32::MAX), 0xFFFF_FFFF);
+/// assert_eq!(nonzero_mask_u32(42), 0xFFFF_FFFF);
+/// ```
 #[inline(always)]
-#[must_use]
+#[must_use = "branchless non-zero mask — ignoring this result discards the non-zero-test"]
 pub fn nonzero_mask_u32(x: u32) -> u32 {
     let non_zero_msb = (x | x.wrapping_neg()) >> 31;
     0u32.wrapping_sub(non_zero_msb)
 }
 
-/// Returns an all-ones mask i-f `a < b`, otherwise all-zeros.
+/// Branchless less-than mask: returns `0xFFFF_FFFF` if `a < b`, otherwise `0x0000_0000`.
+///
+/// The result is a valid mask suitable for use with [`select_u32`].
+/// On x86-64 the compiler emits a branchless `SETB + NEG` instruction pair —
+/// no conditional branch instruction is generated.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::mask::lt_mask_u32;
+/// assert_eq!(lt_mask_u32(0, 1), 0xFFFF_FFFF);
+/// assert_eq!(lt_mask_u32(1, 0), 0x0000_0000);
+/// assert_eq!(lt_mask_u32(7, 7), 0x0000_0000);
+/// assert_eq!(lt_mask_u32(0, u32::MAX), 0xFFFF_FFFF);
+/// assert_eq!(lt_mask_u32(u32::MAX, 0), 0x0000_0000);
+/// ```
 #[inline(always)]
-#[must_use]
+#[must_use = "branchless less-than mask — ignoring this result discards the comparison"]
 pub fn lt_mask_u32(a: u32, b: u32) -> u32 {
     // (a < b) as u32 produces 0 or 1; wrapping_sub converts to 0x00000000 or 0xFFFFFFFF.
     // The compiler emits a branchless SETB + NEG on x86-64 — no branch instruction.
     0u32.wrapping_sub(u32::from(a < b))
 }
 
-/// Returns the minimum of `a` and `b` without branching.
+/// Branchless minimum: returns the lesser of `a` and `b` without a branch instruction.
+///
+/// Combines [`lt_mask_u32`] with [`select_u32`] to implement a fully
+/// branch-free minimum. Both inputs are evaluated unconditionally.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::mask::min_u32;
+/// assert_eq!(min_u32(5, 3), 3);
+/// assert_eq!(min_u32(3, 5), 3);
+/// assert_eq!(min_u32(7, 7), 7);
+/// assert_eq!(min_u32(0, u32::MAX), 0);
+/// assert_eq!(min_u32(u32::MAX, 0), 0);
+/// ```
 #[inline(always)]
-#[must_use]
+#[must_use = "branchless min — result is the lesser value; ignoring it discards the computation"]
 pub fn min_u32(a: u32, b: u32) -> u32 {
     let mask = lt_mask_u32(a, b);
     select_u32(mask, a, b)
 }
 
-/// Returns the maximum of `a` and `b` without branching.
+/// Branchless maximum: returns the greater of `a` and `b` without a branch instruction.
+///
+/// Combines [`lt_mask_u32`] with [`select_u32`] to implement a fully
+/// branch-free maximum. Both inputs are evaluated unconditionally.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::mask::max_u32;
+/// assert_eq!(max_u32(5, 3), 5);
+/// assert_eq!(max_u32(3, 5), 5);
+/// assert_eq!(max_u32(7, 7), 7);
+/// assert_eq!(max_u32(0, u32::MAX), u32::MAX);
+/// assert_eq!(max_u32(u32::MAX, 0), u32::MAX);
+/// ```
 #[inline(always)]
-#[must_use]
+#[must_use = "branchless max — result is the greater value; ignoring it discards the computation"]
 pub fn max_u32(a: u32, b: u32) -> u32 {
     let mask = lt_mask_u32(a, b);
     select_u32(mask, b, a)
 }
 
-/// Returns the absolute value of `x` without branching.
+/// Branchless absolute value of a signed 32-bit integer.
+///
+/// Uses the arithmetic right-shift trick: the sign bit is broadcast to all
+/// positions via `x >> 31`, producing `0xFFFF_FFFF` for negative values and
+/// `0x0000_0000` for non-negative values. XOR with the mask conditionally
+/// inverts the bits, and the subsequent subtraction completes the two's-complement
+/// negation — all without any branch instruction.
+///
+/// # Note
+///
+/// `abs_i32(i32::MIN)` returns `i32::MIN` (wraps) because `i32::MAX + 1`
+/// is unrepresentable in `i32`. This matches `i32::wrapping_abs`.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::mask::abs_i32;
+/// assert_eq!(abs_i32(5), 5);
+/// assert_eq!(abs_i32(-5), 5);
+/// assert_eq!(abs_i32(0), 0);
+/// assert_eq!(abs_i32(i32::MAX), i32::MAX);
+/// // i32::MIN wraps — documented behavior matching wrapping_abs
+/// assert_eq!(abs_i32(i32::MIN), i32::MIN);
+/// ```
 #[inline(always)]
-#[must_use]
+#[must_use = "branchless abs — result is the absolute value; ignoring it discards the computation"]
 pub fn abs_i32(x: i32) -> i32 {
     let mask = x >> 31;
     (x ^ mask).wrapping_sub(mask)
@@ -91,78 +236,255 @@ pub fn abs_i32(x: i32) -> i32 {
 mod tests {
     use super::*;
 
+    // --- select_u32 ---
+
     #[test]
-    fn test_lt_mask_less_than() {
+    fn test_select_u32_all_ones() {
+        assert_eq!(select_u32(0xFFFF_FFFF, 10, 20), 10);
+    }
+
+    #[test]
+    fn test_select_u32_all_zeros() {
+        assert_eq!(select_u32(0, 10, 20), 20);
+    }
+
+    #[test]
+    fn test_select_u32_zero_inputs() {
+        assert_eq!(select_u32(0xFFFF_FFFF, 0, 0), 0);
+        assert_eq!(select_u32(0, 0, 0), 0);
+    }
+
+    #[test]
+    fn test_select_u32_max_value_inputs() {
+        assert_eq!(select_u32(0xFFFF_FFFF, u32::MAX, 0), u32::MAX);
+        assert_eq!(select_u32(0, u32::MAX, 0), 0);
+        assert_eq!(select_u32(0xFFFF_FFFF, 0, u32::MAX), 0);
+        assert_eq!(select_u32(0, 0, u32::MAX), u32::MAX);
+    }
+
+    #[test]
+    fn test_select_u32_identity_case() {
+        // Selecting the same value regardless of mask is identity
+        assert_eq!(select_u32(0xFFFF_FFFF, 42, 42), 42);
+        assert_eq!(select_u32(0, 42, 42), 42);
+    }
+
+    // --- select_u64 ---
+
+    #[test]
+    fn test_select_u64_all_ones() {
+        assert_eq!(select_u64(0xFFFF_FFFF_FFFF_FFFF, 10, 20), 10);
+    }
+
+    #[test]
+    fn test_select_u64_all_zeros() {
+        assert_eq!(select_u64(0, 10, 20), 20);
+    }
+
+    #[test]
+    fn test_select_u64_zero_inputs() {
+        assert_eq!(select_u64(0xFFFF_FFFF_FFFF_FFFF, 0, 0), 0);
+        assert_eq!(select_u64(0, 0, 0), 0);
+    }
+
+    #[test]
+    fn test_select_u64_max_value_inputs() {
+        assert_eq!(select_u64(0xFFFF_FFFF_FFFF_FFFF, u64::MAX, 0), u64::MAX);
+        assert_eq!(select_u64(0, u64::MAX, 0), 0);
+    }
+
+    // --- eq_mask_u32 ---
+
+    #[test]
+    fn test_eq_mask_u32_equal() {
+        assert_eq!(eq_mask_u32(5, 5), 0xFFFF_FFFF);
+        assert_eq!(eq_mask_u32(0, 0), 0xFFFF_FFFF);
+        assert_eq!(eq_mask_u32(u32::MAX, u32::MAX), 0xFFFF_FFFF);
+    }
+
+    #[test]
+    fn test_eq_mask_u32_not_equal() {
+        assert_eq!(eq_mask_u32(5, 6), 0);
+        assert_eq!(eq_mask_u32(0, u32::MAX), 0);
+        assert_eq!(eq_mask_u32(u32::MAX, 0), 0);
+    }
+
+    #[test]
+    fn test_eq_mask_u32_zero_inputs() {
+        assert_eq!(eq_mask_u32(0, 0), 0xFFFF_FFFF);
+        assert_eq!(eq_mask_u32(0, 1), 0);
+    }
+
+    // --- is_zero_mask_u32 ---
+
+    #[test]
+    fn test_is_zero_mask_u32_zero() {
+        assert_eq!(is_zero_mask_u32(0), 0xFFFF_FFFF);
+    }
+
+    #[test]
+    fn test_is_zero_mask_u32_one() {
+        assert_eq!(is_zero_mask_u32(1), 0);
+    }
+
+    #[test]
+    fn test_is_zero_mask_u32_max() {
+        assert_eq!(is_zero_mask_u32(u32::MAX), 0);
+    }
+
+    #[test]
+    fn test_is_zero_mask_u32_nontrivial() {
+        assert_eq!(is_zero_mask_u32(42), 0);
+        assert_eq!(is_zero_mask_u32(0x8000_0000), 0);
+    }
+
+    // --- nonzero_mask_u32 ---
+
+    #[test]
+    fn test_nonzero_mask_u32_zero() {
+        assert_eq!(nonzero_mask_u32(0), 0);
+    }
+
+    #[test]
+    fn test_nonzero_mask_u32_one() {
+        assert_eq!(nonzero_mask_u32(1), 0xFFFF_FFFF);
+    }
+
+    #[test]
+    fn test_nonzero_mask_u32_max() {
+        assert_eq!(nonzero_mask_u32(u32::MAX), 0xFFFF_FFFF);
+    }
+
+    #[test]
+    fn test_nonzero_mask_u32_nontrivial() {
+        assert_eq!(nonzero_mask_u32(42), 0xFFFF_FFFF);
+        assert_eq!(nonzero_mask_u32(0x8000_0000), 0xFFFF_FFFF);
+    }
+
+    // --- lt_mask_u32 ---
+
+    #[test]
+    fn test_lt_mask_u32_less_than() {
         assert_eq!(lt_mask_u32(0, 1), 0xFFFF_FFFF);
         assert_eq!(lt_mask_u32(3, 5), 0xFFFF_FFFF);
         assert_eq!(lt_mask_u32(0, u32::MAX), 0xFFFF_FFFF);
     }
 
     #[test]
-    fn test_lt_mask_greater_than() {
+    fn test_lt_mask_u32_greater_than() {
         assert_eq!(lt_mask_u32(1, 0), 0);
         assert_eq!(lt_mask_u32(5, 3), 0);
         assert_eq!(lt_mask_u32(u32::MAX, 0), 0);
     }
 
     #[test]
-    fn test_lt_mask_equal() {
+    fn test_lt_mask_u32_equal() {
         assert_eq!(lt_mask_u32(0, 0), 0);
         assert_eq!(lt_mask_u32(7, 7), 0);
         assert_eq!(lt_mask_u32(u32::MAX, u32::MAX), 0);
     }
 
     #[test]
-    fn test_min_u32() {
-        assert_eq!(min_u32(5, 3), 3);
+    fn test_lt_mask_u32_zero_inputs() {
+        assert_eq!(lt_mask_u32(0, 0), 0);
+    }
+
+    // --- min_u32 ---
+
+    #[test]
+    fn test_min_u32_a_less() {
         assert_eq!(min_u32(3, 5), 3);
+    }
+
+    #[test]
+    fn test_min_u32_b_less() {
+        assert_eq!(min_u32(5, 3), 3);
+    }
+
+    #[test]
+    fn test_min_u32_equal_inputs() {
         assert_eq!(min_u32(7, 7), 7);
+    }
+
+    #[test]
+    fn test_min_u32_zero_inputs() {
+        assert_eq!(min_u32(0, 0), 0);
         assert_eq!(min_u32(0, u32::MAX), 0);
         assert_eq!(min_u32(u32::MAX, 0), 0);
     }
 
     #[test]
-    fn test_max_u32() {
+    fn test_min_u32_max_value() {
+        assert_eq!(min_u32(u32::MAX, u32::MAX), u32::MAX);
+    }
+
+    // --- max_u32 ---
+
+    #[test]
+    fn test_max_u32_a_greater() {
         assert_eq!(max_u32(5, 3), 5);
+    }
+
+    #[test]
+    fn test_max_u32_b_greater() {
         assert_eq!(max_u32(3, 5), 5);
+    }
+
+    #[test]
+    fn test_max_u32_equal_inputs() {
         assert_eq!(max_u32(7, 7), 7);
+    }
+
+    #[test]
+    fn test_max_u32_zero_inputs() {
+        assert_eq!(max_u32(0, 0), 0);
         assert_eq!(max_u32(0, u32::MAX), u32::MAX);
         assert_eq!(max_u32(u32::MAX, 0), u32::MAX);
     }
 
     #[test]
-    fn test_select_u32() {
-        assert_eq!(select_u32(0xFFFF_FFFF, 10, 20), 10);
-        assert_eq!(select_u32(0, 10, 20), 20);
+    fn test_max_u32_max_value() {
+        assert_eq!(max_u32(u32::MAX, u32::MAX), u32::MAX);
     }
 
-    #[test]
-    fn test_eq_mask_u32() {
-        assert_eq!(eq_mask_u32(5, 5), 0xFFFF_FFFF);
-        assert_eq!(eq_mask_u32(5, 6), 0);
-        assert_eq!(eq_mask_u32(0, 0), 0xFFFF_FFFF);
-    }
+    // --- abs_i32 ---
 
     #[test]
-    fn test_is_zero_mask_u32() {
-        assert_eq!(is_zero_mask_u32(0), 0xFFFF_FFFF);
-        assert_eq!(is_zero_mask_u32(1), 0);
-        assert_eq!(is_zero_mask_u32(u32::MAX), 0);
-    }
-
-    #[test]
-    fn test_nonzero_mask_u32() {
-        assert_eq!(nonzero_mask_u32(0), 0);
-        assert_eq!(nonzero_mask_u32(1), 0xFFFF_FFFF);
-        assert_eq!(nonzero_mask_u32(u32::MAX), 0xFFFF_FFFF);
-    }
-
-    #[test]
-    fn test_abs_i32() {
+    fn test_abs_i32_positive() {
         assert_eq!(abs_i32(5), 5);
+    }
+
+    #[test]
+    fn test_abs_i32_negative() {
         assert_eq!(abs_i32(-5), 5);
+    }
+
+    #[test]
+    fn test_abs_i32_zero() {
         assert_eq!(abs_i32(0), 0);
+    }
+
+    #[test]
+    fn test_abs_i32_max() {
+        assert_eq!(abs_i32(i32::MAX), i32::MAX);
+    }
+
+    #[test]
+    fn test_abs_i32_min_plus_one() {
+        // i32::MIN + 1 is the most negative representable value that has a positive counterpart
         assert_eq!(abs_i32(i32::MIN + 1), i32::MAX);
+    }
+
+    #[test]
+    fn test_abs_i32_min_wraps() {
+        // i32::MIN.wrapping_abs() == i32::MIN — documented wrapping behavior
+        assert_eq!(abs_i32(i32::MIN), i32::MIN);
+    }
+
+    #[test]
+    fn test_abs_i32_nontrivial() {
+        assert_eq!(abs_i32(-100), 100);
+        assert_eq!(abs_i32(100), 100);
     }
 }
 #[cfg(test)]
