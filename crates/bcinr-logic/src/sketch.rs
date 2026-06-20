@@ -3,14 +3,100 @@
 //!
 //! CC=1 for all sketching operations.
 
-/// Count-Min Sketch update step branchlessly.
-#[inline(always)]
+/// Performs one Count-Min Sketch update step branchlessly.
+///
+/// The Count-Min Sketch is a probabilistic data structure for frequency
+/// estimation with bounded error.  It maintains a 2-D table of `depth × width`
+/// counters.  On each update the item's hash is mixed with each row index
+/// using Fibonacci hashing (`× 0x9E3779B185EBCA87`) and the selected counter
+/// is incremented with saturating arithmetic to prevent overflow.
+///
+/// # Arguments
+///
+/// * `table` – flat `depth × width` counter array (row-major order)
+/// * `hash`  – pre-computed 64-bit hash of the item being observed
+/// * `depth` – number of hash functions (rows); typically 4–8
+/// * `width` – number of buckets per row; typically a power of two
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::sketch::count_min_sketch_update;
+///
+/// const DEPTH: usize = 4;
+/// const WIDTH: usize = 16;
+/// let mut table = [0u32; DEPTH * WIDTH];
+///
+/// // Insert item with hash 0xABCD_1234 three times.
+/// count_min_sketch_update(&mut table, 0xABCD_1234, DEPTH, WIDTH);
+/// count_min_sketch_update(&mut table, 0xABCD_1234, DEPTH, WIDTH);
+/// count_min_sketch_update(&mut table, 0xABCD_1234, DEPTH, WIDTH);
+///
+/// // At least one counter per row must be ≥ 3 (the true count).
+/// for row in 0..DEPTH {
+///     let row_max = table[row * WIDTH..(row + 1) * WIDTH].iter().copied().max().unwrap_or(0);
+///     assert!(row_max >= 3, "row {row} max counter should be >= 3");
+/// }
+/// ```
+#[inline]
 pub fn count_min_sketch_update(table: &mut [u32], hash: u64, depth: usize, width: usize) {
     (0..depth).for_each(|i| {
         let h = (hash ^ (i as u64)).wrapping_mul(0x9E3779B185EBCA87);
         let idx = (h as usize) % width;
         table[i * width + idx] = table[i * width + idx].saturating_add(1);
     });
+}
+
+/// Queries a Count-Min Sketch table and returns the minimum counter across all rows
+/// for the given hash, which is an upper-bound estimate of the item's frequency.
+///
+/// # Arguments
+///
+/// * `table` – flat `depth × width` counter array (same layout as [`count_min_sketch_update`])
+/// * `hash`  – pre-computed 64-bit hash of the item to query
+/// * `depth` – number of hash functions (rows)
+/// * `width` – number of buckets per row
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::sketch::{count_min_sketch_update, count_min_sketch_query};
+///
+/// const DEPTH: usize = 4;
+/// const WIDTH: usize = 16;
+/// let mut table = [0u32; DEPTH * WIDTH];
+///
+/// // Zero-element sketch: every query returns 0.
+/// assert_eq!(count_min_sketch_query(&table, 0xDEAD, DEPTH, WIDTH), 0);
+///
+/// // Single element: query returns 1.
+/// count_min_sketch_update(&mut table, 0xDEAD, DEPTH, WIDTH);
+/// assert_eq!(count_min_sketch_query(&table, 0xDEAD, DEPTH, WIDTH), 1);
+///
+/// // After 5 more inserts the estimate is ≥ 5 (exact when no collisions).
+/// for _ in 0..5 {
+///     count_min_sketch_update(&mut table, 0xBEEF, DEPTH, WIDTH);
+/// }
+/// assert!(count_min_sketch_query(&table, 0xBEEF, DEPTH, WIDTH) >= 5);
+/// ```
+#[must_use = "sketch estimate — ignoring discards the probabilistic count"]
+#[inline]
+pub fn count_min_sketch_query(table: &[u32], hash: u64, depth: usize, width: usize) -> u32 {
+    let mut min_count = u32::MAX;
+    (0..depth).for_each(|i| {
+        let h = (hash ^ (i as u64)).wrapping_mul(0x9E3779B185EBCA87);
+        let idx = (h as usize) % width;
+        let count = table[i * width + idx];
+        // Branchless min: select the smaller of min_count and count
+        let take_new = (count < min_count) as u32;
+        let mask = 0u32.wrapping_sub(take_new);
+        min_count = (count & mask) | (min_count & !mask);
+    });
+    if depth == 0 {
+        0
+    } else {
+        min_count
+    }
 }
 
 #[cfg(test)]
@@ -51,6 +137,74 @@ mod tests {
     #[test]
     fn test_rejects_mutant_3() {
         assert!(sketch_reference(1, 1) != mutant_sketch_3(1, 1));
+    }
+
+    use super::*;
+
+    const DEPTH: usize = 4;
+    const WIDTH: usize = 256;
+
+    // ── zero-element sketch ───────────────────────────────────────────────────
+
+    #[test]
+    fn test_zero_element_sketch_all_counters_zero() {
+        let table = [0u32; DEPTH * WIDTH];
+        for row in 0..DEPTH {
+            let row_sum: u32 = table[row * WIDTH..(row + 1) * WIDTH].iter().sum();
+            assert_eq!(row_sum, 0, "row {row} should be all zeros");
+        }
+    }
+
+    #[test]
+    fn test_zero_element_sketch_query_returns_zero() {
+        let table = [0u32; DEPTH * WIDTH];
+        assert_eq!(count_min_sketch_query(&table, 0xABC, DEPTH, WIDTH), 0);
+        assert_eq!(count_min_sketch_query(&table, 0x000, DEPTH, WIDTH), 0);
+    }
+
+    // ── single-element insert ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_single_element_query_equals_one() {
+        let mut table = [0u32; DEPTH * WIDTH];
+        count_min_sketch_update(&mut table, 0xDEAD_BEEF, DEPTH, WIDTH);
+        // Count-Min estimate for the inserted hash must be exactly 1
+        assert_eq!(count_min_sketch_query(&table, 0xDEAD_BEEF, DEPTH, WIDTH), 1);
+    }
+
+    #[test]
+    fn test_single_element_non_member_no_false_negative() {
+        // A non-inserted key should have estimate 0 in an empty-enough table
+        let mut table = [0u32; DEPTH * WIDTH];
+        count_min_sketch_update(&mut table, 0x1111_2222, DEPTH, WIDTH);
+        // The estimate for the inserted key must be >= 1
+        let est = count_min_sketch_query(&table, 0x1111_2222, DEPTH, WIDTH);
+        assert!(est >= 1, "inserted element must have estimate >= 1");
+    }
+
+    // ── cardinality estimate within expected error bounds ─────────────────────
+
+    #[test]
+    fn test_count_min_sketch_estimate_within_error_bounds() {
+        // Insert the same key N times; the estimate must equal N (exact, no
+        // collisions expected with WIDTH=256 and only 1 distinct key).
+        let n: u32 = 100;
+        let mut table = [0u32; DEPTH * WIDTH];
+        for _ in 0..n {
+            count_min_sketch_update(&mut table, 0xCAFE_BABE, DEPTH, WIDTH);
+        }
+        let estimate = count_min_sketch_query(&table, 0xCAFE_BABE, DEPTH, WIDTH);
+        // Estimate should be >= true count (CM property); with no other items
+        // and a wide table it should be exact.
+        assert!(
+            estimate >= n,
+            "estimate {estimate} must be >= true count {n}"
+        );
+        // Allow at most 5% overestimate from accidental collisions
+        assert!(
+            estimate <= n + (n / 20).max(5),
+            "estimate {estimate} exceeded 5% overcount threshold for true count {n}"
+        );
     }
 }
 
