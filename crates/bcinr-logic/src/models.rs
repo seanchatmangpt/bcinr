@@ -18,12 +18,6 @@ mod tests_models {
     fn models_reference(val: u64, _aux: u64) -> u64 {
         val
     }
-    #[test]
-    fn test_models_equivalence() {
-        assert_eq!(models_reference(1, 0), 1);
-    }
-    #[test]
-    fn test_models_boundaries() {}
     fn mutant_models_1(val: u64, aux: u64) -> u64 {
         !models_reference(val, aux)
     }
@@ -33,17 +27,27 @@ mod tests_models {
     fn mutant_models_3(val: u64, aux: u64) -> u64 {
         models_reference(val, aux) ^ 0xFF
     }
+
     #[test]
-    fn test_models_counterfactual_mutant_1() {
+    fn test_models_reference() {
+        // equivalence and boundary
+        assert_eq!(models_reference(1, 0), 1);
+        // mutant divergence
         assert!(models_reference(1, 1) != mutant_models_1(1, 1));
-    }
-    #[test]
-    fn test_models_counterfactual_mutant_2() {
         assert!(models_reference(1, 1) != mutant_models_2(1, 1));
-    }
-    #[test]
-    fn test_models_counterfactual_mutant_3() {
         assert!(models_reference(1, 1) != mutant_models_3(1, 1));
+    }
+
+    use super::*;
+
+    #[test]
+    fn test_integrity_gate() {
+        // XOR with 0xAA is its own inverse
+        let v = 0xDEAD_BEEF_CAFE_BABEu64;
+        assert_eq!(models_integrity_gate(models_integrity_gate(v)), v);
+        assert_eq!(models_integrity_gate(0), 0xAA);
+        assert_eq!(models_integrity_gate(0xAA), 0x00);
+        assert_eq!(models_integrity_gate(0xFF), 0x55);
     }
 }
 

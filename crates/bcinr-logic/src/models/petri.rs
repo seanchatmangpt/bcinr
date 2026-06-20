@@ -100,18 +100,6 @@ mod tests {
             initial
         }
     }
-
-    #[test]
-    fn test_petri_equivalence() {
-        let res = petri_reference(1, 1 | (2 << 8));
-        assert_eq!(res, 2);
-    }
-
-    #[test]
-    fn test_petri_boundaries() {
-        assert_eq!(petri_reference(0, 0), 0);
-    }
-
     fn mutant_petri_1(val: u64, aux: u64) -> u64 {
         !petri_reference(val, aux)
     }
@@ -123,16 +111,50 @@ mod tests {
     }
 
     #[test]
-    fn test_counterfactual_mutant_1() {
+    fn test_petri_reference() {
+        // equivalence: token moves from place 0 to place 1
+        let res = petri_reference(1, 1 | (2 << 8));
+        assert_eq!(res, 2);
+        // boundary: empty marking fires nothing
+        assert_eq!(petri_reference(0, 0), 0);
+        // mutant divergence
         assert!(petri_reference(1, 1) != mutant_petri_1(1, 1));
-    }
-    #[test]
-    fn test_counterfactual_mutant_2() {
         assert!(petri_reference(1, 1) != mutant_petri_2(1, 1));
-    }
-    #[test]
-    fn test_counterfactual_mutant_3() {
         assert!(petri_reference(1, 1) != mutant_petri_3(1, 1));
+    }
+
+    use super::*;
+
+    #[test]
+    fn test_petri_primitives() {
+        // KBitSet: zero, set, contains, satisfies
+        let mut bs = KBitSet::<1>::zero();
+        assert!(!bs.contains(3));
+        bs.set(3);
+        assert!(bs.contains(3));
+        assert!(!bs.contains(4));
+        let mut req = KBitSet::<1>::zero();
+        req.set(3);
+        assert!(bs.satisfies(req));
+        let mut excess = KBitSet::<1>::zero();
+        excess.set(7);
+        assert!(!bs.satisfies(excess));
+        // SwarMarking: enabled transition fires, disabled does not
+        let mut m0 = KBitSet::<1>::zero();
+        m0.set(0);
+        let marking = SwarMarking::new(m0);
+        let mut inp = KBitSet::<1>::zero();
+        inp.set(0);
+        let mut out = KBitSet::<1>::zero();
+        out.set(1);
+        let (next, fired) = marking.try_fire(inp, out);
+        assert!(fired);
+        assert!(next.current.contains(1));
+        assert!(!next.current.contains(0));
+        // second fire from same state should not fire (place 0 gone)
+        let (same, fired2) = next.try_fire(inp, out);
+        assert!(!fired2);
+        assert_eq!(same.current, next.current);
     }
 }
 

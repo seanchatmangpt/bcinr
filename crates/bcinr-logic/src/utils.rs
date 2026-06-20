@@ -64,12 +64,6 @@ mod tests_utils {
     fn utils_reference(val: u64, _aux: u64) -> u64 {
         val
     }
-    #[test]
-    fn test_utils_equivalence() {
-        assert_eq!(utils_reference(1, 0), 1);
-    }
-    #[test]
-    fn test_utils_boundaries() {}
     fn mutant_utils_1(val: u64, aux: u64) -> u64 {
         !utils_reference(val, aux)
     }
@@ -79,17 +73,27 @@ mod tests_utils {
     fn mutant_utils_3(val: u64, aux: u64) -> u64 {
         utils_reference(val, aux) ^ 0xFF
     }
+
     #[test]
-    fn test_utils_counterfactual_mutant_1() {
+    fn test_utils_reference() {
+        // equivalence and boundary
+        assert_eq!(utils_reference(1, 0), 1);
+        // mutant divergence
         assert!(utils_reference(1, 1) != mutant_utils_1(1, 1));
-    }
-    #[test]
-    fn test_utils_counterfactual_mutant_2() {
         assert!(utils_reference(1, 1) != mutant_utils_2(1, 1));
-    }
-    #[test]
-    fn test_utils_counterfactual_mutant_3() {
         assert!(utils_reference(1, 1) != mutant_utils_3(1, 1));
+    }
+
+    use super::*;
+
+    #[test]
+    fn test_integrity_gate() {
+        // XOR with 0xAA is its own inverse
+        let v = 0xDEAD_BEEF_CAFE_BABEu64;
+        assert_eq!(utils_integrity_gate(utils_integrity_gate(v)), v);
+        assert_eq!(utils_integrity_gate(0), 0xAA);
+        assert_eq!(utils_integrity_gate(0xAA), 0x00);
+        assert_eq!(utils_integrity_gate(0xFF), 0x55);
     }
 }
 
