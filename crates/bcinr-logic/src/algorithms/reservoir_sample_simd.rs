@@ -160,7 +160,7 @@ mod tests {
         let mut rng = 0x1234_5678_9ABC_DEF0u64;
         for _ in 0..n_trials {
             let result = reservoir_sample_batch(STREAM[0], &STREAM[1..], 2, &mut rng, lcg);
-            if result >= 1 && result <= 4 {
+            if (1..=4).contains(&result) {
                 counts[result as usize] += 1;
             }
         }
@@ -168,7 +168,7 @@ mod tests {
         for i in 1..=4 {
             let count = counts[i];
             assert!(
-                count >= 1500 && count <= 3500,
+                (1500..=3500).contains(&count),
                 "Element {i} appeared {count} times (expected ~2500)"
             );
         }

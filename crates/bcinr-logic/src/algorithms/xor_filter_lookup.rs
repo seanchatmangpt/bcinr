@@ -26,20 +26,20 @@
 /// let _ = xor_filter_lookup(0, &table, 0);
 /// ```
 pub fn xor_filter_lookup(key: u64, table: &[u8], seed: u64) -> bool {
-    // Precondition: table.len() is a multiple of 3 and non-zero.
-    // Saturate n to 1 to avoid division-by-zero on empty tables.
+    // A table with fewer than 3 entries cannot hold a valid filter.
+    if table.len() < 3 {
+        return false;
+    }
+    // n = number of entries per block (table.len() / 3, minimum 1).
     let n = (table.len() / 3).max(1);
     let fp = xor_filter_fingerprint(key, seed);
     let h0 = xor_filter_hash(key, seed, 0) as usize % n;
     let h1 = xor_filter_hash(key, seed, 1) as usize % n + n;
     let h2 = xor_filter_hash(key, seed, 2) as usize % n + 2 * n;
-    // Guard bounds: if table is shorter than required, treat as non-member.
-    let in_bounds = (h2 < table.len()) as u8;
+    // All three indices are within [0, 3*n) ⊆ [0, table.len()), so indexing is safe.
     let xor_val = table[h0] ^ table[h1] ^ table[h2];
-    // Branchless: (xor_val == fp) AND in_bounds.
-    // Encode as: (xor_val ^ fp == 0) & in_bounds
-    let eq = (xor_val ^ fp == 0) as u8 & in_bounds;
-    eq != 0
+    // Branchless: true iff XOR of three table cells equals the key's fingerprint.
+    xor_val == fp
 }
 
 /// Derive an 8-bit fingerprint for a key.
@@ -106,10 +106,14 @@ mod tests {
 
     #[test]
     fn test_empty_table_no_panic() {
-        // Empty table (len=0): n saturates to 1, so h2 = 2 which is >= 0 (len=0).
-        // in_bounds = 0, result must be false.
+        // Empty table (len < 3): early return false without indexing.
         let result = xor_filter_lookup(0, &[], 0);
         assert!(!result, "Empty table should return false");
+        // Table with 1 or 2 bytes is also invalid.
+        let result1 = xor_filter_lookup(0, &[0u8], 0);
+        assert!(!result1, "1-byte table should return false");
+        let result2 = xor_filter_lookup(0, &[0u8, 0], 0);
+        assert!(!result2, "2-byte table should return false");
     }
 
     #[test]

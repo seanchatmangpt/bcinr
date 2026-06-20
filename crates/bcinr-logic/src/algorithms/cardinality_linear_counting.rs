@@ -75,16 +75,17 @@ pub fn linear_counting_estimate(bitmap: &[u64]) -> u64 {
     // is_empty  (zeros == m) → estimate = 0.
     // saturated (zeros == 0) → estimate = m (bitmap full).
     // normal    (0 < zeros < m) → estimate = set_bits (number of distinct hash slots occupied).
-    let is_empty = (zeros == m) as u64;
     let is_saturated = (zeros == 0) as u64;
+    // is_normal: 0 < zeros < m (normal range where set_bits is the estimate).
     let is_normal = ((zeros > 0) & (zeros < m)) as u64;
+    // When zeros == m (bitmap empty): both flags are 0 → r_saturated=0, r_normal=0 → result=0.
 
     // Branchless selection: exactly one flag is 1, others are 0.
-    let r_empty = 0u64 * is_empty;
+    // r_empty is always 0 (empty → estimate 0), included for clarity.
     let r_saturated = m * is_saturated;
     let r_normal = set_bits * is_normal;
 
-    r_empty + r_saturated + r_normal
+    r_saturated + r_normal
 }
 
 #[cfg(test)]

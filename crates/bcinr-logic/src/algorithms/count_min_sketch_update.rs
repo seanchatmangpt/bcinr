@@ -79,10 +79,7 @@ mod tests {
         for i in 0..d {
             let h = cm_hash(key, i as u64) as usize % w;
             let idx = i * w + h;
-            sketch[idx] = match sketch[idx].checked_add(delta) {
-                Some(v) => v,
-                None => u32::MAX,
-            };
+            sketch[idx] = sketch[idx].saturating_add(delta);
         }
     }
 

@@ -18,7 +18,7 @@
 ///
 /// # Arguments
 /// * `table` - Mutable slice of `k` `(key, count)` pairs. Slots with `count == 0`
-///             are considered empty and may hold any key value.
+///   are considered empty and may hold any key value.
 ///
 /// # Examples
 /// ```rust
