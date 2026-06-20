@@ -11,43 +11,25 @@ Accumulate episodic return with a fixed-point discount factor, clamped to [0, ma
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes EpisodeReturnBounded necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches episode_return_bounded_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Episodic return `G = Σ γ^t r_t` accumulates discounted rewards across all steps of an episode and is the primary training signal for value-function learning in RL. In fixed-point game implementations, the accumulator is a bounded integer; without an explicit ceiling clamp, many steps of positive reward push `G` above the u32 representable range, and the resulting wrap corrupts the value function target for all updates in that episode. The correction `if G > max_return { max_return }` is a branch that fires predictably only after the clamp engages — a branch that can be eliminated.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every EpisodeReturnBounded call that branches adds jitter
-     - Deterministic latency: the Saturating lowering gives O(1) constant time
-     - Bounded state: stateCard = 64 (64 distinct states)
-     - Auditability: the OCEL event code 132 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches episode_return_bounded_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — the ceiling check fires only after many positive-reward steps accumulate, so it is both rare and data-dependent; it triggers misprediction when it fires for the first time in a long winning episode.
+- **Deterministic latency** — the Saturating lowering uses `saturating_add_i64` for the reward addition and `.max(0).min(max_ret)` for clamping, all O(1) arithmetic with no data-dependent control flow.
+- **Fixed-point discount** — the discount factor γ is represented as `discount_num / 256` (a u8 numerator), enabling exact integer discount application with a single multiply-and-divide-by-256 — no floating-point required, no rounding branches.
+- **Accumulator overflow** — without the ceiling clamp, a very large `old_return` multiplied by a near-1 discount and added to a positive reward can overflow even i64 before the clamp; `saturating_add_i64` prevents the intermediate overflow, and `.min(max_ret)` handles the logical ceiling.
+- **OCEL auditability** — OCEL event code `132` ties each return accumulation step to both the `agent` and `episode` object traces, enabling per-episode return trajectory reconstruction.
 
 ## Solution
 
-<!-- TODO: Explain how episode_return_bounded resolves the forces.
-     It lowers onto `bcinr_logic::int::saturating_add_i64` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Saturating` was the right lowering choice. -->
+The kernel resolves the forces by computing discounted accumulation as pure saturating integer arithmetic. The packed-u64 ABI places the current episode return in `state` bits[0..32], the step reward in `input` bits[0..8], the discount numerator in bits[8..16] (discount = discount_num/256), and the max return in bits[16..32]. The discount is applied as `(ret * disc_num) / 256` — integer multiply then divide-by-256 shift, both O(1). The reward is added with `saturating_add_i64`, which prevents intermediate i64 overflow. The result is floored at 0 with `.max(0)` and ceilinged at `max_ret` with `.min(max_ret)`. The return value packs the new return in bits[0..32]. The Saturating lowering was chosen because episode return is fundamentally a clamped accumulator — saturation at the ceiling is the correct semantic, not wrap or panic.
 
 **Branchless primitive:** `bcinr_logic::int::saturating_add_i64`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 64 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** Every return accumulation step costs identical cycles regardless of whether the accumulator is near the ceiling or near zero. The fixed-point discount and saturating addition guarantee the result is always in `[0, max_return]` — a property the value function training can depend on. OCEL events `132` on both `agent` and `episode` objects enable per-episode return curve reconstruction. **Costs:** The discount factor is limited to `discount_num/256` granularity (u8 numerator), so exact γ values like 0.99 are approximated as 253/256 ≈ 0.98828. The max_return field is a u16, capping bounded returns at 65535. **Compositions:** This kernel accumulates the outputs of [RewardSignalClamped](reward_signal_clamped.md); the episode return it maintains is the training signal that shapes what [PolicyActionSelected](policy_action_selected.md) outputs after training.
 
 ---
 
@@ -55,10 +37,10 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["episode_return_bounded\nSaturating: bcinr_logic::int::saturating_add_i64"]
-    result["result\n(u64)"]
+    state["state\nbits[0..32] = current episode return (u32)"]
+    input["input\nbits[0..8] = step_reward (u8)\nbits[8..16] = discount_num (u8, γ=num/256)\nbits[16..32] = max_return (u16)"]
+    kernel["episode_return_bounded\nSaturating: (ret*disc_num)/256 + reward → max(0).min(max_ret)"]
+    result["result\nbits[0..32] = new episode return (clamped to [0, max_return])"]
     state --> kernel
     input --> kernel
     kernel --> result
@@ -67,12 +49,6 @@ graph LR
     ocel_1["OCEL: episode"]
     result --> ocel_1
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -124,17 +100,10 @@ otel::emit(132);
 let ev = OcelEvent::new(132, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [RewardSignalClamped](reward_signal_clamped.md) — each step reward fed into this accumulator should first be clamped here
+- [PolicyActionSelected](policy_action_selected.md) — the trained policy that generated the actions whose rewards are accumulated here
+- [ActionMaskApplied](action_mask_applied.md) — only legal actions generate rewards; illegal actions are masked before selection

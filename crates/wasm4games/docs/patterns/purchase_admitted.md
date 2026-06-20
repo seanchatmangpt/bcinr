@@ -11,43 +11,24 @@ Advance a purchase flow FSM one transition over a flat 5x5 transition table.
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes PurchaseAdmitted necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches purchase_admitted_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+In-app purchase flows require a multi-step validation sequence: a player adds items to a cart, initiates checkout, and the purchase is either confirmed by the payment backend or rejected. Without a formal FSM, this flow is managed with nested if-else or match on a mutable state enum — code that is difficult to audit, prone to state-corruption under concurrent UI events, and branchy. The five states (IDLE, CART, CHECKOUT, PAID, FAILED) and five symbols (ADD, REMOVE, PAY, CONFIRM, FAIL) define exactly 25 legal transitions; a flat table encodes all of them, and `dfa_advance` selects the next state in O(1) with no branch.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every PurchaseAdmitted call that branches adds jitter
-     - Deterministic latency: the Dfa lowering gives O(1) constant time
-     - Bounded state: stateCard = 4 (4 distinct states)
-     - Auditability: the OCEL event code 96 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches purchase_admitted_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — a `match (state, event)` over 25 combinations adds many conditional branches and mispredictions per purchase event.
+- **Deterministic latency** — the Dfa lowering resolves the transition in O(1) via a flat `TABLE[state * 5 + symbol]` array index, with no branch.
+- **State-corruption risk** — without a formal table, concurrent UI events (e.g., tapping "confirm" while "pay" is in-flight) can reach illegal state combinations; the DFA table makes every state/symbol pair explicitly defined.
+- **Out-of-domain robustness** — invalid symbols (e.g., from a buggy UI layer) must not index outside the table; OOB symbols are masked to ADD (0) branchlessly, holding the default transition.
+- **Absorbing terminal states** — PAID and FAILED must be trapping states that absorb all subsequent events to prevent re-triggering a completed or failed purchase.
+- **OCEL auditability** — OCEL event code 96 ties every purchase state transition to an auditable `player`/`item` object trace, supporting refund and dispute workflows.
 
 ## Solution
 
-<!-- TODO: Explain how purchase_admitted resolves the forces.
-     It lowers onto `bcinr_logic::dfa::dfa_advance` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Dfa` was the right lowering choice. -->
-
-**Branchless primitive:** `bcinr_logic::dfa::dfa_advance`
-
-_Replace this placeholder with the solution description._
+The kernel packs state as bits[0..8] = current FSM state (0..4, clamped to `[0, FAILED]`) and input as bits[0..8] = event symbol (0..4). The 5×5 transition table encodes all legal transitions as a flat array of 25 `usize` entries, indexed as `TABLE[state * 5 + symbol]`. Out-of-alphabet symbols are masked to ADD (0) branchlessly via `sym_raw & 0.wrapping_sub(in_alphabet)`, which zeroes the symbol when `sym_raw >= 5` without a conditional. `dfa_advance` performs the table lookup. PAID (state 3) and FAILED (state 4) are absorbing: every symbol loops back to the same state, making double-confirmation or double-failure structurally impossible. The `Dfa` lowering is correct because the purchase flow is inherently a finite-state machine where all legal behavior is captured by explicit enumeration.
 
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 4 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** all 25 state/symbol combinations are encoded explicitly and auditably in one flat array; OOB event symbols cannot corrupt state; PAID and FAILED are structurally absorbing; OCEL event 96 provides a per-purchase transition audit trail. **Costs:** extending the FSM (e.g., adding a REFUND state) requires widening both the state and symbol vocabularies and regenerating the table. **Compositions:** this pattern is preceded by [LevelGateEvaluated](level_gate_evaluated.md) — a level gate guards entry to the purchase flow — and triggers [CurrencyDeltaApplied](currency_delta_applied.md) when the CONFIRM symbol drives CHECKOUT to PAID.
 
 ---
 
@@ -55,23 +36,36 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 ---
-title: PurchaseAdmitted — DFA (4 states)
+title: PurchaseAdmitted — DFA (5 states x 5 symbols)
 ---
 stateDiagram-v2
-    [*] --> S0
-    S0: State_0
-    S1: State_1
-    S2: State_2
-    S3: State_3
-    S0 --> S0 : TODO_symbol
-    S1 --> S1 : TODO_symbol
-    S2 --> S2 : TODO_symbol
-    S3 --> S3 : TODO_symbol
-```
+    [*] --> IDLE
+    IDLE: IDLE (0)
+    CART: CART (1)
+    CHECKOUT: CHECKOUT (2)
+    PAID: PAID (3)
+    FAILED: FAILED (4)
 
-<!-- TODO: Replace State_N labels and TODO_symbol edges with the actual state names
-     and alphabet symbols from src/patterns/purchase_admitted.rs (see the DFA table
-     comment and the _reference oracle for the canonical state/symbol vocabulary). -->
+    IDLE --> CART : ADD
+    IDLE --> IDLE : REMOVE / PAY / CONFIRM / FAIL
+
+    CART --> CART : ADD
+    CART --> IDLE : REMOVE / FAIL
+    CART --> CHECKOUT : PAY
+
+    CHECKOUT --> CART : ADD / REMOVE
+    CHECKOUT --> CHECKOUT : PAY
+    CHECKOUT --> PAID : CONFIRM
+    CHECKOUT --> FAILED : FAIL
+
+    PAID --> CART : ADD
+    PAID --> PAID : REMOVE / PAY / CONFIRM / FAIL
+
+    FAILED --> CART : ADD
+    FAILED --> IDLE : REMOVE
+    FAILED --> CHECKOUT : PAY
+    FAILED --> FAILED : CONFIRM / FAIL
+```
 
 ---
 
@@ -123,17 +117,10 @@ otel::emit(96);
 let ev = OcelEvent::new(96, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [LevelGateEvaluated](level_gate_evaluated.md) — the level gate precedes purchase; only ADMITTED players enter the purchase FSM.
+- [CurrencyDeltaApplied](currency_delta_applied.md) — a CONFIRM event driving CHECKOUT to PAID triggers the downstream currency spend.
+- [RewardTierSelected](reward_tier_selected.md) — purchases can affect reward tier by triggering prestige flag updates.

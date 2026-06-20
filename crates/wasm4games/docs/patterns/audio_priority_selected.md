@@ -11,43 +11,25 @@ Select the higher-priority of two competing audio channels; tie goes to channel 
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes AudioPrioritySelected necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches audio_priority_selected_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Game audio mixers compete for a limited pool of hardware voice channels. When two sound effects or music channels both want to play simultaneously, the mixer must award the voice slot to the higher-priority channel — explosions over footsteps, voice lines over ambient. This selection runs at every voice-assignment call, potentially hundreds of times per frame on busy scenes, and each naïve `if p1 > p0` branch produces a data-dependent misprediction every time the dominant channel changes.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every AudioPrioritySelected call that branches adds jitter
-     - Deterministic latency: the Mask lowering gives O(1) constant time
-     - Bounded state: stateCard = 2 (2 distinct states)
-     - Auditability: the OCEL event code 108 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches audio_priority_selected_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — a conditional priority comparison branches at every voice conflict, with misprediction rates proportional to how often priorities change (combat, transitions).
+- **Deterministic latency** — the Mask lowering uses `lt_mask_u32` + `select_u32`, reducing the comparison to a bitwise all-ones/all-zeros mask and an arithmetic select, yielding O(1) fixed throughput.
+- **Tie-breaking invariant** — the strict-`<` predicate (`p0 < p1`) ensures channel 0 wins on equal priority; this contract is observable (replays depend on it) and must not vary with input data.
+- **Packed dual output** — the result returns both the winning channel id (bits[0..8]) and the winning priority (bits[8..16]) in a single word, avoiding a second call to recover the priority for downstream volume clamping.
+- **OCEL auditability** — event code 108 ties each voice-slot assignment to the `audio_source` object trace, enabling reconstruction of the mixer state at any tick.
 
 ## Solution
 
-<!-- TODO: Explain how audio_priority_selected resolves the forces.
-     It lowers onto `bcinr_logic::mask::select_u32` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Mask` was the right lowering choice. -->
-
 **Branchless primitive:** `bcinr_logic::mask::select_u32`
 
-_Replace this placeholder with the solution description._
+State bits[0..8] carry channel 0 priority and bits[8..16] carry channel 0 id; input bits[0..8] carry channel 1 priority and bits[8..16] carry channel 1 id. `lt_mask_u32(p0, p1)` produces an all-ones mask when `p0 < p1` (channel 1 strictly wins) and all-zeros for ties and channel-0-wins cases. Two `select_u32` calls fan the mask over both the id and priority fields simultaneously. The result packs the winning channel id into bits[0..8] and the winning priority into bits[8..16].
 
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 2 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** Voice selection is O(1) and branch-free; the tie-breaking rule is structurally encoded in the strict-`<` predicate and cannot drift; both id and priority are available in one result word. **Costs:** Only two channels are compared per call; N-way selection (3+ simultaneous conflicts) requires chaining; channel id and priority are limited to 8-bit fields (0..255). **Compositions:** The winning channel's volume is then passed through `volume_clamped`; a fading channel reduces its priority to 0 via `audio_fade_applied` before the next selection; `look_target_weighted` applies the identical strict-higher-wins idiom to camera targets.
 
 ---
 
@@ -55,22 +37,16 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["audio_priority_selected\nMask: bcinr_logic::mask::select_u32"]
-    result["result\n(u64)"]
+    state["state (u64)\nbits[0..8] = ch0_priority\nbits[8..16] = ch0_id"]
+    input["input (u64)\nbits[0..8] = ch1_priority\nbits[8..16] = ch1_id"]
+    kernel["audio_priority_selected\nMask: lt_mask_u32(p0,p1) → select_u32"]
+    result["result (u64)\nbits[0..8] = selected_id\nbits[8..16] = winning_priority"]
     state --> kernel
     input --> kernel
     kernel --> result
-    ocel_0["OCEL: audio_source"]
+    ocel_0["OCEL: audio_source (code 108)"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +98,11 @@ otel::emit(108);
 let ev = OcelEvent::new(108, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [VolumeClamped](volume_clamped.md) — the selected channel's volume is bounded after selection.
+- [AudioFadeApplied](audio_fade_applied.md) — a fading channel drops its priority to 0 each tick, which then feeds back into selection.
+- [AudioDistanceAttenuated](audio_distance_attenuated.md) — attenuation produces the effective volume that the selection uses for ranking.
+- [LookTargetWeighted](look_target_weighted.md) — applies the same strict-higher-wins Mask pattern to competing camera look targets.

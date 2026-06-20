@@ -11,43 +11,29 @@ Tick a status-effect set: set/clear an effect bit, decay duration, recount activ
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes StatusEffectTicked necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches status_effect_ticked_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+RPG and action games track status effects — poison, stun, burn, freeze — as a collection of simultaneously active conditions on each entity. Each game tick must optionally apply or clear one effect, decay a shared duration counter, and report how many effects are currently active. Without a bitset, a common implementation loops over an array of effect structs: `for effect in &mut effects { if effect.active { effect.duration -= 1; if effect.duration == 0 { effect.active = false; } } }`. This loop branches on each active check and early-exits on duration expiry, producing data-dependent control flow that mispredicts whenever the active-effect pattern changes between ticks. A duration that underflows due to a missed saturation check can also wrap to a large positive value, keeping a supposedly-expired effect permanently active. This pattern eliminates all those branches by encoding up to 16 effect slots in a bitmask and decaying a single shared duration with saturating subtraction.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every StatusEffectTicked call that branches adds jitter
-     - Deterministic latency: the Bitset lowering gives O(1) constant time
-     - Bounded state: stateCard = 16 (16 distinct states)
-     - Auditability: the OCEL event code 67 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches status_effect_ticked_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction:** A per-effect loop with conditional active checks mispredicts on every transition between "effect active" and "effect expired"; with 16 potential effects and a variable active count per tick, the predictor cannot track the per-slot branch history.
+- **Deterministic latency:** The Bitset lowering uses `set_bit_u64`, `clear_bit_u64`, `select_u64` (for the apply toggle), `saturating_sub_i64` (for duration decay), and `rank_u64` (for the active count), all executing in fixed time regardless of which bits are set.
+- **Duration underflow:** A shared duration that is decremented past zero with wrapping arithmetic keeps all effects alive indefinitely; `saturating_sub_i64` followed by `.max(0)` ensures the duration floor is always zero regardless of the decay amount.
+- **Apply atomicity:** The set/clear operation on one slot must be a no-op when the `apply` toggle bit is zero — the `select_u64(apply, toggled, mask)` call achieves this without branching on the apply flag.
+- **OCEL auditability:** Event code `67` ties every tick operation to the `target` object, recording the pre-tick bitmask, the set/clear operation, the decay amount, and the post-tick active count for replay-based status-effect audits.
 
 ## Solution
 
-<!-- TODO: Explain how status_effect_ticked resolves the forces.
-     It lowers onto `bcinr_logic::bitset::rank_u64` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Bitset` was the right lowering choice. -->
+The kernel stores the 16-slot effect bitmask in bits[0..16] of `state` and the shared duration in bits[16..32]. Input packs: bits[0..4] = slot index (which effect to set or clear), bit[4] = set(1)/clear(0) flag, bit[5] = apply toggle (1 to perform the set/clear, 0 to leave the mask unchanged), bits[8..16] = duration decay amount this tick. The kernel computes `with_set = set_bit_u64(mask, slot)` and `with_clear = clear_bit_u64(mask, slot)`, selects between them via `select_u64(set_flag, ...)`, then uses a second `select_u64(apply, toggled, mask)` to make the operation conditional on the apply bit without branching. Duration is decayed with `saturating_sub_i64(duration, decay).max(0)`. Active count is `rank_u64(new_mask, 15)` — the number of set bits in positions 0 through 15. The Bitset lowering was the right choice because the problem is set membership: the effect slots are independent boolean flags, and the branchless set/clear/count primitives operate on all 16 slots simultaneously without iteration.
 
 **Branchless primitive:** `bcinr_logic::bitset::rank_u64`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 16 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
+**Gains:** All 16 effect slots are maintained in O(1) time with no per-slot loop and no branch on active/expired state. Duration underflow is structurally prevented by `saturating_sub_i64`. The active count is always consistent with the bitmask — `rank_u64` is a popcount, so there is no way for the count to drift from the actual set bits. The OCEL trace records every tick operation on the target entity via event code `67`.
 
-_Replace this placeholder with consequences and trade-offs._
+**Costs:** All 16 effects share a single duration counter; effects with independent durations must either be composed across multiple `status_effect_ticked` calls or use a separate per-effect duration encoding. The bitmask is limited to 16 slots; games with more than 16 distinct effect types require wider state. Only one effect slot can be set or cleared per call; applying multiple effects simultaneously requires multiple calls.
+
+**Composes naturally with:** `damage_applied` (damage events can trigger a status application — pass the effect slot and set flag to this kernel immediately after the damage call), `entity_state_transitioned` (a poison or burn effect with duration zero can generate a `hit` event to the lifecycle DFA), `inventory_item_changed` (equipping or consuming an item can clear a status effect bit via this kernel).
 
 ---
 
@@ -55,22 +41,16 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["status_effect_ticked\nBitset: bcinr_logic::bitset::rank_u64"]
-    result["result\n(u64)"]
+    state["state\nbits[0..16]=effect bitmask (16 slots)\nbits[16..32]=shared duration"]
+    input["input\nbits[0..4]=slot index\nbit[4]=set(1)/clear(0)\nbit[5]=apply toggle\nbits[8..16]=duration decay"]
+    kernel["status_effect_ticked\nBitset: set_bit_u64 / clear_bit_u64\n+ select_u64 (set flag + apply toggle)\n+ saturating_sub_i64 (duration)\n+ rank_u64 (active count)"]
+    result["result\nbits[0..16]=updated effect bitmask\nbits[16..32]=new duration\nbits[32..40]=active effect count"]
     state --> kernel
     input --> kernel
     kernel --> result
     ocel_0["OCEL: target"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +102,10 @@ otel::emit(67);
 let ev = OcelEvent::new(67, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [DamageApplied](damage_applied.md) — damage events can trigger a status-effect application immediately after HP reduction; the caller passes the effect slot and set flag to this kernel after each hit.
+- [EntityStateTransitioned](entity_state_transitioned.md) — status effects with nonzero active count can drive a `hit` event symbol each tick into the entity lifecycle DFA, representing ongoing damage-over-time.
+- [InventoryItemChanged](inventory_item_changed.md) — consuming a cure item clears one or more status effect bits by calling this kernel with the clear flag set on the affected slots.

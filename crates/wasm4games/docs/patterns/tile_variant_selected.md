@@ -11,43 +11,25 @@ Select a tile variant index (0..4) from a weight value via bucketize with bounda
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes TileVariantSelected necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches tile_variant_selected_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Tile-based games add visual variety by selecting among multiple art variants for the same terrain type — for example, three grass tile sprites weighted 50%/30%/20% to break up repetitive patterns. During map generation, this selection must run for every tile, which can mean hundreds of thousands of calls. A naïve `if w < 64 { 0 } else if w < 128 { 1 } else if w < 192 { 2 } else { 3 }` chain adds three data-dependent branches per tile whose outcomes are determined by the noise input, which is pseudorandom and therefore maximally hard to predict. The Lut lowering collapses those three branches into a single `bucketize_u32` (which is itself a branchless shift-and-clamp) and a final clamp.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every TileVariantSelected call that branches adds jitter
-     - Deterministic latency: the Lut lowering gives O(1) constant time
-     - Bounded state: stateCard = 8 (8 distinct states)
-     - Auditability: the OCEL event code 89 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches tile_variant_selected_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — each `if w < boundary` branch mispredicts whenever the pseudorandom noise value straddles the boundary, which happens at roughly the frequency of each band's width; across millions of tiles the total mispredict penalty dominates generation time.
+- **Deterministic latency** — the Lut lowering computes the bucket in O(1) using `bucketize_u32(weight, 64) / 64` followed by `clamp_u32(bucket, 0, 3)`, both of which are branchless arithmetic.
+- **Boundary precision** — the four buckets must partition `[0, 255]` exactly at 64, 128, and 192 so that the variant distribution matches the intended weights; the step-size of 64 achieves this exactly.
+- **Stability at extremes** — a weight of 255 must reliably select variant 3 (not overflow to a fifth bucket); `clamp_u32` ensures the result is always in `[0, 3]`.
+- **OCEL auditability** — event code 89 ties each variant selection to the `tile` object, making the per-tile variant assignment auditable without storing it separately.
 
 ## Solution
 
-<!-- TODO: Explain how tile_variant_selected resolves the forces.
-     It lowers onto `bcinr_logic::fix::bucketize_u32` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Lut` was the right lowering choice. -->
+The kernel accepts `state` (bits[0..8] reserved for biome context; unused in this kernel) and `input` packed as `bits[0..8] = raw weight value (0..=255)`. It returns `bits[0..8] = variant index (0..3)`. The weight byte is extracted from input and passed to `bucketize_u32(weight, 64)`, which computes `weight - (weight % 64)` — the floor to the nearest multiple of 64 — giving 0, 64, 128, or 192. Dividing by 64 yields bucket index 0, 1, 2, or 3. A final `clamp_u32(bucket, 0, 3)` guards against any edge case at the top of the range. The Lut lowering is appropriate because the transformation is a static partitioning of a fixed input range into a fixed number of output classes — a lookup by arithmetic rather than a table, but semantically identical.
 
 **Branchless primitive:** `bcinr_logic::fix::bucketize_u32`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 8 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** O(1) latency per tile with no branches; the four variant bands are defined by a single step parameter (64) rather than three comparison constants, making the partition easy to reason about; the result is guaranteed in `[0, 3]` by the final clamp; the OCEL trail at event code 89 logs each variant selection against the `tile` object. **Costs:** the weight input is bounded to a byte `[0, 255]`, so variant weights are quantized to multiples of 64 out of 256 (25% granularity); changing the number of variants or their relative weights requires changing the step size and recompiling the kernel. **Natural compositions:** `noise_value_sampled` produces the weight byte that this kernel consumes; `biome_class_selected` determines which tile set is used before this kernel selects the variant within that set; `terrain_height_quantized` co-determines the tile type alongside the variant.
 
 ---
 
@@ -55,22 +37,16 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["tile_variant_selected\nLut: bcinr_logic::fix::bucketize_u32"]
-    result["result\n(u64)"]
+    state["state\nbits[0..8]=biome context (reserved, unused)"]
+    input["input\nbits[0..8]=raw weight value (0..=255)"]
+    kernel["tile_variant_selected\nLut: bucketize_u32(weight,64)/64\nclamp_u32(bucket, 0, 3)"]
+    result["result\nbits[0..8]=variant index (0..3)\n0=[0,63], 1=[64,127], 2=[128,191], 3=[192,255]"]
     state --> kernel
     input --> kernel
     kernel --> result
-    ocel_0["OCEL: tile"]
+    ocel_0["OCEL: tile (code 89)"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +98,10 @@ otel::emit(89);
 let ev = OcelEvent::new(89, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [noise_value_sampled](noise_value_sampled.md) — the noise byte produced by the FNV-1a receipt fold feeds directly into this kernel's weight input
+- [biome_class_selected](biome_class_selected.md) — biome class determines which tile art set is active before this kernel selects the visual variant within that set
+- [terrain_height_quantized](terrain_height_quantized.md) — terrain height and tile variant are co-determined from the same noise source; height selects the tile type, variant selects the sprite

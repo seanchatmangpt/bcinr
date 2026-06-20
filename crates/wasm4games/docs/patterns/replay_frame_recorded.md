@@ -11,43 +11,29 @@ Fold (prior digest, tick, input, state) into a deterministic replay digest.
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes ReplayFrameRecorded necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches replay_frame_recorded_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Deterministic replay requires that every frame of a simulation can be reproduced exactly from its recorded inputs, and that any tampering with the recorded data can be detected. The standard approach — recording (tick, input, state) tuples to a file or ring buffer — is allocation-heavy and does not prevent silent in-place modification of recorded frames. Without a rolling hash that mixes all four frame fields (prior digest, tick, input word, state digest), an adversary can modify a frame's input while leaving the replay stream structurally valid. Even for non-adversarial use, a bug that causes a single field to be omitted from the hash (e.g., forgetting to mix the tick) makes the digest insensitive to that field's value, so two different frame sequences can produce the same digest. This pattern folds all four frame fields through `DeterministicSubstrateReceipt` in a fixed order — seeded at the tick count — to produce a 64-bit rolling digest that is sensitive to every field.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every ReplayFrameRecorded call that branches adds jitter
-     - Deterministic latency: the Receipt lowering gives O(1) constant time
-     - Bounded state: stateCard = 64 (64 distinct states)
-     - Auditability: the OCEL event code 35 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches replay_frame_recorded_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction:** A conditional hash update that checks each field for zero or for sentinel values before mixing branches once per field per frame; at 60 Hz with 200 entities, those branches add jitter to every frame's recording pass.
+- **Deterministic latency:** The Receipt lowering uses a fixed sequence of four FNV-1a `mix(h, x) = (h ^ x).wrapping_mul(PRIME)` operations with no conditional logic — all frames hash in identical time regardless of field values.
+- **Tamper evidence:** A simple XOR or CRC hash is vulnerable to deliberate collision construction; FNV-1a's multiply-based mixing makes it computationally expensive to find two different frame streams with the same rolling digest, providing practical tamper evidence without allocation or cryptographic overhead.
+- **Field completeness:** Every field — prior digest, tick, input word, and state digest — must participate in the mix; omitting any field makes the digest blind to changes in that field. The proptest weakening test (which drops the `in_word` mix step) explicitly verifies that omitting a field causes the digest to diverge from the oracle.
+- **OCEL auditability:** Event code `35` ties every frame recording to the `frame` object in the OCEL trace, so the audit trail records the per-frame digest alongside the game-world events, enabling cross-system verification.
 
 ## Solution
 
-<!-- TODO: Explain how replay_frame_recorded resolves the forces.
-     It lowers onto `bcinr_logic::patterns::integrity_receipt::DeterministicSubstrateReceipt` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Receipt` was the right lowering choice. -->
+The kernel accepts the prior rolling digest in `state` and a packed frame descriptor in `input`: bits[0..16] = tick, bits[16..40] = input word, bits[40..64] = state digest low bits. It constructs a `DeterministicSubstrateReceipt` seeded at `current_hash = state, steps = tick` and calls `r.record(in_word, st_digest, state)` which executes four ordered FNV-1a mix steps: `mix(h, tick)`, `mix(h, in_word)`, `mix(h, st_digest)`, `mix(h, state)`. The result of `r.finalize()` is the new rolling digest. The Receipt lowering was the right choice because the problem is ordered multi-field folding with tamper evidence requirements — exactly the capability `DeterministicSubstrateReceipt` was designed for, providing a standardized FNV-1a chain that the rest of the kernel family also uses for `receipt_appended`.
 
 **Branchless primitive:** `bcinr_logic::patterns::integrity_receipt::DeterministicSubstrateReceipt`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 64 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
+**Gains:** Every frame's digest is computed in O(1) time with no allocation, no branch, and no external state beyond the 64-bit running hash. Identical frame streams always produce identical digests (verified by proptest equivalence). The four-field mix is sensitive to changes in any field — a one-bit flip in the tick, input word, or state digest produces a different rolling digest. The `FNV_OFFSET` seed (`0xCBF2_9CE4_8422_2325`) bootstraps a fresh chain from a well-known initial value.
 
-_Replace this placeholder with consequences and trade-offs._
+**Costs:** The digest is 64 bits — sufficient for practical tamper evidence but not cryptographically secure against a motivated adversary with compute resources. The tick field is limited to 16 bits (`[0, 65 535]` ticks), which constrains session length at typical 60 Hz to about 18 minutes before tick wrap; callers must epoch-manage longer sessions. The input word is 24 bits and the state digest lo is 24 bits — wider game state must be summarized before packing.
+
+**Composes naturally with:** `receipt_appended` (replay frames are a specialized receipt fold — both use `DeterministicSubstrateReceipt`; frame recording seeds the chain at the tick count while receipt appending seeds at 0), `ocel_event_linked` (replay frames correspond to OCEL events; the frame digest can be folded into the OCEL link receipt for cross-system verification), `input_admitted` (only admitted inputs are recorded in the frame hash — refused or blocked bytes are excluded from the digest).
 
 ---
 
@@ -55,22 +41,16 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["replay_frame_recorded\nReceipt: bcinr_logic::patterns::integrity_receipt::DeterministicSubstrateReceipt"]
-    result["result\n(u64)"]
+    state["state\nprior 64-bit rolling replay digest\n(seed with FNV_OFFSET for frame 0)"]
+    input["input\nbits[0..16]=tick\nbits[16..40]=input word (24-bit)\nbits[40..64]=state digest lo (24-bit)"]
+    kernel["replay_frame_recorded\nReceipt: DeterministicSubstrateReceipt\nmix(h,tick), mix(h,in_word)\nmix(h,st_digest), mix(h,state)"]
+    result["result\nnew 64-bit rolling replay digest"]
     state --> kernel
     input --> kernel
     kernel --> result
     ocel_0["OCEL: frame"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +102,10 @@ otel::emit(35);
 let ev = OcelEvent::new(35, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [ReceiptAppended](receipt_appended.md) — replay frames use the same `DeterministicSubstrateReceipt` substrate as receipt appending; `replay_frame_recorded` is a specialized four-field fold (seeded at tick) while `receipt_appended` is a general two-field fold (seeded at 0).
+- [OcelEventLinked](ocel_event_linked.md) — replay frame digests correspond to OCEL events in the same session trace; the frame digest can be cross-referenced against the OCEL link audit trail for session-level integrity verification.
+- [InputAdmitted](input_admitted.md) — only admitted inputs (those passing the `input_admitted` gate) are packed into the frame's input word; refused bytes are excluded from the rolling digest.

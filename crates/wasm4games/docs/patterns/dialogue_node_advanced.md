@@ -11,43 +11,24 @@ Advance a 6-state linear dialogue tree FSM via branchless DFA table lookup.
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes DialogueNodeAdvanced necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches dialogue_node_advanced_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Branching dialogue trees in RPGs track conversation state through a sequence of nodes and choices: START, a series of content nodes (NODE_A through NODE_C), an END state, and a LOCKED state for conversations that have been administratively suspended. Players navigate with NEXT, BACK, and CHOICE_A/CHOICE_B symbols; a LOCK symbol suspends the conversation and UNLOCK resumes it. Without a DFA, this is managed with nested match arms — one per (state, symbol) pair — adding 36 branches in aggregate across the state/symbol space. The LOCKED state requires careful handling: every symbol except UNLOCK must stay in LOCKED, and coding this correctly in a match is error-prone under refactoring.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every DialogueNodeAdvanced call that branches adds jitter
-     - Deterministic latency: the Dfa lowering gives O(1) constant time
-     - Bounded state: stateCard = 5 (5 distinct states)
-     - Auditability: the OCEL event code 98 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches dialogue_node_advanced_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — a 6×6 `match (state, symbol)` adds up to 36 branches; even a simplified version mispredicts at node boundaries.
+- **Deterministic latency** — the Dfa lowering resolves any transition in O(1) via `DIALOGUE_TABLE[state * 6 + symbol]`, with no branch.
+- **LOCKED absorbing trap** — the LOCKED state must absorb all symbols except UNLOCK; this invariant is structurally enforced by the table row, not by call-site logic.
+- **Bidirectional navigation** — BACK must correctly retrace the conversation path (NODE_B -> NODE_A, NODE_C -> NODE_B, END -> NODE_C), which is non-trivial to get right in a match without a table.
+- **Invalid state tolerance** — states > 5 are clamped to the table range; OOB states must not index outside the 36-entry table.
+- **OCEL auditability** — OCEL event code 98 ties every dialogue advance to an auditable `npc`/`player` object trace, supporting narrative replay and QA.
 
 ## Solution
 
-<!-- TODO: Explain how dialogue_node_advanced resolves the forces.
-     It lowers onto `bcinr_logic::dfa::dfa_advance` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Dfa` was the right lowering choice. -->
-
-**Branchless primitive:** `bcinr_logic::dfa::dfa_advance`
-
-_Replace this placeholder with the solution description._
+The kernel packs state as bits[0..8] = current dialogue state (0=START, 1=NODE_A, 2=NODE_B, 3=NODE_C, 4=END, 5=LOCKED) and input as bits[0..8] = symbol (0=NEXT, 1=BACK, 2=CHOICE_A, 3=CHOICE_B, 4=LOCK, 5=UNLOCK). The 6×6 transition table (`DIALOGUE_TABLE`, 36 entries) encodes all legal transitions. Key structural facts from the table: START and NODE_A/NODE_B/NODE_C all transition to LOCKED on LOCK; LOCKED absorbs all symbols except UNLOCK, which returns to START; END is a soft sink (NEXT and CHOICE_A/B stay in END; BACK returns to NODE_C; LOCK goes to LOCKED). `dfa_advance` performs the table lookup with state clamped to `[0, 5]`. The `Dfa` lowering is correct because the dialogue tree is a formal FSM with all transitions enumerable in a 6×6 table.
 
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 5 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** LOCKED absorbing behavior is structurally guaranteed by the table row; BACK navigation is correctly encoded without special-casing; all 36 transitions are auditable in a single data structure; OCEL event 98 provides a per-advance narrative trace. **Costs:** adding a new dialogue node requires widening the state vocabulary and regenerating the 36+-entry table. **Compositions:** dialogue advancement is triggered by [QuestStepAdvanced](quest_step_advanced.md) reaching Done; [ConditionFlagEvaluated](condition_flag_evaluated.md) gates which symbols are offered to the player; [ChoiceWeightSelected](choice_weight_selected.md) drives the CHOICE_A/CHOICE_B symbols probabilistically.
 
 ---
 
@@ -55,25 +36,44 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 ---
-title: DialogueNodeAdvanced — DFA (5 states)
+title: DialogueNodeAdvanced — DFA (6 states x 6 symbols)
 ---
 stateDiagram-v2
-    [*] --> S0
-    S0: State_0
-    S1: State_1
-    S2: State_2
-    S3: State_3
-    S4: State_4
-    S0 --> S0 : TODO_symbol
-    S1 --> S1 : TODO_symbol
-    S2 --> S2 : TODO_symbol
-    S3 --> S3 : TODO_symbol
-    S4 --> S4 : TODO_symbol
-```
+    [*] --> START
+    START: START (0)
+    NODE_A: NODE_A (1)
+    NODE_B: NODE_B (2)
+    NODE_C: NODE_C (3)
+    END: END (4)
+    LOCKED: LOCKED (5)
 
-<!-- TODO: Replace State_N labels and TODO_symbol edges with the actual state names
-     and alphabet symbols from src/patterns/dialogue_node_advanced.rs (see the DFA table
-     comment and the _reference oracle for the canonical state/symbol vocabulary). -->
+    START --> NODE_A : NEXT / CHOICE_A
+    START --> NODE_B : CHOICE_B
+    START --> START : BACK / UNLOCK
+    START --> LOCKED : LOCK
+
+    NODE_A --> NODE_B : NEXT / CHOICE_B
+    NODE_A --> NODE_A : CHOICE_A / UNLOCK
+    NODE_A --> START : BACK
+    NODE_A --> LOCKED : LOCK
+
+    NODE_B --> NODE_C : NEXT
+    NODE_B --> NODE_A : BACK / CHOICE_A
+    NODE_B --> NODE_B : CHOICE_B / UNLOCK
+    NODE_B --> LOCKED : LOCK
+
+    NODE_C --> END : NEXT
+    NODE_C --> NODE_B : BACK
+    NODE_C --> NODE_C : CHOICE_A / CHOICE_B / UNLOCK
+    NODE_C --> LOCKED : LOCK
+
+    END --> END : NEXT / CHOICE_A / CHOICE_B / UNLOCK
+    END --> NODE_C : BACK
+    END --> LOCKED : LOCK
+
+    LOCKED --> LOCKED : NEXT / BACK / CHOICE_A / CHOICE_B / LOCK
+    LOCKED --> START : UNLOCK
+```
 
 ---
 
@@ -125,17 +125,10 @@ otel::emit(98);
 let ev = OcelEvent::new(98, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [QuestStepAdvanced](quest_step_advanced.md) — quest completion in the Done state is the canonical trigger for advancing the dialogue FSM.
+- [ConditionFlagEvaluated](condition_flag_evaluated.md) — narrative condition flags gate which CHOICE symbols the player is offered.
+- [ChoiceWeightSelected](choice_weight_selected.md) — weighted random choice selection drives the CHOICE_A/CHOICE_B symbol to feed into this kernel.

@@ -11,43 +11,29 @@ Evaluate a Critical-to-Quality (CTQ) characteristic: whether a measured value is
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes CtqThresholdEvaluated necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches ctq_threshold_evaluated_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Game quality pipelines track CTQ characteristics such as frame latency, network round-trip jitter, and asset load time. Each characteristic has a specification window [LSL, USL]: values below the lower spec limit (too fast) are as much a process failure as values above the upper limit (too slow). Every tick, each metric measurement must be classified into one of three outcomes — ADMITTED (in spec), below-LSL, or above-USL — and the result must contribute to DPMO computation. A naïve nested if-else classifier (`if value < LSL ... else if value > USL ... else ...`) introduces two conditional branches per measurement per tick, directly polluting the pipeline with branch mispredictions on every spec boundary crossing.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every CtqThresholdEvaluated call that branches adds jitter
-     - Deterministic latency: the Mask lowering gives O(1) constant time
-     - Bounded state: stateCard = 2 (2 distinct states)
-     - Auditability: the OCEL event code 120 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches ctq_threshold_evaluated_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — two nested comparisons (LSL check, then USL check) mispredict whenever the measured metric drifts across either boundary.
+- **Deterministic latency** — the Mask lowering via `lt_mask_u32` gives O(1) constant time; both boundary decisions execute unconditionally in parallel.
+- **Three-way classification** — the result must encode both in_spec (bit0) and direction (bit8) in a single u64, enabling downstream consumers to act on either without re-evaluating.
+- **Symmetric boundaries** — both under-spec and over-spec are defects; the pattern must treat both directions with equal importance.
+- **OCEL auditability** — OCEL event code 120 ties each CTQ evaluation to a `quality_metric` object trace for process capability studies.
 
 ## Solution
 
-<!-- TODO: Explain how ctq_threshold_evaluated resolves the forces.
-     It lowers onto `bcinr_logic::mask::lt_mask_u32` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Mask` was the right lowering choice. -->
+The kernel packs `state` bits[0..16] as the measured value (u16) and `input` bits[0..16] as LSL, bits[16..32] as USL. Two `lt_mask_u32` calls produce `below_lsl` (all-ones when value < LSL) and `above_usl_mask` (all-ones when usl < value). Their bitwise inverses give `above_lsl` and `below_usl`. The conjunction `above_lsl & below_usl` gives an all-ones mask when value is in [LSL, USL]; `>> 31` extracts this as 1 for in_spec. Separately, `above_usl_mask >> 31` gives 1 for the direction bit when value strictly exceeds USL. Both are packed into bits[0..8] (in_spec) and bits[8..16] (direction) of the return u64. This is the Mask lowering: two simultaneous comparisons resolved to independent single bits in one data-flow pass, with no branching.
 
 **Branchless primitive:** `bcinr_logic::mask::lt_mask_u32`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 2 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
+**Gains:** Both boundary decisions execute in a single pipeline pass with no branching. The in_spec and direction bits are independent: a consumer can test in_spec alone without also testing direction, or can OR the two bits into a single violation flag. The Hoare-logic invariant guarantees in_spec=1 only when value is in [LSL, USL] and direction=1 only when value strictly exceeds USL.
 
-_Replace this placeholder with consequences and trade-offs._
+**Costs:** The bit-field ABI is fixed — value in state bits[0..16], LSL+USL packed into input bits[0..32]. The state cardinality is 2 (ADMITTED or VIOLATED), but the direction sub-field adds a third outcome for upstream consumers that read it.
+
+**Compositions:** CTQ violations (in_spec=0) feed DPMO computation in `defect_rate_quantized`. The violation result drives `quality_gate_evaluated` FSM transitions. Pairs naturally with `sigma_level_computed` in a pipeline: CTQ -> defect_rate -> sigma.
 
 ---
 
@@ -55,22 +41,16 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["ctq_threshold_evaluated\nMask: bcinr_logic::mask::lt_mask_u32"]
-    result["result\n(u64)"]
+    state["state (u64)\nbits[0..16] = measured value (u16)"]
+    input["input (u64)\nbits[0..16] = LSL\nbits[16..32] = USL"]
+    kernel["ctq_threshold_evaluated\nMask: lt_mask_u32 x2\nabove_lsl & below_usl -> in_spec\nabove_usl_mask -> direction"]
+    result["result (u64)\nbits[0..8] = in_spec (1=ADMITTED)\nbits[8..16] = direction (1=above USL)"]
     state --> kernel
     input --> kernel
     kernel --> result
-    ocel_0["OCEL: quality_metric"]
+    ocel_0["OCEL: quality_metric\nevent code 120"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +102,10 @@ otel::emit(120);
 let ev = OcelEvent::new(120, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [SigmaLevelComputed](sigma_level_computed.md) — CTQ violations aggregate into DPMO that feeds sigma level classification.
+- [DefectRateQuantized](defect_rate_quantized.md) — the CTQ failure rate (in_spec=0 count / sample) is the defect rate input.
+- [QualityGateEvaluated](quality_gate_evaluated.md) — CTQ result advances the quality gate FSM on SUBMIT and FAIL symbols.

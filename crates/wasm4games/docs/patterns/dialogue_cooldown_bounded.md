@@ -11,43 +11,24 @@ Decrement a dialogue cooldown counter by a tick delta, clamping to 0; return new
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes DialogueCooldownBounded necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches dialogue_cooldown_bounded_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+NPCs in open-world and social games enforce cooldowns between dialogue interactions to prevent players from spamming conversation triggers. Each game tick, the cooldown counter is decremented by the elapsed tick delta; when it reaches zero the NPC is "ready" to talk again. Without saturating subtraction, a tick delta larger than the remaining cooldown wraps the u16 counter to a value near 65535 — meaning an NPC that should be immediately available instead shows a false cooldown of over a minute. Without branchless equality masking, the ready flag requires an `if new_cd == 0` conditional that mispredicts at the boundary tick.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every DialogueCooldownBounded call that branches adds jitter
-     - Deterministic latency: the Lut lowering gives O(1) constant time
-     - Bounded state: stateCard = 8 (8 distinct states)
-     - Auditability: the OCEL event code 101 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches dialogue_cooldown_bounded_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — a naïve `if new_cd == 0 { ready = true }` introduces a mispredictable branch at the cooldown-expiry tick.
+- **Deterministic latency** — the Lut lowering (saturating subtraction + equality mask) resolves the countdown and ready flag in O(1) with no branch.
+- **Integer underflow** — a tick delta larger than the remaining cooldown must saturate to 0 rather than wrapping to a near-maximum value; wraparound would produce a false cooldown delay of ~65535 ticks.
+- **Ready flag derivation** — the ready flag must be exactly 1 when the new cooldown is 0, and 0 otherwise; `eq_mask_u32(new_cd, 0) >> 31` produces this branchlessly from the mask bit.
+- **Already-expired cooldown** — if the cooldown is already 0 and a tick delta arrives, the result must remain 0 with ready=1; saturating subtraction handles this correctly.
+- **OCEL auditability** — OCEL event code 101 ties every cooldown tick to an auditable `player`/`npc` object trace.
 
 ## Solution
 
-<!-- TODO: Explain how dialogue_cooldown_bounded resolves the forces.
-     It lowers onto `bcinr_logic::mask::eq_mask_u32` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Lut` was the right lowering choice. -->
-
-**Branchless primitive:** `bcinr_logic::mask::eq_mask_u32`
-
-_Replace this placeholder with the solution description._
+The kernel packs state as bits[0..16] = current cooldown ticks and input as bits[0..16] = tick delta to subtract. `cooldown.saturating_sub(delta)` clamps the result to 0 when delta exceeds the cooldown, eliminating underflow in one instruction. The ready flag is computed as `eq_mask_u32(new_cd, 0) >> 31`: `eq_mask_u32` produces 0xFFFF_FFFF when `new_cd == 0` and 0 otherwise; shifting right by 31 extracts the top bit as a 0/1 ready flag. The result packs the new cooldown into bits[0..16] and the ready flag into bits[16..24]. The `Lut` lowering is used here because the equality-mask-to-flag derivation is a small lookup-style operation on a bounded value space rather than a pure arithmetic composition.
 
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 8 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** cooldown underflow is structurally impossible; the ready flag is derived branchlessly from the equality mask; an already-expired cooldown remains stable at 0 with ready=1 on every subsequent tick; OCEL event 101 provides per-tick audit for NPC availability. **Costs:** the cooldown is bounded to a 16-bit counter (max 65535 ticks); games needing longer cooldowns must widen the state field. **Compositions:** the ready flag from this pattern gates [NarrativeBranchSelected](narrative_branch_selected.md) — dialogue only proceeds when ready=1 — and composes with [DialogueNodeAdvanced](dialogue_node_advanced.md) which fires once the NPC becomes available. The same saturating-decrement-with-ready idiom appears in [NpsPromptGated](nps_prompt_gated.md).
 
 ---
 
@@ -55,24 +36,23 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["dialogue_cooldown_bounded\nLut: bcinr_logic::mask::eq_mask_u32"]
-    result["result\n(u64)"]
-    state --> kernel
-    input --> kernel
-    kernel --> result
+    state["state (u64)\nbits[0..16]: cooldown ticks (u16)"]
+    input["input (u64)\nbits[0..16]: tick delta"]
+    sub["saturating_sub(cooldown, delta)\n=> new_cd >= 0, floor at 0"]
+    eq["eq_mask_u32(new_cd, 0)\n0xFFFF_FFFF if new_cd==0, else 0"]
+    ready["ready = eq_mask >> 31\n(1 if new_cd==0, 0 otherwise)"]
+    result["result (u64)\nbits[0..16]: new cooldown\nbits[16..24]: ready flag"]
+    state --> sub
+    input --> sub
+    sub --> eq
+    eq --> ready
+    sub --> result
+    ready --> result
     ocel_0["OCEL: player"]
     result --> ocel_0
     ocel_1["OCEL: npc"]
     result --> ocel_1
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -124,17 +104,10 @@ otel::emit(101);
 let ev = OcelEvent::new(101, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [NarrativeBranchSelected](narrative_branch_selected.md) — dialogue branch selection is gated on the ready flag from this kernel.
+- [DialogueNodeAdvanced](dialogue_node_advanced.md) — dialogue node advancement fires when the cooldown ready flag becomes 1.
+- [NpsPromptGated](nps_prompt_gated.md) — NPS survey prompts use the same saturating-cooldown-with-ready-flag idiom.

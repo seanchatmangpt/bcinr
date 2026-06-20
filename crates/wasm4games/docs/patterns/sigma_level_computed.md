@@ -11,43 +11,29 @@ Compute Six-Sigma level from defects per million opportunities (DPMO) via branch
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes SigmaLevelComputed necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches sigma_level_computed_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Game quality monitoring pipelines measure DPMO continuously — every frame, every network tick — to classify the process health of a game session (matchmaking latency, render pipeline errors, audio glitches). DPMO thresholds that separate sigma levels 1 through 6 span four orders of magnitude ([3, 233, 6210, 66807, 308538]), so a naïve classifier uses a chain of five if-else comparisons. Each comparison is a potential branch misprediction that injects latency jitter into the monitoring loop, making the sigma level itself an unstable metric. Without this pattern, the classification becomes the noise source it is meant to measure.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every SigmaLevelComputed call that branches adds jitter
-     - Deterministic latency: the Lut lowering gives O(1) constant time
-     - Bounded state: stateCard = 7 (7 distinct states)
-     - Auditability: the OCEL event code 118 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches sigma_level_computed_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — five sequential if-else comparisons on DPMO mispredict unpredictably as DPMO crosses thresholds during trending quality shifts.
+- **Deterministic latency** — the Lut lowering via `lt_mask_u32` and nested `select_u32` gives O(1) constant time independent of which sigma bucket DPMO falls into.
+- **Monotone invariant** — sigma must be monotone-decreasing in DPMO; any branchy reordering risks violating the invariant under compiler optimization.
+- **Bounded output** — the result must always be in [1, 6]; unbounded outputs corrupt downstream quality gate logic.
+- **OCEL auditability** — OCEL event code 118 ties each sigma classification to an object trace on `quality_metric`, enabling process audit without branchy logging conditionals.
 
 ## Solution
 
-<!-- TODO: Explain how sigma_level_computed resolves the forces.
-     It lowers onto `bcinr_logic::mask::lt_mask_u32` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Lut` was the right lowering choice. -->
+The kernel accepts a packed-u64 where `state` bits[0..32] carry the DPMO value (u32, 0..=1_000_000) and `input` is unused. Five `lt_mask_u32` calls produce all-ones masks for each threshold (dpmo < 3, < 233, < 6210, < 66807, < 308538). A cascade of five `select_u32` calls then resolves the sigma level from bottom to top: starting at sigma=1 (the default for high DPMO), each successive select overwrites with a higher sigma if the corresponding mask is active. This is the Lut lowering: a priority-encoded selection table with O(1) depth regardless of input. The result is packed into bits[0..8] of the return u64.
 
 **Branchless primitive:** `bcinr_logic::mask::lt_mask_u32`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 7 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
+**Gains:** Sigma classification now has constant, predictable latency; no branch predictor state is polluted by DPMO values. The monotone-decreasing invariant (higher DPMO yields lower or equal sigma) is structurally guaranteed by the priority cascade. OCEL event 118 provides a per-classification audit trail.
 
-_Replace this placeholder with consequences and trade-offs._
+**Costs:** The bit-field ABI is fixed — callers must pack DPMO into bits[0..32] of state; the sigma level emerges in bits[0..8] of the result. The state space is bounded to 7 classes (sigma 0 is not a valid output; valid outputs are 1–6).
+
+**Compositions:** Feed the result directly into `quality_gate_evaluated` (which gates PASSED vs FAILED on sigma level) and `ctq_threshold_evaluated` (which supplies the DPMO upstream). Pair with `defect_rate_quantized` to normalize raw defect counts to DPMO before this kernel.
 
 ---
 
@@ -55,22 +41,16 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["sigma_level_computed\nLut: bcinr_logic::mask::lt_mask_u32"]
-    result["result\n(u64)"]
+    state["state (u64)\nbits[0..32] = dpmo (u32)\n0..=1_000_000"]
+    input["input (u64)\nunused"]
+    kernel["sigma_level_computed\nLut: 5x lt_mask_u32\n+ 5x select_u32 cascade"]
+    result["result (u64)\nbits[0..8] = sigma level\n1..=6"]
     state --> kernel
     input --> kernel
     kernel --> result
-    ocel_0["OCEL: quality_metric"]
+    ocel_0["OCEL: quality_metric\nevent code 118"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +102,10 @@ otel::emit(118);
 let ev = OcelEvent::new(118, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [DefectRateQuantized](defect_rate_quantized.md) — quantizes raw defect counts to DPMO; its output is the state input to this kernel.
+- [CtqThresholdEvaluated](ctq_threshold_evaluated.md) — CTQ violations upstream drive the DPMO that feeds sigma classification.
+- [QualityGateEvaluated](quality_gate_evaluated.md) — sigma level output feeds the quality gate FSM to decide PASSED vs FAILED.

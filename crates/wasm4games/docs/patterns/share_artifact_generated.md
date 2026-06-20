@@ -11,43 +11,25 @@ Generate a deterministic, receipt-stamped shareable artifact id.
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes ShareArtifactGenerated necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches share_artifact_generated_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+When a mastery moment fires — a perfect combo, a speed-run record, an achievement unlock — the game must immediately generate a shareable artifact id that encodes the game state at that exact moment: which player achieved it, in which session, on which content seed. This id must be deterministic (reproducible from the same inputs for verification), collision-resistant (two different achievements must produce different ids), and computed in O(1) time since it fires synchronously in the game tick. A naïve UUID4 requires an entropy source and is not deterministic; a hash with dynamic allocation violates the zero-allocation budget.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every ShareArtifactGenerated call that branches adds jitter
-     - Deterministic latency: the Receipt lowering gives O(1) constant time
-     - Bounded state: stateCard = 64 (64 distinct states)
-     - Auditability: the OCEL event code 81 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches share_artifact_generated_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Determinism** — the artifact id must be a pure function of its inputs so the server can re-derive it from the player id, session salt, and content seed for verification without storing it; non-deterministic ids (random UUIDs) fail this requirement.
+- **Collision resistance** — two distinct player/session/seed tuples must produce distinct ids with overwhelming probability; a weak hash (e.g., XOR fold) fails on common inputs like player id 0 with any seed.
+- **Zero allocation** — the Receipt lowering uses `DeterministicSubstrateReceipt` (an FNV-1a fold over the packed fields) with no heap allocation, satisfying the T0 zero-allocation budget.
+- **Field isolation** — player id occupies the low 32 bits of state and session salt the high 32 bits; mixing them into the hash without masking would cause a player with high bits set to collide with a different player/salt combination — the kernel masks both fields before hashing.
+- **OCEL auditability** — OCEL event code `81` ties each artifact generation to both the `player` and `artifact` object traces, enabling backend verification of share links by replaying the receipt fold.
 
 ## Solution
 
-<!-- TODO: Explain how share_artifact_generated resolves the forces.
-     It lowers onto `bcinr_logic::patterns::integrity_receipt::DeterministicSubstrateReceipt` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Receipt` was the right lowering choice. -->
+The kernel resolves the forces by folding three fields through a `DeterministicSubstrateReceipt` (FNV-1a-based hash with a fixed offset and prime). The packed-u64 ABI places the player id in `state` bits[0..32] and the session salt in bits[32..64]; the content seed (e.g. the mastery-moment digest) is the full `input` u64. The kernel extracts `player = state & 0xFFFF_FFFF` and `salt = (state >> 32) & 0xFFFF_FFFF`, creates a fresh receipt (`DeterministicSubstrateReceipt::new()` seeded at FNV_OFFSET), calls `r.record(player, input, salt)`, and returns `r.finalize()`. The FNV-1a fold is `(h ^ x).wrapping_mul(FNV_PRIME)` applied once for each field — fully O(1) and branch-free. The Receipt lowering was chosen because the semantic is precisely a receipt fold: a compact, deterministic, collision-resistant fingerprint of a game event's provenance.
 
 **Branchless primitive:** `bcinr_logic::patterns::integrity_receipt::DeterministicSubstrateReceipt`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 64 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** The artifact id is a 64-bit deterministic fingerprint reproducible by any party holding the three input fields; the game server can verify share links without storing a lookup table. FNV-1a provides strong avalanche — a single bit change in any field produces a completely different id. Zero heap allocation means this can fire in the hot game tick. OCEL events `81` on `player` and `artifact` enable complete share-link audit trails. **Costs:** The id space is 64 bits — birthday-collision probability is negligible at game scales (~10^9 artifacts before the first expected collision) but not cryptographically unforgeable; a motivated attacker with access to the hash parameters could forge ids. Player id and salt are limited to 32 bits each; larger id spaces require a wider ABI. **Compositions:** The artifact id produced here accompanies the [NpsPromptGated](nps_prompt_gated.md) prompt so the player can share the artifact from the prompt; it is triggered by [MasteryMomentDetected](mastery_moment_detected.md); and the same Receipt lowering appears in [ReceiptAppended](receipt_appended.md).
 
 ---
 
@@ -55,10 +37,10 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["share_artifact_generated\nReceipt: bcinr_logic::patterns::integrity_receipt::DeterministicSubstrateReceipt"]
-    result["result\n(u64)"]
+    state["state\nbits[0..32] = player id (u32)\nbits[32..64] = session salt (u32)"]
+    input["input\nbits[0..64] = content seed (mastery-moment digest)"]
+    kernel["share_artifact_generated\nReceipt: DeterministicSubstrateReceipt FNV-1a fold\nrecord(player, seed, salt) → finalize()"]
+    result["result\nbits[0..64] = deterministic share-artifact id"]
     state --> kernel
     input --> kernel
     kernel --> result
@@ -67,12 +49,6 @@ graph LR
     ocel_1["OCEL: artifact"]
     result --> ocel_1
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -124,17 +100,10 @@ otel::emit(81);
 let ev = OcelEvent::new(81, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [MasteryMomentDetected](mastery_moment_detected.md) — a detected mastery moment provides the content seed that triggers artifact generation
+- [NpsPromptGated](nps_prompt_gated.md) — the NPS prompt that accompanies the share moment carries this artifact id
+- [ReceiptAppended](receipt_appended.md) — shares the same DeterministicSubstrateReceipt FNV-1a Receipt lowering

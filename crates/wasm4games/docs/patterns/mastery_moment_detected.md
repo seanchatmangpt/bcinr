@@ -11,43 +11,25 @@ Detect a mastery moment when the rolling streak popcount meets a threshold.
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes MasteryMomentDetected necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches mastery_moment_detected_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+High-engagement trigger events — a 5-kill streak, a perfect combo, completing every challenge in a level — are the moments when players are most likely to share, rate, or invite friends. Detecting these moments requires tracking a rolling window of recent success flags and firing when the window contains enough successes to cross a mastery threshold. A naïve implementation counts successes with a loop counter and branches on the threshold comparison; with hundreds of player sessions and multiple achievement types this adds measurable jitter to the event-detection tick.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every MasteryMomentDetected call that branches adds jitter
-     - Deterministic latency: the Bitset lowering gives O(1) constant time
-     - Bounded state: stateCard = 32 (32 distinct states)
-     - Auditability: the OCEL event code 80 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches mastery_moment_detected_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — the threshold comparison `if count >= threshold { fire }` is data-dependent and fires unpredictably as players approach but do not yet reach mastery, causing mispredictions precisely at the highest-engagement moment.
+- **Deterministic latency** — the Bitset lowering uses `rank_u64` (hardware popcount on the rolling window) and `lt_mask_u32` for the threshold comparison, both O(1) with no data-dependent control flow, so detection latency is identical whether the player is at count 0 or count 31.
+- **Rolling window semantics** — the 32-bit window is shifted left by 1 and OR'd with the new success bit on every call, naturally expiring old attempts; the kernel preserves the updated window in the result so the caller can thread it back as state on the next tick without a separate data structure.
+- **Threshold equality** — the detection condition is `count >= threshold` (not `>`); the kernel uses `!lt_mask_u32(count, threshold)` to express this branchlessly, and the proptest oracle confirms equality fires correctly — a weakened `>` implementation misses the exact-threshold case.
+- **OCEL auditability** — OCEL event code `80` ties each mastery evaluation to both the `player` and `session` object traces, enabling per-session achievement reconstruction and fairness audits.
 
 ## Solution
 
-<!-- TODO: Explain how mastery_moment_detected resolves the forces.
-     It lowers onto `bcinr_logic::bitset::rank_u64` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Bitset` was the right lowering choice. -->
+The kernel resolves the forces by representing the rolling streak as a 32-bit bitset and computing detection via popcount + comparison. The packed-u64 ABI places the current 32-bit window in `state` bits[0..32], the new success flag in `input` bit[0], and the success threshold in bits[8..16]. The new window is computed as `((window << 1) | success) & 0xFFFF_FFFF` — a branchless shift-and-OR that ages out the oldest attempt. `rank_u64(new_window, 31)` counts set bits in the low 32 bits via hardware popcount. Detection fires as `(!lt_mask_u32(count, threshold) & 1)` — equivalently, `count >= threshold`. The result encodes the updated window in bits[0..32], the count in bits[32..40], and the detection flag in bit[40]. The Bitset lowering was chosen because the rolling window is a literal bitset and popcount rank is the defining primitive of the Bitset family.
 
 **Branchless primitive:** `bcinr_logic::bitset::rank_u64`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 32 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** Mastery detection costs identical cycles at count 1 and count 32, giving flat latency across all session states. The threshold-equality boundary is correctly handled by `!lt_mask_u32`, making the detection semantics precise. The updated window is returned in-band, so no auxiliary state structure is needed. OCEL events `80` span both `player` and `session`, enabling cross-session mastery analytics. **Costs:** The rolling window is fixed at 32 attempts; longer history windows require a wider kernel or a multi-word bitset. The threshold is limited to 8 bits (u8), so thresholds above 255 are unsupported. **Compositions:** A detected mastery moment triggers [ShareArtifactGenerated](share_artifact_generated.md) and [NpsPromptGated](nps_prompt_gated.md); the same set/clear/count bitset idiom appears in [StatusEffectTicked](status_effect_ticked.md).
 
 ---
 
@@ -55,10 +37,10 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["mastery_moment_detected\nBitset: bcinr_logic::bitset::rank_u64"]
-    result["result\n(u64)"]
+    state["state\nbits[0..32] = rolling streak window (1 bit per attempt)"]
+    input["input\nbit[0] = new success flag\nbits[8..16] = success threshold (u8)"]
+    kernel["mastery_moment_detected\nBitset: (window<<1|success) → rank_u64 → !lt_mask(count,threshold)"]
+    result["result\nbits[0..32] = updated window\nbits[32..40] = success count\nbit[40] = mastery-detected flag"]
     state --> kernel
     input --> kernel
     kernel --> result
@@ -67,12 +49,6 @@ graph LR
     ocel_1["OCEL: session"]
     result --> ocel_1
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -124,17 +100,10 @@ otel::emit(80);
 let ev = OcelEvent::new(80, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [NpsPromptGated](nps_prompt_gated.md) — a detected mastery moment sets the readiness flag that gates the NPS prompt
+- [ShareArtifactGenerated](share_artifact_generated.md) — a detected mastery moment triggers generation of a shareable artifact
+- [StatusEffectTicked](status_effect_ticked.md) — shares the same rolling bitset set/clear/count idiom for tracking timed effects

@@ -11,43 +11,25 @@ Clamp a raw terrain height sample to [min_h, max_h], producing a bounded 16-bit 
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes TerrainHeightQuantized necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches terrain_height_quantized_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Raw terrain height samples from a noise function span the full 16-bit unsigned range but a procedural map's playable height band is narrower — for example, a tower-defense map might constrain passable terrain to heights `[100, 200]` to ensure walls are always above water and below the sky. Without clamping, tiles sampled below `min_h` would render as underwater terrain and trigger incorrect collision layers, while tiles above `max_h` would be treated as impassable cliffs regardless of their intended role. A naïve `if raw < min_h { min_h } else if raw > max_h { max_h } else { raw }` branches twice on every tile; the Lut lowering replaces both branches with a single `clamp_u32` call.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every TerrainHeightQuantized call that branches adds jitter
-     - Deterministic latency: the Lut lowering gives O(1) constant time
-     - Bounded state: stateCard = 8 (8 distinct states)
-     - Auditability: the OCEL event code 90 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches terrain_height_quantized_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — the two boundary comparisons branch on the raw sample value, which is derived from a pseudorandom noise function and therefore unpredictable; both the floor branch and the ceiling branch mispredict at a rate proportional to how often samples fall near each boundary.
+- **Deterministic latency** — `clamp_u32` is O(1) and branchless; it composes two mask-based min/max operations and executes in constant time regardless of where the raw sample falls relative to the bounds.
+- **Domain safety** — downstream systems (biome selection, collision, tile type assignment) all assume height is in `[min_h, max_h]`; a height value outside that range is a precondition violation that silently corrupts those systems; the clamp enforces the invariant structurally.
+- **Parameterized bounds** — different map regions can use different height bands (e.g., a cave region with `[50, 150]` vs. a mountain region with `[180, 255]`); the kernel accepts `min_h` and `max_h` at call time rather than hardcoding them, so the same kernel serves all regions.
+- **OCEL auditability** — event code 90 ties each height quantization to the `terrain` object, making the applied bounds auditable without storing them in the tile struct.
 
 ## Solution
 
-<!-- TODO: Explain how terrain_height_quantized resolves the forces.
-     It lowers onto `bcinr_logic::fix::clamp_u32` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Lut` was the right lowering choice. -->
+The kernel accepts `state` packed as `bits[0..16] = raw height value (u16)` and `input` packed as `bits[0..16] = min_height, bits[16..32] = max_height`. It returns `bits[0..16] = clamped height in [min_height, max_height]`. The raw value and both bounds are extracted and passed directly to `clamp_u32(raw, min_h, max_h)`, which computes `min(max(raw, min_h), max_h)` using branchless mask operations. The result is masked by `0xFFFF` to confirm it fits in a u16. The Lut lowering was chosen because the operation is a bounded projection: a fixed mapping from the full u16 range into the `[min_h, max_h]` subrange, which is the canonical Lut contract.
 
 **Branchless primitive:** `bcinr_logic::fix::clamp_u32`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 8 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** O(1) latency per tile; out-of-band height values are silently corrected to the nearest valid boundary without a branch or a panic; the clamp is parameterized so the same kernel handles any valid `[min_h, max_h]` range; the OCEL trail at event code 90 logs the applied bounds against the `terrain` object. **Costs:** the ABI requires that `min_h <= max_h` at call time — if the caller provides an inverted range the result is implementation-defined (generally returns `min_h`); both bounds and the raw height are 16-bit, so heights above 65535 cannot be represented. **Natural compositions:** `noise_value_sampled` produces the raw height byte that this kernel clamps; `biome_class_selected` uses the clamped height to set biome flags; `tile_variant_selected` selects the visual sprite from the height-determined tile type; `spawn_weight_evaluated` reads the clamped height to decide whether a spawn is valid at this elevation.
 
 ---
 
@@ -55,22 +37,16 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["terrain_height_quantized\nLut: bcinr_logic::fix::clamp_u32"]
-    result["result\n(u64)"]
+    state["state\nbits[0..16]=raw height value (u16)"]
+    input["input\nbits[0..16]=min_height\nbits[16..32]=max_height"]
+    kernel["terrain_height_quantized\nLut: clamp_u32(raw, min_h, max_h)\nresult & 0xFFFF"]
+    result["result\nbits[0..16]=clamped height in [min_height, max_height]"]
     state --> kernel
     input --> kernel
     kernel --> result
-    ocel_0["OCEL: terrain"]
+    ocel_0["OCEL: terrain (code 90)"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +98,11 @@ otel::emit(90);
 let ev = OcelEvent::new(90, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [noise_value_sampled](noise_value_sampled.md) — the noise byte produced by the FNV-1a fold serves as the raw height sample that this kernel clamps
+- [tile_variant_selected](tile_variant_selected.md) — the clamped height determines the tile type; tile_variant_selected then picks the visual sprite within that type
+- [biome_class_selected](biome_class_selected.md) — biome flags are derived from the clamped height; terrain_height_quantized feeds biome_class_selected in the procedural pipeline
+- [spawn_weight_evaluated](spawn_weight_evaluated.md) — spawn rates depend on terrain height; the clamped height is used to look up the spawn rate for this tile

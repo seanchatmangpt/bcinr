@@ -11,43 +11,25 @@ Gate an NPS prompt on readiness vs saturation, yielding ADMITTED/BLOCKED/REFUSED
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes NpsPromptGated necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches nps_prompt_gated_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Net Promoter Score prompts must thread two conflicting requirements: they should appear when the player is in a positive, engaged state (readiness above a bar), but they must not be shown so frequently that the player becomes annoyed and ignores them (saturation cap). A player in an engaged state who has already seen the prompt three times today should get REFUSED, not ADMITTED. In a multi-threaded game engine, the naïve if-else chain — `if shown >= cap { refused } else if score < bar { blocked } else { admitted }` — reads two shared counters inside a conditional that can race between the read and the write in another thread, causing miscount. A branchless kernel closes the race by computing the decision from a single consistent snapshot of the packed state word.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every NpsPromptGated call that branches adds jitter
-     - Deterministic latency: the Mask lowering gives O(1) constant time
-     - Bounded state: stateCard = 9 (9 distinct states)
-     - Auditability: the OCEL event code 82 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches nps_prompt_gated_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — the two-condition gate (`shown >= cap` then `score < bar`) produces two conditional branches whose outcomes change as the player's session evolves, causing mispredictions at exactly the moments the prompt is most likely to be shown.
+- **Deterministic latency** — the Mask lowering onto `lt_mask_u32`, `nonzero_mask_u32`, and `select_u32` resolves both conditions in O(1) arithmetic with no data-dependent control flow, giving flat latency across ADMITTED, BLOCKED, and REFUSED.
+- **Priority ordering** — saturation (REFUSED) must dominate readiness (ADMITTED/BLOCKED); if saturation is checked second, a saturated player with a high score would be incorrectly ADMITTED. The kernel encodes this priority explicitly: base is computed first (BLOCKED vs ADMITTED), then overridden by saturation.
+- **Concurrency safety** — because the decision is a pure function of a single u64 snapshot, the caller can load the state word atomically and call the kernel; no double-read race between the saturation check and the readiness check is possible.
+- **OCEL auditability** — OCEL event code `82` ties each NPS gate decision to both the `player` and `prompt` object traces, providing an immutable record of when each player was shown, blocked, or refused a prompt.
 
 ## Solution
 
-<!-- TODO: Explain how nps_prompt_gated resolves the forces.
-     It lowers onto `bcinr_logic::mask::select_u32` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Mask` was the right lowering choice. -->
+The kernel resolves the forces by composing two comparison masks in priority order. The packed-u64 ABI places the readiness score in `state` bits[0..16] and prompts-shown count in bits[16..24]; the readiness bar is in `input` bits[0..16] and the saturation cap in bits[16..24]. First, `lt_mask_u32(score, bar)` produces the below-bar mask; `select_u32(below_bar, BLOCKED, ADMITTED)` is the base decision. Second, `!lt_mask_u32(shown, cap)` produces the saturated mask (shown >= cap); `nonzero_mask_u32(saturated)` converts it to a full-word mask; `select_u32(saturated_mask, REFUSED, base)` overrides the base with REFUSED if saturated. The result is a status code in bits[0..8] — one of ADMITTED (4), BLOCKED (7, per `status::BLOCKED`), or REFUSED. The Mask lowering was chosen because the gate decision is a two-level conditional select — the canonical use case for ordered `select_u32` composition.
 
 **Branchless primitive:** `bcinr_logic::mask::select_u32`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 9 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** The NPS gate computes ADMITTED/BLOCKED/REFUSED in a single deterministic O(1) call with no branches, giving flat latency regardless of player state. The priority ordering (saturation dominates readiness) is encoded in the kernel and cannot be violated by a race condition in the caller. OCEL events `82` on both `player` and `prompt` support per-player prompt-exposure analytics. **Costs:** The readiness score and cap are limited to 16 bits and 8 bits respectively; engines with wider score representations must normalize before packing. The saturation cap is a hard count ceiling with no time decay — a cap of 3 means "at most 3 prompts ever," not "3 per day"; time-decayed caps require a pre-processing step. **Compositions:** This kernel is triggered by [MasteryMomentDetected](mastery_moment_detected.md) (which sets the readiness flag) and accompanies [ShareArtifactGenerated](share_artifact_generated.md) (which provides the artifact to share from the prompt); the same ADMITTED/BLOCKED/REFUSED select idiom appears in [LevelGateEvaluated](level_gate_evaluated.md).
 
 ---
 
@@ -55,10 +37,10 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["nps_prompt_gated\nMask: bcinr_logic::mask::select_u32"]
-    result["result\n(u64)"]
+    state["state\nbits[0..16] = readiness score (u16)\nbits[16..24] = prompts shown (u8)"]
+    input["input\nbits[0..16] = readiness bar (u16)\nbits[16..24] = saturation cap (u8)"]
+    kernel["nps_prompt_gated\nMask: lt_mask(score,bar)→select(BLOCKED,ADMITTED)\n+ nonzero_mask(shown>=cap)→select(REFUSED,base)"]
+    result["result\nbits[0..8] = status code (ADMITTED/BLOCKED/REFUSED)"]
     state --> kernel
     input --> kernel
     kernel --> result
@@ -67,12 +49,6 @@ graph LR
     ocel_1["OCEL: prompt"]
     result --> ocel_1
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -124,17 +100,10 @@ otel::emit(82);
 let ev = OcelEvent::new(82, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [MasteryMomentDetected](mastery_moment_detected.md) — mastery detection sets the readiness score that gates the NPS prompt
+- [ShareArtifactGenerated](share_artifact_generated.md) — the artifact accompanying the NPS prompt is generated by this pattern
+- [LevelGateEvaluated](level_gate_evaluated.md) — shares the same ADMITTED/BLOCKED/REFUSED select-composition idiom

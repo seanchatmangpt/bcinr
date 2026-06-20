@@ -11,43 +11,29 @@ Normalize a raw NPS response score (0..=10) and classify as Detractor/Passive/Pr
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes NpsScoreBounded necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches nps_score_bounded_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+NPS (Net Promoter Score) surveys embedded in games collect raw response scores on a 0–10 scale from players at session end, milestone events, or prompted intervals. The game server must classify each response into Detractor (0–6), Passive (7–8), or Promoter (9–10) in a tight monitoring loop alongside other quality signals. Raw scores arriving from the network may exceed 10 due to encoding errors or adversarial input; without clamping, the classifier can index into the wrong bucket or return a sentinel value that corrupts the NPS aggregate. A branchy classifier on eleven possible score values (0–10) plus an overflow guard pollutes the branch predictor on every NPS event.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every NpsScoreBounded call that branches adds jitter
-     - Deterministic latency: the Lut lowering gives O(1) constant time
-     - Bounded state: stateCard = 11 (11 distinct states)
-     - Auditability: the OCEL event code 121 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches nps_score_bounded_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — an if/else-if chain on score < 7 / score < 9 / else executes different code paths depending on player sentiment, creating a jitter source correlated with player behavior.
+- **Deterministic latency** — the Lut lowering via `clamp_u32` and two `lt_mask_u32` + `select_u32` calls gives O(1) constant time across all 11 possible input values.
+- **Input validation** — raw scores outside [0, 10] must be silently clamped before classification; the clamp must not branch on the overflow condition.
+- **Three-category output** — the result must encode both the clamped score (for audit) and the category (0/1/2) in a single u64 for downstream NPS aggregation.
+- **OCEL auditability** — OCEL event code 121 ties each NPS classification to both a `prompt` and a `player` object trace for player experience analytics.
 
 ## Solution
 
-<!-- TODO: Explain how nps_score_bounded resolves the forces.
-     It lowers onto `bcinr_logic::fix::clamp_u32` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Lut` was the right lowering choice. -->
+The kernel takes `state` bits[0..8] as the raw NPS score (0..=10, u8) and ignores `input`. First, `clamp_u32(score, 0, 10)` branchlessly enforces the [0, 10] ceiling — any score above 10 is silently reduced to 10. Then two `lt_mask_u32` calls produce `below_7` (all-ones when clamped < 7) and `below_9` (all-ones when clamped < 9). A nested `select_u32` resolves the category: `select_u32(below_9, 1, 2)` gives 1 for Passive (<9) or 2 for Promoter (>=9); then `select_u32(below_7, 0, cat_ge_7)` gives 0 for Detractor (<7) or the previous result otherwise. The return u64 packs the clamped score into bits[0..8] and the category into bits[8..16]. This is the Lut lowering: a two-threshold priority table that handles all 11 input values in one data-flow pass.
 
 **Branchless primitive:** `bcinr_logic::fix::clamp_u32`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 11 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
+**Gains:** The clamped score and category are computed simultaneously in a single pipeline pass. The category is monotone-non-decreasing in the clamped score (Detractor < Passive < Promoter), which is structurally guaranteed by the priority cascade. Both the clamped score and category are available in the return value, so audit and aggregation consumers share one kernel call.
 
-_Replace this placeholder with consequences and trade-offs._
+**Costs:** The bit-field ABI is fixed — raw score in state bits[0..8]; clamped score in result bits[0..8], category in result bits[8..16]. Scores above 10 are silently clamped to 10 (Promoter), which may mask data quality issues upstream if the caller does not validate input.
+
+**Compositions:** The NPS category output feeds `sigma_level_computed` as a quality contribution metric. Pairs with `nps_prompt_gated` (which gates when the NPS prompt fires) and `defect_rate_quantized` (NPS is a quality metric alongside defect rates).
 
 ---
 
@@ -55,24 +41,18 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["nps_score_bounded\nLut: bcinr_logic::fix::clamp_u32"]
-    result["result\n(u64)"]
+    state["state (u64)\nbits[0..8] = raw NPS score\n0..=10 (u8, clamped if >10)"]
+    input["input (u64)\nunused"]
+    kernel["nps_score_bounded\nLut: clamp_u32 -> [0,10]\n+ lt_mask_u32 x2 (thr 7, 9)\n+ select_u32 x2 -> category"]
+    result["result (u64)\nbits[0..8] = clamped score (0..=10)\nbits[8..16] = category\n0=Detractor, 1=Passive, 2=Promoter"]
     state --> kernel
     input --> kernel
     kernel --> result
-    ocel_0["OCEL: prompt"]
+    ocel_0["OCEL: prompt\nevent code 121"]
     result --> ocel_0
     ocel_1["OCEL: player"]
     result --> ocel_1
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -124,17 +104,9 @@ otel::emit(121);
 let ev = OcelEvent::new(121, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [DefectRateQuantized](defect_rate_quantized.md) — NPS score is a quality metric parallel to defect rate; both feed quality analysis.
+- [SigmaLevelComputed](sigma_level_computed.md) — NPS promoter/detractor ratio contributes to the quality sigma signal.

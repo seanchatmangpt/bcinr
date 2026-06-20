@@ -11,43 +11,23 @@ Test whether a condition flag is set in a 32-bit flags bitset and return its ran
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes ConditionFlagEvaluated necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches condition_flag_evaluated_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Narrative systems track world-state conditions — "player has visited the temple", "player has spoken to the blacksmith", "player holds the key" — as a 32-bit flag bitset. Dialogue trees and quest scripts test these conditions to determine which branches are available and in what order they appear. Without branchless bitset operations, checking a condition requires a conditional shift-and-compare, and computing the rank of a flag among all active flags (used to enumerate only satisfied conditions) requires a loop over all 32 bits with a counter — adding 32 branches per rank query in the worst case.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every ConditionFlagEvaluated call that branches adds jitter
-     - Deterministic latency: the Bitset lowering gives O(1) constant time
-     - Bounded state: stateCard = 32 (32 distinct states)
-     - Auditability: the OCEL event code 99 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches condition_flag_evaluated_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — a naïve `for bit in 0..32 { if flags & (1<<bit) != 0 { count += 1; } }` loop adds up to 32 mispredictable branches per rank computation.
+- **Deterministic latency** — the Bitset lowering computes both flag presence and rank in O(1) via a single masked popcount of `flags & ((1 << idx) - 1)`, with no loop or branch.
+- **Dual output** — dialogue callers need both whether a flag is set (to gate the branch) and the rank of the flag among active flags (to order the offered choices); packing both into bits[0..8] and bits[8..16] avoids a second call.
+- **5-bit index safety** — the flag index is masked to 5 bits (`idx = input & 0x1F`) before the shift, preventing undefined behavior on shift-by-32.
+- **OCEL auditability** — OCEL event code 99 ties every flag evaluation to an auditable `player` object trace, supporting narrative replay.
 
 ## Solution
 
-<!-- TODO: Explain how condition_flag_evaluated resolves the forces.
-     It lowers onto `bcinr_logic::bitset::rank_u64` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Bitset` was the right lowering choice. -->
-
-**Branchless primitive:** `bcinr_logic::bitset::rank_u64`
-
-_Replace this placeholder with the solution description._
+The kernel packs state as bits[0..32] = condition flags bitset (32 flags; 1 = condition satisfied) and input as bits[0..8] = flag index to test (0..31). The flag index is masked to 5 bits. The presence bit is extracted as `(flags >> idx) & 1`. The rank — the number of set flags at positions strictly below `idx` — is computed as `(flags & ((1u64 << idx).wrapping_sub(1))).count_ones()`: a single masked popcount using `wrapping_sub` to handle `idx = 0` safely (the mask becomes 0). The result packs presence into bit 0 and rank into bits[8..16]. The `Bitset` lowering is correct because both operations (flag test and rank) are standard bitset primitives reducible to popcount and mask.
 
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 32 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** flag test and rank are computed in O(1) with no loop; the packed dual-output avoids a second kernel call for ordering; the 5-bit index mask prevents shift-by-32 undefined behavior; OCEL event 99 provides per-condition-check audit. **Costs:** the condition space is bounded to 32 flags; games with more conditions must segment the bitset across multiple state words. **Compositions:** this pattern gates which dialogue symbols are offered in [DialogueNodeAdvanced](dialogue_node_advanced.md); the same bitset rank idiom appears in [CapabilityFlagEvaluated](capability_flag_evaluated.md); rank output feeds [NarrativeBranchSelected](narrative_branch_selected.md) as a branch weight.
 
 ---
 
@@ -55,22 +35,22 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["condition_flag_evaluated\nBitset: bcinr_logic::bitset::rank_u64"]
-    result["result\n(u64)"]
-    state --> kernel
-    input --> kernel
-    kernel --> result
+    state["state (u64)\nbits[0..32]: condition flags bitset\n(32 flags, 1=satisfied)"]
+    input["input (u64)\nbits[0..8]: flag index (0..31)"]
+    mask["rank mask = flags & ((1<<idx)-1)\n[wrapping_sub handles idx=0]"]
+    popcount["count_ones(rank mask)\n=> rank in [0,31]"]
+    bit["(flags >> idx) & 1\n=> presence (0 or 1)"]
+    result["result (u64)\nbits[0..8]: 1 if flag set, 0 otherwise\nbits[8..16]: rank among active flags"]
+    state --> mask
+    state --> bit
+    input --> mask
+    input --> bit
+    mask --> popcount
+    popcount --> result
+    bit --> result
     ocel_0["OCEL: player"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +102,10 @@ otel::emit(99);
 let ev = OcelEvent::new(99, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [DialogueNodeAdvanced](dialogue_node_advanced.md) — condition flag presence gates which symbols (CHOICE_A, CHOICE_B) are offered to the player.
+- [NarrativeBranchSelected](narrative_branch_selected.md) — condition counts and ranks contribute to the branch weights compared by this pattern.
+- [CapabilityFlagEvaluated](capability_flag_evaluated.md) — uses the same bitset rank idiom for capability rather than narrative condition flags.

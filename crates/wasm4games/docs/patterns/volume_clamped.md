@@ -11,43 +11,25 @@ Apply a volume change (delta) to current volume, clamping to [0, 255].
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes VolumeClamped necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches volume_clamped_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Game audio volume is adjusted from multiple sources simultaneously: a music slider, an SFX slider, a ducking system, and per-effect attenuation all write signed deltas to the same channel volume each frame. Without clamping to the hardware output range [0, 255], a negative delta that exceeds the current volume wraps around to 254 — producing a sudden ear-splitting burst — and a positive delta can overflow to a near-zero value, silencing the channel mid-playback. Both failure modes are silent data corruption from the caller's perspective.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every VolumeClamped call that branches adds jitter
-     - Deterministic latency: the Lut lowering gives O(1) constant time
-     - Bounded state: stateCard = 8 (8 distinct states)
-     - Auditability: the OCEL event code 109 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches volume_clamped_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — a naïve `if new_vol < 0` or `if new_vol > 255` guard branches on data-dependent conditions that fire on fade completion and volume-limit events.
+- **Deterministic latency** — the Lut lowering pre-computes both `vol.saturating_add(delta)` and `vol.saturating_sub(delta)`, then uses a branchless `select_u32` on the direction bit, giving O(1) fixed execution.
+- **Direction encoding** — the direction (up vs down) is packed as a single bit (bit[8] of input) and converted to an all-ones/all-zeros mask via `0u32.wrapping_sub(dir)`, replacing a conditional with arithmetic.
+- **Two-path symmetry** — both the up-result and down-result are computed eagerly before the select; neither path introduces dead code that the compiler might optimize away in a way that breaks the no-branch invariant.
+- **OCEL auditability** — event code 109 ties each volume step to the `audio_source` object trace, enabling reconstruction of the volume envelope for any channel at any tick.
 
 ## Solution
 
-<!-- TODO: Explain how volume_clamped resolves the forces.
-     It lowers onto `bcinr_logic::fix::clamp_u32` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Lut` was the right lowering choice. -->
-
 **Branchless primitive:** `bcinr_logic::fix::clamp_u32`
 
-_Replace this placeholder with the solution description._
+State bits[0..8] carry the current volume (0..255). Input bits[0..8] carry the delta magnitude; bit[8] carries the direction (0 = increase, 1 = decrease). Both `clamp_u32(vol.saturating_add(delta), 0, 255)` (up path) and `clamp_u32(vol.saturating_sub(delta), 0, 255)` (down path) are evaluated unconditionally. The direction bit is widened to a full mask via `0u32.wrapping_sub(dir)` (all-ones when dir=1, all-zeros when dir=0), and `select_u32(dir_mask, down_result, up_result)` picks the correct result without branching. The Lut lowering was chosen because the output must always be in [0, 255] — a two-sided absolute range — matching `clamp_u32`'s domain exactly.
 
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 8 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** Volume is provably in [0, 255] after every call; direction handling is branch-free; the pre-computed dual-path evaluation ensures constant instruction count. **Costs:** Both addition and subtraction paths are always executed (2x ALU work vs 1x for a branching impl); delta is an 8-bit magnitude, limiting the maximum single-step change to 255. **Compositions:** The clamped volume feeds `audio_priority_selected` (priority ranking uses effective volume); `audio_fade_applied` applies repeated down-deltas until the floor fires; `audio_distance_attenuated` produces an attenuation delta that then passes through this kernel.
 
 ---
 
@@ -55,22 +37,16 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["volume_clamped\nLut: bcinr_logic::fix::clamp_u32"]
-    result["result\n(u64)"]
+    state["state (u64)\nbits[0..8] = current volume (0..255)"]
+    input["input (u64)\nbits[0..8] = delta magnitude\nbit[8] = direction (0=up, 1=down)"]
+    kernel["volume_clamped\nLut: sat_add & sat_sub → wrapping_sub(dir) mask → select_u32"]
+    result["result (u64)\nbits[0..8] = new volume in [0, 255]"]
     state --> kernel
     input --> kernel
     kernel --> result
-    ocel_0["OCEL: audio_source"]
+    ocel_0["OCEL: audio_source (code 109)"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +98,10 @@ otel::emit(109);
 let ev = OcelEvent::new(109, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [AudioPrioritySelected](audio_priority_selected.md) — the clamped volume feeds the priority comparison for voice slot assignment.
+- [AudioFadeApplied](audio_fade_applied.md) — fade applies repeated down-deltas that must go through clamping to correctly detect the silent floor.
+- [AudioDistanceAttenuated](audio_distance_attenuated.md) — distance attenuation produces a volume value that is subsequently bounded by the same [0, 255] range.

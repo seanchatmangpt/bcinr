@@ -11,43 +11,24 @@ Advance a linear quest one step; complete moves forward, abandon resets.
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes QuestStepAdvanced necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches quest_step_advanced_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Linear quest progression in RPGs and adventure games follows a well-defined sequence of steps: accept, complete step 1, complete step 2, complete step 3, reach Done. Without a DFA, quest state is managed with a nested `match` or `switch` on the current step and event, adding one branch per legal transition per quest event. Over many simultaneous quests and replay-log entries, the branch overhead accumulates, and the absence of an explicit Done absorbing state allows bugs where a completed quest can be re-triggered. Replay log analysis also becomes difficult when state transitions are scattered across multiple match arms rather than captured in a single auditable table.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every QuestStepAdvanced call that branches adds jitter
-     - Deterministic latency: the Dfa lowering gives O(1) constant time
-     - Bounded state: stateCard = 5 (5 distinct states)
-     - Auditability: the OCEL event code 69 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches quest_step_advanced_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — a nested `match (step, event)` over 15 combinations adds mispredictable branches per quest event, compounding when many quests are active simultaneously.
+- **Deterministic latency** — the Dfa lowering resolves the transition in O(1) via `TABLE[step * 3 + symbol]`, with no branch.
+- **Absorbing Done state** — once a quest reaches Done (step 4), it must be structurally impossible to advance further; the Done row absorbs all symbols (`idle`, `complete`, `abandon` all loop to Done).
+- **Reset on abandon** — the `abandon` symbol must reset any in-progress step back to step 0 (not to Done), modeling quest cancellation cleanly.
+- **Out-of-alphabet safety** — invalid symbols from a buggy caller must not index outside the table; OOB symbols are masked to `idle` (hold) branchlessly.
+- **OCEL auditability** — OCEL event code 69 ties every quest step transition to an auditable `player`/`quest` object trace, enabling quest replay forensics.
 
 ## Solution
 
-<!-- TODO: Explain how quest_step_advanced resolves the forces.
-     It lowers onto `bcinr_logic::dfa::dfa_advance` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Dfa` was the right lowering choice. -->
-
-**Branchless primitive:** `bcinr_logic::dfa::dfa_advance`
-
-_Replace this placeholder with the solution description._
+The kernel packs state as bits[0..8] = current step (0 = step0, 1 = step1, 2 = step2, 3 = step3, 4 = Done) and input as bits[0..8] = quest symbol (0 = idle, 1 = complete, 2 = abandon). The 5×3 transition table (15 entries) is flat; `complete` advances each in-progress step forward, `abandon` resets to step0, `idle` holds. The Done row maps all symbols to Done (absorbing). OOB symbols are masked to `idle` (0) via `sym_raw & 0.wrapping_sub(in_alphabet)`. `dfa_advance` performs the table lookup. The `Dfa` lowering is correct because quest progression is inherently a finite state machine where all legal transitions can be enumerated explicitly.
 
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 5 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** the Done absorbing state prevents re-triggering a completed quest; abandon resets correctly in all in-progress states; OOB symbols hold the current step; OCEL event 69 provides a per-quest-step audit. **Costs:** the alphabet is fixed at 3 symbols; adding a `pause` or `timeout` event requires widening the table. **Compositions:** quest completion in the Done state triggers [DialogueNodeAdvanced](dialogue_node_advanced.md) to unlock NPC dialogue; the DFA pattern is the same lowering as [EntityStateTransitioned](entity_state_transitioned.md); quest step events fold into [ReceiptAppended](receipt_appended.md) for receipt chain integrity.
 
 ---
 
@@ -55,25 +36,33 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 ---
-title: QuestStepAdvanced — DFA (5 states)
+title: QuestStepAdvanced — DFA (5 states, alphabet: idle/complete/abandon)
 ---
 stateDiagram-v2
-    [*] --> S0
-    S0: State_0
-    S1: State_1
-    S2: State_2
-    S3: State_3
-    S4: State_4
-    S0 --> S0 : TODO_symbol
-    S1 --> S1 : TODO_symbol
-    S2 --> S2 : TODO_symbol
-    S3 --> S3 : TODO_symbol
-    S4 --> S4 : TODO_symbol
-```
+    [*] --> step0
+    step0: step0 (0)
+    step1: step1 (1)
+    step2: step2 (2)
+    step3: step3 (3)
+    Done: Done (4) [absorbing]
 
-<!-- TODO: Replace State_N labels and TODO_symbol edges with the actual state names
-     and alphabet symbols from src/patterns/quest_step_advanced.rs (see the DFA table
-     comment and the _reference oracle for the canonical state/symbol vocabulary). -->
+    step0 --> step0 : idle / abandon
+    step0 --> step1 : complete
+
+    step1 --> step1 : idle
+    step1 --> step0 : abandon
+    step1 --> step2 : complete
+
+    step2 --> step2 : idle
+    step2 --> step0 : abandon
+    step2 --> step3 : complete
+
+    step3 --> step3 : idle
+    step3 --> step0 : abandon
+    step3 --> Done : complete
+
+    Done --> Done : idle / complete / abandon
+```
 
 ---
 
@@ -125,17 +114,10 @@ otel::emit(69);
 let ev = OcelEvent::new(69, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [DialogueNodeAdvanced](dialogue_node_advanced.md) — quest completion in the Done state triggers NPC dialogue advancement.
+- [EntityStateTransitioned](entity_state_transitioned.md) — uses the same DFA lowering idiom for general entity FSMs.
+- [ReceiptAppended](receipt_appended.md) — quest step events fold into the receipt chain for audit integrity.

@@ -11,43 +11,29 @@ Encode a semantic command type (0..=127) into a platform opcode class via branch
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes CommandOpcodeEncoded necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches command_opcode_encoded_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Game engines maintain a vocabulary of semantic command types — MOVE, ATTACK, BUILD, UI, network sync, and so on — that must be translated into platform-specific opcode classes for different rendering and execution backends (WebGPU compute, DirectX draw, Metal blit, audio DSP dispatch). The translation assigns each command type to one of four opcode classes based on three threshold boundaries at 32, 64, and 96. Without branchless boundary comparison, every draw call submission traverses a chain of if-else statements on the command type, creating branch mispredictions at every class boundary in a high-frequency command stream.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every CommandOpcodeEncoded call that branches adds jitter
-     - Deterministic latency: the Lut lowering gives O(1) constant time
-     - Bounded state: stateCard = 4 (4 distinct states)
-     - Auditability: the OCEL event code 123 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches command_opcode_encoded_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — a three-branch if-else-if chain on command type creates prediction pressure at each of the three class boundaries, which are frequently crossed during scene transitions.
+- **Deterministic latency** — the Lut lowering via three `lt_mask_u32` comparisons summed to a threshold-crossing count gives O(1) constant time regardless of which class the command falls into.
+- **Original type preservation** — the encoded opcode class must be accompanied by the original command type (bits[8..16]) so that bridge adapters can log the semantic intent alongside the platform opcode.
+- **Four-class partition** — command types 0–31 (class 0), 32–63 (class 1), 64–95 (class 2), 96–127 (class 3) must be assigned without branching.
+- **OCEL auditability** — OCEL event code 123 ties each opcode encoding to an `engine_cmd` object trace for command dispatch auditing.
 
 ## Solution
 
-<!-- TODO: Explain how command_opcode_encoded resolves the forces.
-     It lowers onto `bcinr_logic::mask::lt_mask_u32` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Lut` was the right lowering choice. -->
+The kernel takes `state` bits[0..7] as the semantic command type (masked to 7 bits, 0..=127) and ignores `input`. Three `lt_mask_u32` comparisons determine how many of the thresholds [32, 64, 96] the command type crosses: `ge32 = (!lt_mask_u32(cmd, 32) >> 31)` yields 1 if cmd >= 32, else 0 — and similarly for 64 and 96. The opcode class is their sum: `ge32 + ge64 + ge96`, which equals 0, 1, 2, or 3 exactly. This is the Lut lowering: a threshold-crossing count that replaces a four-way branch with three independent comparisons and an addition. The return u64 packs opcode_class into bits[0..8] and the original cmd into bits[8..16].
 
 **Branchless primitive:** `bcinr_logic::mask::lt_mask_u32`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 4 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
+**Gains:** The opcode class is computed in a fixed three-comparison + addition sequence; no branch predictor state is consumed. The original command type is preserved in the upper byte, enabling bridge adapters to log semantic intent without a second call. The threshold-crossing idiom generalizes cleanly to more classes by adding comparisons.
 
-_Replace this placeholder with consequences and trade-offs._
+**Costs:** The bit-field ABI is fixed — command type in state bits[0..7], opcode class in result bits[0..8], original cmd in result bits[8..16]. The four opcode classes and three boundaries are compile-time constants; runtime-configurable class boundaries require a kernel variant.
+
+**Compositions:** The encoded opcode feeds `bridge_state_transitioned` (encoding is only meaningful in CONNECTED state) and `payload_size_bounded` (the opcode's payload must be MTU-bounded). `capability_flag_evaluated` gates which opcode classes are valid for the current adapter before encoding.
 
 ---
 
@@ -55,22 +41,16 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["command_opcode_encoded\nLut: bcinr_logic::mask::lt_mask_u32"]
-    result["result\n(u64)"]
+    state["state (u64)\nbits[0..7] = cmd type (0..=127)"]
+    input["input (u64)\nunused"]
+    kernel["command_opcode_encoded\nLut: lt_mask_u32 x3\n(thr 32, 64, 96)\nopcode = ge32 + ge64 + ge96"]
+    result["result (u64)\nbits[0..8] = opcode class (0..3)\nbits[8..16] = original cmd type"]
     state --> kernel
     input --> kernel
     kernel --> result
-    ocel_0["OCEL: engine_cmd"]
+    ocel_0["OCEL: engine_cmd\nevent code 123"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +102,10 @@ otel::emit(123);
 let ev = OcelEvent::new(123, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [BridgeStateTransitioned](bridge_state_transitioned.md) — opcode encoding is only valid after the bridge reaches CONNECTED state.
+- [CapabilityFlagEvaluated](capability_flag_evaluated.md) — adapter capabilities gate which opcode classes are available before encoding.
+- [PayloadSizeBounded](payload_size_bounded.md) — the encoded opcode's payload must be MTU-clamped before transmission.

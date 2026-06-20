@@ -11,43 +11,29 @@ Advance a quality gate FSM (UNINSPECTED/PENDING/PASSED/FAILED/REMEDIATED) via a 
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes QualityGateEvaluated necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches quality_gate_evaluated_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Continuous delivery pipelines for live game services run quality gates that approve or block each build or session configuration from reaching players. These gates progress through a well-defined lifecycle: a new configuration starts UNINSPECTED, moves to PENDING when submitted for review, transitions to PASSED or FAILED based on CTQ and sigma evidence, and can move to REMEDIATED after a failed inspection is addressed. Implementing this lifecycle with a switch-on-state structure means every quality check event branches on the current state, causing branch mispredictions at exactly the moments when the gate is under load (high-volume quality events during a release window).
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every QualityGateEvaluated call that branches adds jitter
-     - Deterministic latency: the Dfa lowering gives O(1) constant time
-     - Bounded state: stateCard = 4 (4 distinct states)
-     - Auditability: the OCEL event code 122 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches quality_gate_evaluated_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — switch-on-state dispatches to different code paths per state, mispredicting at every quality check event when the state is in flux.
+- **Deterministic latency** — the Dfa lowering via `dfa_advance` gives O(1) constant time: one table index read per transition, independent of which state or symbol is active.
+- **Five-state lifecycle** — UNINSPECTED, PENDING, PASSED, FAILED, and REMEDIATED must all be reachable and their transitions must be total (every (state, symbol) pair must map somewhere defined).
+- **Idempotent self-loops** — PASSED receiving another PASS event must stay PASSED; FAILED receiving a FAIL must stay FAILED. These self-loops must not branch.
+- **OCEL auditability** — OCEL event code 122 ties each gate transition to a `quality_metric` object trace for audit and compliance.
 
 ## Solution
 
-<!-- TODO: Explain how quality_gate_evaluated resolves the forces.
-     It lowers onto `bcinr_logic::dfa::dfa_advance` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Dfa` was the right lowering choice. -->
+The kernel packs `state` bits[0..8] as the current gate state (0..=4, reduced mod 5 for out-of-range inputs) and `input` bits[0..8] as the transition symbol (0..=4, reduced mod 5). The flat 5×5 transition table encodes all 25 (state, symbol) pairs: rows are UNINSPECTED=0, PENDING=1, PASSED=2, FAILED=3, REMEDIATED=4; columns are SUBMIT=0, PASS=1, FAIL=2, REMEDIATE=3, RESUBMIT=4. `dfa_advance(st, sym, &TABLE, ALPHABET)` performs a single branchless array index read. The result (bits[0..8]) is the next gate state. This is the Dfa lowering: the entire state machine is a lookup into a flat constant-time table with no conditional logic.
 
 **Branchless primitive:** `bcinr_logic::dfa::dfa_advance`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 4 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
+**Gains:** All 25 transitions execute at identical latency. Self-loops (PASSED + PASS -> PASSED) are free. Adding a sixth state requires only extending the table — no new branches in the kernel. The gate state is a plain u8, trivially loggable and serializable for OCEL audit.
 
-_Replace this placeholder with consequences and trade-offs._
+**Costs:** The bit-field ABI is fixed. The table is a compile-time constant, so runtime-configurable quality policies cannot be expressed without a kernel variant. Out-of-range state or symbol values are silently reduced modulo 5; callers must validate inputs if they need strict rejection of invalid states.
+
+**Compositions:** CTQ violation verdicts from `ctq_threshold_evaluated` drive FAIL symbols into this gate. Sigma level from `sigma_level_computed` determines whether a PASS or FAIL symbol is emitted. Defect rate from `defect_rate_quantized` provides the underlying evidence for the inspection event.
 
 ---
 
@@ -55,23 +41,25 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 ---
-title: QualityGateEvaluated — DFA (4 states)
+title: QualityGateEvaluated — DFA (5 states)
 ---
 stateDiagram-v2
-    [*] --> S0
-    S0: State_0
-    S1: State_1
-    S2: State_2
-    S3: State_3
-    S0 --> S0 : TODO_symbol
-    S1 --> S1 : TODO_symbol
-    S2 --> S2 : TODO_symbol
-    S3 --> S3 : TODO_symbol
+    [*] --> UNINSPECTED
+    UNINSPECTED --> PENDING : SUBMIT / RESUBMIT
+    UNINSPECTED --> UNINSPECTED : PASS / FAIL / REMEDIATE
+    PENDING --> PASSED : PASS
+    PENDING --> FAILED : FAIL
+    PENDING --> PENDING : SUBMIT / REMEDIATE / RESUBMIT
+    PASSED --> PASSED : SUBMIT / PASS / REMEDIATE / RESUBMIT
+    PASSED --> FAILED : FAIL
+    FAILED --> FAILED : SUBMIT / PASS / FAIL
+    FAILED --> REMEDIATED : REMEDIATE
+    FAILED --> PENDING : RESUBMIT
+    REMEDIATED --> PASSED : PASS
+    REMEDIATED --> FAILED : FAIL
+    REMEDIATED --> REMEDIATED : SUBMIT / REMEDIATE
+    REMEDIATED --> PENDING : RESUBMIT
 ```
-
-<!-- TODO: Replace State_N labels and TODO_symbol edges with the actual state names
-     and alphabet symbols from src/patterns/quality_gate_evaluated.rs (see the DFA table
-     comment and the _reference oracle for the canonical state/symbol vocabulary). -->
 
 ---
 
@@ -123,17 +111,10 @@ otel::emit(122);
 let ev = OcelEvent::new(122, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [CtqThresholdEvaluated](ctq_threshold_evaluated.md) — CTQ verdict drives FAIL symbol into this gate's transition.
+- [SigmaLevelComputed](sigma_level_computed.md) — sigma level determines whether PASS or FAIL symbol is submitted.
+- [DefectRateQuantized](defect_rate_quantized.md) — defect rate provides the inspection evidence that triggers SUBMIT events.

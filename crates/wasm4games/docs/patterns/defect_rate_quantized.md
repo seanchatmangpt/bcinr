@@ -11,43 +11,29 @@ Clamp a measured defect rate (parts per million) to [0, 1_000_000] for normaliza
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes DefectRateQuantized necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches defect_rate_quantized_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+Game telemetry pipelines collect raw defect counts and sample sizes per monitoring window. When the sample size is very small (e.g., a single observed event), the computed rate `(defects * 1_000_000) / sample` can explode far above 1,000,000 PPM — a physically meaningless value that corrupts sigma level and NPS score calculations downstream. In addition, a sample size of zero causes a division-by-zero fault, which a branchless check must absorb without halting the monitoring loop. Without this normalization kernel, upstream noise propagates through the quality pipeline as garbage-in, garbage-out.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every DefectRateQuantized call that branches adds jitter
-     - Deterministic latency: the Lut lowering gives O(1) constant time
-     - Bounded state: stateCard = 8 (8 distinct states)
-     - Auditability: the OCEL event code 119 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches defect_rate_quantized_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — a naïve `if rate > 1_000_000 { clamp }` guard on a hot monitoring path adds jitter whenever the defect spike occurs.
+- **Deterministic latency** — the Lut lowering via `clamp_u32` gives O(1) constant time regardless of whether clamping is needed.
+- **Division-by-zero safety** — sample size zero must be handled branchlessly; the kernel substitutes 1 via a bitwise zero-detect mask (`(sample == 0) as u64).wrapping_neg()`) without branching.
+- **PPM ceiling invariant** — result must always be in [0, 1_000_000] for the sigma level LUT thresholds to remain valid.
+- **OCEL auditability** — OCEL event code 119 ties each quantization to an object trace on `quality_metric`.
 
 ## Solution
 
-<!-- TODO: Explain how defect_rate_quantized resolves the forces.
-     It lowers onto `bcinr_logic::fix::clamp_u32` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Lut` was the right lowering choice. -->
+The kernel packs `state` bits[0..32] as the raw defect count (u32) and `input` bits[0..32] as the sample size (u32). Sample size zero is substituted with 1 branchlessly: `let is_zero = ((raw_sample == 0) as u64).wrapping_neg()` produces an all-ones mask when zero, and `raw_sample | (is_zero & 1)` replaces zero with one without a branch. The rate is then `(defects * 1_000_000) / sample`, saturated via `saturating_mul` to prevent u64 overflow, and then `clamp_u32` enforces the [0, 1_000_000] ceiling. The result occupies bits[0..32] of the return u64. This is the Lut lowering: a fixed arithmetic transform that maps any (defects, sample) pair to a normalized PPM value in one pipeline pass.
 
 **Branchless primitive:** `bcinr_logic::fix::clamp_u32`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 8 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
+**Gains:** The [0, 1_000_000] invariant on the output is unconditionally guaranteed, so downstream sigma level and NPS computations can trust the input range without their own guards. Division-by-zero is absorbed silently, preserving the monitoring loop's liveness. Constant-time execution eliminates jitter spikes on defect bursts.
 
-_Replace this placeholder with consequences and trade-offs._
+**Costs:** The bit-field ABI is fixed — defect count in state bits[0..32], sample size in input bits[0..32]. Saturating multiplication loses precision for astronomically large defect counts (over ~4 billion per sample), but this is outside the PPM domain.
+
+**Compositions:** The quantized PPM output feeds `sigma_level_computed` directly. It also feeds `ctq_threshold_evaluated` as the measured value against CTQ spec limits, and contributes to `nps_score_bounded` quality calculations.
 
 ---
 
@@ -55,22 +41,16 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["defect_rate_quantized\nLut: bcinr_logic::fix::clamp_u32"]
-    result["result\n(u64)"]
+    state["state (u64)\nbits[0..32] = defect count (u32)"]
+    input["input (u64)\nbits[0..32] = sample size (u32)\n(0 -> substituted with 1)"]
+    kernel["defect_rate_quantized\nLut: saturating_mul + clamp_u32\nrate = (defects*1_000_000)/sample\nclamped to [0, 1_000_000]"]
+    result["result (u64)\nbits[0..32] = PPM rate\n0..=1_000_000"]
     state --> kernel
     input --> kernel
     kernel --> result
-    ocel_0["OCEL: quality_metric"]
+    ocel_0["OCEL: quality_metric\nevent code 119"]
     result --> ocel_0
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -122,17 +102,10 @@ otel::emit(119);
 let ev = OcelEvent::new(119, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [SigmaLevelComputed](sigma_level_computed.md) — receives this kernel's PPM output as its DPMO input for sigma classification.
+- [CtqThresholdEvaluated](ctq_threshold_evaluated.md) — CTQ failure rate is the defect rate after normalization against spec limits.
+- [NpsScoreBounded](nps_score_bounded.md) — NPS score computation uses the bounded defect rate as a quality signal.

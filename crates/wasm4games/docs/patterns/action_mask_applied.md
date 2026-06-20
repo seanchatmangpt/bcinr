@@ -11,43 +11,25 @@ Apply an action mask to a policy output — zero out Q-values for illegal action
 
 ## Context
 
-<!-- TODO: Describe the game situation that makes ActionMaskApplied necessary.
-     Why does this pattern exist? What breaks — or becomes unpredictably slow —
-     without it? Seed from the authority line below, then expand:
-     Authority: oracle predicate: matches action_mask_applied_reference for all inputs -->
-
-_Replace this placeholder with 2–3 sentences on the game problem this pattern addresses._
+RL environments with structured constraints — "can't attack while reloading," "can't move while stunned" — maintain a bitset of which actions are legal at each step. When the policy selects the argmax over Q-values without first zeroing illegal Q-values, the agent may execute a physically impossible action, violating environment invariants and causing undefined state transitions. The naive guard is `if (valid >> idx) & 1 == 0 { q = 0 }`, which branches on a data-dependent legality bit — at thousands of action checks per rollout batch, every bit that flips state causes a misprediction.
 
 ## Forces
 
-<!-- TODO: List the tensions this pattern must hold in balance. Consider:
-     - Branch misprediction: every ActionMaskApplied call that branches adds jitter
-     - Deterministic latency: the Bitset lowering gives O(1) constant time
-     - Bounded state: stateCard = 32 (32 distinct states)
-     - Auditability: the OCEL event code 131 ties the transition to an object trace
-     Authority to defend: oracle predicate: matches action_mask_applied_reference for all inputs -->
-
-_Replace this placeholder with the forces — what pulls in opposite directions here._
+- **Branch misprediction** — the legality check `if illegal { zero Q-value }` branches on a per-action-per-step bit that changes as constraints come and go during episode, causing high misprediction rates in constrained environments.
+- **Deterministic latency** — the Bitset lowering extracts the legality bit with a shift and AND, forms a full-word mask with a wrapping negation (`0u64.wrapping_sub(legal_bit)`), and applies it with `select_u64` — all O(1) with no data-dependent control flow.
+- **Correctness by construction** — zeroing the Q-value before argmax rather than after selection means the policy can never commit to an illegal action; the constraint is enforced at the signal level, not post-hoc.
+- **Legality flag transparency** — the kernel returns both the masked Q-value (bits[0..16]) and the raw legality flag (bit[16]), so downstream callers can distinguish "Q=0 because action is illegal" from "Q=0 because the policy genuinely assigns zero value."
+- **OCEL auditability** — OCEL event code `131` ties each mask application to both the `agent` and `episode` object traces, enabling audit of which actions were masked at each step and why.
 
 ## Solution
 
-<!-- TODO: Explain how action_mask_applied resolves the forces.
-     It lowers onto `bcinr_logic::mask::select_u64` to compute without conditional branches.
-     Describe the bit-field ABI (how state and input are packed into u64),
-     the branchless arithmetic, and why `Bitset` was the right lowering choice. -->
+The kernel resolves the forces via bitset rank and branchless select. The packed-u64 ABI places the 32-bit valid-actions bitset in `state` bits[0..32], the action index in `input` bits[0..8] (masked to 5 bits for safe shifting into a 32-bit word), and the proposed Q-value in bits[8..24]. The legality bit is extracted as `(valid >> idx) & 1`. The full-word legality mask is `0u64.wrapping_sub(legal_bit)` — a branchless negation that produces `0xFFFF...FFFF` if legal and `0` if illegal. `select_u64(legal_mask, q_val, 0)` then passes the Q-value through or zeros it in one instruction. The return value packs the masked Q in bits[0..16] and the legality flag in bit[16]. The Bitset lowering was chosen because the core operation is a single-bit rank from a bitset, the defining operation of the Bitset family.
 
 **Branchless primitive:** `bcinr_logic::mask::select_u64`
 
-_Replace this placeholder with the solution description._
-
 ## Consequences
 
-<!-- TODO: What trade-offs follow from applying this pattern?
-     Gains: predictable latency, side-channel resistance, OCEL audit trail.
-     Costs: fixed bit-field ABI, state space bounded to 32 classes.
-     What patterns naturally compose with this one (see Related Patterns below)? -->
-
-_Replace this placeholder with consequences and trade-offs._
+**Gains:** Action legality enforcement costs identical cycles regardless of whether the action is legal or illegal — no misprediction tax even in heavily constrained environments. The legality flag in the result gives downstream selectors a clean signal rather than inferring legality from a zero Q-value. OCEL events `131` span both `agent` and `episode` objects, supporting multi-object-centric constraint audits. **Costs:** The valid-actions bitset is limited to 32 actions (bits[0..31] of state); environments with larger action spaces require a wider kernel. The action index is truncated to 5 bits (0..31) for shift safety — indices ≥32 are silently masked, which may misidentify an out-of-range index as index `idx & 31`. **Compositions:** This kernel feeds its masked Q-values directly into [PolicyActionSelected](policy_action_selected.md) and [AiActionSelected](ai_action_selected.md); the same bitset rank idiom appears in [CapabilityFlagEvaluated](capability_flag_evaluated.md).
 
 ---
 
@@ -55,10 +37,10 @@ _Replace this placeholder with consequences and trade-offs._
 
 ```mermaid
 graph LR
-    state["state\n(u64)"]
-    input["input\n(u64)"]
-    kernel["action_mask_applied\nBitset: bcinr_logic::mask::select_u64"]
-    result["result\n(u64)"]
+    state["state\nbits[0..32] = valid_actions bitset (up to 32 actions)"]
+    input["input\nbits[0..8] = action_index (0..31)\nbits[8..24] = proposed Q-value (u16)"]
+    kernel["action_mask_applied\nBitset: (valid>>idx)&1 → wrapping_sub mask → select_u64(q, 0)"]
+    result["result\nbits[0..16] = masked Q-value\nbit[16] = is_legal flag"]
     state --> kernel
     input --> kernel
     kernel --> result
@@ -67,12 +49,6 @@ graph LR
     ocel_1["OCEL: episode"]
     result --> ocel_1
 ```
-
-<!-- TODO: Improve this structural data-flow diagram:
-     - Annotate bit-field layout on the state/input/result nodes
-     - Label the arithmetic operation on the kernel node
-     - Add state machine nodes if this pattern has meaningful internal states
-     - Or replace with a more specific diagram tailored to this pattern -->
 
 ---
 
@@ -124,17 +100,10 @@ otel::emit(131);
 let ev = OcelEvent::new(131, logical_tick, admission_status);
 ```
 
-<!-- TODO: Add a concrete game-loop example showing this kernel in context:
-     how is the state packed? what does the caller do with the result?
-     what does the OCEL event represent in the game world? -->
-
 ---
 
 ## Related Patterns
 
-<!-- TODO: Add links to related patterns in this directory. Examples:
-     - [PatternName](pattern_name.md) — brief relationship note
-     Suggestions: look for patterns in the same family, same lowering, or that
-     compose naturally (one pattern's output feeds another's input). -->
-
-_No related patterns linked yet — fill in and remove this placeholder._
+- [PolicyActionSelected](policy_action_selected.md) — masked Q-values from this kernel feed the policy argmax
+- [AiActionSelected](ai_action_selected.md) — NPC utility scores benefit from the same pre-argmax masking
+- [CapabilityFlagEvaluated](capability_flag_evaluated.md) — shares the same bitset rank idiom for single-bit capability checks
