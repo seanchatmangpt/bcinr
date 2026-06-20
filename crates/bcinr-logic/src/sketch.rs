@@ -169,11 +169,6 @@ mod tests {
         }
     }
 
-    use super::*;
-
-    const DEPTH: usize = 4;
-    const WIDTH: usize = 256;
-
     // ── zero-element sketch ───────────────────────────────────────────────────
 
     #[test]

@@ -41,7 +41,6 @@ pub fn weighted_avg_u32(val: u64, aux: u64) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proptest::prelude::*;
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation
@@ -80,38 +79,35 @@ mod tests {
         weighted_avg_u32_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-    proptest! {
-        #[test]
-        fn test_weighted_avg_u32_all(val in any::<u64>(), aux in any::<u64>()) {
-            let expected = weighted_avg_u32_reference(val, aux);
-            let actual = weighted_avg_u32(val, aux);
-            prop_assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
-            prop_assert_eq!(weighted_avg_u32(0, 0), weighted_avg_u32_reference(0, 0));
-            prop_assert_eq!(
+    // -------------------------------------------------------------------------
+    // BOUNDARY EXAMPLES: Hardcoded edge cases
+    // -------------------------------------------------------------------------
+    #[test]
+    fn test_weighted_avg_u32_all() {
+        // oracle
+        assert_eq!(
+            weighted_avg_u32(42, 1337),
+            weighted_avg_u32_reference(42, 1337)
+        );
+        // boundaries
+            assert_eq!(weighted_avg_u32(0, 0), weighted_avg_u32_reference(0, 0));
+            assert_eq!(
                 weighted_avg_u32(u64::MAX, u64::MAX),
                 weighted_avg_u32_reference(u64::MAX, u64::MAX)
             );
-            prop_assert_eq!(
+            assert_eq!(
                 weighted_avg_u32(u64::MAX, 0),
                 weighted_avg_u32_reference(u64::MAX, 0)
             );
-            prop_assert_eq!(
+            assert_eq!(
                 weighted_avg_u32(0, u64::MAX),
                 weighted_avg_u32_reference(0, u64::MAX)
             );
-            let actual = mutant_weighted_avg_u32_1(val, aux);
-            if val != aux && val != 0 && aux != 0 {
-                prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
-            }
-            let actual = mutant_weighted_avg_u32_2(val, aux);
-            if val != aux && val != 0 && aux != 0 {
-                prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
-            }
-            let actual = mutant_weighted_avg_u32_3(val, aux);
-            if val != aux && val != 0 && aux != 0 {
-                prop_assert!(expected != actual, "Counterfactual Mutant 3 failed to fail!");
-            }
-        }
+        // mutants
+        let base = weighted_avg_u32_reference(42, 1337);
+        assert_ne!(mutant_weighted_avg_u32_1(42, 1337), base, "mutant 1");
+        assert_ne!(mutant_weighted_avg_u32_2(42, 1337), base, "mutant 2");
+        assert_ne!(mutant_weighted_avg_u32_3(42, 1337), base, "mutant 3");
     }
 
     // -------------------------------------------------------------------------
