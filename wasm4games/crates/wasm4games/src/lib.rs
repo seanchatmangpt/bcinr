@@ -5,6 +5,28 @@
 #![allow(clippy::needless_range_loop)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::must_use_candidate)]
+// Branchless kernels use deliberate integer casts for bit-packing; these pedantic
+// lints are suppressed crate-wide because the casts are structurally intentional.
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_possible_wrap)]
+#![allow(clippy::cast_sign_loss)]
+#![allow(clippy::cast_lossless)]
+// Short single-letter names (s, i, h) are idiomatic in packed-u64 kernel ABIs.
+#![allow(clippy::similar_names)]
+#![allow(clippy::many_single_char_names)]
+// Miscellaneous pedantic lints that don't apply to generated kernel code.
+#![allow(clippy::bool_to_int_with_if)]
+#![allow(clippy::decimal_bitwise_operands)]
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::items_after_statements)]
+#![allow(clippy::match_same_arms)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::missing_panics_doc)]
+#![allow(clippy::no_effect_underscore_binding)]
+#![allow(clippy::struct_excessive_bools)]
+#![allow(clippy::uninlined_format_args)]
+#![allow(clippy::unreadable_literal)]
+#![allow(clippy::assertions_on_constants)]
 
 //! `wasm4games` — a branchless, `no_std`, engine-agnostic *game-pattern foundry*.
 //!
@@ -138,4 +160,4 @@ pub mod prelude {
 }
 
 #[cfg(test)]
-pub mod chain_tests;
+mod chain_tests;

@@ -4,11 +4,11 @@
 // corpus.rs is the portability oracle (frozen digest), chain tests are the
 // composition oracle (non-determinism + cross-kernel data-flow correctness).
 
-pub mod anticheat_verdict;
-pub mod audio_cascade;
-pub mod combat_hit;
-pub mod mp_resync;
-pub mod nav_quest;
-pub mod procgen_tile;
-pub mod quality_loop;
-pub mod shop_purchase;
+mod anticheat_verdict;
+mod audio_cascade;
+mod combat_hit;
+mod mp_resync;
+mod nav_quest;
+mod procgen_tile;
+mod quality_loop;
+mod shop_purchase;
