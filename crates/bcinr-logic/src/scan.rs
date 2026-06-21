@@ -92,7 +92,8 @@ pub const fn scan_gate(val: u64) -> u64 {
 /// use bcinr_logic::scan::find_byte_mask;
 /// let data = b"hello world";
 /// let mask = find_byte_mask(data, b'l');
-/// assert_eq!(mask, 0b0000_0100_1000); // bits 2 and 3 for "ll", bit 9 for last 'l'
+/// // 'l' at indices 2, 3, 9 → (1<<2)|(1<<3)|(1<<9) = 4+8+512 = 524
+/// assert_eq!(mask, 524);
 /// assert_eq!(find_byte_mask(&[], b'x'), 0);
 /// assert_eq!(find_byte_mask(b"aaa", b'b'), 0);
 /// ```
@@ -312,8 +313,9 @@ pub fn segmented_prefix_sum_u32x8(values: [u32; 8], flags: [bool; 8]) -> [u32; 8
 
 /// Inclusive prefix maximum for 16 u32 values.
 ///
-/// `out[i] = max(arr[0], arr[1], ..., arr[i])` — branchless using bitwise mask
-/// selection.  The output is monotonically non-decreasing.
+/// `out[i] = max(arr[0], arr[1], ..., arr[i])` — branchless using `u32::max`
+/// which the compiler lowers to a CMOV instruction on x86 (no branch).
+/// The output is monotonically non-decreasing.
 ///
 /// # Examples
 /// ```
@@ -322,26 +324,24 @@ pub fn segmented_prefix_sum_u32x8(values: [u32; 8], flags: [bool; 8]) -> [u32; 8
 /// let out = prefix_max_u32x16(a);
 /// assert!(out.windows(2).all(|w| w[1] >= w[0]));
 /// assert_eq!(out[15], 9);
+/// // Works correctly for values >= 2^31
+/// let high = [0x8000_0000u32, 0u32, 0xFFFF_FFFFu32, 1u32,
+///             0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32];
+/// let out2 = prefix_max_u32x16(high);
+/// assert_eq!(out2[0], 0x8000_0000);
+/// assert_eq!(out2[1], 0x8000_0000);
+/// assert_eq!(out2[2], 0xFFFF_FFFF);
 /// ```
 #[inline(always)]
 pub fn prefix_max_u32x16(arr: [u32; 16]) -> [u32; 16] {
     let mut out = arr;
+    let mut prev_max = out[0];
     (1..16usize).for_each(|i| {
-        let prev = out[i - 1];
-        let cur  = out[i];
-        // Branchless max:
-        //   diff = prev - cur (wrapping)
-        //   sign = diff >> 31  (1 if prev < cur due to underflow, 0 if prev >= cur)
-        //   mask = sign - 1
-        //     sign=0 (prev >= cur): mask = 0xFFFF_FFFF → keep prev
-        //     sign=1 (prev <  cur): mask = 0            → keep cur (no change)
-        //   out[i] = cur + (diff & mask)
-        //     prev>=cur: cur + (prev-cur) = prev  ✓
-        //     prev< cur: cur + 0          = cur   ✓
-        let diff = prev.wrapping_sub(cur);
-        let sign = diff >> 31;
-        let mask = sign.wrapping_sub(1); // 0xFFFF_FFFF when prev >= cur
-        out[i] = cur.wrapping_add(diff & mask);
+        // u32::max compiles to a CMOV on x86 — branchless and correct for all u32 values,
+        // including values >= 2^31 where the signed-shift trick breaks.
+        let new_max = prev_max.max(out[i]);
+        out[i] = new_max;
+        prev_max = new_max;
     });
     out
 }
