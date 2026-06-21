@@ -31,6 +31,7 @@ impl RegisterEngine {
     /// Sorts and filters branchlessly.
     /// T1 Admission: T_f < 200ns.
     #[inline(always)]
+    #[must_use]
     pub fn sort_and_filter(data: &mut [u32; 8], threshold: u32) -> u8 {
         bitonic_sort_8u32(data);
 
@@ -46,6 +47,7 @@ impl RegisterEngine {
     /// Selects only matching elements and packs them via sorting.
     /// T1 Admission: T_f < 200ns.
     #[inline(always)]
+    #[must_use]
     pub fn select_and_pack(data: &[u32; 8], target: u32) -> [u32; 8] {
         let mut result = [0u32; 8];
 
@@ -63,42 +65,21 @@ impl RegisterEngine {
 
 #[cfg(test)]
 mod tests {
-
-    fn register_sql_reference(val: u64, _aux: u64) -> u64 {
-        val
-    }
+    use super::*;
 
     #[test]
-    fn test_register_sql_equivalence() {
-        assert_eq!(register_sql_reference(1, 0), 1);
-    }
-
-    #[test]
-    fn test_register_sql_boundaries() {
-        // Boundary verification
-    }
-
-    fn mutant_register_sql_1(val: u64, aux: u64) -> u64 {
-        !register_sql_reference(val, aux)
-    }
-    fn mutant_register_sql_2(val: u64, aux: u64) -> u64 {
-        register_sql_reference(val, aux).wrapping_add(1)
-    }
-    fn mutant_register_sql_3(val: u64, aux: u64) -> u64 {
-        register_sql_reference(val, aux) ^ 0xFF
-    }
-
-    #[test]
-    fn test_counterfactual_mutant_1() {
-        assert!(register_sql_reference(1, 1) != mutant_register_sql_1(1, 1));
-    }
-    #[test]
-    fn test_counterfactual_mutant_2() {
-        assert!(register_sql_reference(1, 1) != mutant_register_sql_2(1, 1));
-    }
-    #[test]
-    fn test_counterfactual_mutant_3() {
-        assert!(register_sql_reference(1, 1) != mutant_register_sql_3(1, 1));
+    fn test_register_sql_phd_oracle() {
+        // PHD Gate: table-driven sort+filter cases
+        // sort_and_filter sorts ascending then marks elements < threshold
+        let cases: &[([u32; 8], u32, u8)] = &[
+            ([8, 7, 6, 5, 4, 3, 2, 1], 5, 0x0F), // [1,2,3,4,5,6,7,8]: [1,2,3,4] < 5 → bits 0-3
+            ([1, 2, 3, 4, 5, 6, 7, 8], 5, 0x0F), // already sorted: same result
+            ([1, 1, 1, 1, 9, 9, 9, 9], 5, 0x0F), // [1,1,1,1] < 5 → bits 0-3
+        ];
+        for &(mut data, threshold, expected_mask) in cases {
+            let mask = RegisterEngine::sort_and_filter(&mut data, threshold);
+            assert_eq!(mask, expected_mask);
+        }
     }
 }
 

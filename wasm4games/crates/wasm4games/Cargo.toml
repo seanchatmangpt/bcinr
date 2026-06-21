@@ -1,0 +1,28 @@
+[package]
+name = "wasm4games"
+version = "26.6.13"
+edition = "2021"
+rust-version = "1.70"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/seanchatmangpt/wasm4games"
+description = "Branchless no_std game-pattern foundry emitting object-centric evidence, built on bcinr-logic"
+readme = "README.md"
+keywords = ["branchless", "gamedev", "no-std", "process-mining"]
+categories = ["game-development", "no-std", "simulation"]
+
+[dependencies]
+bcinr-logic = { git = "https://github.com/seanchatmangpt/bcinr", version = "26.6.13" }
+criterion = { version = "0.5", optional = true }
+
+[dev-dependencies]
+proptest = "1.2.0"
+
+[features]
+default = []
+alloc = ["bcinr-logic/alloc"]
+std = ["alloc", "bcinr-logic/std"]
+bench = ["dep:criterion", "bcinr-logic/bench"]
+
+[[bench]]
+name = "w4g_bench"
+harness = false

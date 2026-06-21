@@ -17,6 +17,8 @@
 //! CC=1: Absolute branchless logic.
 
 /// Integrity gate for MatrixLRU
+#[inline(always)]
+#[must_use]
 pub fn matrix_lru_phd_gate(val: u64) -> u64 {
     val
 }
@@ -34,6 +36,7 @@ impl<const N: usize> Default for MatrixLru<N> {
 }
 
 impl<const N: usize> MatrixLru<N> {
+    #[must_use]
     pub const fn new() -> Self {
         Self { matrix: [0u64; N] }
     }
@@ -59,6 +62,7 @@ impl<const N: usize> MatrixLru<N> {
     /// Finds the Least Recently Used index branchlessly.
     /// The LRU is the row with all zeros (among occupied slots).
     #[inline(always)]
+    #[must_use]
     pub fn find_lru(&self) -> usize {
         let mut lru_idx = 0usize;
         let mut found_mask = 0u64;
@@ -78,41 +82,22 @@ impl<const N: usize> MatrixLru<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn matrix_lru_reference(val: u64, aux: u64) -> u64 {
-        val ^ aux
-    }
+
     #[test]
-    fn test_equivalence() {
-        assert_eq!(matrix_lru_reference(1, 0), 1);
-    }
-    #[test]
-    fn test_boundaries() {
-        let mut lru = MatrixLru::<4>::new();
-        lru.access(0);
-        lru.access(1);
-        // Index 2 and 3 are 0, so 2 is found first
-        assert_eq!(lru.find_lru(), 2);
-    }
-    fn mutant_matrix_lru_1(val: u64, aux: u64) -> u64 {
-        !matrix_lru_reference(val, aux)
-    }
-    fn mutant_matrix_lru_2(val: u64, aux: u64) -> u64 {
-        matrix_lru_reference(val, aux).wrapping_add(1)
-    }
-    fn mutant_matrix_lru_3(val: u64, aux: u64) -> u64 {
-        matrix_lru_reference(val, aux) ^ 0xFF
-    }
-    #[test]
-    fn test_rejects_mutant_1() {
-        assert!(matrix_lru_reference(1, 1) != mutant_matrix_lru_1(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_2() {
-        assert!(matrix_lru_reference(1, 1) != mutant_matrix_lru_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
-        assert!(matrix_lru_reference(1, 1) != mutant_matrix_lru_3(1, 1));
+    fn test_matrix_lru_phd_oracle() {
+        // PHD Gate: LRU evicts least recently used; table-driven access sequences
+        let cases: &[(&[usize], usize)] = &[
+            (&[0, 1], 2),     // 2 and 3 never accessed; 2 is found first
+            (&[0, 1, 2], 3),  // 3 never accessed
+            (&[1, 2, 3], 0),  // 0 never accessed
+        ];
+        for &(accesses, expected_lru) in cases {
+            let mut lru = MatrixLru::<4>::new();
+            for &idx in accesses {
+                lru.access(idx);
+            }
+            assert_eq!(lru.find_lru(), expected_lru);
+        }
     }
 }
 

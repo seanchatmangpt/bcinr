@@ -33,7 +33,11 @@ fn main() {
     assert_eq!(select_bit_u64(x, 1), Some(2), "1st set bit at position 2");
     assert_eq!(select_bit_u64(x, 2), Some(4), "2nd set bit at position 4");
     assert_eq!(select_bit_u64(x, 4), Some(7), "4th set bit at position 7");
-    assert_eq!(select_bit_u64(x, 5), None, "only 5 bits set (0-4), index 5 → None");
+    assert_eq!(
+        select_bit_u64(x, 5),
+        None,
+        "only 5 bits set (0-4), index 5 → None"
+    );
     assert_eq!(select_bit_u64(0, 0), None, "no bits set → None");
     println!("select_bit_u64(0b10110101, 2)={:?}", select_bit_u64(x, 2));
 
@@ -46,8 +50,12 @@ fn main() {
 
     // --- parity_u64_slice: XOR all words then popcount parity ---
     let even_bits: &[u64] = &[0b0011, 0b1100]; // 2+2 = 4 bits total → even parity
-    let odd_bits: &[u64] = &[0b0111];           // 3 bits → odd parity
-    assert_eq!(parity_u64_slice(even_bits), 0, "4 set bits → even parity = 0");
+    let odd_bits: &[u64] = &[0b0111]; // 3 bits → odd parity
+    assert_eq!(
+        parity_u64_slice(even_bits),
+        0,
+        "4 set bits → even parity = 0"
+    );
     assert_eq!(parity_u64_slice(odd_bits), 1, "3 set bits → odd parity = 1");
     assert_eq!(parity_u64_slice(&[]), 0, "empty slice → 0");
     println!("parity_u64_slice([0b0111])={}", parity_u64_slice(odd_bits));
@@ -55,19 +63,35 @@ fn main() {
     // --- jaccard_u64_slices: |A ∩ B| / |A ∪ B| ---
     let a: &[u64] = &[0b1100]; // bits 2,3
     let b: &[u64] = &[0b1010]; // bits 1,3
-    // intersection = 0b1000 (bit 3) → 1 bit; union = 0b1110 → 3 bits; jaccard = 1/3 ≈ 0.333
+                               // intersection = 0b1000 (bit 3) → 1 bit; union = 0b1110 → 3 bits; jaccard = 1/3 ≈ 0.333
     let j = jaccard_u64_slices(a, b);
     let expected = 1.0f32 / 3.0f32;
     assert!((j - expected).abs() < 1e-5, "jaccard must be ~1/3, got {j}");
-    assert_eq!(jaccard_u64_slices(&[u64::MAX], &[u64::MAX]), 1.0, "identical sets → jaccard=1.0");
-    assert_eq!(jaccard_u64_slices(&[0b1100], &[0b0011]), 0.0, "disjoint sets → jaccard=0.0");
+    assert_eq!(
+        jaccard_u64_slices(&[u64::MAX], &[u64::MAX]),
+        1.0,
+        "identical sets → jaccard=1.0"
+    );
+    assert_eq!(
+        jaccard_u64_slices(&[0b1100], &[0b0011]),
+        0.0,
+        "disjoint sets → jaccard=0.0"
+    );
     println!("jaccard([0b1100],[0b1010])={j:.4}");
 
     // --- hamming_u64_slices: number of differing bits ---
     let h = hamming_u64_slices(&[0b1100u64], &[0b1010u64]);
     assert_eq!(h, 2, "two bits differ: bit 1 and bit 2");
-    assert_eq!(hamming_u64_slices(&[0u64], &[0u64]), 0, "identical → distance 0");
-    assert_eq!(hamming_u64_slices(&[u64::MAX], &[0u64]), 64, "all bits differ");
+    assert_eq!(
+        hamming_u64_slices(&[0u64], &[0u64]),
+        0,
+        "identical → distance 0"
+    );
+    assert_eq!(
+        hamming_u64_slices(&[u64::MAX], &[0u64]),
+        64,
+        "all bits differ"
+    );
     println!("hamming_u64_slices([0b1100],[0b1010])={h}");
 
     // --- intersect_u64_slices / union_u64_slices (in-place) ---
@@ -84,10 +108,16 @@ fn main() {
     println!("union 0b0101 | 0b1010 = {:#06b}", set_c[0]);
 
     // --- any_bit_set_u64_slice ---
-    assert!(any_bit_set_u64_slice(&[0u64, 1u64]), "second word has a bit set");
+    assert!(
+        any_bit_set_u64_slice(&[0u64, 1u64]),
+        "second word has a bit set"
+    );
     assert!(!any_bit_set_u64_slice(&[0u64, 0u64]), "no bits set");
     assert!(!any_bit_set_u64_slice(&[]), "empty → false");
-    println!("any_bit_set_u64_slice([0,1])={}", any_bit_set_u64_slice(&[0, 1]));
+    println!(
+        "any_bit_set_u64_slice([0,1])={}",
+        any_bit_set_u64_slice(&[0, 1])
+    );
 
     println!("\nAll bitset algebra assertions passed.");
 }

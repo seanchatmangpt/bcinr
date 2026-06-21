@@ -172,38 +172,27 @@ mod tests {
         val
     }
 
-    #[test]
-    fn test_vision_equivalence() {
-        assert_eq!(vision_reference(1, 0), 1);
-    }
+    fn mutant_vision_1(val: u64, aux: u64) -> u64 { !vision_reference(val, aux) }
+    fn mutant_vision_2(val: u64, aux: u64) -> u64 { vision_reference(val, aux).wrapping_add(1) }
+    fn mutant_vision_3(val: u64, aux: u64) -> u64 { vision_reference(val, aux) ^ 0xFF }
 
     #[test]
-    fn test_vision_boundaries() {
+    fn test_vision_equivalence_and_boundaries() {
+        assert_eq!(vision_reference(1, 0), 1);
         let engine = Vision2030Engine::<1>::new();
         assert_eq!(engine.marking.current.words[0], 1);
     }
 
-    fn mutant_vision_1(val: u64, aux: u64) -> u64 {
-        !vision_reference(val, aux)
-    }
-    fn mutant_vision_2(val: u64, aux: u64) -> u64 {
-        vision_reference(val, aux).wrapping_add(1)
-    }
-    fn mutant_vision_3(val: u64, aux: u64) -> u64 {
-        vision_reference(val, aux) ^ 0xFF
-    }
-
     #[test]
-    fn test_counterfactual_mutant_1() {
-        assert!(vision_reference(1, 1) != mutant_vision_1(1, 1));
-    }
-    #[test]
-    fn test_counterfactual_mutant_2() {
-        assert!(vision_reference(1, 1) != mutant_vision_2(1, 1));
-    }
-    #[test]
-    fn test_counterfactual_mutant_3() {
-        assert!(vision_reference(1, 1) != mutant_vision_3(1, 1));
+    fn test_vision_counterfactual_mutants() {
+        let cases: &[fn(u64, u64) -> u64] = &[mutant_vision_1, mutant_vision_2, mutant_vision_3];
+        for (i, mutant) in cases.iter().enumerate() {
+            assert!(
+                vision_reference(1, 1) != mutant(1, 1),
+                "mutant {} was not rejected",
+                i + 1
+            );
+        }
     }
 }
 

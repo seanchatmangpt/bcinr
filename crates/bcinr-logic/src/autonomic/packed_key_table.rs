@@ -4,6 +4,7 @@
 //! Optimized for no_std, zero-allocation, and branchless execution.
 
 /// Integrity gate for packed_key_table
+#[must_use]
 pub fn packed_key_table_gate(val: u64) -> u64 {
     val
 }
@@ -86,6 +87,8 @@ where
     K: Copy + Default + PartialEq,
     V: Copy + Default,
 {
+    /// Creates a new empty packed key table.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             hashes: [u64::MAX; N],
@@ -111,6 +114,7 @@ where
     K: Copy + Default + PartialEq,
     V: Copy + Default,
 {
+    #[must_use]
     #[inline(always)]
     pub fn get(&self, key: K) -> Option<V> {
         let hash = hash_key(&key);
@@ -124,6 +128,7 @@ where
         [None, Some(result)][found]
     }
 
+    #[must_use]
     pub fn insert(&mut self, key: K, _value: V) -> bool {
         let hash = hash_key(&key);
         let mut exists = 0usize;
@@ -154,16 +159,6 @@ mod tests {
         val ^ aux
     }
 
-    #[test]
-    fn test_equivalence() {
-        assert_eq!(pkt_reference(1, 0), 1);
-    }
-
-    #[test]
-    fn test_boundaries() {
-        // boundaries
-    }
-
     fn mutant_pkt_1(val: u64, aux: u64) -> u64 {
         !pkt_reference(val, aux)
     }
@@ -175,16 +170,21 @@ mod tests {
     }
 
     #[test]
-    fn test_rejects_mutant_1() {
-        assert!(pkt_reference(1, 1) != mutant_pkt_1(1, 1));
+    fn test_equivalence_and_boundaries() {
+        assert_eq!(pkt_reference(1, 0), 1);
+        // boundaries (structural placeholder, preserved)
     }
+
     #[test]
-    fn test_rejects_mutant_2() {
-        assert!(pkt_reference(1, 1) != mutant_pkt_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
-        assert!(pkt_reference(1, 1) != mutant_pkt_3(1, 1));
+    fn test_rejects_mutants() {
+        let cases: &[fn(u64, u64) -> u64] = &[mutant_pkt_1, mutant_pkt_2, mutant_pkt_3];
+        for (i, mutant) in cases.iter().enumerate() {
+            assert!(
+                pkt_reference(1, 1) != mutant(1, 1),
+                "mutant {} was not rejected",
+                i + 1
+            );
+        }
     }
 }
 

@@ -34,25 +34,38 @@ fn main() {
 
     compare_exchange(&mut b, 0, 0); // self-swap → identity
     assert_eq!(b[0], 2, "self-swap is identity");
-    println!("compare_exchange: [3,1]→[{},{}], [2,5]→[{},{}]", a[0], a[1], b[0], b[1]);
+    println!(
+        "compare_exchange: [3,1]→[{},{}], [2,5]→[{},{}]",
+        a[0], a[1], b[0], b[1]
+    );
 
     // --- bitonic_sort_8u32: fully sorts 8 u32s ---
     let mut arr8: [u32; 8] = [7, 2, 8, 1, 5, 3, 9, 4];
     let sorted8_ref: [u32; 8] = [1, 2, 3, 4, 5, 7, 8, 9];
     bitonic_sort_8u32(&mut arr8);
-    assert_eq!(arr8, sorted8_ref, "bitonic_sort_8u32 must produce sorted output");
+    assert_eq!(
+        arr8, sorted8_ref,
+        "bitonic_sort_8u32 must produce sorted output"
+    );
     assert!(is_sorted_u32(&arr8), "output must be non-decreasing");
     println!("bitonic_sort_8u32: [7,2,8,1,5,3,9,4] → {arr8:?}");
 
     // Edge: already sorted
     let mut already_sorted: [u32; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
     bitonic_sort_8u32(&mut already_sorted);
-    assert_eq!(already_sorted, [1, 2, 3, 4, 5, 6, 7, 8], "sorted input stays sorted");
+    assert_eq!(
+        already_sorted,
+        [1, 2, 3, 4, 5, 6, 7, 8],
+        "sorted input stays sorted"
+    );
 
     // Edge: reverse sorted
     let mut reversed: [u32; 8] = [8, 7, 6, 5, 4, 3, 2, 1];
     bitonic_sort_8u32(&mut reversed);
-    assert!(is_sorted_u32(&reversed), "reverse-sorted input must sort correctly");
+    assert!(
+        is_sorted_u32(&reversed),
+        "reverse-sorted input must sort correctly"
+    );
     println!("bitonic_sort_8u32([8..1]): {reversed:?}");
 
     // Edge: all equal
@@ -65,7 +78,10 @@ fn main() {
     let mut arr16_ref = arr16;
     arr16_ref.sort();
     bitonic_sort_16u32(&mut arr16);
-    assert_eq!(arr16, arr16_ref, "bitonic_sort_16u32 must match stdlib sort");
+    assert_eq!(
+        arr16, arr16_ref,
+        "bitonic_sort_16u32 must match stdlib sort"
+    );
     assert!(is_sorted_u32(&arr16), "output must be non-decreasing");
     println!("bitonic_sort_16u32(random 0..15): {arr16:?}");
 
@@ -79,7 +95,11 @@ fn main() {
         lt_mask |= ((v < 120) as u64) << i;
     }
     let rank = popcount_u64(lt_mask) as u32;
-    assert_eq!(data[rank as usize - 1], 100, "last element < 120 should be 100");
+    assert_eq!(
+        data[rank as usize - 1],
+        100,
+        "last element < 120 should be 100"
+    );
     assert!(data[rank as usize] >= 120, "first element ≥ 120");
     println!("rank of 120 in sorted [25,50,75,100,125,150,175,200]: {rank}");
 

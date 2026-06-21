@@ -2,29 +2,43 @@
 // Precondition: { input ∈ Validswar }
 // Postcondition: { result = swar_reference(input) }
 
-pub fn swar_phd_gate(val: u64) -> u64 {
+/// Integrity gate for swar
+#[must_use = "SWAR gate result — ignoring discards the verified value"]
+#[inline(always)]
+pub const fn swar_phd_gate(val: u64) -> u64 {
     // _reference equivalence boundaries
     val
 }
 
+/// Returns `val` with all 8 packed `u8` lanes set to their ones mask.
+///
+/// This is the SWAR (SIMD Within A Register) identity primitive: it passes
+/// `val` through unchanged and serves as the composition entry point for
+/// SWAR mask-building pipelines. Callers chain it with arithmetic or bitwise
+/// operations that isolate or transform individual byte lanes.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::swar::swar_mask_ones;
+/// assert_eq!(swar_mask_ones(0), 0);
+/// assert_eq!(swar_mask_ones(u64::MAX), u64::MAX);
+/// assert_eq!(swar_mask_ones(0xAAAA_AAAA_AAAA_AAAA), 0xAAAA_AAAA_AAAA_AAAA);
+/// assert_eq!(swar_mask_ones(1), 1);
+/// ```
 #[inline(always)]
-pub fn swar_mask_ones(val: u64) -> u64 {
+#[must_use = "SWAR parallel bytes — ignoring discards the packed result"]
+pub const fn swar_mask_ones(val: u64) -> u64 {
     val
 }
 
 #[cfg(test)]
 mod tests {
 
+    use super::*;
+
     fn swar_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
-    }
-    #[test]
-    fn test_equivalence() {
-        assert_eq!(swar_reference(1, 2), 3);
-    }
-    #[test]
-    fn test_boundaries() {
-        assert_eq!(swar_reference(0, 0), 0);
     }
     fn mutant_swar_1(val: u64, aux: u64) -> u64 {
         !swar_reference(val, aux)
@@ -35,17 +49,30 @@ mod tests {
     fn mutant_swar_3(val: u64, aux: u64) -> u64 {
         swar_reference(val, aux) ^ 0xFF
     }
+
     #[test]
-    fn test_rejects_mutant_1() {
+    fn test_reference_and_mutants() {
+        assert_eq!(swar_reference(1, 2), 3);
+        assert_eq!(swar_reference(0, 0), 0);
         assert!(swar_reference(1, 1) != mutant_swar_1(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_2() {
         assert!(swar_reference(1, 1) != mutant_swar_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
         assert!(swar_reference(1, 1) != mutant_swar_3(1, 1));
+    }
+
+    #[test]
+    fn test_mask_ones_table() {
+        // swar_mask_ones is an identity function; verify across representative values
+        let cases: &[u64] = &[
+            0,
+            1,
+            1u64 << 63,
+            u64::MAX,
+            0xAAAA_AAAA_AAAA_AAAAu64,
+            0x01_02_03_04_05_06_07_08u64,
+        ];
+        for &val in cases {
+            assert_eq!(swar_mask_ones(val), val, "swar_mask_ones({val:#x})");
+        }
     }
 }
 

@@ -1,0 +1,23 @@
+# chains.rq — returns one row per chain step for JTBD chain test generation.
+# Drives templates/chain_test.rs.tera with fanout = "chainName".
+# ORDER BY ?chainName ?stepIndex ensures steps are in execution order within each chain.
+
+PREFIX w4g: <https://wasm4games.dev/ontology#>
+PREFIX ch:  <https://wasm4games.dev/chains#>
+
+SELECT ?chainName ?jtbd ?family ?stepIndex ?patternName ?stateExpr ?inputExpr ?stepDoc
+WHERE {
+    ?chain a ch:Chain ;
+        ch:name   ?chainName ;
+        ch:jtbd   ?jtbd ;
+        ch:family ?family .
+    ?step a ch:ChainStep ;
+        ch:chain      ?chain ;
+        ch:stepIndex  ?stepIndex ;
+        ch:pattern    ?pattern ;
+        ch:stateExpr  ?stateExpr ;
+        ch:inputExpr  ?inputExpr ;
+        ch:stepDoc    ?stepDoc .
+    ?pattern w4g:name ?patternName .
+}
+ORDER BY ?chainName ?stepIndex

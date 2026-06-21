@@ -23,7 +23,11 @@ fn main() {
     assert_eq!(popcount_u64(0b1011), 3);
     assert_eq!(popcount_u32(0b1011), 3);
     assert_eq!(popcount_u32(0), 0);
-    println!("popcount_u64(0b1011)={}, popcount_u64(MAX)={}", popcount_u64(0b1011), popcount_u64(u64::MAX));
+    println!(
+        "popcount_u64(0b1011)={}, popcount_u64(MAX)={}",
+        popcount_u64(0b1011),
+        popcount_u64(u64::MAX)
+    );
 
     // --- leading zeros: from MSB ---
     assert_eq!(leading_zeros_u64(0), 64, "all zeros → 64 leading zeros");
@@ -43,7 +47,11 @@ fn main() {
     // --- reverse_bits ---
     assert_eq!(reverse_bits_u64(1), 0x8000_0000_0000_0000, "LSB → MSB");
     assert_eq!(reverse_bits_u64(0x8000_0000_0000_0000), 1, "MSB → LSB");
-    assert_eq!(reverse_bits_u64(reverse_bits_u64(0xABCD_1234_5678_EF00)), 0xABCD_1234_5678_EF00, "double reverse = identity");
+    assert_eq!(
+        reverse_bits_u64(reverse_bits_u64(0xABCD_1234_5678_EF00)),
+        0xABCD_1234_5678_EF00,
+        "double reverse = identity"
+    );
     assert_eq!(reverse_bits_u32(1), 0x8000_0000);
     println!("reverse_bits_u64(1)={:#018x}", reverse_bits_u64(1));
 
@@ -62,7 +70,11 @@ fn main() {
     assert!(is_pow2_u32(64));
     assert!(!is_pow2_u32(3));
     assert!(!is_pow2_u32(100));
-    println!("is_pow2_u32(64)={}, is_pow2_u32(100)={}", is_pow2_u32(64), is_pow2_u32(100));
+    println!(
+        "is_pow2_u32(64)={}, is_pow2_u32(100)={}",
+        is_pow2_u32(64),
+        is_pow2_u32(100)
+    );
 
     // --- parity_u32: 1 if odd popcount, 0 if even ---
     assert_eq!(parity_u32(0), 0, "0 bits set → even parity");
@@ -71,15 +83,30 @@ fn main() {
     assert_eq!(parity_u32(0b111), 1, "3 bits set → odd parity");
     // Cross-check: parity matches popcount parity
     let v: u32 = 0b1101_0110;
-    assert_eq!(parity_u32(v), popcount_u32(v) & 1, "parity must match popcount mod 2");
+    assert_eq!(
+        parity_u32(v),
+        popcount_u32(v) & 1,
+        "parity must match popcount mod 2"
+    );
     println!("parity_u32(0b111)={}", parity_u32(0b111));
 
     // --- signed saturating arithmetic ---
-    assert_eq!(saturating_add_i64(i64::MAX, 1), i64::MAX, "saturates at MAX");
-    assert_eq!(saturating_sub_i64(i64::MIN, 1), i64::MIN, "saturates at MIN");
+    assert_eq!(
+        saturating_add_i64(i64::MAX, 1),
+        i64::MAX,
+        "saturates at MAX"
+    );
+    assert_eq!(
+        saturating_sub_i64(i64::MIN, 1),
+        i64::MIN,
+        "saturates at MIN"
+    );
     assert_eq!(saturating_mul_i64(i64::MAX, 2), i64::MAX, "mul saturates");
     assert_eq!(saturating_add_i64(10, -3), 7, "normal case");
-    println!("saturating_add_i64(MAX,1)={}", saturating_add_i64(i64::MAX, 1));
+    println!(
+        "saturating_add_i64(MAX,1)={}",
+        saturating_add_i64(i64::MAX, 1)
+    );
 
     println!("\nAll integer operation assertions passed.");
 }

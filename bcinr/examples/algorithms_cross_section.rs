@@ -30,14 +30,30 @@ fn main() {
     assert_eq!(abs_diff_u64(3, 10), 7, "symmetric");
     assert_eq!(abs_diff_u64(0, 0), 0);
     assert_eq!(abs_diff_u64(u64::MAX, 0), u64::MAX);
-    println!("abs_diff_u64(10,3)={}, abs_diff_u64(3,10)={}", abs_diff_u64(10, 3), abs_diff_u64(3, 10));
+    println!(
+        "abs_diff_u64(10,3)={}, abs_diff_u64(3,10)={}",
+        abs_diff_u64(10, 3),
+        abs_diff_u64(3, 10)
+    );
 
     // --- Tier 1-100: rotate_left_u64 — barrel rotate by (aux & 63) bits ---
     assert_eq!(rotate_left_u64(1, 0), 1, "rotate by 0 is identity");
     assert_eq!(rotate_left_u64(1, 1), 2, "rotate left 1");
-    assert_eq!(rotate_left_u64(0x8000_0000_0000_0000, 1), 1, "MSB wraps to LSB");
-    assert_eq!(rotate_left_u64(rotate_left_u64(0xABCD, 7), 64 - 7), 0xABCD, "rotate left then right = identity");
-    println!("rotate_left_u64(1,1)={}, rotate back={}", rotate_left_u64(1,1), rotate_left_u64(rotate_left_u64(0xABCD, 7), 57));
+    assert_eq!(
+        rotate_left_u64(0x8000_0000_0000_0000, 1),
+        1,
+        "MSB wraps to LSB"
+    );
+    assert_eq!(
+        rotate_left_u64(rotate_left_u64(0xABCD, 7), 64 - 7),
+        0xABCD,
+        "rotate left then right = identity"
+    );
+    println!(
+        "rotate_left_u64(1,1)={}, rotate back={}",
+        rotate_left_u64(1, 1),
+        rotate_left_u64(rotate_left_u64(0xABCD, 7), 57)
+    );
 
     // --- Tier 101-200: gcd_u64_branchless — Binary GCD ---
     assert_eq!(gcd_u64_branchless(12, 8), 4);
@@ -46,15 +62,26 @@ fn main() {
     assert_eq!(gcd_u64_branchless(7, 0), 7, "gcd(n, 0) = n");
     assert_eq!(gcd_u64_branchless(7, 1), 1, "gcd(n, 1) = 1");
     assert_eq!(gcd_u64_branchless(100, 75), 25);
-    println!("gcd(12,8)={}, gcd(100,75)={}", gcd_u64_branchless(12, 8), gcd_u64_branchless(100, 75));
+    println!(
+        "gcd(12,8)={}, gcd(100,75)={}",
+        gcd_u64_branchless(12, 8),
+        gcd_u64_branchless(100, 75)
+    );
 
     // --- Tier 101-200: popcount_u128 — popcount of both val and aux combined ---
     // Implementation: val.count_ones() + aux.count_ones()
     assert_eq!(popcount_u128(0, 0), 0);
-    assert_eq!(popcount_u128(0b1011, 0b0100), 4, "3 bits in val + 1 bit in aux");
+    assert_eq!(
+        popcount_u128(0b1011, 0b0100),
+        4,
+        "3 bits in val + 1 bit in aux"
+    );
     assert_eq!(popcount_u128(u64::MAX, 0), 64, "all 64 bits in val");
     assert_eq!(popcount_u128(u64::MAX, u64::MAX), 128, "all 128 bits total");
-    println!("popcount_u128(0b1011, 0b0100)={}", popcount_u128(0b1011, 0b0100));
+    println!(
+        "popcount_u128(0b1011, 0b0100)={}",
+        popcount_u128(0b1011, 0b0100)
+    );
 
     // --- Tier 201-300: leb128_decode_u64 — LEB128 variable-length integer decode ---
     // Single-byte encoding: value < 128, high bit = 0 → value is the low 7 bits
@@ -73,17 +100,17 @@ fn main() {
     // then count the combined set bits in the normalized pair.
     let a: u64 = 48;
     let b: u64 = 36;
-    let g = gcd_u64_branchless(a, b);    // GCD = 12
-    let na = a / g;                       // normalized: 4
-    let nb = b / g;                       // normalized: 3
+    let g = gcd_u64_branchless(a, b); // GCD = 12
+    let na = a / g; // normalized: 4
+    let nb = b / g; // normalized: 3
     let combined_bits = popcount_u128(na, nb); // popcount(4) + popcount(3) = 1 + 2 = 3
     assert_eq!(g, 12, "GCD(48,36)=12");
     assert_eq!(na, 4);
     assert_eq!(nb, 3);
     assert_eq!(combined_bits, 3, "popcount(4)+popcount(3) = 1+2 = 3");
     // The distance between the normalized values, rotated by their GCD mod 64
-    let dist = abs_diff_u64(na, nb);                // |4-3| = 1
-    let rotated = rotate_left_u64(dist, g & 0x3F);  // rotate 1 by 12 = 4096
+    let dist = abs_diff_u64(na, nb); // |4-3| = 1
+    let rotated = rotate_left_u64(dist, g & 0x3F); // rotate 1 by 12 = 4096
     assert_eq!(rotated, 1u64 << 12, "1 rotated left by 12 = 4096");
     println!("pipeline: gcd={g}, normalized=({na},{nb}), combined_bits={combined_bits}, rotate={rotated}");
 

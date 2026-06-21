@@ -1,0 +1,1446 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix w4g:  <https://wasm4games.dev/ontology#> .
+
+#################################################################
+# wasm4games pattern ontology
+#
+# This is the ggen INPUT SURFACE. `ggen sync` runs the SPARQL queries in
+# ggen/queries/ over this graph and renders the Tera templates in
+# ggen/templates/ to (re)produce the committed Rust under src/patterns/.
+# The committed Rust is the offline source of truth; this graph is its model.
+#
+# PARITY: this graph declares 75 w4g:Pattern individuals (ids 1-75) that match
+# crate::patterns::PATTERN_REGISTRY plus the five Anti-Cheat detectors (71-75).
+#################################################################
+
+#################################################################
+# Classes
+#################################################################
+
+w4g:Pattern a rdfs:Class ;
+    rdfs:comment "A branchless game pattern: a pure u64->u64 kernel plus its evidence metadata." .
+
+w4g:ObjectKind a rdfs:Class ;
+    rdfs:comment "An OCEL object type an event links to." .
+
+w4g:Lowering a rdfs:Class ;
+    rdfs:comment "A branchless lowering family (mirrors crate::ir::LoweringKind)." .
+
+#################################################################
+# Properties
+#################################################################
+
+w4g:id            a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:integer .
+w4g:name          a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:string .
+w4g:lowering      a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range w4g:Lowering .
+w4g:stateCard     a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:integer .
+w4g:eventCode     a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:integer .
+w4g:eventName     a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:string .
+w4g:otelSpan      a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:integer .
+w4g:requiredStatus a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:integer .
+w4g:refusalStatus a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:integer .
+w4g:primitive     a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:string .
+w4g:doc           a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:string .
+w4g:touchesObject a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range w4g:ObjectKind .
+
+# --- Authority slot ---------------------------------------------------------
+# w4g:authority is the one-line correctness anchor a kernel is bred against.
+# For value-kernels it is the oracle-predicate ("matches NAME_reference for all
+# inputs"); for the Anti-Cheat detectors it is the legality spec the verdict bit
+# encodes (e.g. movement: "|proposed-cur| <= max_speed"). Concise prose, one per
+# pattern. Mirrors the `Authority:` doc line / `_reference` oracle in the kernel.
+w4g:authority     a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:string .
+
+# --- Fixture-corpus slots ---------------------------------------------------
+# Two-sided breed corpus, declared in the ontology so the admit/refuse battery is
+# part of the model (rendered into the kernel `#[cfg(test)]` block). Each value is
+# a packed `(state, input)` fixture written in Rust literal form.
+#   w4g:mustAdmit  — legal / in-domain fixtures the kernel MUST admit (verdict 0
+#                    for detectors; oracle-equal for value-kernels).
+#   w4g:mustRefuse — cheat / boundary fixtures the kernel MUST refuse (verdict
+#                    nonzero for detectors; oracle-equal-after-clamp for value-kernels).
+# Seeded for the five Anti-Cheat detectors plus three representative value-kernels
+# (damage_applied, currency_delta_applied, nav_state_advanced); not every pattern
+# is seeded here.
+w4g:mustAdmit     a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:string .
+w4g:mustRefuse    a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:string .
+
+# --- Alexander pattern language family slot ----------------------------------
+# Queryable family label used by the documentation index (ORDER BY ?family ?id).
+# Every w4g:Pattern individual must carry exactly one w4g:family value.
+w4g:family        a rdf:Property ; rdfs:domain w4g:Pattern ; rdfs:range xsd:string .
+
+w4g:code a rdf:Property ; rdfs:domain w4g:ObjectKind ; rdfs:range xsd:integer .
+# (w4g:name is reused for ObjectKind labels.)
+
+#################################################################
+# Lowering individuals (one per crate::ir::LoweringKind variant)
+#################################################################
+
+w4g:Lut        a w4g:Lowering ; w4g:name "Lut" .
+w4g:Mask       a w4g:Lowering ; w4g:name "Mask" .
+w4g:Saturating a w4g:Lowering ; w4g:name "Saturating" .
+w4g:Bitset     a w4g:Lowering ; w4g:name "Bitset" .
+w4g:Dfa        a w4g:Lowering ; w4g:name "Dfa" .
+w4g:Network    a w4g:Lowering ; w4g:name "Network" .
+w4g:Receipt    a w4g:Lowering ; w4g:name "Receipt" .
+
+#################################################################
+# ObjectKind individuals (stable codes, reused across patterns)
+#################################################################
+
+w4g:obj_player        a w4g:ObjectKind ; w4g:code 1  ; w4g:name "player" .
+w4g:obj_world         a w4g:ObjectKind ; w4g:code 2  ; w4g:name "world" .
+w4g:obj_entity        a w4g:ObjectKind ; w4g:code 3  ; w4g:name "entity" .
+w4g:obj_entity_a      a w4g:ObjectKind ; w4g:code 4  ; w4g:name "entity_a" .
+w4g:obj_entity_b      a w4g:ObjectKind ; w4g:code 5  ; w4g:name "entity_b" .
+w4g:obj_attacker      a w4g:ObjectKind ; w4g:code 6  ; w4g:name "attacker" .
+w4g:obj_target        a w4g:ObjectKind ; w4g:code 7  ; w4g:name "target" .
+w4g:obj_receipt_chain a w4g:ObjectKind ; w4g:code 8  ; w4g:name "receipt_chain" .
+w4g:obj_event         a w4g:ObjectKind ; w4g:code 9  ; w4g:name "event" .
+w4g:obj_object        a w4g:ObjectKind ; w4g:code 10 ; w4g:name "object" .
+w4g:obj_span          a w4g:ObjectKind ; w4g:code 11 ; w4g:name "span" .
+w4g:obj_frame         a w4g:ObjectKind ; w4g:code 12 ; w4g:name "frame" .
+w4g:obj_quantity      a w4g:ObjectKind ; w4g:code 13 ; w4g:name "quantity" .
+w4g:obj_hud_widget    a w4g:ObjectKind ; w4g:code 14 ; w4g:name "hud_widget" .
+w4g:obj_projectile    a w4g:ObjectKind ; w4g:code 15 ; w4g:name "projectile" .
+w4g:obj_session       a w4g:ObjectKind ; w4g:code 16 ; w4g:name "session" .
+w4g:obj_artifact      a w4g:ObjectKind ; w4g:code 17 ; w4g:name "artifact" .
+w4g:obj_prompt        a w4g:ObjectKind ; w4g:code 18 ; w4g:name "prompt" .
+w4g:obj_agent         a w4g:ObjectKind ; w4g:code 19 ; w4g:name "agent" .
+w4g:obj_item          a w4g:ObjectKind ; w4g:code 20 ; w4g:name "item" .
+w4g:obj_quest         a w4g:ObjectKind ; w4g:code 21 ; w4g:name "quest" .
+# Phase 2 object kinds (codes 0x0016-0x001F = 22-31)
+w4g:obj_nav_node       a w4g:ObjectKind ; w4g:code 22 ; w4g:name "nav_node" .
+w4g:obj_tile           a w4g:ObjectKind ; w4g:code 23 ; w4g:name "tile" .
+w4g:obj_terrain        a w4g:ObjectKind ; w4g:code 24 ; w4g:name "terrain" .
+w4g:obj_npc            a w4g:ObjectKind ; w4g:code 25 ; w4g:name "npc" .
+w4g:obj_camera         a w4g:ObjectKind ; w4g:code 26 ; w4g:name "camera" .
+w4g:obj_audio_source   a w4g:ObjectKind ; w4g:code 27 ; w4g:name "audio_source" .
+w4g:obj_peer           a w4g:ObjectKind ; w4g:code 28 ; w4g:name "peer" .
+w4g:obj_quality_metric a w4g:ObjectKind ; w4g:code 29 ; w4g:name "quality_metric" .
+w4g:obj_engine_cmd     a w4g:ObjectKind ; w4g:code 30 ; w4g:name "engine_cmd" .
+w4g:obj_episode        a w4g:ObjectKind ; w4g:code 31 ; w4g:name "episode" .
+
+#################################################################
+# Pattern individuals (one per committed kernel; ORDER BY w4g:id)
+#################################################################
+
+w4g:input_admitted a w4g:Pattern ;
+    w4g:id 1 ;
+    w4g:name "input_admitted" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 9 ;
+    w4g:eventCode 2 ;
+    w4g:eventName "InputAdmitted" ;
+    w4g:otelSpan 2 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::eq_mask_u32" ;
+    w4g:doc "Map a raw input byte to an admission status code via a branchless eq-mask classifier." ;
+    w4g:authority "oracle predicate: matches input_admitted_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:family "Core Sim & Combat" .
+
+w4g:fixed_tick_advanced a w4g:Pattern ;
+    w4g:id 2 ;
+    w4g:name "fixed_tick_advanced" ;
+    w4g:lowering w4g:Saturating ;
+    w4g:stateCard 64 ;
+    w4g:eventCode 1 ;
+    w4g:eventName "FixedTickAdvanced" ;
+    w4g:otelSpan 1 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::int::saturating_add_i64" ;
+    w4g:doc "Advance a fixed-step accumulator and emit whole ticks via bucketize." ;
+    w4g:authority "oracle predicate: matches fixed_tick_advanced_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_world ;
+    w4g:family "Core Sim & Combat" .
+
+w4g:entity_state_transitioned a w4g:Pattern ;
+    w4g:id 3 ;
+    w4g:name "entity_state_transitioned" ;
+    w4g:lowering w4g:Dfa ;
+    w4g:stateCard 4 ;
+    w4g:eventCode 16 ;
+    w4g:eventName "EntityStateTransitioned" ;
+    w4g:otelSpan 16 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::dfa::dfa_advance" ;
+    w4g:doc "Advance an entity lifecycle DFA one transition over a flat table." ;
+    w4g:authority "oracle predicate: matches entity_state_transitioned_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_entity ;
+    w4g:family "Core Sim & Combat" .
+
+w4g:object_spawned a w4g:Pattern ;
+    w4g:id 4 ;
+    w4g:name "object_spawned" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 6 ;
+    w4g:eventCode 18 ;
+    w4g:eventName "ObjectSpawned" ;
+    w4g:otelSpan 18 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::fix::clamp_u32" ;
+    w4g:doc "Resolve a requested archetype to its initial packed state via a bounded LUT." ;
+    w4g:authority "oracle predicate: matches object_spawned_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_entity ;
+    w4g:family "Core Sim & Combat" .
+
+w4g:aabb_collision_resolved a w4g:Pattern ;
+    w4g:id 5 ;
+    w4g:name "aabb_collision_resolved" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 2 ;
+    w4g:eventCode 17 ;
+    w4g:eventName "AabbCollisionResolved" ;
+    w4g:otelSpan 17 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::lt_mask_u32" ;
+    w4g:doc "Resolve AABB overlap via the separating-axis test, ANDing four lt-masks." ;
+    w4g:authority "oracle predicate: matches aabb_collision_resolved_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_entity_a ;
+    w4g:touchesObject w4g:obj_entity_b ;
+    w4g:family "Core Sim & Combat" .
+
+w4g:ocel_event_linked a w4g:Pattern ;
+    w4g:id 6 ;
+    w4g:name "ocel_event_linked" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 32 ;
+    w4g:eventCode 33 ;
+    w4g:eventName "OcelEventLinked" ;
+    w4g:otelSpan 33 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::select_u64" ;
+    w4g:doc "Gate event-object link validity with select; report admitted link popcount." ;
+    w4g:authority "oracle predicate: matches ocel_event_linked_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_event ;
+    w4g:touchesObject w4g:obj_object ;
+    w4g:family "Evidence & Replay" .
+
+w4g:otel_span_emitted a w4g:Pattern ;
+    w4g:id 7 ;
+    w4g:name "otel_span_emitted" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 8 ;
+    w4g:eventCode 34 ;
+    w4g:eventName "OtelSpanEmitted" ;
+    w4g:otelSpan 34 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::fix::clamp_u32" ;
+    w4g:doc "Resolve a pattern slot to its runtime OTEL span code via a bounded LUT." ;
+    w4g:authority "oracle predicate: matches otel_span_emitted_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_span ;
+    w4g:family "Evidence & Replay" .
+
+w4g:replay_frame_recorded a w4g:Pattern ;
+    w4g:id 8 ;
+    w4g:name "replay_frame_recorded" ;
+    w4g:lowering w4g:Receipt ;
+    w4g:stateCard 64 ;
+    w4g:eventCode 35 ;
+    w4g:eventName "ReplayFrameRecorded" ;
+    w4g:otelSpan 35 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::patterns::integrity_receipt::DeterministicSubstrateReceipt" ;
+    w4g:doc "Fold (prior digest, tick, input, state) into a deterministic replay digest." ;
+    w4g:authority "oracle predicate: matches replay_frame_recorded_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_frame ;
+    w4g:family "Evidence & Replay" .
+
+w4g:receipt_appended a w4g:Pattern ;
+    w4g:id 9 ;
+    w4g:name "receipt_appended" ;
+    w4g:lowering w4g:Receipt ;
+    w4g:stateCard 64 ;
+    w4g:eventCode 32 ;
+    w4g:eventName "ReceiptAppended" ;
+    w4g:otelSpan 3 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::patterns::integrity_receipt::DeterministicSubstrateReceipt" ;
+    w4g:doc "Append one transition to a rolling receipt chain via FNV-1a folding." ;
+    w4g:authority "oracle predicate: matches receipt_appended_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_receipt_chain ;
+    w4g:family "Evidence & Replay" .
+
+w4g:physics_value_rendered a w4g:Pattern ;
+    w4g:id 10 ;
+    w4g:name "physics_value_rendered" ;
+    w4g:lowering w4g:Saturating ;
+    w4g:stateCard 32 ;
+    w4g:eventCode 48 ;
+    w4g:eventName "PhysicsValueRendered" ;
+    w4g:otelSpan 48 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::fix::clamp_u32" ;
+    w4g:doc "Render a raw quantity into a display-safe range by clamping to [lo, hi]." ;
+    w4g:authority "oracle predicate: matches physics_value_rendered_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_quantity ;
+    w4g:family "Physics & Meaning" .
+
+w4g:semantic_lod_selected a w4g:Pattern ;
+    w4g:id 11 ;
+    w4g:name "semantic_lod_selected" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 7 ;
+    w4g:eventCode 49 ;
+    w4g:eventName "SemanticLodSelected" ;
+    w4g:otelSpan 49 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::fix::bucketize_u32" ;
+    w4g:doc "Select a semantic LOD tier for a HUD widget by quantizing distance." ;
+    w4g:authority "oracle predicate: matches semantic_lod_selected_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_hud_widget ;
+    w4g:family "Physics & Meaning" .
+
+w4g:projectile_advanced a w4g:Pattern ;
+    w4g:id 12 ;
+    w4g:name "projectile_advanced" ;
+    w4g:lowering w4g:Saturating ;
+    w4g:stateCard 32 ;
+    w4g:eventCode 50 ;
+    w4g:eventName "ProjectileAdvanced" ;
+    w4g:otelSpan 50 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::int::saturating_add_i64" ;
+    w4g:doc "Integrate a projectile by velocity with saturation, then clamp into the field." ;
+    w4g:authority "oracle predicate: matches projectile_advanced_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_projectile ;
+    w4g:family "Physics & Meaning" .
+
+w4g:ai_action_selected a w4g:Pattern ;
+    w4g:id 13 ;
+    w4g:name "ai_action_selected" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 4 ;
+    w4g:eventCode 64 ;
+    w4g:eventName "AiActionSelected" ;
+    w4g:otelSpan 64 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::select_u32" ;
+    w4g:doc "Select an AI action by utility argmax over four scores (first index wins ties)." ;
+    w4g:authority "oracle predicate: matches ai_action_selected_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_agent ;
+    w4g:family "AI Agent / Benchmark" .
+
+w4g:damage_applied a w4g:Pattern ;
+    w4g:id 14 ;
+    w4g:name "damage_applied" ;
+    w4g:lowering w4g:Saturating ;
+    w4g:stateCard 16 ;
+    w4g:eventCode 66 ;
+    w4g:eventName "DamageApplied" ;
+    w4g:otelSpan 66 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::int::saturating_sub_i64" ;
+    w4g:doc "Apply branchless saturating damage with crit select and an HP floor." ;
+    w4g:authority "oracle predicate: matches damage_applied_reference for all inputs" ;
+    w4g:mustAdmit "(100, 7)" ;
+    w4g:mustAdmit "(100, 7 | (1 << 16))" ;
+    w4g:mustAdmit "(5000, 1000)" ;
+    w4g:mustRefuse "(0, 5)" ;
+    w4g:mustRefuse "(10, 100 | (1 << 16))" ;
+    w4g:touchesObject w4g:obj_attacker ;
+    w4g:touchesObject w4g:obj_target ;
+    w4g:family "Core Sim & Combat" .
+
+w4g:status_effect_ticked a w4g:Pattern ;
+    w4g:id 15 ;
+    w4g:name "status_effect_ticked" ;
+    w4g:lowering w4g:Bitset ;
+    w4g:stateCard 16 ;
+    w4g:eventCode 67 ;
+    w4g:eventName "StatusEffectTicked" ;
+    w4g:otelSpan 67 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::bitset::rank_u64" ;
+    w4g:doc "Tick a status-effect set: set/clear an effect bit, decay duration, recount actives." ;
+    w4g:authority "oracle predicate: matches status_effect_ticked_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_target ;
+    w4g:family "Core Sim & Combat" .
+
+w4g:inventory_item_changed a w4g:Pattern ;
+    w4g:id 16 ;
+    w4g:name "inventory_item_changed" ;
+    w4g:lowering w4g:Bitset ;
+    w4g:stateCard 32 ;
+    w4g:eventCode 68 ;
+    w4g:eventName "InventoryItemChanged" ;
+    w4g:otelSpan 68 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::bitset::select_bit_u64" ;
+    w4g:doc "Change an inventory: find the first free slot on add, clear a slot on remove." ;
+    w4g:authority "oracle predicate: matches inventory_item_changed_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:touchesObject w4g:obj_item ;
+    w4g:family "Economy / Progression" .
+
+w4g:quest_step_advanced a w4g:Pattern ;
+    w4g:id 17 ;
+    w4g:name "quest_step_advanced" ;
+    w4g:lowering w4g:Dfa ;
+    w4g:stateCard 5 ;
+    w4g:eventCode 69 ;
+    w4g:eventName "QuestStepAdvanced" ;
+    w4g:otelSpan 69 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::dfa::dfa_advance" ;
+    w4g:doc "Advance a linear quest one step; complete moves forward, abandon resets." ;
+    w4g:authority "oracle predicate: matches quest_step_advanced_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:touchesObject w4g:obj_quest ;
+    w4g:family "Narrative / Dialogue" .
+
+w4g:mastery_moment_detected a w4g:Pattern ;
+    w4g:id 18 ;
+    w4g:name "mastery_moment_detected" ;
+    w4g:lowering w4g:Bitset ;
+    w4g:stateCard 32 ;
+    w4g:eventCode 80 ;
+    w4g:eventName "MasteryMomentDetected" ;
+    w4g:otelSpan 80 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::bitset::rank_u64" ;
+    w4g:doc "Detect a mastery moment when the rolling streak popcount meets a threshold." ;
+    w4g:authority "oracle predicate: matches mastery_moment_detected_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:touchesObject w4g:obj_session ;
+    w4g:family "Promotion & NPS" .
+
+w4g:share_artifact_generated a w4g:Pattern ;
+    w4g:id 19 ;
+    w4g:name "share_artifact_generated" ;
+    w4g:lowering w4g:Receipt ;
+    w4g:stateCard 64 ;
+    w4g:eventCode 81 ;
+    w4g:eventName "ShareArtifactGenerated" ;
+    w4g:otelSpan 81 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::patterns::integrity_receipt::DeterministicSubstrateReceipt" ;
+    w4g:doc "Generate a deterministic, receipt-stamped shareable artifact id." ;
+    w4g:authority "oracle predicate: matches share_artifact_generated_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:touchesObject w4g:obj_artifact ;
+    w4g:family "Promotion & NPS" .
+
+w4g:nps_prompt_gated a w4g:Pattern ;
+    w4g:id 20 ;
+    w4g:name "nps_prompt_gated" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 9 ;
+    w4g:eventCode 82 ;
+    w4g:eventName "NpsPromptGated" ;
+    w4g:otelSpan 82 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::select_u32" ;
+    w4g:doc "Gate an NPS prompt on readiness vs saturation, yielding ADMITTED/BLOCKED/REFUSED." ;
+    w4g:authority "oracle predicate: matches nps_prompt_gated_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:touchesObject w4g:obj_prompt ;
+    w4g:family "Promotion & NPS" .
+
+#################################################################
+# Phase 2: Pathfinding (ids 21-25, event codes 0x0053-0x0057)
+#################################################################
+
+w4g:path_node_expanded a w4g:Pattern ;
+    w4g:id 21 ;
+    w4g:name "path_node_expanded" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 2 ;
+    w4g:eventCode 83 ;
+    w4g:eventName "PathNodeExpanded" ;
+    w4g:otelSpan 83 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::select_u32" ;
+    w4g:doc "Select the winning A*/Dijkstra candidate node based on f-cost comparison." ;
+    w4g:authority "oracle predicate: matches path_node_expanded_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_nav_node ;
+    w4g:family "Pathfinding" .
+
+w4g:waypoint_reached a w4g:Pattern ;
+    w4g:id 22 ;
+    w4g:name "waypoint_reached" ;
+    w4g:lowering w4g:Saturating ;
+    w4g:stateCard 16 ;
+    w4g:eventCode 84 ;
+    w4g:eventName "WaypointReached" ;
+    w4g:otelSpan 84 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::int::saturating_sub_i64" ;
+    w4g:doc "Check if remaining distance to a waypoint is within tolerance and compute saturating remainder." ;
+    w4g:authority "oracle predicate: matches waypoint_reached_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:touchesObject w4g:obj_nav_node ;
+    w4g:family "Pathfinding" .
+
+w4g:heuristic_distance_estimated a w4g:Pattern ;
+    w4g:id 23 ;
+    w4g:name "heuristic_distance_estimated" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 2 ;
+    w4g:eventCode 85 ;
+    w4g:eventName "HeuristicDistanceEstimated" ;
+    w4g:otelSpan 85 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::max_u32" ;
+    w4g:doc "Branchless Chebyshev distance (max of |dx|, |dy|) for A* heuristic using signed i16 deltas." ;
+    w4g:authority "oracle predicate: matches heuristic_distance_estimated_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_nav_node ;
+    w4g:family "Pathfinding" .
+
+w4g:path_cost_bounded a w4g:Pattern ;
+    w4g:id 24 ;
+    w4g:name "path_cost_bounded" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 8 ;
+    w4g:eventCode 86 ;
+    w4g:eventName "PathCostBounded" ;
+    w4g:otelSpan 86 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::fix::clamp_u32" ;
+    w4g:doc "Clamp accumulated path cost to a maximum budget and flag if the budget was exceeded." ;
+    w4g:authority "oracle predicate: matches path_cost_bounded_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_nav_node ;
+    w4g:family "Pathfinding" .
+
+w4g:nav_state_advanced a w4g:Pattern ;
+    w4g:id 25 ;
+    w4g:name "nav_state_advanced" ;
+    w4g:lowering w4g:Dfa ;
+    w4g:stateCard 4 ;
+    w4g:eventCode 87 ;
+    w4g:eventName "NavStateAdvanced" ;
+    w4g:otelSpan 87 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::dfa::dfa_advance" ;
+    w4g:doc "Advance a 4-state navigation FSM (IDLE/MOVING/ARRIVED/BLOCKED) via branchless DFA table lookup." ;
+    w4g:authority "oracle predicate: matches nav_state_advanced_reference for all inputs" ;
+    w4g:mustAdmit "(0, 1)" ;
+    w4g:mustAdmit "(1, 2)" ;
+    w4g:mustAdmit "(1, 3)" ;
+    w4g:mustRefuse "(3, 1)" ;
+    w4g:mustRefuse "(2, 1)" ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:touchesObject w4g:obj_nav_node ;
+    w4g:family "Pathfinding" .
+
+#################################################################
+# Phase 2: Procedural Generation (ids 26-30, event codes 0x0058-0x005C)
+#################################################################
+
+w4g:noise_value_sampled a w4g:Pattern ;
+    w4g:id 26 ;
+    w4g:name "noise_value_sampled" ;
+    w4g:lowering w4g:Receipt ;
+    w4g:stateCard 64 ;
+    w4g:eventCode 88 ;
+    w4g:eventName "NoiseValueSampled" ;
+    w4g:otelSpan 88 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::patterns::integrity_receipt::DeterministicSubstrateReceipt" ;
+    w4g:doc "Deterministic hash-based noise — fold (seed, x, y) through a receipt to produce a bounded noise value in [0, 255]." ;
+    w4g:authority "oracle predicate: matches noise_value_sampled_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_world ;
+    w4g:family "Procedural Gen" .
+
+w4g:tile_variant_selected a w4g:Pattern ;
+    w4g:id 27 ;
+    w4g:name "tile_variant_selected" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 8 ;
+    w4g:eventCode 89 ;
+    w4g:eventName "TileVariantSelected" ;
+    w4g:otelSpan 89 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::fix::bucketize_u32" ;
+    w4g:doc "Select a tile variant index (0..4) from a weight value via bucketize with boundaries at [64, 128, 192]." ;
+    w4g:authority "oracle predicate: matches tile_variant_selected_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_tile ;
+    w4g:family "Procedural Gen" .
+
+w4g:terrain_height_quantized a w4g:Pattern ;
+    w4g:id 28 ;
+    w4g:name "terrain_height_quantized" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 8 ;
+    w4g:eventCode 90 ;
+    w4g:eventName "TerrainHeightQuantized" ;
+    w4g:otelSpan 90 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::fix::clamp_u32" ;
+    w4g:doc "Clamp a raw terrain height sample to [min_h, max_h], producing a bounded 16-bit height value." ;
+    w4g:authority "oracle predicate: matches terrain_height_quantized_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_terrain ;
+    w4g:family "Procedural Gen" .
+
+w4g:spawn_weight_evaluated a w4g:Pattern ;
+    w4g:id 29 ;
+    w4g:name "spawn_weight_evaluated" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 2 ;
+    w4g:eventCode 91 ;
+    w4g:eventName "SpawnWeightEvaluated" ;
+    w4g:otelSpan 91 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::lt_mask_u32" ;
+    w4g:doc "Evaluate whether a spawn should occur: spawn when a random roll is strictly less than the spawn_rate threshold." ;
+    w4g:authority "oracle predicate: matches spawn_weight_evaluated_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_entity ;
+    w4g:family "Procedural Gen" .
+
+w4g:biome_class_selected a w4g:Pattern ;
+    w4g:id 30 ;
+    w4g:name "biome_class_selected" ;
+    w4g:lowering w4g:Bitset ;
+    w4g:stateCard 16 ;
+    w4g:eventCode 92 ;
+    w4g:eventName "BiomeClassSelected" ;
+    w4g:otelSpan 92 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::bitset::rank_u64" ;
+    w4g:doc "Select a biome class from a packed biome-flags bitset by ranking the highest set bit at the selector position." ;
+    w4g:authority "oracle predicate: matches biome_class_selected_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_terrain ;
+    w4g:family "Procedural Gen" .
+
+#################################################################
+# Phase 2: Economy / Progression (ids 31-35, event codes 0x005D-0x0061)
+#################################################################
+
+w4g:currency_delta_applied a w4g:Pattern ;
+    w4g:id 31 ;
+    w4g:name "currency_delta_applied" ;
+    w4g:lowering w4g:Saturating ;
+    w4g:stateCard 64 ;
+    w4g:eventCode 93 ;
+    w4g:eventName "CurrencyDeltaApplied" ;
+    w4g:otelSpan 93 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::int::saturating_add_i64" ;
+    w4g:doc "Apply a signed currency delta (earn or spend) to a balance with a floor of 0 and a ceiling of 0xFFFF_FFFF." ;
+    w4g:authority "oracle predicate: matches currency_delta_applied_reference for all inputs" ;
+    w4g:mustAdmit "(100, 50)" ;
+    w4g:mustAdmit "(1000, 100 | (1u64 << 31))" ;
+    w4g:mustRefuse "(50, 100 | (1u64 << 31))" ;
+    w4g:mustRefuse "(0xFFFF_FFFE, 5)" ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:family "Economy / Progression" .
+
+w4g:xp_threshold_crossed a w4g:Pattern ;
+    w4g:id 32 ;
+    w4g:name "xp_threshold_crossed" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 2 ;
+    w4g:eventCode 94 ;
+    w4g:eventName "XpThresholdCrossed" ;
+    w4g:otelSpan 94 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::lt_mask_u32" ;
+    w4g:doc "Check whether accumulated XP crosses a level-up threshold and compute overflow XP branchlessly." ;
+    w4g:authority "oracle predicate: matches xp_threshold_crossed_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:family "Economy / Progression" .
+
+w4g:level_gate_evaluated a w4g:Pattern ;
+    w4g:id 33 ;
+    w4g:name "level_gate_evaluated" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 2 ;
+    w4g:eventCode 95 ;
+    w4g:eventName "LevelGateEvaluated" ;
+    w4g:otelSpan 95 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::select_u32" ;
+    w4g:doc "Gate an ability or item unlock: banned->REFUSED, level met->ADMITTED, else BLOCKED, composed from branchless selects." ;
+    w4g:authority "oracle predicate: matches level_gate_evaluated_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:family "Economy / Progression" .
+
+w4g:purchase_admitted a w4g:Pattern ;
+    w4g:id 34 ;
+    w4g:name "purchase_admitted" ;
+    w4g:lowering w4g:Dfa ;
+    w4g:stateCard 4 ;
+    w4g:eventCode 96 ;
+    w4g:eventName "PurchaseAdmitted" ;
+    w4g:otelSpan 96 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::dfa::dfa_advance" ;
+    w4g:doc "Advance a purchase flow FSM one transition over a flat 5x5 transition table." ;
+    w4g:authority "oracle predicate: matches purchase_admitted_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:touchesObject w4g:obj_item ;
+    w4g:family "Economy / Progression" .
+
+w4g:reward_tier_selected a w4g:Pattern ;
+    w4g:id 35 ;
+    w4g:name "reward_tier_selected" ;
+    w4g:lowering w4g:Bitset ;
+    w4g:stateCard 16 ;
+    w4g:eventCode 97 ;
+    w4g:eventName "RewardTierSelected" ;
+    w4g:otelSpan 97 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::int::popcount_u64" ;
+    w4g:doc "Select a reward tier (0..3) by counting prestige flags set in a bitset, then bucketing the count against three thresholds." ;
+    w4g:authority "oracle predicate: matches reward_tier_selected_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:family "Economy / Progression" .
+
+#################################################################
+# Phase 2: Narrative / Dialogue (ids 36-40, event codes 0x0062-0x0066)
+#################################################################
+
+w4g:dialogue_node_advanced a w4g:Pattern ;
+    w4g:id 36 ;
+    w4g:name "dialogue_node_advanced" ;
+    w4g:lowering w4g:Dfa ;
+    w4g:stateCard 5 ;
+    w4g:eventCode 98 ;
+    w4g:eventName "DialogueNodeAdvanced" ;
+    w4g:otelSpan 98 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::dfa::dfa_advance" ;
+    w4g:doc "Advance a 6-state linear dialogue tree FSM via branchless DFA table lookup." ;
+    w4g:authority "oracle predicate: matches dialogue_node_advanced_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_npc ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:family "Narrative / Dialogue" .
+
+w4g:condition_flag_evaluated a w4g:Pattern ;
+    w4g:id 37 ;
+    w4g:name "condition_flag_evaluated" ;
+    w4g:lowering w4g:Bitset ;
+    w4g:stateCard 32 ;
+    w4g:eventCode 99 ;
+    w4g:eventName "ConditionFlagEvaluated" ;
+    w4g:otelSpan 99 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::bitset::rank_u64" ;
+    w4g:doc "Test whether a condition flag is set in a 32-bit flags bitset and return its rank among active flags." ;
+    w4g:authority "oracle predicate: matches condition_flag_evaluated_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:family "Narrative / Dialogue" .
+
+w4g:narrative_branch_selected a w4g:Pattern ;
+    w4g:id 38 ;
+    w4g:name "narrative_branch_selected" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 2 ;
+    w4g:eventCode 100 ;
+    w4g:eventName "NarrativeBranchSelected" ;
+    w4g:otelSpan 100 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::select_u32" ;
+    w4g:doc "Select one of three narrative branches by which weighted condition has the highest weight; ties go to lowest index." ;
+    w4g:authority "oracle predicate: matches narrative_branch_selected_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_npc ;
+    w4g:family "Narrative / Dialogue" .
+
+w4g:dialogue_cooldown_bounded a w4g:Pattern ;
+    w4g:id 39 ;
+    w4g:name "dialogue_cooldown_bounded" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 8 ;
+    w4g:eventCode 101 ;
+    w4g:eventName "DialogueCooldownBounded" ;
+    w4g:otelSpan 101 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::eq_mask_u32" ;
+    w4g:doc "Decrement a dialogue cooldown counter by a tick delta, clamping to 0; return new cooldown and a ready flag." ;
+    w4g:authority "oracle predicate: matches dialogue_cooldown_bounded_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:touchesObject w4g:obj_npc ;
+    w4g:family "Narrative / Dialogue" .
+
+w4g:choice_weight_selected a w4g:Pattern ;
+    w4g:id 40 ;
+    w4g:name "choice_weight_selected" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 8 ;
+    w4g:eventCode 102 ;
+    w4g:eventName "ChoiceWeightSelected" ;
+    w4g:otelSpan 102 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::select_u32" ;
+    w4g:doc "Select a dialogue choice by bucketing a roll against 3 cumulative weight boundaries." ;
+    w4g:authority "oracle predicate: matches choice_weight_selected_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:family "Narrative / Dialogue" .
+
+#################################################################
+# Phase 2: Camera (ids 41-45, event codes 0x0067-0x006B)
+#################################################################
+
+w4g:camera_distance_clamped a w4g:Pattern ;
+    w4g:id 41 ;
+    w4g:name "camera_distance_clamped" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 8 ;
+    w4g:eventCode 103 ;
+    w4g:eventName "CameraDistanceClamped" ;
+    w4g:otelSpan 103 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::fix::clamp_u32" ;
+    w4g:doc "Clamp camera distance to [min_dist, max_dist], producing a bounded 16-bit distance value." ;
+    w4g:authority "oracle predicate: matches camera_distance_clamped_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_camera ;
+    w4g:family "Camera" .
+
+w4g:look_target_weighted a w4g:Pattern ;
+    w4g:id 42 ;
+    w4g:name "look_target_weighted" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 2 ;
+    w4g:eventCode 104 ;
+    w4g:eventName "LookTargetWeighted" ;
+    w4g:otelSpan 104 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::select_u32" ;
+    w4g:doc "Select between two look targets (primary vs secondary) by priority weight; higher wins, ties to primary." ;
+    w4g:authority "oracle predicate: matches look_target_weighted_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_camera ;
+    w4g:touchesObject w4g:obj_target ;
+    w4g:family "Camera" .
+
+w4g:fov_adjusted a w4g:Pattern ;
+    w4g:id 43 ;
+    w4g:name "fov_adjusted" ;
+    w4g:lowering w4g:Saturating ;
+    w4g:stateCard 32 ;
+    w4g:eventCode 105 ;
+    w4g:eventName "FovAdjusted" ;
+    w4g:otelSpan 105 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::int::saturating_add_i64" ;
+    w4g:doc "Adjust field-of-view by a signed delta, clamping to [min_fov, max_fov]." ;
+    w4g:authority "oracle predicate: matches fov_adjusted_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_camera ;
+    w4g:family "Camera" .
+
+w4g:camera_shake_applied a w4g:Pattern ;
+    w4g:id 44 ;
+    w4g:name "camera_shake_applied" ;
+    w4g:lowering w4g:Receipt ;
+    w4g:stateCard 64 ;
+    w4g:eventCode 106 ;
+    w4g:eventName "CameraShakeApplied" ;
+    w4g:otelSpan 106 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::patterns::integrity_receipt::DeterministicSubstrateReceipt" ;
+    w4g:doc "Deterministic camera shake offset computed from a receipt hash of (frame_tick, intensity, seed)." ;
+    w4g:authority "oracle predicate: matches camera_shake_applied_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_camera ;
+    w4g:family "Camera" .
+
+w4g:camera_follow_lerped a w4g:Pattern ;
+    w4g:id 45 ;
+    w4g:name "camera_follow_lerped" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 8 ;
+    w4g:eventCode 107 ;
+    w4g:eventName "CameraFollowLerped" ;
+    w4g:otelSpan 107 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::fix::clamp_u32" ;
+    w4g:doc "Fixed-point lerp approximation for camera follow: new_pos = current + (target - current) * alpha / 256." ;
+    w4g:authority "oracle predicate: matches camera_follow_lerped_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_camera ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:family "Camera" .
+
+#################################################################
+# Phase 2: Audio (ids 46-50, event codes 0x006C-0x0070)
+#################################################################
+
+w4g:audio_priority_selected a w4g:Pattern ;
+    w4g:id 46 ;
+    w4g:name "audio_priority_selected" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 2 ;
+    w4g:eventCode 108 ;
+    w4g:eventName "AudioPrioritySelected" ;
+    w4g:otelSpan 108 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::select_u32" ;
+    w4g:doc "Select the higher-priority of two competing audio channels; tie goes to channel 0." ;
+    w4g:authority "oracle predicate: matches audio_priority_selected_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_audio_source ;
+    w4g:family "Audio" .
+
+w4g:volume_clamped a w4g:Pattern ;
+    w4g:id 47 ;
+    w4g:name "volume_clamped" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 8 ;
+    w4g:eventCode 109 ;
+    w4g:eventName "VolumeClamped" ;
+    w4g:otelSpan 109 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::fix::clamp_u32" ;
+    w4g:doc "Apply a volume change (delta) to current volume, clamping to [0, 255]." ;
+    w4g:authority "oracle predicate: matches volume_clamped_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_audio_source ;
+    w4g:family "Audio" .
+
+w4g:audio_fade_applied a w4g:Pattern ;
+    w4g:id 48 ;
+    w4g:name "audio_fade_applied" ;
+    w4g:lowering w4g:Saturating ;
+    w4g:stateCard 32 ;
+    w4g:eventCode 110 ;
+    w4g:eventName "AudioFadeApplied" ;
+    w4g:otelSpan 110 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::int::saturating_sub_i64" ;
+    w4g:doc "Apply a fade step — reduce volume by fade_rate per tick, floor at 0; return new volume and a silent flag." ;
+    w4g:authority "oracle predicate: matches audio_fade_applied_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_audio_source ;
+    w4g:family "Audio" .
+
+w4g:audio_trigger_evaluated a w4g:Pattern ;
+    w4g:id 49 ;
+    w4g:name "audio_trigger_evaluated" ;
+    w4g:lowering w4g:Dfa ;
+    w4g:stateCard 4 ;
+    w4g:eventCode 111 ;
+    w4g:eventName "AudioTriggerEvaluated" ;
+    w4g:otelSpan 111 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::dfa::dfa_advance" ;
+    w4g:doc "Advance an audio playback FSM (STOPPED/PLAYING/PAUSED/FADING) via DFA table lookup." ;
+    w4g:authority "oracle predicate: matches audio_trigger_evaluated_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_audio_source ;
+    w4g:touchesObject w4g:obj_entity ;
+    w4g:family "Audio" .
+
+w4g:audio_distance_attenuated a w4g:Pattern ;
+    w4g:id 50 ;
+    w4g:name "audio_distance_attenuated" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 8 ;
+    w4g:eventCode 112 ;
+    w4g:eventName "AudioDistanceAttenuated" ;
+    w4g:otelSpan 112 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::fix::clamp_u32" ;
+    w4g:doc "Compute attenuated volume from distance: max(0, max_vol - distance * attenuation_factor), clamped to [0, max_vol]." ;
+    w4g:authority "oracle predicate: matches audio_distance_attenuated_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_audio_source ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:family "Audio" .
+
+#################################################################
+# Phase 2: Multiplayer / Network (ids 51-55, event codes 0x0071-0x0075)
+#################################################################
+
+w4g:tick_delta_bounded a w4g:Pattern ;
+    w4g:id 51 ;
+    w4g:name "tick_delta_bounded" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 8 ;
+    w4g:eventCode 113 ;
+    w4g:eventName "TickDeltaBounded" ;
+    w4g:otelSpan 113 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::fix::clamp_u32" ;
+    w4g:doc "Clamp a tick delta to a max_jitter window to prevent large desync jumps." ;
+    w4g:authority "oracle predicate: matches tick_delta_bounded_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_peer ;
+    w4g:family "Multiplayer / Network" .
+
+w4g:lag_compensation_applied a w4g:Pattern ;
+    w4g:id 52 ;
+    w4g:name "lag_compensation_applied" ;
+    w4g:lowering w4g:Saturating ;
+    w4g:stateCard 32 ;
+    w4g:eventCode 114 ;
+    w4g:eventName "LagCompensationApplied" ;
+    w4g:otelSpan 114 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::fix::clamp_u32" ;
+    w4g:doc "Rewind a server-authoritative position by lag*velocity to estimate where the client was at a past tick." ;
+    w4g:authority "oracle predicate: matches lag_compensation_applied_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_peer ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:family "Multiplayer / Network" .
+
+w4g:packet_priority_evaluated a w4g:Pattern ;
+    w4g:id 53 ;
+    w4g:name "packet_priority_evaluated" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 2 ;
+    w4g:eventCode 115 ;
+    w4g:eventName "PacketPriorityEvaluated" ;
+    w4g:otelSpan 115 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::select_u32" ;
+    w4g:doc "Evaluate packet send priority: select highest priority class among 3 pending packet queues; first index wins ties." ;
+    w4g:authority "oracle predicate: matches packet_priority_evaluated_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_peer ;
+    w4g:family "Multiplayer / Network" .
+
+w4g:prediction_error_bounded a w4g:Pattern ;
+    w4g:id 54 ;
+    w4g:name "prediction_error_bounded" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 8 ;
+    w4g:eventCode 116 ;
+    w4g:eventName "PredictionErrorBounded" ;
+    w4g:otelSpan 116 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::fix::clamp_u32" ;
+    w4g:doc "Clamp client-side prediction error magnitude to a reconciliation threshold; above it, set a force-resync flag." ;
+    w4g:authority "oracle predicate: matches prediction_error_bounded_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_peer ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:family "Multiplayer / Network" .
+
+w4g:sync_state_admitted a w4g:Pattern ;
+    w4g:id 55 ;
+    w4g:name "sync_state_admitted" ;
+    w4g:lowering w4g:Dfa ;
+    w4g:stateCard 4 ;
+    w4g:eventCode 117 ;
+    w4g:eventName "SyncStateAdmitted" ;
+    w4g:otelSpan 117 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::dfa::dfa_advance" ;
+    w4g:doc "Advance a synchronization FSM (UNSYNCED/SYNCING/SYNCED/DRIFTED/LOST) via DFA table lookup." ;
+    w4g:authority "oracle predicate: matches sync_state_admitted_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_peer ;
+    w4g:touchesObject w4g:obj_session ;
+    w4g:family "Multiplayer / Network" .
+
+#################################################################
+# Phase 2: DfLSS / Quality (ids 56-60, event codes 0x0076-0x007A)
+#################################################################
+
+w4g:sigma_level_computed a w4g:Pattern ;
+    w4g:id 56 ;
+    w4g:name "sigma_level_computed" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 7 ;
+    w4g:eventCode 118 ;
+    w4g:eventName "SigmaLevelComputed" ;
+    w4g:otelSpan 118 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::lt_mask_u32" ;
+    w4g:doc "Compute Six-Sigma level from defects per million opportunities (DPMO) via branchless threshold comparisons." ;
+    w4g:authority "oracle predicate: matches sigma_level_computed_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_quality_metric ;
+    w4g:family "DfLSS / Quality" .
+
+w4g:defect_rate_quantized a w4g:Pattern ;
+    w4g:id 57 ;
+    w4g:name "defect_rate_quantized" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 8 ;
+    w4g:eventCode 119 ;
+    w4g:eventName "DefectRateQuantized" ;
+    w4g:otelSpan 119 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::fix::clamp_u32" ;
+    w4g:doc "Clamp a measured defect rate (parts per million) to [0, 1_000_000] for normalization." ;
+    w4g:authority "oracle predicate: matches defect_rate_quantized_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_quality_metric ;
+    w4g:family "DfLSS / Quality" .
+
+w4g:ctq_threshold_evaluated a w4g:Pattern ;
+    w4g:id 58 ;
+    w4g:name "ctq_threshold_evaluated" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 2 ;
+    w4g:eventCode 120 ;
+    w4g:eventName "CtqThresholdEvaluated" ;
+    w4g:otelSpan 120 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::lt_mask_u32" ;
+    w4g:doc "Evaluate a Critical-to-Quality (CTQ) characteristic: whether a measured value is within spec [LSL, USL] and the violation direction." ;
+    w4g:authority "oracle predicate: matches ctq_threshold_evaluated_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_quality_metric ;
+    w4g:family "DfLSS / Quality" .
+
+w4g:nps_score_bounded a w4g:Pattern ;
+    w4g:id 59 ;
+    w4g:name "nps_score_bounded" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 11 ;
+    w4g:eventCode 121 ;
+    w4g:eventName "NpsScoreBounded" ;
+    w4g:otelSpan 121 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::fix::clamp_u32" ;
+    w4g:doc "Normalize a raw NPS response score (0..=10) and classify as Detractor/Passive/Promoter via branchless thresholds." ;
+    w4g:authority "oracle predicate: matches nps_score_bounded_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_prompt ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:family "DfLSS / Quality" .
+
+w4g:quality_gate_evaluated a w4g:Pattern ;
+    w4g:id 60 ;
+    w4g:name "quality_gate_evaluated" ;
+    w4g:lowering w4g:Dfa ;
+    w4g:stateCard 4 ;
+    w4g:eventCode 122 ;
+    w4g:eventName "QualityGateEvaluated" ;
+    w4g:otelSpan 122 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::dfa::dfa_advance" ;
+    w4g:doc "Advance a quality gate FSM (UNINSPECTED/PENDING/PASSED/FAILED/REMEDIATED) via a flat DFA transition table." ;
+    w4g:authority "oracle predicate: matches quality_gate_evaluated_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_quality_metric ;
+    w4g:family "DfLSS / Quality" .
+
+#################################################################
+# Phase 2: Engine Bridge (ids 61-65, event codes 0x007B-0x007F)
+#################################################################
+
+w4g:command_opcode_encoded a w4g:Pattern ;
+    w4g:id 61 ;
+    w4g:name "command_opcode_encoded" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 4 ;
+    w4g:eventCode 123 ;
+    w4g:eventName "CommandOpcodeEncoded" ;
+    w4g:otelSpan 123 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::lt_mask_u32" ;
+    w4g:doc "Encode a semantic command type (0..=127) into a platform opcode class via branchless boundary comparison." ;
+    w4g:authority "oracle predicate: matches command_opcode_encoded_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_engine_cmd ;
+    w4g:family "Engine Bridge" .
+
+w4g:capability_flag_evaluated a w4g:Pattern ;
+    w4g:id 62 ;
+    w4g:name "capability_flag_evaluated" ;
+    w4g:lowering w4g:Bitset ;
+    w4g:stateCard 32 ;
+    w4g:eventCode 124 ;
+    w4g:eventName "CapabilityFlagEvaluated" ;
+    w4g:otelSpan 124 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::bitset::rank_u64" ;
+    w4g:doc "Test whether a capability bit is set in a 64-bit capability flags word and return its rank (count of set bits at 0..=idx)." ;
+    w4g:authority "oracle predicate: matches capability_flag_evaluated_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_engine_cmd ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:family "Engine Bridge" .
+
+w4g:bridge_state_transitioned a w4g:Pattern ;
+    w4g:id 63 ;
+    w4g:name "bridge_state_transitioned" ;
+    w4g:lowering w4g:Dfa ;
+    w4g:stateCard 5 ;
+    w4g:eventCode 125 ;
+    w4g:eventName "BridgeStateTransitioned" ;
+    w4g:otelSpan 125 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::dfa::dfa_advance" ;
+    w4g:doc "Advance a platform bridge adapter FSM (DISCONNECTED/CONNECTING/CONNECTED/ERROR/RECOVERING) over a flat 5x5 table." ;
+    w4g:authority "oracle predicate: matches bridge_state_transitioned_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_engine_cmd ;
+    w4g:family "Engine Bridge" .
+
+w4g:payload_size_bounded a w4g:Pattern ;
+    w4g:id 64 ;
+    w4g:name "payload_size_bounded" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 8 ;
+    w4g:eventCode 126 ;
+    w4g:eventName "PayloadSizeBounded" ;
+    w4g:otelSpan 126 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::min_u32" ;
+    w4g:doc "Clamp a payload size request to the adapter's maximum MTU via branchless min; return clamped size and an overflow flag." ;
+    w4g:authority "oracle predicate: matches payload_size_bounded_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_engine_cmd ;
+    w4g:family "Engine Bridge" .
+
+w4g:adapter_priority_ranked a w4g:Pattern ;
+    w4g:id 65 ;
+    w4g:name "adapter_priority_ranked" ;
+    w4g:lowering w4g:Network ;
+    w4g:stateCard 8 ;
+    w4g:eventCode 127 ;
+    w4g:eventName "AdapterPriorityRanked" ;
+    w4g:otelSpan 127 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::network::bitonic_sort_8u32" ;
+    w4g:doc "Rank 4 adapter priorities using a branchless bitonic sort network on 8 slots; highest priority lands in bits[0..16]." ;
+    w4g:authority "oracle predicate: matches adapter_priority_ranked_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_engine_cmd ;
+    w4g:family "Engine Bridge" .
+
+#################################################################
+# Phase 2: AI Agent / Benchmark (ids 66-70, event codes 0x0080-0x0084)
+#################################################################
+
+w4g:reward_signal_clamped a w4g:Pattern ;
+    w4g:id 66 ;
+    w4g:name "reward_signal_clamped" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 8 ;
+    w4g:eventCode 128 ;
+    w4g:eventName "RewardSignalClamped" ;
+    w4g:otelSpan 128 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::int::saturating_add_i64" ;
+    w4g:doc "Clamp a raw RL reward signal to [-max_reward, +max_reward] for stability via saturating i64 intrinsics." ;
+    w4g:authority "oracle predicate: matches reward_signal_clamped_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_agent ;
+    w4g:family "AI Agent / Benchmark" .
+
+w4g:policy_action_selected a w4g:Pattern ;
+    w4g:id 67 ;
+    w4g:name "policy_action_selected" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 2 ;
+    w4g:eventCode 129 ;
+    w4g:eventName "PolicyActionSelected" ;
+    w4g:otelSpan 129 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::select_u32" ;
+    w4g:doc "Select the highest-value action from a policy's four Q-values, with first-index-wins tie-breaking." ;
+    w4g:authority "oracle predicate: matches policy_action_selected_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_agent ;
+    w4g:family "AI Agent / Benchmark" .
+
+w4g:observation_class_selected a w4g:Pattern ;
+    w4g:id 68 ;
+    w4g:name "observation_class_selected" ;
+    w4g:lowering w4g:Lut ;
+    w4g:stateCard 8 ;
+    w4g:eventCode 130 ;
+    w4g:eventName "ObservationClassSelected" ;
+    w4g:otelSpan 130 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::fix::clamp_u32" ;
+    w4g:doc "Discretize a continuous observation value into one of N bins via integer division, clamped to [0, max_bins-1]." ;
+    w4g:authority "oracle predicate: matches observation_class_selected_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_agent ;
+    w4g:family "AI Agent / Benchmark" .
+
+w4g:action_mask_applied a w4g:Pattern ;
+    w4g:id 69 ;
+    w4g:name "action_mask_applied" ;
+    w4g:lowering w4g:Bitset ;
+    w4g:stateCard 32 ;
+    w4g:eventCode 131 ;
+    w4g:eventName "ActionMaskApplied" ;
+    w4g:otelSpan 131 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::select_u64" ;
+    w4g:doc "Apply an action mask to a policy output — zero out Q-values for illegal actions via a branchless legality select." ;
+    w4g:authority "oracle predicate: matches action_mask_applied_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_agent ;
+    w4g:touchesObject w4g:obj_episode ;
+    w4g:family "AI Agent / Benchmark" .
+
+w4g:episode_return_bounded a w4g:Pattern ;
+    w4g:id 70 ;
+    w4g:name "episode_return_bounded" ;
+    w4g:lowering w4g:Saturating ;
+    w4g:stateCard 64 ;
+    w4g:eventCode 132 ;
+    w4g:eventName "EpisodeReturnBounded" ;
+    w4g:otelSpan 132 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::int::saturating_add_i64" ;
+    w4g:doc "Accumulate episodic return with a fixed-point discount factor, clamped to [0, max_return]." ;
+    w4g:authority "oracle predicate: matches episode_return_bounded_reference for all inputs" ;
+    w4g:touchesObject w4g:obj_agent ;
+    w4g:touchesObject w4g:obj_episode ;
+    w4g:family "AI Agent / Benchmark" .
+
+#################################################################
+# Phase 3: Anti-Cheat detectors (ids 71-75, event codes 0x0085-0x0089)
+#
+# These are LEGALITY detectors, not value-kernels: the kernel returns a verdict
+# bitmask (0 = ADMITTED/legal, nonzero = REFUSED/cheat). The w4g:authority slot
+# carries the legality spec the verdict bit encodes; mustAdmit/mustRefuse seed
+# the two-sided breed corpus (legal cases must verdict 0, cheat cases nonzero).
+#################################################################
+
+w4g:movement_legality_checked a w4g:Pattern ;
+    w4g:id 71 ;
+    w4g:name "movement_legality_checked" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 2 ;
+    w4g:eventCode 133 ;
+    w4g:eventName "MovementLegalityChecked" ;
+    w4g:otelSpan 133 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::lt_mask_u32" ;
+    w4g:doc "Verdict bit0 set iff |proposed - current| exceeds max_speed (teleport cheat); a move at or under the budget is admitted." ;
+    w4g:authority "legality spec: |proposed - cur| <= max_speed" ;
+    w4g:mustAdmit "(100, 100 | (5 << 16))" ;
+    w4g:mustAdmit "(100, 105 | (5 << 16))" ;
+    w4g:mustAdmit "(200, 195 | (10 << 16))" ;
+    w4g:mustRefuse "(100, 200 | (5 << 16))" ;
+    w4g:mustRefuse "(200, 100 | (5 << 16))" ;
+    w4g:mustRefuse "(0, 5000 | (10 << 16))" ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:family "Anti-Cheat" .
+
+w4g:resource_bound_checked a w4g:Pattern ;
+    w4g:id 72 ;
+    w4g:name "resource_bound_checked" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 2 ;
+    w4g:eventCode 134 ;
+    w4g:eventName "ResourceBoundChecked" ;
+    w4g:otelSpan 134 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::lt_mask_u32" ;
+    w4g:doc "Verdict bit0 set iff hp strictly exceeds hp_cap (resource-overflow cheat); hp at or under the cap is admitted." ;
+    w4g:authority "legality spec: hp <= hp_cap" ;
+    w4g:mustAdmit "(0, 100)" ;
+    w4g:mustAdmit "(100, 100)" ;
+    w4g:mustAdmit "(75, 100)" ;
+    w4g:mustRefuse "(101, 100)" ;
+    w4g:mustRefuse "(9999, 100)" ;
+    w4g:mustRefuse "(1, 0)" ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:family "Anti-Cheat" .
+
+w4g:cooldown_legality_checked a w4g:Pattern ;
+    w4g:id 73 ;
+    w4g:name "cooldown_legality_checked" ;
+    w4g:lowering w4g:Bitset ;
+    w4g:stateCard 2 ;
+    w4g:eventCode 135 ;
+    w4g:eventName "CooldownLegalityChecked" ;
+    w4g:otelSpan 135 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::bitset::rank_u64" ;
+    w4g:doc "Verdict bit0 mirrors the i16 sign bit of the remaining cooldown; a negative cooldown (fast-fire cheat) is refused." ;
+    w4g:authority "legality spec: remaining_cooldown >= 0 (i16 sign bit clear)" ;
+    w4g:mustAdmit "(0, 0)" ;
+    w4g:mustAdmit "(1, 0)" ;
+    w4g:mustAdmit "(0x7FFF, 0)" ;
+    w4g:mustRefuse "((-1_i16 as u16) as u64, 0)" ;
+    w4g:mustRefuse "(0x8000, 0)" ;
+    w4g:mustRefuse "((-100_i16 as u16) as u64, 0)" ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:family "Anti-Cheat" .
+
+w4g:action_rate_bounded a w4g:Pattern ;
+    w4g:id 74 ;
+    w4g:name "action_rate_bounded" ;
+    w4g:lowering w4g:Mask ;
+    w4g:stateCard 2 ;
+    w4g:eventCode 136 ;
+    w4g:eventName "ActionRateBounded" ;
+    w4g:otelSpan 136 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::mask::lt_mask_u32" ;
+    w4g:doc "Verdict bit0 set iff actions issued this tick strictly exceed the per-tick budget (action-spam/macro cheat)." ;
+    w4g:authority "legality spec: actions_this_tick <= tick_budget" ;
+    w4g:mustAdmit "(0, 8)" ;
+    w4g:mustAdmit "(8, 8)" ;
+    w4g:mustAdmit "(3, 8)" ;
+    w4g:mustRefuse "(9, 8)" ;
+    w4g:mustRefuse "(1000, 8)" ;
+    w4g:mustRefuse "(1, 0)" ;
+    w4g:touchesObject w4g:obj_player ;
+    w4g:family "Anti-Cheat" .
+
+w4g:transition_legality_checked a w4g:Pattern ;
+    w4g:id 75 ;
+    w4g:name "transition_legality_checked" ;
+    w4g:lowering w4g:Dfa ;
+    w4g:stateCard 2 ;
+    w4g:eventCode 137 ;
+    w4g:eventName "TransitionLegalityChecked" ;
+    w4g:otelSpan 137 ;
+    w4g:requiredStatus 4 ;
+    w4g:refusalStatus 7 ;
+    w4g:primitive "bcinr_logic::dfa::dfa_advance" ;
+    w4g:doc "Verdict bit0 set iff the (from_state, symbol) DFA edge lands on the absorbing SINK state (forbidden/state-desync transition)." ;
+    w4g:authority "legality spec: dfa_advance(from, symbol) != SINK (the edge is a legal protocol transition)" ;
+    w4g:mustAdmit "(0, 0)" ;
+    w4g:mustAdmit "(1, 1)" ;
+    w4g:mustAdmit "(3, 2)" ;
+    w4g:mustRefuse "(0, 2)" ;
+    w4g:mustRefuse "(4, 0)" ;
+    w4g:mustRefuse "(4, 1)" ;
+    w4g:touchesObject w4g:obj_entity ;
+    w4g:family "Anti-Cheat" .

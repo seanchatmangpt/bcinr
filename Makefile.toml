@@ -93,6 +93,7 @@ workspace = false
 command = "cargo"
 args = ["run", "--manifest-path", "tools/bcinr-contract-gate/Cargo.toml", "--release", "--quiet"]
 
+
 [tasks.ci]
 category = "CI"
 description = "Comprehensive CI pipeline"

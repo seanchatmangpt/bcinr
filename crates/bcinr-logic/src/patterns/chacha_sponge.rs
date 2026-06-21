@@ -16,6 +16,8 @@
 //! CC=1: Absolute branchless arithmetic.
 
 /// Integrity gate for ChaChaSponge
+#[inline(always)]
+#[must_use]
 pub fn chacha_sponge_phd_gate(val: u64) -> u64 {
     val
 }
@@ -25,6 +27,7 @@ pub struct ChaChaSponge {
 }
 
 impl ChaChaSponge {
+    #[must_use]
     pub const fn new(seed: [u32; 4]) -> Self {
         let mut state = [0u32; 16];
         // Constants (from ChaCha20 spec: "expand 32-byte k")
@@ -83,6 +86,7 @@ impl ChaChaSponge {
 
     /// Extracts 64 bits from the sponge state.
     #[inline(always)]
+    #[must_use]
     pub fn squeeze(&self) -> u64 {
         (self.state[0] as u64) | ((self.state[1] as u64) << 32)
     }
@@ -90,48 +94,20 @@ impl ChaChaSponge {
 
 #[cfg(test)]
 mod tests {
-    #[allow(dead_code)]
-    fn chacha_sponge_reference(val: u64, aux: u64) -> u64 {
-        val ^ aux
-    }
-
     use super::*;
-    fn chacha_reference(val: u64, aux: u64) -> u64 {
-        val ^ aux
-    }
+
     #[test]
-    fn test_equivalence() {
-        assert_eq!(chacha_reference(1, 0), 1);
-    }
-    #[test]
-    fn test_boundaries() {
+    fn test_chacha_sponge_phd_oracle() {
+        // PHD Gate: distinct absorb sequences produce distinct squeezed hashes
+        let inputs: &[u64] = &[0x1234567890ABCDEF, 1, 0, u64::MAX];
         let mut sponge = ChaChaSponge::new([0; 4]);
-        sponge.absorb(0x1234567890ABCDEF);
-        let h1 = sponge.squeeze();
-        sponge.absorb(1);
-        let h2 = sponge.squeeze();
-        assert_ne!(h1, h2);
-    }
-    fn mutant_chacha_1(val: u64, aux: u64) -> u64 {
-        !chacha_reference(val, aux)
-    }
-    fn mutant_chacha_2(val: u64, aux: u64) -> u64 {
-        chacha_reference(val, aux).wrapping_add(1)
-    }
-    fn mutant_chacha_3(val: u64, aux: u64) -> u64 {
-        chacha_reference(val, aux) ^ 0xFF
-    }
-    #[test]
-    fn test_rejects_mutant_1() {
-        assert!(chacha_reference(1, 1) != mutant_chacha_1(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_2() {
-        assert!(chacha_reference(1, 1) != mutant_chacha_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
-        assert!(chacha_reference(1, 1) != mutant_chacha_3(1, 1));
+        let mut prev = u64::MAX;
+        for &inp in inputs {
+            sponge.absorb(inp);
+            let h = sponge.squeeze();
+            assert_ne!(h, prev, "hash should differ after new absorb");
+            prev = h;
+        }
     }
 }
 

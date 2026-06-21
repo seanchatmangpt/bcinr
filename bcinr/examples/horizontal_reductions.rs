@@ -14,29 +14,56 @@
 // example — they panic with integer overflow in debug builds due to a SWAR
 // comparison that uses plain `+` instead of `wrapping_add`, causing carry
 // propagation across byte lanes. Filed as defect in DOC_COVERAGE_LOG.md.
-use bcinr::reduce::{horizontal_and_u32, horizontal_or_u32, horizontal_sum_u8x8, horizontal_xor_u32};
+use bcinr::reduce::{
+    horizontal_and_u32, horizontal_or_u32, horizontal_sum_u8x8, horizontal_xor_u32,
+};
 
 fn main() {
     // --- horizontal_or_u32: any bit set? ---
     assert_eq!(horizontal_or_u32(&[]), 0, "empty → 0");
     assert_eq!(horizontal_or_u32(&[0, 0, 0]), 0);
-    assert_eq!(horizontal_or_u32(&[0b0001, 0b0010, 0b0100]), 0b0111, "OR folds all set bits");
-    assert_eq!(horizontal_or_u32(&[0xFFFF_0000, 0x0000_FFFF]), 0xFFFF_FFFF, "no overlap, full coverage");
-    println!("horizontal_or_u32([1,2,4])={:#05b}", horizontal_or_u32(&[0b0001, 0b0010, 0b0100]));
+    assert_eq!(
+        horizontal_or_u32(&[0b0001, 0b0010, 0b0100]),
+        0b0111,
+        "OR folds all set bits"
+    );
+    assert_eq!(
+        horizontal_or_u32(&[0xFFFF_0000, 0x0000_FFFF]),
+        0xFFFF_FFFF,
+        "no overlap, full coverage"
+    );
+    println!(
+        "horizontal_or_u32([1,2,4])={:#05b}",
+        horizontal_or_u32(&[0b0001, 0b0010, 0b0100])
+    );
 
     // --- horizontal_and_u32: all bits set? ---
     assert_eq!(horizontal_and_u32(&[]), 0, "empty → 0 (not u32::MAX)");
-    assert_eq!(horizontal_and_u32(&[u32::MAX, u32::MAX]), u32::MAX, "all-ones AND all-ones = all-ones");
-    assert_eq!(horizontal_and_u32(&[0b1111, 0b0110]), 0b0110, "AND keeps only common bits");
+    assert_eq!(
+        horizontal_and_u32(&[u32::MAX, u32::MAX]),
+        u32::MAX,
+        "all-ones AND all-ones = all-ones"
+    );
+    assert_eq!(
+        horizontal_and_u32(&[0b1111, 0b0110]),
+        0b0110,
+        "AND keeps only common bits"
+    );
     assert_eq!(horizontal_and_u32(&[0xFF, 0x0F]), 0x0F);
-    println!("horizontal_and_u32([0b1111,0b0110])={:#06b}", horizontal_and_u32(&[0b1111, 0b0110]));
+    println!(
+        "horizontal_and_u32([0b1111,0b0110])={:#06b}",
+        horizontal_and_u32(&[0b1111, 0b0110])
+    );
 
     // --- horizontal_xor_u32: parity / toggle ---
     assert_eq!(horizontal_xor_u32(&[]), 0);
     assert_eq!(horizontal_xor_u32(&[0xFF]), 0xFF, "single element");
     assert_eq!(horizontal_xor_u32(&[0xFF, 0xFF]), 0, "same value XOR'd = 0");
     assert_eq!(horizontal_xor_u32(&[0b0001, 0b0011, 0b0101]), 0b0111);
-    println!("horizontal_xor_u32([1,3,5])={:#05b}", horizontal_xor_u32(&[0b0001, 0b0011, 0b0101]));
+    println!(
+        "horizontal_xor_u32([1,3,5])={:#05b}",
+        horizontal_xor_u32(&[0b0001, 0b0011, 0b0101])
+    );
 
     // --- horizontal_sum_u8x8: sum 8 bytes packed in a u64 ---
     // Pack bytes [1,2,3,4,5,6,7,8] as little-endian u64

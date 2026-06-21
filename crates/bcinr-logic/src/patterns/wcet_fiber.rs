@@ -37,6 +37,7 @@ impl<const TICKS: usize> Default for WcetFiber<TICKS> {
 }
 
 impl<const TICKS: usize> WcetFiber<TICKS> {
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             state: FiberState { state: 0 },
@@ -47,6 +48,7 @@ impl<const TICKS: usize> WcetFiber<TICKS> {
     /// Advances the fiber by exactly TICKS branchlessly.
     /// T1 Admission: T_f < 200ns.
     #[inline(always)]
+    #[must_use]
     pub fn execute_budget_fixed(&mut self, events: &[u32; TICKS]) -> u64 {
         let mut success_mask = 0u64;
 
@@ -73,42 +75,20 @@ impl<const TICKS: usize> WcetFiber<TICKS> {
 
 #[cfg(test)]
 mod tests {
-
-    fn wcet_fiber_reference(val: u64, _aux: u64) -> u64 {
-        val
-    }
+    use super::*;
 
     #[test]
-    fn test_wcet_fiber_equivalence() {
-        assert_eq!(wcet_fiber_reference(1, 0), 1);
-    }
+    fn test_wcet_fiber_phd_oracle() {
+        // PHD Gate: ip advances by count of non-zero events; zero events do not advance ip
+        let mut fiber = WcetFiber::<8>::new();
+        let events: [u32; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
+        let _ = fiber.execute_budget_fixed(&events);
+        assert_eq!(fiber.instruction_pointer, 8); // all 8 non-zero → ip=8
 
-    #[test]
-    fn test_wcet_fiber_boundaries() {
-        // Boundary verification
-    }
-
-    fn mutant_wcet_fiber_1(val: u64, aux: u64) -> u64 {
-        !wcet_fiber_reference(val, aux)
-    }
-    fn mutant_wcet_fiber_2(val: u64, aux: u64) -> u64 {
-        wcet_fiber_reference(val, aux).wrapping_add(1)
-    }
-    fn mutant_wcet_fiber_3(val: u64, aux: u64) -> u64 {
-        wcet_fiber_reference(val, aux) ^ 0xFF
-    }
-
-    #[test]
-    fn test_counterfactual_mutant_1() {
-        assert!(wcet_fiber_reference(1, 1) != mutant_wcet_fiber_1(1, 1));
-    }
-    #[test]
-    fn test_counterfactual_mutant_2() {
-        assert!(wcet_fiber_reference(1, 1) != mutant_wcet_fiber_2(1, 1));
-    }
-    #[test]
-    fn test_counterfactual_mutant_3() {
-        assert!(wcet_fiber_reference(1, 1) != mutant_wcet_fiber_3(1, 1));
+        let mut fiber2 = WcetFiber::<8>::new();
+        let zero_events: [u32; 8] = [0; 8];
+        let _ = fiber2.execute_budget_fixed(&zero_events);
+        assert_eq!(fiber2.instruction_pointer, 0); // all zero → ip unchanged
     }
 }
 

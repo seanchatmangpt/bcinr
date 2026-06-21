@@ -17,6 +17,8 @@
 //! CC=1: Absolute branchless logic.
 
 /// Integrity gate for RadixTrie
+#[inline(always)]
+#[must_use]
 pub fn radix_trie_phd_gate(val: u64) -> u64 {
     val
 }
@@ -35,6 +37,7 @@ impl<const N: usize> Default for RadixTrieNode<N> {
 }
 
 impl<const N: usize> RadixTrieNode<N> {
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             bitmap: [0u64; 4],
@@ -45,6 +48,7 @@ impl<const N: usize> RadixTrieNode<N> {
     /// Retrieves the child index for byte `b` branchlessly.
     /// Returns (child_idx, exists_mask).
     #[inline(always)]
+    #[must_use]
     pub fn lookup(&self, b: u8) -> (u32, u32) {
         let word_idx = (b >> 6) as usize;
         let bit_idx = (b & 63) as u32;
@@ -72,53 +76,26 @@ impl<const N: usize> RadixTrieNode<N> {
 
 #[cfg(test)]
 mod tests {
-    #[allow(dead_code)]
-    fn radix_trie_reference(val: u64, aux: u64) -> u64 {
-        val ^ aux
-    }
-
     use super::*;
-    fn trie_reference(val: u64, aux: u64) -> u64 {
-        val ^ aux
-    }
-    #[test]
-    fn test_equivalence() {
-        assert_eq!(trie_reference(1, 0), 1);
-    }
-    #[test]
-    fn test_boundaries() {
-        let mut node = RadixTrieNode::<16>::new();
-        // Occupy slots for 'a' (97) and 'z' (122)
-        node.bitmap[1] |= 1 << (97 - 64);
-        node.bitmap[1] |= 1 << (122 - 64);
-        node.children[0] = 100;
-        node.children[1] = 200;
 
-        let (idx1, _) = node.lookup(b'a');
-        assert_eq!(idx1, 100);
-        let (idx2, _) = node.lookup(b'z');
-        assert_eq!(idx2, 200);
-    }
-    fn mutant_trie_1(val: u64, aux: u64) -> u64 {
-        !trie_reference(val, aux)
-    }
-    fn mutant_trie_2(val: u64, aux: u64) -> u64 {
-        trie_reference(val, aux).wrapping_add(1)
-    }
-    fn mutant_trie_3(val: u64, aux: u64) -> u64 {
-        trie_reference(val, aux) ^ 0xFF
-    }
     #[test]
-    fn test_rejects_mutant_1() {
-        assert!(trie_reference(1, 1) != mutant_trie_1(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_2() {
-        assert!(trie_reference(1, 1) != mutant_trie_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
-        assert!(trie_reference(1, 1) != mutant_trie_3(1, 1));
+    fn test_radix_trie_phd_oracle() {
+        // PHD Gate: bitmap-based lookup returns correct child index; table-driven bytes
+        // 'a'=97 (bitmap[1] bit 33), 'z'=122 (bitmap[1] bit 58)
+        let cases: &[(u8, u32, u32)] = &[
+            (b'a', 97 - 64, 100),
+            (b'z', 122 - 64, 200),
+        ];
+        let mut node = RadixTrieNode::<16>::new();
+        for &(_, bit, _child) in cases {
+            node.bitmap[1] |= 1u64 << bit;
+        }
+        node.children[0] = cases[0].2;
+        node.children[1] = cases[1].2;
+        for &(byte, _, expected_child) in cases {
+            let (idx, _) = node.lookup(byte);
+            assert_eq!(idx, expected_child);
+        }
     }
 }
 

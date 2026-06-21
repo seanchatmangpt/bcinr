@@ -1,0 +1,135 @@
+# ggen model for the wasm4games pattern foundry.
+#
+# `ggen sync` loads the RDF graph in [rdf], runs each rule's SPARQL query over it, renders
+# the rule's Tera template with the result rows, and writes the result to `output_file`.
+# The committed files under ../src/patterns/ are produced by these rules and checked in so
+# the offline build never depends on ggen. Re-run `ggen sync` after editing schema/patterns.ttl.
+
+# ---------------------------------------------------------------------------
+# [metadata] — schema version and generation bookkeeping
+# ---------------------------------------------------------------------------
+# schema_version: semver of the patterns.ttl ontology format. Bump the minor
+#   version when new properties are added; bump major for breaking ABI changes.
+# date_format: strftime format used by ggen when stamping generated file headers.
+#   ISO-8601 date only ("GENERATED %Y-%m-%d") keeps diffs small in CI.
+[metadata]
+schema_version = "1.0.0"
+date_format = "%Y-%m-%d"
+
+# ---------------------------------------------------------------------------
+# [project]
+# ---------------------------------------------------------------------------
+[project]
+name = "wasm4games-patterns"
+description = "Branchless game-pattern kernels and OCEL/OTEL evidence surface, generated from an RDF ontology."
+
+# ---------------------------------------------------------------------------
+# [rdf] — the single source of truth for all pattern metadata
+# ---------------------------------------------------------------------------
+# files: Turtle files to load into the in-memory RDF graph before any query.
+#   Currently a single ontology; add more files here if you split the graph.
+# base: the default IRI prefix, matches the `w4g:` PREFIX in every .rq file.
+[rdf]
+# The single source ontology. Mirrors crate::ir::PatternSpec as data.
+files = ["schema/patterns.ttl"]
+base = "https://wasm4games.dev/ontology#"
+
+# ---------------------------------------------------------------------------
+# [generation] — output root and per-rule code generation pipeline
+# ---------------------------------------------------------------------------
+# base_dir: all output_file paths are resolved relative to this directory,
+#   which is the crate root (parent of ggen/).
+[generation]
+# Output paths are relative to this crate root (the parent of ggen/).
+base_dir = ".."
+
+# ---------------------------------------------------------------------------
+# Rule: kernels
+# ---------------------------------------------------------------------------
+# Query : queries/kernels.rq
+#   Runs a SPARQL SELECT over w4g:Pattern individuals, returning one row per
+#   pattern with all fields needed by the kernel template (id, name, lowering,
+#   stateCard, eventCode, eventName, otelSpan, requiredStatus, refusalStatus,
+#   primitive, doc, authority, plus GROUP_CONCAT aggregates for mustAdmit /
+#   mustRefuse corpus fixtures).
+#
+# Template: templates/kernel.rs.tera
+#   Iterates `results` (one row per pattern) and renders a complete Rust source
+#   file per pattern: the branchless kernel function, a branchful reference
+#   oracle, three mutant functions, proptest property tests (equivalence + cf1-3),
+#   boundary tests, the two-sided breed-rigor battery (must_admit / must_refuse /
+#   weakened), and a Criterion bench module.
+#
+# Output  : src/patterns/{name}.rs  (one file per pattern, fanout on `name`)
+#   The `{name}` placeholder is substituted with each row's `name` binding so
+#   `damage_applied` -> `src/patterns/damage_applied.rs`, etc. (75 files total).
+[[generation.rules]]
+name = "kernels"
+query = { file = "queries/kernels.rq" }
+template = { file = "templates/kernel.rs.tera" }
+output_file = "src/patterns/{name}.rs"
+fanout = "name"
+
+# ---------------------------------------------------------------------------
+# Rule: patterns_mod
+# ---------------------------------------------------------------------------
+# Query : queries/pattern_index.rq
+#   SPARQL SELECT returning one row per pattern ordered by id, with object kinds
+#   aggregated as parallel comma-joined lists (objectCodes / objectNames) for the
+#   ObjectKind slice literals in PATTERN_REGISTRY.
+#
+# Template: templates/patterns_mod.rs.tera
+#   Single-file template that emits:
+#     1. `pub mod <name>;` declarations for all pattern sub-modules (ordered by id).
+#     2. `pub use <name>::<name>;` flat re-exports so callers can write
+#        `use wasm4games::patterns::damage_applied;` without knowing the module path.
+#     3. `pub static PATTERN_REGISTRY: &[PatternSpec]` — the full catalog as data,
+#        iterated by `crate::verify` for admission-contract smoke-testing at startup.
+#
+# Output  : src/patterns/mod.rs  (single file, no fanout)
+[[generation.rules]]
+name = "patterns_mod"
+query = { file = "queries/pattern_index.rq" }
+template = { file = "templates/patterns_mod.rs.tera" }
+output_file = "src/patterns/mod.rs"
+
+# ---------------------------------------------------------------------------
+# Rule: ocel_schema
+# ---------------------------------------------------------------------------
+# Query : queries/ocel_schema.rq
+#   SPARQL SELECT of (pattern_id, patternName, eventCode, eventName,
+#   objectCode, objectName) — one row per (event, linked object) pair,
+#   ordered by (id, objectCode) for stable output.
+#
+# Template: templates/ocel_schema.rs.tera
+#   Single-file template that emits:
+#     - `OcelSchemaEdge` struct (pattern_id, activity, object_type fields).
+#     - `OcelSchemaEdge::matches(activity, object_type) -> bool` helper.
+#     - `pub static OCEL_SCHEMA: &[OcelSchemaEdge]` — the flat edge list.
+#   Mirrors `crate::evidence::ocel` so admission checks can validate
+#   (event_code, object_code) membership against the schema at zero heap cost.
+#
+# Output  : src/evidence/ocel_schema.rs  (single file, no fanout)
+[[generation.rules]]
+name = "ocel_schema"
+query = { file = "queries/ocel_schema.rq" }
+template = { file = "templates/ocel_schema.rs.tera" }
+output_file = "src/evidence/ocel_schema.rs"
+
+# ---------------------------------------------------------------------------
+# Rule: chain_tests  (fanout — one .rs file per JTBD chain)
+# ---------------------------------------------------------------------------
+# Query : queries/chains.rq
+#   Returns all steps for all 8 JTBD chains ordered by chainName, stepIndex.
+#
+# Template: templates/chain_test.rs.tera
+#   Emits one Rust test module per chain; uses loop.first/loop.last to emit
+#   the module wrapper, the run_chain() -> u64 function, and #[test] fn.
+#
+# Output  : src/chain_tests/{chainName}.rs  (one file per chain)
+[[generation.rules]]
+name = "chain_tests"
+query = { file = "queries/chains.rq" }
+template = { file = "templates/chain_test.rs.tera" }
+fanout = "chainName"
+output_pattern = "src/chain_tests/{chainName}.rs"

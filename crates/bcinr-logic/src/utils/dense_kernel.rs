@@ -62,17 +62,6 @@ mod tests {
     fn dense_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
     }
-
-    #[test]
-    fn test_equivalence() {
-        assert_eq!(dense_reference(1, 0), 1);
-    }
-
-    #[test]
-    fn test_boundaries() {
-        // boundaries
-    }
-
     fn mutant_dense_1(val: u64, aux: u64) -> u64 {
         !dense_reference(val, aux)
     }
@@ -84,15 +73,13 @@ mod tests {
     }
 
     #[test]
-    fn test_rejects_mutant_1() {
+    fn test_dense_reference() {
+        // equivalence and boundary
+        assert_eq!(dense_reference(1, 0), 1);
+        assert_eq!(dense_reference(0, 0), 0);
+        // mutant divergence
         assert!(dense_reference(1, 1) != mutant_dense_1(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_2() {
         assert!(dense_reference(1, 1) != mutant_dense_2(1, 1));
-    }
-    #[test]
-    fn test_rejects_mutant_3() {
         assert!(dense_reference(1, 1) != mutant_dense_3(1, 1));
     }
 }
