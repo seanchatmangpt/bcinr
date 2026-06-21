@@ -95,10 +95,12 @@ cargo build -p wasm4games --target wasm32-unknown-unknown --no-default-features
 - [The Game-Pattern Foundry (overview)](../../docs/diataxis/explanation/wasm4games-overview.md) — the model, doctrine, and wasm4pm relationship.
 - [The GGEN-Only User Surface (covenant)](../../docs/diataxis/explanation/ggen-only-user-surface.md) — edit the ontology, never hand-edit kernels.
 - [The Honest Kernel](../../docs/diataxis/explanation/wasm4games-the-honest-kernel.md) — how the battery proves correctness without lying.
+- [The Offline Conformance Pipeline](../../docs/diataxis/explanation/procmine.md) — how `procmine` does process mining offline: token replay, DFG discovery, OCEL export, and the conformance digest.
 - [Pattern Catalog (reference)](../../docs/diataxis/reference/wasm4games-patterns.md) — all 75 patterns, status vocabulary, evidence types.
 - [Add a Pattern (tutorial)](../../docs/diataxis/tutorials/wasm4games-add-a-pattern.md) — declare → `ggen sync` → verify.
 - [Run real wasm4pm admission (how-to)](../../docs/diataxis/how-to/wasm4games-run-wasm4pm-admission.md) — real admit/refuse via the excluded bridge.
 - [EXTRACTION.md](./EXTRACTION.md) — how to lift wasm4games into its own repository.
+- [CLAUDE.md](./CLAUDE.md) — coding-agent guide: ggen covenant, feature gates, golden digest protocol, procmine API.
 
 ## License
 
