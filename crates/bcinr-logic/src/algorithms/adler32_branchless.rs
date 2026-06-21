@@ -4,17 +4,22 @@
 
 /// adler32_branchless
 ///
-/// Branchless implementation guaranteed to execute in constant time
-/// with zero dynamic dispatch or control flow hazards.
+/// Adler-32 checksum of the 8 bytes packed (little-endian) in `val`, with
+/// running state supplied via `aux`.
 ///
-/// # Branchless Contract
-/// **Interpretation:** Adler-32 checksum of the 8 bytes packed (little-endian) in
-/// `val`, where `aux` supplies the running state: `a = aux & 0xFFFF` (low sum),
-/// `b = (aux >> 16) & 0xFFFF` (high sum). Each byte updates `a += byte` then
-/// `b += a`, both taken mod 65521. The result is `(b << 16) | a`. The 8-byte
-/// window is fully unrolled, so the whole routine is branchless and O(1).
+/// # Interpretation
+/// `a = aux & 0xFFFF` (low sum), `b = (aux >> 16) & 0xFFFF` (high sum).
+/// Each byte updates `a += byte` then `b += a`, both reduced mod 65521.
+/// The result is `(b << 16) | a`. The 8-byte window is fully unrolled (O(1),
+/// no data-dependent branches on the accumulation path).
+///
+/// # Note on the modulo reduction
+/// The `% 65521` operation compiles to an integer division instruction on
+/// most architectures because 65521 is not a power of two. This step is
+/// therefore **not** hardware-branchless. The accumulation and byte-extraction
+/// steps are branchless; only the reduction is not.
+///
 /// **Ensures:** Result matches the independent reference for all inputs.
-/// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::adler32_branchless::adler32_branchless;
