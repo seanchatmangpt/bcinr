@@ -7,7 +7,23 @@ pub fn scan_gate(val: u64) -> u64 {
     val
 }
 
-/// Create a 64-bit mask where each bit represents if the corresponding byte matches the target.
+/// Build a 64-bit bitmask indicating which of the first 64 bytes equal `target`.
+///
+/// Bit `i` of the returned mask is set to `1` if `bytes[i] == target`, and `0`
+/// otherwise. At most the first 64 bytes are scanned; if `bytes` is shorter
+/// only `bytes.len()` bits are examined and the rest remain `0`.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::scan::find_byte_mask;
+/// let data = b"hello world";
+/// let mask = find_byte_mask(data, b'l');
+/// // 'l' at indices 2, 3, 9 → (1<<2)|(1<<3)|(1<<9) = 4+8+512 = 524
+/// assert_eq!(mask, 524);
+/// assert_eq!(find_byte_mask(&[], b'x'), 0);
+/// assert_eq!(find_byte_mask(b"aaa", b'b'), 0);
+/// ```
 #[inline(always)]
 pub fn find_byte_mask(bytes: &[u8], target: u8) -> u64 {
     let mut mask = 0u64;
@@ -53,6 +69,41 @@ pub fn is_ascii_u64_slice(bytes: &[u8]) -> bool {
     });
 
     accumulator == 0
+}
+
+/// Inclusive prefix maximum for 16 u32 values.
+///
+/// `out[i] = max(arr[0], arr[1], ..., arr[i])` — branchless using `u32::max`
+/// which the compiler lowers to a CMOV instruction on x86 (no branch).
+/// The output is monotonically non-decreasing.
+///
+/// # Examples
+/// ```
+/// use bcinr_logic::scan::prefix_max_u32x16;
+/// let a = [3u32,1,4,1,5,9,2,6,5,3,5,8,9,7,9,3];
+/// let out = prefix_max_u32x16(a);
+/// assert!(out.windows(2).all(|w| w[1] >= w[0]));
+/// assert_eq!(out[15], 9);
+/// // Works correctly for values >= 2^31
+/// let high = [0x8000_0000u32, 0u32, 0xFFFF_FFFFu32, 1u32,
+///             0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32];
+/// let out2 = prefix_max_u32x16(high);
+/// assert_eq!(out2[0], 0x8000_0000);
+/// assert_eq!(out2[1], 0x8000_0000);
+/// assert_eq!(out2[2], 0xFFFF_FFFF);
+/// ```
+#[inline(always)]
+pub fn prefix_max_u32x16(arr: [u32; 16]) -> [u32; 16] {
+    let mut out = arr;
+    let mut prev_max = out[0];
+    (1..16usize).for_each(|i| {
+        // u32::max compiles to a CMOV on x86 — branchless and correct for all u32 values,
+        // including values >= 2^31 where the signed-shift trick breaks.
+        let new_max = prev_max.max(out[i]);
+        out[i] = new_max;
+        prev_max = new_max;
+    });
+    out
 }
 
 #[cfg(test)]
