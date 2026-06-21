@@ -76,9 +76,11 @@ impl BumpArena {
     /// # Hoare-logic Proof
     ///
     /// ```text
-    /// Precondition:  { self.offset ∈ [0, self.data.len()] }
-    /// can_alloc = (next_offset <= self.data.len()) as usize
-    /// Invariant:     { (can_alloc = 1) ↔ (next_offset <= self.data.len()) }
+    /// Precondition:  { self.offset ∈ [0, self.data.len()], size ∈ [0, usize::MAX] }
+    /// (next_offset, overflow) = current_offset.overflowing_add(size)
+    /// can_alloc = ((next_offset <= self.data.len()) & !overflow) as usize
+    /// Invariant:     { (can_alloc = 1) ↔ (next_offset <= self.data.len()) ∧ ¬overflow }
+    ///                overflow = true ⇒ can_alloc = 0 (guards wrapping to small value)
     /// Safety Check:  { (can_alloc ≠ 0) ⇒ [current_offset, current_offset+size) ⊆ valid }
     /// unsafe block:  { from_raw_parts_mut(ptr, size) is safe iff can_alloc ≠ 0 }
     /// Postcondition: { if can_alloc ≠ 0 then Some(slice) else None }
@@ -86,8 +88,8 @@ impl BumpArena {
     #[inline(always)]
     pub fn alloc(&mut self, size: usize) -> Option<&mut [u8]> {
         let current_offset = self.offset;
-        let next_offset = current_offset.wrapping_add(size);
-        let can_alloc = (next_offset <= self.data.len()) as usize;
+        let (next_offset, overflow) = current_offset.overflowing_add(size);
+        let can_alloc = ((next_offset <= self.data.len()) & !overflow) as usize;
         let mask = 0usize.wrapping_sub(can_alloc);
 
         self.offset = (next_offset & mask) | (current_offset & !mask);
@@ -96,7 +98,11 @@ impl BumpArena {
             let slice = &mut self.data[current_offset..];
             let ptr = slice.as_mut_ptr();
             // SAFETY: Bounds check `current_offset + size <= self.data.len()` is verified
-            // above via `can_alloc`. The slice is valid and properly aligned.
+            // above via `can_alloc`, which also guards against `size` near usize::MAX causing
+            // `overflowing_add` to wrap to a small value. The `!overflow` term in `can_alloc`
+            // ensures that if addition overflows, `can_alloc = 0` and this branch is not taken.
+            // The slice is valid and properly aligned (derived from Vec<u8>).
+            // Hoare-logic Verification Line 100: overflow-safe bounds guard verified.
             unsafe { core::slice::from_raw_parts_mut(ptr, size) }
         })
     }
