@@ -5,12 +5,13 @@
 PREFIX w4g: <https://wasm4games.dev/ontology#>
 PREFIX ch:  <https://wasm4games.dev/chains#>
 
-SELECT ?chainName ?jtbd ?family ?stepIndex ?patternName ?stateExpr ?inputExpr ?stepDoc
+SELECT ?chainName ?jtbd ?family ?golden ?stepIndex ?patternName ?stateExpr ?inputExpr ?stepDoc
 WHERE {
     ?chain a ch:Chain ;
         ch:name   ?chainName ;
         ch:jtbd   ?jtbd ;
-        ch:family ?family .
+        ch:family ?family ;
+        ch:golden ?golden .
     ?step a ch:ChainStep ;
         ch:chain      ?chain ;
         ch:stepIndex  ?stepIndex ;

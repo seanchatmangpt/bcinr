@@ -30,8 +30,10 @@ description = "Branchless game-pattern kernels and OCEL/OTEL evidence surface, g
 #   Currently a single ontology; add more files here if you split the graph.
 # base: the default IRI prefix, matches the `w4g:` PREFIX in every .rq file.
 [rdf]
-# The single source ontology. Mirrors crate::ir::PatternSpec as data.
-files = ["schema/patterns.ttl"]
+# Source ontologies loaded into one in-memory graph. patterns.ttl mirrors
+# crate::ir::PatternSpec; chains.ttl defines the JTBD chains consumed by the
+# chain_tests rule (its query joins ch:* against w4g:Pattern individuals).
+files = ["schema/patterns.ttl", "schema/chains.ttl"]
 base = "https://wasm4games.dev/ontology#"
 
 # ---------------------------------------------------------------------------
@@ -131,5 +133,42 @@ output_file = "src/evidence/ocel_schema.rs"
 name = "chain_tests"
 query = { file = "queries/chains.rq" }
 template = { file = "templates/chain_test.rs.tera" }
+output_file = "src/chain_tests/{chainName}.rs"
 fanout = "chainName"
-output_pattern = "src/chain_tests/{chainName}.rs"
+
+# ---------------------------------------------------------------------------
+# Rule: pattern_docs  (fanout — one Alexander-pattern-language doc per kernel)
+# ---------------------------------------------------------------------------
+# Query : queries/pattern_docs.rq
+#   One row per pattern with the fields the doc scaffold needs (id, name,
+#   family, lowering, stateCard, eventCode, eventName, otelSpan, requiredStatus,
+#   refusalStatus, primitive, doc, authority, and GROUP_CONCAT objectNames).
+#
+# Template: templates/pattern_doc.md.tera
+#   Renders one Markdown guide per pattern with Context / Forces / Solution /
+#   Consequences scaffolding, a Mermaid diagram, and an evidence-model table.
+#
+# Output  : docs/patterns/{name}.md  (one file per pattern, fanout on `name`)
+[[generation.rules]]
+name = "pattern_docs"
+query = { file = "queries/pattern_docs.rq" }
+template = { file = "templates/pattern_doc.md.tera" }
+output_file = "docs/patterns/{name}.md"
+fanout = "name"
+
+# ---------------------------------------------------------------------------
+# Rule: pattern_index_docs  (single file — family-organized pattern index)
+# ---------------------------------------------------------------------------
+# Query : queries/pattern_index_docs.rq
+#   One row per pattern ordered by (family, id) so the template can group the
+#   catalog into family sections for the searchable index.
+#
+# Template: templates/patterns_index.md.tera
+#   Emits docs/patterns/INDEX.md — all 75 patterns linked and grouped by family.
+#
+# Output  : docs/patterns/INDEX.md  (single file, no fanout)
+[[generation.rules]]
+name = "pattern_index_docs"
+query = { file = "queries/pattern_index_docs.rq" }
+template = { file = "templates/patterns_index.md.tera" }
+output_file = "docs/patterns/INDEX.md"

@@ -25,11 +25,22 @@ mod shop_purchase_chain {
         let step8 = nps_prompt_gated(90u64 | (1u64 << 16), 50u64 | (5u64 << 16));
         [step1, step2, step3, step4, step5, step6, step7, step8]
             .iter()
-            .fold(0xcbf29ce484222325_u64, |h, &r| (h ^ r).wrapping_mul(0x100000001b3_u64))
+            .fold(0xcbf29ce484222325_u64, |h, &r| {
+                (h ^ r).wrapping_mul(0x100000001b3_u64)
+            })
     }
 
+    /// Golden FNV-1a digest of the 8-step composition (from chains.ttl `ch:golden`).
+    /// Any kernel or data-flow drift changes this value — that is the composition oracle.
+    const GOLDEN: u64 = 0x5dda04bc0681c63e;
+
     #[test]
-    fn chain_deterministic() {
-        assert_eq!(run_chain(), run_chain(), "JTBD chain must be deterministic");
+    fn chain_matches_golden() {
+        let digest = run_chain();
+        assert_eq!(digest, run_chain(), "JTBD chain must be deterministic");
+        assert_eq!(
+            digest, GOLDEN,
+            "JTBD chain composition digest drifted from chains.ttl"
+        );
     }
 }

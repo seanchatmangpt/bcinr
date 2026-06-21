@@ -1,8 +1,10 @@
 {# chain_test.rs.tera — generates one #[cfg(test)] module per JTBD chain.
    Fanout by chainName; results contains all 8 steps for one chain, ordered by stepIndex.
-   Available per row: chainName, jtbd, family, stepIndex, patternName, stateExpr, inputExpr, stepDoc.
+   Available per row: chainName, jtbd, family, golden, stepIndex, patternName, stateExpr, inputExpr, stepDoc.
    Step variables are named step1..step8 in sequence; stateExpr/inputExpr may reference
    earlier step variables (e.g. "step3") to express data dependencies between steps.
+   `golden` is the precomputed FNV-1a digest of the 8 step outputs; the test asserts the
+   live composition still reproduces it (composition oracle, not just a determinism check).
 #}
 {% for row in results %}
 {% if loop.first %}
@@ -20,12 +22,23 @@ mod {{ row.chainName }}_chain {
 {% if loop.last %}
         [step1, step2, step3, step4, step5, step6, step7, step8]
             .iter()
-            .fold(0xcbf29ce484222325_u64, |h, &r| (h ^ r).wrapping_mul(0x100000001b3_u64))
+            .fold(0xcbf29ce484222325_u64, |h, &r| {
+                (h ^ r).wrapping_mul(0x100000001b3_u64)
+            })
     }
 
+    /// Golden FNV-1a digest of the 8-step composition (from chains.ttl `ch:golden`).
+    /// Any kernel or data-flow drift changes this value — that is the composition oracle.
+    const GOLDEN: u64 = {{ row.golden }};
+
     #[test]
-    fn chain_deterministic() {
-        assert_eq!(run_chain(), run_chain(), "JTBD chain must be deterministic");
+    fn chain_matches_golden() {
+        let digest = run_chain();
+        assert_eq!(digest, run_chain(), "JTBD chain must be deterministic");
+        assert_eq!(
+            digest, GOLDEN,
+            "JTBD chain composition digest drifted from chains.ttl"
+        );
     }
 }
 {% endif %}

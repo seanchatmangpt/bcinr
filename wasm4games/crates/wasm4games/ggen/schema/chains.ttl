@@ -34,6 +34,7 @@ ch:ChainStep a rdfs:Class ;
 ch:name     a rdf:Property ; rdfs:domain ch:Chain ; rdfs:range xsd:string .
 ch:jtbd     a rdf:Property ; rdfs:domain ch:Chain ; rdfs:range xsd:string .
 ch:family   a rdf:Property ; rdfs:domain ch:Chain ; rdfs:range xsd:string .
+ch:golden   a rdf:Property ; rdfs:domain ch:Chain ; rdfs:range xsd:string .
 
 #################################################################
 # Properties — ChainStep
@@ -56,7 +57,8 @@ ch:stepDoc    a rdf:Property ; rdfs:domain ch:ChainStep ; rdfs:range xsd:string 
 ch:combat_hit a ch:Chain ;
     ch:name   "combat_hit" ;
     ch:jtbd   "Full combat pipeline: input gate, collision, damage, entity state, status effect, movement law, receipt seal, NPS gate." ;
-    ch:family "Core Sim & Combat" .
+    ch:family "Core Sim & Combat" ;
+    ch:golden "0xfeeba62f449f2718" .
 
 ch:c1s1 a ch:ChainStep ;
     ch:chain      ch:combat_hit ;
@@ -132,7 +134,8 @@ ch:c1s8 a ch:ChainStep ;
 ch:nav_quest a ch:Chain ;
     ch:name   "nav_quest" ;
     ch:jtbd   "Nav-quest pipeline: nav DFA, A* node expansion, waypoint, cost bound, quest step, AI selection, OCEL link, receipt seal." ;
-    ch:family "Pathfinding" .
+    ch:family "Pathfinding" ;
+    ch:golden "0x33853c6b941518fd" .
 
 ch:c2s1 a ch:ChainStep ;
     ch:chain      ch:nav_quest ;
@@ -208,7 +211,8 @@ ch:c2s8 a ch:ChainStep ;
 ch:audio_cascade a ch:Chain ;
     ch:name   "audio_cascade" ;
     ch:jtbd   "Audio cascade: trigger FSM, priority select, volume clamp, fade, distance atten, tick advance, OTEL span, receipt seal." ;
-    ch:family "Audio" .
+    ch:family "Audio" ;
+    ch:golden "0xd0fcd15a8450c3c0" .
 
 ch:c3s1 a ch:ChainStep ;
     ch:chain      ch:audio_cascade ;
@@ -284,7 +288,8 @@ ch:c3s8 a ch:ChainStep ;
 ch:shop_purchase a ch:Chain ;
     ch:name   "shop_purchase" ;
     ch:jtbd   "Shop purchase: level gate, purchase FSM, currency delta, inventory, reward tier, mastery moment, share artifact, NPS gate." ;
-    ch:family "Economy / Progression" .
+    ch:family "Economy / Progression" ;
+    ch:golden "0x5dda04bc0681c63e" .
 
 ch:c4s1 a ch:ChainStep ;
     ch:chain      ch:shop_purchase ;
@@ -360,7 +365,8 @@ ch:c4s8 a ch:ChainStep ;
 ch:mp_resync a ch:Chain ;
     ch:name   "mp_resync" ;
     ch:jtbd   "MP resync: sync FSM, tick delta bound, lag compensation, prediction error, packet priority, entity state, receipt seal, OCEL link." ;
-    ch:family "Multiplayer / Network" .
+    ch:family "Multiplayer / Network" ;
+    ch:golden "0x0a245f5ba670cb04" .
 
 ch:c5s1 a ch:ChainStep ;
     ch:chain      ch:mp_resync ;
@@ -436,7 +442,8 @@ ch:c5s8 a ch:ChainStep ;
 ch:procgen_tile a ch:Chain ;
     ch:name   "procgen_tile" ;
     ch:jtbd   "Procgen tile: noise sample, terrain height, biome class, tile variant, spawn weight, physics render, object spawn, receipt seal." ;
-    ch:family "Procedural Gen" .
+    ch:family "Procedural Gen" ;
+    ch:golden "0xa0d0718aa4dea29d" .
 
 ch:c6s1 a ch:ChainStep ;
     ch:chain      ch:procgen_tile ;
@@ -512,7 +519,8 @@ ch:c6s8 a ch:ChainStep ;
 ch:anticheat_verdict a ch:Chain ;
     ch:name   "anticheat_verdict" ;
     ch:jtbd   "Anti-cheat verdict: movement law, resource bound, cooldown, action rate, transition law, entity kill, OCEL link, receipt seal." ;
-    ch:family "Anti-Cheat" .
+    ch:family "Anti-Cheat" ;
+    ch:golden "0x3bf04dda41b48d9c" .
 
 ch:c7s1 a ch:ChainStep ;
     ch:chain      ch:anticheat_verdict ;
@@ -588,7 +596,8 @@ ch:c7s8 a ch:ChainStep ;
 ch:quality_loop a ch:Chain ;
     ch:name   "quality_loop" ;
     ch:jtbd   "Quality loop: CTQ threshold, sigma level, defect rate, quality gate DFA, bridge state, command opcode, adapter rank, capability flag." ;
-    ch:family "DfLSS / Quality" .
+    ch:family "DfLSS / Quality" ;
+    ch:golden "0x962cb513fb562b48" .
 
 ch:c8s1 a ch:ChainStep ;
     ch:chain      ch:quality_loop ;

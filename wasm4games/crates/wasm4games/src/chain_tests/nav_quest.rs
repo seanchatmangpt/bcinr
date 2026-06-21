@@ -18,19 +18,32 @@ mod nav_quest_chain {
         // Step 5: Quest DFA: step0 + complete(1) → step1.
         let step5 = quest_step_advanced(0u64, 1u64);
         // Step 6: AI argmax: util=[100,200,50,75] → action 1 (highest utility=200).
-        let step6 =
-            ai_action_selected(0u64, 100u64 | (200u64 << 16) | (50u64 << 32) | (75u64 << 48));
+        let step6 = ai_action_selected(
+            0u64,
+            100u64 | (200u64 << 16) | (50u64 << 32) | (75u64 << 48),
+        );
         // Step 7: Link OCEL event: gate=0xF, proposed=0x5 → admitted.
         let step7 = ocel_event_linked(0xFu64, 0x5u64);
         // Step 8: Seal quest step result (step5=1) into FNV-1a receipt chain.
         let step8 = receipt_appended(0xcbf29ce484222325_u64, step5);
         [step1, step2, step3, step4, step5, step6, step7, step8]
             .iter()
-            .fold(0xcbf29ce484222325_u64, |h, &r| (h ^ r).wrapping_mul(0x100000001b3_u64))
+            .fold(0xcbf29ce484222325_u64, |h, &r| {
+                (h ^ r).wrapping_mul(0x100000001b3_u64)
+            })
     }
 
+    /// Golden FNV-1a digest of the 8-step composition (from chains.ttl `ch:golden`).
+    /// Any kernel or data-flow drift changes this value — that is the composition oracle.
+    const GOLDEN: u64 = 0x33853c6b941518fd;
+
     #[test]
-    fn chain_deterministic() {
-        assert_eq!(run_chain(), run_chain(), "JTBD chain must be deterministic");
+    fn chain_matches_golden() {
+        let digest = run_chain();
+        assert_eq!(digest, run_chain(), "JTBD chain must be deterministic");
+        assert_eq!(
+            digest, GOLDEN,
+            "JTBD chain composition digest drifted from chains.ttl"
+        );
     }
 }
