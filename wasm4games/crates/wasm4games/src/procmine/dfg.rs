@@ -10,6 +10,7 @@
 //! comparison are allocation-free.
 
 use super::model::ChainModel;
+use super::Trace;
 
 /// A directly-follows graph as a bounded, de-duplicated edge set.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -107,9 +108,21 @@ impl Dfg {
     }
 }
 
+/// Discover a directly-follows graph from a multi-trace log: the union of every trace's
+/// directly-follows edges. Process discovery in its simplest, allocation-free form.
+#[must_use = "returns the discovered DFG; bind or compare it against a model DFG"]
+pub fn discover(traces: &[Trace]) -> Dfg {
+    let mut dfg = Dfg::empty();
+    for t in traces {
+        dfg.observe(t.as_slice());
+    }
+    dfg
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::model::CHAIN_MODELS;
+    use super::super::Trace;
     use super::*;
 
     #[test]
@@ -161,5 +174,28 @@ mod tests {
         let mut b = a;
         b.merge(&a);
         assert_eq!(a, b, "merging a DFG with itself is a no-op");
+    }
+
+    #[test]
+    fn discover_unions_traces_and_recovers_the_model() {
+        let m = &CHAIN_MODELS[4]; // nav_quest
+        let t = Trace::from_model(m);
+        // A log of identical perfect traces discovers exactly the model DFG.
+        let log = [t, t, t];
+        let discovered = discover(&log);
+        assert_eq!(
+            discovered.order_divergence(&Dfg::from_model(m)),
+            DfgDivergence::default()
+        );
+    }
+
+    #[test]
+    fn discover_accumulates_divergence_from_a_shuffled_trace() {
+        let m = &CHAIN_MODELS[4];
+        let mut shuffled = Trace::from_model(m);
+        shuffled.swap(0, 3);
+        let log = [Trace::from_model(m), shuffled];
+        let discovered = discover(&log);
+        assert!(discovered.order_divergence(&Dfg::from_model(m)).extra > 0);
     }
 }

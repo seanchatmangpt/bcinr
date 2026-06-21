@@ -56,6 +56,27 @@ pub fn trace_for_chain(events: &[OcelEvent]) -> Trace {
     trace
 }
 
+/// Build a growable [`OcelLog`] for one chain run (requires the `alloc` feature).
+///
+/// The same eight events as [`events_for_chain`], pushed into an [`OcelLog`] so the log can
+/// be serialized with [`OcelLog::to_json`] and handed to an OCEL consumer (e.g. the
+/// `wasm4games-wasm4pm` admission bridge).
+///
+/// [`OcelLog`]: crate::evidence::ocel::OcelLog
+/// [`OcelLog::to_json`]: crate::evidence::ocel::OcelLog::to_json
+#[cfg(feature = "alloc")]
+#[must_use = "returns the OCEL log; serialize it with to_json or iterate it"]
+pub fn log_for_chain(
+    model: &ChainModel,
+    kernel_outputs: &[u64; 8],
+) -> crate::evidence::ocel::OcelLog {
+    let mut log = crate::evidence::ocel::OcelLog::new();
+    for ev in events_for_chain(model, kernel_outputs) {
+        log.push(ev);
+    }
+    log
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::conformance::{check_trace, to_verdict};
@@ -106,5 +127,19 @@ mod tests {
     fn unknown_pattern_id_has_no_spec() {
         assert!(spec_by_id(u16::MAX).is_none());
         assert!(spec_by_id(9999).is_none());
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn log_for_chain_exports_object_centric_json() {
+        let m = &CHAIN_MODELS[2]; // combat_hit; step 3 (idx 2) = damage_applied (id 14)
+        let outputs = [4u64, 1, 86, 2, 1, 0, 0xdead_beef, 4];
+        let log = log_for_chain(m, &outputs);
+        assert_eq!(log.len(), 8);
+        let json = log.to_json();
+        assert!(json.starts_with('[') && json.ends_with(']'));
+        // The damage event carries activity 14 and links the value it produced (86).
+        assert!(json.contains("\"activity\":14"));
+        assert!(json.contains("\"id\":86"));
     }
 }

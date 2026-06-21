@@ -44,8 +44,9 @@ pub mod replay;
 pub use conformance::{
     check_model_self, check_trace, fitness_bp, to_verdict, ConformanceResult, FITNESS_PERFECT_BP,
 };
-pub use dfg::{Dfg, DfgDivergence};
+pub use dfg::{discover, Dfg, DfgDivergence};
 pub use model::{ChainModel, CHAIN_MODELS};
+pub use ocel_log::{events_for_chain, spec_by_id, trace_for_chain};
 pub use replay::{replay, TokenCounts};
 
 /// Maximum number of steps (activities) in a chain trace.
