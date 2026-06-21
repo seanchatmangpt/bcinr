@@ -4,8 +4,9 @@
 
 /// exp2_u64_fixed
 ///
-/// Branchless implementation guaranteed to execute in constant time
-/// with zero dynamic dispatch or control flow hazards.
+/// Branchless Q16 fixed-point 2^n, using only the integer part of the Q16 exponent.
+/// Input `val` is a Q16 number (val / 65536 = exponent). Result is `2^floor(val/65536)`
+/// in Q16 format (i.e. `65536 << int_exp`), saturating to u64::MAX for large exponents.
 ///
 /// # Branchless Contract
 /// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
@@ -13,15 +14,26 @@
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::exp2_u64_fixed::exp2_u64_fixed;
-/// let result = exp2_u64_fixed(42, 1337);
-/// assert!(result <= u64::MAX);
+/// assert_eq!(exp2_u64_fixed(0, 0), 65536);        // 2^0 = 1 in Q16
+/// assert_eq!(exp2_u64_fixed(65536, 0), 131072);   // 2^1 = 2 in Q16
+/// assert_eq!(exp2_u64_fixed(131072, 0), 262144);  // 2^2 = 4 in Q16
 /// ```
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn exp2_u64_fixed(val: u64, aux: u64) -> u64 {
-    let x = (val & 0xFFFFFFFF) as u128;
-    (0x100000000u128 + x) as u64
+pub fn exp2_u64_fixed(val: u64, _aux: u64) -> u64 {
+    // val is Q16: integer exponent is val >> 16.
+    // Result in Q16: 65536 * 2^int_exp = 65536 << int_exp.
+    // Saturate at u64::MAX for int_exp >= 48 (65536 << 48 would overflow u64).
+    let int_exp = (val >> 16) as u32;
+    // Branchless saturation: if int_exp >= 48, sat_mask = 0xFFF...F, else 0x0
+    let saturated = (int_exp >= 48) as u64;
+    let sat_mask = saturated.wrapping_neg(); // all-ones if saturated, zero otherwise
+    // Clamp shift to prevent undefined behavior (Rust panics on shift >= 64)
+    let safe_exp = int_exp & 63;
+    let result = 65536u64.wrapping_shl(safe_exp);
+    // Select: if saturated return u64::MAX, else return result
+    (result & !sat_mask) | (u64::MAX & sat_mask)
 }
 
 #[cfg(test)]
@@ -30,11 +42,15 @@ mod tests {
     use proptest::prelude::*;
 
     // -------------------------------------------------------------------------
-    // POSITIVE ORACLE: Reference implementation
+    // POSITIVE ORACLE: Reference implementation matching same integer-exp semantics
     // -------------------------------------------------------------------------
     fn exp2_u64_fixed_reference(val: u64, _aux: u64) -> u64 {
-        let x = val & 0xFFFFFFFF;
-        0x100000000u64 + x
+        let int_exp = (val >> 16) as u32;
+        if int_exp >= 48 {
+            u64::MAX
+        } else {
+            65536u64 << int_exp
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -52,6 +68,25 @@ mod tests {
     fn mutant_exp2_u64_fixed_3(val: u64, aux: u64) -> u64 {
         exp2_u64_fixed_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
+
+    // -------------------------------------------------------------------------
+    // SEMANTIC TESTS: Verify Q16 fixed-point exponentiation
+    // -------------------------------------------------------------------------
+    #[test]
+    fn test_exp2_u64_fixed_known_values() {
+        // 2^0 = 1; in Q16 = 65536
+        assert_eq!(exp2_u64_fixed(0, 0), 65536);
+        // 2^1 = 2; in Q16 = 131072
+        assert_eq!(exp2_u64_fixed(65536, 0), 131072);
+        // 2^2 = 4; in Q16 = 262144
+        assert_eq!(exp2_u64_fixed(131072, 0), 262144);
+        // 2^3 = 8; in Q16 = 524288
+        assert_eq!(exp2_u64_fixed(196608, 0), 524288);
+        // Saturation: int_exp=48 overflows, returns u64::MAX
+        assert_eq!(exp2_u64_fixed(48u64 * 65536, 0), u64::MAX);
+        // Large input saturates
+        assert_eq!(exp2_u64_fixed(u64::MAX, 0), u64::MAX);
+    }
 
     proptest! {
         #[test]
@@ -129,7 +164,7 @@ pub mod bench {
     pub fn bench_exp2_u64_fixed(c: &mut Criterion) {
         c.bench_function("exp2_u64_fixed", |b| {
             b.iter(|| {
-                let res = exp2_u64_fixed(black_box(42), black_box(1337));
+                let res = exp2_u64_fixed(black_box(65536), black_box(1337));
                 black_box(res)
             })
         });
