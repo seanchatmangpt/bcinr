@@ -12,8 +12,8 @@ This document catalogues every `unsafe` block in `crates/bcinr-logic/src/`, alon
 - **Proof** — Reference to formal verification (Hoare-logic, test oracle)
 - **Risk Level** — HIGH, MEDIUM, LOW
 
-**Total Unsafe Blocks:** 4  
-**Permitted Files:** 3 (mem.rs, packed_key_table.rs, deterministic_mpmc.rs)  
+**Total Unsafe Blocks:** 24  
+**Permitted Files:** 4 (mem.rs, packed_key_table.rs, deterministic_mpmc.rs, simd_dispatch.rs)  
 **Forbidden Files:** All other files (enforced via `#![forbid(unsafe_code)]`)
 
 ---
@@ -32,25 +32,33 @@ pub fn alloc(&mut self, size: usize) -> Option<&mut [u8]>
 **Unsafe Code:**
 ```rust
 // SAFETY: Bounds check `current_offset + size <= self.data.len()` is verified
-// above via `can_alloc`. The slice is valid and properly aligned.
+// above via `can_alloc`, which also guards against `size` near usize::MAX causing
+// `overflowing_add` to wrap to a small value. The `!overflow` term in `can_alloc`
+// ensures that if addition overflows, `can_alloc = 0` and this branch is not taken.
+// The slice is valid and properly aligned (derived from Vec<u8>).
+// Hoare-logic Verification Line 100: overflow-safe bounds guard verified.
 unsafe { core::slice::from_raw_parts_mut(ptr, size) }
 ```
 
 **Preconditions (CRITICAL):**
-1. `current_offset + size <= self.data.len()` ✓ Verified by branchless `can_alloc` check
+1. `current_offset + size <= self.data.len()` AND no overflow ✓ Verified by branchless `can_alloc` check using `overflowing_add`
 2. `ptr` is properly aligned for `u8` ✓ Derived from `Vec<u8>` allocation
 3. `[ptr, ptr+size)` is valid and mutable ✓ Guaranteed by Vec invariant
 4. Lifetime of slice does not escape arena ✓ Enforced by Rust borrow checker
 
 **Proof:**
-- **Hoare-logic:** Lines 42-56 implement a **deterministic bounds check** using arithmetic:
+- **Hoare-logic:** Lines 42-56 implement a **deterministic overflow-safe bounds check** using arithmetic:
   ```
-  Precondition:  { current_offset ∈ [0, self.data.len()], size ∈ [0, MAX] }
-  can_alloc = (next_offset <= self.data.len()) as usize
-  Invariant:     { (can_alloc = 1) ↔ (next_offset <= self.data.len()) }
+  Precondition:  { current_offset ∈ [0, self.data.len()], size ∈ [0, usize::MAX] }
+  (next_offset, overflow) = current_offset.overflowing_add(size)
+  can_alloc = ((next_offset <= self.data.len()) & !overflow) as usize
+  Invariant:     { (can_alloc = 1) ↔ (next_offset <= self.data.len()) ∧ ¬overflow }
+               overflow = true ⇒ can_alloc = 0 (guards wrapping to small value)
   Postcondition: { if can_alloc ≠ 0 then [current_offset, current_offset+size) ⊆ valid }
   ```
   This proof is formalized in `docs/thesis.pdf` (Theorem: Memory Soundness, Section 5.3).
+  The `overflowing_add` fix closes the UB window where `size ≈ usize::MAX` caused
+  `wrapping_add` to produce a small `next_offset`, falsely satisfying the bounds check.
 
 - **Test Oracle:** `src/mem.rs` test module validates allocations and resets.
   - All successful allocations satisfy bounds
@@ -58,7 +66,7 @@ unsafe { core::slice::from_raw_parts_mut(ptr, size) }
 
 **Risk Level:** **LOW**
 
-**Rationale:** The precondition is **proven** (not assumed) via arithmetic before the unsafe block. The bounds check is branchless and constant-time. No data races are possible (single-threaded arena).
+**Rationale:** The precondition is **proven** (not assumed) via arithmetic before the unsafe block. The `!overflow` term in `can_alloc` eliminates the wrapping-overflow UB that existed with the previous `wrapping_add` approach. The check is branchless and constant-time. No data races are possible (single-threaded arena).
 
 ---
 
@@ -216,17 +224,66 @@ cargo +nightly miri test patterns::deterministic_mpmc
 
 ---
 
+### 5. `src/simd_dispatch.rs` — SIMD intrinsic dispatch layer
+
+**Location:** `crates/bcinr-logic/src/simd_dispatch.rs`
+
+**Exemption Mechanism:** `#![allow(unsafe_code)]` set at file level (line 28); all other files retain `#![forbid(unsafe_code)]`.
+
+**Unsafe Block Count:** 20 (10 SSE4.2 intrinsic call-sites + 10 ARM Neon intrinsic call-sites)
+
+**Function Signatures (representative):**
+```rust
+unsafe fn splat_u8x16_sse(value: u8) -> [u8; 16]
+unsafe fn movemask_u8x16_sse(a: [u8; 16]) -> u16
+unsafe fn compare_eq_u8x16_sse(a: [u8; 16], b: [u8; 16]) -> [u8; 16]
+// ... (8 further SSE4.2 kernels)
+unsafe fn splat_u8x16_neon(value: u8) -> [u8; 16]
+// ... (9 further Neon kernels)
+```
+
+**Preconditions (CRITICAL):**
+1. All intrinsic functions are marked `unsafe fn` — callers must ensure target feature availability ✓
+2. SSE4.2 functions are gated behind `#[cfg(target_arch = "x86_64")]` / `target_feature` checks ✓
+3. Neon functions are gated behind `#[cfg(target_arch = "aarch64")]` / `target_feature` checks ✓
+4. Array arguments are `[u8; 16]` — correct size and alignment for 128-bit SIMD registers ✓
+5. Public dispatch wrappers check CPU features at runtime before calling unsafe intrinsic fns ✓
+
+**Proof:**
+- **Hoare-logic (representative):**
+  ```
+  Precondition:  { target_arch = x86_64, target_feature = "sse4.2" }
+  Operation:     _mm_set1_epi8(value as i8) → __m128i
+  Invariant:     { input value ∈ [0, 255], all 16 lanes initialized identically }
+  Postcondition: { result is a valid 16-byte SIMD register with all bytes = value }
+  ```
+- **Test Oracle:** SIMD kernels are validated against scalar reference implementations in the test suite.
+- **Architecture Guards:** Runtime dispatch via `is_x86_feature_detected!` / `std::arch` feature flags prevents calling SIMD paths on unsupported hardware.
+
+**Risk Level:** **MEDIUM**
+
+**Rationale:** All unsafe is confined to intrinsic calls where `unsafe` is required by the Rust standard library SIMD API. The callers perform feature detection. Array sizes are statically guaranteed correct by the type system. Each unsafe fn is individually documented with a `// SAFETY:` comment.
+
+**Miri Verification:**
+```bash
+# Miri cannot emulate SIMD intrinsics; validate via CI on x86_64 / aarch64 targets
+cargo test -p bcinr-logic --lib -- simd
+```
+
+---
+
 ## Unsafe Policy (ENFORCED)
 
 ### Files Where Unsafe Is Allowed
 
-Only **three files** are exempt from `#![forbid(unsafe_code)]`:
+Only **four files** are exempt from `#![forbid(unsafe_code)]`:
 
 | File | Reason | Unsafe Count |
 |------|--------|-------------|
-| `mem.rs` | Memory arena with proven bounds checks | 1 |
+| `mem.rs` | Memory arena with overflow-safe branchless bounds checks | 1 |
 | `autonomic/packed_key_table.rs` | Type-safe byte reinterpretation | 1 |
 | `patterns/deterministic_mpmc.rs` | Lock-free MPMC primitives | 2 |
+| `simd_dispatch.rs` | CPU intrinsic calls (SSE4.2 + ARM Neon), feature-gated | 20 |
 
 ### Files Where Unsafe Is FORBIDDEN
 
@@ -312,6 +369,7 @@ grep -r "unsafe" crates/bcinr-logic/src --include="*.rs" | \
   grep -v "mem.rs" | \
   grep -v "packed_key_table.rs" | \
   grep -v "deterministic_mpmc.rs" | \
+  grep -v "simd_dispatch.rs" | \
   wc -l
 # Expected: 0
 ```
@@ -349,6 +407,7 @@ RUSTFLAGS="-D warnings" cargo clippy --all-targets --all-features -- -D warnings
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-06-13 | Sean | Initial audit: 4 unsafe blocks, all proven safe |
+| 2026-06-21 | Claude | fix(mem): replace wrapping_add with overflowing_add to close OOB UB; add simd_dispatch.rs (20 blocks) to audit trail; correct total to 24 blocks across 4 permitted files |
 
 ---
 
