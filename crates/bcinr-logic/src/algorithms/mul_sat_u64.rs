@@ -43,11 +43,12 @@ pub fn mul_sat_u64(a: u64, b: u64) -> u64 {
     let lower = product_128 as u64;
     let upper = (product_128 >> 64) as u64;
 
-    // Branchless: if upper != 0, mask = 0xFFFF...FFFF; else mask = 0
-    // Hacker's Delight technique: -1 >> (64 - ctz(upper))
-    // But simpler: create mask from upper != 0 condition
-    // mask = (upper == 0) ? 0 : 0xFFFF...FFFF
-    let mask = ((upper as i64 | -(upper as i64)) >> 63) as u64;
+    // Branchless: if upper != 0, overflow_mask = 0xFFFF...FFFF; else 0.
+    // Use unsigned subtraction from zero: 0u64.wrapping_sub(x != 0 as u64)
+    // produces 0xFFFF...FFFF when x != 0, and 0 when x == 0.
+    // This avoids the signed negation -(upper as i64) which panics in debug
+    // builds when upper == 0x8000_0000_0000_0000 (i64::MIN).
+    let mask = 0u64.wrapping_sub((upper != 0) as u64);
 
     // Return (lower & ~mask) | (u64::MAX & mask)
     // If mask = 0: returns lower
@@ -79,22 +80,32 @@ mod tests {
         assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
         // boundaries
 
-        assert_eq!(
-            mul_sat_u64(0, 0),
-            mul_sat_u64_reference(0, 0)
-        );
-        assert_eq!(
-            mul_sat_u64(u64::MAX, u64::MAX),
-            mul_sat_u64_reference(u64::MAX, u64::MAX)
-        );
-        assert_eq!(
-            mul_sat_u64(u64::MAX, 0),
-            mul_sat_u64_reference(u64::MAX, 0)
-        );
-        assert_eq!(
-            mul_sat_u64(0, u64::MAX),
-            mul_sat_u64_reference(0, u64::MAX)
-        );
+        // (1, anything) -> anything
+        assert_eq!(mul_sat_u64(1, 42), 42);
+        assert_eq!(mul_sat_u64(42, 1), 42);
+
+        // (0, anything) -> 0
+        assert_eq!(mul_sat_u64(0, u64::MAX), 0);
+        assert_eq!(mul_sat_u64(u64::MAX, 0), 0);
+
+        // Overflow cases saturate to MAX
+        assert_eq!(mul_sat_u64(u64::MAX, u64::MAX), u64::MAX);
+        assert_eq!(mul_sat_u64(u64::MAX, 2), u64::MAX);
+        assert_eq!(mul_sat_u64(2, u64::MAX), u64::MAX);
+
+        // Large but non-overflow: (2^32) * (2^32) = 2^64 (overflow)
+        assert_eq!(mul_sat_u64(0x100000000, 0x100000000), u64::MAX);
+
+        // Just below overflow threshold: 0xFFFFFFFF^2 = 0xFFFFFFFE00000001 < 2^64
+        let sqrt_max = 0xFFFFFFFF_u64; // floor(sqrt(2^64 - 1))
+        let product = mul_sat_u64(sqrt_max, sqrt_max);
+        assert_eq!(product, 0xFFFFFFFE00000001); // Does not overflow
+
+        // Regression: previously panicked in debug builds because upper == 0x8000_0000_0000_0000
+        // (= i64::MIN), and -(upper as i64) overflows signed negation.
+        // u64::MAX * 0x8000_0000_0000_0001 overflows → saturates to u64::MAX
+        assert_eq!(mul_sat_u64(u64::MAX, 0x8000_0000_0000_0001), u64::MAX);
+        assert_eq!(mul_sat_u64(0x8000_0000_0000_0001, u64::MAX), u64::MAX);
     }
 
     // -------------------------------------------------------------------------
@@ -106,8 +117,9 @@ mod tests {
     // Proof sketch:
     // 1. Compute full 128-bit product: (a as u128) * (b as u128)
     // 2. Extract upper 64 bits (indicates overflow)
-    // 3. Branchless: Create mask from upper bits via sign-extension
-    //    mask = ((upper | -upper) >> 63) as u64  [All-1s if upper != 0]
+    // 3. Branchless: Create mask from overflow condition (upper != 0)
+    //    mask = 0u64.wrapping_sub((upper != 0) as u64)  [All-1s if upper != 0]
+    //    Avoids signed negation that panics in debug builds when upper == i64::MIN.
     // 4. Result = (lower & ~mask) | (u64::MAX & mask)
     //    - If no overflow: mask = 0, result = lower
     //    - If overflow: mask = ~0, result = u64::MAX
