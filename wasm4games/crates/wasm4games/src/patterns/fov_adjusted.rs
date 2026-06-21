@@ -55,9 +55,6 @@ mod tests {
     fn mutant_1(s: u64, i: u64) -> u64 {
         !fov_adjusted_reference(s, i)
     }
-    fn mutant_2(s: u64, i: u64) -> u64 {
-        fov_adjusted_reference(s, i).wrapping_add(1)
-    }
     fn mutant_3(s: u64, i: u64) -> u64 {
         fov_adjusted_reference(s, i) ^ 0xFFFF
     }
@@ -79,14 +76,6 @@ mod tests {
             prop_assume!(min_fov <= max_fov);
             let r = fov_adjusted_reference(s, i);
             if r != 0 { prop_assert!(r != mutant_1(s, i)); }
-        }
-        #[test]
-        fn cf2(s in any::<u64>(), i in any::<u64>()) {
-            let min_fov = ((i >> 16) & 0xFF) as i64;
-            let max_fov = ((i >> 24) & 0xFF) as i64;
-            prop_assume!(min_fov <= max_fov);
-            let r = fov_adjusted_reference(s, i);
-            prop_assert!(r != mutant_2(s, i));
         }
         #[test]
         fn cf3(s in any::<u64>(), i in any::<u64>()) {

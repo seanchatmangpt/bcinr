@@ -115,3 +115,21 @@ name = "ocel_schema"
 query = { file = "queries/ocel_schema.rq" }
 template = { file = "templates/ocel_schema.rs.tera" }
 output_file = "src/evidence/ocel_schema.rs"
+
+# ---------------------------------------------------------------------------
+# Rule: chain_tests  (fanout — one .rs file per JTBD chain)
+# ---------------------------------------------------------------------------
+# Query : queries/chains.rq
+#   Returns all steps for all 8 JTBD chains ordered by chainName, stepIndex.
+#
+# Template: templates/chain_test.rs.tera
+#   Emits one Rust test module per chain; uses loop.first/loop.last to emit
+#   the module wrapper, the run_chain() -> u64 function, and #[test] fn.
+#
+# Output  : src/chain_tests/{chainName}.rs  (one file per chain)
+[[generation.rules]]
+name = "chain_tests"
+query = { file = "queries/chains.rq" }
+template = { file = "templates/chain_test.rs.tera" }
+fanout = "chainName"
+output_pattern = "src/chain_tests/{chainName}.rs"

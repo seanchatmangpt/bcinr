@@ -1,0 +1,19 @@
+# pattern_index_docs.rq — one row per pattern for the Alexander pattern language index.
+# Drives templates/patterns_index.md.tera (single output: docs/patterns/INDEX.md).
+# Ordered by family (alpha) then id within family so the index template can emit
+# one heading per family using consecutive-row grouping.
+
+PREFIX w4g: <https://wasm4games.dev/ontology#>
+
+SELECT ?id ?name ?family ?lowering ?eventName ?doc
+WHERE {
+    ?pattern a w4g:Pattern ;
+        w4g:id        ?id ;
+        w4g:name      ?name ;
+        w4g:family    ?family ;
+        w4g:lowering  ?loweringNode ;
+        w4g:eventName ?eventName ;
+        w4g:doc       ?doc .
+    ?loweringNode w4g:name ?lowering .
+}
+ORDER BY ?family ?id

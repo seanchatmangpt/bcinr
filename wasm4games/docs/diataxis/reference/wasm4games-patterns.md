@@ -4,6 +4,10 @@
 > them. This mirrors `patterns::PATTERN_REGISTRY` (a `&[ir::PatternSpec]`). For the *why*,
 > see the [foundry overview](../explanation/wasm4games-overview.md); to add an entry, see
 > the [add-a-pattern tutorial](../tutorials/wasm4games-add-a-pattern.md).
+>
+> **Pattern language guides:** Each pattern has a dedicated [Alexander-style guide](../../../crates/wasm4games/docs/patterns/INDEX.md)
+> with Context / Forces / Solution / Consequences narrative, a Mermaid diagram, and a usage
+> example. See the [full index](../../../crates/wasm4games/docs/patterns/INDEX.md).
 
 The catalog holds **75 patterns**: ids 1–70 across 14 families, plus the **Anti-Cheat**
 family (ids 71–75). The first tables below name the original Phase 1 families in full; the
@@ -43,8 +47,8 @@ The deterministic spine of a game loop.
 
 | Pattern | Kernel fn | Family | Lowering | Event code | Object kinds | OTEL span | Admission |
 |---|---|---|---|---|---|---|---|
-| InputAdmitted | `input_admitted` | Core sim & combat | `Mask` | `0x0001` | `player`, `input_device` | `0x0002` (`INPUT_ADMIT`) | `ADMITTED` ⇒ `REFUSED` |
-| FixedTickAdvanced | `fixed_tick_advanced` | Core sim & combat | `Saturating` | `0x0002` | `world`, `clock` | `0x0001` (`TICK`) | `ADMITTED` ⇒ `BLOCKED` |
+| InputAdmitted | `input_admitted` | Core sim & combat | `Mask` | `0x0002` | `player` | `0x0002` (`INPUT_ADMIT`) | `ADMITTED` ⇒ `REFUSED` |
+| FixedTickAdvanced | `fixed_tick_advanced` | Core sim & combat | `Saturating` | `0x0001` | `world`, `clock` | `0x0001` (`TICK`) | `ADMITTED` ⇒ `BLOCKED` |
 | EntityStateTransitioned | `entity_state_transitioned` | Core sim & combat | `Dfa` | `0x0003` | `entity` | `0x0010` | `ADMITTED` ⇒ `REFUSED` |
 | AabbCollisionResolved | `aabb_collision_resolved` | Core sim & combat | `Mask` | `0x0004` | `entity`, `entity` | `0x0011` | `ADMITTED` ⇒ `REFUSED` |
 | DamageApplied | `damage_applied` | Core sim & combat | `Saturating` | `0x0005` | `attacker`, `target` | `0x0012` | `ADMITTED` ⇒ `REFUSED` |
@@ -121,7 +125,7 @@ path as a legal one — there is no data-dependent branch a cheat could time or 
 | ResourceBoundChecked | `resource_bound_checked` | value ≤ declared capacity (else overflow) | `Mask` | `bit0 = hp_overflow` |
 | CooldownLegalityChecked | `cooldown_legality_checked` | action fires only after its cooldown elapses | `Mask` | `bit0 = cooldown_violation` |
 | ActionRateBounded | `action_rate_bounded` | actions-per-window ≤ the allowed rate | `Mask` | `bit0 = rate_exceeded` |
-| TransitionLegalityChecked | `transition_legality_checked` | the state-machine edge is permitted | `Mask` | `bit0 = illegal_transition` |
+| TransitionLegalityChecked | `transition_legality_checked` | the state-machine edge is permitted | `Dfa` | `bit0 = illegal_transition` |
 
 ### Authority-per-pattern
 

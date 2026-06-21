@@ -2,7 +2,7 @@
 
    NOTE ON FIDELITY: every output file carries the GENERATED banner below, and the body
    follows the canonical `damage_applied` convention: a packed-u64 kernel, a branchful
-   `_reference` oracle, three mutants, proptest equivalence + cf1/cf2/cf3, a boundaries test,
+   `_reference` oracle, two mutants, proptest equivalence + cf1/cf3 (cf2/wrapping_add dropped as redundant), a boundaries test,
    a two-sided breed battery (must_admit/must_refuse/weakened corpus with
    corpus_admit_matches_oracle / corpus_refuse_matches_oracle / weakened_fails_refuse_corpus),
    and a `bench` module. This template hard-codes the representative saturating-damage shape
@@ -93,9 +93,6 @@ mod tests {
     fn mutant_1(s: u64, i: u64) -> u64 {
         !{{ row.name }}_reference(s, i)
     }
-    fn mutant_2(s: u64, i: u64) -> u64 {
-        {{ row.name }}_reference(s, i).wrapping_add(1)
-    }
     fn mutant_3(s: u64, i: u64) -> u64 {
         {{ row.name }}_reference(s, i) ^ 0xFFFF
     }
@@ -109,11 +106,6 @@ mod tests {
         fn prop_cf1_nonzero_output_differs_from_bitflip_mutant(s in any::<u64>(), i in any::<u64>()) {
             let r = {{ row.name }}_reference(s, i);
             if r != 0 { prop_assert!(r != mutant_1(s, i)); }
-        }
-        #[test]
-        fn prop_cf2_output_differs_from_increment_mutant(s in any::<u64>(), i in any::<u64>()) {
-            let r = {{ row.name }}_reference(s, i);
-            prop_assert!(r != mutant_2(s, i));
         }
         #[test]
         fn prop_cf3_nonzero_output_differs_from_xor_mutant(s in any::<u64>(), i in any::<u64>()) {

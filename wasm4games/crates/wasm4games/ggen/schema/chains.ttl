@@ -1,0 +1,655 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix w4g:  <https://wasm4games.dev/ontology#> .
+@prefix ch:   <https://wasm4games.dev/chains#> .
+
+#################################################################
+# wasm4games JTBD chain ontology
+#
+# Defines 8 combinatorial test chains, each composing 8 branchless kernels
+# in sequence to exercise a complete gameplay Job to Be Done (JTBD).
+# `ggen sync` renders src/chain_tests/{chainName}.rs from chains.rq +
+# chain_test.rs.tera. The output carries GENERATED banners and should not
+# be hand-edited; edit the TTL and regenerate instead.
+#
+# PARITY: 8 ch:Chain individuals × 8 ch:ChainStep each = 64 step definitions.
+# Every ch:pattern reference must match a w4g:Pattern individual in patterns.ttl.
+#################################################################
+
+#################################################################
+# Classes
+#################################################################
+
+ch:Chain a rdfs:Class ;
+    rdfs:comment "A JTBD composition of 8 branchless kernels exercising a complete gameplay flow." .
+
+ch:ChainStep a rdfs:Class ;
+    rdfs:comment "One kernel invocation in a chain, with concrete packed-u64 state/input expressions." .
+
+#################################################################
+# Properties — Chain
+#################################################################
+
+ch:name     a rdf:Property ; rdfs:domain ch:Chain ; rdfs:range xsd:string .
+ch:jtbd     a rdf:Property ; rdfs:domain ch:Chain ; rdfs:range xsd:string .
+ch:family   a rdf:Property ; rdfs:domain ch:Chain ; rdfs:range xsd:string .
+
+#################################################################
+# Properties — ChainStep
+#################################################################
+
+ch:chain      a rdf:Property ; rdfs:domain ch:ChainStep ; rdfs:range ch:Chain .
+ch:stepIndex  a rdf:Property ; rdfs:domain ch:ChainStep ; rdfs:range xsd:integer .
+ch:pattern    a rdf:Property ; rdfs:domain ch:ChainStep ; rdfs:range w4g:Pattern .
+ch:stateExpr  a rdf:Property ; rdfs:domain ch:ChainStep ; rdfs:range xsd:string .
+ch:inputExpr  a rdf:Property ; rdfs:domain ch:ChainStep ; rdfs:range xsd:string .
+ch:stepDoc    a rdf:Property ; rdfs:domain ch:ChainStep ; rdfs:range xsd:string .
+
+#################################################################
+# Chain 1 — combat_hit
+# JTBD: Full combat pipeline from raw input through damage, entity state, status,
+#        movement law, receipt seal, and NPS gate.
+# Families: Core Sim & Combat, Evidence & Replay, Anti-Cheat, Promotion & NPS
+#################################################################
+
+ch:combat_hit a ch:Chain ;
+    ch:name   "combat_hit" ;
+    ch:jtbd   "Full combat pipeline: input gate, collision, damage, entity state, status effect, movement law, receipt seal, NPS gate." ;
+    ch:family "Core Sim & Combat" .
+
+ch:c1s1 a ch:ChainStep ;
+    ch:chain      ch:combat_hit ;
+    ch:stepIndex  "1"^^xsd:integer ;
+    ch:pattern    w4g:input_admitted ;
+    ch:stateExpr  "0u64" ;
+    ch:inputExpr  "0x41u64" ;
+    ch:stepDoc    "Gate raw input byte 0x41 ('A'); valid byte is ADMITTED." .
+
+ch:c1s2 a ch:ChainStep ;
+    ch:chain      ch:combat_hit ;
+    ch:stepIndex  "2"^^xsd:integer ;
+    ch:pattern    w4g:aabb_collision_resolved ;
+    ch:stateExpr  "10u64 | (5u64 << 16) | (20u64 << 32) | (15u64 << 48)" ;
+    ch:inputExpr  "15u64 | (5u64 << 16) | (25u64 << 32) | (15u64 << 48)" ;
+    ch:stepDoc    "Resolve AABB overlap: attacker [10..20,5..15] vs target [15..25,5..15]." .
+
+ch:c1s3 a ch:ChainStep ;
+    ch:chain      ch:combat_hit ;
+    ch:stepIndex  "3"^^xsd:integer ;
+    ch:pattern    w4g:damage_applied ;
+    ch:stateExpr  "100u64" ;
+    ch:inputExpr  "7u64 | (1u64 << 16)" ;
+    ch:stepDoc    "Apply base-7 crit hit (×2=14) to HP=100; result HP=86." .
+
+ch:c1s4 a ch:ChainStep ;
+    ch:chain      ch:combat_hit ;
+    ch:stepIndex  "4"^^xsd:integer ;
+    ch:pattern    w4g:entity_state_transitioned ;
+    ch:stateExpr  "1u64" ;
+    ch:inputExpr  "1u64" ;
+    ch:stepDoc    "Advance entity DFA: Active(1) + hit(1) → Hurt(2)." .
+
+ch:c1s5 a ch:ChainStep ;
+    ch:chain      ch:combat_hit ;
+    ch:stepIndex  "5"^^xsd:integer ;
+    ch:pattern    w4g:status_effect_ticked ;
+    ch:stateExpr  "0u64" ;
+    ch:inputExpr  "(1u64 << 4) | (1u64 << 5) | (10u64 << 8)" ;
+    ch:stepDoc    "Set poison in slot 0 (set-bit + apply-toggle) with decay 10." .
+
+ch:c1s6 a ch:ChainStep ;
+    ch:chain      ch:combat_hit ;
+    ch:stepIndex  "6"^^xsd:integer ;
+    ch:pattern    w4g:movement_legality_checked ;
+    ch:stateExpr  "100u64" ;
+    ch:inputExpr  "101u64 | (5u64 << 16)" ;
+    ch:stepDoc    "Check movement: cur=100, proposed=101, max_speed=5 → delta=1 ≤ 5 ADMITTED." .
+
+ch:c1s7 a ch:ChainStep ;
+    ch:chain      ch:combat_hit ;
+    ch:stepIndex  "7"^^xsd:integer ;
+    ch:pattern    w4g:receipt_appended ;
+    ch:stateExpr  "0xcbf29ce484222325_u64" ;
+    ch:inputExpr  "step3" ;
+    ch:stepDoc    "Seal damage result (step3=86) into FNV-1a receipt chain." .
+
+ch:c1s8 a ch:ChainStep ;
+    ch:chain      ch:combat_hit ;
+    ch:stepIndex  "8"^^xsd:integer ;
+    ch:pattern    w4g:nps_prompt_gated ;
+    ch:stateExpr  "75u64 | (1u64 << 16)" ;
+    ch:inputExpr  "50u64 | (5u64 << 16)" ;
+    ch:stepDoc    "NPS gate: readiness=75, shown=1, bar=50, cap=5 → ADMITTED." .
+
+#################################################################
+# Chain 2 — nav_quest
+# JTBD: Pathfinding through waypoints with quest progression, AI action selection,
+#        OCEL event linkage, and receipt audit trail.
+# Families: Pathfinding, Narrative / Dialogue, AI Agent / Benchmark, Evidence & Replay
+#################################################################
+
+ch:nav_quest a ch:Chain ;
+    ch:name   "nav_quest" ;
+    ch:jtbd   "Nav-quest pipeline: nav DFA, A* node expansion, waypoint, cost bound, quest step, AI selection, OCEL link, receipt seal." ;
+    ch:family "Pathfinding" .
+
+ch:c2s1 a ch:ChainStep ;
+    ch:chain      ch:nav_quest ;
+    ch:stepIndex  "1"^^xsd:integer ;
+    ch:pattern    w4g:nav_state_advanced ;
+    ch:stateExpr  "0u64" ;
+    ch:inputExpr  "1u64" ;
+    ch:stepDoc    "Advance nav DFA: IDLE(0) + MOVE(1) → MOVING(1)." .
+
+ch:c2s2 a ch:ChainStep ;
+    ch:chain      ch:nav_quest ;
+    ch:stepIndex  "2"^^xsd:integer ;
+    ch:pattern    w4g:path_node_expanded ;
+    ch:stateExpr  "200u64 | (1u64 << 32)" ;
+    ch:inputExpr  "150u64 | (2u64 << 32)" ;
+    ch:stepDoc    "A* expand: candidate cost=150 < current=200, select candidate node id=2." .
+
+ch:c2s3 a ch:ChainStep ;
+    ch:chain      ch:nav_quest ;
+    ch:stepIndex  "3"^^xsd:integer ;
+    ch:pattern    w4g:waypoint_reached ;
+    ch:stateExpr  "5u64" ;
+    ch:inputExpr  "10u64" ;
+    ch:stepDoc    "Waypoint check: dist=5 ≤ tol=10 → REACHED." .
+
+ch:c2s4 a ch:ChainStep ;
+    ch:chain      ch:nav_quest ;
+    ch:stepIndex  "4"^^xsd:integer ;
+    ch:pattern    w4g:path_cost_bounded ;
+    ch:stateExpr  "800u64" ;
+    ch:inputExpr  "1000u64" ;
+    ch:stepDoc    "Path cost check: acc=800 ≤ budget=1000 → within budget, over_flag=0." .
+
+ch:c2s5 a ch:ChainStep ;
+    ch:chain      ch:nav_quest ;
+    ch:stepIndex  "5"^^xsd:integer ;
+    ch:pattern    w4g:quest_step_advanced ;
+    ch:stateExpr  "0u64" ;
+    ch:inputExpr  "1u64" ;
+    ch:stepDoc    "Quest DFA: step0 + complete(1) → step1." .
+
+ch:c2s6 a ch:ChainStep ;
+    ch:chain      ch:nav_quest ;
+    ch:stepIndex  "6"^^xsd:integer ;
+    ch:pattern    w4g:ai_action_selected ;
+    ch:stateExpr  "0u64" ;
+    ch:inputExpr  "100u64 | (200u64 << 16) | (50u64 << 32) | (75u64 << 48)" ;
+    ch:stepDoc    "AI argmax: util=[100,200,50,75] → action 1 (highest utility=200)." .
+
+ch:c2s7 a ch:ChainStep ;
+    ch:chain      ch:nav_quest ;
+    ch:stepIndex  "7"^^xsd:integer ;
+    ch:pattern    w4g:ocel_event_linked ;
+    ch:stateExpr  "0xFu64" ;
+    ch:inputExpr  "0x5u64" ;
+    ch:stepDoc    "Link OCEL event: gate=0xF, proposed=0x5 → admitted." .
+
+ch:c2s8 a ch:ChainStep ;
+    ch:chain      ch:nav_quest ;
+    ch:stepIndex  "8"^^xsd:integer ;
+    ch:pattern    w4g:receipt_appended ;
+    ch:stateExpr  "0xcbf29ce484222325_u64" ;
+    ch:inputExpr  "step5" ;
+    ch:stepDoc    "Seal quest step result (step5=1) into FNV-1a receipt chain." .
+
+#################################################################
+# Chain 3 — audio_cascade
+# JTBD: Audio trigger through priority selection, volume adjustment, fade,
+#        distance attenuation, tick advance, span emission, and receipt seal.
+# Families: Audio, Core Sim & Combat, Evidence & Replay
+#################################################################
+
+ch:audio_cascade a ch:Chain ;
+    ch:name   "audio_cascade" ;
+    ch:jtbd   "Audio cascade: trigger FSM, priority select, volume clamp, fade, distance atten, tick advance, OTEL span, receipt seal." ;
+    ch:family "Audio" .
+
+ch:c3s1 a ch:ChainStep ;
+    ch:chain      ch:audio_cascade ;
+    ch:stepIndex  "1"^^xsd:integer ;
+    ch:pattern    w4g:audio_trigger_evaluated ;
+    ch:stateExpr  "0u64" ;
+    ch:inputExpr  "0u64" ;
+    ch:stepDoc    "Audio FSM: STOPPED(0) + PLAY(0) → PLAYING(1)." .
+
+ch:c3s2 a ch:ChainStep ;
+    ch:chain      ch:audio_cascade ;
+    ch:stepIndex  "2"^^xsd:integer ;
+    ch:pattern    w4g:audio_priority_selected ;
+    ch:stateExpr  "80u64 | (0u64 << 8)" ;
+    ch:inputExpr  "75u64 | (1u64 << 8)" ;
+    ch:stepDoc    "Priority select: ch0 p=80 id=0 vs ch1 p=75 id=1 → ch0 wins (p0>p1)." .
+
+ch:c3s3 a ch:ChainStep ;
+    ch:chain      ch:audio_cascade ;
+    ch:stepIndex  "3"^^xsd:integer ;
+    ch:pattern    w4g:volume_clamped ;
+    ch:stateExpr  "200u64" ;
+    ch:inputExpr  "20u64" ;
+    ch:stepDoc    "Volume clamp: vol=200, delta=20 up → 220 (≤255)." .
+
+ch:c3s4 a ch:ChainStep ;
+    ch:chain      ch:audio_cascade ;
+    ch:stepIndex  "4"^^xsd:integer ;
+    ch:pattern    w4g:audio_fade_applied ;
+    ch:stateExpr  "220u64" ;
+    ch:inputExpr  "30u64" ;
+    ch:stepDoc    "Fade: vol=220, rate=30 → max(220-30,0)=190." .
+
+ch:c3s5 a ch:ChainStep ;
+    ch:chain      ch:audio_cascade ;
+    ch:stepIndex  "5"^^xsd:integer ;
+    ch:pattern    w4g:audio_distance_attenuated ;
+    ch:stateExpr  "220u64 | (4u64 << 8)" ;
+    ch:inputExpr  "5u64" ;
+    ch:stepDoc    "Distance atten: max_vol=220, atten=4, dist=5 → 220-4*5=200." .
+
+ch:c3s6 a ch:ChainStep ;
+    ch:chain      ch:audio_cascade ;
+    ch:stepIndex  "6"^^xsd:integer ;
+    ch:pattern    w4g:fixed_tick_advanced ;
+    ch:stateExpr  "500u64" ;
+    ch:inputExpr  "16u64 | (16u64 << 32)" ;
+    ch:stepDoc    "Tick advance: acc=500, elapsed=16, step=16 → bucketize(516,16)=32." .
+
+ch:c3s7 a ch:ChainStep ;
+    ch:chain      ch:audio_cascade ;
+    ch:stepIndex  "7"^^xsd:integer ;
+    ch:pattern    w4g:otel_span_emitted ;
+    ch:stateExpr  "0u64" ;
+    ch:inputExpr  "2u64" ;
+    ch:stepDoc    "Emit OTEL span code for slot 2." .
+
+ch:c3s8 a ch:ChainStep ;
+    ch:chain      ch:audio_cascade ;
+    ch:stepIndex  "8"^^xsd:integer ;
+    ch:pattern    w4g:receipt_appended ;
+    ch:stateExpr  "0xcbf29ce484222325_u64" ;
+    ch:inputExpr  "step4" ;
+    ch:stepDoc    "Seal faded volume result (step4=190) into FNV-1a receipt chain." .
+
+#################################################################
+# Chain 4 — shop_purchase
+# JTBD: Economy purchase flow from level gate through currency delta,
+#        inventory change, reward tier, mastery detection, artifact sharing, NPS.
+# Families: Economy / Progression, Promotion & NPS
+#################################################################
+
+ch:shop_purchase a ch:Chain ;
+    ch:name   "shop_purchase" ;
+    ch:jtbd   "Shop purchase: level gate, purchase FSM, currency delta, inventory, reward tier, mastery moment, share artifact, NPS gate." ;
+    ch:family "Economy / Progression" .
+
+ch:c4s1 a ch:ChainStep ;
+    ch:chain      ch:shop_purchase ;
+    ch:stepIndex  "1"^^xsd:integer ;
+    ch:pattern    w4g:level_gate_evaluated ;
+    ch:stateExpr  "10u64" ;
+    ch:inputExpr  "5u64" ;
+    ch:stepDoc    "Level gate: player_level=10 ≥ required=5 → ADMITTED." .
+
+ch:c4s2 a ch:ChainStep ;
+    ch:chain      ch:shop_purchase ;
+    ch:stepIndex  "2"^^xsd:integer ;
+    ch:pattern    w4g:purchase_admitted ;
+    ch:stateExpr  "0u64" ;
+    ch:inputExpr  "0u64" ;
+    ch:stepDoc    "Purchase FSM: IDLE(0) + ADD(0) → CART(1)." .
+
+ch:c4s3 a ch:ChainStep ;
+    ch:chain      ch:shop_purchase ;
+    ch:stepIndex  "3"^^xsd:integer ;
+    ch:pattern    w4g:currency_delta_applied ;
+    ch:stateExpr  "1000u64" ;
+    ch:inputExpr  "50u64" ;
+    ch:stepDoc    "Currency delta: balance=1000 - cost=50 → 950." .
+
+ch:c4s4 a ch:ChainStep ;
+    ch:chain      ch:shop_purchase ;
+    ch:stepIndex  "4"^^xsd:integer ;
+    ch:pattern    w4g:inventory_item_changed ;
+    ch:stateExpr  "0u64" ;
+    ch:inputExpr  "1u64" ;
+    ch:stepDoc    "Inventory change: add item id=1 to empty inventory." .
+
+ch:c4s5 a ch:ChainStep ;
+    ch:chain      ch:shop_purchase ;
+    ch:stepIndex  "5"^^xsd:integer ;
+    ch:pattern    w4g:reward_tier_selected ;
+    ch:stateExpr  "0b111u64" ;
+    ch:inputExpr  "2u64" ;
+    ch:stepDoc    "Reward tier: prestige_flags=0b111 (3 bits set), threshold=2 → tier selected." .
+
+ch:c4s6 a ch:ChainStep ;
+    ch:chain      ch:shop_purchase ;
+    ch:stepIndex  "6"^^xsd:integer ;
+    ch:pattern    w4g:mastery_moment_detected ;
+    ch:stateExpr  "0b0101_0101u64" ;
+    ch:inputExpr  "1u64 | (3u64 << 8)" ;
+    ch:stepDoc    "Mastery: window=0b01010101 (4 successes), success=1, threshold=3 → detected." .
+
+ch:c4s7 a ch:ChainStep ;
+    ch:chain      ch:shop_purchase ;
+    ch:stepIndex  "7"^^xsd:integer ;
+    ch:pattern    w4g:share_artifact_generated ;
+    ch:stateExpr  "42u64 | (7u64 << 32)" ;
+    ch:inputExpr  "99u64" ;
+    ch:stepDoc    "Generate share artifact: player_id=42, salt=7, content_seed=99 → FNV hash." .
+
+ch:c4s8 a ch:ChainStep ;
+    ch:chain      ch:shop_purchase ;
+    ch:stepIndex  "8"^^xsd:integer ;
+    ch:pattern    w4g:nps_prompt_gated ;
+    ch:stateExpr  "90u64 | (1u64 << 16)" ;
+    ch:inputExpr  "50u64 | (5u64 << 16)" ;
+    ch:stepDoc    "NPS gate: readiness=90, shown=1, bar=50, cap=5 → ADMITTED." .
+
+#################################################################
+# Chain 5 — mp_resync
+# JTBD: Multiplayer resync pipeline from sync FSM through tick delta bound,
+#        lag compensation, prediction error, packet priority, entity state, receipt seal, OCEL link.
+# Families: Multiplayer / Network, Core Sim & Combat, Evidence & Replay
+#################################################################
+
+ch:mp_resync a ch:Chain ;
+    ch:name   "mp_resync" ;
+    ch:jtbd   "MP resync: sync FSM, tick delta bound, lag compensation, prediction error, packet priority, entity state, receipt seal, OCEL link." ;
+    ch:family "Multiplayer / Network" .
+
+ch:c5s1 a ch:ChainStep ;
+    ch:chain      ch:mp_resync ;
+    ch:stepIndex  "1"^^xsd:integer ;
+    ch:pattern    w4g:sync_state_admitted ;
+    ch:stateExpr  "0u64" ;
+    ch:inputExpr  "0u64" ;
+    ch:stepDoc    "Sync FSM: UNSYNCED(0) + START_SYNC(0) → SYNCING(1)." .
+
+ch:c5s2 a ch:ChainStep ;
+    ch:chain      ch:mp_resync ;
+    ch:stepIndex  "2"^^xsd:integer ;
+    ch:pattern    w4g:tick_delta_bounded ;
+    ch:stateExpr  "100u64" ;
+    ch:inputExpr  "103u64 | (8u64 << 16)" ;
+    ch:stepDoc    "Tick delta: prev=100, curr=103, max_delta=8 → bounded_delta=3." .
+
+ch:c5s3 a ch:ChainStep ;
+    ch:chain      ch:mp_resync ;
+    ch:stepIndex  "3"^^xsd:integer ;
+    ch:pattern    w4g:lag_compensation_applied ;
+    ch:stateExpr  "500u64 | (2u64 << 16)" ;
+    ch:inputExpr  "3u64" ;
+    ch:stepDoc    "Lag compensation: pred_pos=500, vel=2, lag=3 → compensated position." .
+
+ch:c5s4 a ch:ChainStep ;
+    ch:chain      ch:mp_resync ;
+    ch:stepIndex  "4"^^xsd:integer ;
+    ch:pattern    w4g:prediction_error_bounded ;
+    ch:stateExpr  "150u64 | (160u64 << 16)" ;
+    ch:inputExpr  "20u64" ;
+    ch:stepDoc    "Prediction error: pred=150, actual=160, threshold=20 → error=10 ≤ 20 OK." .
+
+ch:c5s5 a ch:ChainStep ;
+    ch:chain      ch:mp_resync ;
+    ch:stepIndex  "5"^^xsd:integer ;
+    ch:pattern    w4g:packet_priority_evaluated ;
+    ch:stateExpr  "90u64 | (60u64 << 8) | (75u64 << 16)" ;
+    ch:inputExpr  "0u64" ;
+    ch:stepDoc    "Packet priority: p=[90,60,75] → argmax=0 (queue 0 has priority 90)." .
+
+ch:c5s6 a ch:ChainStep ;
+    ch:chain      ch:mp_resync ;
+    ch:stepIndex  "6"^^xsd:integer ;
+    ch:pattern    w4g:entity_state_transitioned ;
+    ch:stateExpr  "1u64" ;
+    ch:inputExpr  "0u64" ;
+    ch:stepDoc    "Entity DFA: Active(1) + spawn(0) → next state per table." .
+
+ch:c5s7 a ch:ChainStep ;
+    ch:chain      ch:mp_resync ;
+    ch:stepIndex  "7"^^xsd:integer ;
+    ch:pattern    w4g:receipt_appended ;
+    ch:stateExpr  "0xcbf29ce484222325_u64" ;
+    ch:inputExpr  "step3" ;
+    ch:stepDoc    "Seal lag-compensated position (step3) into FNV-1a receipt chain." .
+
+ch:c5s8 a ch:ChainStep ;
+    ch:chain      ch:mp_resync ;
+    ch:stepIndex  "8"^^xsd:integer ;
+    ch:pattern    w4g:ocel_event_linked ;
+    ch:stateExpr  "0x3u64" ;
+    ch:inputExpr  "0x3u64" ;
+    ch:stepDoc    "Link OCEL resync event: gate=3, proposed=3." .
+
+#################################################################
+# Chain 6 — procgen_tile
+# JTBD: Procedural tile generation from noise sampling through terrain height,
+#        biome class, tile variant, spawn weight, physics render, object spawn, receipt seal.
+# Families: Procedural Gen, Physics & Meaning, Core Sim & Combat, Evidence & Replay
+#################################################################
+
+ch:procgen_tile a ch:Chain ;
+    ch:name   "procgen_tile" ;
+    ch:jtbd   "Procgen tile: noise sample, terrain height, biome class, tile variant, spawn weight, physics render, object spawn, receipt seal." ;
+    ch:family "Procedural Gen" .
+
+ch:c6s1 a ch:ChainStep ;
+    ch:chain      ch:procgen_tile ;
+    ch:stepIndex  "1"^^xsd:integer ;
+    ch:pattern    w4g:noise_value_sampled ;
+    ch:stateExpr  "12345u64" ;
+    ch:inputExpr  "42u64 | (17u64 << 16)" ;
+    ch:stepDoc    "Hash-noise: seed=12345, x=42, y=17 → noise byte [0,255]." .
+
+ch:c6s2 a ch:ChainStep ;
+    ch:chain      ch:procgen_tile ;
+    ch:stepIndex  "2"^^xsd:integer ;
+    ch:pattern    w4g:terrain_height_quantized ;
+    ch:stateExpr  "step1" ;
+    ch:inputExpr  "10u64 | (200u64 << 16)" ;
+    ch:stepDoc    "Quantize noise (step1) into height buckets of size 10, max 200." .
+
+ch:c6s3 a ch:ChainStep ;
+    ch:chain      ch:procgen_tile ;
+    ch:stepIndex  "3"^^xsd:integer ;
+    ch:pattern    w4g:biome_class_selected ;
+    ch:stateExpr  "0b0001_0110u64" ;
+    ch:inputExpr  "1u64" ;
+    ch:stepDoc    "Biome class: flags=0b00010110 (forest+lake bits), selector=1." .
+
+ch:c6s4 a ch:ChainStep ;
+    ch:chain      ch:procgen_tile ;
+    ch:stepIndex  "4"^^xsd:integer ;
+    ch:pattern    w4g:tile_variant_selected ;
+    ch:stateExpr  "step1" ;
+    ch:inputExpr  "0u64" ;
+    ch:stepDoc    "Tile variant: use noise value (step1) as weight for variant selection." .
+
+ch:c6s5 a ch:ChainStep ;
+    ch:chain      ch:procgen_tile ;
+    ch:stepIndex  "5"^^xsd:integer ;
+    ch:pattern    w4g:spawn_weight_evaluated ;
+    ch:stateExpr  "step1" ;
+    ch:inputExpr  "180u64" ;
+    ch:stepDoc    "Spawn weight: noise roll (step1) vs spawn rate threshold=180." .
+
+ch:c6s6 a ch:ChainStep ;
+    ch:chain      ch:procgen_tile ;
+    ch:stepIndex  "6"^^xsd:integer ;
+    ch:pattern    w4g:physics_value_rendered ;
+    ch:stateExpr  "1200u64" ;
+    ch:inputExpr  "0u64 | (1000u64 << 16)" ;
+    ch:stepDoc    "Physics render: value=1200, clamp to [0, 1000] → 1000." .
+
+ch:c6s7 a ch:ChainStep ;
+    ch:chain      ch:procgen_tile ;
+    ch:stepIndex  "7"^^xsd:integer ;
+    ch:pattern    w4g:object_spawned ;
+    ch:stateExpr  "1u64" ;
+    ch:inputExpr  "2u64" ;
+    ch:stepDoc    "Spawn object: type=1, variant=2." .
+
+ch:c6s8 a ch:ChainStep ;
+    ch:chain      ch:procgen_tile ;
+    ch:stepIndex  "8"^^xsd:integer ;
+    ch:pattern    w4g:receipt_appended ;
+    ch:stateExpr  "0xcbf29ce484222325_u64" ;
+    ch:inputExpr  "step7" ;
+    ch:stepDoc    "Seal spawn event (step7) into FNV-1a receipt chain." .
+
+#################################################################
+# Chain 7 — anticheat_verdict
+# JTBD: Full anti-cheat verdict pipeline: movement law, resource bound, cooldown,
+#        action rate, transition law, entity kill, OCEL link, receipt seal.
+# Families: Anti-Cheat, Core Sim & Combat, Evidence & Replay
+#################################################################
+
+ch:anticheat_verdict a ch:Chain ;
+    ch:name   "anticheat_verdict" ;
+    ch:jtbd   "Anti-cheat verdict: movement law, resource bound, cooldown, action rate, transition law, entity kill, OCEL link, receipt seal." ;
+    ch:family "Anti-Cheat" .
+
+ch:c7s1 a ch:ChainStep ;
+    ch:chain      ch:anticheat_verdict ;
+    ch:stepIndex  "1"^^xsd:integer ;
+    ch:pattern    w4g:movement_legality_checked ;
+    ch:stateExpr  "100u64" ;
+    ch:inputExpr  "104u64 | (5u64 << 16)" ;
+    ch:stepDoc    "Movement law: cur=100, proposed=104, max_speed=5 → delta=4 ≤ 5 ADMITTED." .
+
+ch:c7s2 a ch:ChainStep ;
+    ch:chain      ch:anticheat_verdict ;
+    ch:stepIndex  "2"^^xsd:integer ;
+    ch:pattern    w4g:resource_bound_checked ;
+    ch:stateExpr  "500u64" ;
+    ch:inputExpr  "1000u64" ;
+    ch:stepDoc    "Resource bound: hp=500 ≤ cap=1000 → ADMITTED (no overflow)." .
+
+ch:c7s3 a ch:ChainStep ;
+    ch:chain      ch:anticheat_verdict ;
+    ch:stepIndex  "3"^^xsd:integer ;
+    ch:pattern    w4g:cooldown_legality_checked ;
+    ch:stateExpr  "10u64" ;
+    ch:inputExpr  "0u64" ;
+    ch:stepDoc    "Cooldown: remaining=10 (positive) → ADMITTED (not fast-fire)." .
+
+ch:c7s4 a ch:ChainStep ;
+    ch:chain      ch:anticheat_verdict ;
+    ch:stepIndex  "4"^^xsd:integer ;
+    ch:pattern    w4g:action_rate_bounded ;
+    ch:stateExpr  "3u64" ;
+    ch:inputExpr  "5u64" ;
+    ch:stepDoc    "Action rate: actions=3 ≤ budget=5 → within rate limit." .
+
+ch:c7s5 a ch:ChainStep ;
+    ch:chain      ch:anticheat_verdict ;
+    ch:stepIndex  "5"^^xsd:integer ;
+    ch:pattern    w4g:transition_legality_checked ;
+    ch:stateExpr  "0u64" ;
+    ch:inputExpr  "1u64" ;
+    ch:stepDoc    "Transition legality DFA: from_state=0, symbol=1 → legal transition." .
+
+ch:c7s6 a ch:ChainStep ;
+    ch:chain      ch:anticheat_verdict ;
+    ch:stepIndex  "6"^^xsd:integer ;
+    ch:pattern    w4g:entity_state_transitioned ;
+    ch:stateExpr  "1u64" ;
+    ch:inputExpr  "3u64" ;
+    ch:stepDoc    "Entity DFA: Active(1) + kill(3) → Dead(3)." .
+
+ch:c7s7 a ch:ChainStep ;
+    ch:chain      ch:anticheat_verdict ;
+    ch:stepIndex  "7"^^xsd:integer ;
+    ch:pattern    w4g:ocel_event_linked ;
+    ch:stateExpr  "0x7u64" ;
+    ch:inputExpr  "0x5u64" ;
+    ch:stepDoc    "Link OCEL verdict event: gate=7, proposed=5." .
+
+ch:c7s8 a ch:ChainStep ;
+    ch:chain      ch:anticheat_verdict ;
+    ch:stepIndex  "8"^^xsd:integer ;
+    ch:pattern    w4g:receipt_appended ;
+    ch:stateExpr  "0xcbf29ce484222325_u64" ;
+    ch:inputExpr  "step5" ;
+    ch:stepDoc    "Seal transition verdict (step5) into FNV-1a receipt chain." .
+
+#################################################################
+# Chain 8 — quality_loop
+# JTBD: DfLSS quality control loop from CTQ evaluation through sigma level,
+#        defect rate, quality gate DFA, bridge state, command opcode, adapter rank, capability flag.
+# Families: DfLSS / Quality, Engine Bridge
+#################################################################
+
+ch:quality_loop a ch:Chain ;
+    ch:name   "quality_loop" ;
+    ch:jtbd   "Quality loop: CTQ threshold, sigma level, defect rate, quality gate DFA, bridge state, command opcode, adapter rank, capability flag." ;
+    ch:family "DfLSS / Quality" .
+
+ch:c8s1 a ch:ChainStep ;
+    ch:chain      ch:quality_loop ;
+    ch:stepIndex  "1"^^xsd:integer ;
+    ch:pattern    w4g:ctq_threshold_evaluated ;
+    ch:stateExpr  "50u64" ;
+    ch:inputExpr  "30u64 | (80u64 << 16)" ;
+    ch:stepDoc    "CTQ check: value=50 within [LSL=30, USL=80] → ADMITTED." .
+
+ch:c8s2 a ch:ChainStep ;
+    ch:chain      ch:quality_loop ;
+    ch:stepIndex  "2"^^xsd:integer ;
+    ch:pattern    w4g:sigma_level_computed ;
+    ch:stateExpr  "1500u64" ;
+    ch:inputExpr  "0u64" ;
+    ch:stepDoc    "Sigma level: DPMO=1500 → approximately 4.5 sigma (LUT bucket)." .
+
+ch:c8s3 a ch:ChainStep ;
+    ch:chain      ch:quality_loop ;
+    ch:stepIndex  "3"^^xsd:integer ;
+    ch:pattern    w4g:defect_rate_quantized ;
+    ch:stateExpr  "15u64" ;
+    ch:inputExpr  "1000u64" ;
+    ch:stepDoc    "Defect rate: 15 defects / 1000 samples → quantized bucket." .
+
+ch:c8s4 a ch:ChainStep ;
+    ch:chain      ch:quality_loop ;
+    ch:stepIndex  "4"^^xsd:integer ;
+    ch:pattern    w4g:quality_gate_evaluated ;
+    ch:stateExpr  "0u64" ;
+    ch:inputExpr  "1u64" ;
+    ch:stepDoc    "Quality gate DFA: state=0, symbol=1 → next gate state." .
+
+ch:c8s5 a ch:ChainStep ;
+    ch:chain      ch:quality_loop ;
+    ch:stepIndex  "5"^^xsd:integer ;
+    ch:pattern    w4g:bridge_state_transitioned ;
+    ch:stateExpr  "0u64" ;
+    ch:inputExpr  "1u64" ;
+    ch:stepDoc    "Bridge DFA: from_state=0, symbol=1 → bridge next state." .
+
+ch:c8s6 a ch:ChainStep ;
+    ch:chain      ch:quality_loop ;
+    ch:stepIndex  "6"^^xsd:integer ;
+    ch:pattern    w4g:command_opcode_encoded ;
+    ch:stateExpr  "45u64" ;
+    ch:inputExpr  "0u64" ;
+    ch:stepDoc    "Command opcode: cmd=45 → count how many of {32,64,96} it exceeds = 1." .
+
+ch:c8s7 a ch:ChainStep ;
+    ch:chain      ch:quality_loop ;
+    ch:stepIndex  "7"^^xsd:integer ;
+    ch:pattern    w4g:adapter_priority_ranked ;
+    ch:stateExpr  "300u64 | (200u64 << 16) | (400u64 << 32) | (100u64 << 48)" ;
+    ch:inputExpr  "0u64" ;
+    ch:stepDoc    "Adapter rank: priorities=[300,200,400,100] → sort descending via bitonic network." .
+
+ch:c8s8 a ch:ChainStep ;
+    ch:chain      ch:quality_loop ;
+    ch:stepIndex  "8"^^xsd:integer ;
+    ch:pattern    w4g:capability_flag_evaluated ;
+    ch:stateExpr  "0b1010_1010u64" ;
+    ch:inputExpr  "3u64" ;
+    ch:stepDoc    "Capability flag: flags=0xAA, check bit idx=3 → bit 3 of 0b10101010 = 1." .
