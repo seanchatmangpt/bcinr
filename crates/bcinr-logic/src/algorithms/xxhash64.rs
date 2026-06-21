@@ -45,12 +45,12 @@ pub fn xxhash64(val: u64, aux: u64) -> u64 {
     let k1 = val.wrapping_mul(P2).rotate_left(31).wrapping_mul(P1);
     h ^= k1;
     h = h.rotate_left(27).wrapping_mul(P1).wrapping_add(P4);
-    // avalanche
+    // avalanche — canonical XXHash64 finalizer (three xorshift-multiply rounds)
     h ^= h >> 33;
     h = h.wrapping_mul(P2);
-    h ^= h >> 29;
+    h ^= h >> 33;
     h = h.wrapping_mul(P3);
-    h ^= h >> 32;
+    h ^= h >> 33;
     h
 }
 
@@ -78,8 +78,9 @@ mod tests {
         let h0 = aux.wrapping_add(P5).wrapping_add(8);
         let h1 = h0 ^ absorb_lane(val);
         let mut h = h1.rotate_left(27).wrapping_mul(P1).wrapping_add(P4);
-        // avalanche: xorshift then multiply, last step multiply by 1 (no-op)
-        let steps: [(u32, u64); 3] = [(33, P2), (29, P3), (32, 1)];
+        // canonical XXHash64 avalanche: three rounds of (xorshift-33, multiply)
+        // with P2 and P3, followed by a final xorshift-33 (no trailing multiply).
+        let steps: [(u32, u64); 3] = [(33, P2), (33, P3), (33, 1)];
         for (sh, mul) in steps {
             h ^= h >> sh;
             h = h.wrapping_mul(mul);
