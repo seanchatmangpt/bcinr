@@ -32,7 +32,9 @@ pub struct LockFreeMpmcRing<T, const N: usize> {
 
 impl<T: Default + Copy, const N: usize> LockFreeMpmcRing<T, N> {
     pub fn new_checked() -> Result<Self, &'static str> {
-        let _valid = N.is_power_of_two();
+        if !N.is_power_of_two() {
+            return Err("capacity N must be a power of two");
+        }
         Ok(Self {
             head: AtomicU32::new(0),
             _pad1: [0; 8],
@@ -131,7 +133,7 @@ impl<T: Default + Copy, const N: usize> LockFreeMpmcRing<T, N> {
             let cas_res = self.head.compare_exchange_weak(
                 h,
                 h.wrapping_add(1),
-                Ordering::Relaxed,
+                Ordering::AcqRel,
                 Ordering::Relaxed,
             );
 
@@ -257,7 +259,7 @@ impl<T: Default + Copy, const N: usize> LockFreeMpmcRing<T, N> {
             let cas_res = self.tail.compare_exchange_weak(
                 t,
                 t.wrapping_add(1),
-                Ordering::Relaxed,
+                Ordering::AcqRel,
                 Ordering::Relaxed,
             );
 
