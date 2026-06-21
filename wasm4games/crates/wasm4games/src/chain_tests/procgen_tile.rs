@@ -18,7 +18,7 @@ mod procgen_tile_chain {
         // Step 5: Spawn weight: noise roll (step1) vs spawn rate threshold=180.
         let step5 = spawn_weight_evaluated(step1, 180u64);
         // Step 6: Physics render: value=1200, clamp to [0, 1000] → 1000.
-        let step6 = physics_value_rendered(1200u64, 1000u64 << 16);
+        let step6 = physics_value_rendered(1200u64, 0u64 | (1000u64 << 16));
         // Step 7: Spawn object: type=1, variant=2.
         let step7 = object_spawned(1u64, 2u64);
         // Step 8: Seal spawn event (step7) into FNV-1a receipt chain.

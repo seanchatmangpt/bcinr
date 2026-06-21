@@ -17,6 +17,10 @@
 // Miscellaneous pedantic lints that don't apply to generated kernel code.
 #![allow(clippy::bool_to_int_with_if)]
 #![allow(clippy::decimal_bitwise_operands)]
+// Chain-test fixtures mirror the explicit packed-field layout declared in chains.ttl
+// (e.g. `80u64 | (0u64 << 8)` documents an empty high field); identity-op `| 0` terms
+// are intentional so the generated source byte-matches the ontology source of truth.
+#![allow(clippy::identity_op)]
 #![allow(clippy::doc_markdown)]
 #![allow(clippy::items_after_statements)]
 #![allow(clippy::match_same_arms)]
@@ -120,6 +124,10 @@ pub mod patterns;
 
 /// Offline admissibility proxy and determinism checks.
 pub mod verify;
+
+/// Offline object-centric process-mining: token-replay conformance checking of the JTBD
+/// chains against their declared `chains.ttl` model (the `wasm4pm` doctrine, made offline).
+pub mod procmine;
 
 /// Re-export of the marker trait so downstream code uses a single `Branchless` notion.
 pub use bcinr_logic::Branchless;

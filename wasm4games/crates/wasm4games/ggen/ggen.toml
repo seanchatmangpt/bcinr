@@ -172,3 +172,21 @@ name = "pattern_index_docs"
 query = { file = "queries/pattern_index_docs.rq" }
 template = { file = "templates/patterns_index.md.tera" }
 output_file = "docs/patterns/INDEX.md"
+
+# ---------------------------------------------------------------------------
+# Rule: procmine_model  (single file — normative process model for conformance)
+# ---------------------------------------------------------------------------
+# Query : queries/chain_models.rq
+#   One row per chain (ordered by name) with its 8 activity ids in stepIndex order
+#   (GROUP_CONCAT over an ordered subquery) plus the chain's ch:golden digest.
+#
+# Template: templates/procmine_model.rs.tera
+#   Emits `pub static CHAIN_MODELS: &[ChainModel]` — the de jure process model that the
+#   `procmine` token-replay conformance checker scores observed traces against.
+#
+# Output  : src/procmine/model.rs  (single file, no fanout)
+[[generation.rules]]
+name = "procmine_model"
+query = { file = "queries/chain_models.rq" }
+template = { file = "templates/procmine_model.rs.tera" }
+output_file = "src/procmine/model.rs"

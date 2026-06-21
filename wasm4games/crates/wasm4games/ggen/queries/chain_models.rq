@@ -1,0 +1,30 @@
+# chain_models.rq — one row per JTBD chain with its ordered activity-id sequence.
+# Drives templates/procmine_model.rs.tera (single file, no fanout) to generate
+# src/procmine/model.rs: the normative process model consumed by token-replay conformance.
+#
+# The inner subquery ORDERs steps by ?stepIndex before grouping, so the GROUP_CONCAT
+# yields the activity ids in execution order (1..8). The outer query ORDERs chains by
+# name so CHAIN_MODELS is stable across regenerations and chain_id == loop index.
+
+PREFIX w4g: <https://wasm4games.dev/ontology#>
+PREFIX ch:  <https://wasm4games.dev/chains#>
+
+SELECT ?chainName ?golden (GROUP_CONCAT(?patternId; SEPARATOR=", ") AS ?activityIds)
+WHERE {
+    {
+        SELECT ?chainName ?golden ?patternId ?stepIndex
+        WHERE {
+            ?chain a ch:Chain ;
+                ch:name   ?chainName ;
+                ch:golden ?golden .
+            ?step a ch:ChainStep ;
+                ch:chain     ?chain ;
+                ch:stepIndex ?stepIndex ;
+                ch:pattern   ?pattern .
+            ?pattern w4g:id ?patternId .
+        }
+        ORDER BY ?stepIndex
+    }
+}
+GROUP BY ?chainName ?golden
+ORDER BY ?chainName
