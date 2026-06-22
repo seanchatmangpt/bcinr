@@ -14,7 +14,7 @@ readme = "../README.md"
 [dependencies]
 criterion = "0.5"
 bcinr-core = { path = "../bcinr-core", version = "26.6.13" }
-bcinr-logic = { path = "../crates/bcinr-logic", version = "26.6.13", features = ["bench"] }
+bcinr-logic = { path = "../crates/bcinr-logic", version = "26.6.13", features = ["bench", "alloc"] }
 prettytable-rs = "0.10.0"
 
 [features]

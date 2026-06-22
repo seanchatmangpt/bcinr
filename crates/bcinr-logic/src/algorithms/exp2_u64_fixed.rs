@@ -39,6 +39,7 @@ pub fn exp2_u64_fixed(val: u64, _aux: u64) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::proptest;
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation matching same integer-exp semantics

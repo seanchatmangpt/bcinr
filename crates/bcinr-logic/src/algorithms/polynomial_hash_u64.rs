@@ -13,6 +13,7 @@
 // Evaluating via Horner's rule: hash = (...((data[0]*base + data[1])*base + data[2])...)
 // All arithmetic is branchless wrapping multiplication and addition.
 
+extern crate alloc;
 /// Polynomial rolling hash of `data` using Horner's method.
 ///
 /// Computes:
@@ -212,17 +213,23 @@ mod tests {
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
+    #[cfg(feature = "alloc")]
+    use alloc::vec::Vec;
 
     pub fn bench_polynomial_hash_u64(c: &mut Criterion) {
-        let data: Vec<u8> = (0u8..=63).collect();
-        c.bench_function("polynomial_hash_u64/64B", |b| {
-            b.iter(|| {
-                black_box(polynomial_hash_u64(
-                    black_box(&data),
-                    black_box(31),
-                    black_box(1_000_000_007),
-                ))
-            })
-        });
+        #[cfg(feature = "alloc")]
+        {
+            use alloc::vec::Vec;
+            let data: Vec<u8> = (0u8..=63).collect();
+            c.bench_function("polynomial_hash_u64/64B", |b| {
+                b.iter(|| {
+                    black_box(polynomial_hash_u64(
+                        black_box(&data),
+                        black_box(31),
+                        black_box(1_000_000_007),
+                    ))
+                })
+            });
+        }
     }
 }

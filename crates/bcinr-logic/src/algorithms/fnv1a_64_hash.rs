@@ -13,6 +13,7 @@
 // 8 bytes at a time via SWAR decomposition for throughput.
 
 /// FNV-1a 64-bit hash over an arbitrary byte slice.
+extern crate alloc;
 ///
 /// Applies the Fowler-Noll-Vo 1a recurrence:
 /// `hash = (hash XOR byte) * FNV_PRIME` for each byte.
@@ -217,8 +218,13 @@ mod tests {
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
+    #[cfg(feature = "alloc")]
+    use alloc::vec::Vec;
 
     pub fn bench_fnv1a_64_hash(c: &mut Criterion) {
+        use alloc::vec::Vec;
+        #[cfg(feature = "alloc")]
+        {
         let data: Vec<u8> = (0u8..=63).collect();
         c.bench_function("fnv1a_64_hash/64B", |b| {
             b.iter(|| {
@@ -226,5 +232,6 @@ pub mod bench {
                 black_box(res)
             })
         });
+        }
     }
 }
