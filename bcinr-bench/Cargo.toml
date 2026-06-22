@@ -40,3 +40,10 @@ harness = false
 [[bench]]
 name = "throughput_bench"
 harness = false
+
+[[bench]]
+name = "fix_bench"
+harness = false
+
+[[example]]
+name = "timing"
