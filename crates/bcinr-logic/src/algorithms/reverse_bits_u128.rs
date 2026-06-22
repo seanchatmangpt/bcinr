@@ -45,6 +45,7 @@ pub fn reverse_bits_u128(val: u64, aux: u64) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation

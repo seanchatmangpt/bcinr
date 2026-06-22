@@ -32,7 +32,7 @@ pub fn fp_cos_u32_q16(val: u64, aux: u64) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proptest::proptest;
+    use proptest::prelude::*;
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Independent reference using f64 trigonometry

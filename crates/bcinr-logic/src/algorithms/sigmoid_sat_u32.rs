@@ -53,6 +53,7 @@ pub fn sigmoid_sat_u32(val: u64, _aux: u64) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation using f64 logistic function
