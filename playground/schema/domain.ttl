@@ -1,0 +1,94 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix bcinr: <https://chatmangpt.com/ontologies/bcinr#> .
+
+<https://chatmangpt.com/ontologies/bcinr> a owl:Ontology ;
+  rdfs:label "BCINR Branchless Process Intelligence Ontology" ;
+  rdfs:comment "Semantic schema describing branchless, zero-allocation workflow execution substrates." ;
+  owl:versionInfo "1.0.0" ;
+  dct:created "2026-06-23"^^xsd:date .
+
+# ==============================================================================
+# Primitives (Radon Law & Zero Allocation)
+# ==============================================================================
+
+bcinr:BranchlessPrimitive a rdfs:Class ;
+  rdfs:label "Branchless Primitive" ;
+  rdfs:comment "A function exhibiting constant-time execution with CC = 1." .
+
+bcinr:select_u64 a bcinr:BranchlessPrimitive ;
+  rdfs:label "select_u64" ;
+  rdfs:comment "Multiplexer selecting between two values based on a bitmask." .
+
+bcinr:nz_mask a bcinr:BranchlessPrimitive ;
+  rdfs:label "nz_mask" ;
+  rdfs:comment "Produces a full 64-bit mask from a non-zero value." .
+
+bcinr:z_mask a bcinr:BranchlessPrimitive ;
+  rdfs:label "z_mask" ;
+  rdfs:comment "Produces a full 64-bit mask from a zero value." .
+
+# ==============================================================================
+# Petri Net Engine Module
+# ==============================================================================
+
+bcinr:PetriNetEngine a rdfs:Class ;
+  rdfs:label "Petri Net Replay Engine" ;
+  rdfs:comment "Replays execution traces on a Petri net utilizing branchless state transformations." .
+
+bcinr:petri_fire_transition a rdf:Property ;
+  rdfs:label "petri_fire_transition" ;
+  rdfs:domain bcinr:PetriNetEngine ;
+  rdfs:comment "Fires a transition constant-time/branchlessly by updating the marking bitboard." .
+
+bcinr:petri_fire_invisible a rdf:Property ;
+  rdfs:label "petri_fire_invisible" ;
+  rdfs:domain bcinr:PetriNetEngine ;
+  rdfs:comment "Fires silent transitions in a bounded loop to complete the reachability frontier." .
+
+# ==============================================================================
+# YAWL Routing Engine Module
+# ==============================================================================
+
+bcinr:BYawlEngine a rdfs:Class ;
+  rdfs:label "bYAWL Engine" ;
+  rdfs:comment "Engine executing the 43 Workflow Patterns branchlessly." .
+
+bcinr:BYawlTask a rdfs:Class ;
+  rdfs:label "bYAWL Task" ;
+  rdfs:comment "Struct mapping join/split masks and types for YAWL routing." .
+
+bcinr:JoinType a rdfs:Class ;
+  rdfs:label "Join Type" ;
+  rdfs:comment "Workflow join logic (AND, XOR, OR, Complex, ThreadMerge)." .
+
+bcinr:SplitType a rdfs:Class ;
+  rdfs:label "Split Type" ;
+  rdfs:comment "Workflow split logic (AND, XOR, OR, MultiInstance, etc.)." .
+
+# ==============================================================================
+# POWL Matrix Compiler Module
+# ==============================================================================
+
+bcinr:PowlCompiler a rdfs:Class ;
+  rdfs:label "POWL Ontology Matrix Compiler" ;
+  rdfs:comment "Lowers hierarchical process models to a flat cache-aligned instruction stream." .
+
+bcinr:Powl64OpKind a rdfs:Class ;
+  rdfs:label "POWL64 Op Kind" ;
+  rdfs:comment "Flat opcode kind (Activity, ChoiceGate, LoopGate, Scope boundary, etc.)." .
+
+bcinr:Powl64Op a rdfs:Class ;
+  rdfs:label "POWL64 Op" ;
+  rdfs:comment "Cache-aligned 64-byte instruction struct featuring predecessor/successor completion masks." .
+
+# ==============================================================================
+# WASM API Boundary Module
+# ==============================================================================
+
+bcinr:WasmApiBoundary a rdfs:Class ;
+  rdfs:label "WASM API Boundary" ;
+  rdfs:comment "Hermetic C-compatible WebAssembly wrapping layer for bcinr engines." .

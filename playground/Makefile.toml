@@ -1,0 +1,29 @@
+[config]
+skip_core_tasks = false
+
+[tasks.ggen-sync]
+category = "Build"
+description = "Sync the playground with ggen ontology"
+command = "ggen"
+args = ["sync"]
+
+[tasks.check]
+dependencies = ["ggen-sync"]
+category = "Build"
+description = "Verify playground compiles"
+command = "cargo"
+args = ["check", "--all-targets", "--all-features"]
+
+[tasks.build]
+dependencies = ["ggen-sync"]
+category = "Build"
+description = "Build playground in release mode"
+command = "cargo"
+args = ["build", "--release", "--all-features"]
+
+[tasks.test]
+dependencies = ["ggen-sync"]
+category = "Test"
+description = "Run playground tests"
+command = "cargo"
+args = ["test", "--all-features", "--all-targets"]

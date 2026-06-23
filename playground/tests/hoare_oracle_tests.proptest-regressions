@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc b7ca8aaf9cf923c579c6bb0985eb0720b35fd156bb2b9cad893973573259018d # shrinks to state_mask = 12, active_triggers = 0, fired_joins_mask = 0, active_locks = 0, active_instances_vec = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], task_id = 0, join_type_idx = 0, split_type_idx = 0, min_instances = 0, max_instances = 0, threshold_instances = 0, join_state_bit = 0, flags = 0, consume_mask = 0, produce_mask = 0, cancellation_mask = 0, condition_mask = 0, reset_mask = 5542201145326011, reachability_mask = 16843743225941618115, interleaved_lock_mask = 8276154488784363264

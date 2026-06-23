@@ -1,0 +1,36 @@
+[project]
+name = "bcinr-process-intelligence"
+version = "0.1.0"
+description = "A ggen project for generating branchless process intelligence modules"
+authors = ["Antigravity"]
+license = "MIT"
+
+[ontology]
+source = "schema/domain.ttl"
+standard_only = false
+
+[inference]
+rules = [
+    { name = "standard-normalization", construct = "CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }" }
+]
+
+[generation]
+output_dir = "."
+
+[[generation.rules]]
+name = "bcinr-summary"
+query = { inline = """
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX bcinr: <https://chatmangpt.com/ontologies/bcinr#>
+
+SELECT ?class ?label ?comment
+WHERE {
+  ?class rdfs:label ?label .
+  OPTIONAL { ?class rdfs:comment ?comment . }
+}
+LIMIT 50
+""" }
+template = { file = "templates/bcinr_summary.txt.tera" }
+output_file = "bcinr_summary.txt"
+mode = "Overwrite"

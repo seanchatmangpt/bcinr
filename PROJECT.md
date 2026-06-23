@@ -1,30 +1,44 @@
-# Project: BCINR release v26.6.13
+# Project: Branchless Process Intelligence Library Suite
 
 ## Architecture
-- `crates/bcinr-logic/`: The core logic crate containing 307 branchless algorithm files under `src/algorithms/`.
-- `tools/bcinr-contract-gate/`: Static analysis tool parsing rust code to verify Cyclomatic Complexity = 1 and compliance.
-- `tools/bcinr-cheat-scanner/`: Detects 5 systematic anti-patterns (self-canceling XOR, circular references, magic constants, padding inflation, fake proofs). Blocks commits in CI.
-- `tools/bcinr-bench-auditor/`: Tool comparing public symbols against criterion benchmarks.
-- `tools/bcinr-reporter/`: Generates audit reports and module integrity status.
-- `tools/u64_audit.py`: Python audit script updating doc clauses, references, proof blocks, and padding in algorithm files.
+We implement a branchless, zero-allocation, `#![no_std]` process intelligence suite inside the `playground` crate.
+It consists of four primary layers:
+1. **petri**: Bitmask-based Petri Net token replay engine.
+2. **yawl**: YAWL routing semantics engine supporting OR/AND/XOR splits and joins, cancelling discriminators, and interleaved parallel routing.
+3. **powl**: POWL ontology matrix compiler which flattens process trees into non-recursive flat `Powl64Op` array execution via static masks.
+4. **wasm**: `#![no_std]` WASM API boundary wrapping the Petri Net and YAWL engines without dynamic allocations.
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| 1 | Test Infra Setup | Design and build the E2E test suite and runner | none | DONE (Conv: 403cae79-f741-45a4-b67d-1113397a0ae2) |
-| 2 | Rust-based Audit & Algo Correctness | Write a Rust binary in the workspace to update references, doc clauses, proof blocks, and padding in algorithm files, and refactor implementation bodies to match references branchlessly and satisfy contract gate | M1 | DONE (Conv: 8240f309-2f4c-4f19-bddb-0cc5eaf65784) |
-| 3 | Tool Admissibility & LSP Fixes | Migrate substring checks in contract-gate/bench-auditor to AST checks; fix Cargo.lock/ORIGINAL_REQUEST LSP warnings | M2 | DONE (Conv: 8240f309-2f4c-4f19-bddb-0cc5eaf65784) |
-| 4 | Warn & Link Fixes | Fix 22 compiler/lint warnings and solve workspace doctest linkage conflicts | M2 | DONE (Conv: 8240f309-2f4c-4f19-bddb-0cc5eaf65784) |
-| 5 | Benchmark Coverage | Add Criterion benchmarks for the 59 helper functions or refine bench-auditor filters | M3, M4 | DONE (Conv: 8240f309-2f4c-4f19-bddb-0cc5eaf65784) |
-| 6 | Release & Victory Verification | Verify all E2E tests, scan diagnostics, contract gates, and run Forensic Auditor | M5 | DONE (Conv: 8240f309-2f4c-4f19-bddb-0cc5eaf65784) |
+| 1 | E2E Testing Track | Design E2E test infra, write Tiers 1-4 tests, publish `TEST_READY.md` | none | IN_PROGRESS (Conv: 4ec3934d-896b-4d9c-9169-cbf93bab5cbe) |
+| 2 | Petri Net Engine | Implement branchless, zero-alloc Petri Net token replay (`petri`) | none | IN_PROGRESS (Conv: 2a11a9ca-8e2d-49ae-949f-1027432776de) |
+| 3 | YAWL Routing Engine | Implement branchless YAWL routing semantics (`yawl`) | M2 | IN_PROGRESS (Conv: 2a11a9ca-8e2d-49ae-949f-1027432776de) |
+| 4 | POWL Compiler | Implement flat non-recursive POWL execution (`powl`) | M3 | IN_PROGRESS (Conv: 2a11a9ca-8e2d-49ae-949f-1027432776de) |
+| 5 | WASM API Boundary | Implement no_std WASM C-interface wrappers (`wasm`) | M2, M3 | IN_PROGRESS (Conv: 2a11a9ca-8e2d-49ae-949f-1027432776de) |
+| 6 | Final Integration & Hardening | Pass 100% E2E tests, add adversarial tests (Tier 5) | M1, M2, M3, M4, M5 | IN_PROGRESS (Conv: 2a11a9ca-8e2d-49ae-949f-1027432776de) |
 
 ## Interface Contracts
-- `crates/bcinr-logic/src/algorithms/`: Each file must export `pub fn <name>(val: u64, aux: u64) -> u64` with CC=1 and zero heap allocations.
-- Each algorithm file must contain doc comments with the literal phrase `"Branchless Contract"`.
-- `tools/u64_audit.py`: Python script to format and update reference code in all 307 files.
-- `anti-llm-cheat-lsp`: LSP scan command must exit with 0 diagnostics.
+- **CC = 1**: All public primitives must avoid data-dependent branching (no `if`, `match`, or loops checking data). Use bitwise polynomials and mask selection.
+- **Zero-Allocation**: No dynamic heap allocations (`Vec`, `Box`, etc. from `alloc`) on the hot execution paths.
+- **no_std**: The playground crate must compile with `#![no_std]`.
+
+### Module APIs:
+- **petri**:
+  - `pub fn petri_fire_transition(marking: &mut u64, in_mask: u64, out_mask: u64, missing: &mut u32, consumed: &mut u32, produced: &mut u32)`
+  - `pub fn petri_fire_invisible(marking: &mut u64, inv_in_masks: &[u64], inv_out_masks: &[u64])`
+- **yawl**:
+  - `BYawlEngine::execute_task_branchless(&mut self, task: &BYawlTask) -> u64`
+- **powl**:
+  - `pub fn powl64_execute_step(state: &mut PowlState, op: &Powl64Op, input_choice: u64, loop_repeat: u64)`
+- **wasm**:
+  - `pub unsafe extern "C" fn wasm_petri_replay(...) -> i32`
+  - `pub unsafe extern "C" fn wasm_yawl_execute_task(...) -> i32`
 
 ## Code Layout
-- `crates/bcinr-logic/src/algorithms/`: The branchless primitive implementations.
-- `tools/`: Scanners, auditors, and formatting scripts.
-- `bcinr-bench/benches/`: Criterion benchmarks.
+- `playground/src/lib.rs`: Library root containing module exports.
+- `playground/src/petri.rs`: Petri net replayer.
+- `playground/src/yawl.rs`: YAWL routing engine.
+- `playground/src/powl.rs`: POWL compiler/executor.
+- `playground/src/wasm.rs`: WASM C-API.
+- `playground/tests/`: Integration, differential, and property-based tests.
