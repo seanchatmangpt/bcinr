@@ -306,12 +306,10 @@ pub mod bench {
     use alloc::vec::Vec;
     use criterion::{black_box, Criterion};
     #[cfg(feature = "alloc")]
-    use alloc::vec::Vec;
 
     pub fn bench_wyhash_64(c: &mut Criterion) {
         #[cfg(feature = "alloc")]
         {
-            use alloc::vec::Vec;
             let data: Vec<u8> = (0u8..=63).collect();
             c.bench_function("wyhash_64/64B", |b| {
                 b.iter(|| black_box(wyhash_64(black_box(&data), black_box(0))))

@@ -217,12 +217,10 @@ pub mod bench {
     use alloc::vec::Vec;
     use criterion::{black_box, Criterion};
     #[cfg(feature = "alloc")]
-    use alloc::vec::Vec;
 
     pub fn bench_pearson_hash_16(c: &mut Criterion) {
         #[cfg(feature = "alloc")]
         {
-            use alloc::vec::Vec;
             let data: Vec<u8> = (0u8..=63).collect();
             c.bench_function("pearson_hash_16/64B", |b| {
                 b.iter(|| black_box(pearson_hash_16(black_box(&data))))

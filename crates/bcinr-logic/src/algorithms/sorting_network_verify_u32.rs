@@ -123,12 +123,10 @@ pub mod bench {
     use alloc::vec::Vec;
     use criterion::{black_box, Criterion};
     #[cfg(feature = "alloc")]
-    use alloc::vec::Vec;
 
     pub fn bench_sorting_network_verify_u32(c: &mut Criterion) {
         #[cfg(feature = "alloc")]
         {
-            use alloc::vec::Vec;
             let data: Vec<u32> = (0..256).collect();
             c.bench_function("sorting_network_verify_u32", |b| {
                 b.iter(|| sorting_network_verify_u32(black_box(&data)))

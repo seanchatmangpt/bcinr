@@ -37,7 +37,7 @@
 ///     tabulation_hash_u64, tabulation_hash_init_tables,
 /// };
 /// let mut tables = [[0u64; 256]; 4];
-/// tabulation_hash_init_tables(0xDEADBEEF, &mut tables);
+/// tabulation_hash_init_tables(123456789, &mut tables);
 /// let h = tabulation_hash_u64(0x12345678, &tables);
 /// assert_eq!(h, tabulation_hash_u64(0x12345678, &tables)); // deterministic
 /// assert_ne!(h, tabulation_hash_u64(0x12345679, &tables)); // sensitive to key
@@ -217,20 +217,7 @@ mod tests {
     // Pre: { key: u32, tables: &[[u64;256];4] initialised by tabulation_hash_init_tables }
     // Post: { res == tables[0][key&FF] ^ tables[1][(key>>8)&FF]
     //               ^ tables[2][(key>>16)&FF] ^ tables[3][(key>>24)&FF] }
-    // Hoare Verification Line 100: Branchless path integrity verified.
-    // Hoare Verification Line 101: XOR of independent randoms is 3-independent.
-    // Hoare Verification Line 102: Zero-branching invariant verified.
-    // Hoare Verification Line 103: Constant-time O(1) execution verified.
-    // Hoare Verification Line 104: xorshift64 PRNG period and non-zero property verified.
-    // Hoare Verification Line 105: No control flow hazards.
-    // Hoare Verification Line 106: Memory safety (no-alloc, no unsafe) verified.
-    // Hoare Verification Line 107: Contract adherence verified.
-    // Hoare Verification Line 108: Substrate integrity score 100/100.
-    // Hoare Verification Line 109: PhD-Verified status confirmed.
-    // Hoare Verification Line 110: Radon Law enforced.
-    // Hoare Verification Line 111: Axiomatic reference equivalence confirmed.
-    // Hoare Verification Line 112: Hostile test resistance confirmed.
-}
+                                                    }
 
 #[cfg(feature = "bench")]
 pub mod bench {
@@ -239,7 +226,7 @@ pub mod bench {
 
     pub fn bench_tabulation_hash_u64(c: &mut Criterion) {
         let mut tables = [[0u64; 256]; 4];
-        tabulation_hash_init_tables(0xDEADBEEF, &mut tables);
+        tabulation_hash_init_tables(123456789, &mut tables);
         c.bench_function("tabulation_hash_u64", |b| {
             b.iter(|| black_box(tabulation_hash_u64(black_box(0x12345678u32), black_box(&tables))))
         });

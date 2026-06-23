@@ -215,12 +215,10 @@ pub mod bench {
     use alloc::vec::Vec;
     use criterion::{black_box, Criterion};
     #[cfg(feature = "alloc")]
-    use alloc::vec::Vec;
 
     pub fn bench_polynomial_hash_u64(c: &mut Criterion) {
         #[cfg(feature = "alloc")]
         {
-            use alloc::vec::Vec;
             let data: Vec<u8> = (0u8..=63).collect();
             c.bench_function("polynomial_hash_u64/64B", |b| {
                 b.iter(|| {
