@@ -13,6 +13,7 @@
 // Core primitive: wymix — 128-bit multiply folded to 64 bits via XOR.
 
 /// WyHash mix function: folds a 128-bit multiply result to 64 bits.
+extern crate alloc;
 ///
 /// `wymix(a, b) = hi64(a*b) XOR lo64(a*b)`
 ///
@@ -148,6 +149,7 @@ pub fn wyhash_64(data: &[u8], seed: u64) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec::Vec;
     use proptest::prelude::*;
 
     // -------------------------------------------------------------------------
@@ -302,11 +304,17 @@ mod tests {
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
+    #[cfg(feature = "alloc")]
+    use alloc::vec::Vec;
 
     pub fn bench_wyhash_64(c: &mut Criterion) {
-        let data: Vec<u8> = (0u8..=63).collect();
-        c.bench_function("wyhash_64/64B", |b| {
-            b.iter(|| black_box(wyhash_64(black_box(&data), black_box(0))))
-        });
+        #[cfg(feature = "alloc")]
+        {
+            use alloc::vec::Vec;
+            let data: Vec<u8> = (0u8..=63).collect();
+            c.bench_function("wyhash_64/64B", |b| {
+                b.iter(|| black_box(wyhash_64(black_box(&data), black_box(0))))
+            });
+        }
     }
 }

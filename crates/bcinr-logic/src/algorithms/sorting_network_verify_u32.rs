@@ -13,6 +13,7 @@
 ///
 /// # Branchless Contract
 /// **Ensures:** Returns `1` iff `∀ i ∈ [0, n-2]: slice[i] ≤ slice[i+1]`.
+extern crate alloc;
 /// **Invariant:** Execution path is independent of slice contents.
 ///
 /// # Examples
@@ -43,6 +44,7 @@ pub fn sorting_network_verify_u32(slice: &[u32]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec::Vec;
     use proptest::prelude::*;
 
     #[test]
@@ -119,11 +121,17 @@ mod tests {
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
+    #[cfg(feature = "alloc")]
+    use alloc::vec::Vec;
 
     pub fn bench_sorting_network_verify_u32(c: &mut Criterion) {
-        let data: Vec<u32> = (0..256).collect();
-        c.bench_function("sorting_network_verify_u32", |b| {
-            b.iter(|| sorting_network_verify_u32(black_box(&data)))
-        });
+        #[cfg(feature = "alloc")]
+        {
+            use alloc::vec::Vec;
+            let data: Vec<u32> = (0..256).collect();
+            c.bench_function("sorting_network_verify_u32", |b| {
+                b.iter(|| sorting_network_verify_u32(black_box(&data)))
+            });
+        }
     }
 }

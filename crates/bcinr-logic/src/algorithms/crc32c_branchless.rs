@@ -13,6 +13,7 @@
 // the current state, and the table is constant, so the entire hot path is
 // a single XOR, a table lookup, and a right-shift.
 
+extern crate alloc;
 /// Castagnoli polynomial (reflected): used to build the CRC-32C table.
 const CRC32C_POLY: u32 = 0x82F63B78;
 
@@ -71,6 +72,7 @@ pub fn crc32c_branchless(data: &[u8], initial: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec::Vec;
     use proptest::prelude::*;
 
     // -------------------------------------------------------------------------
@@ -219,11 +221,17 @@ mod tests {
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
+    #[cfg(feature = "alloc")]
+    use alloc::vec::Vec;
 
     pub fn bench_crc32c_branchless(c: &mut Criterion) {
+        use alloc::vec::Vec;
+        #[cfg(feature = "alloc")]
+        {
         let data: Vec<u8> = (0u8..=63).collect();
         c.bench_function("crc32c_branchless/64B", |b| {
             b.iter(|| black_box(crc32c_branchless(black_box(&data), black_box(!0))))
         });
+        }
     }
 }

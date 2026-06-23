@@ -98,73 +98,99 @@ pub const fn horizontal_sum_u8x8(v: u64) -> u64 {
     (res & 0x00000000FFFFFFFF) + ((res >> 32) & 0x00000000FFFFFFFF)
 }
 
-/// Returns the maximum byte value across 8 packed `u8` lanes in a `u64`.
+// Per-byte unsigned "a >= b" predicate for packed u64 SWAR words. Returns 0xFF in
+// each byte lane where the unsigned byte a_i >= b_i, and 0x00 otherwise, with no
+// cross-lane carries.
+//
+// A naive `(a | HI) - (b & !HI)` only compares the low 7 bits of each lane and
+// discards the real top bit, which is wrong for any byte >= 0x80. The true 8-bit
+// unsigned comparison must fold the genuine top bits back in:
+//   a_i >= b_i  <=>  (a7 & !b7) | ((a7 == b7) & (a_lo7 >= b_lo7)).
+#[inline(always)]
+fn swar_byte_ge_mask(a: u64, b: u64) -> u64 {
+    const HI: u64 = 0x8080_8080_8080_8080u64; // top bit of each lane
+    const LO: u64 = 0x7F7F_7F7F_7F7F_7F7Fu64; // low 7 bits of each lane
+    let a7 = a & HI;
+    let b7 = b & HI;
+    // Borrow into bit 7 of the low-7-bit subtraction: set iff a_lo7 >= b_lo7.
+    let borrow = (a | HI).wrapping_sub(b & LO) & HI;
+    // Fold in the real top bits to obtain the true 8-bit comparison in bit 7.
+    let ge = ((a7 & !b7) | (!(a7 ^ b7) & borrow)) & HI;
+    // Expand each lane's bit 7 to a full 0xFF mask, strictly within the lane:
+    // (ge - (ge >> 7)) is 0x7F where set; OR-ing ge restores the top bit -> 0xFF.
+    ge.wrapping_sub(ge >> 7) | ge
+}
+
+// Branchless per-byte unsigned max of two packed u64 SWAR words.
+// For each byte lane: selects the larger of the corresponding bytes in `a` and `b`.
+#[inline(always)]
+fn swar_byte_max(a: u64, b: u64) -> u64 {
+    let mask = swar_byte_ge_mask(a, b); // 0xFF where a >= b
+    (a & mask) | (b & !mask)
+}
+
+// Branchless per-byte unsigned min of two packed u64 SWAR words.
+// For each byte lane: selects the smaller of the corresponding bytes in `a` and `b`.
+#[inline(always)]
+fn swar_byte_min(a: u64, b: u64) -> u64 {
+    let mask = swar_byte_ge_mask(a, b); // 0xFF where a >= b => b is the min there
+    (b & mask) | (a & !mask)
+}
+
+/// Returns the maximum byte value broadcast to all 8 lanes of a packed `u64`.
 ///
 /// Treats the 64-bit word as 8 independent `u8` lanes (little-endian layout:
-/// lane 0 in bits 0–7, lane 7 in bits 56–63) and returns the largest value.
-/// Uses a branchless SWAR comparison (CC=1).
-///
-/// **Precondition:** All 8 lanes must carry the same value, or the word must be
-/// `0` or `u64::MAX`. The comparison kernel relies on a carry-trick that
-/// produces defined results only under this invariant; mixed-lane inputs yield
-/// implementation-defined output.
+/// lane 0 in bits 0–7, lane 7 in bits 56–63) and returns the largest value
+/// replicated across all 8 lanes. Uses a branchless 3-step SWAR tournament
+/// reduction correct for all mixed-lane inputs.
 ///
 /// # Examples
 ///
 /// ```
 /// use bcinr_logic::reduce::horizontal_max_u8x8;
 /// assert_eq!(horizontal_max_u8x8(0), 0);
-/// assert_eq!(horizontal_max_u8x8(u64::MAX), 255);
-/// assert_eq!(horizontal_max_u8x8(0x07_07_07_07_07_07_07_07), 7);
-/// assert_eq!(horizontal_max_u8x8(0x05_05_05_05_05_05_05_05), 5);
+/// assert_eq!(horizontal_max_u8x8(u64::MAX), u64::MAX);
+/// assert_eq!(horizontal_max_u8x8(0x07_03_05_01_06_02_04_00), 0x07_07_07_07_07_07_07_07);
+/// // High-bit lanes (>= 0x80) must compare as their true unsigned value:
+/// assert_eq!(horizontal_max_u8x8(0x80_7F_01_02_03_04_05_06), 0x80_80_80_80_80_80_80_80);
 /// ```
 #[inline(always)]
 #[must_use = "horizontal_max_u8x8 result — ignoring discards the maximum lane value"]
-pub fn horizontal_max_u8x8(v: u64) -> u8 {
-    let mut v = v;
-    (0..3).for_each(|i| {
-        let shift = 8 << i;
-        let v2 = v >> shift;
-        let mask = 0x0101010101010101u64.wrapping_mul(0xFF);
-        let m = (((v2 & mask) + (mask ^ (v & mask))) >> 7) & 0x0101010101010101u64;
-        let m = m.wrapping_mul(0xFF);
-        v = (v & !m) | (v2 & m);
-    });
-    (v & 0xFF) as u8
+pub fn horizontal_max_u8x8(v: u64) -> u64 {
+    // 3-step pairwise SWAR tournament reduction.
+    let v1 = swar_byte_max(v, v >> 8);     // compare bytes (0,1),(2,3),(4,5),(6,7)
+    let v1 = swar_byte_max(v1, v1 >> 16);  // compare pairs
+    let v1 = swar_byte_max(v1, v1 >> 32);  // final reduction
+    // Broadcast the max byte (now in byte 0) to all 8 lanes.
+    let max_byte = v1 & 0xFF;
+    max_byte.wrapping_mul(0x0101_0101_0101_0101)
 }
 
-/// Returns the minimum byte value across 8 packed `u8` lanes in a `u64`.
+/// Returns the minimum byte value broadcast to all 8 lanes of a packed `u64`.
 ///
 /// Treats the 64-bit word as 8 independent `u8` lanes (little-endian layout:
-/// lane 0 in bits 0–7, lane 7 in bits 56–63) and returns the smallest value.
-/// Uses a branchless SWAR comparison (CC=1).
-///
-/// **Precondition:** The comparison kernel relies on a carry-trick addition.
-/// For most non-zero inputs the 64-bit intermediate sum wraps; in release
-/// builds this is defined wrapping behavior, but in debug builds Rust's
-/// overflow checks will panic. Pass `0` in debug contexts; in release mode
-/// any value is safe.
+/// lane 0 in bits 0–7, lane 7 in bits 56–63) and returns the smallest value
+/// replicated across all 8 lanes. Uses a branchless 3-step SWAR tournament
+/// reduction correct for all inputs including zero and mixed lanes.
 ///
 /// # Examples
 ///
 /// ```
 /// use bcinr_logic::reduce::horizontal_min_u8x8;
-/// // Zero is always safe across all build profiles
 /// assert_eq!(horizontal_min_u8x8(0), 0);
+/// assert_eq!(horizontal_min_u8x8(u64::MAX), u64::MAX);
+/// assert_eq!(horizontal_min_u8x8(0x07_03_05_01_06_02_04_00), 0);
 /// ```
 #[inline(always)]
 #[must_use = "horizontal_min_u8x8 result — ignoring discards the minimum lane value"]
-pub fn horizontal_min_u8x8(v: u64) -> u8 {
-    let mut v = v;
-    (0..3).for_each(|i| {
-        let shift = 8 << i;
-        let v2 = v >> shift;
-        let mask = 0x0101010101010101u64.wrapping_mul(0xFF);
-        let m = (((v & mask) + (mask ^ (v2 & mask))) >> 7) & 0x0101010101010101u64;
-        let m = m.wrapping_mul(0xFF);
-        v = (v & !m) | (v2 & m);
-    });
-    (v & 0xFF) as u8
+pub fn horizontal_min_u8x8(v: u64) -> u64 {
+    // 3-step pairwise SWAR tournament reduction.
+    let v1 = swar_byte_min(v, v >> 8);     // compare bytes (0,1),(2,3),(4,5),(6,7)
+    let v1 = swar_byte_min(v1, v1 >> 16);  // compare pairs
+    let v1 = swar_byte_min(v1, v1 >> 32);  // final reduction
+    // Broadcast the min byte (now in byte 0) to all 8 lanes.
+    let min_byte = v1 & 0xFF;
+    min_byte.wrapping_mul(0x0101_0101_0101_0101)
 }
 
 // ---------------------------------------------------------------------------
@@ -423,10 +449,10 @@ mod tests_phd_reduce {
         assert_eq!(horizontal_sum_u8x8(0), 0);
         assert_eq!(horizontal_sum_u8x8(u64::MAX), 8 * 255);
         assert_eq!(horizontal_sum_u8x8(0x01_01_01_01_01_01_01_01), 8);
-        // horizontal_max_u8x8
+        // horizontal_max_u8x8 — returns max byte broadcast to all lanes
         assert_eq!(horizontal_max_u8x8(0), 0);
-        assert_eq!(horizontal_max_u8x8(u64::MAX), 255);
-        // horizontal_min_u8x8 — only v=0 safe in debug builds (carry-trick overflow)
+        assert_eq!(horizontal_max_u8x8(u64::MAX), u64::MAX);
+        // horizontal_min_u8x8 — returns min byte broadcast to all lanes
         assert_eq!(horizontal_min_u8x8(0), 0);
     }
 
@@ -569,6 +595,90 @@ mod tests_phd_reduce {
     #[test]
     fn test_reduce_sum_single() {
         assert_eq!(reduce_sum_u64(&[42]), 42);
+    }
+
+    #[test]
+    fn test_horizontal_max_u8x8_mixed() {
+        // bytes [3,1,4,1,5,9,2,6] — max is 9, broadcast to all lanes
+        assert_eq!(
+            horizontal_max_u8x8(u64::from_le_bytes([3, 1, 4, 1, 5, 9, 2, 6])),
+            0x0909_0909_0909_0909
+        );
+    }
+
+    #[test]
+    fn test_horizontal_max_u8x8_zero() {
+        assert_eq!(horizontal_max_u8x8(0), 0);
+    }
+
+    #[test]
+    fn test_horizontal_max_u8x8_all_ff() {
+        assert_eq!(horizontal_max_u8x8(u64::MAX), 0xFFFF_FFFF_FFFF_FFFFu64);
+    }
+
+    #[test]
+    fn test_horizontal_min_u8x8_mixed() {
+        // bytes [3,1,4,1,5,9,2,6] — min is 1, broadcast to all lanes
+        assert_eq!(
+            horizontal_min_u8x8(u64::from_le_bytes([3, 1, 4, 1, 5, 9, 2, 6])),
+            0x0101_0101_0101_0101
+        );
+    }
+
+    #[test]
+    fn test_horizontal_min_u8x8_zero() {
+        assert_eq!(horizontal_min_u8x8(0), 0);
+    }
+
+    #[test]
+    fn test_horizontal_max_u8x8_uniform() {
+        // All lanes are 7 — max is 7, broadcast
+        assert_eq!(
+            horizontal_max_u8x8(0x0707_0707_0707_0707u64),
+            0x0707_0707_0707_0707u64
+        );
+    }
+
+    #[test]
+    fn test_horizontal_min_u8x8_uniform() {
+        // All lanes are 5 — min is 5, broadcast
+        assert_eq!(
+            horizontal_min_u8x8(0x0505_0505_0505_0505u64),
+            0x0505_0505_0505_0505u64
+        );
+    }
+
+    // Scalar reference: extract 8 lanes, reduce, broadcast.
+    fn ref_max_u8x8(v: u64) -> u64 {
+        let m = (0..8).map(|i| (v >> (8 * i)) as u8).max().unwrap();
+        (m as u64).wrapping_mul(0x0101_0101_0101_0101)
+    }
+    fn ref_min_u8x8(v: u64) -> u64 {
+        let m = (0..8).map(|i| (v >> (8 * i)) as u8).min().unwrap();
+        (m as u64).wrapping_mul(0x0101_0101_0101_0101)
+    }
+
+    #[test]
+    fn test_horizontal_max_min_u8x8_random_oracle() {
+        // Randomized oracle covering high-bit lanes (>= 0x80), which the earlier
+        // low-7-bit-only SWAR comparison silently mishandled. xorshift64 PRNG keeps
+        // this self-contained and deterministic.
+        let mut s: u64 = 0x9E37_79B9_7F4A_7C15;
+        let mut next = || {
+            s ^= s << 13;
+            s ^= s >> 7;
+            s ^= s << 17;
+            s
+        };
+        for _ in 0..200_000 {
+            let v = next();
+            assert_eq!(horizontal_max_u8x8(v), ref_max_u8x8(v), "max mismatch at {v:#018x}");
+            assert_eq!(horizontal_min_u8x8(v), ref_min_u8x8(v), "min mismatch at {v:#018x}");
+        }
+        // Explicit high-bit edge cases.
+        assert_eq!(horizontal_max_u8x8(0x80_7F_00_00_00_00_00_00), ref_max_u8x8(0x80_7F_00_00_00_00_00_00));
+        assert_eq!(horizontal_max_u8x8(0xFF_01_02_03_04_05_06_07), 0xFFFF_FFFF_FFFF_FFFF);
+        assert_eq!(horizontal_min_u8x8(0xFF_80_81_82_83_84_85_86), 0x8080_8080_8080_8080);
     }
 }
 

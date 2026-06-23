@@ -13,6 +13,7 @@
 // Handles arbitrary-length byte slices: 4-byte blocks are mixed via
 // the standard MurmurHash3 body; a 0–3 byte tail is processed branchlessly
 // via byte-masked word assembly.
+extern crate alloc;
 
 const C1: u32 = 0xcc9e2d51;
 const C2: u32 = 0x1b873593;
@@ -104,6 +105,7 @@ pub fn murmur3_32_hash(data: &[u8], seed: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec::Vec;
     use proptest::prelude::*;
 
     // -------------------------------------------------------------------------
@@ -269,11 +271,17 @@ mod tests {
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
+    #[cfg(feature = "alloc")]
+    use alloc::vec::Vec;
 
     pub fn bench_murmur3_32_hash(c: &mut Criterion) {
+        use alloc::vec::Vec;
+        #[cfg(feature = "alloc")]
+        {
         let data: Vec<u8> = (0u8..=63).collect();
         c.bench_function("murmur3_32_hash/64B", |b| {
             b.iter(|| black_box(murmur3_32_hash(black_box(&data), black_box(0))))
         });
+        }
     }
 }

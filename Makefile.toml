@@ -93,6 +93,12 @@ workspace = false
 command = "cargo"
 args = ["run", "--manifest-path", "tools/bcinr-contract-gate/Cargo.toml", "--release", "--quiet"]
 
+[tasks.ggen]
+category = "Test"
+description = "Run counterfactual and falsification test suite"
+workspace = false
+command = "cargo"
+args = ["run", "--manifest-path", "tools/ggen/Cargo.toml", "--release", "--quiet"]
 
 [tasks.ci]
 category = "CI"
