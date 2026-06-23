@@ -98,35 +98,42 @@ pub const fn horizontal_sum_u8x8(v: u64) -> u64 {
     (res & 0x00000000FFFFFFFF) + ((res >> 32) & 0x00000000FFFFFFFF)
 }
 
-// Branchless per-byte max of two packed u64 words using the SWAR technique.
+// Per-byte unsigned "a >= b" predicate for packed u64 SWAR words. Returns 0xFF in
+// each byte lane where the unsigned byte a_i >= b_i, and 0x00 otherwise, with no
+// cross-lane carries.
+//
+// A naive `(a | HI) - (b & !HI)` only compares the low 7 bits of each lane and
+// discards the real top bit, which is wrong for any byte >= 0x80. The true 8-bit
+// unsigned comparison must fold the genuine top bits back in:
+//   a_i >= b_i  <=>  (a7 & !b7) | ((a7 == b7) & (a_lo7 >= b_lo7)).
+#[inline(always)]
+fn swar_byte_ge_mask(a: u64, b: u64) -> u64 {
+    const HI: u64 = 0x8080_8080_8080_8080u64; // top bit of each lane
+    const LO: u64 = 0x7F7F_7F7F_7F7F_7F7Fu64; // low 7 bits of each lane
+    let a7 = a & HI;
+    let b7 = b & HI;
+    // Borrow into bit 7 of the low-7-bit subtraction: set iff a_lo7 >= b_lo7.
+    let borrow = (a | HI).wrapping_sub(b & LO) & HI;
+    // Fold in the real top bits to obtain the true 8-bit comparison in bit 7.
+    let ge = ((a7 & !b7) | (!(a7 ^ b7) & borrow)) & HI;
+    // Expand each lane's bit 7 to a full 0xFF mask, strictly within the lane:
+    // (ge - (ge >> 7)) is 0x7F where set; OR-ing ge restores the top bit -> 0xFF.
+    ge.wrapping_sub(ge >> 7) | ge
+}
+
+// Branchless per-byte unsigned max of two packed u64 SWAR words.
 // For each byte lane: selects the larger of the corresponding bytes in `a` and `b`.
 #[inline(always)]
 fn swar_byte_max(a: u64, b: u64) -> u64 {
-    // Set high bits of a (prevent carry into next lane), clear high bits of b.
-    const HI: u64 = 0x8080_8080_8080_8080u64;
-    let a_hi = a | HI;
-    let b_lo = b & !HI;
-    // Per-byte subtraction without cross-byte carries.
-    let diff = a_hi.wrapping_sub(b_lo);
-    // Bit 7 of each byte in diff == 1 iff a_byte >= b_byte.
-    let mask_hi = diff & HI;
-    // Expand each set bit-7 to a full 0xff byte mask.
-    let mask = mask_hi.wrapping_sub(mask_hi >> 7);
+    let mask = swar_byte_ge_mask(a, b); // 0xFF where a >= b
     (a & mask) | (b & !mask)
 }
 
-// Branchless per-byte min of two packed u64 words using the SWAR technique.
+// Branchless per-byte unsigned min of two packed u64 SWAR words.
 // For each byte lane: selects the smaller of the corresponding bytes in `a` and `b`.
 #[inline(always)]
 fn swar_byte_min(a: u64, b: u64) -> u64 {
-    // Use the complement of the max mask: where a >= b, select b; otherwise select a.
-    const HI: u64 = 0x8080_8080_8080_8080u64;
-    let a_hi = a | HI;
-    let b_lo = b & !HI;
-    let diff = a_hi.wrapping_sub(b_lo);
-    let mask_hi = diff & HI;
-    let mask = mask_hi.wrapping_sub(mask_hi >> 7);
-    // mask is 0xff where a >= b, so select b where a >= b (b is not larger), a otherwise.
+    let mask = swar_byte_ge_mask(a, b); // 0xFF where a >= b => b is the min there
     (b & mask) | (a & !mask)
 }
 
@@ -144,6 +151,8 @@ fn swar_byte_min(a: u64, b: u64) -> u64 {
 /// assert_eq!(horizontal_max_u8x8(0), 0);
 /// assert_eq!(horizontal_max_u8x8(u64::MAX), u64::MAX);
 /// assert_eq!(horizontal_max_u8x8(0x07_03_05_01_06_02_04_00), 0x07_07_07_07_07_07_07_07);
+/// // High-bit lanes (>= 0x80) must compare as their true unsigned value:
+/// assert_eq!(horizontal_max_u8x8(0x80_7F_01_02_03_04_05_06), 0x80_80_80_80_80_80_80_80);
 /// ```
 #[inline(always)]
 #[must_use = "horizontal_max_u8x8 result — ignoring discards the maximum lane value"]
@@ -637,6 +646,39 @@ mod tests_phd_reduce {
             horizontal_min_u8x8(0x0505_0505_0505_0505u64),
             0x0505_0505_0505_0505u64
         );
+    }
+
+    // Scalar reference: extract 8 lanes, reduce, broadcast.
+    fn ref_max_u8x8(v: u64) -> u64 {
+        let m = (0..8).map(|i| (v >> (8 * i)) as u8).max().unwrap();
+        (m as u64).wrapping_mul(0x0101_0101_0101_0101)
+    }
+    fn ref_min_u8x8(v: u64) -> u64 {
+        let m = (0..8).map(|i| (v >> (8 * i)) as u8).min().unwrap();
+        (m as u64).wrapping_mul(0x0101_0101_0101_0101)
+    }
+
+    #[test]
+    fn test_horizontal_max_min_u8x8_random_oracle() {
+        // Randomized oracle covering high-bit lanes (>= 0x80), which the earlier
+        // low-7-bit-only SWAR comparison silently mishandled. xorshift64 PRNG keeps
+        // this self-contained and deterministic.
+        let mut s: u64 = 0x9E37_79B9_7F4A_7C15;
+        let mut next = || {
+            s ^= s << 13;
+            s ^= s >> 7;
+            s ^= s << 17;
+            s
+        };
+        for _ in 0..200_000 {
+            let v = next();
+            assert_eq!(horizontal_max_u8x8(v), ref_max_u8x8(v), "max mismatch at {v:#018x}");
+            assert_eq!(horizontal_min_u8x8(v), ref_min_u8x8(v), "min mismatch at {v:#018x}");
+        }
+        // Explicit high-bit edge cases.
+        assert_eq!(horizontal_max_u8x8(0x80_7F_00_00_00_00_00_00), ref_max_u8x8(0x80_7F_00_00_00_00_00_00));
+        assert_eq!(horizontal_max_u8x8(0xFF_01_02_03_04_05_06_07), 0xFFFF_FFFF_FFFF_FFFF);
+        assert_eq!(horizontal_min_u8x8(0xFF_80_81_82_83_84_85_86), 0x8080_8080_8080_8080);
     }
 }
 
