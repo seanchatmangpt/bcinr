@@ -211,6 +211,7 @@ mod tests {
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
+    use alloc::vec::Vec;
     use criterion::{black_box, Criterion};
 
     pub fn bench_polynomial_hash_u64(c: &mut Criterion) {
