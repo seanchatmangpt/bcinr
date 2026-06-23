@@ -13,6 +13,7 @@
 // producing a 16-bit hash as two concatenated 8-bit Pearson digests.
 // All operations are table lookups — inherently branchless.
 
+extern crate alloc;
 /// Standard Pearson permutation table (bijective byte mapping).
 ///
 /// This is the classic table from Pearson's 1972 paper, ensuring every
@@ -77,6 +78,7 @@ pub fn pearson_hash_16(data: &[u8]) -> u16 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec::Vec;
     use proptest::prelude::*;
 
     // -------------------------------------------------------------------------
@@ -213,11 +215,17 @@ mod tests {
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
+    #[cfg(feature = "alloc")]
+    use alloc::vec::Vec;
 
     pub fn bench_pearson_hash_16(c: &mut Criterion) {
-        let data: Vec<u8> = (0u8..=63).collect();
-        c.bench_function("pearson_hash_16/64B", |b| {
-            b.iter(|| black_box(pearson_hash_16(black_box(&data))))
-        });
+        #[cfg(feature = "alloc")]
+        {
+            use alloc::vec::Vec;
+            let data: Vec<u8> = (0u8..=63).collect();
+            c.bench_function("pearson_hash_16/64B", |b| {
+                b.iter(|| black_box(pearson_hash_16(black_box(&data))))
+            });
+        }
     }
 }

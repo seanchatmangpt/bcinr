@@ -61,8 +61,7 @@ fn bench_popcount(c: &mut Criterion) {
             &data,
             |b, data| {
                 b.iter(|| {
-                    data.iter()
-                        .fold(0u64, |acc, &x| acc + popcount_u64(black_box(x)))
+                    black_box(data.iter().fold(0u64, |acc, &x| acc + popcount_u64(black_box(x))))
                 });
             },
         );
@@ -72,8 +71,7 @@ fn bench_popcount(c: &mut Criterion) {
             &data,
             |b, data| {
                 b.iter(|| {
-                    data.iter()
-                        .fold(0u64, |acc, &x| acc + x.count_ones() as u64)
+                    black_box(data.iter().fold(0u64, |acc, &x| acc + x.count_ones() as u64))
                 });
             },
         );
@@ -98,40 +96,68 @@ fn bench_hash_throughput(c: &mut Criterion) {
         let data: Vec<u8> = (0..size).map(|i| i as u8).collect();
         group.throughput(Throughput::Bytes(size as u64));
 
-        // xxhash64: takes (val, aux) packed u64 word
+        // xxhash64: chain across the buffer in 8-byte chunks so throughput numbers
+        // reflect processing the full buffer rather than a single 8-byte word.
+        // Remainder bytes (size % 8 != 0) are ignored via chunks_exact.
         group.bench_with_input(
             BenchmarkId::new("xxhash64", size),
             &data,
             |b, data| {
-                b.iter(|| xxhash64(black_box(data.len() as u64), black_box(0)));
+                b.iter(|| {
+                    let mut h = 0u64;
+                    for chunk in data.chunks_exact(8) {
+                        let word = u64::from_le_bytes(chunk.try_into().unwrap());
+                        h = xxhash64(black_box(word), h);
+                    }
+                    black_box(h)
+                });
             },
         );
 
-        // adler32: checksum over packed 8-byte word
+        // adler32: chain across the buffer in 8-byte chunks
         group.bench_with_input(
             BenchmarkId::new("adler32", size),
             &data,
             |b, data| {
-                b.iter(|| adler32_branchless(black_box(data.len() as u64), black_box(0)));
+                b.iter(|| {
+                    let mut h = 0u64;
+                    for chunk in data.chunks_exact(8) {
+                        let word = u64::from_le_bytes(chunk.try_into().unwrap());
+                        h = adler32_branchless(black_box(word), h);
+                    }
+                    black_box(h)
+                });
             },
         );
 
-        // farmhash64: fast non-cryptographic hash
+        // farmhash64: chain across the buffer in 8-byte chunks
         group.bench_with_input(
             BenchmarkId::new("farmhash64", size),
             &data,
             |b, data| {
-                b.iter(|| farmhash64(black_box(data.len() as u64), black_box(0)));
+                b.iter(|| {
+                    let mut h = 0u64;
+                    for chunk in data.chunks_exact(8) {
+                        let word = u64::from_le_bytes(chunk.try_into().unwrap());
+                        h = farmhash64(black_box(word), h);
+                    }
+                    black_box(h)
+                });
             },
         );
 
-        // siphash_2_4: authenticated, non-cryptographic, DoS-resistant
+        // siphash_2_4: chain across the buffer in 8-byte chunks
         group.bench_with_input(
             BenchmarkId::new("siphash_2_4", size),
             &data,
             |b, data| {
                 b.iter(|| {
-                    siphash_2_4_branchless(black_box(data.len() as u64), black_box(0))
+                    let mut h = 0u64;
+                    for chunk in data.chunks_exact(8) {
+                        let word = u64::from_le_bytes(chunk.try_into().unwrap());
+                        h = siphash_2_4_branchless(black_box(word), h);
+                    }
+                    black_box(h)
                 });
             },
         );
@@ -321,36 +347,34 @@ fn bench_fixed_point(c: &mut Criterion) {
 
     // Branchless saturating add from fix module
     group.bench_function("add_sat_u32_branchless", |b| {
-        b.iter(|| {
-            values
-                .iter()
-                .fold(0u32, |acc, &x| add_sat(acc, black_box(x)))
-        });
+        b.iter(|| black_box(values.iter().fold(0u32, |acc, &x| add_sat(acc, black_box(x)))));
     });
 
     // std saturating_add as baseline
     group.bench_function("std_saturating_add_u32", |b| {
         b.iter(|| {
-            values
-                .iter()
-                .fold(0u32, |acc, &x| acc.saturating_add(black_box(x)))
+            black_box(
+                values
+                    .iter()
+                    .fold(0u32, |acc, &x| acc.saturating_add(black_box(x))),
+            )
         });
     });
 
     // Branchless clamp vs std clamp
     group.bench_function("clamp_u32_branchless", |b| {
         b.iter(|| {
-            values.iter().fold(0u32, |acc, &x| {
+            black_box(values.iter().fold(0u32, |acc, &x| {
                 acc.wrapping_add(clamp_u32(black_box(x), 100, 900_000))
-            })
+            }))
         });
     });
 
     group.bench_function("std_clamp_u32", |b| {
         b.iter(|| {
-            values.iter().fold(0u32, |acc, &x| {
+            black_box(values.iter().fold(0u32, |acc, &x| {
                 acc.wrapping_add(black_box(x).clamp(100, 900_000))
-            })
+            }))
         });
     });
 
@@ -399,6 +423,7 @@ fn bench_bitset_ops(c: &mut Criterion) {
                 b_iter.iter(|| {
                     let mut dst = a.clone();
                     union_u64_slices(black_box(&mut dst), black_box(&b));
+                    black_box(dst);
                 });
             },
         );
@@ -409,9 +434,11 @@ fn bench_bitset_ops(c: &mut Criterion) {
             &(&a, &b),
             |b_iter, (a, b)| {
                 b_iter.iter(|| {
-                    a.iter()
-                        .zip(b.iter())
-                        .fold(0usize, |acc, (&x, &y)| acc + (x ^ y).count_ones() as usize)
+                    black_box(
+                        a.iter()
+                            .zip(b.iter())
+                            .fold(0usize, |acc, (&x, &y)| acc + (x ^ y).count_ones() as usize),
+                    )
                 });
             },
         );

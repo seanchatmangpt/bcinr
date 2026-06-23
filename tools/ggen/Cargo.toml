@@ -1,0 +1,9 @@
+[package]
+name = "ggen"
+version = "0.1.0"
+edition = "2021"
+description = "Generate counterfactual and falsification test cases to probe for algorithm invariant violations"
+
+[dependencies]
+rand = { version = "0.8", features = ["small_rng"] }
+walkdir = "2.4"

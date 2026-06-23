@@ -4,23 +4,44 @@
 
 /// delta_encode_simd_u32
 ///
-/// Branchless implementation guaranteed to execute in constant time
-/// with zero dynamic dispatch or control flow hazards.
+/// SIMD-within-a-register (SWAR) 2-lane u32 delta encoding.
+///
+/// Interprets `val` and `aux` as two packed u32 lanes:
+/// - Lane 0 (low  word): bits  0-31
+/// - Lane 1 (high word): bits 32-63
+///
+/// Computes the per-lane wrapping delta independently:
+/// - `d0 = (val as u32).wrapping_sub(aux as u32)`
+/// - `d1 = (val >> 32) as u32).wrapping_sub((aux >> 32) as u32)`
+///
+/// Returns the two deltas packed back into a single u64.
 ///
 /// # Branchless Contract
-/// **Ensures:** The result matches the slow but correct reference implementation for all inputs.
+/// **Ensures:** The result matches independent per-lane subtraction for all inputs.
 /// **Invariant:** Execution path is independent of input data values (Branchless).
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::delta_encode_simd_u32::delta_encode_simd_u32;
-/// let result = delta_encode_simd_u32(42, 1337);
-/// assert!(result <= u64::MAX);
+/// // Lane 0: 10 - 3 = 7, Lane 1: 20 - 5 = 15
+/// let val  = (10u64) | (20u64 << 32);
+/// let prev = ( 3u64) | ( 5u64 << 32);
+/// let enc  = delta_encode_simd_u32(val, prev);
+/// assert_eq!(enc as u32, 7);
+/// assert_eq!((enc >> 32) as u32, 15);
 /// ```
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
-#[allow(unused_variables)]
 pub fn delta_encode_simd_u32(val: u64, aux: u64) -> u64 {
-    val.wrapping_sub(aux)
+    // Treat val and aux as two packed u32 lanes (SWAR / SIMD-within-a-register)
+    // val = [v1: u32 | v0: u32], aux = [prev1: u32 | prev0: u32]
+    let v0 = val as u32;
+    let v1 = (val >> 32) as u32;
+    let p0 = aux as u32;
+    let p1 = (aux >> 32) as u32;
+    // Compute delta for each lane independently (wrapping subtraction)
+    let d0 = v0.wrapping_sub(p0);
+    let d1 = v1.wrapping_sub(p1);
+    (d0 as u64) | ((d1 as u64) << 32)
 }
 
 #[cfg(test)]
@@ -28,10 +49,16 @@ mod tests {
     use super::*;
 
     // -------------------------------------------------------------------------
-    // POSITIVE ORACLE: Reference implementation
+    // POSITIVE ORACLE: Reference implementation (per-lane wrapping subtract)
     // -------------------------------------------------------------------------
     fn delta_encode_simd_u32_reference(val: u64, aux: u64) -> u64 {
-        (val as i128 - aux as i128) as u64
+        let v0 = val as u32;
+        let v1 = (val >> 32) as u32;
+        let p0 = aux as u32;
+        let p1 = (aux >> 32) as u32;
+        let d0 = v0.wrapping_sub(p0);
+        let d1 = v1.wrapping_sub(p1);
+        (d0 as u64) | ((d1 as u64) << 32)
     }
 
     // -------------------------------------------------------------------------
@@ -83,6 +110,33 @@ mod tests {
         if m2 != baseline { assert_ne!(m2, baseline, "mutant 2"); }
         if m3 != baseline { assert_ne!(m3, baseline, "mutant 3"); }
     }
+    // -------------------------------------------------------------------------
+    // LANE SEMANTICS: Verify independent per-lane operation
+    // -------------------------------------------------------------------------
+    #[test]
+    fn test_delta_encode_simd_u32_lane_independence() {
+        // Lane 0: 10 - 3 = 7, Lane 1: 20 - 5 = 15
+        let val  = (10u64) | (20u64 << 32);
+        let prev = ( 3u64) | ( 5u64 << 32);
+        let enc  = delta_encode_simd_u32(val, prev);
+        assert_eq!(enc as u32, 7);
+        assert_eq!((enc >> 32) as u32, 15);
+
+        // Lane 0 wraps: 0 - 1 = u32::MAX
+        let val2  = 0u64 | (0u64 << 32);
+        let prev2 = 1u64 | (0u64 << 32);
+        let enc2  = delta_encode_simd_u32(val2, prev2);
+        assert_eq!(enc2 as u32, u32::MAX);
+        assert_eq!((enc2 >> 32) as u32, 0);
+
+        // High lane wraps, low lane unchanged
+        let val3  = (5u64) | (0u64 << 32);
+        let prev3 = (5u64) | (1u64 << 32);
+        let enc3  = delta_encode_simd_u32(val3, prev3);
+        assert_eq!(enc3 as u32, 0);
+        assert_eq!((enc3 >> 32) as u32, u32::MAX);
+    }
+
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
 

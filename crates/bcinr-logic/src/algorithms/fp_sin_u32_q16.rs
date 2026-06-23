@@ -19,34 +19,44 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn fp_sin_u32_q16(val: u64, aux: u64) -> u64 {
-    // Bhaskara I sine approximation in Q16 fixed point. The denominator
-    // 40500 - x_deg*(180 - x_deg) is minimized at x_deg=90 (value 32400),
-    // so it is strictly positive for every x_deg in [0, 360) — no guard needed.
-    let x = (val as i64 % (360i64 << 16)).abs();
-    let x_deg = x >> 16;
-    let num = (4 * x_deg * (180 - x_deg)) << 16;
-    let den = 40500 - (x_deg * (180 - x_deg));
-    (num / den) as u64
+pub fn fp_sin_u32_q16(val: u64, _aux: u64) -> u64 {
+    // Bhaskara I sine approximation extended to full circle via quadrant folding.
+    // val is Q16 degrees (degrees * 65536). We reduce modulo 360° then fold
+    // the second semicircle [180°, 360°) using sin(x) = -sin(x - 180°).
+    const FULL: u64 = 360 * 65536; // full rotation in Q16
+    let angle = val % FULL;
+    let x_deg = (angle >> 16) as i64; // whole degrees in [0, 359]
+
+    // Fold to [0, 180]: for x in (180, 360), sin(x) = -sin(x - 180)
+    let negate_mask = -((x_deg > 180) as i64); // 0xFFF...F if negate, 0x0 otherwise
+    let folded = x_deg - (180 & negate_mask); // x_deg - 180 if negate, else x_deg
+
+    // Bhaskara I: sin(x°) ≈ 4x(180-x) / (40500 - x(180-x)) for x in [0, 180]
+    let prod = folded * (180 - folded);
+    let num = 4 * prod;
+    let den = 40500 - prod;
+    // Scale to Q16: result in [0, 65536] representing [0.0, 1.0]
+    let abs_result: i64 = if den == 0 { 65536 } else { (num * 65536) / den };
+    // Apply sign: negate via two's complement if in second semicircle
+    let result: i64 = (abs_result ^ negate_mask) - negate_mask;
+    result as u64
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
 
     // -------------------------------------------------------------------------
-    // POSITIVE ORACLE: Reference implementation
+    // POSITIVE ORACLE: Independent reference using f64 trigonometry
     // -------------------------------------------------------------------------
     fn fp_sin_u32_q16_reference(val: u64, _aux: u64) -> u64 {
-        let x = (val as i64 % (360i64 << 16)).abs();
-        let x_deg = x / 65536;
-        let num = 4 * x_deg * (180 - x_deg);
-        let den = 40500 - x_deg * (180 - x_deg);
-        if den == 0 {
-            0
-        } else {
-            ((num << 16) / den) as u64
-        }
+        const FULL: u64 = 360 * 65536;
+        let angle_q16 = val % FULL;
+        let angle_deg = (angle_q16 as f64) / 65536.0;
+        let radians = angle_deg * core::f64::consts::PI / 180.0;
+        let sin_val = radians.sin();
+        (sin_val * 65536.0) as i64 as u64
     }
 
     // -------------------------------------------------------------------------
@@ -65,35 +75,90 @@ mod tests {
         fp_sin_u32_q16_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
+    // -------------------------------------------------------------------------
+    // KNOWN-ANGLE TESTS: Verify correct Q16 values at cardinal angles
+    // -------------------------------------------------------------------------
     #[test]
-    fn test_fp_sin_u32_q16_all() {
-        // equivalence oracle
-        let expected = fp_sin_u32_q16_reference(42, 1337);
-        let actual = fp_sin_u32_q16(42, 1337);
-        assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
-        // boundaries
+    fn test_fp_sin_u32_q16_cardinal_angles() {
+        // 0 degrees: sin(0) = 0
+        assert_eq!(fp_sin_u32_q16(0 * 65536, 0), 0u64);
+        // 90 degrees: sin(90) = 1.0, Q16 = 65536
+        assert_eq!(fp_sin_u32_q16(90 * 65536, 0), 65536u64);
+        // 180 degrees: sin(180) = 0
+        assert_eq!(fp_sin_u32_q16(180 * 65536, 0), 0u64);
+        // 270 degrees: sin(270) = -1.0, Q16 signed = -65536 = 0xFFFF0000 in u64 two's complement
+        assert_eq!(
+            fp_sin_u32_q16(270 * 65536, 0),
+            (-65536i64) as u64
+        );
+    }
 
+    proptest! {
+        #[test]
+        fn test_fp_sin_u32_q16_equivalence(val in any::<u64>(), aux in any::<u64>()) {
+            let expected = fp_sin_u32_q16_reference(val, aux);
+            let actual = fp_sin_u32_q16(val, aux);
+            // Bhaskara I approximation has max error ~1234 Q16 units vs f64 sin
+            // (integer-degree truncation near steep-slope regions). Tolerance 1300 is safe.
+            let diff = (expected as i64).wrapping_sub(actual as i64).unsigned_abs();
+            prop_assert!(diff <= 1300,
+                "Adversarial failure: branchless mismatch at val={}: expected={} actual={} diff={}",
+                val, expected as i64, actual as i64, diff);
+        }
+
+        #[test]
+        fn test_fp_sin_u32_q16_counterfactual_mutant_1(val in any::<u64>(), aux in any::<u64>()) {
+            let expected = fp_sin_u32_q16_reference(val, aux);
+            let actual = mutant_fp_sin_u32_q16_1(val, aux);
+            if val != aux && val != 0 && aux != 0 {
+                prop_assert!(expected != actual, "Counterfactual Mutant 1 failed to fail!");
+            }
+        }
+
+        #[test]
+        fn test_fp_sin_u32_q16_counterfactual_mutant_2(val in any::<u64>(), aux in any::<u64>()) {
+            let expected = fp_sin_u32_q16_reference(val, aux);
+            let actual = mutant_fp_sin_u32_q16_2(val, aux);
+            if val != aux && val != 0 && aux != 0 {
+                prop_assert!(expected != actual, "Counterfactual Mutant 2 failed to fail!");
+            }
+        }
+
+        #[test]
+        fn test_fp_sin_u32_q16_counterfactual_mutant_3(val in any::<u64>(), aux in any::<u64>()) {
+            let expected = fp_sin_u32_q16_reference(val, aux);
+            let actual = mutant_fp_sin_u32_q16_3(val, aux);
+            if val != aux && val != 0 && aux != 0 {
+                prop_assert!(expected != actual, "Counterfactual Mutant 3 failed to fail!");
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // BOUNDARY EXAMPLES: Hardcoded edge cases with approximation tolerance
+    // -------------------------------------------------------------------------
+    fn approx_eq_sin(val: u64, aux: u64) {
+        let expected = fp_sin_u32_q16_reference(val, aux);
+        let actual = fp_sin_u32_q16(val, aux);
+        let diff = (expected as i64).wrapping_sub(actual as i64).unsigned_abs();
+        assert!(
+            diff <= 1300,
+            "val={} expected={} actual={} diff={}",
+            val,
+            expected as i64,
+            actual as i64,
+            diff
+        );
+    }
+
+    #[test]
+    fn test_fp_sin_u32_q16_boundaries() {
+        // val=0: both reference and impl return 0 exactly
         assert_eq!(fp_sin_u32_q16(0, 0), fp_sin_u32_q16_reference(0, 0));
-        assert_eq!(
-            fp_sin_u32_q16(u64::MAX, u64::MAX),
-            fp_sin_u32_q16_reference(u64::MAX, u64::MAX)
-        );
-        assert_eq!(
-            fp_sin_u32_q16(u64::MAX, 0),
-            fp_sin_u32_q16_reference(u64::MAX, 0)
-        );
-        assert_eq!(
-            fp_sin_u32_q16(0, u64::MAX),
-            fp_sin_u32_q16_reference(0, u64::MAX)
-        );
-        // mutant divergence
-        let baseline = fp_sin_u32_q16_reference(42, 1337);
-        let m1 = mutant_fp_sin_u32_q16_1(42, 1337);
-        let m2 = mutant_fp_sin_u32_q16_2(42, 1337);
-        let m3 = mutant_fp_sin_u32_q16_3(42, 1337);
-        if m1 != baseline { assert_ne!(m1, baseline, "mutant 1"); }
-        if m2 != baseline { assert_ne!(m2, baseline, "mutant 2"); }
-        if m3 != baseline { assert_ne!(m3, baseline, "mutant 3"); }
+        // Large values: implementation stays within Bhaskara I approximation error
+        approx_eq_sin(u64::MAX, u64::MAX);
+        approx_eq_sin(u64::MAX, 0);
+        approx_eq_sin(0, u64::MAX);
     }
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
@@ -108,7 +173,7 @@ pub mod bench {
     pub fn bench_fp_sin_u32_q16(c: &mut Criterion) {
         c.bench_function("fp_sin_u32_q16", |b| {
             b.iter(|| {
-                let res = fp_sin_u32_q16(black_box(42), black_box(1337));
+                let res = fp_sin_u32_q16(black_box(90 * 65536), black_box(1337));
                 black_box(res)
             })
         });

@@ -269,7 +269,7 @@ fn bench_next_lexicographic_permutation_u64(c: &mut Criterion) {
         b.iter(|| next_lexicographic_permutation_u64(black_box(0), black_box(0)))
     });
     c.bench_function("next_lexicographic_permutation_u64_max", |b| {
-        b.iter(|| next_lexicographic_permutation_u64(black_box(u64::MAX), black_box(u64::MAX)))
+        b.iter(|| next_lexicographic_permutation_u64(black_box(0xFFFFFFFFFFFFFFFEu64), black_box(0xFFFFFFFFFFFFFFFEu64)))
     });
 }
 
@@ -724,7 +724,7 @@ fn bench_abs_diff_u64(c: &mut Criterion) {
         b.iter(|| abs_diff_u64(black_box(0), black_box(0)))
     });
     c.bench_function("abs_diff_u64_max", |b| {
-        b.iter(|| abs_diff_u64(black_box(u64::MAX), black_box(u64::MAX)))
+        b.iter(|| abs_diff_u64(black_box(u64::MAX), black_box(0)))
     });
 }
 
@@ -861,26 +861,26 @@ fn bench_fp_sqrt_u32_q16(c: &mut Criterion) {
 fn bench_fp_sin_u32_q16(c: &mut Criterion) {
     use bcinr_logic::algorithms::fp_sin_u32_q16::fp_sin_u32_q16;
     c.bench_function("fp_sin_u32_q16_avg", |b| {
-        b.iter(|| fp_sin_u32_q16(black_box(42), black_box(1337)))
+        b.iter(|| fp_sin_u32_q16(black_box(5_898_240u64), black_box(5_898_240u64)))
     });
     c.bench_function("fp_sin_u32_q16_min", |b| {
-        b.iter(|| fp_sin_u32_q16(black_box(0), black_box(0)))
+        b.iter(|| fp_sin_u32_q16(black_box(0u64), black_box(0u64)))
     });
     c.bench_function("fp_sin_u32_q16_max", |b| {
-        b.iter(|| fp_sin_u32_q16(black_box(u64::MAX), black_box(u64::MAX)))
+        b.iter(|| fp_sin_u32_q16(black_box(17_694_720u64), black_box(17_694_720u64)))
     });
 }
 
 fn bench_fp_cos_u32_q16(c: &mut Criterion) {
     use bcinr_logic::algorithms::fp_cos_u32_q16::fp_cos_u32_q16;
     c.bench_function("fp_cos_u32_q16_avg", |b| {
-        b.iter(|| fp_cos_u32_q16(black_box(42), black_box(1337)))
+        b.iter(|| fp_cos_u32_q16(black_box(5_898_240u64), black_box(5_898_240u64)))
     });
     c.bench_function("fp_cos_u32_q16_min", |b| {
-        b.iter(|| fp_cos_u32_q16(black_box(0), black_box(0)))
+        b.iter(|| fp_cos_u32_q16(black_box(0u64), black_box(0u64)))
     });
     c.bench_function("fp_cos_u32_q16_max", |b| {
-        b.iter(|| fp_cos_u32_q16(black_box(u64::MAX), black_box(u64::MAX)))
+        b.iter(|| fp_cos_u32_q16(black_box(17_694_720u64), black_box(17_694_720u64)))
     });
 }
 
@@ -991,13 +991,13 @@ fn bench_fast_inverse_sqrt_u32(c: &mut Criterion) {
 fn bench_gcd_u64_branchless(c: &mut Criterion) {
     use bcinr_logic::algorithms::gcd_u64_branchless::gcd_u64_branchless;
     c.bench_function("gcd_u64_branchless_avg", |b| {
-        b.iter(|| gcd_u64_branchless(black_box(42), black_box(1337)))
+        b.iter(|| gcd_u64_branchless(black_box(7_919u64 * 65_537), black_box(7_907u64 * 65_521)))
     });
     c.bench_function("gcd_u64_branchless_min", |b| {
-        b.iter(|| gcd_u64_branchless(black_box(0), black_box(0)))
+        b.iter(|| gcd_u64_branchless(black_box(2u64), black_box(3u64)))
     });
     c.bench_function("gcd_u64_branchless_max", |b| {
-        b.iter(|| gcd_u64_branchless(black_box(u64::MAX), black_box(u64::MAX)))
+        b.iter(|| gcd_u64_branchless(black_box(18_446_744_073_709_551_557u64), black_box(9_007_199_254_740_881u64)))
     });
 }
 
