@@ -44,7 +44,6 @@ pub fn sorting_network_verify_u32(slice: &[u32]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::vec::Vec;
     use proptest::prelude::*;
 
     #[test]

@@ -8,7 +8,7 @@ pub fn quotient_filter_add_u64(val: u64, aux: u64) -> u64 {
     let mask = (0xFFu64).wrapping_shl(shift);
     let has_zero = (zero_bytes != 0) as u64;
     let insert = ((aux & 0xFF).wrapping_shl(shift)) & mask;
-    (val | (insert * has_zero))
+    val | (insert * has_zero)
 }
 
 #[cfg(test)]

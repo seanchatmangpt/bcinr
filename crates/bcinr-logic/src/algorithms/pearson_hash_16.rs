@@ -78,7 +78,6 @@ pub fn pearson_hash_16(data: &[u8]) -> u16 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::vec::Vec;
     use proptest::prelude::*;
 
     // -------------------------------------------------------------------------

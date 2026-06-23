@@ -72,7 +72,6 @@ pub fn crc32c_branchless(data: &[u8], initial: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::vec::Vec;
     use proptest::prelude::*;
 
     // -------------------------------------------------------------------------

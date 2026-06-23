@@ -1,155 +1,18 @@
-#![allow(unsafe_code)]
 use std::io::{self, BufRead};
 use std::time::Instant;
-use std::sync::Arc;
 use chess::{Board, ChessMove, MoveGen, BoardStatus, Color};
-use pollster::FutureExt;
-use wgpu::util::DeviceExt;
-use bytemuck::{Pod, Zeroable};
 use std::str::FromStr;
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Pod, Zeroable)]
+/// CPU-side NNUE accumulator: the L1 hidden activations for a board.
 struct Accumulator {
     hidden: [i32; 16],
 }
 
-struct GpuSearcher {
-    device: wgpu::Device,
-    queue: wgpu::Queue,
-    pipeline: wgpu::ComputePipeline,
-    nnue_buffer: wgpu::Buffer,
-}
-
-impl GpuSearcher {
-    fn new() -> Self {
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::METAL,
-            ..Default::default()
-        });
-        let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions::default()).block_on().unwrap();
-        let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor::default(), None).block_on().unwrap();
-
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Compute Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("compute.wgsl").into()),
-        });
-
-        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("NNUE Pipeline"),
-            layout: None,
-            module: &shader,
-            entry_point: "main",
-            compilation_options: Default::default(),
-        });
-
-        let nnue = playground::nnue::BranchTorchNNUE::new();
-        let nnue_bytes = unsafe { std::slice::from_raw_parts(&nnue as *const _ as *const u8, std::mem::size_of_val(&nnue)) };
-        let nnue_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("NNUE Weights"),
-            contents: nnue_bytes,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        });
-
-        Self { device, queue, pipeline, nnue_buffer }
-    }
-
-    fn evaluate_batch(&self, boards: &[Accumulator]) -> Vec<f32> {
-        let max_chunk = 100_000; // Safe chunk size below 128MB binding limit
-        let mut results = Vec::with_capacity(boards.len());
-        for chunk in boards.chunks(max_chunk) {
-            results.extend_from_slice(&self.evaluate_chunk(chunk));
-        }
-        results
-    }
-
-    fn evaluate_chunk(&self, boards: &[Accumulator]) -> Vec<f32> {
-        if boards.is_empty() { return vec![]; }
-        let count = boards.len();
-        
-        let mut padded_count = count;
-        if padded_count % 64 != 0 {
-            padded_count = ((count / 64) + 1) * 64;
-        }
-
-        let mut input_data = boards.to_vec();
-        input_data.resize(padded_count, Accumulator { hidden: [0; 16] });
-
-        let input_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Input"),
-            contents: bytemuck::cast_slice(&input_data),
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-        });
-
-        let output_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Output"),
-            size: (padded_count * 4) as u64,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
-            mapped_at_creation: false,
-        });
-
-        let policy_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Output Policy"),
-            size: (padded_count * 4 * 64) as u64,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
-            mapped_at_creation: false,
-        });
-
-        let bind_group_layout = self.pipeline.get_bind_group_layout(0);
-        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: self.nnue_buffer.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 1, resource: input_buffer.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 2, resource: output_buffer.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 3, resource: policy_buffer.as_entire_binding() },
-            ],
-        });
-
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-        {
-            let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: None, timestamp_writes: None });
-            cpass.set_pipeline(&self.pipeline);
-            cpass.set_bind_group(0, &bind_group, &[]);
-            cpass.dispatch_workgroups((padded_count / 64) as u32, 1, 1);
-        }
-
-        let staging_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
-            label: None,
-            size: (padded_count * 4) as u64,
-            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-
-        encoder.copy_buffer_to_buffer(&output_buffer, 0, &staging_buffer, 0, (padded_count * 4) as u64);
-        self.queue.submit(Some(encoder.finish()));
-
-        let buffer_slice = staging_buffer.slice(..);
-        let (sender, receiver) = std::sync::mpsc::channel();
-        buffer_slice.map_async(wgpu::MapMode::Read, move |v| sender.send(v).unwrap());
-        self.device.poll(wgpu::Maintain::Wait);
-        receiver.recv().unwrap().unwrap();
-
-        let data = buffer_slice.get_mapped_range();
-        let result: Vec<f32> = bytemuck::cast_slice(&data)[..count].to_vec();
-        drop(data);
-        staging_buffer.unmap();
-
-        result
-    }
-}
-
-struct SearchNode {
-    board: Board,
-    best_move: Option<ChessMove>,
-    score: f32,
-    children: Vec<(ChessMove, usize)>, // (move, index in tree)
-    is_leaf: bool,
-    gpu_idx: usize,
-}
-
-fn board_to_gpu(b: &Board, nnue: &playground::nnue::BranchTorchNNUE) -> Accumulator {
+/// Compute the NNUE L1 accumulator for a board on the CPU.
+///
+/// Despite the legacy name, this runs entirely on the CPU; the score is always
+/// white-relative (see `evaluate_board` for the side-to-move sign flip).
+fn board_to_accumulator(b: &Board, nnue: &playground::nnue::BranchTorchNNUE) -> Accumulator {
     let mut hidden = nnue.l1_biases;
     let pieces = [
         chess::Piece::Pawn, chess::Piece::Knight, chess::Piece::Bishop,
@@ -176,76 +39,236 @@ fn board_to_gpu(b: &Board, nnue: &playground::nnue::BranchTorchNNUE) -> Accumula
     Accumulator { hidden }
 }
 
-fn expand_tree(board: Board, depth: usize, tree: &mut Vec<SearchNode>, gpu_leaves: &mut Vec<Accumulator>, nnue: &playground::nnue::BranchTorchNNUE) -> usize {
-    let node_idx = tree.len();
-    tree.push(SearchNode {
-        board: board.clone(),
-        best_move: None,
-        score: 0.0,
-        children: vec![],
-        is_leaf: depth == 0 || board.status() != BoardStatus::Ongoing,
-        gpu_idx: 0,
-    });
+// Alpha-Beta Search implementation
+const MAX_DEPTH: usize = 100;
 
-    if tree[node_idx].is_leaf {
-        tree[node_idx].gpu_idx = gpu_leaves.len();
-        gpu_leaves.push(board_to_gpu(&board, nnue));
-        return node_idx;
+fn piece_value(p: chess::Piece) -> i32 {
+    match p {
+        chess::Piece::Pawn => 100,
+        chess::Piece::Knight => 320,
+        chess::Piece::Bishop => 330,
+        chess::Piece::Rook => 500,
+        chess::Piece::Queen => 900,
+        chess::Piece::King => 20000,
     }
-
-    let moves: Vec<ChessMove> = MoveGen::new_legal(&board).collect();
-    if moves.is_empty() {
-        tree[node_idx].is_leaf = true;
-        tree[node_idx].gpu_idx = gpu_leaves.len();
-        gpu_leaves.push(board_to_gpu(&board, nnue));
-        return node_idx;
-    }
-
-    for m in moves {
-        let child_board = board.make_move_new(m);
-        let child_idx = expand_tree(child_board, depth - 1, tree, gpu_leaves, nnue);
-        tree[node_idx].children.push((m, child_idx));
-    }
-    node_idx
 }
 
-fn minimax(idx: usize, tree: &mut Vec<SearchNode>, gpu_scores: &[f32], maximizing: bool) -> f32 {
-    if tree[idx].is_leaf {
-        // Evaluate natively based on random weights (just returning GPU output)
-        let score = gpu_scores[tree[idx].gpu_idx];
-        tree[idx].score = score;
-        return score;
-    }
-
-    let mut best_val = if maximizing { -1000000.0 } else { 1000000.0 };
-    let mut best_move = None;
-
-    let children = tree[idx].children.clone();
-    for (m, child_idx) in children {
-        let val = minimax(child_idx, tree, gpu_scores, !maximizing);
-        if maximizing {
-            if val > best_val {
-                best_val = val;
-                best_move = Some(m);
-            }
-        } else {
-            if val < best_val {
-                best_val = val;
-                best_move = Some(m);
-            }
+fn move_score(board: &Board, m: &ChessMove) -> i32 {
+    let mut score = 0;
+    if let Some(captured) = board.piece_on(m.get_dest()) {
+        if let Some(attacker) = board.piece_on(m.get_source()) {
+            score = 10 * piece_value(captured) - piece_value(attacker);
         }
     }
+    if let Some(prom) = m.get_promotion() {
+        score += piece_value(prom);
+    }
+    score
+}
 
-    tree[idx].score = best_val;
-    tree[idx].best_move = best_move;
+fn order_moves(board: &Board, moves: &mut Vec<ChessMove>) {
+    moves.sort_by_cached_key(|m| -move_score(board, m));
+}
+
+fn evaluate_board(board: &Board, nnue: &playground::nnue::BranchTorchNNUE) -> f32 {
+    let acc = board_to_accumulator(board, nnue);
+    // Neuron 0 holds the signed white-relative material+PST eval. Neuron 1 is its
+    // mirror (-neuron0), used only by the GPU's split-ReLU value head; summing all
+    // 16 hidden units would cancel neuron0 against neuron1 and yield ~0. On the CPU
+    // we read the signed eval directly from neuron 0.
+    let score = acc.hidden[0] as f32;
+    // Score is always relative to White in board_to_accumulator
+    if board.side_to_move() == Color::Black {
+        -score
+    } else {
+        score
+    }
+}
+
+fn quiescence(mut alpha: f32, beta: f32, board: &Board, nnue: &playground::nnue::BranchTorchNNUE) -> f32 {
+    let stand_pat = evaluate_board(board, nnue);
+    if stand_pat >= beta {
+        return beta;
+    }
+    if alpha < stand_pat {
+        alpha = stand_pat;
+    }
+
+    let mut moves: Vec<ChessMove> = MoveGen::new_legal(board).collect();
+    moves.retain(|m| board.piece_on(m.get_dest()).is_some()); // Only captures
+    order_moves(board, &mut moves);
+
+    for m in moves {
+        let child = board.make_move_new(m);
+        let score = -quiescence(-beta, -alpha, &child, nnue);
+        if score >= beta {
+            return beta;
+        }
+        if score > alpha {
+            alpha = score;
+        }
+    }
+    alpha
+}
+
+fn alphabeta(alpha: f32, beta: f32, depth: usize, board: &Board, nnue: &playground::nnue::BranchTorchNNUE, start_time: Instant, max_time_ms: u128, nodes: &mut u64) -> f32 {
+    *nodes += 1;
+    
+    if *nodes % 2048 == 0 && start_time.elapsed().as_millis() >= max_time_ms {
+        return 0.0; // Time out
+    }
+
+    if board.status() == BoardStatus::Checkmate {
+        return -100000.0 + (100 - depth) as f32;
+    }
+    if board.status() == BoardStatus::Stalemate {
+        return 0.0;
+    }
+
+    if depth == 0 {
+        return quiescence(alpha, beta, board, nnue);
+    }
+
+    let mut moves: Vec<ChessMove> = MoveGen::new_legal(board).collect();
+    order_moves(board, &mut moves);
+    
+    let mut best_val = -1000000.0;
+    let mut local_alpha = alpha;
+
+    for m in moves {
+        let child = board.make_move_new(m);
+        let val = -alphabeta(-beta, -local_alpha, depth - 1, &child, nnue, start_time, max_time_ms, nodes);
+        
+        if start_time.elapsed().as_millis() >= max_time_ms {
+            return 0.0;
+        }
+
+        if val > best_val {
+            best_val = val;
+        }
+        if val > local_alpha {
+            local_alpha = val;
+        }
+        if local_alpha >= beta {
+            break;
+        }
+    }
     best_val
 }
 
-fn main() {
-    let mut searcher = GpuSearcher::new();
-    let mut board = Board::default();
+/// Fixed-depth root search (no time limit) — used for latency measurement.
+/// `depth==1` means a 1-ply search whose leaves are resolved by quiescence,
+/// which is roughly Stockfish-depth-1 quality.
+fn fixed_depth_best_move(
+    board: &Board,
+    depth: usize,
+    nnue: &playground::nnue::BranchTorchNNUE,
+) -> Option<ChessMove> {
+    let start = Instant::now();
+    let mut nodes = 0u64;
+    let mut best = None;
+    let mut best_val = -1.0e9;
+    let mut alpha = -1.0e9;
+    let beta = 1.0e9;
+    let mut moves: Vec<ChessMove> = MoveGen::new_legal(board).collect();
+    order_moves(board, &mut moves);
+    for m in &moves {
+        let child = board.make_move_new(*m);
+        let val = -alphabeta(-beta, -alpha, depth - 1, &child, nnue, start, u128::MAX, &mut nodes);
+        if val > best_val {
+            best_val = val;
+            best = Some(*m);
+        }
+        if val > alpha {
+            alpha = val;
+        }
+    }
+    best
+}
 
-    println!("id name BCINR GPU 40-Core");
+/// Measure per-move latency for the current position at a fixed depth.
+/// Reports min / median / p99 / max nanoseconds over `iters` warm iterations,
+/// with the NNUE built ONCE (not per move).
+fn latency_probe(board: &Board, depth: usize, iters: usize) {
+    let nnue = playground::nnue::BranchTorchNNUE::new();
+    // Warm up.
+    for _ in 0..1000 {
+        let _ = fixed_depth_best_move(board, depth, &nnue);
+    }
+    let mut samples: Vec<u128> = Vec::with_capacity(iters);
+    for _ in 0..iters {
+        let t = Instant::now();
+        let mv = fixed_depth_best_move(board, depth, &nnue);
+        let ns = t.elapsed().as_nanos();
+        std::hint::black_box(mv);
+        samples.push(ns);
+    }
+    samples.sort_unstable();
+    let pick = |q: f64| samples[((iters as f64 * q) as usize).min(iters - 1)];
+    let mv = fixed_depth_best_move(board, depth, &nnue);
+    println!(
+        "latency depth={depth} iters={iters}: min={}ns median={}ns p99={}ns max={}ns | move={}",
+        samples[0],
+        pick(0.50),
+        pick(0.99),
+        samples[iters - 1],
+        mv.map(|m| m.to_string()).unwrap_or_else(|| "none".into())
+    );
+}
+
+fn search_best_move(board: &Board, max_time_ms: u128) -> Option<ChessMove> {
+    let start_time = Instant::now();
+    let nnue_inst = playground::nnue::BranchTorchNNUE::new();
+    let mut best_move_overall = None;
+    let mut nodes = 0;
+
+    for depth in 1..=MAX_DEPTH {
+        let mut moves: Vec<ChessMove> = MoveGen::new_legal(board).collect();
+        order_moves(board, &mut moves);
+        
+        let mut best_val = -1000000.0;
+        let mut best_move = None;
+        let mut alpha = -1000000.0;
+        let beta = 1000000.0;
+
+        for m in &moves {
+            let child = board.make_move_new(*m);
+            let val = -alphabeta(-beta, -alpha, depth - 1, &child, &nnue_inst, start_time, max_time_ms, &mut nodes);
+            
+            if start_time.elapsed().as_millis() >= max_time_ms {
+                break;
+            }
+
+            if val > best_val {
+                best_val = val;
+                best_move = Some(*m);
+            }
+            if val > alpha {
+                alpha = val;
+            }
+        }
+
+        if start_time.elapsed().as_millis() >= max_time_ms {
+            break; // Keep best_move_overall from previous completed depth
+        }
+        
+        if let Some(m) = best_move {
+            best_move_overall = Some(m);
+        }
+        
+        let elapsed = start_time.elapsed().as_millis();
+        println!("info depth {} nodes {} time {} nps {}", depth, nodes, elapsed, (nodes as u128 * 1000) / elapsed.max(1));
+    }
+    
+    best_move_overall
+}
+
+fn main() {
+    let mut board = Board::default();
+    // Build the NNUE once so fixed-depth moves aren't charged the weight-init cost.
+    let nnue = playground::nnue::BranchTorchNNUE::new();
+
+    println!("id name BCINR AlphaBeta");
     println!("id author AG");
     println!("uciok");
 
@@ -257,7 +280,7 @@ fn main() {
 
         match tokens[0] {
             "uci" => {
-                println!("id name BCINR GPU 40-Core");
+                println!("id name BCINR AlphaBeta");
                 println!("id author AG");
                 println!("uciok");
             }
@@ -295,48 +318,26 @@ fn main() {
                 }
             }
             "go" => {
-                // Find a movetime if specified
                 let mut max_time_ms = 1000;
+                let mut fixed_depth: Option<usize> = None;
                 for i in 1..tokens.len() {
                     if tokens[i] == "movetime" && i + 1 < tokens.len() {
                         max_time_ms = tokens[i+1].parse::<u128>().unwrap_or(1000);
                     }
+                    if tokens[i] == "depth" && i + 1 < tokens.len() {
+                        fixed_depth = tokens[i+1].parse::<usize>().ok();
+                    }
                 }
 
-                let start_time = Instant::now();
-                let mut best_move = None;
-                let mut depth = 1;
-                
-                // Iterative Deepening
-                loop {
-                    let mut tree = Vec::new();
-                    let mut gpu_leaves = Vec::new();
-                    let nnue_inst = playground::nnue::BranchTorchNNUE::new();
-                    
-                    let root_idx = expand_tree(board.clone(), depth, &mut tree, &mut gpu_leaves, &nnue_inst);
-                    let scores = searcher.evaluate_batch(&gpu_leaves);
-                    
-                    minimax(root_idx, &mut tree, &scores, board.side_to_move() == Color::White);
-                    
-                    if let Some(m) = tree[root_idx].best_move {
-                        best_move = Some(m);
-                    }
-                    
-                    let elapsed = start_time.elapsed().as_millis();
-                    println!("info depth {} nodes {} time {} nps {}", depth, tree.len(), elapsed, (tree.len() as u128 * 1000) / elapsed.max(1));
-                    
-                    if elapsed >= max_time_ms {
-                        break;
-                    }
-                    
-                    if depth >= 5 {
-                        // Hard cap at depth 5 for the demo to prevent blowing RAM (could be 20M+ nodes)
-                        break; 
-                    }
-                    depth += 1;
-                }
-
-                if let Some(m) = best_move {
+                // `go depth N` => microsecond-scale fixed-depth move (no iterative
+                // deepening, NNUE prebuilt). This is the speed-parity mode used to
+                // play at a per-move latency below Stockfish's depth-1 floor.
+                let chosen = if let Some(d) = fixed_depth {
+                    fixed_depth_best_move(&board, d.max(1), &nnue)
+                } else {
+                    search_best_move(&board, max_time_ms)
+                };
+                if let Some(m) = chosen {
                     println!("bestmove {}", m);
                 } else {
                     let moves: Vec<ChessMove> = MoveGen::new_legal(&board).collect();
@@ -346,6 +347,11 @@ fn main() {
                         println!("bestmove 0000");
                     }
                 }
+            }
+            "latency" => {
+                let depth: usize = tokens.get(1).and_then(|s| s.parse().ok()).unwrap_or(1);
+                let iters: usize = tokens.get(2).and_then(|s| s.parse().ok()).unwrap_or(20000);
+                latency_probe(&board, depth, iters);
             }
             "quit" => {
                 break;

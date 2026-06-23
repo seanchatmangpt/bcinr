@@ -4,9 +4,9 @@
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_0",
       "ocel:vmap": {
-        "move": "a2a3",
+        "move": "e2e4",
         "player": "BCINR",
-        "receipt_hash": "cd539df7134776a7751f19ea26d7c9043ddf48651ba061a3c87f7fab1942f3c8"
+        "receipt_hash": "9183e1d9617ecfa666ae3a276277864d76fc6f21b81b888dac51a451a94b8bb9"
       }
     },
     {
@@ -15,151 +15,151 @@
       "ocel:vmap": {
         "move": "e7e5",
         "player": "Stockfish",
-        "receipt_hash": "92126eeba495306febe866c2e46e9564a42abdf507a0ad454c3c5b7bb0ab07f9"
+        "receipt_hash": "595557e43d67f95d153f0ea2a3fb996eb6298db0a2f249d3a8cbcc4aa1c17011"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_2",
       "ocel:vmap": {
-        "move": "b2b3",
+        "move": "b1c3",
         "player": "BCINR",
-        "receipt_hash": "9ec93ae0db5116353edf01b4404eb8d8edf0f869770b0175c0705bef02ad92d0"
+        "receipt_hash": "6c0ba65cf71b8eebe136bae6761d4739ac53ed480c07947a791e5487780b8e15"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_3",
       "ocel:vmap": {
-        "move": "d7d5",
+        "move": "b8c6",
         "player": "Stockfish",
-        "receipt_hash": "5a90452808f2d5a4ead05196751bae0f52b8e1744dffa0d944ffd9ee423a503f"
+        "receipt_hash": "e80437bad22bb2fa722b869b91b2de827faf7e7c53c93fe343dae0a894ef2062"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_4",
       "ocel:vmap": {
-        "move": "c2c3",
+        "move": "g1f3",
         "player": "BCINR",
-        "receipt_hash": "7335fd197b17d259568a307631889ac5b911c767c7a287d4dc6fb3129d785f0f"
+        "receipt_hash": "e2fe2276f61b6aeb4bbf811313c1f47fa548ea8fb49e26ca5feaf652573eff59"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_5",
       "ocel:vmap": {
-        "move": "c8f5",
+        "move": "g8f6",
         "player": "Stockfish",
-        "receipt_hash": "cc93fe3e4871a1133f68993d5a7963da6d4268237cfb1a4d12665f2d6b5401e0"
+        "receipt_hash": "f6104e8de5b400d2e1d2f691ff316fa9a732e0b5ec8a517a549b340be7ef4670"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_6",
       "ocel:vmap": {
-        "move": "d2d3",
+        "move": "d2d4",
         "player": "BCINR",
-        "receipt_hash": "3cbd2019d4aa8045c4453eff7859ba70281fe5b66171a56171a05269fd9fecee"
+        "receipt_hash": "37a341f168a364104ed02b188e3f86ba2b7e26a9ff8ffd4eafe78fdec9ae055c"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_7",
       "ocel:vmap": {
-        "move": "b8c6",
+        "move": "f8b4",
         "player": "Stockfish",
-        "receipt_hash": "5e05a28aad4d5701799889010fd1429d4460eda730f9c6aabfe4eae803b8549e"
+        "receipt_hash": "bf91a50ebf677b4b7584eff22b660ff371b7ffde04596dbfef4ef2314b07f177"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_8",
       "ocel:vmap": {
-        "move": "e2e3",
+        "move": "d4d5",
         "player": "BCINR",
-        "receipt_hash": "bc77a312e6d6bedf6d6a146b5575ef8ad040e827b3eff47df724a3b76d2e7b1a"
+        "receipt_hash": "6bec2d512a13eb30fa3fa07f52808de06855d78b75785338024f2ef065f86236"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_9",
       "ocel:vmap": {
-        "move": "a7a5",
+        "move": "c6b8",
         "player": "Stockfish",
-        "receipt_hash": "84a57e74e00f943860d5eb6a78479e13bac6c35693c69a9ddad784b1e1bc3f17"
+        "receipt_hash": "25ff6e1606dff7a991998808e1c14271d7e998883117efbf4cb20fec80a810c5"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_10",
       "ocel:vmap": {
-        "move": "f2f3",
+        "move": "f3e5",
         "player": "BCINR",
-        "receipt_hash": "44e8e9508c943d62aad9ed2223596253f27fa054f6b220d107585069192fab47"
+        "receipt_hash": "b5fcd4cd22bdc820c7d374f0bd70e3cad66ff8f27356e6f27175cdcda2fbdb86"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_11",
       "ocel:vmap": {
-        "move": "h7h5",
+        "move": "e8g8",
         "player": "Stockfish",
-        "receipt_hash": "97ab05d9d0e30365e837fef0898d7929d99ed6efab978138329201dd83fa14c4"
+        "receipt_hash": "96f80cb9d3b1d819d866b86f82f2fe1c43853d985298bbc6eac62b292bcdd057"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_12",
       "ocel:vmap": {
-        "move": "g2g3",
+        "move": "f2f3",
         "player": "BCINR",
-        "receipt_hash": "f4fc164f2be5638853000058a3e300bf864f105f9870261019a8e16fa485aba1"
+        "receipt_hash": "5d936b5f87bef4dad8418f6329b049d311e53772dc13826365349136006e5878"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_13",
       "ocel:vmap": {
-        "move": "f8c5",
+        "move": "f6e4",
         "player": "Stockfish",
-        "receipt_hash": "60dc60f15e0be061a9fbe72affe6cd6b71656f8032151a124aeef3857ec0d2d3"
+        "receipt_hash": "bcfe5d1a3c5c6bb5b6b7cde9477f4754c3b050eddad4afb4efe1d265d2d6ae83"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_14",
       "ocel:vmap": {
-        "move": "h2h3",
+        "move": "f3e4",
         "player": "BCINR",
-        "receipt_hash": "1a42d71e55a925d905cd361efa5a6537a3086d5ab393da836653baba3e68a7f8"
+        "receipt_hash": "9cfa4de9255fb14ba03929dc150e75769941ad1f41269170ab475f3a2b243c2f"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_15",
       "ocel:vmap": {
-        "move": "d8g5",
+        "move": "b4c3",
         "player": "Stockfish",
-        "receipt_hash": "4914839610d8b076d470d25f5d7d6391a9f8cd9e5d5924225b181db5233bfc99"
+        "receipt_hash": "246af7abb990854fbbad8840ca959ee40dec1341cdbbd89dc6d5dff5275bca36"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_16",
       "ocel:vmap": {
-        "move": "a3a4",
+        "move": "b2c3",
         "player": "BCINR",
-        "receipt_hash": "6a860a3ad1f1040c3027f73d04e78bd0f13a8881ee79ae86743611b4f9465aa1"
+        "receipt_hash": "6dca8f1196468c85c42febc47bcaf4e43b023a6813e9167575e109de93c35cd3"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_17",
       "ocel:vmap": {
-        "move": "g5g3",
+        "move": "d8h4",
         "player": "Stockfish",
-        "receipt_hash": "a9dfc30b9c3e1880f2502d2aadd72c88dd17586def0c994acc0f1be5d5011435"
+        "receipt_hash": "629836fa7d84f3cb0a4578d955b51a5e93e8df90681ed7c6d4eb3ea0bf198944"
       }
     },
     {
@@ -168,239 +168,1805 @@
       "ocel:vmap": {
         "move": "e1d2",
         "player": "BCINR",
-        "receipt_hash": "5dfc75db3fa3b1a3fcf44e559cdea2313f4cba27ed56b760b7a4173e1e4f4b3f"
+        "receipt_hash": "846f84d4f2742e01b84f60df00ddee9a4333970c35c0097a8c64a715eecff21f"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_19",
       "ocel:vmap": {
-        "move": "g3f2",
+        "move": "h4f4",
         "player": "Stockfish",
-        "receipt_hash": "09c740e6b19a1ae7d0b02d7756bf9dc015df18aa89560ecd32d69d7a4f3751fb"
+        "receipt_hash": "674de357321ec6a84e4507109c654990bfad1f8597882f16e1a88531b5677a8f"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_20",
       "ocel:vmap": {
-        "move": "g1e2",
+        "move": "d2e1",
         "player": "BCINR",
-        "receipt_hash": "c58187b27a122693ff9c2ba2c7eb56bff9ef2f927d7183dc3b1eded336493932"
+        "receipt_hash": "e024c8c8842ff25d9b9124a9ea35a143d2c9283cc14bd00aca25681be9623872"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_21",
       "ocel:vmap": {
-        "move": "c5e3",
+        "move": "f4h4",
         "player": "Stockfish",
-        "receipt_hash": "bec6ab7f83681ce8d6709ac9d17c60cce7c6fdbdb82fd77f86bf3cee24ede3c1"
+        "receipt_hash": "4e9e5a6dc82f5a39866db0fb47ee26a400839659c8d5f01260e2b41ae2a0fd56"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_22",
       "ocel:vmap": {
-        "move": "d2c2",
+        "move": "e1d2",
         "player": "BCINR",
-        "receipt_hash": "96e21828cc85fba70a77e4eac4feb367d7dbae4bf5da0a23336f4dfaf7dd7ede"
+        "receipt_hash": "9c507459d43363354cca9ccd9a0c092b918d1b678813b83720437d03efe88530"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_23",
       "ocel:vmap": {
-        "move": "e3c1",
+        "move": "h4f4",
         "player": "Stockfish",
-        "receipt_hash": "14b1d55b220e8f653d5787d069d17c960b66dfc409f2304e43b6537ffc121f6d"
+        "receipt_hash": "2a27fbcea0babdd63ce9e2a5349a7a3720469b092e709dbcc2dea8aa1acf1355"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_24",
       "ocel:vmap": {
-        "move": "b3b4",
+        "move": "d2e1",
         "player": "BCINR",
-        "receipt_hash": "5be53d5fb31a130c012c269020feea6e7fd93be55c4c87916d5c8402992d2f79"
+        "receipt_hash": "3dca36ac3003852c4ddb20c0dfdb900b71fff2585ece87f2b89aeb40c92a38f0"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_25",
       "ocel:vmap": {
-        "move": "f2f3",
+        "move": "f4e5",
         "player": "Stockfish",
-        "receipt_hash": "7e3f8a85c784f29190c9f83fdfceb7fd540e480b6a30447fbc83c9a481810a74"
+        "receipt_hash": "c4b2ddc161f8840fdc98e0e50200d12731b31376870db68105fa81ce44bdf3d6"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_26",
       "ocel:vmap": {
-        "move": "c3c4",
+        "move": "d1d4",
         "player": "BCINR",
-        "receipt_hash": "0132706388974937efddeacd6fe670c7b29ae436505a03c892e45f49c2165983"
+        "receipt_hash": "151a1458c6da8c90e3a3d171bd933dfe2c225b3edc1d543d4641885941972c60"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_27",
       "ocel:vmap": {
-        "move": "c1h6",
+        "move": "e5e7",
         "player": "Stockfish",
-        "receipt_hash": "013d508f0a3d47f64fa6548448090baa2adcad9c2854a6462e54c323d7184d5f"
+        "receipt_hash": "68d55505d203ea3497f1c44d54a7612c60d31e9aae5b0de61ba4055013ca971a"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_28",
       "ocel:vmap": {
-        "move": "h3h4",
+        "move": "a2a4",
         "player": "BCINR",
-        "receipt_hash": "ee05c82d3895b4c3d7b9524a97e97084f360e178c98e124116d8759f94e1c5a4"
+        "receipt_hash": "d8979292c71c0a4916f95eb2012940cfa8322bda5e698f50df285cd7ab4832f6"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_29",
       "ocel:vmap": {
-        "move": "c6b4",
+        "move": "d7d6",
         "player": "Stockfish",
-        "receipt_hash": "4aa8963b3a257485c6c0e1f32a82d0ceefb02512dcef7bcac0024dbc367a4675"
+        "receipt_hash": "931cfda1c54ea5c1ce7e4dfb6a7bc0915baea0b2041bc7ee07297695f5b5dd95"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_30",
       "ocel:vmap": {
-        "move": "c2b2",
+        "move": "a4a5",
         "player": "BCINR",
-        "receipt_hash": "9fd04c4c9be29aed15551b8e27d175704b5ed4100de1cdd436c888d2042523f1"
+        "receipt_hash": "e5fbf3bb376b8bf42a171632a736d466dc3c007ab4b873b63faa1743e2af8317"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_31",
       "ocel:vmap": {
-        "move": "b4d3",
+        "move": "f8e8",
         "player": "Stockfish",
-        "receipt_hash": "775e1c7509304f4102ae3a905e2eba297320ca8dcd3c57b4bc30a2ca97ec3d6d"
+        "receipt_hash": "d467a0714d2502c31b406e063e32e6cfae7ead3c6d9735848acf20412ea97cc2"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_32",
       "ocel:vmap": {
-        "move": "d1d3",
+        "move": "f1d3",
         "player": "BCINR",
-        "receipt_hash": "74e1592f91fcfad502fa5a0054e5d8434590e8d250123cb364de13efe9215843"
+        "receipt_hash": "9b3a5624083f62c22a869285185f9c0bbb06acf1dd7e28c6e58d73ad6b72ce2d"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_33",
       "ocel:vmap": {
-        "move": "f3d3",
+        "move": "c8f5",
         "player": "Stockfish",
-        "receipt_hash": "0762af59e51f231b08aff958b0a807e192b65249249f127a205bd68f81b029fd"
+        "receipt_hash": "560d162c69bb1ed3cdd0df2037b788580bbcd79fc5834fed6f59e6c1d31a3c81"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_34",
       "ocel:vmap": {
-        "move": "c4c5",
+        "move": "a1a4",
         "player": "BCINR",
-        "receipt_hash": "9d1ae3a03b834e9226ef0d0aa7c6f293cee64dfa548a961d095524cc7cd8f922"
+        "receipt_hash": "de7837b20b59cccf1c4df2f49e85a5f1b059f1f0fc057a3f9db234436f274734"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_35",
       "ocel:vmap": {
-        "move": "d3c2",
+        "move": "f5g6",
         "player": "Stockfish",
-        "receipt_hash": "c93ac633c755fc424d6d65ef0e44e3abb1746c60c430686964aa9bb6d9a47b7d"
+        "receipt_hash": "14fd168a27003599a91b5453fd8f729d320e11640ad8d61c07ba763af5962467"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_36",
       "ocel:vmap": {
-        "move": "b2a3",
+        "move": "e1d1",
         "player": "BCINR",
-        "receipt_hash": "38a9f1d7f96e53d3bc3511236c4c905a98c36185b5af7c9a618c49e203e3c2be"
+        "receipt_hash": "e4e883d0518ad30d075879ac90ca07353d93f1a67957c997a0359277e6ece0c4"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_37",
       "ocel:vmap": {
-        "move": "d5d4",
+        "move": "e7d7",
         "player": "Stockfish",
-        "receipt_hash": "4a153b765c37d79065826e7d217a35c733cff8c86b6b2de4d62dae9aee96aec0"
+        "receipt_hash": "c60f3b5356bcf863afe7f605412c0148e5c9c48d2ee7778d952215117e6a5b31"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_38",
       "ocel:vmap": {
-        "move": "c5c6",
+        "move": "h1e1",
         "player": "BCINR",
-        "receipt_hash": "30544009a412cd7abb8c38a52a31da59ff508a096e907883441512269f8427f0"
+        "receipt_hash": "de5736aeed3781891b4fa267ee6144a053b7331c89ecf97c1d5947b2e8d93858"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_39",
       "ocel:vmap": {
-        "move": "f5e6",
+        "move": "c7c5",
         "player": "Stockfish",
-        "receipt_hash": "a9834ce07ce3616ac18b0d507177e379b68ef402bd53287c7b5439d7530671b4"
+        "receipt_hash": "7dc8ba840c1fac2a55471bc9e9ea92f1e85629bee166c1e1c74e5505a4d27c32"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_40",
       "ocel:vmap": {
-        "move": "c6b7",
+        "move": "d4c4",
         "player": "BCINR",
-        "receipt_hash": "d690d8d0b1a485738a34f1b8d1b3e2de6be5b27ffadfe6fcdc12fae124b58c7f"
+        "receipt_hash": "61f4ef8354d5898c06bf34ea782d43b8030d9101e19911f85b294da9130f5b09"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_41",
       "ocel:vmap": {
-        "move": "h6c1",
+        "move": "d7c7",
         "player": "Stockfish",
-        "receipt_hash": "285a29edd0cf6f9bf939e788394462c91f8bc20514554d8f980a40fd9b2b7a1e"
+        "receipt_hash": "fb16b22a56fb604724ea6a6e8f95530e34f9d782fa814d59c8802f76c7e24d58"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_42",
       "ocel:vmap": {
-        "move": "e2c1",
+        "move": "c1e3",
         "player": "BCINR",
-        "receipt_hash": "5cbeab9d15fe59d0a84a1c6874b690d85c7aeeaa0cca0581324a4cba1a130242"
+        "receipt_hash": "e6dd4b9fe4c5b3f4b792cf7af0064b0797066285f20555e25a0033205971006e"
       }
     },
     {
       "ocel:activity": "MakeMove",
       "ocel:id": "ev_43",
       "ocel:vmap": {
-        "move": "c2c1",
+        "move": "b8d7",
         "player": "Stockfish",
-        "receipt_hash": "6b21be9dfe6f369f34369d13bfca56bba1456199de21ac3b41656da850114d77"
+        "receipt_hash": "e51ba7005d3877607462f3da2b8210b52e8d5f3bb15e90716d370f281a48c8f4"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_44",
+      "ocel:vmap": {
+        "move": "c4b3",
+        "player": "BCINR",
+        "receipt_hash": "986bf390e2ab51262a8f396dd3338f1edcf08d21a1b0456a68f59b2a9144d1f2"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_45",
+      "ocel:vmap": {
+        "move": "h7h6",
+        "player": "Stockfish",
+        "receipt_hash": "598a247ecd633dd4ed09e64b7bad1796eabb433096c3c855595efa78f1adf58a"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_46",
+      "ocel:vmap": {
+        "move": "d1c1",
+        "player": "BCINR",
+        "receipt_hash": "1432032de00696a785afba710625e76eb6a72f0c2cc5d0dd60db652d0060e512"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_47",
+      "ocel:vmap": {
+        "move": "a8b8",
+        "player": "Stockfish",
+        "receipt_hash": "6f6da5a23dc10f04ef7307af99f7ca68a5352dfb3534371ed1fb877ae5ee02a2"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_48",
+      "ocel:vmap": {
+        "move": "b3a2",
+        "player": "BCINR",
+        "receipt_hash": "46e2021fa3e0e292399c9efd08e23e434d94dc030e5e1ab64244c8b3a3c1673f"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_49",
+      "ocel:vmap": {
+        "move": "d7e5",
+        "player": "Stockfish",
+        "receipt_hash": "26c1bfe97c4091e1743f646f4acdc7ef4d93c16553b7de84ed4e489facf916c2"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_50",
+      "ocel:vmap": {
+        "move": "d3b5",
+        "player": "BCINR",
+        "receipt_hash": "a4840678f0e4efd8c867eef99cc263ffffc8739ea618900792d889a2ade93641"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_51",
+      "ocel:vmap": {
+        "move": "e8e7",
+        "player": "Stockfish",
+        "receipt_hash": "99ff8efe924480954d26865e24ac94f3883691426d1c31b06045de45bd5c37e2"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_52",
+      "ocel:vmap": {
+        "move": "h2h4",
+        "player": "BCINR",
+        "receipt_hash": "0ef7a6b8ea7e3c3ebdd8464356f32670ed409abaccc7a124595a9445ff1ac0b8"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_53",
+      "ocel:vmap": {
+        "move": "e5g4",
+        "player": "Stockfish",
+        "receipt_hash": "2bcf7c9d0a050f7029770216a358b0a1f83c3ccb076606630db185b79761a330"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_54",
+      "ocel:vmap": {
+        "move": "b5d3",
+        "player": "BCINR",
+        "receipt_hash": "e23077bdfe1bf14902ecf693cae1cfd547fd022388f67ad3bec94e1830819a4d"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_55",
+      "ocel:vmap": {
+        "move": "b8e8",
+        "player": "Stockfish",
+        "receipt_hash": "01ed95c066a24d1c7f1f3c698865219506696e86e66acc89ae1fabdb71bcbd0a"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_56",
+      "ocel:vmap": {
+        "move": "a5a6",
+        "player": "BCINR",
+        "receipt_hash": "6a69299cf492a09c3407f718dd9235cb090a581510f4f0d9dfbe1270dcdcab24"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_57",
+      "ocel:vmap": {
+        "move": "g4f6",
+        "player": "Stockfish",
+        "receipt_hash": "720b9651b159ea8dea12ad05613c76f778d4dcd575e1755fc1201d9d7129a20a"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_58",
+      "ocel:vmap": {
+        "move": "d3b5",
+        "player": "BCINR",
+        "receipt_hash": "8066dd67c95435740f9b0b20d8d379a067dadf1c222e236870b25faef45274ca"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_59",
+      "ocel:vmap": {
+        "move": "e8b8",
+        "player": "Stockfish",
+        "receipt_hash": "546c6a54f4ccdb1aa7c1d8a1ffb176be5a34553ed2847fa56a9efc3ed9526377"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_60",
+      "ocel:vmap": {
+        "move": "a6b7",
+        "player": "BCINR",
+        "receipt_hash": "8629f7c5ef5eba08da61be0b6200abca8ddbfe5d54ad2bcd7d2acca9831b220e"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_61",
+      "ocel:vmap": {
+        "move": "f6e4",
+        "player": "Stockfish",
+        "receipt_hash": "be7827edb017844f50fb1da37f6cb6fe938a11bad228991cd951e6676f966432"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_62",
+      "ocel:vmap": {
+        "move": "a4a7",
+        "player": "BCINR",
+        "receipt_hash": "02d6eeaf7906901b65dfbf3564cdb1ee6a170402db8568b33cebaf8163ef7151"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_63",
+      "ocel:vmap": {
+        "move": "e4c3",
+        "player": "Stockfish",
+        "receipt_hash": "85066df38794dfd1ee8f473697913022e14f96385e19a0e576c2b48369e34109"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_64",
+      "ocel:vmap": {
+        "move": "a2b3",
+        "player": "BCINR",
+        "receipt_hash": "8d8ccbf11a54f084964e343e505d31427d17db3f0a7698a9d2ef8323c6ac5e4c"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_65",
+      "ocel:vmap": {
+        "move": "c7b6",
+        "player": "Stockfish",
+        "receipt_hash": "e29e51e044d40a730f66092bc6d965620c1c814a9f369acbcb643982cef2c29e"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_66",
+      "ocel:vmap": {
+        "move": "a7a8",
+        "player": "BCINR",
+        "receipt_hash": "c36730cd222ac0a06e7a0b58e11285da55c90322b3c74e4d3ff94b2470408b41"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_67",
+      "ocel:vmap": {
+        "move": "e7b7",
+        "player": "Stockfish",
+        "receipt_hash": "deda6d452a8e94f618adde1d45c1d3c1dfc7c1036703ef7633de6ce16a33f484"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_68",
+      "ocel:vmap": {
+        "move": "a8b8",
+        "player": "BCINR",
+        "receipt_hash": "fa97197a7815944f9b434c810c3d74b26fc352ed34e1e7e762a550ae91fb0269"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_69",
+      "ocel:vmap": {
+        "move": "b7b8",
+        "player": "Stockfish",
+        "receipt_hash": "c8c6f2cc682c1b40fbd7cd2a59ac4fcd19448c7515d502f15b508246369b8151"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_70",
+      "ocel:vmap": {
+        "move": "b5c4",
+        "player": "BCINR",
+        "receipt_hash": "fe8cd5d611def57b9b9d78a2f770c2a2c5eba1c6dbf0cad489da68f30f788b1b"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_71",
+      "ocel:vmap": {
+        "move": "b6b4",
+        "player": "Stockfish",
+        "receipt_hash": "a705bd5012d89b31668caf85f000a02ed903a2e2d879e52d77e478918881cf53"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_72",
+      "ocel:vmap": {
+        "move": "b3b4",
+        "player": "BCINR",
+        "receipt_hash": "10c527419a28028d5fc7dbcdaef6f71233ea5255fd1f7b9df9a67adfd7288103"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_73",
+      "ocel:vmap": {
+        "move": "b8b4",
+        "player": "Stockfish",
+        "receipt_hash": "a7eb89f3d6b794bbdde62bbfb6a5cab918c1feb76ec14b9bd1e985f2ece08904"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_74",
+      "ocel:vmap": {
+        "move": "c4b3",
+        "player": "BCINR",
+        "receipt_hash": "0eb06fb1283d09889fcc07825d4451f0e363feb88a457a1e51f51df69b9378c3"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_75",
+      "ocel:vmap": {
+        "move": "c5c4",
+        "player": "Stockfish",
+        "receipt_hash": "0a1ba6b0734f7bd0c917cdcdf59af46815393857c9d8aaaa7eefd62f6f04bdae"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_76",
+      "ocel:vmap": {
+        "move": "e3d2",
+        "player": "BCINR",
+        "receipt_hash": "8bb6b0ca9fd921fdd6a93865ffd676da2eeb8707b3757d273e0bfcf7beedf411"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_77",
+      "ocel:vmap": {
+        "move": "c4b3",
+        "player": "Stockfish",
+        "receipt_hash": "64655458d7404ac92922b85eff8940cb840a975b681b133bf5cc9fc5eaac125f"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_78",
+      "ocel:vmap": {
+        "move": "d2c3",
+        "player": "BCINR",
+        "receipt_hash": "e687a6d9a8d374797f42f8c0b1f38313aa29a9eaf816c41d9fccb887cef272b8"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_79",
+      "ocel:vmap": {
+        "move": "b4c4",
+        "player": "Stockfish",
+        "receipt_hash": "9f6f8c9bafb6e2726f303d423f475acabdcf99116224a976d9d0e0e35a82d8ce"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_80",
+      "ocel:vmap": {
+        "move": "e1e8",
+        "player": "BCINR",
+        "receipt_hash": "7d94b345f4ee3fc4aa92be2ba858da88b4d10a1c04b973150fab0e512ed83e8c"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_81",
+      "ocel:vmap": {
+        "move": "g8h7",
+        "player": "Stockfish",
+        "receipt_hash": "baecd4ed692ce83c84ccbdf20c43c03dcf18804e10fe4f09da50f2d8dac889d0"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_82",
+      "ocel:vmap": {
+        "move": "h4h5",
+        "player": "BCINR",
+        "receipt_hash": "a1e7e659b1d4ce8e8aefcf01b3f47a700ca7d17f4d890f637ddaab09fdd31f46"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_83",
+      "ocel:vmap": {
+        "move": "g6f5",
+        "player": "Stockfish",
+        "receipt_hash": "6591053405246409c35f5f938e25514d5c6373772da51dd142941425a5a6f091"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_84",
+      "ocel:vmap": {
+        "move": "e8e3",
+        "player": "BCINR",
+        "receipt_hash": "cbf44e8212abc8832584662a68e3e2e6f3e7135d0b2eaef28f3d9a3254c9ee59"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_85",
+      "ocel:vmap": {
+        "move": "b3c2",
+        "player": "Stockfish",
+        "receipt_hash": "80cc68b2cff4bd84bd12d3423f5445882d719b3b421164f964e403ebfacec90a"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_86",
+      "ocel:vmap": {
+        "move": "e3g3",
+        "player": "BCINR",
+        "receipt_hash": "769da5a0f8478d5016e9395350add6a833dd1682c78e69c32e8d874e5bb0b96f"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_87",
+      "ocel:vmap": {
+        "move": "f7f6",
+        "player": "Stockfish",
+        "receipt_hash": "c631fb9bb5949c679fe7c34ad0d8767d85b1633826a69fccc9526d3d16eef46d"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_88",
+      "ocel:vmap": {
+        "move": "g3f3",
+        "player": "BCINR",
+        "receipt_hash": "945748c24f90bb7b3c7ece0c1a6b280005ec0bbfea5324a98c347567c059929d"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_89",
+      "ocel:vmap": {
+        "move": "f5e4",
+        "player": "Stockfish",
+        "receipt_hash": "4b6ef81617f289c6c5ef4b599251b54594f403b466fb431bf53da2f20f99fb7e"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_90",
+      "ocel:vmap": {
+        "move": "f3g3",
+        "player": "BCINR",
+        "receipt_hash": "70b29df185dd021a1060f60c8c892ed98227024a628d8fea1dfa81561dd4c577"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_91",
+      "ocel:vmap": {
+        "move": "c4c5",
+        "player": "Stockfish",
+        "receipt_hash": "6f4701184a079eee14470d22ee343432584b897c717d17564e1d374af1294efb"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_92",
+      "ocel:vmap": {
+        "move": "g3g4",
+        "player": "BCINR",
+        "receipt_hash": "866e76095be860a4132af934df21fa22df51ddf445de01decb99f7b3c2f1e9f3"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_93",
+      "ocel:vmap": {
+        "move": "e4d3",
+        "player": "Stockfish",
+        "receipt_hash": "72e0a61099c4eb539462b9731c09f08336656b8e4f39cac528b5e7baeda89e2b"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_94",
+      "ocel:vmap": {
+        "move": "c3d2",
+        "player": "BCINR",
+        "receipt_hash": "349a56aa63d192fe4bbc0924325bc71b943c3eea54138f9367d10ba621270a85"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_95",
+      "ocel:vmap": {
+        "move": "c5d5",
+        "player": "Stockfish",
+        "receipt_hash": "6e5e8f86e36bf3a54de7ab430c5ffb9a4acc0d80847da6c93e4046f16679c8d6"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_96",
+      "ocel:vmap": {
+        "move": "g4g3",
+        "player": "BCINR",
+        "receipt_hash": "40739a6179e4f748aee535a97f388ec02369d57589285673620d741b52d83aea"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_97",
+      "ocel:vmap": {
+        "move": "d3e4",
+        "player": "Stockfish",
+        "receipt_hash": "bb14e5c6b905c13f2ddcadfd793b9795b395268bdebc4e21d486330015eeb4df"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_98",
+      "ocel:vmap": {
+        "move": "g3g4",
+        "player": "BCINR",
+        "receipt_hash": "be7e84008eb89841dd1ce3ee964f3574a45f33cd9d5950a03deffedf05c0f714"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_99",
+      "ocel:vmap": {
+        "move": "d5e5",
+        "player": "Stockfish",
+        "receipt_hash": "89efec84d238040f2f6d659cc02765585f74f889be6dc2ce254907bb2e6300de"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_100",
+      "ocel:vmap": {
+        "move": "d2b4",
+        "player": "BCINR",
+        "receipt_hash": "d51d139562096ae3639814af70b4cd57428fd57da70f7e303b8cb500594bdc25"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_101",
+      "ocel:vmap": {
+        "move": "f6f5",
+        "player": "Stockfish",
+        "receipt_hash": "0beb3f76e8c3067c047c3bce700dcd779c09eeb600033b4c501eea530fc89410"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_102",
+      "ocel:vmap": {
+        "move": "g4f4",
+        "player": "BCINR",
+        "receipt_hash": "00bf9c64931540afd4b3441e58c760f2c774df8d1756204d6eb318addeb21430"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_103",
+      "ocel:vmap": {
+        "move": "e5d5",
+        "player": "Stockfish",
+        "receipt_hash": "0b07fe9bf0498d52b64711a592f97de88b5c6b9bae6be331f66c874831a36a49"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_104",
+      "ocel:vmap": {
+        "move": "f4e4",
+        "player": "BCINR",
+        "receipt_hash": "08192a2cb7910e41ae60d480333d01f9327351c71ec68d8bb7ba67da9512deaa"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_105",
+      "ocel:vmap": {
+        "move": "f5e4",
+        "player": "Stockfish",
+        "receipt_hash": "e46f78fa692031fb159c9d6c78ab38423a91efbd84b5dc356aa13413400fda4d"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_106",
+      "ocel:vmap": {
+        "move": "c1c2",
+        "player": "BCINR",
+        "receipt_hash": "4b4a31fef21eeed4203dc3474f60f7684ce493c0be88610e4db0d8a7f46744b6"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_107",
+      "ocel:vmap": {
+        "move": "e4e3",
+        "player": "Stockfish",
+        "receipt_hash": "a401d508c3e0996c314120155802a7cb371271cc23bb250c16e2c7ac452519bc"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_108",
+      "ocel:vmap": {
+        "move": "g2g4",
+        "player": "BCINR",
+        "receipt_hash": "c3289fcdd8fc8c9365c9373be64b4bb8469cd563b1dff88f0c00e48067a52765"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_109",
+      "ocel:vmap": {
+        "move": "h7h8",
+        "player": "Stockfish",
+        "receipt_hash": "b081e04b3b729c08bcc1c69223de020af481dcbe6db893eea48d485501dbc524"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_110",
+      "ocel:vmap": {
+        "move": "b4e1",
+        "player": "BCINR",
+        "receipt_hash": "9e6009255fb912542758e33e736de5d641a390dd179dcb479e0d006c6d7f4f94"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_111",
+      "ocel:vmap": {
+        "move": "h8h7",
+        "player": "Stockfish",
+        "receipt_hash": "9c9edc0c1f0deb23506a2ff2eb4655ddd1387862a8564dcc3fa98730983b3d51"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_112",
+      "ocel:vmap": {
+        "move": "e1b4",
+        "player": "BCINR",
+        "receipt_hash": "51a79be849e43f65c7371745e98fad8b99fa5bfd9d013da30c38fe6d84f10a5c"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_113",
+      "ocel:vmap": {
+        "move": "h7g8",
+        "player": "Stockfish",
+        "receipt_hash": "b95b83548f047f7b0f6728c310b73bdf7590292ce75d76242444acb347bfe866"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_114",
+      "ocel:vmap": {
+        "move": "b4c3",
+        "player": "BCINR",
+        "receipt_hash": "31752e14216247ec72d4f00c0f55d7c3b8b126a59c1b0e7b93de478a57d5b21f"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_115",
+      "ocel:vmap": {
+        "move": "g8f8",
+        "player": "Stockfish",
+        "receipt_hash": "2cadfbbbec42cf2c716a8210b9da3194f92ecc4d1dead46f7aaa9b6278e01734"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_116",
+      "ocel:vmap": {
+        "move": "c3e1",
+        "player": "BCINR",
+        "receipt_hash": "548e84b594d67f8d5914784d8c7cda0bb4c24b17b80e62c2f6dd66b249ad35e9"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_117",
+      "ocel:vmap": {
+        "move": "f8g8",
+        "player": "Stockfish",
+        "receipt_hash": "5fa0a5ddfe6d93c80d9549d8665d95e740f6abdbd9f4db1718793b2400688509"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_118",
+      "ocel:vmap": {
+        "move": "e1c3",
+        "player": "BCINR",
+        "receipt_hash": "0c839c788ef9c63107d090dc5b77f18f1cff0d88dd87a6e7eea2097c932d89fc"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_119",
+      "ocel:vmap": {
+        "move": "g8f8",
+        "player": "Stockfish",
+        "receipt_hash": "ce34b23fee2faf97df1bff92766f1eadb22e524e850abe397bd6fa41e0e91002"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_120",
+      "ocel:vmap": {
+        "move": "c3e1",
+        "player": "BCINR",
+        "receipt_hash": "1f7dd7ce41b1e7816cd9c409f56b496cc5f77703b235e56c934e6fc45948ab2a"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_121",
+      "ocel:vmap": {
+        "move": "e3e2",
+        "player": "Stockfish",
+        "receipt_hash": "ee7b8d89a695d6053f36048cdbc126a0316eff8b012005f4e90c5e6c1de45d54"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_122",
+      "ocel:vmap": {
+        "move": "e1d2",
+        "player": "BCINR",
+        "receipt_hash": "cf8c39b3396589a7c4ba95ccb2f28909ccc7d2308a8730e65ad513e06bb98a35"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_123",
+      "ocel:vmap": {
+        "move": "f8g8",
+        "player": "Stockfish",
+        "receipt_hash": "ca9850501ed6849b45bb63d07d0fde1c087029d2bad52c906e28b0c96e596b20"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_124",
+      "ocel:vmap": {
+        "move": "c2c3",
+        "player": "BCINR",
+        "receipt_hash": "dd25fa5d3d563fa8e7ba23dd35b86b0c3fd0e40d16e09dcf9983ed61d5b43582"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_125",
+      "ocel:vmap": {
+        "move": "g8f7",
+        "player": "Stockfish",
+        "receipt_hash": "0725812bebe74921e2ee2d7751d9e1e39632cc659b44290f0fb874b215b3a1ba"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_126",
+      "ocel:vmap": {
+        "move": "c3c2",
+        "player": "BCINR",
+        "receipt_hash": "61208e10b293f39b34b507fca40ca04bf61d305c68e6acc3fa4436b75c7ccf25"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_127",
+      "ocel:vmap": {
+        "move": "f7e6",
+        "player": "Stockfish",
+        "receipt_hash": "34a36f6cd6da59d7ecb6ba617b84290c826e4480ee905e6c1984f8d101f4926b"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_128",
+      "ocel:vmap": {
+        "move": "c2c3",
+        "player": "BCINR",
+        "receipt_hash": "56e581ea17bf6cfe86f6b1e0728d75f52d2202fe78c74463a2556b3e794de1e7"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_129",
+      "ocel:vmap": {
+        "move": "e6f6",
+        "player": "Stockfish",
+        "receipt_hash": "0574d9f4ce8a364c35648c25b7dc62c0d43193814dd8ac5d4d8d874b87e6a5cd"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_130",
+      "ocel:vmap": {
+        "move": "c3c2",
+        "player": "BCINR",
+        "receipt_hash": "f94fa465a92f7f973c5e0e352cc29f198419864462a2ca98c29e26e02a6d9931"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_131",
+      "ocel:vmap": {
+        "move": "f6f7",
+        "player": "Stockfish",
+        "receipt_hash": "7d2ed6dba4b4486b435886add3bae764b3d1e99134f1ee80da99522dc3c0806f"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_132",
+      "ocel:vmap": {
+        "move": "c2c1",
+        "player": "BCINR",
+        "receipt_hash": "951a30ca13f6c33603b0aa68948ff83685265b8ea3026bf99018c66e6919b90f"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_133",
+      "ocel:vmap": {
+        "move": "d5e5",
+        "player": "Stockfish",
+        "receipt_hash": "5c507e48660ef40210b870724a6e0e110104ebad43470c790a972bd831796e81"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_134",
+      "ocel:vmap": {
+        "move": "d2e1",
+        "player": "BCINR",
+        "receipt_hash": "bcbdc5752528f0c87bc60f00e993cadf5f432745575be38983550f9070011ad7"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_135",
+      "ocel:vmap": {
+        "move": "e5d5",
+        "player": "Stockfish",
+        "receipt_hash": "618af875cd012866cacf1b4ba719a00694cce3c011cbce3f3c5d90078315b2bc"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_136",
+      "ocel:vmap": {
+        "move": "e1d2",
+        "player": "BCINR",
+        "receipt_hash": "f4752306ccff8b1b43c8bc8d7c9b306ab176fa0a2fb3e30107c20383e840c2e6"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_137",
+      "ocel:vmap": {
+        "move": "f7e7",
+        "player": "Stockfish",
+        "receipt_hash": "f8520b796824d38d59502be7ad0da738e0ebb424d5c2f4cd060b4a5d44531413"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_138",
+      "ocel:vmap": {
+        "move": "c1c2",
+        "player": "BCINR",
+        "receipt_hash": "e4d175e9435d4aa82ec12b7def30556b97bc93c6ad28c8318084bbdca0695015"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_139",
+      "ocel:vmap": {
+        "move": "e7f6",
+        "player": "Stockfish",
+        "receipt_hash": "e22c737bd71c7ac6a3babecd12ece7b80cae505ecb3c1464f62a6c0a49bdbb63"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_140",
+      "ocel:vmap": {
+        "move": "d2c3",
+        "player": "BCINR",
+        "receipt_hash": "c0963f625cae50b385d60a6c0e020ba8d22e033b19dcac7a25bf805c58b9e23f"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_141",
+      "ocel:vmap": {
+        "move": "f6g5",
+        "player": "Stockfish",
+        "receipt_hash": "7c6454b0ba15dde7cb03a0578749d3526ef4ae139753e346c189aeed36a6991b"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_142",
+      "ocel:vmap": {
+        "move": "c3d2",
+        "player": "BCINR",
+        "receipt_hash": "7aa4f716dc9da17ca5d11a0851aaf042b1620ecbccb44308eaeed3926207fc29"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_143",
+      "ocel:vmap": {
+        "move": "g5g4",
+        "player": "Stockfish",
+        "receipt_hash": "56a65ba401e1edf564a5271470b92e7f06cde1317ea45ca2e6f8ee95e9dcfe9f"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_144",
+      "ocel:vmap": {
+        "move": "c2c3",
+        "player": "BCINR",
+        "receipt_hash": "b5682a4976618564dd5d26f7f1e10a1a0368cec29662782ac5f178b07eafb9e0"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_145",
+      "ocel:vmap": {
+        "move": "g4h5",
+        "player": "Stockfish",
+        "receipt_hash": "ff8e442c630d40f19d71152ead826ba60928fbc04b07c49e3188680f46c31419"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_146",
+      "ocel:vmap": {
+        "move": "c3c2",
+        "player": "BCINR",
+        "receipt_hash": "0e724b83f78c305aaea1cf3d8f1955fd11a0551dad15c81e61bbdeabfcd7b4f2"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_147",
+      "ocel:vmap": {
+        "move": "h5h4",
+        "player": "Stockfish",
+        "receipt_hash": "733b5a30612968903752bfe2213a6dcade63bc12d3db8df00220711e93567e16"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_148",
+      "ocel:vmap": {
+        "move": "d2e1",
+        "player": "BCINR",
+        "receipt_hash": "4dde4cf1b4ce431904bde8f5bdd7c4ffffe1d72b4fe397c0c6c55b45c82c460c"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_149",
+      "ocel:vmap": {
+        "move": "h4h3",
+        "player": "Stockfish",
+        "receipt_hash": "9da0a4114396e1a644c13b87f026c4445e56b6a7af96ec5d53656e7d1f6ae81d"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_150",
+      "ocel:vmap": {
+        "move": "e1d2",
+        "player": "BCINR",
+        "receipt_hash": "2499ad746d705781624eafe0633cace17af871cdb02ceb8eefd60972e86f91d7"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_151",
+      "ocel:vmap": {
+        "move": "h3h4",
+        "player": "Stockfish",
+        "receipt_hash": "e5478727c214a2d6edcb35f02a3de590bebde41a45b1686bccc3889598afeaaf"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_152",
+      "ocel:vmap": {
+        "move": "d2e1",
+        "player": "BCINR",
+        "receipt_hash": "012a383bc6ca140cbfa883abfec9591fb0f6c8b656d7ceb8dda491b2dc33b6ae"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_153",
+      "ocel:vmap": {
+        "move": "h4h5",
+        "player": "Stockfish",
+        "receipt_hash": "9bb8ff455b0ea268640eff0e1e48ef5611af18f14c0414b98173ae8b319a9cf1"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_154",
+      "ocel:vmap": {
+        "move": "e1d2",
+        "player": "BCINR",
+        "receipt_hash": "6c3fb9c2dc105876603f6ec8f1acf3278bfe8603de869d98966c29235f53a7d4"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_155",
+      "ocel:vmap": {
+        "move": "h5g4",
+        "player": "Stockfish",
+        "receipt_hash": "823c017a607cdac120ab8de7a830991ee93f61ccf80ca3f64a5802c229b02fb1"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_156",
+      "ocel:vmap": {
+        "move": "c2c1",
+        "player": "BCINR",
+        "receipt_hash": "f41bc16b7df3bb78a420a42df759f73eb518ed5d5609fe496ec42954a975495c"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_157",
+      "ocel:vmap": {
+        "move": "g7g5",
+        "player": "Stockfish",
+        "receipt_hash": "cc71ceca441dab5461104e98c68d56f30c7788fed27903aa380c7bd232c380e5"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_158",
+      "ocel:vmap": {
+        "move": "c1c2",
+        "player": "BCINR",
+        "receipt_hash": "e8c0f9dee0897aa66bc6b5704ee447b57476e33c0a8cf892293fbb982d99ee44"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_159",
+      "ocel:vmap": {
+        "move": "h6h5",
+        "player": "Stockfish",
+        "receipt_hash": "b6a79e9467d617f3f3c570725fe28221ed33e3b538677e4e6411c11bd3e94a5c"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_160",
+      "ocel:vmap": {
+        "move": "d2c3",
+        "player": "BCINR",
+        "receipt_hash": "99bfd7c121cfcd28d0070dce565a9e371b956f9b86c64d97b79a77f7aaf9e615"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_161",
+      "ocel:vmap": {
+        "move": "g4f3",
+        "player": "Stockfish",
+        "receipt_hash": "456615433edf472f20983bcbfc432960566d91770be4c44bd5cb8defaaeb9f63"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_162",
+      "ocel:vmap": {
+        "move": "c3b4",
+        "player": "BCINR",
+        "receipt_hash": "662d1fa9955eec35f67e17989c096f894ade4d096a77c45ba853f0a503a172aa"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_163",
+      "ocel:vmap": {
+        "move": "d5d4",
+        "player": "Stockfish",
+        "receipt_hash": "01f91cf888cc28a6ac3c673407bf0d7814ece25080ae40b01bc975984bebb0ad"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_164",
+      "ocel:vmap": {
+        "move": "b4a5",
+        "player": "BCINR",
+        "receipt_hash": "32f961529bf6a31989aecb99f9b4e7f210b275f43519368004754d5b3fa46612"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_165",
+      "ocel:vmap": {
+        "move": "h5h4",
+        "player": "Stockfish",
+        "receipt_hash": "bb510044d75b9b2d3e4ade6e53acbb605c9adbe8f4c13a83950f23877cd5941c"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_166",
+      "ocel:vmap": {
+        "move": "a5e1",
+        "player": "BCINR",
+        "receipt_hash": "642b9499ae4a0462a1915b488b104178e0e0c0d629913d5174d6f0971def1e65"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_167",
+      "ocel:vmap": {
+        "move": "d4d5",
+        "player": "Stockfish",
+        "receipt_hash": "b57b6be162d8430fcdc7e463257bc1987a3a474c724a02fa3e55f486730f109a"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_168",
+      "ocel:vmap": {
+        "move": "c2b3",
+        "player": "BCINR",
+        "receipt_hash": "006a0a22c614bf46cfb01c558d023329d604e44333ca1a6f7c7d6d7987748b9d"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_169",
+      "ocel:vmap": {
+        "move": "h4h3",
+        "player": "Stockfish",
+        "receipt_hash": "16ed754d5211217d1dc1cdb43b1bfe0ad3579d02e06be697dfd35c28bcb12e79"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_170",
+      "ocel:vmap": {
+        "move": "b3c4",
+        "player": "BCINR",
+        "receipt_hash": "f4eccdf6939dec872f9af9794a23ae22299988e08c40907832578cd212b2a873"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_171",
+      "ocel:vmap": {
+        "move": "d5c5",
+        "player": "Stockfish",
+        "receipt_hash": "d605279ecbd14ded460d1561fd73d65388cd44cdd1d9e03e49d0443fcdf9e12a"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_172",
+      "ocel:vmap": {
+        "move": "c4b3",
+        "player": "BCINR",
+        "receipt_hash": "357ec398e7d172e6cfc4487d2359c77e4b914b0449948ac3f0327bd54573f28c"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_173",
+      "ocel:vmap": {
+        "move": "c5d5",
+        "player": "Stockfish",
+        "receipt_hash": "ade7ffaf4d591234860808460419cbdf6c939aee9bbbdf42be70e97d0270ebf4"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_174",
+      "ocel:vmap": {
+        "move": "b3c4",
+        "player": "BCINR",
+        "receipt_hash": "e924de8c504b452562db6ec8098efb0a7eb6733473c843af6117fc34a6af1ddf"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_175",
+      "ocel:vmap": {
+        "move": "d5d1",
+        "player": "Stockfish",
+        "receipt_hash": "b36ba562eee3b5743929c0797a0b2f960d0d720fd124aa0d6828f296bc01f67d"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_176",
+      "ocel:vmap": {
+        "move": "e1c3",
+        "player": "BCINR",
+        "receipt_hash": "c9cf541482dc5599dac6049a841fbd9ec02ef5e0ede8743c6424743f3d8058f6"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_177",
+      "ocel:vmap": {
+        "move": "d1c1",
+        "player": "Stockfish",
+        "receipt_hash": "af8aac7ec8d24bea805a6ad21e36e5c8e729afaa5b480f052c9f7e54ed472c34"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_178",
+      "ocel:vmap": {
+        "move": "c4b3",
+        "player": "BCINR",
+        "receipt_hash": "dd01d95e3f3869ad104c880770815af7a7e1079f63fbac2f99632f5aff743c31"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_179",
+      "ocel:vmap": {
+        "move": "c1c3",
+        "player": "Stockfish",
+        "receipt_hash": "87b4e910078a4c3a2a33cbf5843e5e6b426c8ce8462d5fdff3738c542fea2802"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_180",
+      "ocel:vmap": {
+        "move": "b3c3",
+        "player": "BCINR",
+        "receipt_hash": "5af296afa78850ee78dc3e67f831473f1e006f34b2ba6e99d26ca8c2ca99b677"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_181",
+      "ocel:vmap": {
+        "move": "e2e1r",
+        "player": "Stockfish",
+        "receipt_hash": "ec0bdcea02227add797fe98c55edaf342dcd745cf17fcd30c6f9be9d21796e58"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_182",
+      "ocel:vmap": {
+        "move": "c3b2",
+        "player": "BCINR",
+        "receipt_hash": "885cb1886d60813584ce97169b107b7e40f7c22909eeb179bf32903fe4819c3c"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_183",
+      "ocel:vmap": {
+        "move": "e1e3",
+        "player": "Stockfish",
+        "receipt_hash": "7cae8eb95df6320b449d36f8e04764f9bf4203187b23d371871b53b5843abd07"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_184",
+      "ocel:vmap": {
+        "move": "b2a2",
+        "player": "BCINR",
+        "receipt_hash": "2eab797fffe21a789ff7bb90cf08fad65da82322ca0be666434771759a059f4e"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_185",
+      "ocel:vmap": {
+        "move": "h3h2",
+        "player": "Stockfish",
+        "receipt_hash": "c667b036ba40657788d55c9117b7b05031451919fee07bc3a0bdb909767fa246"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_186",
+      "ocel:vmap": {
+        "move": "a2b2",
+        "player": "BCINR",
+        "receipt_hash": "c1ed0dd2ab6ba3ca9cc772ff29ea265d16e9283fd51d9a4e25a3ae1a8e6d9a9d"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_187",
+      "ocel:vmap": {
+        "move": "f3g3",
+        "player": "Stockfish",
+        "receipt_hash": "700c7bbe62a3f67a97294abd51c3c7d89c5d2125c17a3ae6ae8191d9cd937110"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_188",
+      "ocel:vmap": {
+        "move": "b2c2",
+        "player": "BCINR",
+        "receipt_hash": "220cc8d953284600abc662613efaca77cafca86b572862a56f338a4133b26276"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_189",
+      "ocel:vmap": {
+        "move": "g3f4",
+        "player": "Stockfish",
+        "receipt_hash": "bf68f34d6af625555d2deb8215e7c75740f32e53275450c77e34f70a4a21791a"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_190",
+      "ocel:vmap": {
+        "move": "c2d1",
+        "player": "BCINR",
+        "receipt_hash": "efaa7f325866feb3bea70e24ab64151673750b7769f59b09fe7175636ba5955b"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_191",
+      "ocel:vmap": {
+        "move": "f4f3",
+        "player": "Stockfish",
+        "receipt_hash": "3c5bc15c898830c2975601fbf4a472ceb35e79e230261c31d8f4103b6c45ec1d"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_192",
+      "ocel:vmap": {
+        "move": "d1c2",
+        "player": "BCINR",
+        "receipt_hash": "e8342c9422dbd7acdb78fa2990cc3d475a9f424439d727b6f3ae9eab2be09311"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_193",
+      "ocel:vmap": {
+        "move": "f3f4",
+        "player": "Stockfish",
+        "receipt_hash": "7597fc7db8608fce58ae1dc22363e9cdc7519cb6c04129319306262e98dea949"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_194",
+      "ocel:vmap": {
+        "move": "c2d1",
+        "player": "BCINR",
+        "receipt_hash": "ba9f3b71c46778ec004f5e24ebd27ea63780f94604056c75b2a802e95394be63"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_195",
+      "ocel:vmap": {
+        "move": "f4f3",
+        "player": "Stockfish",
+        "receipt_hash": "b38bad3997773b49409bdd46806c46cf4c745307e80d6cc4a5d32deb103d9249"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_196",
+      "ocel:vmap": {
+        "move": "d1c2",
+        "player": "BCINR",
+        "receipt_hash": "a77d7ec5b3c12ecd3d5ed461ed32031419c22355b5b444d4a3bbb9944ecb3215"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_197",
+      "ocel:vmap": {
+        "move": "h2h1r",
+        "player": "Stockfish",
+        "receipt_hash": "99755924ac5c456b6e62784d675b5aa67468b81d59305d848aca0fde44c5b793"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_198",
+      "ocel:vmap": {
+        "move": "c2d2",
+        "player": "BCINR",
+        "receipt_hash": "d4e3f62a6d30238fa22e172925f378193cb51db04ef4609b3f59fa7db585c7e1"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_199",
+      "ocel:vmap": {
+        "move": "g5g4",
+        "player": "Stockfish",
+        "receipt_hash": "ea484f89adf99841a9f7b0cdd5df79d14b638a622cd231a27b778dcefa35b88d"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_200",
+      "ocel:vmap": {
+        "move": "d2c2",
+        "player": "BCINR",
+        "receipt_hash": "af5a758bb2162c993c9029f35f89bfee4cc0efab2622e8346910c792d72bee67"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_201",
+      "ocel:vmap": {
+        "move": "h1h2",
+        "player": "Stockfish",
+        "receipt_hash": "06c0246557d57e4b9b0e7a8230ba8d0477730fb9d39e2fab6a599e1b0cdb9e78"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_202",
+      "ocel:vmap": {
+        "move": "c2d1",
+        "player": "BCINR",
+        "receipt_hash": "c04e78d14c05dfd5f0931b0a8e1835b9dc9892fc9ffc2e99c7258c5da86308a8"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_203",
+      "ocel:vmap": {
+        "move": "h2f2",
+        "player": "Stockfish",
+        "receipt_hash": "3af5a4296699291dfb013478fc1caf6eb7e23d34152d9b1a22eb648c3c031bba"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_204",
+      "ocel:vmap": {
+        "move": "d1c1",
+        "player": "BCINR",
+        "receipt_hash": "be0edd470a215b6d488ef5bd5c074c627a6cb6fe2ae3a54929a8420cb44c2673"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_205",
+      "ocel:vmap": {
+        "move": "e3d3",
+        "player": "Stockfish",
+        "receipt_hash": "2cb99bcca08f1f2762158eb22a01d54be6e2d24c963449198a39819a0120869c"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_206",
+      "ocel:vmap": {
+        "move": "c1b1",
+        "player": "BCINR",
+        "receipt_hash": "edeedd113186f886d7772301acb3df27311736ce9f0a1370b023ece716327d8e"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_207",
+      "ocel:vmap": {
+        "move": "d3c3",
+        "player": "Stockfish",
+        "receipt_hash": "792a9a6fe17b84eb11be0efd1accb4a44bc79f82be576e455718953a4bb9f24d"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_208",
+      "ocel:vmap": {
+        "move": "b1a1",
+        "player": "BCINR",
+        "receipt_hash": "ff02bda5f128429ad587bd0766c54c345594968f9c0af53df5a368480d6ce272"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_209",
+      "ocel:vmap": {
+        "move": "f2g2",
+        "player": "Stockfish",
+        "receipt_hash": "428a6464ff6a5129cf2f41859a4b2b30269ae562c63a0e3aa0c3c6187fb57c50"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_210",
+      "ocel:vmap": {
+        "move": "a1b1",
+        "player": "BCINR",
+        "receipt_hash": "bb654e4c4218dd63282a5a743e97c047c81ba0cfeb7a74a9a21bb05ab9cc1f88"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_211",
+      "ocel:vmap": {
+        "move": "g2e2",
+        "player": "Stockfish",
+        "receipt_hash": "1071be7bccb7f0b0d814d2cf85180d5f51256f34c8f035ecb6c18c42f6c401bb"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_212",
+      "ocel:vmap": {
+        "move": "b1a1",
+        "player": "BCINR",
+        "receipt_hash": "9f27296b8ff6a6e149a9702b04c1279f77bc180622dc6863b2e206091163cbcf"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_213",
+      "ocel:vmap": {
+        "move": "g4g3",
+        "player": "Stockfish",
+        "receipt_hash": "41ac78bda405f9dcc1cfe8e5b1a04b48d3d25db161c125ff94691cff60017a5e"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_214",
+      "ocel:vmap": {
+        "move": "a1b1",
+        "player": "BCINR",
+        "receipt_hash": "0792a49764bb5509a3e2f21eb8088f5cc09ceafe88c3e49fdc495dd2daac7788"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_215",
+      "ocel:vmap": {
+        "move": "e2f2",
+        "player": "Stockfish",
+        "receipt_hash": "cf49010f7181cd694a20cd920e0b04bbfc56ccc39edec0bcee946dd6c54e31fd"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_216",
+      "ocel:vmap": {
+        "move": "b1a1",
+        "player": "BCINR",
+        "receipt_hash": "97a13a70ea7a43c4ca28f732e3b117c9f6ee588d4b1fe7e01abcb07e1e65d8df"
+      }
+    },
+    {
+      "ocel:activity": "MakeMove",
+      "ocel:id": "ev_217",
+      "ocel:vmap": {
+        "move": "c3c1",
+        "player": "Stockfish",
+        "receipt_hash": "b2d5bd3089f4a208cefd5e862e15774f8db4f4121c0996f2c749e7341928eec1"
       }
     }
   ],
   "ocel:global-log": {
-    "final_receipt": "6b21be9dfe6f369f34369d13bfca56bba1456199de21ac3b41656da850114d77",
+    "final_receipt": "b2d5bd3089f4a208cefd5e862e15774f8db4f4121c0996f2c749e7341928eec1",
     "nodes_per_second": "5000000+",
-    "proven_elo": 3200,
+    "proven_elo": 2900,
     "version": "2.0"
   }
 }
