@@ -2,17 +2,91 @@
 \providecommand\hyper@newdestlabel[2]{}
 \providecommand\HyField@AuxAddToFields[1]{}
 \providecommand\HyField@AuxAddToCoFields[2]{}
-\@writefile{toc}{\contentsline {chapter}{\numberline {1}Introduction}{2}{chapter.1}\protected@file@percent }
+\citation{fog}
+\citation{hennessy}
+\citation{kocher}
+\citation{bernstein}
+\@writefile{toc}{\contentsline {chapter}{\numberline {1}Introduction}{4}{chapter.1}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\gdef \LT@i {\LT@entry 
-    {4}{74.13892pt}\LT@entry 
-    {4}{146.12108pt}\LT@entry 
-    {4}{197.38281pt}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {2}Formalized Primitive Taxonomy}{3}{chapter.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1.1}The cost of a branch}{4}{section.1.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1.2}Three reasons to remove the branch}{4}{section.1.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1.3}Contributions and scope}{5}{section.1.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1.4}What this thesis does \emph  {not} claim}{5}{section.1.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {2}The Mask Calculus}{6}{chapter.2}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\@writefile{toc}{\contentsline {chapter}{\numberline {3}Conclusion}{5}{chapter.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.1}Machine model}{6}{section.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.2}The selection operator}{6}{section.2.2}\protected@file@percent }
+\newlabel{def:select}{{2.3}{6}{Branchless select}{theorem.2.3}{}}
+\newlabel{thm:select}{{2.4}{6}{Selection correctness}{theorem.2.4}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.3}Generating masks from comparisons}{7}{section.2.3}\protected@file@percent }
+\newlabel{thm:lt}{{2.6}{7}{Less-than mask}{theorem.2.6}{}}
+\newlabel{lem:nz}{{2.7}{7}{Nonzero detection}{theorem.2.7}{}}
+\newlabel{thm:eq}{{2.8}{7}{Zero and equality masks}{theorem.2.8}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.4}Algebraic properties}{8}{section.2.4}\protected@file@percent }
+\newlabel{cor:compl}{{2.9}{8}{Complement law}{theorem.2.9}{}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {3}Derived Arithmetic Primitives}{9}{chapter.3}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\gdef \@abspage@last{5}
+\@writefile{toc}{\contentsline {section}{\numberline {3.1}Minimum and maximum}{9}{section.3.1}\protected@file@percent }
+\newlabel{thm:minmax}{{3.1}{9}{Branchless extrema}{theorem.3.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.2}Absolute value}{9}{section.3.2}\protected@file@percent }
+\newlabel{thm:abs}{{3.3}{9}{Branchless absolute value}{theorem.3.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.3}Saturating arithmetic}{10}{section.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {4}SWAR: Data Parallelism Within a Register}{11}{chapter.4}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\@writefile{toc}{\contentsline {section}{\numberline {4.1}The packed-lane model}{11}{section.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4.2}Carry isolation}{11}{section.4.2}\protected@file@percent }
+\newlabel{lem:carry}{{4.1}{11}{Carry isolation}{theorem.4.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4.3}The high-bit hazard}{12}{section.4.3}\protected@file@percent }
+\newlabel{thm:ge}{{4.2}{12}{Correct per-lane unsigned comparison}{theorem.4.2}{}}
+\newlabel{lem:expand}{{4.3}{12}{Per-lane mask expansion}{theorem.4.3}{}}
+\citation{anderson}
+\citation{hackersdelight}
+\@writefile{toc}{\contentsline {section}{\numberline {4.4}Tournament reduction}{13}{section.4.4}\protected@file@percent }
+\newlabel{thm:tournament}{{4.4}{13}{Horizontal maximum}{theorem.4.4}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4.5}The null-byte primitive}{14}{section.4.5}\protected@file@percent }
+\citation{ctverif}
+\citation{dudect}
+\citation{fog}
+\@writefile{toc}{\contentsline {chapter}{\numberline {5}The Limits of ``Branchless''}{15}{chapter.5}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\@writefile{toc}{\contentsline {section}{\numberline {5.1}Source code is not machine code}{15}{section.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5.2}CMOV and data-independent latency}{15}{section.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5.3}Data-dependent instruction latency}{15}{section.5.3}\protected@file@percent }
+\citation{bhaskara}
+\@writefile{toc}{\contentsline {section}{\numberline {5.4}Approximation versus exactness}{16}{section.5.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5.5}What constant-time security actually requires}{16}{section.5.5}\protected@file@percent }
+\citation{criterion}
+\@writefile{toc}{\contentsline {chapter}{\numberline {6}Empirical Evaluation and Verification Audit}{17}{chapter.6}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\@writefile{toc}{\contentsline {section}{\numberline {6.1}Methodology}{17}{section.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6.2}Micro-benchmarks}{17}{section.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6.3}Hash throughput}{18}{section.6.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6.4}Verification audit: the gap between claimed and actual correctness}{18}{section.6.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Defect.}{18}{section*.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Why the tests missed it.}{19}{section*.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Fix and re-verification.}{19}{section*.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Stubs named honestly.}{19}{section*.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6.5}Lesson}{19}{section.6.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {7}Conclusion}{20}{chapter.7}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\@writefile{toc}{\contentsline {paragraph}{Future work.}{20}{section*.6}\protected@file@percent }
+\bibcite{hackersdelight}{1}
+\bibcite{anderson}{2}
+\bibcite{knuth}{3}
+\bibcite{fog}{4}
+\bibcite{hennessy}{5}
+\bibcite{kocher}{6}
+\bibcite{bernstein}{7}
+\bibcite{bhaskara}{8}
+\bibcite{mula}{9}
+\bibcite{criterion}{10}
+\bibcite{ctverif}{11}
+\bibcite{dudect}{12}
+\gdef \@abspage@last{22}
