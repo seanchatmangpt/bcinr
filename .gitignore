@@ -1,2 +1,6 @@
 target/
 .claude/
+thesis.aux
+thesis.log
+thesis.out
+thesis.toc
