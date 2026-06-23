@@ -606,6 +606,236 @@ negligible cost. The proofs tell us \emph{why} the kernel is correct; the differ
 oracle catches the moment the code stops matching the proof.
 
 % =====================================================================
+\chapter{From Kernels to Autonomic Control Planes}
+
+The preceding chapters establish the $\mathcal{B}$-calculus as a correct
+foundation for integer kernels. This chapter traces how that foundation propagates
+upward: through a branchless Petri-net substrate to a self-managing process
+engine --- and, more carefully, what this enables at scale and what it still does
+not guarantee.
+
+\section{Context: why sub-microsecond primitives matter at system scale}
+
+A single branchless \code{select\_u32} at $1.71\,\mathrm{ns}$ is not
+interesting in isolation. It becomes interesting when it is the innermost
+operation inside a tight loop that runs across millions of events per second on
+hundreds of nodes. At that point the arithmetic cost of a branch-misprediction
+($15$--$20$ cycles, $\approx 5$--$7\,\mathrm{ns}$ at $3\,\mathrm{GHz}$) is not
+paid once but billions of times per second across the fleet. The compound effect
+is not a constant additive penalty: on cache-cold, high-entropy workloads ---
+financial matching engines, real-time telemetry ingestion, distributed consensus
+protocols --- the misprediction rate can reach $30$--$50\%$ of dynamic branches,
+which turns a $5\,\mathrm{ns}$ primitive into a $10\,\mathrm{ns}$ one. That
+$2\times$ slowdown collapses throughput headroom that the system designer expected
+to spend on application logic.
+
+The inverse is equally real: eliminating data-dependent branches from the hot
+path of a control plane not only recovers cycles but also makes the worst-case
+execution time (WCET) \emph{statically bounded}. Hard real-time schedulers
+(aerospace flight computers, industrial PLCs, financial exchange matching) require
+a bound on the worst case, not the average; branchless kernels collapse the
+distribution to a narrow spike, which is precisely what makes the bound tight.
+
+\section{The branchless Petri-net substrate}
+
+The library implements a Petri-net execution substrate in
+\code{crates/bcinr-logic/src/models/petri.rs}. A Petri net is a bipartite
+directed graph of \emph{places} (holding tokens) and \emph{transitions} (firing
+rules). A transition fires when every input place is marked; firing consumes the
+input tokens and produces output tokens. Petri nets are a classical model for
+concurrent, reactive, and workflow-style systems \cite{murata}.
+
+The key representation decision is to encode the token distribution as a
+word-aligned bitset: place $k$ maps to bit $k$ of a \code{KBitSet<WORDS>} whose
+underlying storage is a \code{[u64; WORDS]} array. This lets enabledness checking
+and firing become word-parallel bitwise operations on $64$ places per
+\code{u64} word.
+
+\begin{definition}[KBitSet]
+\code{KBitSet<WORDS>} is the type $\{0,1\}^{64 \cdot \text{WORDS}}$ with the
+following primitives (all CC$=1$):
+\[
+  \code{set}(k):\ \text{words}[k\gg 6] \,\mathrel{|}=\, 1 \ll (k \wedge 63),
+\]
+\[
+  \code{contains}(k):\ (\text{words}[k\gg 6] \gg (k \wedge 63)) \wedge 1 = 1,
+\]
+\[
+  \code{satisfies}(R):\ \bigvee_{i} (R.\text{words}[i] \wedge \lnot \text{self.words}[i]) = \mathbf{0}.
+\]
+All three are constant-time in the length of \code{WORDS}; there are no
+data-dependent branches.
+\end{definition}
+
+The firing rule in \code{SwarMarking::try\_fire} combines these with the
+$\select$ operator of Chapter~2:
+
+\begin{lstlisting}
+pub fn try_fire(&self, input: KBitSet<W>, output: KBitSet<W>)
+    -> (Self, bool)
+{
+    let is_enabled = self.current.satisfies(input);
+    let mask = 0u64.wrapping_sub(is_enabled as u64); // 0 or 0xFFFF...
+    let mut next = KBitSet::<W>::zero();
+    (0..W).for_each(|i| {
+        let fired  = (self.current.words[i] & !input.words[i]) | output.words[i];
+        next.words[i] = (fired & mask) | (self.current.words[i] & !mask);
+    });
+    (Self { current: next }, is_enabled)
+}
+\end{lstlisting}
+
+The pattern \code{0u64.wrapping\_sub(flag as u64)} is precisely the less-than
+mask of Theorem~\ref{thm:lt} applied to a boolean: it broadcasts the
+$\{0,1\}$ enabledness bit to an all-ones or all-zeros word, and the subsequent
+word-parallel select is Theorem~\ref{thm:select} applied word-by-word. The
+Petri-net layer is therefore not an independent design; it is a direct application
+of the mask calculus.
+
+\begin{theorem}[Branchless firing correctness]\label{thm:fire}
+Let $m$ be a marking and let $T=(I,O)$ be a transition with input set $I$ and
+output set $O$. Define $e = m.\code{satisfies}(I)$. Then
+$\code{try\_fire}(I,O)$ returns the marking
+\[
+  m' = \begin{cases}
+    (m \setminus I) \cup O & \text{if } e, \\
+    m                      & \text{if } \lnot e,
+  \end{cases}
+\]
+and the flag $e$, with no conditional branches.
+\end{theorem}
+\begin{proof}
+When $e=\mathtt{true}$, \code{mask}$=\mathbf{1}$, so
+$\code{next.words}[i]=((\text{self.words}[i] \wedge \lnot I.\text{words}[i])|O.\text{words}[i])
+\wedge\mathbf{1} \,|\, \text{self.words}[i]\wedge\mathbf{0}
+= (m\setminus I)\cup O$.
+When $e=\mathtt{false}$, \code{mask}$=\mathbf{0}$, so
+$\code{next.words}[i]=\mathbf{0}\,|\,\text{self.words}[i]=m$.
+The control-flow graph has no branches; only bitwise and wrapping arithmetic.
+\end{proof}
+
+\section{The Vision 2030 autonomic engine}
+
+\code{Vision2030Engine} in \code{src/models/vision\_2030.rs} builds a
+self-managing (autonomic) process engine on top of the Petri-net substrate. It
+implements the MAPE-K loop \cite{kephart} --- Monitor, Analyze, Plan, Execute ---
+in a fully branchless execution core:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Phase} & \textbf{Method} & \textbf{Mechanism} \\
+\midrule
+Monitor   & \code{observe}  & FNV-1a hash lookup in \code{PackedKeyTable} \\
+Analyze   & \code{infer}    & Read \code{AutonomicState} (integrity, throughput, health) \\
+Plan      & \code{propose}  & Return \code{Vec<AutonomicAction>} based on state flags \\
+Execute   & \code{execute}  & Branchless reset via mask select on marking \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The \code{observe} method hashes an incoming activity label (e.g.\ ``Process'')
+with FNV-1a, looks it up in a \code{PackedKeyTable<u64, u8, 16>} (a packed
+hash table with CC$=1$ lookup), and fires the corresponding Petri-net transition
+via \code{SwarMarking::try\_fire}. The resulting marking update and state
+adjustment (integrity, drift detection) use only the mask arithmetic of
+Chapters~2--4; the method contains no \code{if} or \code{match} in its hot path.
+
+The engine is parameterised over \code{WORDS} at compile time, so the net can
+scale from a 3-place toy (\code{WORDS=1}) to a 256-place industrial process
+(\code{WORDS=4}) without changing the algorithm.
+
+\section{Civilization-scale unlocks: what is actually claimed}
+
+It would be easy to reach for large language here --- ``branchless control planes
+enable civilization-scale coordination'' --- and the library's earlier documentation
+did exactly that. This section states the honest claim instead.
+
+\paragraph{What the calculus genuinely enables.}
+The $\mathcal{B}$-calculus and the Petri-net substrate give three concrete
+engineering guarantees that compound at scale:
+
+\begin{enumerate}
+  \item \textbf{Statically bounded latency per transition.} A single
+  \code{try\_fire} on a \code{KBitSet<4>} (256 places) costs exactly
+  $4 \times 3 = 12$ bitwise-arithmetic operations plus a hash lookup --- a
+  constant independent of the current marking, the number of tokens, or the
+  activity label. This is the WCET property, and it is the property that makes
+  the engine composable into a hard real-time control loop.
+
+  \item \textbf{Deterministic failure behaviour.} An unenabled transition returns
+  the unchanged marking and \code{fired=false} in the same time as a successful
+  fire. There is no ``slow path'' for the error case, no exception, and no heap
+  allocation on failure. Systems that must meet SLAs under adversarial input
+  (e.g.\ a transaction processing engine under DoS) need this property.
+
+  \item \textbf{Side-channel resistance at the transition layer.} The Petri-net
+  firing rule does not branch on the marking values, so an observer watching only
+  the instruction stream cannot infer \emph{which} transition fired from timing
+  alone. This is weaker than full constant-time security (Chapter~5 still applies:
+  the FNV-1a lookup touches a table, and the hash is not secret), but it closes
+  the most obvious timing oracle at the decision layer.
+\end{enumerate}
+
+\paragraph{What the calculus does not provide.}
+\begin{itemize}
+  \item \textbf{Correctness of the process model.} The firing rule is correct
+  (Theorem~\ref{thm:fire}), but whether the Petri-net topology correctly encodes
+  the intended business process is a modelling question outside the algebra. A
+  branchless incorrect process model is still incorrect.
+  \item \textbf{Distributed consistency.} Nothing in this chapter addresses
+  multi-node consensus, network partitions, or replication. A control plane
+  composed of branchless kernels is fast and predictable locally; whether it
+  behaves correctly across a distributed fleet depends on the protocols layered
+  above it.
+  \item \textbf{Security of the activity-label channel.} The \code{observe}
+  method trusts the \code{payload} byte string. An adversary who can inject
+  arbitrary payloads can fire arbitrary transitions. The mask calculus prevents
+  timing leakage of the firing outcome; it does not authenticate the input.
+\end{itemize}
+
+\paragraph{A grounded characterisation.}
+The honest claim is: \textit{the $\mathcal{B}$-calculus and \code{Vision2030Engine}
+provide a formally grounded, WCET-bounded, branch-free substrate for autonomic
+process management, suited to environments where latency predictability and
+side-channel hygiene at the decision layer are requirements}. That is a real and
+useful guarantee. Whether it amounts to a ``civilization-scale unlock'' depends
+entirely on whether such environments matter at civilization scale --- a question
+this thesis does not answer.
+
+\section{Verification status of the application layer}
+
+The application layer introduces two components not covered by Chapters~2--5:
+
+\begin{enumerate}
+  \item \code{PackedKeyTable}: a compact hash table with open addressing.
+  The \code{lookup} method is CC$=1$ by construction (no branch on hash
+  collision; it uses linear probing with a fixed-length loop). This claim is
+  verified by the \code{bcinr-contract-gate} tool, which checks cyclomatic
+  complexity.
+
+  \item \code{Vision2030Engine::observe}: the method's hot path is branchless
+  (mask-based select on \code{valid\_idx}), but the \code{is\_some()} call on
+  \code{PackedKeyTable::get} is a boolean extracted to a branchless integer
+  via the \code{as usize} cast. The resulting code compiles to a conditional
+  move on x86-64 (verified by inspecting \code{cargo objdump} output), not a
+  branch.
+\end{enumerate}
+
+Both components carry the same adversarial differential tests as the core
+primitives: three mutant functions that invert, increment, or XOR the reference
+output, rejected by the unit tests in \code{vision\_2030.rs} and
+\code{kernel.rs}.
+
+\paragraph{Remaining gaps.} The \code{adapt} and \code{manifest} methods contain
+floating-point arithmetic (\code{f32} clamping) that is not covered by the integer
+calculus of Chapters~2--4. Floating-point \code{clamp} lowers to
+\code{MAXSS}/\code{MINSS} on x86, which is branchless --- but the latency is
+not guaranteed constant across denormals and NaN inputs on all microarchitectures.
+For the current \code{[0.0, 1.0]} range this is not a practical concern, but it
+is a gap in the formal coverage.
+
+% =====================================================================
 \chapter{Conclusion}
 
 The defensible core of \textit{bcinr} is small and genuinely solid: a mask calculus
@@ -617,20 +847,31 @@ carry-isolated SWAR reductions follow by composition with proofs
 intent for the scalar primitives, and hash throughputs land where algorithmic structure
 predicts.
 
+Chapter~7 traces the calculus upward: the same $\select$ primitive underlies the
+branchless Petri-net transition rule (Theorem~\ref{thm:fire}), which in turn is the
+execution core of the \code{Vision2030Engine} autonomic process manager. This vertical
+coherence --- from a two-instruction mask generator to a self-managing control plane ---
+is the architectural claim. It is a real and concrete claim. The chapter is equally
+explicit about what it does not claim: correctness of the process model, distributed
+consistency, and input authentication are out of scope.
+
 The honest findings matter as much as the proofs. ``Branchless'' is a source-level
 property the compiler may not preserve; ``constant-time'' in the security sense demands
 operand-independent memory and latency that this algebra alone does not provide; and a
 ``verified'' routine can still be wrong when its tests are curated rather than
 adversarial --- as the SWAR maximum was, on $71\%$ of inputs, until this work corrected
 it. The contribution is therefore not a sweeping claim but a disciplined one: a proven
-calculus, measured faithfully, audited adversarially, with its limits stated plainly.
+calculus, measured faithfully, audited adversarially, applied to a concrete autonomic
+substrate, with its limits stated plainly at every level.
 
-\paragraph{Future work.} Three directions would strengthen the guarantees from
+\paragraph{Future work.} Four directions would strengthen the guarantees from
 \emph{argued} to \emph{checked}: (i) machine-checked proofs of Chapters~2--4 in a proof
 assistant or SMT-backed verifier (e.g.\ Why3); (ii) constant-time verification of the
 emitted machine code with \texttt{ct-verif} or statistical leakage testing with
-\texttt{dudect}; and (iii) replacing the remaining identity-stub ``gates'' with either
-real verification anchors or nothing at all.
+\texttt{dudect}; (iii) replacing the remaining identity-stub ``gates'' with either
+real verification anchors or nothing at all; and (iv) extending the integer calculus
+to cover the floating-point \code{adapt}/\code{manifest} paths in
+\code{Vision2030Engine}, closing the formal coverage gap identified in Section~7.5.
 
 \begin{thebibliography}{99}
 \bibitem{hackersdelight} H.\ S.\ Warren Jr., \emph{Hacker's Delight}, 2nd ed.,
@@ -658,6 +899,10 @@ Microbenchmarking in Rust}, \url{https://github.com/bheisler/criterion.rs}.
 M.\ Emmi, ``Verifying Constant-Time Implementations,'' \emph{USENIX Security}, 2016.
 \bibitem{dudect} O.\ Reparaz, J.\ Balasch, and I.\ Verbauwhede, ``Dude, is my code
 constant time?,'' \emph{DATE}, 2017.
+\bibitem{murata} T.\ Murata, ``Petri Nets: Properties, Analysis and Applications,''
+\emph{Proceedings of the IEEE}, 77(4):541--580, 1989.
+\bibitem{kephart} J.\ O.\ Kephart and D.\ M.\ Chess, ``The Vision of Autonomic
+Computing,'' \emph{IEEE Computer}, 36(1):41--50, 2003.
 \end{thebibliography}
 
 \end{document}
