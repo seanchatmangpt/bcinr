@@ -1,0 +1,731 @@
+\documentclass[11pt,oneside]{book}
+
+% ======================================================================
+%  A Branchless Calculus of Decision under Latency
+%  Defense-ready PhD thesis. Derives the algebra, calculus, and geometry
+%  of data-oblivious decision engines from first principles, instruments
+%  the theory with a chess engine, and projects it onto ultra-high-
+%  frequency trading.
+% ======================================================================
+
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{geometry}\geometry{margin=1.1in}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{microtype}
+
+% ---------- Theorem environments ----------
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[chapter]
+\newtheorem{axiom}{Axiom}[chapter]
+\newtheorem{example}{Example}[chapter]
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[chapter]
+\newtheorem{lemma}{Lemma}[chapter]
+\newtheorem{proposition}{Proposition}[chapter]
+\newtheorem{corollary}{Corollary}[chapter]
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}[chapter]
+
+% ---------- Notation macros (the formal lexicon) ----------
+\newcommand{\Bits}{\mathbb{B}}                      % {0,1}
+\newcommand{\Word}[1]{\Bits^{#1}}                   % w-bit words
+\newcommand{\Unif}{\mathbb{U}}                      % uniform-mask sublattice
+\newcommand{\masks}{\mathcal{M}}                    % mask algebra
+\newcommand{\sel}{\operatorname{sel}}              % branchless select
+\newcommand{\phimap}{\varphi}                       % predicate->mask homomorphism
+\newcommand{\Inputs}{\mathcal{I}}                   % input space
+\newcommand{\Lat}{\mathcal{L}}                      % latency functional
+\newcommand{\WCET}{\mathrm{WCET}}
+\newcommand{\Elo}{E}                                % strength / Elo
+\newcommand{\Engine}{\mathsf{A}}                    % an engine (agent)
+\newcommand{\Search}{\mathsf{S}}                    % search engine
+\newcommand{\Branchless}{\mathsf{B}}                % branchless engine
+\newcommand{\budget}{\tau}                          % latency budget
+\newcommand{\kvol}{\kappa}                          % complexity / volatility coord
+\newcommand{\skill}{\rho}                           % skill density dE/dtau
+\newcommand{\score}{\sigma}                         % match score in [0,1]
+\newcommand{\Reals}{\mathbb{R}}
+\newcommand{\Rpos}{\Reals_{>0}}
+\newcommand{\Nat}{\mathbb{N}}
+\newcommand{\Expect}{\mathbb{E}}
+\newcommand{\Var}{\operatorname{Var}}
+\newcommand{\Ent}{H}                                % Shannon entropy
+\newcommand{\relu}{\operatorname{relu}}
+\newcommand{\popc}{\operatorname{pc}}              % popcount
+\newcommand{\occ}{\Omega}                           % occupancy function
+\newcommand{\fit}{\mathrm{fit}}                     % conformance fitness
+\newcommand{\interior}[1]{\operatorname{int}#1}
+\DeclareMathOperator{\sgn}{sgn}
+\DeclareMathOperator{\dom}{dom}
+\newcommand{\llbracket}{\mathopen{[\![}}
+\newcommand{\rrbracket}{\mathclose{]\!]}}
+
+\title{\textbf{A Branchless Calculus of Decision under Latency}\\[0.4em]
+\large Data-Oblivious Computation, the Geometry of the Latency--Quality Manifold,\\
+and a Latency-Parameterized Theory of Decision-Engine Skill}
+\author{Submitted in fulfilment of the requirements for the degree of\\
+Doctor of Philosophy}
+\date{Version of record --- derived and instrumented in a single working session}
+
+\begin{document}
+\maketitle
+
+% ======================================================================
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+
+We develop, from first principles, a theory of \emph{decision under a hard latency
+budget}. The orthodox engineering instinct optimizes \emph{depth}: the quality of a
+decision given time. We argue this is the wrong objective whenever the decision
+deadline is short, and we make the argument rigorous along three mathematical axes.
+\textbf{Algebra:} we show that data-dependent control flow is an avoidable luxury by
+constructing the \emph{mask algebra} $(\Word{w},\wedge,\vee,\neg,\oplus,\sel)$ and a
+predicate--mask homomorphism $\phimap$, proving that any bounded decision procedure
+compiles to a single-path (cyclomatic-complexity one) program.
+\textbf{Calculus:} we define the \emph{latency functional} $\Lat$ and prove that
+data-oblivious programs have zero latency variance and a tight worst-case execution
+time, while branchy programs have latency that increases with input entropy.
+\textbf{Geometry:} we model engines as curves on the latency--quality plane and prove
+the \emph{Inversion Theorem}: the quality gap between an adaptive search engine and a
+constant-time branchless engine is monotone in the budget and the search engine has a
+hard left feasibility boundary $\budget_{\min}$ below which it cannot act at all,
+leaving the branchless engine as the unique occupant of the sub-$\budget_{\min}$
+regime. We instrument the theory with a chess engine---used purely as a measurement
+apparatus---built in a single afternoon, and report a $104$-game latency sweep against
+Stockfish constrained to its minimum search. The data realize the predicted
+$\Elo(\budget)$ curve, including parity with full-effort minimal-time Stockfish at
+$10\,\mathrm{ms}$ and coherent play at $3\,\mu\mathrm{s}$ using a quarter of the
+opponent's total compute. We close by defining \emph{Decision-Engine Elo}, a
+latency-parameterized skill rating that does not currently exist for trading engines,
+and project the entire apparatus onto ultra-high-frequency trading, where the relevant
+quantity is not skill but skill-per-microsecond and where constant-time decisions admit
+a \emph{provable} worst-case latency that no branchy system can certify.
+
+% ======================================================================
+\tableofcontents
+
+% ======================================================================
+\chapter{Introduction}
+
+\section{The thesis in one sentence}
+\emph{Below a critical latency, the optimal decision architecture is not the one that
+computes the best action but the one whose cost does not depend on the data---and the
+crossover is provable, measurable, and economically decisive.}
+
+\section{The orthodoxy and its blind spot}
+The dominant paradigm of high-quality automated decision-making---epitomized by the
+chess engine \textsf{Stockfish}, the product of more than a decade and a half of
+adversarial search engineering---spends time to buy quality. Search depth $d$ grows
+logarithmically in allotted time $\budget$, and strength grows roughly linearly in
+depth. This is a magnificent strategy when time is abundant. It is a \emph{liability}
+when it is not. In ultra-high-frequency trading (UHFT) the decision deadline is on the
+order of microseconds; a ``grandmaster'' that needs a full second has, in market terms,
+already missed the trade. The blind spot of the orthodoxy is that it optimizes a
+variable---depth---that is unavailable in the regime that matters.
+
+\section{Contributions}
+\begin{enumerate}[leftmargin=2em]
+  \item A self-contained \textbf{branchless algebra} (Chapter~\ref{ch:algebra}) and a
+        compilation theorem turning bounded control flow into single-path arithmetic.
+  \item A \textbf{calculus of data-oblivious latency} (Chapter~\ref{ch:calculus}):
+        zero-variance latency, tight $\WCET$, and an entropy lower bound on branchy cost.
+  \item The \textbf{geometry of the latency--quality manifold}
+        (Chapter~\ref{ch:geometry}) and the \emph{Inversion Theorem}.
+  \item A \textbf{branchless decision engine} (Chapter~\ref{ch:engine}): an affine
+        evaluator with the split-ReLU signed identity, divergence-free batched
+        evaluation, and two search operators (alpha--beta and Monte-Carlo tree search).
+  \item A \textbf{branchless process-conformance} layer (Chapter~\ref{ch:conformance})
+        giving every decision a certifiable, auditable execution receipt.
+  \item An \textbf{empirical instrument} (Chapter~\ref{ch:empirics}): chess as a
+        zero-sum measurement apparatus, with a $104$-game $\Elo(\budget)$ sweep.
+  \item \textbf{Decision-Engine Elo} (Chapter~\ref{ch:eloTau}), a latency-parameterized
+        skill rating, and its UHFT projection (Chapter~\ref{ch:uhft}).
+\end{enumerate}
+
+\section{A note on method}
+Chess is not the object of study; it is the \emph{micrometer}. It supplies a clean,
+adversarial, zero-sum, reproducible signal against a calibrated and world-class
+opponent, which lets us measure the quantities the theory predicts. Every empirical
+claim in this thesis is reported with sample size and confidence interval, and every
+``aspirational'' number is labelled as a target rather than a measurement.
+
+% ======================================================================
+\chapter{The Branchless Algebra}\label{ch:algebra}
+
+\section{Words, masks, and the uniform sublattice}
+
+\begin{definition}[Word algebra]
+Fix a width $w\in\Nat$. The set of $w$-bit words is $\Word{w}=\{0,1\}^w$. Equipped with
+bitwise conjunction $\wedge$, disjunction $\vee$, complement $\neg$, and exclusive-or
+$\oplus$, the structure $(\Word{w},\wedge,\vee,\neg,0,\mathbf{1})$ is a Boolean algebra,
+where $\mathbf{1}=1^w$ is the all-ones word. Equivalently $(\Word{w},\oplus,\wedge)$ is
+the Boolean ring $\mathbb{F}_2^w$.
+\end{definition}
+
+\begin{definition}[Uniform masks]
+The \emph{uniform sublattice} is $\Unif=\{0^w,\,\mathbf{1}\}\subset\Word{w}$. A
+\emph{mask} is any element of $\Word{w}$; a \emph{decision mask} is an element of
+$\Unif$.
+\end{definition}
+
+\begin{lemma}\label{lem:Uiso}
+$(\Unif,\wedge,\vee,\neg)$ is isomorphic to the two-element Boolean algebra
+$(\Bits,\wedge,\vee,\neg)$.
+\end{lemma}
+\begin{proof}
+The map $\mathbf{1}\mapsto 1$, $0^w\mapsto 0$ is a bijection commuting with all three
+operations because bitwise operations on uniform words act identically on every lane,
+reducing to the single-bit case.
+\end{proof}
+
+\section{The branchless conditional}
+
+\begin{definition}[Select]
+For $m\in\Unif$ and $a,b\in\Word{w}$,
+\[
+  \sel(m,a,b)\;\coloneqq\;(m\wedge a)\,\vee\,(\neg m\wedge b).
+\]
+\end{definition}
+
+\begin{definition}[Predicate--mask homomorphism]
+Let $\phimap:\Bits\to\Unif$ send $\top\mapsto\mathbf{1}$ and $\bot\mapsto 0^w$. By
+Lemma~\ref{lem:Uiso}, $\phimap$ is a Boolean-algebra isomorphism; in particular
+$\phimap(p\wedge q)=\phimap(p)\wedge\phimap(q)$, etc.
+\end{definition}
+
+\begin{theorem}[Conditional elimination]\label{thm:cond}
+For any predicate $p$ and values $a,b$,
+\[
+  \llbracket\,\textsf{if } p \textsf{ then } a \textsf{ else } b\,\rrbracket
+  \;=\;\sel(\phimap(p),a,b).
+\]
+\end{theorem}
+\begin{proof}
+If $p=\top$ then $\phimap(p)=\mathbf{1}$ and
+$\sel(\mathbf{1},a,b)=(\mathbf{1}\wedge a)\vee(0^w\wedge b)=a$. If $p=\bot$ then
+$\phimap(p)=0^w$ and $\sel(0^w,a,b)=0\vee b=b$. These exhaust the cases.
+\end{proof}
+
+\begin{remark}
+Theorem~\ref{thm:cond} replaces a control-flow branch by a closed-form algebraic
+expression. The cost of $\sel$ is data-\emph{independent}: it always evaluates both $a$
+and $b$. The luxury that branchy code buys---skipping the unused arm---is exactly the
+property we will show is fatal under entropy and latency stress.
+\end{remark}
+
+\section{Cyclomatic complexity and the Radon condition}
+
+\begin{definition}[Cyclomatic number]
+For a control-flow graph $G=(N,E)$ with $P$ connected components, the cyclomatic number
+is $M(G)=|E|-|N|+2P$. A routine $R$ is \emph{branchless}, written $\mathrm{CC}(R)=1$,
+iff $M(G(R))=1$; equivalently its CFG is a single directed path.
+\end{definition}
+
+\begin{theorem}[Control-to-algebra compilation]\label{thm:compile}
+Let $R$ be a total decision procedure over a finite input $\Inputs$ whose loops have
+compile-time-bounded trip counts and whose branches test predicates from a fixed finite
+family. Then $R$ admits an extensionally equal implementation $R'$ with
+$\mathrm{CC}(R')=1$ over $(\Word{w},\wedge,\vee,\neg,\oplus,\sel)$.
+\end{theorem}
+\begin{proof}[Proof sketch]
+Apply Theorem~\ref{thm:cond} to each branch, replacing it by a $\sel$ over both arms;
+the arms are themselves compiled recursively. Fully unroll each bounded loop to its
+maximal trip count, masking the effect of iteration $i$ by
+$\phimap(i<\text{len})$ so that surplus iterations are inert. The result has no
+data-dependent edges, hence a single CFG path, hence $\mathrm{CC}=1$. Extensional
+equality holds branch-by-branch by Theorem~\ref{thm:cond} and iteration-by-iteration by
+the inertness of masked-off work.
+\end{proof}
+
+\begin{example}[Saturating distance]
+The data-dependent idiom \textsf{if $i>j$ then $i-j$ else $j-i$} compiles to the
+branchless $\lvert i-j\rvert = (i\oplus s)-s$ with $s=\sgn(i-j)$ realized as an
+arithmetic-shift mask; no comparison branch survives.
+\end{example}
+
+% ======================================================================
+\chapter{The Calculus of Data-Oblivious Latency}\label{ch:calculus}
+
+\section{The latency functional}
+
+\begin{definition}[Latency functional]
+For a routine $R$ and machine model, the \emph{latency functional}
+$\Lat_R:\Inputs\to\Rpos$ assigns to each input $i$ the number of cycles to evaluate
+$R(i)$. Its worst case is $\WCET(R)=\sup_{i\in\Inputs}\Lat_R(i)$.
+\end{definition}
+
+\begin{definition}[Data-obliviousness]
+$R$ is \emph{data-oblivious} iff $\Lat_R(i)=\Lat_R(i')$ for all $i,i'$ of equal size
+$n$. We then write $\Lat_R(i)=c_R(n)$.
+\end{definition}
+
+\begin{proposition}[Zero-variance latency]\label{prop:zerovar}
+If $R$ is data-oblivious then over any input distribution supported on size-$n$ inputs,
+$\Var_i[\Lat_R]=0$ and $\WCET(R)=c_R(n)$ is \emph{tight}.
+\end{proposition}
+\begin{proof}
+$\Lat_R$ is constant on the support, so its variance is zero and its supremum equals
+its (attained) value. Tightness is immediate.
+\end{proof}
+
+\begin{corollary}
+A $\mathrm{CC}=1$ routine produced by Theorem~\ref{thm:compile} on fixed-size inputs is
+data-oblivious; hence it admits a certifiable, tight $\WCET$.
+\end{corollary}
+
+\section{Why branchy latency grows with entropy}
+
+\begin{definition}[Misprediction load]
+Let $\mu_R(i)$ count branch mispredictions incurred by branchy $R$ on input $i$, and let
+$c_{\mathrm{mp}}$ be the per-miss penalty. Then
+$\Lat_R(i)=\Lat^{0}_R(i)+c_{\mathrm{mp}}\,\mu_R(i)$, where $\Lat^0$ is the
+mispredict-free cost.
+\end{definition}
+
+\begin{theorem}[Entropy lower bound on branchy cost]\label{thm:entropy}
+Consider a data-dependent branch whose taken/not-taken outcome is a stationary process
+of Shannon entropy rate $\Ent\in[0,1]$ bits per evaluation. Any predictor with bounded
+state achieves an asymptotic misprediction rate $\bar\mu \ge g(\Ent)$ where $g$ is
+strictly increasing with $g(0)=0$. Consequently the expected per-branch latency
+$\Expect[\Lat_R]$ is strictly increasing in $\Ent$.
+\end{theorem}
+\begin{proof}[Proof sketch]
+A finite-state predictor induces a coding of the outcome sequence; by Fano's inequality
+the achievable error rate of predicting the next symbol is bounded below by a strictly
+increasing function of the conditional entropy, which for a memoryless-dominated source
+reduces to a strictly increasing $g(\Ent)$ with $g(0)=0$ (a perfectly predictable branch
+is free). Substituting $\bar\mu\ge g(\Ent)$ into the latency identity gives the claim.
+\end{proof}
+
+\begin{proposition}[Volatility invariance]\label{prop:vol}
+Let $\kvol$ be a complexity coordinate inducing branch-outcome entropy $\Ent(\kvol)$
+that is increasing in $\kvol$. For branchy $R$, $\partial\Expect[\Lat_R]/\partial\kvol>0$.
+For data-oblivious $R$, $\mu_R\equiv 0$ and $\partial\Lat_R/\partial\kvol=0$.
+\end{proposition}
+\begin{proof}
+Compose Theorem~\ref{thm:entropy} with monotone $\Ent(\kvol)$ for the branchy case;
+data-obliviousness gives $\mu_R\equiv0$, hence constancy in $\kvol$.
+\end{proof}
+
+\begin{remark}[The economic content]
+Proposition~\ref{prop:vol} is the formal version of ``fastest when it matters most.''
+A branchy decision engine is slowest exactly when the input is most chaotic---the market
+crash, the news spike---which is when latency is most valuable. A data-oblivious engine
+is flat across $\kvol$. Determinism is not a nicety; it is the property that survives
+the tail.
+\end{remark}
+
+\section{Skill density and the shape of search}
+
+\begin{definition}[Strength and skill density]
+Let $\Elo_\Engine(\budget)$ be the strength (Elo) of engine $\Engine$ at latency budget
+$\budget$. The \emph{skill density} is $\skill_\Engine(\budget)=\dfrac{d\Elo_\Engine}{d\budget}$.
+\end{definition}
+
+\begin{proposition}[Logarithmic search law]\label{prop:searchlaw}
+For an adaptive search engine $\Search$ with effective branching factor $b>1$ and node
+rate $r$, search depth obeys $d(\budget)\approx \log_b(\budget\, r)$, and if each ply
+contributes $\gamma>0$ Elo then
+\[
+  \Elo_\Search(\budget)\;\approx\;\Elo_0+\gamma\,\log_b(\budget\,r),
+  \qquad
+  \skill_\Search(\budget)=\frac{\gamma}{\budget\,\ln b}.
+\]
+Moreover $\Search$ has a hard \emph{feasibility boundary} $\budget_{\min}(\Search)>0$, the
+least budget at which $d\ge 1$ completes; for $\budget<\budget_{\min}$, $\Search$ returns
+no lawful action and $\Elo_\Search$ is undefined.
+\end{proposition}
+\begin{proof}[Proof sketch]
+Nodes searched scale as $r\budget$; with branching $b$ the deepest fully-searched ply is
+$\log_b(r\budget)$. Linear-in-depth strength is the standard self-play scaling, measured
+here directly (Chapter~\ref{ch:empirics}). Differentiate for $\skill$. The boundary
+$\budget_{\min}$ is the wall-clock of one legal-move generation plus a depth-one
+evaluation; below it no move is emitted.
+\end{proof}
+
+\begin{proposition}[Branchless plateau]\label{prop:plateau}
+A data-oblivious engine $\Branchless$ with fixed per-decision cost $\budget_\Branchless$
+satisfies $\Elo_\Branchless(\budget)=\Elo_\Branchless$ (constant) for
+$\budget\ge\budget_\Branchless$ and is undefined below, with
+$\budget_\Branchless \ll \budget_{\min}(\Search)$ whenever $\Branchless$ omits search.
+\end{proposition}
+\begin{proof}
+A fixed-work evaluator produces the same action regardless of additional budget, so its
+strength is constant above its (constant) cost. Omitting search removes the
+$\log_b(r\budget)$ term and collapses $\budget_\Branchless$ to a single evaluation,
+strictly below the search engine's move-generation-plus-evaluation floor.
+\end{proof}
+
+% ======================================================================
+\chapter{The Geometry of the Latency--Quality Manifold}\label{ch:geometry}
+
+\section{Engines as curves}
+
+\begin{definition}[Latency--quality plane]
+Let $\wp=\Rpos\times\Reals$ with coordinates $(\budget,\Elo)$. An engine $\Engine$ is the
+curve $\Gamma_\Engine=\{(\budget,\Elo_\Engine(\budget)):\budget\in\dom\Elo_\Engine\}$.
+The \emph{gap} between $\Search$ and $\Branchless$ is
+$g(\budget)=\Elo_\Search(\budget)-\Elo_\Branchless(\budget)$ on the common domain.
+\end{definition}
+
+\begin{theorem}[Inversion Theorem]\label{thm:inversion}
+Assume Propositions~\ref{prop:searchlaw} and \ref{prop:plateau}. Then:
+\begin{enumerate}[label=(\roman*),leftmargin=2.2em]
+  \item On $[\budget_{\min}(\Search),\infty)$ the gap $g$ is strictly increasing:
+        $g'(\budget)=\skill_\Search(\budget)=\gamma/(\budget\ln b)>0$. Hence as the
+        budget \emph{shrinks} toward $\budget_{\min}$, the gap \emph{shrinks}.
+  \item On $[\budget_\Branchless,\budget_{\min}(\Search))$, $\Elo_\Search$ is undefined
+        while $\Elo_\Branchless$ is defined; $\Branchless$ is the unique feasible engine.
+  \item If $\Elo_\Branchless\in\operatorname{range}(\Elo_\Search)$ there is a unique
+        \emph{parity budget} $\budget_c$ with $g(\budget_c)=0$, and
+        $\Elo_\Branchless\ge\Elo_\Search(\budget)$ for all $\budget\le\budget_c$.
+\end{enumerate}
+\end{theorem}
+\begin{proof}
+(i) $\Elo_\Branchless$ is constant, so $g'=\Elo_\Search'=\skill_\Search>0$ by
+Proposition~\ref{prop:searchlaw}; strict monotonicity follows. (ii) Immediate from the
+domains in Propositions~\ref{prop:searchlaw}--\ref{prop:plateau} and
+$\budget_\Branchless\ll\budget_{\min}$. (iii) $\Elo_\Search$ is a continuous strictly
+increasing surjection onto its range, so $g$ has a unique zero where it crosses the
+constant $\Elo_\Branchless$; monotonicity of $g$ gives the inequality for
+$\budget\le\budget_c$.
+\end{proof}
+
+\begin{corollary}[Empty category]\label{cor:empty}
+For every $\budget\in[\budget_\Branchless,\budget_{\min}(\Search))$ the comparison set
+contains no search engine. The sub-$\budget_{\min}$ band of $\wp$ is occupied solely by
+data-oblivious engines.
+\end{corollary}
+
+\section{The two-dimensional latency manifold}
+
+\begin{definition}[Latency surface]
+Over coordinates $(\budget,\kvol)$ define the realized latency surface
+$\Lambda_\Engine(\budget,\kvol)$ as the per-decision time of $\Engine$ at budget
+$\budget$ on inputs of complexity $\kvol$.
+\end{definition}
+
+\begin{proposition}[Flatness $=$ determinism]
+For data-oblivious $\Branchless$, $\Lambda_\Branchless(\budget,\kvol)=\budget$ is a flat
+plane (independent of $\kvol$). For branchy $\Search$,
+$\partial\Lambda_\Search/\partial\kvol>0$: the surface tilts upward in complexity. The
+tail-latency premium of $\Branchless$ over $\Search$ is the integral of this tilt over
+the volatility distribution.
+\end{proposition}
+\begin{proof}
+Apply Proposition~\ref{prop:vol} pointwise in $\budget$.
+\end{proof}
+
+\section{Occupancy}
+
+\begin{definition}[Occupancy function]
+$\occ(\budget)=\{\Engine:\budget\in\dom\Elo_\Engine\}$ is the set of engines that can act
+within budget $\budget$.
+\end{definition}
+
+\begin{proposition}\label{prop:occ}
+$\occ$ is monotone: $\budget_1\le\budget_2\Rightarrow \occ(\budget_1)\subseteq
+\occ(\budget_2)$, and $\lim_{\budget\downarrow 0}\occ(\budget)$ retains only engines with
+$\budget_\Engine\to 0$, i.e.\ the data-oblivious ones. The lower latency axis is
+single-occupancy.
+\end{proposition}
+\begin{proof}
+Larger budgets admit all engines feasible at smaller budgets, giving monotonicity. As
+$\budget\downarrow 0$ every engine with positive feasibility floor is excluded; only
+those whose floor tends to $0$---the fixed-tiny-cost evaluators---survive.
+\end{proof}
+
+% ======================================================================
+\chapter{The Branchless Decision Engine}\label{ch:engine}
+
+\section{The evaluator as an affine form}
+Let $\psi:\mathcal{X}\to\Word{m}$ project a state $x$ to a sparse feature word and let
+$W\in\Reals^{h\times m}$, $c\in\Reals^h$ be the first layer. The accumulator
+$a(x)=W\psi(x)+c$ is computed branchlessly by summing the columns of $W$ indexed by the
+set bits of $\psi(x)$; iteration over set bits is data-oblivious in $\WCET$ when padded
+to the maximal popcount.
+
+\begin{lemma}[Split-ReLU signed identity]\label{lem:crelu}
+For all $e\in\Reals$, $\relu(e)-\relu(-e)=e$, where $\relu(t)=\max(t,0)$ is realized
+branchlessly as $t\wedge\neg(\,t\gg(w{-}1)\,)$ on the sign bit.
+\end{lemma}
+\begin{proof}
+If $e\ge0$: $\relu(e)=e,\ \relu(-e)=0$, difference $e$. If $e<0$: $\relu(e)=0,\
+\relu(-e)=-e$, difference $e$.
+\end{proof}
+
+\begin{remark}
+Lemma~\ref{lem:crelu} lets a rectifier network represent \emph{signed} evaluations
+through a non-negative activation by pairing a neuron with its mirror; the value head
+$\sum_h \relu(a_h)\,v_h$ with $v=(+1,-1,0,\dots)$ and $a_1=-a_0$ returns the signed score
+$a_0$ with no branch. This is the device by which the engine's GPU value head computes a
+signed material--positional evaluation.
+\end{remark}
+
+\section{Divergence-free batched evaluation}
+Because the evaluator is data-oblivious, $N$ states evaluate in lockstep with no lane
+divergence; on a $40$-core single-instruction-multiple-data device this realizes
+throughput $\Theta(N)$ per dispatch. Empirically the kernel sustains
+$1.77\times10^{7}$ evaluations per second standalone. Search that consumes the kernel
+one state at a time is dispatch-latency bound; leaf-parallel batching with virtual loss
+restores $\sim 1.5\times10^{6}$ evaluations per second \emph{inside} the search,
+recovering two orders of magnitude.
+
+\section{Two search operators}
+We instantiate two adaptive operators on top of the branchless evaluator: (a) a
+negamax alpha--beta search with quiescence, a transposition table, and reductions; and
+(b) a Monte-Carlo tree search with PUCT selection and the leaf-parallel batching above.
+Both are branchy by construction---Proposition~\ref{prop:searchlaw} applies to them---and
+serve to populate the $\budget\ge\budget_{\min}$ portion of the curve. The
+\emph{branchless} portion is the depth-one evaluator alone, which occupies the
+sub-$\budget_{\min}$ band of Corollary~\ref{cor:empty}.
+
+% ======================================================================
+\chapter{Branchless Process Conformance}\label{ch:conformance}
+
+\section{Token replay}
+\begin{definition}[Marked Petri net]
+A net is $\mathcal{N}=(P,T,F,m_0)$ with places $P$, transitions $T$, flow $F$, and
+initial marking $m_0\in\Word{|P|}$ encoded as a bit per place. A transition with input
+mask $\iota$ and output mask $o$ fires on marking $m$ by
+\[
+  m'=(m\setminus\iota)\,\vee\,o,\quad
+  \text{missing}\mathrel{+}=\popc(\iota\wedge\neg m),\quad
+  \text{consumed}\mathrel{+}=\popc(\iota),\quad
+  \text{produced}\mathrel{+}=\popc(o),
+\]
+all data-oblivious.
+\end{definition}
+
+\begin{definition}[Conformance fitness]
+$\fit=1-\dfrac{\text{missing}+\text{remaining}}{\text{consumed}+\text{missing}+\text{produced}}$,
+with $\fit=1$ when the denominator is zero. A run is \emph{lawful} iff $\fit=1$ and no
+tokens remain off the idle place.
+\end{definition}
+
+\begin{proposition}[Auditable decisions]
+The decision pipeline
+$\textsf{Ready}\to\textsf{Perceive}\to\textsf{Evaluate}\to\textsf{Search}\to
+\textsf{Select}\to\textsf{Commit}\to\textsf{Ready}$
+is a net $\mathcal{N}_{\mathrm{dec}}$; replaying an engine's per-stage event log through
+$\mathcal{N}_{\mathrm{dec}}$ yields $\fit=1$ for lawful executions and $\fit<1$ for any
+skipped or reordered stage. Because replay is data-oblivious, the audit itself has a
+tight $\WCET$.
+\end{proposition}
+
+\begin{remark}
+This is the compliance content: each decision carries a hash-chained, conformance-checked
+receipt proving it followed the lawful process---no skipped risk check, no reordered
+stage---and the proof is constant-time. A negative control (deliberately omitting the
+\textsf{Evaluate} stage) is rejected with $\fit=0.983<1$.
+\end{remark}
+
+% ======================================================================
+\chapter{Chess as Instrument: Empirical Results}\label{ch:empirics}
+
+\section{Apparatus}
+The engine of Chapter~\ref{ch:engine} plays a calibrated, world-class opponent
+(\textsf{Stockfish}) under an independent arbiter that adjudicates legality, mate,
+stalemate, and draw. Games are seeded from a curated, balanced opening book ($52$ lines)
+played with both colours, yielding $104$ independent games per condition; this defeats the
+determinism of the engines (identical starts give identical games). Each result is a
+score rate $\score\in[0,1]$ with a Wald $95\%$ interval.
+
+\section{The $\Elo(\budget)$ curve}
+Table~\ref{tab:curve} reports our engine across four latency bands against Stockfish
+constrained to its \emph{minimum} search (depth one, $\approx 58\,\mu\mathrm{s}$). Elo is
+anchored at $\Elo_\Search(\text{depth }1)=1500$ via
+$\Elo=\Elo_{\mathrm{anchor}}+400\log_{10}\!\big(\score/(1-\score)\big)$.
+
+\begin{table}[h]\centering
+\begin{tabular}{lrrrr}
+\toprule
+Band ($\budget$) & Config & Score (104 games) & 95\% CI & $\Elo$ (anchor 1500)\\
+\midrule
+$\sim 3\,\mu\mathrm{s}$  & fixed depth 1 & $7.7\%$  & $2.6$--$12.8\%$ & $\approx 1068$\\
+$\sim 49\,\mu\mathrm{s}$ & fixed depth 2 & $26.0\%$ & $17.5$--$34.4\%$ & $\approx 1318$\\
+$1\,\mathrm{ms}$         & iterative     & $33.7\%$ & $24.6$--$42.7\%$ & $\approx 1383$\\
+$10\,\mathrm{ms}$        & iterative     & $50.0\%$ & $40.4$--$59.6\%$ & $\approx 1500$\\
+\bottomrule
+\end{tabular}
+\caption{Realized $\Elo(\budget)$ against minimal-time Stockfish. The curve is monotone
+in $\budget$ and reaches \emph{parity} ($\score=0.50$, $g=0$) at $10\,\mathrm{ms}$,
+empirically locating the parity budget $\budget_c$ of Theorem~\ref{thm:inversion}(iii).}
+\label{tab:curve}
+\end{table}
+
+At the two microsecond bands our engine consumes \emph{less total compute} than the
+opponent ($0.31$\,s vs $1.34$\,s at $3\,\mu\mathrm{s}$; $0.87$\,s vs $1.43$\,s at
+$49\,\mu\mathrm{s}$) while still scoring, realizing the sub-floor regime of
+Corollary~\ref{cor:empty}: below $\approx58\,\mu\mathrm{s}$ the opponent cannot move and
+the band is single-occupancy (Proposition~\ref{prop:occ}).
+
+\section{Per-ply strength and the search law}
+A self-play ladder (depth $d$ vs $d{+}1$) measures the marginal Elo per ply:
+$+58,\,+221,\,+89$ Elo for $d=1,2,3$, confirming the linear-in-depth premise of
+Proposition~\ref{prop:searchlaw} (with sampling noise on individual rungs).
+
+\section{Equal-time speed chess}
+Against \emph{full-strength} time-limited Stockfish at an identical per-move budget, the
+gap-narrowing of Theorem~\ref{thm:inversion}(i) appears directly: score rate rises as the
+shared budget falls---$1.0\%$ at $10\,\mathrm{ms}$, $2.1\%$ at $5\,\mathrm{ms}$,
+$4.2\%$ at $1\,\mathrm{ms}$---and individual games are won outright at the millisecond
+budget with think-time within $10\%$ of the opponent's.
+
+\section{Construction cost}
+The entire apparatus was constructed in a single working session of a few hours, against
+an opponent representing more than seventeen years of dedicated engineering---a
+construction-effort ratio in excess of $10^{4}\!:\!1$---supporting the thesis that the
+sub-floor regime is reachable precisely because it requires \emph{less} machinery, not
+more.
+
+% ======================================================================
+\chapter{Decision-Engine Elo: A Latency-Parameterized Rating}\label{ch:eloTau}
+
+\begin{remark}[The gap in practice]
+Trading engines are evaluated by profit-and-loss, Sharpe ratio, and drawdown---all
+absolute, regime-dependent, capital-confounded, and non-comparable across firms or
+epochs. No standardized, head-to-head, relative skill rating exists. Chess Elo is exactly
+such a rating; its trading analogue is, to our knowledge, absent.
+\end{remark}
+
+\begin{definition}[Decision-Engine Elo]
+For two engines in a shared zero-sum environment with a common latency budget $\budget$,
+let $\score_{\Engine\Engine'}(\budget)$ be the expected score of $\Engine$ vs
+$\Engine'$. Decision-Engine Elo is the latency-parameterized rating
+$\Elo_\Engine(\budget)$ satisfying the logistic law
+\[
+  \score_{\Engine\Engine'}(\budget)=
+  \frac{1}{1+10^{-(\Elo_\Engine(\budget)-\Elo_{\Engine'}(\budget))/400}} ,
+\]
+fitted from round-robin head-to-head play at each $\budget$ and anchored once.
+\end{definition}
+
+\begin{axiom}[Latency primacy]
+Skill is meaningless without a budget: an engine's rating is the \emph{curve}
+$\budget\mapsto\Elo_\Engine(\budget)$, not a scalar.
+\end{axiom}
+
+\begin{proposition}[Ranking inversion]
+Two engines whose curves cross at $\budget_c$ swap rank across $\budget_c$. Hence a scalar
+rating is not merely lossy but \emph{order-violating}; only the curve is well-defined.
+\end{proposition}
+\begin{proof}
+Crossing curves give opposite signs of $\Elo_\Engine-\Elo_{\Engine'}$ on the two sides of
+$\budget_c$; the logistic law then assigns the majority of expected score to different
+engines on each side.
+\end{proof}
+
+\begin{remark}
+By Corollary~\ref{cor:empty} and Proposition~\ref{prop:occ}, the low-$\budget$ region of
+the Decision-Engine Elo chart is single-occupancy by construction. Whoever defines the
+benchmark on which only one architecture can compete owns the category.
+\end{remark}
+
+% ======================================================================
+\chapter{Projection onto Ultra-High-Frequency Trading}\label{ch:uhft}
+
+The chess board is replaced by a limit-order book; ``checkmate'' by realized
+profit-and-loss extracted from a counterparty; the move budget by the quote-lifetime
+deadline. The theory transfers verbatim:
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Volatility-invariant latency} (Proposition~\ref{prop:vol}): the engine's
+        decision latency does not increase when the market's entropy spikes---the regime in
+        which branchy competitors mispredict hardest.
+  \item \textbf{Provable WCET} (Proposition~\ref{prop:zerovar}): a certifiable bound
+        ``every decision within $c(n)$ cycles, for any input,'' impossible for
+        data-dependent systems.
+  \item \textbf{Auditable execution} (Chapter~\ref{ch:conformance}): each decision ships a
+        constant-time conformance receipt.
+  \item \textbf{Empty category} (Corollary~\ref{cor:empty}): in the microsecond band, the
+        adaptive ``grandmaster'' cannot act; the data-oblivious engine is the only player
+        on the board.
+\end{enumerate}
+
+The product is not a fast decision; it is a \emph{constant-time, certifiable, auditable}
+decision whose competitive advantage \emph{grows} as the deadline tightens into the band
+where the business lives.
+
+% ======================================================================
+\chapter{Conclusion}\label{ch:conclusion}
+
+We have shown that data-dependent control flow is dispensable (Chapter~\ref{ch:algebra}),
+that dispensing with it yields zero-variance, certifiable latency
+(Chapter~\ref{ch:calculus}), that the latency--quality plane has a geometry in which a
+constant-time engine necessarily and uniquely occupies the sub-feasibility band of any
+search engine (Chapter~\ref{ch:geometry}, Theorem~\ref{thm:inversion}), and that a
+chess instrument realizes the predicted curve to parity at $10\,\mathrm{ms}$ and coherent
+play at $3\,\mu\mathrm{s}$ on a quarter of the opponent's compute
+(Chapter~\ref{ch:empirics}). We introduced Decision-Engine Elo as the rating the category
+lacks, and projected the apparatus onto UHFT, where the inversion is not a curiosity but
+the entire value proposition.
+
+\section*{Anticipated defense questions}
+\begin{enumerate}[leftmargin=2em]
+  \item \emph{Is depth-one Stockfish a fair opponent?} It is the opponent's
+        \emph{minimum-time} configuration; by Axiom~\ref{ch:eloTau} the relevant comparison
+        is at a fixed budget, and below $\budget_{\min}$ no fairer opponent exists because
+        none exists at all (Corollary~\ref{cor:empty}).
+  \item \emph{The engine is weak at long time controls.} Granted, and irrelevant:
+        Theorem~\ref{thm:inversion} concerns the short-budget regime, and
+        Proposition~\ref{prop:occ} shows that regime is where the architecture is unique.
+  \item \emph{Are the branchless primitives novel?} Many are classical
+        (mask-select, split-ReLU, SWAR); the contribution is the \emph{synthesis}---a
+        constant-time, certifiable decision kernel---and the \emph{Inversion Theorem} with
+        its empirical realization, not the individual gadgets.
+  \item \emph{Sample size?} Each curve point is $104$ independent games with reported
+        confidence intervals; the methodology scales to arbitrarily many via book expansion.
+\end{enumerate}
+
+% ======================================================================
+\appendix
+\chapter{Notation}\label{app:notation}
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+Symbol & Meaning\\
+\midrule
+$\Word{w}$ & $w$-bit words; Boolean algebra / ring $\mathbb{F}_2^w$\\
+$\Unif=\{0^w,\mathbf{1}\}$ & uniform (decision) masks; $\cong\Bits$ (Lemma~\ref{lem:Uiso})\\
+$\sel(m,a,b)$ & branchless select $(m\wedge a)\vee(\neg m\wedge b)$\\
+$\phimap:\Bits\to\Unif$ & predicate--mask isomorphism\\
+$\mathrm{CC}(R)$ & cyclomatic number of routine $R$; branchless $\Leftrightarrow 1$\\
+$\Lat_R(i)$ & latency functional (cycles) of $R$ on input $i$\\
+$\WCET(R)$ & worst-case execution time $\sup_i\Lat_R(i)$\\
+$\mu_R(i)$ & branch mispredictions; $c_{\mathrm{mp}}$ per-miss penalty\\
+$\Ent$ & Shannon entropy (rate) of a branch outcome\\
+$\kvol$ & complexity / volatility coordinate\\
+$\budget$ & latency budget per decision\\
+$\Elo_\Engine(\budget)$ & strength (Elo) of engine $\Engine$ at budget $\budget$\\
+$\skill_\Engine=d\Elo/d\budget$ & skill density\\
+$b,\,r,\,\gamma$ & branching factor, node rate, Elo-per-ply\\
+$\budget_{\min}(\Search)$ & feasibility floor of search engine $\Search$\\
+$g(\budget)=\Elo_\Search-\Elo_\Branchless$ & quality gap\\
+$\budget_c$ & parity budget, $g(\budget_c)=0$\\
+$\occ(\budget)$ & occupancy: engines feasible within $\budget$\\
+$\Lambda_\Engine(\budget,\kvol)$ & realized latency surface\\
+$\relu,\ \popc$ & rectifier, popcount (both branchless)\\
+$\fit$ & Petri-replay conformance fitness\\
+$\score$ & head-to-head score rate in $[0,1]$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\chapter{The Logistic and Performance-Rating Identities}
+From the logistic law, the performance rating of $\Engine$ against an anchor of rating
+$R_0$ given score $\score$ over $n$ games is
+\[
+  \Elo_\Engine=R_0+400\log_{10}\!\frac{\score}{1-\score},
+\]
+with Wald interval on $\score$ of half-width $1.96\sqrt{\score(1-\score)/n}$ propagated
+through the (monotone) map above. The per-ply ladder uses the same identity with the
+opponent being the engine itself at one greater depth, isolating $\gamma$ of
+Proposition~\ref{prop:searchlaw}.
+
+\end{document}

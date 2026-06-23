@@ -60,6 +60,35 @@ const OPENINGS: &[&[&str]] = &[
     &["d2d4", "e7e6", "c2c4", "f8b4"],                    // Nimzo-ish
     &["e2e4", "e7e5", "g1f3", "b8c6", "f1c4"],            // Italian
     &["d2d4", "d7d5", "g1f3", "g8f6"],                    // Symmetrical d4
+    // --- extended book for >100-game samples (tighter CIs) ---
+    &["e2e4", "c7c5", "b1c3"],                            // Closed Sicilian
+    &["e2e4", "c7c5", "c2c3"],                            // Alapin
+    &["e2e4", "e7e5", "g1f3", "b8c6", "d2d4"],            // Scotch
+    &["e2e4", "e7e5", "f2f4"],                            // King's Gambit
+    &["e2e4", "e7e6", "d2d4", "d7d5", "b1c3"],            // French Winawer setup
+    &["e2e4", "c7c6", "d2d4", "d7d5", "b1c3"],            // Caro main
+    &["d2d4", "g8f6", "c2c4", "c7c5"],                    // Benoni
+    &["d2d4", "g8f6", "c2c4", "e7e6", "g1f3"],            // QID
+    &["d2d4", "g8f6", "c2c4", "g7g6", "b1c3", "d7d5"],    // Grünfeld
+    &["d2d4", "g8f6", "c2c4", "g7g6", "b1c3", "f8g7"],    // King's Indian
+    &["d2d4", "d7d5", "c2c4", "e7e6"],                    // QGD
+    &["d2d4", "d7d5", "c2c4", "d5c4"],                    // QGA
+    &["c2c4", "c7c5"],                                    // Symmetrical English
+    &["c2c4", "e7e6", "g1f3", "d7d5"],                    // English -> Catalan
+    &["g1f3", "g8f6", "g2g3"],                            // King's Indian Attack
+    &["d2d4", "f7f5", "g2g3"],                            // Leningrad Dutch
+    &["e2e4", "d7d5", "e4d5", "d8d5", "b1c3"],            // Scandinavian main
+    &["e2e4", "g8f6", "e4e5", "f6d5"],                    // Alekhine main
+    &["e2e4", "d7d6", "d2d4", "g8f6", "b1c3"],            // Pirc main
+    &["b2b3"],                                            // Larsen
+    &["g2g3", "d7d5"],                                    // Hypermodern
+    &["e2e4", "e7e5", "g1f3", "g8f6", "f3e5"],            // Petroff main
+    &["e2e4", "c7c5", "g1f3", "b8c6"],                    // Sicilian ...Nc6
+    &["e2e4", "c7c5", "g1f3", "e7e6"],                    // Taimanov
+    &["d2d4", "e7e6", "c2c4", "g8f6", "b1c3", "f8b4"],    // Nimzo-Indian
+    &["d2d4", "d7d5", "c2c4", "c7c6", "g1f3", "g8f6"],    // Slav main
+    &["c2c4", "g8f6", "g2g3", "g7g6"],                    // English fianchetto
+    &["e2e4", "e7e5", "b1c3"],                            // Vienna
 ];
 
 struct Engine {
