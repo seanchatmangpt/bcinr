@@ -15,7 +15,7 @@
 //! | 12    | has_sla_token  | 0/1    |                                      |
 //! | 15    | is_compensating| 0/1    |                                      |
 
-#[forbid(unsafe_code)]
+#![forbid(unsafe_code)]
 
 /// Packed admission context word.  See module-level docs for bit layout.
 pub type AdmissionContext = u64;
@@ -72,7 +72,7 @@ const fn has_sla_token(ctx: u64) -> u8 {
 /// - bit 7: resource_load == 15 (saturated)
 /// - bits 6..5: tenant_class (0..3, clamped to 2 bits)
 /// - bit 4: has_sla_token
-/// - bits 3..0: urgency_tier >> 1  (4 urgency buckets of width 2)
+/// - bits 3..0: urgency_tier >> 1  (8 urgency buckets of width 2)
 ///
 /// This encoding collapses the full context into 256 entries while preserving
 /// all policy-relevant distinctions.
@@ -108,7 +108,7 @@ const fn build_topology_lut() -> [ProcessTopology; 256] {
         let saturated = (k >> 7) & 1;
         let tc = (k >> 5) & 0x3;
         let sla = (k >> 4) & 0x1;
-        let urg_bucket = k & 0xF; // urgency_tier >> 1; 4 means original tier >= 8
+        let urg_bucket = k & 0xF; // urgency_tier >> 1; bucket 4 means original tier >= 8
 
         lut[key] = if saturated == 1 {
             ProcessTopology::Quarantine
