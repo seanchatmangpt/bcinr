@@ -11,7 +11,7 @@ Version: **v26.6.24** | Hardware: Apple M-series ARM64 (Firestorm, 3.2 GHz) | Ha
 | Scheduler | Latency | Cycles | Notes |
 |---|---|---|---|
 | `const_tick` (Lever 4) | **436 ps** (measured) | 1.4 | Compile-time topology; N=4,8,16 identical |
-| `legacy` SWAR | 16.7 ns (measured) | 53 | Interpretive bit-scan loop |
+| `legacy` SWAR | 16.7 ns (measured) | 53 | Branchless via kind_mask; +29% vs prior branchy impl on benign linear chain (no misprediction to avoid) |
 | `wired_petri` | 524 ns (measured) | 1,675 | Full Petri reconstruction each tick |
 
 ### Hot-Path Primitives
