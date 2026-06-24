@@ -19,10 +19,14 @@ pub static STATION_WEIGHTS_Q8: &[i32] = &[
     256, // [3] king_safety
     256, // [4] pawn_structure
     256, // [5] center_control
+    256, // [6] passed_pawn
+    192, // [7] rook_open_file
+    128, // [8] bishop_pair
+    192, // [9] king_tropism
 ];
 
 /// Number of weighted stations.
-pub const WEIGHT_COUNT: usize = 6;
+pub const WEIGHT_COUNT: usize = 10;
 
 /// Apply a Q8.8 weight to a raw centipawn contribution. Branchless: CC = 1.
 #[must_use]

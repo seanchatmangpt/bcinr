@@ -82,6 +82,38 @@ pub static OCEL_SCHEMA: &[OcelSchemaEdge] = &[
         activity_name: "center_control_evaluated",
         object_kind: "feature",
     },
+    // feature: passed_pawn -> passed_pawn_evaluated
+    OcelSchemaEdge {
+        cell_id: 6,
+        cell_name: "passed_pawn",
+        activity: 1006,
+        activity_name: "passed_pawn_evaluated",
+        object_kind: "feature",
+    },
+    // feature: rook_open_file -> rook_open_file_evaluated
+    OcelSchemaEdge {
+        cell_id: 7,
+        cell_name: "rook_open_file",
+        activity: 1007,
+        activity_name: "rook_open_file_evaluated",
+        object_kind: "feature",
+    },
+    // feature: bishop_pair -> bishop_pair_evaluated
+    OcelSchemaEdge {
+        cell_id: 8,
+        cell_name: "bishop_pair",
+        activity: 1008,
+        activity_name: "bishop_pair_evaluated",
+        object_kind: "feature",
+    },
+    // feature: king_tropism -> king_tropism_evaluated
+    OcelSchemaEdge {
+        cell_id: 9,
+        cell_name: "king_tropism",
+        activity: 1009,
+        activity_name: "king_tropism_evaluated",
+        object_kind: "feature",
+    },
     // tactical: hanging -> hanging_detected
     OcelSchemaEdge {
         cell_id: 0,
@@ -117,7 +149,7 @@ pub static OCEL_SCHEMA: &[OcelSchemaEdge] = &[
 ];
 
 /// Number of OCEL schema edges.
-pub const OCEL_EDGE_COUNT: usize = 10;
+pub const OCEL_EDGE_COUNT: usize = 14;
 
 #[cfg(test)]
 mod tests {

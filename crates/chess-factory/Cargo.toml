@@ -45,6 +45,11 @@ required-features = ["std"]
 name = "bcinr_kaizen"
 required-features = ["std"]
 
+[[bin]]
+name = "print_book_hashes"
+path = "src/bin/print_book_hashes.rs"
+required-features = ["std"]
+
 [dev-dependencies]
 proptest = "1.4"
 criterion = "0.5"

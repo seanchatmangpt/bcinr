@@ -21,6 +21,14 @@ pub mod king_safety;
 pub mod pawn_structure;
 /// [5] center_control_evaluated — Mask lowering.
 pub mod center_control;
+/// [6] passed_pawn_evaluated — Mask lowering.
+pub mod passed_pawn;
+/// [7] rook_open_file_evaluated — Mask lowering.
+pub mod rook_open_file;
+/// [8] bishop_pair_evaluated — Mask lowering.
+pub mod bishop_pair;
+/// [9] king_tropism_evaluated — Mask lowering.
+pub mod king_tropism;
 
 pub use material::evaluate as evaluate_material;
 pub use pst::evaluate as evaluate_pst;
@@ -28,6 +36,10 @@ pub use mobility::evaluate as evaluate_mobility;
 pub use king_safety::evaluate as evaluate_king_safety;
 pub use pawn_structure::evaluate as evaluate_pawn_structure;
 pub use center_control::evaluate as evaluate_center_control;
+pub use passed_pawn::evaluate as evaluate_passed_pawn;
+pub use rook_open_file::evaluate as evaluate_rook_open_file;
+pub use bishop_pair::evaluate as evaluate_bishop_pair;
+pub use king_tropism::evaluate as evaluate_king_tropism;
 
 
 /// Static metadata for one generated feature station.
@@ -105,10 +117,46 @@ pub static STATION_REGISTRY: &[StationSpec] = &[
         weight_q8: 256,
         evaluate: center_control::evaluate,
     },
+    StationSpec {
+        id: 6,
+        name: "passed_pawn",
+        event_code: 1006,
+        event_name: "passed_pawn_evaluated",
+        score_scale: 20,
+        weight_q8: 256,
+        evaluate: passed_pawn::evaluate,
+    },
+    StationSpec {
+        id: 7,
+        name: "rook_open_file",
+        event_code: 1007,
+        event_name: "rook_open_file_evaluated",
+        score_scale: 10,
+        weight_q8: 192,
+        evaluate: rook_open_file::evaluate,
+    },
+    StationSpec {
+        id: 8,
+        name: "bishop_pair",
+        event_code: 1008,
+        event_name: "bishop_pair_evaluated",
+        score_scale: 30,
+        weight_q8: 128,
+        evaluate: bishop_pair::evaluate,
+    },
+    StationSpec {
+        id: 9,
+        name: "king_tropism",
+        event_code: 1009,
+        event_name: "king_tropism_evaluated",
+        score_scale: 10,
+        weight_q8: 192,
+        evaluate: king_tropism::evaluate,
+    },
 ];
 
 /// Number of generated feature stations.
-pub const STATION_COUNT: usize = 6;
+pub const STATION_COUNT: usize = 10;
 
 #[cfg(test)]
 mod tests {

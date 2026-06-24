@@ -46,6 +46,10 @@ pub fn aggregate(v: &PositionView) -> i32 {
     let r3 = stations::evaluate_king_safety(v).evidence.raw_cp;
     let r4 = stations::evaluate_pawn_structure(v).evidence.raw_cp;
     let r5 = stations::evaluate_center_control(v).evidence.raw_cp;
+    let r6 = stations::evaluate_passed_pawn(v).evidence.raw_cp;
+    let r7 = stations::evaluate_rook_open_file(v).evidence.raw_cp;
+    let r8 = stations::evaluate_bishop_pair(v).evidence.raw_cp;
+    let r9 = stations::evaluate_king_tropism(v).evidence.raw_cp;
 
     apply_weight(r0, STATION_WEIGHTS_Q8[0])
         .wrapping_add(apply_weight(r1, STATION_WEIGHTS_Q8[1]))
@@ -53,6 +57,10 @@ pub fn aggregate(v: &PositionView) -> i32 {
         .wrapping_add(apply_weight(r3, STATION_WEIGHTS_Q8[3]))
         .wrapping_add(apply_weight(r4, STATION_WEIGHTS_Q8[4]))
         .wrapping_add(apply_weight(r5, STATION_WEIGHTS_Q8[5]))
+        .wrapping_add(apply_weight(r6, STATION_WEIGHTS_Q8[6]))
+        .wrapping_add(apply_weight(r7, STATION_WEIGHTS_Q8[7]))
+        .wrapping_add(apply_weight(r8, STATION_WEIGHTS_Q8[8]))
+        .wrapping_add(apply_weight(r9, STATION_WEIGHTS_Q8[9]))
         .wrapping_add(motif_bonus(v))
 }
 

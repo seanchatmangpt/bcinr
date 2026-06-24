@@ -19,7 +19,7 @@ use std::time::Instant;
 
 use chess::{Board, ChessMove, MoveGen};
 
-use chess_factory::search::{fixed_depth_best_move, search_best_move, search_best_move_us};
+use chess_factory::search::{fixed_depth_best_move, search_best_move_us};
 
 /// Default fixed depth for `go depth` / one-shot mode.
 const DEFAULT_DEPTH: usize = 4;
@@ -157,7 +157,7 @@ fn uci_loop() {
                         if let Some(us) = max_time_us {
                             search_best_move_us(&board, us)
                         } else {
-                            search_best_move(&board, max_time_ms)
+                            search_best_move_us(&board, max_time_ms * 1000)
                         }
                     }
                 };
