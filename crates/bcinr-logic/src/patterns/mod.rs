@@ -19,8 +19,10 @@ pub mod hazard_shield;
 pub mod matrix_lru;
 pub mod radix_trie;
 pub mod swar_quotient;
+pub mod hierarchical_time_wheel;
 pub mod time_wheel;
 
+pub use hierarchical_time_wheel::HierarchicalTimeWheel;
 pub use autonomic_arena::AutonomicExhaustionArena;
 pub use bit_transcoder::BitTranscoder;
 pub use bloom_scan::BloomScanPipeline;

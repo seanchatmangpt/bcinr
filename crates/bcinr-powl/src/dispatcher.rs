@@ -268,19 +268,20 @@ pub struct SparseEnabledIndex<const OPS: usize> {
 }
 
 impl<const OPS: usize> SparseEnabledIndex<OPS> {
+    /// Compile-time bound: OPS must be ≤ 512 (8 × 64 bits).
+    /// Evaluated once per monomorphisation; compatible with `generic_const_exprs`.
+    const _OPS_BOUND: () =
+        assert!(OPS <= 512, "SparseEnabledIndex: OPS must be <= 512 (8 * 64 bits)");
+
     /// Construct an index where every op starts with `initial_counts`
     /// as its pending predecessor count and no dependents are
     /// registered.
     ///
     /// Call [`register_edge`][Self::register_edge] (or set
     /// `dependents` directly) before the first [`on_complete`][Self::on_complete].
-    ///
-    /// # Panics (compile-time)
-    ///
-    /// Asserts `OPS <= 512` at const-eval time.
     #[must_use]
     pub fn new(initial_counts: [u32; OPS]) -> Self {
-        const { assert!(OPS <= 512, "SparseEnabledIndex: OPS must be <= 512 (8 * 64 bits)") };
+        let _ = Self::_OPS_BOUND; // force evaluation at instantiation
         Self {
             dependents: [[0u64; 8]; OPS],
             pending_count: initial_counts.map(AtomicU32::new),

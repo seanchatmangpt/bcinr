@@ -1,9 +1,11 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use bcinr_powl::{
     compiler::{compile_powl, PowlAstNode},
+    const_scheduler::{const_tick, linear_chain_preds, parallel_spo_preds},
     scheduler::{scheduler_tick, PowlRunState},
+    scheduler_wide::{wide_tick, WidePowlState},
     scheduler_wired::{petri_tick, PowlPetriState, FiberPool},
-    tape::PowlTape,
+    tape::{PowlTape, v2::PowlTapeLarge},
 };
 
 // ---------------------------------------------------------------------------
@@ -287,7 +289,7 @@ fn bench_mpmc_ring(c: &mut Criterion) {
     g.throughput(Throughput::Elements(64));
     g.bench_function("push64_pop64_throughput", |b| {
         let ring = LockFreeMpmcRing::<WorkItem, 64>::new_checked().unwrap();
-        let item = WorkItem { op_idx: 0, succ_mask: 0 };
+        let _item = WorkItem { op_idx: 0, succ_mask: 0 };
         b.iter(|| {
             for i in 0u32..64 { ring.push_t1(WorkItem { op_idx: i, succ_mask: 0 }); }
             let mut acc = 0u32;
@@ -473,6 +475,201 @@ fn bench_stress(c: &mut Criterion) {
     g.finish();
 }
 
+// ---------------------------------------------------------------------------
+// GROUP: Lever 4 — Compile-time topology scheduler (const_tick)
+// ---------------------------------------------------------------------------
+
+fn bench_const_tick_linear(c: &mut Criterion) {
+    let mut g = c.benchmark_group("lever4/const_tick/linear_chain");
+    g.throughput(Throughput::Elements(1));
+
+    // N=4: 4-op linear chain — fully unrolled by the compiler
+    g.bench_function("N=4", |b| {
+        b.iter(|| {
+            let mut done = 0u64;
+            for _ in 0..4 {
+                const_tick::<4, { linear_chain_preds(4) }>(&mut done);
+            }
+            done
+        })
+    });
+
+    // N=8
+    g.bench_function("N=8", |b| {
+        b.iter(|| {
+            let mut done = 0u64;
+            for _ in 0..8 {
+                const_tick::<8, { linear_chain_preds(8) }>(&mut done);
+            }
+            done
+        })
+    });
+
+    // N=16
+    g.bench_function("N=16", |b| {
+        b.iter(|| {
+            let mut done = 0u64;
+            for _ in 0..16 {
+                const_tick::<16, { linear_chain_preds(16) }>(&mut done);
+            }
+            done
+        })
+    });
+
+    g.finish();
+}
+
+fn bench_const_tick_parallel(c: &mut Criterion) {
+    let mut g = c.benchmark_group("lever4/const_tick/parallel_spo");
+    g.throughput(Throughput::Elements(1));
+
+    // N=4 parallel SPO (3 parallel → 1 join) — all fire in 2 ticks
+    g.bench_function("N=4", |b| {
+        b.iter(|| {
+            let mut done = 0u64;
+            for _ in 0..2 {
+                const_tick::<4, { parallel_spo_preds(4) }>(&mut done);
+            }
+            done
+        })
+    });
+
+    g.bench_function("N=8", |b| {
+        b.iter(|| {
+            let mut done = 0u64;
+            for _ in 0..2 {
+                const_tick::<8, { parallel_spo_preds(8) }>(&mut done);
+            }
+            done
+        })
+    });
+
+    g.finish();
+}
+
+// ---------------------------------------------------------------------------
+// GROUP: Lever 1 — Wide tape scheduler (wide_tick, 512-op)
+// ---------------------------------------------------------------------------
+
+fn wide_linear_tape(n: usize) -> PowlTapeLarge {
+    let mut t = PowlTapeLarge::new();
+    t.len = n as u16;
+    for i in 0..n {
+        if i > 0 {
+            t.pred_mask[i][(i - 1) / 64] = 1u64 << ((i - 1) % 64);
+        }
+        if i + 1 < n {
+            t.succ_mask[i][(i + 1) / 64] = 1u64 << ((i + 1) % 64);
+        }
+    }
+    t
+}
+
+fn wide_parallel_tape(n: usize) -> PowlTapeLarge {
+    let mut t = PowlTapeLarge::new();
+    t.len = n as u16;
+    // ops 0..n-2 independent; op n-1 depends on all
+    for branch in 0..(n - 1) {
+        t.succ_mask[branch][(n - 1) / 64] |= 1u64 << ((n - 1) % 64);
+        t.pred_mask[n - 1][branch / 64] |= 1u64 << (branch % 64);
+    }
+    t
+}
+
+fn bench_wide_tick_linear(c: &mut Criterion) {
+    let mut g = c.benchmark_group("lever1/wide_tick/linear_chain");
+
+    for n in [4usize, 16, 64, 256, 512] {
+        let tape = wide_linear_tape(n);
+        g.throughput(Throughput::Elements(n as u64));
+        g.bench_with_input(BenchmarkId::from_parameter(n), &tape, |b, tape| {
+            b.iter(|| {
+                let mut state = WidePowlState::from_entry(0);
+                let mut total = 0u64;
+                for _ in 0..n {
+                    let f = wide_tick(tape, &mut state);
+                    total |= f[0];
+                }
+                total
+            })
+        });
+    }
+    g.finish();
+}
+
+fn bench_wide_tick_parallel(c: &mut Criterion) {
+    let mut g = c.benchmark_group("lever1/wide_tick/parallel_spo");
+
+    for n in [4usize, 16, 64, 256] {
+        let tape = wide_parallel_tape(n);
+        g.throughput(Throughput::Elements(n as u64));
+        g.bench_with_input(BenchmarkId::from_parameter(n), &tape, |b, tape| {
+            b.iter(|| {
+                let mut entry = [0u64; 8];
+                for i in 0..(n - 1) {
+                    entry[i / 64] |= 1u64 << (i % 64);
+                }
+                let mut state = WidePowlState::new(entry);
+                // tick 1: all branches fire; tick 2: join fires
+                let f1 = wide_tick(tape, &mut state);
+                let f2 = wide_tick(tape, &mut state);
+                (f1, f2)
+            })
+        });
+    }
+    g.finish();
+}
+
+// ---------------------------------------------------------------------------
+// Lever comparison: const_tick vs legacy tick for N=4 (apples-to-apples)
+// ---------------------------------------------------------------------------
+
+fn bench_lever_comparison_n4(c: &mut Criterion) {
+    let mut g = c.benchmark_group("lever_comparison/N=4_linear_chain");
+    g.throughput(Throughput::Elements(4));
+
+    // Baseline: legacy scheduler (N=4 chain, full compilation + tick loop)
+    let tape_legacy = linear_chain(4);
+    let ops_legacy: Vec<_> = tape_legacy.ops[..tape_legacy.len as usize].to_vec();
+    g.bench_function("legacy", |b| {
+        b.iter(|| {
+            let mut state = PowlRunState::new(&tape_legacy);
+            let mut fired = 0u32;
+            while state.check_mask != 0 {
+                fired += scheduler_tick(&ops_legacy, &mut state).0.count_ones();
+            }
+            fired
+        })
+    });
+
+    // Wired petri: N=4 chain
+    let tape_wired = linear_chain(4);
+    let ops_wired: Vec<_> = tape_wired.ops[..tape_wired.len as usize].to_vec();
+    g.bench_function("wired_petri", |b| {
+        b.iter(|| {
+            let mut state = PowlPetriState::new(tape_wired.entry_mask);
+            let mut fired = 0u32;
+            while state.check.words[0] != 0 {
+                fired += petri_tick(&ops_wired, &mut state, None).count_ones() as u32;
+            }
+            fired
+        })
+    });
+
+    // Lever 4: const_tick (compile-time topology)
+    g.bench_function("const_tick", |b| {
+        b.iter(|| {
+            let mut done = 0u64;
+            for _ in 0..4 {
+                const_tick::<4, { linear_chain_preds(4) }>(&mut done);
+            }
+            done
+        })
+    });
+
+    g.finish();
+}
+
 criterion_group!(
     benches,
     // Legacy baseline
@@ -495,5 +692,11 @@ criterion_group!(
     bench_bulk_propagation,
     // Stress
     bench_stress,
+    // ── NEW: 1000x levers ──────────────────────────────────────────────────
+    bench_const_tick_linear,
+    bench_const_tick_parallel,
+    bench_wide_tick_linear,
+    bench_wide_tick_parallel,
+    bench_lever_comparison_n4,
 );
 criterion_main!(benches);

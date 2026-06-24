@@ -2,19 +2,24 @@
 //!
 //! # Nightly features
 //!
-//! This crate uses `#![feature(adt_const_params)]` to allow [`TopologyKind`]
-//! as a const generic parameter in the [`typestate`] module.
+//! - `adt_const_params`: allows [`TopologyKind`] as a const generic parameter.
+//! - `generic_const_exprs`: enables `[u64; N]` in const generic position,
+//!   unlocking compile-time topology encoding in [`const_scheduler`] and
+//!   512-op wide tapes in [`scheduler_wide`].
 //!
-//! `generic_const_exprs` is reserved for future tape-size proofs but is not
-//! yet enabled here because it conflicts with existing `const { assert! }` blocks
-//! in `dispatcher.rs` under that feature's stricter evaluation rules.
+//! The former `const { assert! }` blocker in `dispatcher.rs` has been resolved
+//! by moving the bound to an `impl`-level `const _OPS_BOUND` item.
 #![feature(adt_const_params)]
+#![feature(generic_const_exprs)]
+#![allow(incomplete_features)] // generic_const_exprs is still being stabilised
 
 pub mod admit;
 pub mod compiler;
+pub mod const_scheduler;
 pub mod enterprise;
 pub mod dispatcher;
 pub mod scheduler;
+pub mod scheduler_wide;
 pub mod scheduler_wired;
 pub mod tape;
 pub mod typestate;
