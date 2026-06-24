@@ -108,9 +108,30 @@ fn apply_xor_dispatch(op: &Powl64Op, fire_mask: u64, choice_taken: &mut u64) -> 
     suppressed & active // done_delta (suppressed slots marked done, not fired)
 }
 
+/// Branchless helper: returns `u64::MAX` when `loop_iter` is under `max_iters`
+/// (where 0 means unlimited), `0` when the limit has been reached.
+///
+/// Proof:
+/// - When `max_iters == 0`: unlimited → always return `u64::MAX`.
+/// - When `max_iters > 0`: return `u64::MAX` iff `loop_iter < max_iters`.
+///   We widen to u16, compute `loop_iter as u16 - max_iters as u16`; this
+///   underflows (sets bit 15) iff `loop_iter < max_iters`. Extract bit 15.
+#[inline(always)]
+pub fn iter_under_limit(loop_iter: u8, max_iters: u8) -> u64 {
+    // unlimited_mask: u64::MAX when max_iters == 0, else 0.
+    let unlimited_mask = 0u64.wrapping_sub((max_iters == 0) as u64);
+    // under_limit_mask: u64::MAX when loop_iter < max_iters, else 0.
+    // Widen to u16 so wrapping_sub overflow is detectable via bit 15.
+    let diff = (loop_iter as u16).wrapping_sub(max_iters as u16);
+    let underflow = ((diff >> 15) & 1) as u64; // 1 iff loop_iter < max_iters
+    let under_limit_mask = 0u64.wrapping_sub(underflow);
+    unlimited_mask | under_limit_mask
+}
+
 /// Branchless LoopRedo handler.
 ///
-/// When `op.kind == LoopRedo` AND `fire_mask != 0`, resets body entries in
+/// When `op.kind == LoopRedo` AND `fire_mask != 0` AND the iteration is under
+/// the limit (`op.branch_count == 0` means unlimited), resets body entries in
 /// done (so they can fire again), adds them to check, and increments the
 /// per-slot loop counter by exactly 0 or 1 — no branch.
 ///
@@ -121,7 +142,9 @@ fn apply_xor_dispatch(op: &Powl64Op, fire_mask: u64, choice_taken: &mut u64) -> 
 fn apply_loop_redo(op: &Powl64Op, fire_mask: u64, loop_iter: &mut u8) -> (u64, u64) {
     let is_redo = kind_mask(op.kind, OpKind::LoopRedo);
     let fire_nz = 0u64.wrapping_sub((fire_mask | fire_mask.wrapping_neg()) >> 63);
-    let active = is_redo & fire_nz;
+    // Gate on iteration limit: branch_count holds max_iters (0 = unlimited).
+    let limit_ok = iter_under_limit(*loop_iter, op.branch_count);
+    let active = is_redo & fire_nz & limit_ok;
 
     // Saturating increment by 0 or 1 — no branch.
     // `active & 1` is 1 iff active == u64::MAX.
@@ -288,11 +311,12 @@ mod tests {
     // New: exercises run_to_completion and validates LoopRedo counter increment.
     #[test]
     fn loop_body_refires_on_redo() {
-        // Loop: body=Atom("body"), redo=Atom("redo")
+        // Loop: body=Atom("body"), redo=Atom("redo"), max_iters=0 (unlimited)
         // The body fires, then redo fires (back-edge), resetting body to fire again.
         let ast = PowlAstNode::Loop {
             body: Box::new(PowlAstNode::Atom("body")),
             redo: Box::new(PowlAstNode::Atom("redo")),
+            max_iters: 0,
         };
         let tape = compile_powl(&ast).unwrap();
 
@@ -300,6 +324,44 @@ mod tests {
         // At minimum, body (slot 0) fires at tick 1.
         assert!(!fired_sets.is_empty(), "at least the body op must fire");
         assert!(ticks > 0);
+    }
+
+    #[test]
+    fn iter_under_limit_correctness() {
+        // max_iters == 0 means unlimited: always returns MAX
+        assert_eq!(iter_under_limit(0, 0), u64::MAX);
+        assert_eq!(iter_under_limit(255, 0), u64::MAX);
+
+        // max_iters == 3: under limit for 0,1,2; at limit for 3+
+        assert_eq!(iter_under_limit(0, 3), u64::MAX);
+        assert_eq!(iter_under_limit(1, 3), u64::MAX);
+        assert_eq!(iter_under_limit(2, 3), u64::MAX);
+        assert_eq!(iter_under_limit(3, 3), 0);
+        assert_eq!(iter_under_limit(4, 3), 0);
+        assert_eq!(iter_under_limit(255, 3), 0);
+
+        // max_iters == 1: only iter 0 is under limit
+        assert_eq!(iter_under_limit(0, 1), u64::MAX);
+        assert_eq!(iter_under_limit(1, 1), 0);
+    }
+
+    #[test]
+    fn loop_terminates_at_max_iters() {
+        // Loop with max_iters=2: body fires, then redo fires at most 2 times,
+        // after which the LoopRedo back-edge is suppressed and execution stops.
+        let ast = PowlAstNode::Loop {
+            body: Box::new(PowlAstNode::Atom("body")),
+            redo: Box::new(PowlAstNode::Atom("redo")),
+            max_iters: 2,
+        };
+        let tape = compile_powl(&ast).unwrap();
+
+        // Run for many ticks to confirm termination.
+        let (fired_sets, _ticks) = run_to_completion(&tape, 20);
+        // Body slot = 0, Redo slot = 1, LoopRedo slot = 2.
+        // With max_iters=2, redo fires at most 2 times.
+        let redo_fires = fired_sets.iter().filter(|&&fs| fs & (1 << 1) != 0).count();
+        assert!(redo_fires <= 2, "redo must fire at most max_iters times, got {}", redo_fires);
     }
 
     // New: kind_mask is the identity for equal kinds, zero for different kinds.

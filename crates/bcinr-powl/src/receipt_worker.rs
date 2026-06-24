@@ -102,11 +102,12 @@ struct Pending {
     op_trace: u64,
     topo_tag: u8,
     active: bool,
+    had_overflow: bool,
 }
 
 impl Pending {
     const fn empty() -> Self {
-        Self { run_id: 0, op_trace: 0, topo_tag: 0, active: false }
+        Self { run_id: 0, op_trace: 0, topo_tag: 0, active: false, had_overflow: false }
     }
 }
 
@@ -124,6 +125,8 @@ pub struct ReceiptWorker {
     pub log: ReceiptLog,
     /// Object-Centric Event Log for POWL process conformance verification.
     pub ocel: OcelLog,
+    /// Cumulative count of ring overflow events (pushes that returned 0).
+    pub overflow_count: u64,
 }
 
 impl ReceiptWorker {
@@ -134,7 +137,13 @@ impl ReceiptWorker {
             prev_chain_hash: [0u8; 32],
             log: ReceiptLog::new(),
             ocel: OcelLog::new(),
+            overflow_count: 0,
         }
+    }
+
+    /// Returns the cumulative overflow count.
+    pub fn overflow(&self) -> u64 {
+        self.overflow_count
     }
 
     /// Drain up to `budget` items from `ring`. Returns number of receipts sealed.
@@ -143,7 +152,10 @@ impl ReceiptWorker {
         ring: &LockFreeMpmcRing<EventWorkItem, RING_CAPACITY>,
         full_mask: u64,
         budget: usize,
+        new_overflows: u64,
     ) -> u32 {
+        self.overflow_count = self.overflow_count.saturating_add(new_overflows);
+
         debug_assert!(full_mask != 0, "full_mask must be nonzero");
 
         let mut sealed = 0u32;
@@ -170,7 +182,8 @@ impl ReceiptWorker {
                     self.pending[slot].op_trace,
                     self.pending[slot].topo_tag,
                 );
-                let entry = self.build_entry(run_id, op_trace, topo_tag);
+                let overflow_bit: u8 = if self.pending[slot].had_overflow { 0x80 } else { 0x00 };
+                let entry = self.build_entry(run_id, op_trace, topo_tag | overflow_bit);
                 // Update running chain head before appending.
                 let mut chain_hash = [0u8; 32];
                 chain_hash.copy_from_slice(&entry[17..49]);
@@ -200,6 +213,7 @@ impl ReceiptWorker {
                 p.op_trace = 0;
                 p.topo_tag = kind_tag;
                 p.active = true;
+                p.had_overflow = false;
                 return Ok(i);
             }
         }
@@ -290,7 +304,7 @@ mod tests {
         ring.push_t1(EventWorkItem { op_idx: 1, run_id, op_trace_so_far: 0b11, kind_tag: 0 });
 
         let mut worker = ReceiptWorker::new();
-        let sealed = worker.drain(&ring, full_mask, 10);
+        let sealed = worker.drain(&ring, full_mask, 10, 0);
 
         assert_eq!(sealed, 1, "one run must be sealed");
         assert_eq!(worker.log.len(), 1, "one receipt entry in log");
@@ -305,7 +319,7 @@ mod tests {
         ring.push_t1(EventWorkItem { op_idx: 0, run_id: 2, op_trace_so_far: 0b1, kind_tag: 0 });
 
         let mut worker = ReceiptWorker::new();
-        let sealed = worker.drain(&ring, full_mask, 10);
+        let sealed = worker.drain(&ring, full_mask, 10, 0);
 
         assert_eq!(sealed, 2);
         assert_eq!(worker.log.len(), 2);
@@ -340,7 +354,7 @@ mod tests {
         ring.push_t1(EventWorkItem { op_idx: 0, run_id: 20, op_trace_so_far: 0b1, kind_tag: 0 });
 
         let mut worker = ReceiptWorker::new();
-        worker.drain(&ring, full_mask, 10);
+        worker.drain(&ring, full_mask, 10, 0);
 
         // First entry: replay_ptr at offset 0.
         let e0 = worker.log.entry(0).unwrap();
@@ -389,7 +403,7 @@ mod tests {
         ring.push_t1(EventWorkItem { op_idx: 0, run_id: 300, op_trace_so_far: 0b1, kind_tag: 2 });
 
         let mut worker = ReceiptWorker::new();
-        let sealed = worker.drain(&ring, full_mask, 10);
+        let sealed = worker.drain(&ring, full_mask, 10, 0);
         assert_eq!(sealed, 3);
 
         let e0 = worker.log.entry(0).unwrap();
@@ -429,5 +443,24 @@ mod tests {
             h.update(&[2u8]);
             assert_eq!(hash2, *h.finalize().as_bytes(), "entry[2] must chain from entry[1]");
         }
+    }
+
+    #[test]
+    fn overflow_count_zero_when_ring_never_full() {
+        let ring = make_ring();
+        let full_mask = 0b1u64;
+        ring.push_t1(EventWorkItem { op_idx: 0, run_id: 1, op_trace_so_far: 0b1, kind_tag: 0 });
+        let mut worker = ReceiptWorker::new();
+        worker.drain(&ring, full_mask, 10, 0);
+        assert_eq!(worker.overflow(), 0);
+    }
+
+    #[test]
+    fn overflow_count_reflects_passed_delta() {
+        let ring = make_ring();
+        let full_mask = 0b1u64;
+        let mut worker = ReceiptWorker::new();
+        worker.drain(&ring, full_mask, 10, 3);
+        assert_eq!(worker.overflow(), 3);
     }
 }

@@ -258,6 +258,14 @@ fn dispatch_successors(
     }
 }
 
+/// Result returned by `petri_tick`.
+pub struct PetriTickResult {
+    /// Bitmask of ops fired this tick.
+    pub fired_ops: u64,
+    /// Number of event ring overflow events encountered this tick.
+    pub event_overflow_count: u32,
+}
+
 /// Drives one scheduler tick using `PriorityPetriEngine` branchless core.
 ///
 /// # What changes vs `scheduler_tick`
@@ -268,7 +276,7 @@ fn dispatch_successors(
 /// | No SLA detection | `TimeWheel::tick()` fires due mask, ORed into `sla_breached` |
 /// | No parallel dispatch | `LockFreeMpmcRing::push_t1` for concurrent branches |
 ///
-/// Returns the bitmask of ops fired this tick.
+/// Returns a `PetriTickResult` with the bitmask of ops fired and overflow count.
 #[inline(always)]
 pub fn petri_tick(
     tape: &[Powl64Op],
@@ -276,7 +284,9 @@ pub fn petri_tick(
     ring: Option<&LockFreeMpmcRing<WorkItem, RING_CAPACITY>>,
     event_ring: Option<&LockFreeMpmcRing<EventWorkItem, RING_CAPACITY>>,
     run_id: u64,
-) -> u64 {
+) -> PetriTickResult {
+    let mut overflow_count: u32 = 0;
+
     // --- SLA wheel: drain any expired deadlines ---
     let sla_due = state.sla_wheel.tick();
     state.sla_breached |= sla_due;
@@ -285,7 +295,7 @@ pub fn petri_tick(
     let candidates = state.check.words[0] & !done;
 
     if candidates == 0 {
-        return 0;
+        return PetriTickResult { fired_ops: 0, event_overflow_count: 0 };
     }
 
     // Build per-transition arrays for PriorityPetriEngine (stack-allocated, no heap).
@@ -302,7 +312,7 @@ pub fn petri_tick(
         outputs,
     ) {
         Ok(e) => e,
-        Err(_) => return 0,
+        Err(_) => return PetriTickResult { fired_ops: 0, event_overflow_count: 0 },
     };
 
     let firing_mask_64 = engine.step();
@@ -312,7 +322,7 @@ pub fn petri_tick(
     // Use it as new_done instead of accumulating from firing_mask.
     let mut new_done = engine.state.current.words[0];
     let mut new_check = 0u64;
-    let mut fired_ops = 0u64;
+    let mut fired_ops_accumulator = 0u64;
 
     let mut fm = firing_mask_64;
     while fm != 0 {
@@ -326,19 +336,22 @@ pub fn petri_tick(
         let op = &tape[i];
         let op_bit = 1u64 << i;
 
-        fired_ops |= op_bit;
+        fired_ops_accumulator |= op_bit;
         new_done  |= op_bit;
         new_check |= op.succ_mask;
 
         // Off hot-path: push fire event to event_ring for ReceiptWorker to drain.
         // BLAKE3 is never computed here — only a cheap push_t1 (~10 ns).
         if let Some(er) = event_ring {
-            er.push_t1(EventWorkItem {
+            let pushed = er.push_t1(EventWorkItem {
                 op_idx: i as u32,
                 run_id,
-                op_trace_so_far: fired_ops,
+                op_trace_so_far: fired_ops_accumulator,
                 kind_tag: op.kind as u8,
             });
+            if pushed == 0 {
+                overflow_count += 1;
+            }
         }
 
         // XorDispatch: branchless — pick lowest-index branch, suppress others.
@@ -356,7 +369,7 @@ pub fn petri_tick(
     state.done.words[0] = new_done;
     state.check.words[0] = new_check & !new_done;
 
-    fired_ops
+    PetriTickResult { fired_ops: fired_ops_accumulator, event_overflow_count: overflow_count }
 }
 
 // ---------------------------------------------------------------------------
@@ -494,7 +507,7 @@ mod tests {
         let mut total_fired = 0u64;
         for _ in 0..10 {
             if state.check.words[0] == 0 { break; }
-            total_fired += petri_tick(&ops, &mut state, None, None, 0).count_ones() as u64;
+            total_fired += petri_tick(&ops, &mut state, None, None, 0).fired_ops.count_ones() as u64;
         }
         assert_eq!(total_fired, 3, "all 3 ops must fire");
         assert_eq!(state.done.words[0], 0b111, "all done");
@@ -516,7 +529,7 @@ mod tests {
         let mut ticks = 0u32;
         let mut total = 0u64;
         while state.check.words[0] != 0 && ticks < 10 {
-            total += petri_tick(&ops, &mut state, None, None, 0).count_ones() as u64;
+            total += petri_tick(&ops, &mut state, None, None, 0).fired_ops.count_ones() as u64;
             ticks += 1;
         }
         // 4 parallel + 1 join = 5 ops total
@@ -562,5 +575,18 @@ mod tests {
         let mut check_mask = [0u64; 8];
         propagate_check_mask_large(fired_words, &succ_table, &mut check_mask, &done_mask);
         assert_eq!(check_mask[0], 0b10, "op 1 should be in check_mask");
+    }
+
+    #[test]
+    fn petri_tick_result_has_fired_ops_field() {
+        let tape = compile_powl(&PowlAstNode::Sequence(vec![
+            PowlAstNode::Atom("a"),
+            PowlAstNode::Atom("b"),
+        ])).unwrap();
+        let ops = tape_ops(&tape);
+        let mut state = PowlPetriState::new(tape.entry_mask);
+        let result = petri_tick(&ops, &mut state, None, None, 0);
+        assert_ne!(result.fired_ops, 0, "at least one op must fire on first tick");
+        assert_eq!(result.event_overflow_count, 0, "no event ring present, no overflow");
     }
 }

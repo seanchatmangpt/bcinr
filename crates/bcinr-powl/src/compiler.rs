@@ -33,9 +33,11 @@ pub enum PowlAstNode<'a> {
     /// Exclusive choice: exactly one branch executes.
     XorChoice(Vec<PowlAstNode<'a>>),
     /// Loop: `body` executes, then either exits or `redo` executes and loops.
+    /// `max_iters` caps the number of redo cycles (0 = unlimited).
     Loop {
         body: Box<PowlAstNode<'a>>,
         redo: Box<PowlAstNode<'a>>,
+        max_iters: u8,
     },
 }
 
@@ -51,6 +53,8 @@ pub enum CompileError {
     EmptyPartialOrder,
     InvalidEdge { from: usize, to: usize, len: usize },
     Cycle,
+    /// A non-LoopRedo slot is unreachable from the entry mask.
+    Unreachable,
 }
 
 // ---------------------------------------------------------------------------
@@ -198,6 +202,7 @@ fn compile_xor_choice<'a>(
 fn compile_loop<'a>(
     body: &'a PowlAstNode<'a>,
     redo: &'a PowlAstNode<'a>,
+    max_iters: u8,
     tape: &mut PowlTape,
 ) -> Result<Segment, CompileError> {
     let body_seg = compile_node(body, tape)?;
@@ -214,6 +219,8 @@ fn compile_loop<'a>(
     // succ_mask points to body entries; pred_mask on body entries NOT set
     // for the back-edge (would create a cycle in Kahn's check).
     tape.ops[back_idx as usize].succ_mask = body_seg.entries;
+    // Store max_iters in branch_count (0 = unlimited).
+    tape.ops[back_idx as usize].branch_count = max_iters;
 
     Ok(Segment { entries: body_seg.entries, exits: body_seg.exits })
 }
@@ -232,7 +239,7 @@ fn compile_node<'a>(
         PowlAstNode::Sequence(children)                 => compile_sequence(children, tape),
         PowlAstNode::PartialOrder { children, edges }   => compile_partial_order(children, edges, tape),
         PowlAstNode::XorChoice(branches)                => compile_xor_choice(branches, tape),
-        PowlAstNode::Loop { body, redo }                => compile_loop(body, redo, tape),
+        PowlAstNode::Loop { body, redo, max_iters }     => compile_loop(body, redo, *max_iters, tape),
     }
 }
 
@@ -285,10 +292,52 @@ fn run_kahn_walk(tape: &PowlTape, n: usize, mut in_deg: [u32; 64]) -> Result<(),
     if visited < non_redo_count { Err(CompileError::Cycle) } else { Ok(()) }
 }
 
-fn kahn_check(tape: &PowlTape) -> Result<(), CompileError> {
+/// Phase 1 of two-phase Kahn: detect non-loop cycles.
+pub fn check_full_graph_acyclic(tape: &PowlTape) -> Result<(), CompileError> {
     let n = tape.len as usize;
     let in_deg = build_in_degrees(tape, n);
     run_kahn_walk(tape, n, in_deg)
+}
+
+/// Phase 2 of two-phase Kahn: ensure every non-LoopRedo slot is reachable
+/// from at least one entry (entry_mask bit set or transitively via succ_mask).
+pub fn check_all_ops_reachable(tape: &PowlTape) -> Result<(), CompileError> {
+    let n = tape.len as usize;
+    let mut visited = 0u64;
+    // BFS from each entry slot.
+    let mut queue: Vec<usize> = Vec::new();
+    let mut seeds = tape.entry_mask;
+    while seeds != 0 {
+        let i = seeds.trailing_zeros() as usize;
+        seeds &= seeds - 1;
+        if i < n && visited & (1u64 << i) == 0 {
+            visited |= 1u64 << i;
+            queue.push(i);
+        }
+    }
+    while let Some(u) = queue.pop() {
+        let mut succs = tape.ops[u].succ_mask;
+        while succs != 0 {
+            let v = succs.trailing_zeros() as usize;
+            succs &= succs - 1;
+            if v < n && visited & (1u64 << v) == 0 {
+                visited |= 1u64 << v;
+                queue.push(v);
+            }
+        }
+    }
+    // Every non-LoopRedo slot must be reachable.
+    for i in 0..n {
+        if tape.ops[i].kind != OpKind::LoopRedo && visited & (1u64 << i) == 0 {
+            return Err(CompileError::Unreachable);
+        }
+    }
+    Ok(())
+}
+
+fn kahn_check(tape: &PowlTape) -> Result<(), CompileError> {
+    check_full_graph_acyclic(tape)?;
+    check_all_ops_reachable(tape)
 }
 
 // ---------------------------------------------------------------------------
@@ -379,6 +428,54 @@ mod tests {
     // ---------------------------------------------------------------------------
     // Proptests
     // ---------------------------------------------------------------------------
+
+    #[test]
+    fn compile_loop_with_max_iters() {
+        let ast = PowlAstNode::Loop {
+            body: Box::new(PowlAstNode::Atom("a")),
+            redo: Box::new(PowlAstNode::Atom("b")),
+            max_iters: 5,
+        };
+        let tape = compile_powl(&ast).unwrap();
+        // body=0, redo=1, LoopRedo=2
+        assert_eq!(tape.len, 3);
+        // max_iters stored in branch_count of LoopRedo slot
+        assert_eq!(tape.ops[2].branch_count, 5);
+    }
+
+    #[test]
+    fn compile_unreachable_error() {
+        // Manually craft a tape where a non-LoopRedo slot has no path from entry.
+        // Use PartialOrder with an edge that makes slot 1 an entry but slot 0 is
+        // wired with no predecessors yet never added to entry_mask.
+        // Actually the compiler always sets entry_mask correctly, so Unreachable
+        // can't happen from normal compilation. Test via check_all_ops_reachable directly.
+        use super::{check_all_ops_reachable, CompileError};
+        use crate::tape::{OpKind, PowlTape};
+
+        let mut tape = PowlTape::new();
+        // Slot 0: entry
+        tape.alloc(OpKind::Atom);
+        // Slot 1: not reachable from entry_mask
+        tape.alloc(OpKind::Atom);
+        tape.entry_mask = 0b01; // only slot 0 is entry; slot 1 is unreachable
+
+        let result = check_all_ops_reachable(&tape);
+        assert_eq!(result, Err(CompileError::Unreachable));
+    }
+
+    #[test]
+    fn check_all_ops_reachable_ok_for_connected_graph() {
+        use super::check_all_ops_reachable;
+
+        let ast = PowlAstNode::Sequence(vec![
+            PowlAstNode::Atom("a"),
+            PowlAstNode::Atom("b"),
+            PowlAstNode::Atom("c"),
+        ]);
+        let tape = compile_powl(&ast).unwrap();
+        assert!(check_all_ops_reachable(&tape).is_ok());
+    }
 
     use proptest::prelude::*;
     use crate::scheduler::{scheduler_tick, PowlRunState};
