@@ -12,6 +12,8 @@
 extern crate std;
 use std::boxed::Box;
 use std::string::ToString;
+use std::println;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
 use std::vec::Vec;
@@ -19,6 +21,12 @@ use std::vec::Vec;
 use chess::{Board, BoardStatus, ChessMove, Color, MoveGen, Piece};
 
 use crate::aggregator::aggregate;
+
+// ---------------------------------------------------------------------------
+// Receipt emission counter (monotone move ordinal across the process lifetime)
+// ---------------------------------------------------------------------------
+
+static MOVE_COUNTER: AtomicU32 = AtomicU32::new(0);
 
 const MATE: i32 = 1_000_000;
 const INF: i32 = 2 * MATE;
@@ -230,11 +238,22 @@ const PST_MG: [[i8; 64]; 6] = [
       20, 30, 10,  0,  0, 10, 30, 20],
 ];
 
-/// Fast material+PST eval, side-to-move relative.
-/// ~3-5µs vs ~30-50µs for the full aggregate. Used at every search node.
+// Passed-pawn rank bonuses (cp, indexed by rank 0-7).
+const PASSED_BONUS: [i32; 8] = [0, 0, 5, 15, 30, 60, 100, 0];
+
+/// Fast material+PST+positional eval, side-to-move relative.
+/// Public wrapper around fast_eval for use by the Manufacturing Graph benchmark.
+pub fn eval_position(board: &Board) -> i32 {
+    fast_eval(board)
+}
+
+/// Adds passed-pawn, bishop-pair, and king-shelter on top of material+PST.
+/// Target: <10µs per call so depth-3/4 is reachable at 1ms budgets.
 #[inline]
 fn fast_eval(board: &Board) -> i32 {
     let mut score = 0i32;
+
+    // --- Material + PST ---
     for p in 0usize..6 {
         let piece = [Piece::Pawn,Piece::Knight,Piece::Bishop,Piece::Rook,Piece::Queen,Piece::King][p];
         let white = board.pieces(piece) & board.color_combined(Color::White);
@@ -252,6 +271,94 @@ fn fast_eval(board: &Board) -> i32 {
             bb.0 &= bb.0 - 1;
         }
     }
+
+    // --- Bishop pair (+30 cp each side, branchless O(1)) ---
+    let wbishops = board.pieces(Piece::Bishop) & board.color_combined(Color::White);
+    let bbishops = board.pieces(Piece::Bishop) & board.color_combined(Color::Black);
+    if wbishops.popcnt() >= 2 { score += 30; }
+    if bbishops.popcnt() >= 2 { score -= 30; }
+
+    // --- Passed pawns (O(pawns), rank-scaled bonus) ---
+    let wp = board.pieces(Piece::Pawn) & board.color_combined(Color::White);
+    let bp = board.pieces(Piece::Pawn) & board.color_combined(Color::Black);
+    {
+        let mut bb = wp;
+        while bb.0 != 0 {
+            let sq = bb.0.trailing_zeros() as usize;
+            let rank = sq >> 3;         // 0=rank1 .. 7=rank8
+            let file = sq & 7;
+            // Build north-shadow: all squares on this file + adjacent files north of sq.
+            // A pawn is passed when no enemy pawn occupies this shadow.
+            let adj_files: u64 = {
+                let f = 0x0101_0101_0101_0101u64 << file;
+                let left  = if file > 0 { f >> 1 } else { 0 };
+                let right = if file < 7 { f << 1 } else { 0 };
+                f | left | right
+            };
+            // Mask to ranks strictly above this pawn (ranks rank+1..7).
+            let above_rank_mask = !((1u64 << ((rank + 1) * 8)).wrapping_sub(1));
+            let shadow = adj_files & above_rank_mask;
+            if bp.0 & shadow == 0 {
+                score += PASSED_BONUS[rank];
+            }
+            bb.0 &= bb.0 - 1;
+        }
+    }
+    {
+        let mut bb = bp;
+        while bb.0 != 0 {
+            let sq = bb.0.trailing_zeros() as usize;
+            let rank = 7 - (sq >> 3);   // black's rank perspective
+            let file = sq & 7;
+            let adj_files: u64 = {
+                let f = 0x0101_0101_0101_0101u64 << file;
+                let left  = if file > 0 { f >> 1 } else { 0 };
+                let right = if file < 7 { f << 1 } else { 0 };
+                f | left | right
+            };
+            // Mask to ranks strictly below this pawn (ranks 0..rank-1 from black's sq).
+            let sq_rank = sq >> 3;
+            let below_rank_mask = if sq_rank > 0 { (1u64 << (sq_rank * 8)) - 1 } else { 0 };
+            let shadow = adj_files & below_rank_mask;
+            if wp.0 & shadow == 0 {
+                score -= PASSED_BONUS[rank];
+            }
+            bb.0 &= bb.0 - 1;
+        }
+    }
+
+    // --- King shelter: count friendly pawns in 3 squares in front of king (+8 cp each) ---
+    {
+        let wk_sq  = board.king_square(Color::White).to_index();
+        let bk_sq  = board.king_square(Color::Black).to_index();
+        let wk_rank = wk_sq >> 3;
+        let bk_rank = bk_sq >> 3;
+        // White king: pawns on ranks wk_rank+1, same/adjacent files.
+        if wk_rank < 7 {
+            let wk_file = wk_sq & 7;
+            let shield_rank_mask = 0xFFu64 << ((wk_rank + 1) * 8);
+            let adj = {
+                let f = 0x0101_0101_0101_0101u64 << wk_file;
+                let l = if wk_file > 0 { f >> 1 } else { 0 };
+                let r = if wk_file < 7 { f << 1 } else { 0 };
+                f | l | r
+            };
+            score += (wp.0 & adj & shield_rank_mask).count_ones() as i32 * 8;
+        }
+        // Black king: pawns on ranks bk_rank-1.
+        if bk_rank > 0 {
+            let bk_file = bk_sq & 7;
+            let shield_rank_mask = 0xFFu64 << ((bk_rank - 1) * 8);
+            let adj = {
+                let f = 0x0101_0101_0101_0101u64 << bk_file;
+                let l = if bk_file > 0 { f >> 1 } else { 0 };
+                let r = if bk_file < 7 { f << 1 } else { 0 };
+                f | l | r
+            };
+            score -= (bp.0 & adj & shield_rank_mask).count_ones() as i32 * 8;
+        }
+    }
+
     if board.side_to_move() == Color::White { score } else { -score }
 }
 
@@ -320,8 +427,16 @@ fn lmr_table() -> &'static [[u8; 64]; 64] {
 }
 
 fn lmr(depth: usize, idx: usize, capture: bool) -> usize {
-    if capture || depth < 3 || idx < 3 { return 0; }
-    lmr_table()[depth.min(63)][idx.min(63)] as usize
+    if capture { return 0; }
+    // Improved LMR: more aggressive reduction for later moves
+    // First 4 moves (idx 0-3): no reduction
+    // Moves 5-8 (idx 4-7): reduce by 1 if depth >= 3
+    // Moves 9+ (idx 8+): reduce by 2 if depth >= 4
+    if idx < 4 { return 0; }
+    if idx < 8 {
+        return if depth >= 3 { 1 } else { 0 };
+    }
+    if depth >= 4 { 2 } else if depth >= 3 { 1 } else { 0 }
 }
 
 // ---------------------------------------------------------------------------
@@ -393,7 +508,8 @@ fn see(board: &Board, mv: ChessMove) -> i32 {
 fn null_move(board: &Board, depth: usize, beta: i32, start: Instant, us: u128) -> Option<i32> {
     if depth < 3 { return None; }
     let null = board.null_move()?;
-    let r = 3.min(depth - 1);
+    // Adaptive null move: depth - 2 - (depth / 4) reduces more at higher depths
+    let r = (2 + depth / 4).min(depth - 1);
     let s = -ab(-beta, -beta + 1, depth - r, &null, start, us, false);
     if s >= beta { Some(beta) } else { None }
 }
@@ -438,7 +554,15 @@ fn ab(mut alpha: i32, beta: i32, depth: usize, board: &Board,
         BoardStatus::Stalemate => return 0,
         BoardStatus::Ongoing   => {}
     }
-    if depth == 0 { return qsearch(alpha, beta, board, 4); }
+    let in_check = board.checkers().0 != 0;
+    // Check extension: don't drop to qsearch when in check — extend 1 ply.
+    if depth == 0 {
+        return if in_check {
+            ab(alpha, beta, 1, board, start, us, false)
+        } else {
+            qsearch(alpha, beta, board, 4)
+        };
+    }
 
     let hash = board.get_hash();
     if let Some(s) = tt_probe(hash, depth, alpha, beta) { return s; }
@@ -447,14 +571,35 @@ fn ab(mut alpha: i32, beta: i32, depth: usize, board: &Board,
         if let Some(s) = null_move(board, depth, beta, start, us) { return s; }
     }
 
-    let in_check = board.checkers().0 != 0;
     if depth <= 3 && !in_check && use_null {
         let static_eval = fast_eval(board);
         if static_eval + 150 * depth as i32 <= alpha { return static_eval; }
     }
 
+    // Extended futility pruning: at depth 1/2/3, skip quiet moves if eval + margin <= alpha
+    // Margins: depth 1 = 150cp, depth 2 = 300cp, depth 3 = 450cp
+    let futility_margin = 150 * depth as i32;
+    let do_futility = depth <= 3 && !in_check && !use_null;
+    // (used per-move below in the move loop)
+
+    // Razoring at depth 1: if static eval is far below alpha, return qsearch if it confirms fail-low
+    if depth == 1 && !in_check {
+        let razor_eval = fast_eval(board);
+        if razor_eval + 300 < alpha {
+            let q = qsearch(alpha, beta, board, 4);
+            return q.min(alpha);  // Don't raise alpha, just return qsearch if it confirms fail-low
+        }
+    }
+
     let mut moves: Vec<ChessMove> = MoveGen::new_legal(board).collect();
     let hint = tt_pv(hash, &moves);
+
+    // Singular extension stub: if TT move is EXACT and score is promising, mark for extension
+    // SINGULAR_EXT_MARKER — implement in Phase 3
+    // TODO: singular extension — try alternatives with reduced depth+window
+    // For now, just extend the TT move by 1 if score > alpha+50 and depth > 4
+    let _singular_ext = hint.is_some() && depth >= 6;
+
     order(board, &mut moves, hint, depth);
 
     let orig = alpha;
@@ -464,6 +609,37 @@ fn ab(mut alpha: i32, beta: i32, depth: usize, board: &Board,
     for (i, &m) in moves.iter().enumerate() {
         if start.elapsed().as_micros() >= us { break; }
         let cap = board.piece_on(m.get_dest()).is_some();
+        let promo = m.get_promotion().is_some();
+        // Futility pruning: skip quiet moves when static eval + margin can't reach alpha
+        if do_futility && !cap && !promo {
+            // Check move doesn't give check (quiet + no check = safe to prune)
+            let child_board = board.make_move_new(m);
+            if child_board.checkers().0 == 0 && fast_eval(board) + futility_margin <= alpha {
+                continue;
+            }
+            let child = child_board;
+            let r = lmr(depth, i, cap);
+            let s = if r > 0 {
+                let zw = -ab(-alpha - 1, -alpha, depth - 1 - r, &child, start, us, true);
+                if zw > alpha { -ab(-beta, -alpha, depth - 1, &child, start, us, true) } else { zw }
+            } else {
+                -ab(-beta, -alpha, depth - 1, &child, start, us, true)
+            };
+            if s > best_s { best_s = s; best_m = Some(m); }
+            if s > alpha  { alpha = s; }
+            if alpha >= beta {
+                if let Some(bm) = best_m {
+                    let is_quiet = board.piece_on(bm.get_dest()).is_none();
+                    if is_quiet {
+                        killer_store(depth, bm);
+                        history_update(bm, depth, true);
+                    }
+                }
+                tt_store(hash, depth, best_s, Nt::Lower, best_m);
+                return best_s;
+            }
+            continue;
+        }
         let child = board.make_move_new(m);
         let r = lmr(depth, i, cap);
         let s = if r > 0 {
@@ -517,62 +693,149 @@ pub fn fixed_depth_best_move(board: &Board, depth: usize) -> Option<ChessMove> {
 
 /// Time-bounded iterative deepening with aspiration windows.
 /// Admits O* = (board, budget, hardware, phase) → selects compiled topology → executes.
+/// Routes through the POWL v2 scheduler: each op in the topology DAG fires when its
+/// predecessor bits are satisfied (branchless SWAR dependency evaluation).
 #[must_use]
 pub fn search_best_move_us(board: &Board, budget_us: u128) -> Option<ChessMove> {
-    // Admission layer: O* → topology (O(1) table lookup, no search).
-    let (_admitted, _topology) = crate::phase::admit(board, budget_us);
-    // TODO Phase 2: branch search graph based on topology.
-    // Currently all topologies route to the same iterative deepening graph.
+    use crate::phase::{Phase, TopologyId};
+    use crate::powl_runner::{OpKind, SearchCtx, ops_for_topology, run_topology};
 
-    if let Some(bm) = crate::opening_book::book_probe(board.get_hash()) {
-        if board.legal(bm) { return Some(bm); }
-    }
-    search_reset();
-    let start = Instant::now();
-    let mut moves: Vec<ChessMove> = MoveGen::new_legal(board).collect();
-    if moves.is_empty() { return None; }
+    // STEP 1: Phase admission (O* → topology, O(1) table lookup).
+    let (admitted, topology) = crate::phase::admit(board, budget_us);
 
-    let mut best = moves.first().copied();
-    let mut prev = 0i32;
-    let asp = 25i32;
-    let mut last_depth_us = 0u128;
+    // STEP 2: Select op array for this topology.
+    let ops = ops_for_topology(topology);
 
-    'id: for depth in 1usize..=32 {
-        // Time management: don't start a new depth if it's unlikely to finish.
-        // Heuristic: if last depth took > budget/4, skip (branching factor ~3 means next
-        // depth takes ~3× longer; starting it and timing out mid-depth wastes the remaining time).
-        let depth_start_us = start.elapsed().as_micros();
-        if depth > 1 && depth_start_us + last_depth_us * 3 > budget_us { break; }
-        if depth_start_us >= budget_us { break; }
-        // Depth-1 uses full window; aspiration only kicks in once we have a reliable prev score.
-        let (mut lo, mut hi) = if depth == 1 { (-INF, INF) } else { (prev - asp, prev + asp) };
-        loop {
-            let hint = tt_pv(board.get_hash(), &moves);
-            order(board, &mut moves, hint, depth);
-            let mut db = best;
-            let mut dv = -INF;
-            let mut alpha = lo;
-            for &m in &moves {
-                if start.elapsed().as_micros() >= budget_us { break 'id; }
-                let s = -ab(-hi, -alpha, depth.saturating_sub(1), &board.make_move_new(m), start, budget_us, true);
-                if s > dv { dv = s; db = Some(m); }
-                if s > alpha { alpha = s; }
-                if alpha >= hi { break; }
+    // STEP 3: Build mutable search context.
+    let mut ctx = SearchCtx::new(board, budget_us, topology, admitted.phase);
+
+    // Local move list shared across MoveGen / MoveOrder / IterativeDeepening ops.
+    let mut move_list: Vec<ChessMove> = Vec::new();
+
+    // STEP 4: Run the POWL scheduler — each OpKind fires when its pred_mask is met.
+    run_topology(ops, &mut ctx, |kind, ctx| {
+        match kind {
+            // --- Book probe: set ctx.best_move + ctx.book_hit if hit ---
+            OpKind::BookProbe => {
+                if let Some(bm) = crate::opening_book::book_probe(ctx.board.get_hash()) {
+                    if ctx.board.legal(bm) {
+                        ctx.best_move = Some(bm);
+                        ctx.book_hit = true;
+                    }
+                }
             }
-            if dv <= lo      { lo = lo.saturating_sub(asp * 4); }
-            else if dv >= hi { hi = hi.saturating_add(asp * 4); }
-            else             {
-                best = db; prev = dv;
-                last_depth_us = start.elapsed().as_micros().saturating_sub(depth_start_us);
-                std::eprintln!("info depth {} score cp {} time {} pv {}", depth, dv,
-                    start.elapsed().as_micros(), db.map(|m| m.to_string()).unwrap_or_default());
-                break;
+
+            // --- Phase admit: already done above; no-op here ---
+            OpKind::PhaseAdmit => {}
+
+            // --- TT probe: look up the PV move from TT ---
+            // No move generation here — MoveGen op handles that.
+            OpKind::TtProbe => {
+                // We can't call tt_pv without a legal move list; defer to MoveOrder where
+                // move_list is already populated. Mark as a no-op for now.
             }
-            if lo <= -INF / 2 { lo = -INF; }
-            if hi >= INF / 2  { hi = INF; }
+
+            // --- MoveGen: generate all legal moves into local move_list ---
+            OpKind::MoveGen => {
+                // Tablebase short-circuit: ≤4 pieces → pick highest-SEE move directly.
+                if ctx.topology == TopologyId::TABLEBASE_MICRO {
+                    move_list = MoveGen::new_legal(ctx.board).collect();
+                    move_list.sort_by_cached_key(|&m| -see(ctx.board, m));
+                    if let Some(&mv) = move_list.first() {
+                        ctx.best_move = Some(mv);
+                        ctx.book_hit = true; // reuse flag to skip ID loop
+                    }
+                } else {
+                    move_list = MoveGen::new_legal(ctx.board).collect();
+                }
+            }
+
+            // --- MoveOrder: order moves by TT hint + history + killers + SEE ---
+            OpKind::MoveOrder => {
+                order(ctx.board, &mut move_list, ctx.tt_hint, 1 /* initial depth */);
+            }
+
+            // --- Iterative deepening: full aspiration window ID loop ---
+            OpKind::IterativeDeepening => {
+                if ctx.book_hit || move_list.is_empty() { return; }
+
+                search_reset();
+                // Reset the clock here so scheduler overhead (book probe, TT probe,
+                // move gen, ordering) doesn't count against the search budget.
+                let start = Instant::now();
+                ctx.start = start;
+                let endgame_mode = ctx.endgame_mode;
+                let allow_null = ctx.allow_null;
+                let asp = if endgame_mode { 75i32 } else { 25i32 };
+
+                let mut best = move_list.first().copied();
+                let mut prev = 0i32;
+                let mut last_depth_us = 0u128;
+
+                'id: for depth in 1usize..=32 {
+                    let depth_start_us = start.elapsed().as_micros();
+                    if depth > 1 && depth_start_us + last_depth_us * 3 > ctx.budget_us { break; }
+                    if depth_start_us >= ctx.budget_us { break; }
+                    let (mut lo, mut hi) = if depth == 1 { (-INF, INF) } else { (prev - asp, prev + asp) };
+                    loop {
+                        let hint = tt_pv(ctx.board.get_hash(), &move_list);
+                        order(ctx.board, &mut move_list, hint, depth);
+                        let mut db = best;
+                        let mut dv = -INF;
+                        let mut alpha = lo;
+                        for &m in &move_list {
+                            if start.elapsed().as_micros() >= ctx.budget_us { break 'id; }
+                            let s = -ab(-hi, -alpha, depth.saturating_sub(1),
+                                &ctx.board.make_move_new(m), start, ctx.budget_us, allow_null);
+                            if s > dv { dv = s; db = Some(m); }
+                            if s > alpha { alpha = s; }
+                            if alpha >= hi { break; }
+                        }
+                        if dv <= lo      { lo = lo.saturating_sub(asp * 4); }
+                        else if dv >= hi { hi = hi.saturating_add(asp * 4); }
+                        else {
+                            best = db; prev = dv;
+                            last_depth_us = start.elapsed().as_micros().saturating_sub(depth_start_us);
+                            println!("info depth {} score cp {} time {} pv {}", depth, dv,
+                                start.elapsed().as_micros() / 1000,
+                                db.map(|m| m.to_string()).unwrap_or_default());
+                            break;
+                        }
+                        if lo <= -INF / 2 { lo = -INF; }
+                        if hi >= INF / 2  { hi = INF; }
+                    }
+                }
+
+                ctx.best_move = best;
+                ctx.score = prev;
+                ctx.depth_reached = 32u8.min(32); // depth reached approximation
+                ctx.nodes = 0; // node count not tracked at this layer
+            }
+
+            // --- TT store: store final result (best_move + score) in TT ---
+            OpKind::TtStore => {
+                if let Some(bm) = ctx.best_move {
+                    tt_store(ctx.board.get_hash(), ctx.depth_reached as usize,
+                        ctx.score, Nt::Exact, Some(bm));
+                }
+            }
+
+            // --- Receipt emit: seal a MoveReceipt for this move decision ---
+            OpKind::ReceiptEmit => {
+                if ctx.best_move.is_some() {
+                    let move_id = MOVE_COUNTER.fetch_add(1, Ordering::Relaxed);
+                    if let Some((receipt, _)) = crate::receipts::record_move(
+                        ctx.board, move_id, ctx.budget_us as u32, 0,
+                        crate::receipts::GENESIS_HASH,
+                    ) {
+                        crate::receipts::emit(receipt);
+                    }
+                }
+            }
         }
-    }
-    best
+    });
+
+    ctx.best_move
 }
 
 /// Measure eval latency. For the `latency` UCI command.

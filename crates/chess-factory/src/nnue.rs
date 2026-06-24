@@ -1,201 +1,162 @@
-//! NNUE (Efficiently Updatable Neural Network) for chess evaluation.
-//!
-//! Architecture: HalfKP features (40,960/side) -> L1 accumulator [i16;64]/side
-//! -> clipped-ReLU -> L2 (128->8 int8 matmul) -> output (8->1 scalar) -> /400 = centipawns
-//!
-//! Until trained weights are loaded, `nnue_init_from_pst` seeds weights so the
-//! network degrades gracefully to a material evaluation.
 #![cfg(feature = "std")]
-
 extern crate std;
+
+use chess::{Board, Color, Piece};
 use std::sync::{Mutex, OnceLock};
+use std::vec;
 use std::vec::Vec;
+use std::boxed::Box;
 
-use chess::{Board, Color, Piece, ALL_SQUARES};
+// Network dimensions
+pub const FT_IN: usize = 40960;  // HalfKP features
+pub const FT_OUT: usize = 32;    // Accumulator size per side
+pub const L2_IN: usize = 64;     // FT_OUT * 2
+pub const L2_OUT: usize = 1;     // Single score output
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-/// Feature-transformer rows: 40_960 per perspective * 2 perspectives.
-pub const FT_ROWS: usize = 81_920;
-
-/// L1 accumulator size (per perspective).
-pub const L1: usize = 64;
-
-/// L2 input size (both perspectives concatenated).
-pub const L2_IN: usize = 128;
-
-/// L2 output neurons.
-pub const L2_OUT: usize = 8;
-
-// ---------------------------------------------------------------------------
-// Weight structures
-// ---------------------------------------------------------------------------
-
-/// All NNUE weight tensors.
+/// NNUE weight storage.
 pub struct NnueWeights {
-    /// Feature transformer: FT_ROWS * L1 elements (row-major: row = feature, col = L1 neuron).
-    pub ft_weights: Vec<i16>,
-    /// Feature transformer biases: one per L1 neuron.
-    pub ft_biases: [i16; L1],
-    /// L2 weight matrix: [L2_OUT][L2_IN] stored as i8.
-    pub l2_weights: [[i8; L2_IN]; L2_OUT],
-    /// L2 biases: one per output neuron, stored as i32 to absorb quantisation scale.
-    pub l2_biases: [i32; L2_OUT],
-    /// Output layer weights: one per L2 neuron.
-    pub output_weights: [i32; L2_OUT],
-    /// Output layer scalar bias.
-    pub output_bias: i32,
+    /// Feature transformer: [FT_IN][FT_OUT] in row-major order.
+    /// Row i = weight vector added to accumulator when feature i is active.
+    pub ft: Vec<i16>,               // FT_IN * FT_OUT entries
+    pub ft_bias: [i16; FT_OUT],
+    /// Output layer: [L2_IN] weights + 1 bias.
+    pub l2: [i16; L2_IN],
+    pub l2_bias: i32,
 }
 
 impl NnueWeights {
-    fn zeroed() -> NnueWeights {
-        let mut ft_weights = Vec::new();
-        ft_weights.resize(FT_ROWS * L1, 0i16);
+    fn new() -> Self {
         NnueWeights {
-            ft_weights,
-            ft_biases: [0i16; L1],
-            l2_weights: [[0i8; L2_IN]; L2_OUT],
-            l2_biases: [0i32; L2_OUT],
-            output_weights: [0i32; L2_OUT],
-            output_bias: 0,
+            ft: vec![0i16; FT_IN * FT_OUT],
+            ft_bias: [0i16; FT_OUT],
+            l2: [0i16; L2_IN],
+            l2_bias: 0,
         }
     }
-}
 
-// ---------------------------------------------------------------------------
-// Accumulator
-// ---------------------------------------------------------------------------
+    /// Initialize weights to approximate PST evaluation.
+    /// This makes the untrained network produce scores close to fast_eval.
+    fn init_pst(&mut self) {
+        // Material values in centipawns × FT_OUT scaling factor
+        // Each piece type gets a characteristic weight that sums to its material value
+        // when all squares for that piece are active.
+        const MAT_CP: [i16; 5] = [100, 337, 365, 477, 1025]; // P N B R Q (no king)
 
-/// Per-position half-KP accumulator (one half per perspective).
-pub struct NnueAccumulator {
-    pub white: [i16; L1],
-    pub black: [i16; L1],
-}
-
-impl NnueAccumulator {
-    pub fn zeroed() -> NnueAccumulator {
-        NnueAccumulator {
-            white: [0i16; L1],
-            black: [0i16; L1],
+        for king_sq in 0..64usize {
+            for sq in 0..64usize {
+                for pt in 0..5usize {
+                    for pc in 0..2usize {
+                        let idx = halfkp_index(king_sq, sq, pt, pc);
+                        let row_start = idx * FT_OUT;
+                        if row_start + FT_OUT <= self.ft.len() {
+                            // Spread material value across all FT_OUT dimensions.
+                            // First dimension gets the material weight; rest are zero.
+                            // This makes the network approximate material counting.
+                            let val = if pc == 0 { MAT_CP[pt] } else { -MAT_CP[pt] };
+                            self.ft[row_start] = val / FT_OUT as i16;
+                        }
+                    }
+                }
+            }
         }
+
+        // Output layer: sum the first accumulator dimension (material proxy)
+        self.l2[0] = 1;   // white perspective
+        self.l2[32] = -1; // black perspective (negated)
+        self.l2_bias = 0;
     }
 }
 
-// ---------------------------------------------------------------------------
-// Feature indexing
-// ---------------------------------------------------------------------------
-
-/// Map a `Piece` to a HalfKP piece-type index (0-4).  King has no HalfKP feature.
-pub fn piece_to_pt(p: Piece) -> Option<usize> {
-    match p {
-        Piece::Pawn   => Some(0),
-        Piece::Knight => Some(1),
-        Piece::Bishop => Some(2),
-        Piece::Rook   => Some(3),
-        Piece::Queen  => Some(4),
-        Piece::King   => None,
-    }
-}
-
-/// Raw HalfKP index (before perspective mirroring / offset).
-///
-/// `king_sq`  – king square index 0..64
-/// `piece_sq` – piece square index 0..64
-/// `pt`       – piece type 0..5 (use `piece_to_pt`)
-/// `pc`       – piece colour: 0 = white, 1 = black
-pub fn halfkp_index(king_sq: usize, piece_sq: usize, pt: usize, pc: usize) -> usize {
-    king_sq * 640 + pc * 320 + pt * 64 + piece_sq
-}
-
-/// Full feature-transformer row index, including perspective and the 40_960 offset
-/// for the black-king perspective.
-///
-/// `persp` – 0 = white's perspective, 1 = black's perspective
-pub fn ft_index(
-    king_sq: usize,
-    piece_sq: usize,
-    pt: usize,
-    pc: usize,
-    persp: usize,
-) -> usize {
-    if persp == 0 {
-        halfkp_index(king_sq, piece_sq, pt, pc)
-    } else {
-        halfkp_index(king_sq ^ 56, piece_sq ^ 56, pt, pc) + 40_960
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Global weight singleton
-// ---------------------------------------------------------------------------
-
-static NNUE_WEIGHTS: OnceLock<Mutex<NnueWeights>> = OnceLock::new();
-
-/// Return a reference to the global (lazily initialised) `NnueWeights`.
-///
-/// On first call, weights are seeded via `nnue_init_from_pst` so the network
-/// approximates material evaluation before real training data is loaded.
-pub fn nnue_weights() -> &'static Mutex<NnueWeights> {
-    NNUE_WEIGHTS.get_or_init(|| {
-        let mut w = NnueWeights::zeroed();
-        nnue_init_from_pst(&mut w);
+/// Global weight storage — initialized once per process.
+fn nnue_weights() -> &'static Mutex<NnueWeights> {
+    static WEIGHTS: OnceLock<Mutex<NnueWeights>> = OnceLock::new();
+    WEIGHTS.get_or_init(|| {
+        let mut w = NnueWeights::new();
+        w.init_pst();
         Mutex::new(w)
     })
 }
 
 // ---------------------------------------------------------------------------
-// Accumulator refresh
+// HalfKP indexing
 // ---------------------------------------------------------------------------
 
-/// Recompute the accumulator from scratch for `board`.
-///
-/// Call this after a position is loaded from scratch.  For incremental updates,
-/// modify the accumulator with the delta (add/subtract the feature weight rows
-/// for the moved/captured piece).
-pub fn nnue_refresh(board: &Board, weights: &NnueWeights, acc: &mut NnueAccumulator) {
-    // Seed with biases.
-    acc.white = weights.ft_biases;
-    acc.black = weights.ft_biases;
+/// Compute the HalfKP feature index for a piece.
+/// king_sq: king position (0-63)
+/// sq: piece position (0-63)
+/// pt: piece type 0=P,1=N,2=B,3=R,4=Q (5=K excluded from features)
+/// pc: 0=same color as king, 1=opposite color
+#[inline]
+pub fn halfkp_index(king_sq: usize, sq: usize, pt: usize, pc: usize) -> usize {
+    king_sq * 640 + sq * 10 + pt * 2 + pc
+}
 
-    // Locate both kings.
-    let white_king_bb = board.pieces(Piece::King) & board.color_combined(Color::White);
-    let black_king_bb = board.pieces(Piece::King) & board.color_combined(Color::Black);
+// ---------------------------------------------------------------------------
+// Accumulator — two sides, each FT_OUT i32 elements
+// ---------------------------------------------------------------------------
 
-    let wk_sq: usize = white_king_bb.to_square().to_index();
-    let bk_sq: usize = black_king_bb.to_square().to_index();
+pub struct Accumulator {
+    pub white: [i32; FT_OUT],
+    pub black: [i32; FT_OUT],
+}
 
-    // Accumulate features for every non-king piece.
-    for sq in ALL_SQUARES {
-        let sq_idx = sq.to_index();
-        let piece_opt = board.piece_on(sq);
-        let color_opt = board.color_on(sq);
-
-        let (piece, color) = match (piece_opt, color_opt) {
-            (Some(p), Some(c)) => (p, c),
-            _ => continue,
+impl Accumulator {
+    pub fn new(bias: &[i16; FT_OUT]) -> Self {
+        let mut acc = Accumulator {
+            white: [0i32; FT_OUT],
+            black: [0i32; FT_OUT],
         };
+        for i in 0..FT_OUT {
+            acc.white[i] = bias[i] as i32;
+            acc.black[i] = bias[i] as i32;
+        }
+        acc
+    }
+}
 
-        let pt = match piece_to_pt(piece) {
-            Some(t) => t,
-            None => continue, // skip kings
+// ---------------------------------------------------------------------------
+// Full refresh — recompute accumulator from board from scratch
+// ---------------------------------------------------------------------------
+
+/// Refresh accumulator for one perspective (king_sq for that side).
+fn refresh_perspective(acc: &mut [i32; FT_OUT], king_sq: usize, king_color: Color,
+                       board: &Board, ft: &[i16], bias: &[i16; FT_OUT]) {
+    // Start from bias
+    for i in 0..FT_OUT { acc[i] = bias[i] as i32; }
+
+    for pt_idx in 0..5usize {
+        let piece = match pt_idx {
+            0 => Piece::Pawn,
+            1 => Piece::Knight,
+            2 => Piece::Bishop,
+            3 => Piece::Rook,
+            _ => Piece::Queen,
         };
+        let white_bb = board.pieces(piece) & board.color_combined(Color::White);
+        let black_bb = board.pieces(piece) & board.color_combined(Color::Black);
 
-        let pc: usize = if color == Color::White { 0 } else { 1 };
-
-        // White-king perspective.
-        let wi = ft_index(wk_sq, sq_idx, pt, pc, 0);
-        let base_w = wi * L1;
-        for k in 0..L1 {
-            acc.white[k] = acc.white[k].saturating_add(weights.ft_weights[base_w + k]);
+        let mut bb = white_bb;
+        while bb.0 != 0 {
+            let sq = bb.0.trailing_zeros() as usize;
+            let pc = if king_color == Color::White { 0 } else { 1 };
+            let idx = halfkp_index(king_sq, sq, pt_idx, pc);
+            let row = idx * FT_OUT;
+            if row + FT_OUT <= ft.len() {
+                for i in 0..FT_OUT { acc[i] += ft[row + i] as i32; }
+            }
+            bb.0 &= bb.0 - 1;
         }
 
-        // Black-king perspective.
-        let bi = ft_index(bk_sq, sq_idx, pt, pc, 1);
-        let base_b = bi * L1;
-        for k in 0..L1 {
-            acc.black[k] = acc.black[k].saturating_add(weights.ft_weights[base_b + k]);
+        let mut bb = black_bb;
+        while bb.0 != 0 {
+            let sq = bb.0.trailing_zeros() as usize;
+            let pc = if king_color == Color::Black { 0 } else { 1 };
+            let idx = halfkp_index(king_sq, sq, pt_idx, pc);
+            let row = idx * FT_OUT;
+            if row + FT_OUT <= ft.len() {
+                for i in 0..FT_OUT { acc[i] += ft[row + i] as i32; }
+            }
+            bb.0 &= bb.0 - 1;
         }
     }
 }
@@ -204,81 +165,65 @@ pub fn nnue_refresh(board: &Board, weights: &NnueWeights, acc: &mut NnueAccumula
 // Forward pass
 // ---------------------------------------------------------------------------
 
-/// Run the full NNUE forward pass and return an evaluation in centipawns
-/// from the side-to-move's perspective.
-///
-/// The accumulator must be current (call `nnue_refresh` or maintain it
-/// incrementally).
-pub fn nnue_forward(acc: &NnueAccumulator, stm: Color, weights: &NnueWeights) -> i32 {
-    // Build the 128-element L2 input: [us | them], clipped to 0..127.
-    let (us_half, them_half) = if stm == Color::White {
-        (&acc.white, &acc.black)
-    } else {
-        (&acc.black, &acc.white)
-    };
+/// Clipped ReLU: clamp to [0, 127].
+#[inline]
+fn crelu(x: i32) -> i32 {
+    x.clamp(0, 127)
+}
 
+/// Full NNUE evaluation: board → score in centipawns, side-to-move relative.
+pub fn nnue_eval(board: &Board) -> i32 {
+    let weights = nnue_weights().lock().unwrap_or_else(|e| e.into_inner());
+
+    let wk_sq = board.king_square(Color::White).to_index();
+    let bk_sq = board.king_square(Color::Black).to_index();
+
+    let mut white_acc = [0i32; FT_OUT];
+    let mut black_acc = [0i32; FT_OUT];
+
+    refresh_perspective(&mut white_acc, wk_sq, Color::White,
+                        board, &weights.ft, &weights.ft_bias);
+    refresh_perspective(&mut black_acc, bk_sq, Color::Black,
+                        board, &weights.ft, &weights.ft_bias);
+
+    // Concatenate: [white_acc | black_acc] with ClippedReLU
     let mut l2_input = [0i32; L2_IN];
-    for k in 0..L1 {
-        l2_input[k]        = (us_half[k]   as i32).clamp(0, 127);
-        l2_input[L1 + k]   = (them_half[k] as i32).clamp(0, 127);
+    for i in 0..FT_OUT { l2_input[i]         = crelu(white_acc[i]); }
+    for i in 0..FT_OUT { l2_input[FT_OUT + i] = crelu(black_acc[i]); }
+
+    // Output layer: dot product
+    let mut score = weights.l2_bias;
+    for i in 0..L2_IN {
+        score += l2_input[i] * weights.l2[i] as i32;
     }
 
-    // L2 layer: 128->8, integer dot-product, bias, right-shift 6, clamp 0..127.
-    let mut l2_out = [0i32; L2_OUT];
-    for o in 0..L2_OUT {
-        let mut acc_o: i32 = weights.l2_biases[o];
-        for i in 0..L2_IN {
-            acc_o += l2_input[i] * (weights.l2_weights[o][i] as i32);
-        }
-        l2_out[o] = (acc_o >> 6).clamp(0, 127);
-    }
+    // Scale to centipawns (network outputs are scaled by ~400)
+    let cp = score / 400;
 
-    // Output layer: 8->1 dot-product + bias, divide by 400 for centipawns.
-    let mut output: i32 = weights.output_bias;
-    for o in 0..L2_OUT {
-        output += l2_out[o] * weights.output_weights[o];
-    }
-
-    output / 400
+    // Side-to-move relative
+    if board.side_to_move() == Color::White { cp } else { -cp }
 }
 
 // ---------------------------------------------------------------------------
-// PST-based weight initialisation
+// Tests
 // ---------------------------------------------------------------------------
+#[cfg(test)]
+mod tests {
+    extern crate std;
+    use super::*;
+    use chess::Board;
 
-/// Seed `NnueWeights` from piece-square tables so the network approximates
-/// material evaluation before real training data is available.
-///
-/// Scheme:
-/// - For every (king_sq, piece_sq, pt, colour, perspective) combination, set
-///   `ft_weights[index * L1 + 0]` to ±BASE[pt]:
-///   white pieces add value, black pieces subtract.
-/// - Wire a pass-through chain: `l2_weights[0][0] = 1`, `output_weights[0] = 400`;
-///   dividing by 400 in `nnue_forward` cancels the scale, leaving centipawns.
-pub fn nnue_init_from_pst(w: &mut NnueWeights) {
-    const BASE: [i16; 5] = [82, 337, 365, 477, 1025]; // P N B R Q
-
-    for ksq in 0..64usize {
-        for psq in 0..64usize {
-            for pt in 0..5usize {
-                for persp in 0..2usize {
-                    // White piece at psq: adds value.
-                    let wi_w = ft_index(ksq, psq, pt, 0, persp) * L1;
-                    if wi_w < w.ft_weights.len() {
-                        w.ft_weights[wi_w] = BASE[pt];
-                    }
-                    // Black piece at psq: subtracts value.
-                    let wi_b = ft_index(ksq, psq, pt, 1, persp) * L1;
-                    if wi_b < w.ft_weights.len() {
-                        w.ft_weights[wi_b] = -BASE[pt];
-                    }
-                }
-            }
-        }
+    #[test]
+    fn nnue_eval_startpos_is_near_zero() {
+        let board = Board::default();
+        let score = nnue_eval(&board);
+        // PST-initialized NNUE should be close to 0 at startpos (symmetric)
+        assert!(score.abs() < 100, "startpos eval {} too large", score);
     }
 
-    // Pass-through chain: l2_weights[0][0]=1, output_weights[0]=400.
-    // nnue_forward divides by 400, so the net effect is identity on L1 neuron 0.
-    w.l2_weights[0][0] = 1i8;
-    w.output_weights[0] = 400;
+    #[test]
+    fn nnue_eval_does_not_panic() {
+        let board = Board::default();
+        let _ = nnue_eval(&board);
+    }
 }

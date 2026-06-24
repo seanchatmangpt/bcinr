@@ -51,6 +51,15 @@ pub mod nnue;
 #[cfg(feature = "std")]
 pub mod phase;
 
+/// POWL v2 type-state runtime scheduler.
+/// Branchless SWAR evaluation of the search DAG; one op array per topology.
+#[cfg(feature = "std")]
+pub mod powl_runner;
+
+/// Manufacturing graph: topology benchmarking and offline eval.
+#[cfg(feature = "std")]
+pub mod manufacturing_graph;
+
 #[cfg(test)]
 mod eval_debug {
     extern crate std;

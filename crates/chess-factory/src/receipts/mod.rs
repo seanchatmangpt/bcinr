@@ -15,7 +15,7 @@ pub mod move_receipt;
 pub mod petri_pipeline;
 pub mod verifier;
 
-pub use move_receipt::{MoveReceipt, SelectionStep, StationRecord};
+pub use move_receipt::{MoveReceipt, SelectionStep, StationRecord, emit, drain, last};
 pub use petri_pipeline::{ReplayResult, STAGE_NAMES};
 pub use verifier::{verify_chain, verify_move, MoveVerdict, Refusal};
 

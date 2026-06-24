@@ -14,6 +14,7 @@
 //! resulting decision is bit-exact across replays.
 
 use std::string::String;
+use std::sync::{Mutex, OnceLock};
 use std::vec::Vec;
 
 use serde::{Deserialize, Serialize};
@@ -128,4 +129,41 @@ impl MoveReceipt {
     pub fn hash_matches(&self) -> bool {
         self.recompute_hash() == self.verification_hash
     }
+}
+
+// ---------------------------------------------------------------------------
+// Ring-buffer emission API (used by search_best_move_us)
+// ---------------------------------------------------------------------------
+
+/// Global ring buffer of the last 1024 move receipts.
+fn receipt_buffer() -> &'static Mutex<Vec<MoveReceipt>> {
+    static BUF: OnceLock<Mutex<Vec<MoveReceipt>>> = OnceLock::new();
+    BUF.get_or_init(|| Mutex::new(Vec::with_capacity(1024)))
+}
+
+/// Emit a receipt into the ring buffer. Non-blocking: drops silently if mutex is contended.
+pub fn emit(receipt: MoveReceipt) {
+    if let Ok(mut buf) = receipt_buffer().try_lock() {
+        if buf.len() >= 1024 {
+            buf.remove(0);
+        }
+        buf.push(receipt);
+    }
+}
+
+/// Drain all buffered receipts (clears the buffer). Used by tests and Manufacturing Graph feedback.
+pub fn drain() -> Vec<MoveReceipt> {
+    receipt_buffer()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .drain(..)
+        .collect()
+}
+
+/// Peek at the last `n` receipts without draining.
+#[must_use]
+pub fn last(n: usize) -> Vec<MoveReceipt> {
+    let buf = receipt_buffer().lock().unwrap_or_else(|e| e.into_inner());
+    let start = buf.len().saturating_sub(n);
+    buf[start..].to_vec()
 }

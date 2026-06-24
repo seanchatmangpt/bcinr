@@ -50,6 +50,11 @@ name = "print_book_hashes"
 path = "src/bin/print_book_hashes.rs"
 required-features = ["std"]
 
+[[bin]]
+name = "gen_book"
+path = "src/bin/gen_book.rs"
+required-features = ["std"]
+
 [dev-dependencies]
 proptest = "1.4"
 criterion = "0.5"
