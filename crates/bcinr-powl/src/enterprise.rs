@@ -7,7 +7,7 @@
 //! that each entry occupies exactly one cache line and is never interleaved
 //! with the hot tape.
 
-#[forbid(unsafe_code)]
+#![forbid(unsafe_code)]
 
 // ---------------------------------------------------------------------------
 // Capability set
@@ -28,12 +28,11 @@ pub type CapabilitySet = u64;
 /// # Algorithm
 ///
 /// ```text
-/// has = granted & required
-/// ok  = 1  iff  has == required
-///     = (has XOR required) wrapping_sub 1 >> 63
-///         → 1 when XOR result == 0, else 0
-/// mask = 0u64.wrapping_sub(ok)
-///         → 0xFFFF... when ok==1, 0 when ok==0
+/// has  = granted & required
+/// xor  = has XOR required          (0 iff has == required)
+/// nz   = (xor | xor.wrapping_neg()) >> 63  (1 iff xor != 0)
+/// ok   = 1.wrapping_sub(nz)        (1 iff xor == 0)
+/// mask = 0u64.wrapping_sub(ok)     (0xFFFF... iff ok==1, 0 otherwise)
 /// ```
 ///
 /// No branches, no conditionals — pure arithmetic on the mask calculus
@@ -54,10 +53,12 @@ pub type CapabilitySet = u64;
 #[inline(always)]
 pub fn capability_mask(granted: CapabilitySet, required: CapabilitySet) -> u64 {
     let has = granted & required;
-    // XOR with required: 0 iff has == required.
-    // wrapping_sub(1): underflows to 0xFFFF... when xor==0, else stays < 0x8000...
-    // >> 63: extracts the carry/sign — 1 when xor==0, 0 otherwise.
-    let ok = (has ^ required).wrapping_sub(1) >> 63;
+    // xor is 0 iff has == required.
+    // (xor | xor.wrapping_neg()) >> 63: 1 when xor != 0, 0 when xor == 0.
+    // ok: 1 when xor == 0 (all required bits present), 0 otherwise.
+    let xor = has ^ required;
+    let nonzero = (xor | xor.wrapping_neg()) >> 63;
+    let ok = 1u64.wrapping_sub(nonzero);
     0u64.wrapping_sub(ok)
 }
 
@@ -241,9 +242,9 @@ pub mod graduation {
 ///
 /// # Algorithm
 ///
-/// For each `u32` counter `n`, the expression `(n.wrapping_sub(1) >> 31) ^ 1`
-/// produces `1` when `n > 0` and `0` when `n == 0` — branchless, single
-/// instruction on most ISAs (SUB + SHR + XOR).
+/// For each u32 counter n, the expression (n | n.wrapping_neg()) >> 31
+/// produces 1 when n > 0 and 0 when n == 0 — branchless, single
+/// instruction on most ISAs (OR + NEG + SHR).
 ///
 /// # Examples
 ///
@@ -262,8 +263,8 @@ pub fn evaluate_graduation(
     compensation_count: u32,
     instance_count: u64,
 ) -> u64 {
-    // Branchless nonzero test: (n.wrapping_sub(1) >> 31) & 1 == 1 iff n > 0.
-    let nonzero_u32 = |n: u32| -> u64 { ((n.wrapping_sub(1) >> 31) ^ 1) as u64 };
+    // Branchless nonzero: (n | n.wrapping_neg()) >> 31 == 1 iff n > 0.
+    let nonzero_u32 = |n: u32| -> u64 { ((n | n.wrapping_neg()) >> 31) as u64 };
 
     let needs_discovery = nonzero_u32(order_violations) * graduation::NEEDS_DISCOVERY;
     let needs_conformance = nonzero_u32(sla_breaches) * graduation::NEEDS_CONFORMANCE;
@@ -271,9 +272,7 @@ pub fn evaluate_graduation(
     let needs_receipts = nonzero_u32(compensation_count) * graduation::NEEDS_RECEIPTS;
 
     // Benchmark required when instance_count >= 1_000.
-    // (instance_count.wrapping_sub(1000) >> 63) ^ 1 == 1 iff count >= 1000.
-    let bench_flag =
-        ((instance_count.wrapping_sub(1_000) >> 63) ^ 1) * graduation::NEEDS_BENCHMARK;
+    let bench_flag = (instance_count >= 1_000) as u64 * graduation::NEEDS_BENCHMARK;
 
     needs_discovery | needs_conformance | needs_replay | needs_receipts | bench_flag
 }
@@ -443,5 +442,31 @@ mod tests {
     fn graduation_discovery_not_set_when_zero_violations() {
         let bits = evaluate_graduation(0, 1, 1, 1, 0);
         assert_eq!(bits & graduation::NEEDS_DISCOVERY, 0);
+    }
+
+    #[test]
+    fn capability_mask_high_bit_xor_returns_zero() {
+        // Regression for wrapping_sub bug: xor = 2^63 would previously give
+        // (2^63).wrapping_sub(1) >> 63 == 0, falsely reporting success.
+        let granted: u64  = 0;
+        let required: u64 = 1u64 << 63;
+        assert_eq!(capability_mask(granted, required), 0,
+            "missing high-bit cap must return 0");
+    }
+
+    #[test]
+    fn graduation_nonzero_u32_max_value() {
+        // Regression for wrapping_sub bug: n = u32::MAX was wrong.
+        let bits = evaluate_graduation(u32::MAX, 0, 0, 0, 0);
+        assert_ne!(bits & graduation::NEEDS_DISCOVERY, 0,
+            "u32::MAX order_violations must set NEEDS_DISCOVERY");
+    }
+
+    #[test]
+    fn graduation_benchmark_near_u64_max() {
+        // Regression for bench_flag overflow: instance_count near u64::MAX.
+        let bits = evaluate_graduation(0, 0, 0, 0, u64::MAX);
+        assert_ne!(bits & graduation::NEEDS_BENCHMARK, 0,
+            "u64::MAX instances must set NEEDS_BENCHMARK");
     }
 }
