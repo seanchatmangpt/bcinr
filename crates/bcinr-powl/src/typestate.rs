@@ -89,6 +89,18 @@ impl HasPowlTape for crate::tape::v2::PowlTape {
     fn entry_mask(&self) -> u64 {
         self.ready_mask()
     }
+
+    // Called only from complete() — post-execution, off hot path.
+    fn content_hash(&self) -> [u8; 32] {
+        let mut h = blake3::Hasher::new();
+        for op in &self.ops[..self.len as usize] {
+            h.update(&op.pred_mask.to_le_bytes());
+            h.update(&op.succ_mask.to_le_bytes());
+            h.update(&op.ctrl.to_le_bytes());
+            h.update(&[op.op_kind as u8, op.choice_group, op.depth, op.fan_out]);
+        }
+        *h.finalize().as_bytes()
+    }
 }
 
 // =============================================================================
@@ -686,6 +698,33 @@ mod tests {
         let (_, receipt) = exec.complete(tok).unwrap();
         assert_eq!(receipt.op_trace, 0b11);
         assert_eq!(receipt.topology, TopologyKind::LongRunning);
+    }
+
+    // -------------------------------------------------------------------------
+    // content_hash tests
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn content_hash_is_deterministic() {
+        let tape1 = two_op_tape();
+        let tape2 = two_op_tape();
+        use crate::typestate::HasPowlTape;
+        assert_eq!(tape1.content_hash(), tape2.content_hash(),
+            "same tape structure must produce same hash");
+    }
+
+    #[test]
+    fn content_hash_differs_for_different_tapes() {
+        use crate::typestate::HasPowlTape;
+        let tape1 = two_op_tape();
+        // Build a single-op tape
+        let mut tape2 = crate::tape::v2::PowlTape::new();
+        let op = crate::tape::v2::Powl64Op::silent();
+        tape2.push(op).unwrap();
+        tape2.entry_op = 0;
+        tape2.exit_op = 0;
+        assert_ne!(tape1.content_hash(), tape2.content_hash(),
+            "different tapes must produce different hashes");
     }
 
     // -------------------------------------------------------------------------
