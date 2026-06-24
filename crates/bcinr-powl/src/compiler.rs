@@ -263,25 +263,8 @@ fn compile_node<'a>(
 
 fn kahn_check(tape: &PowlTape) -> Result<(), CompileError> {
     let n = tape.len as usize;
-    // in-degree per slot (pred_mask, excluding LoopRedo back-edges as sources)
-    let mut in_deg = [0u32; 64];
-    for i in 0..n {
-        if tape.ops[i].kind == OpKind::LoopRedo {
-            // back-edges are excluded from cycle check
-            continue;
-        }
-        let mut succs = tape.ops[i].succ_mask;
-        while succs != 0 {
-            let j = succs.trailing_zeros() as usize;
-            if tape.ops[j].kind != OpKind::LoopRedo {
-                in_deg[j] += 1;
-            }
-            succs &= succs - 1;
-        }
-    }
-
-    // Recompute from pred_mask excluding LoopRedo contributions.
-    // Actually recompute in_deg from pred_masks directly.
+    // Compute in-degree per slot from pred_mask, excluding LoopRedo back-edges.
+    // LoopRedo slots are excluded from the DAG check entirely.
     let mut in_deg2 = [0u32; 64];
     for i in 0..n {
         if tape.ops[i].kind == OpKind::LoopRedo {

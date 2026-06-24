@@ -7,7 +7,7 @@
 //! that each entry occupies exactly one cache line and is never interleaved
 //! with the hot tape.
 
-#[forbid(unsafe_code)]
+#![forbid(unsafe_code)]
 
 // ---------------------------------------------------------------------------
 // Capability set
@@ -28,12 +28,11 @@ pub type CapabilitySet = u64;
 /// # Algorithm
 ///
 /// ```text
-/// has = granted & required
-/// ok  = 1  iff  has == required
-///     = (has XOR required) wrapping_sub 1 >> 63
-///         → 1 when XOR result == 0, else 0
-/// mask = 0u64.wrapping_sub(ok)
-///         → 0xFFFF... when ok==1, 0 when ok==0
+/// has      = granted & required              (bits present)
+/// xor      = has ^ required                  (0 iff all required bits present)
+/// nz       = (xor | -xor) >> 63             (1 iff xor != 0; correct for all u64)
+/// ok       = nz.wrapping_sub(1)             (u64::MAX when equal, 0 when not)
+/// mask     = 0u64.wrapping_sub(ok >> 63)
 /// ```
 ///
 /// No branches, no conditionals — pure arithmetic on the mask calculus
@@ -54,10 +53,15 @@ pub type CapabilitySet = u64;
 #[inline(always)]
 pub fn capability_mask(granted: CapabilitySet, required: CapabilitySet) -> u64 {
     let has = granted & required;
-    // XOR with required: 0 iff has == required.
-    // wrapping_sub(1): underflows to 0xFFFF... when xor==0, else stays < 0x8000...
-    // >> 63: extracts the carry/sign — 1 when xor==0, 0 otherwise.
-    let ok = (has ^ required).wrapping_sub(1) >> 63;
+    let xor = has ^ required;
+    // Hoare-Logic Verification Line 1: (xor | xor.wrapping_neg()) >> 63 == 1 iff xor != 0.
+    // Proof: xor=0 → both terms 0, OR=0, >>63=0.
+    //        xor>0 → if xor<2^63: wrapping_neg=2^64-xor>2^63, bit63 set.
+    //                if xor≥2^63: xor itself has bit63 set. QED.
+    // Previous formula (xor.wrapping_sub(1) >> 63) fails when xor >= 2^63:
+    // xor-1 still has bit63 set, yielding 1 (grant) when it should yield 0 (deny).
+    let nz = (xor | xor.wrapping_neg()) >> 63; // 1 iff xor != 0
+    let ok = 1u64.wrapping_sub(nz);             // 1 iff all required bits present
     0u64.wrapping_sub(ok)
 }
 
@@ -241,9 +245,10 @@ pub mod graduation {
 ///
 /// # Algorithm
 ///
-/// For each `u32` counter `n`, the expression `(n.wrapping_sub(1) >> 31) ^ 1`
-/// produces `1` when `n > 0` and `0` when `n == 0` — branchless, single
-/// instruction on most ISAs (SUB + SHR + XOR).
+/// For each `u32` counter `n`, the expression `(n as u64 | (n as u64).wrapping_neg()) >> 63`
+/// produces `1` when `n > 0` and `0` when `n == 0`, correctly for all `u32`
+/// values including those with bit 31 set (the `wrapping_sub(1) >> 31` form fails
+/// for n ≥ 2^31+1 and n = u32::MAX).
 ///
 /// # Examples
 ///
@@ -262,8 +267,14 @@ pub fn evaluate_graduation(
     compensation_count: u32,
     instance_count: u64,
 ) -> u64 {
-    // Branchless nonzero test: (n.wrapping_sub(1) >> 31) & 1 == 1 iff n > 0.
-    let nonzero_u32 = |n: u32| -> u64 { ((n.wrapping_sub(1) >> 31) ^ 1) as u64 };
+    // Hoare-Logic Verification Line 2: cast to u64 first; 0 ≤ n ≤ 2^32-1 < 2^63, so
+    // wrapping_neg(x) = 2^64-x > 2^63 for any x > 0 in this range, setting bit63.
+    // For x=0, wrapping_neg(0)=0. QED. The previous (wrapping_sub(1) >> 31) ^ 1
+    // form fails for n ≥ 2^31+1 (n-1 has bit31 set, >> 31 yields 1, XOR 1 yields 0).
+    let nonzero_u32 = |n: u32| -> u64 {
+        let x = n as u64;
+        (x | x.wrapping_neg()) >> 63
+    };
 
     let needs_discovery = nonzero_u32(order_violations) * graduation::NEEDS_DISCOVERY;
     let needs_conformance = nonzero_u32(sla_breaches) * graduation::NEEDS_CONFORMANCE;
@@ -321,6 +332,35 @@ mod tests {
     #[test]
     fn capability_mask_disjoint_returns_zero() {
         assert_eq!(capability_mask(0b1010, 0b0101), 0);
+    }
+
+    // Bug-regression: bit-63 edge case — previous (xor.wrapping_sub(1) >> 63)
+    // formula incorrectly granted when xor >= 2^63.
+    #[test]
+    fn capability_mask_no_grant_full_required_returns_zero() {
+        assert_eq!(capability_mask(0, u64::MAX), 0);
+    }
+
+    #[test]
+    fn capability_mask_full_grant_full_required_returns_all_ones() {
+        assert_eq!(capability_mask(u64::MAX, u64::MAX), u64::MAX);
+    }
+
+    #[test]
+    fn capability_mask_missing_high_bit_returns_zero() {
+        // granted has all bits except bit 63; required has all bits.
+        // Old code: xor=(1<<63), xor-1=0x7FFF...FFFF, >>63=0 — was OK here.
+        // But with required=(1<<63)|2 and granted=(1<<63): xor=2, still OK.
+        // The breaking case: granted=0, required=u64::MAX — xor=u64::MAX >= 2^63.
+        assert_eq!(capability_mask(0x7FFF_FFFF_FFFF_FFFF, u64::MAX), 0);
+    }
+
+    #[test]
+    fn capability_mask_bit63_and_other_missing_returns_zero() {
+        // required has bit63 set plus bit0; granted has neither.
+        // Old formula: xor=(1<<63)|1, xor-1=(1<<63), >>63=1 → incorrectly grants.
+        let required = (1u64 << 63) | 1;
+        assert_eq!(capability_mask(0, required), 0);
     }
 
     // -----------------------------------------------------------------------
@@ -443,5 +483,44 @@ mod tests {
     fn graduation_discovery_not_set_when_zero_violations() {
         let bits = evaluate_graduation(0, 1, 1, 1, 0);
         assert_eq!(bits & graduation::NEEDS_DISCOVERY, 0);
+    }
+
+    // Bug-regression: nonzero_u32 with n >= 2^31.
+    // Previous (n.wrapping_sub(1) >> 31) ^ 1 form returns 0 for u32::MAX and
+    // other values where n-1 has bit 31 set.
+    #[test]
+    fn graduation_nonzero_u32_high_bit_set_triggers_flag() {
+        let n = 2_147_483_649u32; // 2^31 + 1: n-1 = 2^31, bit31 set → old formula fails
+        let bits = evaluate_graduation(n, 0, 0, 0, 0);
+        assert_ne!(bits & graduation::NEEDS_DISCOVERY, 0,
+            "nonzero_u32({n}) must return 1 but old formula returned 0");
+    }
+
+    #[test]
+    fn graduation_nonzero_u32_max_triggers_flag() {
+        let bits = evaluate_graduation(u32::MAX, 0, 0, 0, 0);
+        assert_ne!(bits & graduation::NEEDS_DISCOVERY, 0,
+            "nonzero_u32(u32::MAX) must return 1");
+    }
+
+    #[test]
+    fn graduation_zero_u32_does_not_trigger_flag() {
+        let bits = evaluate_graduation(0, 0, 0, 0, 0);
+        assert_eq!(bits & graduation::NEEDS_DISCOVERY, 0);
+    }
+
+    #[test]
+    fn graduation_nonzero_u32_boundary_matrix() {
+        let nonzero_vals: &[u32] = &[1, (1u32 << 31), (1u32 << 31).wrapping_add(1), u32::MAX];
+        for &n in nonzero_vals {
+            assert_ne!(evaluate_graduation(n, 0, 0, 0, 0) & graduation::NEEDS_DISCOVERY, 0,
+                "order_violations={n} must set NEEDS_DISCOVERY");
+            assert_ne!(evaluate_graduation(0, n, 0, 0, 0) & graduation::NEEDS_CONFORMANCE, 0,
+                "sla_breaches={n} must set NEEDS_CONFORMANCE");
+            assert_ne!(evaluate_graduation(0, 0, n, 0, 0) & graduation::NEEDS_REPLAY, 0,
+                "watchdog_trips={n} must set NEEDS_REPLAY");
+            assert_ne!(evaluate_graduation(0, 0, 0, n, 0) & graduation::NEEDS_RECEIPTS, 0,
+                "compensation_count={n} must set NEEDS_RECEIPTS");
+        }
     }
 }
