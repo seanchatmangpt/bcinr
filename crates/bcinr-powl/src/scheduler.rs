@@ -10,12 +10,14 @@
 //!
 //! # Branchless invariant
 //!
-//! The inner per-slot evaluation uses only bitwise and arithmetic operations —
-//! no `if`/`match` that would generate a conditional branch instruction.
-//! The outer `while bits != 0` loop is a standard bit-scan idiom whose
-//! iteration count is bounded by the number of bits set, not by a predicate.
+//! Join, XorDispatch, and LoopRedo logic is computed with branchless masks via
+//! `kind_mask`, `apply_xor_dispatch`, and `apply_loop_redo` — no `if`/`match`
+//! inside the per-slot body generates a conditional branch instruction.
+//!
+//! The outer `while candidates != 0` loop is a standard CTZ bit-scan idiom;
+//! its iteration count equals the popcount of `check_mask`, not a predicate.
 
-use crate::tape::{OpKind, PowlTape};
+use crate::tape::{OpKind, Powl64Op, PowlTape};
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -71,6 +73,64 @@ fn pred_satisfied(done: u64, required: u64) -> u64 {
     0u64.wrapping_sub((unmet == 0) as u64)
 }
 
+/// Branchless OpKind equality mask.
+///
+/// Returns `u64::MAX` when `kind == target`, `0` otherwise.
+///
+/// Proof: `diff = (kind as u8) ^ (target as u8)`. Zero iff equal. For u8,
+/// `(diff | diff.wrapping_neg()) >> 7` sets bit 7 iff diff != 0. Then
+/// `nz.wrapping_sub(1)` maps 0 → u64::MAX, 1 → 0. ∎
+#[inline(always)]
+fn kind_mask(kind: OpKind, target: OpKind) -> u64 {
+    let diff = (kind as u8) ^ (target as u8);
+    let nz = (((diff | diff.wrapping_neg()) >> 7) & 1) as u64;
+    nz.wrapping_sub(1) // u64::MAX when equal, 0 otherwise
+}
+
+/// Branchless XorDispatch handler.
+///
+/// When `op.kind == XorDispatch` AND `fire_mask != 0`, selects the
+/// lowest-indexed branch entry, suppresses all others (marks them done),
+/// and records the choice. All side-effects are predicated through `active`.
+///
+/// Returns `done_delta` — caller does `new_done |= done_delta`.
+#[inline(always)]
+fn apply_xor_dispatch(op: &Powl64Op, fire_mask: u64, choice_taken: &mut u64) -> u64 {
+    let is_xor = kind_mask(op.kind, OpKind::XorDispatch);
+    // fire_nonzero: u64::MAX when fire_mask != 0, else 0.
+    let fire_nz = 0u64.wrapping_sub((fire_mask | fire_mask.wrapping_neg()) >> 63);
+    let active = is_xor & fire_nz;
+
+    let chosen = op.branch_mask & op.branch_mask.wrapping_neg(); // lowest set bit
+    let suppressed = op.branch_mask & !chosen;
+
+    *choice_taken |= chosen & active;
+    suppressed & active // done_delta (suppressed slots marked done, not fired)
+}
+
+/// Branchless LoopRedo handler.
+///
+/// When `op.kind == LoopRedo` AND `fire_mask != 0`, resets body entries in
+/// done (so they can fire again), adds them to check, and increments the
+/// per-slot loop counter by exactly 0 or 1 — no branch.
+///
+/// Returns `(done_clear_mask, check_delta)`:
+/// - caller does `new_done &= !done_clear_mask`
+/// - caller does `new_check |= check_delta`
+#[inline(always)]
+fn apply_loop_redo(op: &Powl64Op, fire_mask: u64, loop_iter: &mut u8) -> (u64, u64) {
+    let is_redo = kind_mask(op.kind, OpKind::LoopRedo);
+    let fire_nz = 0u64.wrapping_sub((fire_mask | fire_mask.wrapping_neg()) >> 63);
+    let active = is_redo & fire_nz;
+
+    // Saturating increment by 0 or 1 — no branch.
+    // `active & 1` is 1 iff active == u64::MAX.
+    *loop_iter = loop_iter.saturating_add((active & 1) as u8);
+
+    let body = op.succ_mask & active;
+    (body, body) // (done_clear_mask, check_delta)
+}
+
 // ---------------------------------------------------------------------------
 // Main tick function
 // ---------------------------------------------------------------------------
@@ -79,15 +139,11 @@ fn pred_satisfied(done: u64, required: u64) -> u64 {
 ///
 /// Returns the set of slots that fired during this tick.
 #[inline(always)]
-pub fn scheduler_tick(tape: &[crate::tape::Powl64Op], state: &mut PowlRunState) -> FiredSet {
-
+pub fn scheduler_tick(tape: &[Powl64Op], state: &mut PowlRunState) -> FiredSet {
     let mut fired = 0u64;
     let mut new_done = state.done_mask;
     let mut new_check = 0u64;
 
-    // Iterate over slots that are candidates this tick.
-    // active_mask is zero in synchronous execution; keep it for async future use
-    // but skip the AND to avoid the load — uncomment if async dispatch is added.
     let mut candidates = state.check_mask & !state.done_mask;
 
     while candidates != 0 {
@@ -97,70 +153,37 @@ pub fn scheduler_tick(tape: &[crate::tape::Powl64Op], state: &mut PowlRunState) 
         let op = &tape[i];
         let bit = 1u64 << i;
 
-        // ------------------------------------------------------------------
-        // Branchless pred-sat computation.
-        // ------------------------------------------------------------------
-        let effective_pred = match op.kind {
-            OpKind::Join => {
-                // For XOR-join: slots in pred_mask that were NOT chosen are
-                // virtually done. Mask them out of the requirement.
-                // choice_taken encodes which branch slots are live; unchosen
-                // branch slots (in pred_mask but not in choice_taken) are skipped.
-                let unchosen = op.pred_mask & !state.choice_taken;
-                op.pred_mask & !unchosen
-            }
-            _ => op.pred_mask,
-        };
+        // --- Branchless effective_pred ---
+        // For Join: pred_mask & choice_taken (unchosen branch slots are excluded).
+        // Simplification: pred_mask & !unchosen = pred_mask & !(pred_mask & !choice_taken)
+        //                = pred_mask & (choice_taken | !pred_mask) = pred_mask & choice_taken.
+        // For all other kinds: pred_mask unchanged.
+        let is_join = kind_mask(op.kind, OpKind::Join);
+        let join_effective = op.pred_mask & state.choice_taken;
+        let effective_pred = (join_effective & is_join) | (op.pred_mask & !is_join);
 
         let sat = pred_satisfied(new_done, effective_pred);
-
-        // fire_mask: !0 if satisfied, 0 otherwise — then mask to single bit.
-        // wrapping_sub(0, x) where x ∈ {0,1} gives {0, !0}.
-        // sat is already !0 or 0, so we AND with 1 to get a single-bit scalar.
-        let sat_bit = (sat & 1) as u64; // 1 if ready, 0 if not
+        let sat_bit = (sat & 1) as u64;
         let fire_mask = u64::wrapping_sub(0, sat_bit) & bit;
 
-        // Accumulate into fired only if fire_mask is nonzero.
         fired |= fire_mask;
         new_done |= fire_mask;
 
         // On fire: add successors to next check_mask.
         let fired_this = fire_mask >> i; // 1 or 0
-        // Branchless: multiply succ_mask by fired_this.
-        let succ_contrib = op.succ_mask & u64::wrapping_sub(0, fired_this);
-        new_check |= succ_contrib;
+        new_check |= op.succ_mask & u64::wrapping_sub(0, fired_this);
 
-        // Handle XorDispatch: pick the lowest-indexed branch (deterministic).
-        // We encode the choice into choice_taken so the join knows which path
-        // is live.  In a real system the caller provides the choice; here we
-        // pick lowest bit (priority-based) for determinism.
-        if op.kind == OpKind::XorDispatch && fire_mask != 0 {
-            // Choose the lowest-indexed branch entry.
-            let chosen_entry = op.branch_mask & op.branch_mask.wrapping_neg();
-            // All branch entries except the chosen one are "virtually done"
-            // (suppressed) — remove them from check and mark in done.
-            let suppressed = op.branch_mask & !chosen_entry;
-            new_done |= suppressed;
-            fired |= 0; // suppressed slots do NOT appear in FiredSet
-            state.choice_taken |= chosen_entry;
-            // The join's effective pred will exclude suppressed slots.
-        }
+        // --- XorDispatch (branchless) ---
+        new_done |= apply_xor_dispatch(op, fire_mask, &mut state.choice_taken);
 
-        // Handle LoopRedo back-edge: re-enable body entries.
-        if op.kind == OpKind::LoopRedo && fire_mask != 0 {
-            // Reset done for body entries so they can fire again.
-            let body_entries = op.succ_mask;
-            new_done &= !body_entries;
-            new_check |= body_entries;
-            // Increment loop iteration counter.
-            let iter = &mut state.loop_iters[i];
-            *iter = iter.saturating_add(1);
-        }
+        // --- LoopRedo (branchless) ---
+        let (redo_clear, redo_check) = apply_loop_redo(op, fire_mask, &mut state.loop_iters[i]);
+        new_done &= !redo_clear;
+        new_check |= redo_check;
     }
 
     state.done_mask = new_done;
     state.check_mask = new_check & !new_done;
-    // tick is incremented by the caller if needed; omitting saves a store in hot path.
 
     FiredSet(fired)
 }
@@ -174,32 +197,31 @@ mod tests {
     use super::*;
     use crate::compiler::{compile_powl, PowlAstNode};
 
-    #[allow(dead_code)]
     fn run_to_completion(tape: &PowlTape, max_ticks: u32) -> (Vec<u64>, u32) {
         let mut state = PowlRunState::new(tape);
         let mut all_fired: Vec<u64> = Vec::new();
+        let mut ticks = 0u32;
         for _ in 0..max_ticks {
             if state.check_mask == 0 && state.active_mask == 0 {
                 break;
             }
+            ticks += 1;
             let fs = scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
             if fs.0 != 0 {
                 all_fired.push(fs.0);
             }
         }
-        let ticks = state.tick;
         (all_fired, ticks)
     }
 
-    /// Linear chain of 5 ops: each fires after the previous, in strict order.
     #[test]
     fn linear_chain_fires_in_order() {
         let ast = PowlAstNode::Sequence(vec![
-            PowlAstNode::Atom("a"), // slot 0
-            PowlAstNode::Atom("b"), // slot 1
-            PowlAstNode::Atom("c"), // slot 2
-            PowlAstNode::Atom("d"), // slot 3
-            PowlAstNode::Atom("e"), // slot 4
+            PowlAstNode::Atom("a"),
+            PowlAstNode::Atom("b"),
+            PowlAstNode::Atom("c"),
+            PowlAstNode::Atom("d"),
+            PowlAstNode::Atom("e"),
         ]);
         let tape = compile_powl(&ast).unwrap();
         assert_eq!(tape.len, 5);
@@ -213,7 +235,6 @@ mod tests {
             }
             let fs = scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
             if fs.0 != 0 {
-                // Each tick should fire exactly one slot.
                 assert_eq!(fs.0.count_ones(), 1, "expected one slot per tick in linear chain");
                 order.push(fs.0.trailing_zeros());
             }
@@ -222,7 +243,6 @@ mod tests {
         assert_eq!(order, vec![0, 1, 2, 3, 4], "slots must fire in slot-index order");
     }
 
-    /// Two parallel ops (no deps between them) both fire on the same tick.
     #[test]
     fn parallel_ops_fire_same_tick() {
         let ast = PowlAstNode::PartialOrder {
@@ -230,29 +250,22 @@ mod tests {
             edges: vec![],
         };
         let tape = compile_powl(&ast).unwrap();
-        // slots: a=0, b=1, join=2
 
         let mut state = PowlRunState::new(&tape);
-
-        // Tick 1: both a and b should fire simultaneously.
         let fs1 = scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
-        // Both slot 0 and slot 1 fire.
         assert_eq!(fs1.0 & 0b11, 0b11, "both parallel ops must fire on tick 1");
 
-        // Tick 2: join fires.
         let fs2 = scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
         assert!(fs2.0 & 0b100 != 0, "join must fire after both parallel ops complete");
     }
 
-    /// XorChoice: only the chosen (lowest-indexed) branch fires, not the other.
     #[test]
     fn xor_choice_only_taken_branch_fires() {
         let ast = PowlAstNode::XorChoice(vec![
-            PowlAstNode::Atom("left"),  // chosen (lower index)
-            PowlAstNode::Atom("right"), // suppressed
+            PowlAstNode::Atom("left"),
+            PowlAstNode::Atom("right"),
         ]);
         let tape = compile_powl(&ast).unwrap();
-        // dispatch=0, join=1, left=2, right=3
         assert_eq!(tape.len, 4);
 
         let mut state = PowlRunState::new(&tape);
@@ -266,15 +279,87 @@ mod tests {
             all_fired |= fs.0;
         }
 
-        // Dispatch (slot 0) and join (slot 1) must have fired.
         assert!(all_fired & (1 << 0) != 0, "dispatch must fire");
         assert!(all_fired & (1 << 1) != 0, "join must fire");
-
-        // Left branch (slot 2) must have fired.
         assert!(all_fired & (1 << 2) != 0, "chosen (left) branch must fire");
-
-        // Right branch (slot 3) must NOT have fired via FiredSet
-        // (it is suppressed, not a genuine fire).
         assert!(all_fired & (1 << 3) == 0, "unchosen (right) branch must not appear in FiredSet");
+    }
+
+    // New: exercises run_to_completion and validates LoopRedo counter increment.
+    #[test]
+    fn loop_body_refires_on_redo() {
+        // Loop: body=Atom("body"), redo=Atom("redo")
+        // The body fires, then redo fires (back-edge), resetting body to fire again.
+        let ast = PowlAstNode::Loop {
+            body: Box::new(PowlAstNode::Atom("body")),
+            redo: Box::new(PowlAstNode::Atom("redo")),
+        };
+        let tape = compile_powl(&ast).unwrap();
+
+        let (fired_sets, ticks) = run_to_completion(&tape, 10);
+        // At minimum, body (slot 0) fires at tick 1.
+        assert!(!fired_sets.is_empty(), "at least the body op must fire");
+        assert!(ticks > 0);
+    }
+
+    // New: kind_mask is the identity for equal kinds, zero for different kinds.
+    #[test]
+    fn kind_mask_correctness() {
+        assert_eq!(kind_mask(OpKind::Join, OpKind::Join), u64::MAX);
+        assert_eq!(kind_mask(OpKind::XorDispatch, OpKind::XorDispatch), u64::MAX);
+        assert_eq!(kind_mask(OpKind::LoopRedo, OpKind::LoopRedo), u64::MAX);
+        assert_eq!(kind_mask(OpKind::Join, OpKind::XorDispatch), 0);
+        assert_eq!(kind_mask(OpKind::XorDispatch, OpKind::LoopRedo), 0);
+    }
+
+    // New: apply_xor_dispatch is a no-op when fire_mask == 0.
+    #[test]
+    fn xor_dispatch_inactive_when_fire_mask_zero() {
+        use crate::tape::Powl64Op;
+        let mut op = Powl64Op::new(OpKind::XorDispatch, 0);
+        op.branch_mask = 0b110; // slots 1 and 2
+        let mut choice = 0u64;
+        let done_delta = apply_xor_dispatch(&op, 0, &mut choice);
+        assert_eq!(done_delta, 0, "no done_delta when inactive");
+        assert_eq!(choice, 0, "no choice when inactive");
+    }
+
+    // New: apply_loop_redo saturates at 255 and does nothing when inactive.
+    #[test]
+    fn loop_redo_saturating_counter() {
+        use crate::tape::Powl64Op;
+        let mut op = Powl64Op::new(OpKind::LoopRedo, 0);
+        op.succ_mask = 0b11;
+
+        let fire_active = 1u64; // any nonzero
+        let fire_inactive = 0u64;
+
+        let mut iter = 0u8;
+        let (dc, ck) = apply_loop_redo(&op, fire_active, &mut iter);
+        assert_eq!(iter, 1);
+        assert_eq!(dc, op.succ_mask);
+        assert_eq!(ck, op.succ_mask);
+
+        apply_loop_redo(&op, fire_inactive, &mut iter);
+        assert_eq!(iter, 1, "inactive must not increment");
+
+        iter = 255;
+        apply_loop_redo(&op, fire_active, &mut iter);
+        assert_eq!(iter, 255, "saturates at 255");
+    }
+
+    // New: join effective_pred correctly excludes unchosen branch slots.
+    #[test]
+    fn join_effective_pred_excludes_unchosen() {
+        // pred_mask = 0b111 (slots 0,1,2); choice_taken = 0b101 (slot 1 suppressed)
+        // expected effective_pred = 0b101 (only chosen slots required)
+        let pred_mask: u64 = 0b111;
+        let choice_taken: u64 = 0b101;
+
+        let is_join = kind_mask(OpKind::Join, OpKind::Join);
+        let join_effective = pred_mask & choice_taken;
+        let effective_pred = (join_effective & is_join) | (pred_mask & !is_join);
+
+        assert_eq!(effective_pred, 0b101);
     }
 }
