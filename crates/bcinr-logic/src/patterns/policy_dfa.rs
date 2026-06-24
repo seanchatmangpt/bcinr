@@ -25,7 +25,6 @@ pub struct ConstantShapePolicyDfa {
 }
 
 impl ConstantShapePolicyDfa {
-    #[must_use]
     pub fn new_checked(
         table: &'static [usize],
         alphabet_size: usize,

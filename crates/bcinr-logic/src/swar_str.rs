@@ -498,11 +498,11 @@ pub fn parse_4_hex_digits(word: u32) -> Option<u32> {
     while i < 4 {
         let b = bytes[i];
         let digit_val: u32;
-        if b >= b'0' && b <= b'9' {
+        if b.is_ascii_digit() {
             digit_val = (b - b'0') as u32;
-        } else if b >= b'A' && b <= b'F' {
+        } else if b.is_ascii_uppercase() && (b'A'..=b'F').contains(&b) {
             digit_val = (b - b'A') as u32 + 10;
-        } else if b >= b'a' && b <= b'f' {
+        } else if b.is_ascii_lowercase() && (b'a'..=b'f').contains(&b) {
             digit_val = (b - b'a') as u32 + 10;
         } else {
             valid = false;

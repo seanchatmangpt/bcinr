@@ -119,7 +119,7 @@ pub fn scheduler_tick(tape: &[crate::tape::Powl64Op], state: &mut PowlRunState) 
         // fire_mask: !0 if satisfied, 0 otherwise — then mask to single bit.
         // wrapping_sub(0, x) where x ∈ {0,1} gives {0, !0}.
         // sat is already !0 or 0, so we AND with 1 to get a single-bit scalar.
-        let sat_bit = (sat & 1) as u64; // 1 if ready, 0 if not
+        let sat_bit = sat & 1; // 1 if ready, 0 if not
         let fire_mask = u64::wrapping_sub(0, sat_bit) & bit;
 
         // Accumulate into fired only if fire_mask is nonzero.

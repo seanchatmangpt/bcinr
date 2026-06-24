@@ -69,8 +69,11 @@ impl<const A: usize, const B: usize, const C: usize> HierarchicalTimeWheel<A, B,
     /// Construct a new empty wheel.
     #[must_use]
     pub const fn new() -> Self {
+        #[allow(clippy::let_unit_value)]
         let _ = Self::_A_POW2;
+        #[allow(clippy::let_unit_value)]
         let _ = Self::_B_POW2;
+        #[allow(clippy::let_unit_value)]
         let _ = Self::_C_POW2;
         Self {
             level0: [0u64; A],

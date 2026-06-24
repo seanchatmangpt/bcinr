@@ -142,8 +142,8 @@ pub fn wide_tick(tape: &PowlTapeLarge, state: &mut WidePowlState) -> [u64; 8] {
     }
 
     // ── Step 3: update done ──────────────────────────────────────────────
-    for i in 0..8 {
-        state.done.words[i] |= fired[i];
+    for (w, f) in state.done.words.iter_mut().zip(fired.iter()) {
+        *w |= f;
     }
 
     // ── Step 4: propagate check mask to successors of fired ops ─────────

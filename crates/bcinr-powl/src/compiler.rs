@@ -265,6 +265,7 @@ fn kahn_check(tape: &PowlTape) -> Result<(), CompileError> {
     let n = tape.len as usize;
     // Compute in-degree from pred_masks, excluding LoopRedo back-edges.
     let mut in_deg2 = [0u32; 64];
+    #[allow(clippy::needless_range_loop)]
     for i in 0..n {
         if tape.ops[i].kind == OpKind::LoopRedo {
             continue;

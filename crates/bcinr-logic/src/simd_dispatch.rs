@@ -460,7 +460,7 @@ fn shuffle_u8x16_branchless_scalar(a: [u8; 16], mask: [u8; 16]) -> [u8; 16] {
     while i < 16 {
         let idx = (mask[i] & 0x0F) as usize;
         // If bit 7 of mask byte is set, the output lane is zero (pshufb spec).
-        let zero_lane = (mask[i] >> 7) as u8; // 1 if zeroing, else 0
+        let zero_lane = mask[i] >> 7; // 1 if zeroing, else 0
         let zero_mask = zero_lane.wrapping_neg(); // 0xFF → zero, 0x00 → keep
         out[i] = a[idx] & !zero_mask;
         i += 1;
@@ -891,7 +891,7 @@ fn blend_u8x16_scalar(mask: [u8; 16], a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     let mut out = [0u8; 16];
     let mut i = 0usize;
     while i < 16 {
-        let msb = (mask[i] >> 7) as u8;
+        let msb = mask[i] >> 7;
         let m = msb.wrapping_neg(); // 0xFF or 0x00
         out[i] = (b[i] & m) | (a[i] & !m);
         i += 1;

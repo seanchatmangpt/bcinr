@@ -281,6 +281,7 @@ impl<const OPS: usize> SparseEnabledIndex<OPS> {
     /// `dependents` directly) before the first [`on_complete`][Self::on_complete].
     #[must_use]
     pub fn new(initial_counts: [u32; OPS]) -> Self {
+        #[allow(clippy::let_unit_value)]
         let _ = Self::_OPS_BOUND; // force evaluation at instantiation
         Self {
             dependents: [[0u64; 8]; OPS],

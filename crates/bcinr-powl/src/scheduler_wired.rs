@@ -298,6 +298,12 @@ pub struct FiberPool<const SLOTS: usize, const TICKS: usize> {
     pub active_mask: u64, // bit i = slot i is running
 }
 
+impl<const SLOTS: usize, const TICKS: usize> Default for FiberPool<SLOTS, TICKS> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const SLOTS: usize, const TICKS: usize> FiberPool<SLOTS, TICKS> {
     pub const fn new() -> Self {
         // WcetFiber::new() is const

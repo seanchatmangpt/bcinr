@@ -24,7 +24,7 @@ use bcinr_logic::patterns::LockFreeMpmcRing;
 /// Kept to 24 bytes so that four events fit in a single cache line (96 bytes
 /// with two-word header on typical CPUs).
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct OcelEvent {
     /// Unique event identifier (monotonic, set by the emitting scheduler).
     pub event_id: u64,
@@ -40,18 +40,6 @@ pub struct OcelEvent {
     pub _pad: [u8; 2],
 }
 
-impl Default for OcelEvent {
-    fn default() -> Self {
-        Self {
-            event_id: 0,
-            case_id: 0,
-            tick: 0,
-            op_idx: 0,
-            topo: 0,
-            _pad: [0u8; 2],
-        }
-    }
-}
 
 // Compile-time size check.
 const _OCEL_EVENT_SIZE: () = assert!(
