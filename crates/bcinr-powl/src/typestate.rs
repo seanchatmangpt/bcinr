@@ -191,6 +191,14 @@ pub struct ExecutionToken {
 // (No `#[derive(Clone)]` or `#[derive(Copy)]`.)
 
 impl ExecutionToken {
+    /// Construct a token from raw fields — for use in trybuild compile-fail tests.
+    ///
+    /// `remaining` is the bitmask of unfired ops; `total` is the op count.
+    #[doc(hidden)]
+    pub fn new_for_test(remaining: u64, total: u8) -> Self {
+        Self { remaining, total }
+    }
+
     /// Construct a fresh token for a tape with `op_count` ops (≤ 64).
     ///
     /// Bits `0..op_count` are set in `remaining`.

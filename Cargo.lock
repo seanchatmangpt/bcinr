@@ -190,6 +190,7 @@ dependencies = [
  "bcinr-logic",
  "blake3",
  "criterion",
+ "proptest",
  "serde",
 ]
 

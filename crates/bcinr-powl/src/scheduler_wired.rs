@@ -118,6 +118,67 @@ pub struct EventWorkItem {
 /// Max parallel branches dispatched to the ring per tick.
 const RING_CAPACITY: usize = 64;
 
+/// Build per-transition input/output KBitSets and op-index table for `PriorityPetriEngine`.
+///
+/// Returns `(inputs, outputs, op_indices)` where each live slot `t` corresponds
+/// to one enabled candidate op.
+#[inline(always)]
+fn build_transition_arrays(
+    tape: &[Powl64Op],
+    candidates: u64,
+    choice_taken: u64,
+) -> ([KBitSet<1>; 64], [KBitSet<1>; 64], [u32; 64]) {
+    let mut inputs  = [KBitSet::<1> { words: [!0u64] }; 64];
+    let mut outputs = [KBitSet::<1> { words: [0] }; 64];
+    let mut op_indices = [u32::MAX; 64];
+    let mut t = 0usize;
+    let mut bits = candidates;
+
+    while bits != 0 && t < 64 {
+        let i = bits.trailing_zeros() as usize;
+        bits &= bits - 1;
+
+        let op = &tape[i];
+        let op_bit = 1u64 << i;
+
+        // Effective pred for XOR-join: unchosen branches are virtually done.
+        let effective_pred = match op.kind {
+            OpKind::Join => {
+                let unchosen = op.pred_mask & !choice_taken;
+                op.pred_mask & !unchosen
+            }
+            _ => op.pred_mask,
+        };
+
+        // POWL done-set is monotone: tokens never leave.
+        // output = effective_pred | op_bit so net effect is: state gains op_bit.
+        inputs[t]  = KBitSet { words: [effective_pred] };
+        outputs[t] = KBitSet { words: [effective_pred | op_bit] };
+        op_indices[t] = i as u32;
+        t += 1;
+    }
+
+    (inputs, outputs, op_indices)
+}
+
+/// Push enabled successors of a fired op to the parallel dispatch ring.
+#[inline(always)]
+fn dispatch_successors(
+    tape: &[Powl64Op],
+    op_idx: usize,
+    new_done: u64,
+    ring: Option<&LockFreeMpmcRing<WorkItem, RING_CAPACITY>>,
+) {
+    if let Some(r) = ring {
+        let mut succ_bits = tape[op_idx].succ_mask & !new_done;
+        while succ_bits != 0 {
+            let s = succ_bits.trailing_zeros() as usize;
+            succ_bits &= succ_bits - 1;
+            r.push_t1(WorkItem { op_idx: s as u32, succ_mask: tape[s].succ_mask });
+        }
+    }
+}
+
 /// Drives one scheduler tick using `PriorityPetriEngine` branchless core.
 ///
 /// # What changes vs `scheduler_tick`
@@ -148,45 +209,9 @@ pub fn petri_tick(
         return 0;
     }
 
-    // Build per-transition input/output KBitSets for PriorityPetriEngine.
-    // Each enabled candidate is a potential transition: input = pred_mask, output = op_bit.
-    // We collect up to 64 candidates in priority order (lowest index first).
-    let _n = candidates.count_ones() as usize;
-
-    // Stack-allocate the transition arrays (no heap).
-    // Unused slots get input=!0 (all bits required) — never satisfied unless all ops done.
-    // This prevents spurious firing in PriorityPetriEngine's fixed-size 64-slot array.
-    let mut inputs  = [KBitSet::<1> { words: [!0u64] }; 64];
-    let mut outputs = [KBitSet::<1> { words: [0] }; 64];
-    let mut op_indices = [u32::MAX; 64];
-    let mut t = 0usize;
-    let mut bits = candidates;
-
-    while bits != 0 && t < 64 {
-        let i = bits.trailing_zeros() as usize;
-        bits &= bits - 1;
-
-        let op = &tape[i];
-        let op_bit = 1u64 << i;
-
-        // Effective pred for XOR-join: unchosen branches are virtually done.
-        let effective_pred = match op.kind {
-            OpKind::Join => {
-                let unchosen = op.pred_mask & !state.choice_taken;
-                op.pred_mask & !unchosen
-            }
-            _ => op.pred_mask,
-        };
-
-        // POWL done-set is monotone: tokens never leave.
-        // Map to Petri net by restoring consumed pred tokens in the output:
-        // output = effective_pred | op_bit
-        // Net effect: state gains op_bit; pred bits stay in marking.
-        inputs[t]  = KBitSet { words: [effective_pred] };
-        outputs[t] = KBitSet { words: [effective_pred | op_bit] };
-        op_indices[t] = i as u32;
-        t += 1;
-    }
+    // Build per-transition arrays for PriorityPetriEngine (stack-allocated, no heap).
+    let (inputs, outputs, op_indices) =
+        build_transition_arrays(tape, candidates, state.choice_taken);
 
     // Construct engine over the live slice. The engine fires transitions in
     // priority order (index 0 first) and accumulates the firing_mask.
@@ -254,15 +279,7 @@ pub fn petri_tick(
         }
 
         // Parallel dispatch: push enabled successors to the ring.
-        if let Some(r) = ring {
-            let mut succ_bits = op.succ_mask & !new_done;
-            while succ_bits != 0 {
-                let s = succ_bits.trailing_zeros() as usize;
-                succ_bits &= succ_bits - 1;
-                let item = WorkItem { op_idx: s as u32, succ_mask: tape[s].succ_mask };
-                r.push_t1(item); // non-blocking; returns u32::MAX on success
-            }
-        }
+        dispatch_successors(tape, i, new_done, ring);
     }
 
     state.done.words[0] = new_done;

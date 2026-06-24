@@ -84,7 +84,142 @@ fn wire(tape: &mut PowlTape, from_exits: u64, to_entries: u64) {
 }
 
 // ---------------------------------------------------------------------------
-// Recursive compiler
+// Per-variant compile helpers
+// ---------------------------------------------------------------------------
+
+fn compile_atom(tape: &mut PowlTape) -> Result<Segment, CompileError> {
+    let idx = tape.alloc(OpKind::Atom).ok_or(CompileError::TapeFull)?;
+    let bit = 1u64 << idx;
+    Ok(Segment { entries: bit, exits: bit })
+}
+
+fn compile_silent(tape: &mut PowlTape) -> Result<Segment, CompileError> {
+    let idx = tape.alloc(OpKind::Silent).ok_or(CompileError::TapeFull)?;
+    let bit = 1u64 << idx;
+    Ok(Segment { entries: bit, exits: bit })
+}
+
+fn compile_sequence<'a>(
+    children: &'a [PowlAstNode<'a>],
+    tape: &mut PowlTape,
+) -> Result<Segment, CompileError> {
+    if children.is_empty() {
+        return Err(CompileError::EmptySequence);
+    }
+    let mut seg = compile_node(&children[0], tape)?;
+    for child in &children[1..] {
+        let next = compile_node(child, tape)?;
+        wire(tape, seg.exits, next.entries);
+        seg = Segment { entries: seg.entries, exits: next.exits };
+    }
+    Ok(seg)
+}
+
+fn compile_partial_order<'a>(
+    children: &'a [PowlAstNode<'a>],
+    edges: &[(usize, usize)],
+    tape: &mut PowlTape,
+) -> Result<Segment, CompileError> {
+    if children.is_empty() {
+        return Err(CompileError::EmptyPartialOrder);
+    }
+    // Compile each child independently.
+    let mut child_segs: Vec<Segment> = Vec::with_capacity(children.len());
+    for child in children {
+        child_segs.push(compile_node(child, tape)?);
+    }
+
+    // Wire explicit dependency edges.
+    for &(from, to) in edges {
+        if from >= children.len() || to >= children.len() {
+            return Err(CompileError::InvalidEdge { from, to, len: children.len() });
+        }
+        wire(tape, child_segs[from].exits, child_segs[to].entries);
+    }
+
+    // Collect overall entries/exits (children with no incoming/outgoing edges).
+    let mut has_incoming = vec![false; children.len()];
+    let mut has_outgoing = vec![false; children.len()];
+    for &(from, to) in edges {
+        has_outgoing[from] = true;
+        has_incoming[to] = true;
+    }
+
+    let mut entries = 0u64;
+    let mut exits = 0u64;
+    for (i, seg) in child_segs.iter().enumerate() {
+        if !has_incoming[i] { entries |= seg.entries; }
+        if !has_outgoing[i] { exits |= seg.exits; }
+    }
+
+    // If there are multiple exits, emit a synthetic silent join.
+    let exits = if exits.count_ones() > 1 {
+        let join_idx = tape.alloc(OpKind::Join).ok_or(CompileError::TapeFull)?;
+        let join_bit = 1u64 << join_idx;
+        wire(tape, exits, join_bit);
+        join_bit
+    } else {
+        exits
+    };
+
+    Ok(Segment { entries, exits })
+}
+
+fn compile_xor_choice<'a>(
+    branches: &'a [PowlAstNode<'a>],
+    tape: &mut PowlTape,
+) -> Result<Segment, CompileError> {
+    if branches.is_empty() {
+        return Err(CompileError::EmptyChoice);
+    }
+
+    let dispatch_idx = tape.alloc(OpKind::XorDispatch).ok_or(CompileError::TapeFull)?;
+    let dispatch_bit = 1u64 << dispatch_idx;
+    let join_idx = tape.alloc(OpKind::Join).ok_or(CompileError::TapeFull)?;
+    let join_bit = 1u64 << join_idx;
+
+    let mut branch_entries = 0u64;
+    for branch in branches {
+        let seg = compile_node(branch, tape)?;
+        wire(tape, dispatch_bit, seg.entries);
+        wire(tape, seg.exits, join_bit);
+        branch_entries |= seg.entries;
+    }
+
+    tape.ops[dispatch_idx as usize].branch_mask = branch_entries;
+    tape.ops[dispatch_idx as usize].branch_count = branches.len() as u8;
+    // join pred_mask = branch_entries (all); scheduler suppresses unchosen branches
+    // via choice_taken. See scheduler.rs for the XOR suppression protocol.
+    tape.ops[join_idx as usize].pred_mask = branch_entries;
+
+    Ok(Segment { entries: dispatch_bit, exits: join_bit })
+}
+
+fn compile_loop<'a>(
+    body: &'a PowlAstNode<'a>,
+    redo: &'a PowlAstNode<'a>,
+    tape: &mut PowlTape,
+) -> Result<Segment, CompileError> {
+    let body_seg = compile_node(body, tape)?;
+    let redo_seg = compile_node(redo, tape)?;
+
+    // Wire body exits → redo entries (the redo path).
+    wire(tape, body_seg.exits, redo_seg.entries);
+
+    // Back-edge: redo exits → body entries via a LoopRedo slot.
+    let back_idx = tape.alloc(OpKind::LoopRedo).ok_or(CompileError::TapeFull)?;
+    let back_bit = 1u64 << back_idx;
+    wire(tape, redo_seg.exits, back_bit);
+
+    // succ_mask points to body entries; pred_mask on body entries NOT set
+    // for the back-edge (would create a cycle in Kahn's check).
+    tape.ops[back_idx as usize].succ_mask = body_seg.entries;
+
+    Ok(Segment { entries: body_seg.entries, exits: body_seg.exits })
+}
+
+// ---------------------------------------------------------------------------
+// Recursive compiler — thin dispatch
 // ---------------------------------------------------------------------------
 
 fn compile_node<'a>(
@@ -92,168 +227,12 @@ fn compile_node<'a>(
     tape: &mut PowlTape,
 ) -> Result<Segment, CompileError> {
     match node {
-        PowlAstNode::Atom(_label) => {
-            let idx = tape.alloc(OpKind::Atom).ok_or(CompileError::TapeFull)?;
-            let bit = 1u64 << idx;
-            Ok(Segment { entries: bit, exits: bit })
-        }
-
-        PowlAstNode::Silent => {
-            let idx = tape.alloc(OpKind::Silent).ok_or(CompileError::TapeFull)?;
-            let bit = 1u64 << idx;
-            Ok(Segment { entries: bit, exits: bit })
-        }
-
-        PowlAstNode::Sequence(children) => {
-            if children.is_empty() {
-                return Err(CompileError::EmptySequence);
-            }
-            let mut seg = compile_node(&children[0], tape)?;
-            for child in &children[1..] {
-                let next = compile_node(child, tape)?;
-                wire(tape, seg.exits, next.entries);
-                seg = Segment { entries: seg.entries, exits: next.exits };
-            }
-            Ok(seg)
-        }
-
-        PowlAstNode::PartialOrder { children, edges } => {
-            if children.is_empty() {
-                return Err(CompileError::EmptyPartialOrder);
-            }
-            // Compile each child independently.
-            let mut child_segs: Vec<Segment> = Vec::with_capacity(children.len());
-            for child in children {
-                child_segs.push(compile_node(child, tape)?);
-            }
-
-            // Wire explicit dependency edges.
-            for &(from, to) in edges {
-                if from >= children.len() || to >= children.len() {
-                    return Err(CompileError::InvalidEdge {
-                        from,
-                        to,
-                        len: children.len(),
-                    });
-                }
-                wire(tape, child_segs[from].exits, child_segs[to].entries);
-            }
-
-            // Collect overall entries (children with no incoming edges from siblings)
-            // and overall exits (children with no outgoing edges to siblings).
-            let mut has_incoming = vec![false; children.len()];
-            let mut has_outgoing = vec![false; children.len()];
-            for &(from, to) in edges {
-                has_outgoing[from] = true;
-                has_incoming[to] = true;
-            }
-
-            let mut entries = 0u64;
-            let mut exits = 0u64;
-            for (i, seg) in child_segs.iter().enumerate() {
-                if !has_incoming[i] {
-                    entries |= seg.entries;
-                }
-                if !has_outgoing[i] {
-                    exits |= seg.exits;
-                }
-            }
-
-            // If there are multiple exits, emit a synthetic silent join.
-            let exits = if exits.count_ones() > 1 {
-                let join_idx = tape.alloc(OpKind::Join).ok_or(CompileError::TapeFull)?;
-                let join_bit = 1u64 << join_idx;
-                wire(tape, exits, join_bit);
-                join_bit
-            } else {
-                exits
-            };
-
-            Ok(Segment { entries, exits })
-        }
-
-        PowlAstNode::XorChoice(branches) => {
-            if branches.is_empty() {
-                return Err(CompileError::EmptyChoice);
-            }
-
-            // Dispatcher slot.
-            let dispatch_idx = tape.alloc(OpKind::XorDispatch).ok_or(CompileError::TapeFull)?;
-            let dispatch_bit = 1u64 << dispatch_idx;
-
-            // Join slot.
-            let join_idx = tape.alloc(OpKind::Join).ok_or(CompileError::TapeFull)?;
-            let join_bit = 1u64 << join_idx;
-
-            // Compile each branch.
-            let mut branch_entries = 0u64;
-            for branch in branches {
-                let seg = compile_node(branch, tape)?;
-                // Each branch entry requires the dispatcher to have fired.
-                wire(tape, dispatch_bit, seg.entries);
-                // Each branch exit feeds the join.
-                wire(tape, seg.exits, join_bit);
-                branch_entries |= seg.entries;
-            }
-
-            tape.ops[dispatch_idx as usize].branch_mask = branch_entries;
-            tape.ops[dispatch_idx as usize].branch_count = branches.len() as u8;
-
-            // The join only needs *one* branch to complete (XOR semantics).
-            // We encode this by leaving pred_mask as the union but the scheduler
-            // will use choice_taken to suppress unchosen branches.
-            // For pred_mask on the join: it waits for whichever branch was taken.
-            // We set the join's pred_mask to the union; the scheduler masks it
-            // with (done_mask | !choice_taken_branches) to handle XOR correctly.
-            // Simplest correct encoding: join pred_mask = branch_entries (all),
-            // scheduler treats done unchosen branches as "virtually done" via
-            // choice_taken suppression logic in FiredSet post-processing.
-            // See scheduler.rs for the exact protocol.
-            tape.ops[join_idx as usize].pred_mask = branch_entries;
-
-            Ok(Segment { entries: dispatch_bit, exits: join_bit })
-        }
-
-        PowlAstNode::Loop { body, redo } => {
-            // Structure:
-            //   [body] → exit decision (silent)
-            //     ↓ (exit path, normal)        ↓ (redo path via LoopRedo back-edge)
-            //   [after loop]              [redo] → back to body entry
-            //
-            // We model it as:
-            //   body_entry ... body_exit → redo_entry ... redo_exit
-            //   redo_exit --(back-edge)-→ body_entry (LoopRedo slot)
-            //
-            // The body exits are also the loop exits (caller decides to stop looping
-            // by not firing the redo path; the scheduler uses choice_taken for this).
-            // For simplicity we emit a silent "loop-exit" dispatcher after body,
-            // and wire redo exit back to body entry via a LoopRedo slot.
-
-            let body_seg = compile_node(body, tape)?;
-            let redo_seg = compile_node(redo, tape)?;
-
-            // Wire body exits → redo entries (the redo path).
-            wire(tape, body_seg.exits, redo_seg.entries);
-
-            // Back-edge: redo exits → body entries.
-            // We use a LoopRedo slot to mark the back-edge explicitly.
-            let back_idx = tape.alloc(OpKind::LoopRedo).ok_or(CompileError::TapeFull)?;
-            let back_bit = 1u64 << back_idx;
-            wire(tape, redo_seg.exits, back_bit);
-
-            // The back-edge slot's succ_mask points to body entries,
-            // but with a back-edge flag (scheduler skips Kahn's check for these).
-            tape.ops[back_idx as usize].succ_mask = body_seg.entries;
-            // Do NOT set pred_mask on body entries for the back-edge
-            // (would create a cycle in Kahn's). The scheduler handles
-            // LoopRedo back-edges specially.
-
-            // Loop exits = body exits (the scheduler decides via choice_taken).
-            Ok(Segment {
-                entries: body_seg.entries,
-                exits: body_seg.exits,
-            })
-        }
+        PowlAstNode::Atom(_label)                       => compile_atom(tape),
+        PowlAstNode::Silent                             => compile_silent(tape),
+        PowlAstNode::Sequence(children)                 => compile_sequence(children, tape),
+        PowlAstNode::PartialOrder { children, edges }   => compile_partial_order(children, edges, tape),
+        PowlAstNode::XorChoice(branches)                => compile_xor_choice(branches, tape),
+        PowlAstNode::Loop { body, redo }                => compile_loop(body, redo, tape),
     }
 }
 
@@ -261,11 +240,9 @@ fn compile_node<'a>(
 // Kahn's cycle detection (ignoring LoopRedo back-edges)
 // ---------------------------------------------------------------------------
 
-fn kahn_check(tape: &PowlTape) -> Result<(), CompileError> {
-    let n = tape.len as usize;
-    // Compute in-degree per slot from pred_mask, excluding LoopRedo back-edges.
-    // LoopRedo slots are excluded from the DAG check entirely.
-    let mut in_deg2 = [0u32; 64];
+/// Compute in-degrees for non-LoopRedo slots, ignoring LoopRedo predecessors.
+fn build_in_degrees(tape: &PowlTape, n: usize) -> [u32; 64] {
+    let mut in_deg = [0u32; 64];
     for i in 0..n {
         if tape.ops[i].kind == OpKind::LoopRedo {
             continue;
@@ -274,14 +251,18 @@ fn kahn_check(tape: &PowlTape) -> Result<(), CompileError> {
         while preds != 0 {
             let j = preds.trailing_zeros() as usize;
             if j < n && tape.ops[j].kind != OpKind::LoopRedo {
-                in_deg2[i] += 1;
+                in_deg[i] += 1;
             }
             preds &= preds - 1;
         }
     }
+    in_deg
+}
 
+/// BFS walk over non-LoopRedo slots; returns `Err(Cycle)` if any slot unreachable.
+fn run_kahn_walk(tape: &PowlTape, n: usize, mut in_deg: [u32; 64]) -> Result<(), CompileError> {
     let mut queue: Vec<usize> = (0..n)
-        .filter(|&i| in_deg2[i] == 0 && tape.ops[i].kind != OpKind::LoopRedo)
+        .filter(|&i| in_deg[i] == 0 && tape.ops[i].kind != OpKind::LoopRedo)
         .collect();
     let mut visited = 0usize;
 
@@ -291,8 +272,8 @@ fn kahn_check(tape: &PowlTape) -> Result<(), CompileError> {
         while succs != 0 {
             let v = succs.trailing_zeros() as usize;
             if v < n && tape.ops[v].kind != OpKind::LoopRedo {
-                in_deg2[v] = in_deg2[v].saturating_sub(1);
-                if in_deg2[v] == 0 {
+                in_deg[v] = in_deg[v].saturating_sub(1);
+                if in_deg[v] == 0 {
                     queue.push(v);
                 }
             }
@@ -300,15 +281,14 @@ fn kahn_check(tape: &PowlTape) -> Result<(), CompileError> {
         }
     }
 
-    let non_redo_count = (0..n)
-        .filter(|&i| tape.ops[i].kind != OpKind::LoopRedo)
-        .count();
+    let non_redo_count = (0..n).filter(|&i| tape.ops[i].kind != OpKind::LoopRedo).count();
+    if visited < non_redo_count { Err(CompileError::Cycle) } else { Ok(()) }
+}
 
-    if visited < non_redo_count {
-        Err(CompileError::Cycle)
-    } else {
-        Ok(())
-    }
+fn kahn_check(tape: &PowlTape) -> Result<(), CompileError> {
+    let n = tape.len as usize;
+    let in_deg = build_in_degrees(tape, n);
+    run_kahn_walk(tape, n, in_deg)
 }
 
 // ---------------------------------------------------------------------------
