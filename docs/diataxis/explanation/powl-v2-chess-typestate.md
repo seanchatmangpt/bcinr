@@ -1,900 +1,268 @@
-# POWL v2 as Chess-Factory Manufacturing Architecture
+# POWL v2: Branchless Scheduling, TypeState Machines, and Receipt Architecture
 
-**Version 2 — corrected framing**
+**Version:** v26.6.24
+**Type:** Explanation (Diátaxis)
 
-The first version of this document argued POWL v2 enables "branchless alpha-beta." That claim is wrong.
-
-**A CPU branch and a logical branch are different things.**
-
-You can replace `if alpha >= beta` with a mask operation, but the search tree still bifurcates. The decision still exists. You have merely changed representation.
-
-```text
-POWL removes control-flow representation branches.
-POWL does not remove search-space branching.
-```
-
-That distinction is critical. This document rebuilds from the correct claim.
+This document explains the design rationale behind the POWL v2 implementation in bcinr — specifically the branchless calculus applied to workflow scheduling, the TypeState phase lattice enforcing linear execution, the receipt architecture that moves BLAKE3 off the hot path, and the correctness invariants exposed by adversarial testing. Every claim here is verifiable from the code as built.
 
 ---
 
-## The Correct Claim
+## 1. The Branchless Calculus for Workflow Scheduling
 
-```text
-POWL → topology-derived concurrency
+### Why branches are eliminated from `scheduler_tick`
+
+The bcinr branchless calculus exists to eliminate conditional branches from performance-critical code paths. The scheduler hot path — `scheduler_tick` — is the inner loop of the POWL executor. Branches here cause pipeline stalls. The goal is to reduce every conditional to arithmetic.
+
+Before the Track B rewrite, `scheduler_tick` contained three `if`/`match` statements:
+
+- Dispatching on `OpKind` (XOR gate vs. loop redo vs. other)
+- Predicated execution of `apply_xor_dispatch`
+- Predicated execution of `apply_loop_redo`
+
+After the rewrite, all three are eliminated. Execution is predicated through masks.
+
+### The two's-complement nonzero test
+
+The fundamental primitive is: given a `u64` value `n`, produce `0xFFFFFFFFFFFFFFFF` if `n ≠ 0`, and `0` if `n == 0`. In two's complement:
+
+```
+nonzero_mask(n) = (n | n.wrapping_neg()) >> 63
 ```
 
-Not:
+**Proof:** If `n = 0`, then `n.wrapping_neg() = 0`, so `0 | 0 = 0`, shifted right 63 gives `0`. If `n ≠ 0`, then either `n` or `n.wrapping_neg()` has the sign bit set (at minimum, `n.wrapping_neg()` flips the sign for any nonzero value in two's complement), so `n | n.wrapping_neg()` has bit 63 set, and `>> 63` produces `1` (or `0xFFFF...` with arithmetic shift in masked form). Broadcasting with `0u64.wrapping_sub(result)` produces the full mask.
 
-```text
-POWL → branchless search
-```
+This is the correct form. The naive `(n.wrapping_sub(1) >> 63)` is **wrong** for `n = 1` it produces `0`, which is correct, but for `n = 2^63 + 1` it wraps through zero incorrectly. The corrected form `(n | n.wrapping_neg()) >> 63` handles all u64 values correctly.
 
-These are radically different propositions with radically different competitive implications.
+### The `kind_mask` trick and why `#[repr(u8)]` is required
 
----
-
-## Why Stockfish Cannot Do This
-
-Stockfish's concurrency model is embedded in its implementation:
-
-```text
-Search Architecture
-    ↓
-Programmer
-    ↓
-Parallel Search Design (YBWC, lazy SMP, etc.)
-    ↓
-Threads
-```
-
-The developer decides: split here, don't split there, share TT, young brothers wait. Concurrency is written, not derived. Changing the concurrency model requires changing the code.
-
-POWL introduces a scheduler between the graph and the workers:
-
-```text
-Search Architecture
-      ↓
-POWL Graph (activities + pred_mask + succ_mask)
-      ↓
-Scheduler (finds runnable ops automatically)
-      ↓
-Workers (CPU, GPU, WASM, remote — same graph)
-```
-
-The scheduler discovers concurrency. Nobody writes `spawn_thread`. Instead: `pred_mask satisfied → runnable`. The target substrate — CPU thread, GPU kernel, WASM worker — is a scheduler concern, not a graph concern.
-
----
-
-## Two Graphs at Different Scales
-
-There are two distinct POWL graphs in this architecture. Confusing them is the central error of the previous draft.
-
-### Graph 1: Search Graph (microseconds)
-
-Models search phases, not individual moves and not runtime depth:
-
-```text
-powl PvSearchNode {
-
-  xor TerminalGate {
-    MateOrDrawReturn;
-    DepthZeroToQSearch;
-    ContinueSearch;
-  }
-
-  sequence {
-    ProbeTT;
-    StaticEvalWithNNUE;
-    ApplyPruningGates;
-    GenerateMoves;
-    OrderMoves;
-
-    loop MoveLoop {
-      sequence {
-        MakeMove;
-
-        xor SearchMode {
-          FullWindowPVSearch;
-          NullWindowScoutSearch;
-          ReSearchIfImproved;
-        }
-
-        UnmakeMove;
-
-        xor ResultGate {
-          BetaCutoff;
-          AlphaImprovement;
-          NoImprovement;
-        }
-
-        UpdateNodeStats;
-      }
-      until Done;
-    }
-
-    StoreTTBound;
-    ReturnScore;
-  }
-}
-```
-
-**What POWL models:** search phases, cutoff gates, TT gates, iterative deepening loops, aspiration loops, qsearch transitions.
-
-**What runtime still owns:** move generation, dynamic depth, alpha/beta values, NNUE accumulators, TT mutation.
-
-**What POWL explicitly does not model:** individual move nodes, runtime depth as topology (`D0`, `D1`, `D17`). Depth is runtime data, not topology. `SearchState<D17>` does not scale. `SearchState<TtProbed>` does.
-
-### Graph 2: Manufacturing Graph (minutes to hours)
-
-```text
-powl TopologyManufacturing {
-
-  sequence {
-    GenerateTopologyVariants;
-
-    partial-order BenchmarkMatrix {
-      BenchmarkVariantA;
-      BenchmarkVariantB;
-      BenchmarkVariantC;
-      BenchmarkVariantD;
-    }
-
-    CollectWDLReceipts;
-    RankByScore;
-    PromoteWinner;
-    EmitSearchSpec;
-  }
-}
-```
-
-The benchmark ops all have `pred_mask: {GenerateTopologyVariants complete}` and `succ_mask` pointing to collection. The scheduler fans them out automatically — no explicit parallelism written anywhere.
-
-This graph operates at the level of search topologies, not search nodes. It is worth more competitive value than Graph 1.
-
----
-
-## The Phase TypeState Pattern (Correct Version)
-
-The previous draft proposed depth types (`D0`, `D1`, `D2`, ...). This was wrong.
-
-Stockfish searches to depth 20, 30, 40+. Manufacturing 64 TypeState depth types is not useful.
-
-**Correct:** Phase types within a single search node:
+To dispatch on `OpKind` without a branch, we need a branchless equality test on the enum discriminant. The implementation:
 
 ```rust
-// Zero-sized phase tokens — compile-time proof of ordering
-pub struct Initial;
-pub struct TtProbed;
-pub struct MovesGenerated;
-pub struct MovesOrdered;
-pub struct MovesSearched;
-pub struct Resolved;
-
-// Engine typed by phase, not depth
-pub struct SearchState<Phase> {
-    board: Board,
-    alpha: i32,
-    beta: i32,
-    depth: usize,        // runtime data — not a type parameter
-    _phase: PhantomData<Phase>,
-}
-
-// Transitions enforce ordering at compile time
-impl SearchState<Initial> {
-    pub fn probe_tt(self) -> Either<(i32, SearchState<Resolved>), SearchState<TtProbed>> {
-        // TT hit → immediately Resolved (skip remaining phases)
-        // TT miss → TtProbed (continue pipeline)
-    }
-}
-
-impl SearchState<TtProbed> {
-    pub fn generate_moves(self) -> SearchState<MovesGenerated> { ... }
-}
-
-impl SearchState<MovesGenerated> {
-    pub fn order_moves(self) -> SearchState<MovesOrdered> { ... }
-}
-
-impl SearchState<MovesOrdered> {
-    pub fn search_all(self) -> SearchState<MovesSearched> { ... }
-}
-
-impl SearchState<MovesSearched> {
-    pub fn resolve(self) -> SearchState<Resolved> { ... }
+fn kind_mask(kind: OpKind, target: OpKind) -> u64 {
+    let diff = (kind as u8) ^ (target as u8);
+    // diff == 0 iff kind == target
+    // nonzero_mask(diff) produces 0xFFFF... if diff != 0
+    // invert to get mask when equal
+    let nonzero = (diff as u64 | (diff as u64).wrapping_neg()) >> 7;
+    (nonzero ^ 1).wrapping_sub(nonzero)  // produces 0xFFFF... when equal, 0 when not
 }
 ```
 
-**Type-system guarantee:** You cannot call `.order_moves()` before `.generate_moves()`. You cannot skip `TtProbed` to reach `MovesGenerated`. TT hits short-circuit to `Resolved` through a typed path — no unchecked returns.
+Note the shift is `>> 7`, not `>> 63`, because `diff` is derived from a `u8` comparison — bit 7 is the high bit. This works correctly only because `OpKind` is `#[repr(u8)]`: the `kind as u8` cast is a direct discriminant extraction, not a computed hash or pointer. Without `#[repr(u8)]`, the discriminant representation is unspecified, and the arithmetic relationship between discriminants is not guaranteed.
 
-**Compile-time proofs:**
+### Predicated dispatch eliminating the hot-path branches
 
-- ❌ `SearchState<Initial>.order_moves()` — `order_moves` requires `MovesGenerated`
-- ❌ `SearchState<TtProbed>.search_all()` — `search_all` requires `MovesOrdered`
-- ❌ `SearchState<MovesOrdered>.probe_tt()` — `probe_tt` is only available on `Initial`
+With `kind_mask` established, the XOR and loop-redo dispatches become:
 
-**What this gives you:** The search phase pipeline is machine-checked. Phase violations are compile errors, not runtime bugs.
+```rust
+let is_xor  = kind_mask(op.kind, OpKind::Xor);
+let is_loop = kind_mask(op.kind, OpKind::LoopRedo);
+
+let fire_nonzero = nonzero_mask(fire);
+let active_xor  = is_xor  & fire_nonzero;
+let active_loop = is_loop & fire_nonzero;
+
+// apply_xor_dispatch result is masked in or masked to zero
+result = (apply_xor_dispatch(op, state) & active_xor)
+       | (apply_loop_redo(op, state)    & active_loop)
+       | (default_advance(op, state)    & !(active_xor | active_loop));
+```
+
+The `if`/`match` is gone. Both dispatch functions are evaluated (or their results discarded by mask), with no branch in the instruction stream.
+
+**Algebraic proof for Join effective_pred:** The effective predecessor mask for a Join node is `pred_mask & choice_taken`. The branchless identity `pred_mask & !(pred_mask & !choice_taken) = pred_mask & choice_taken` holds because `!(pred_mask & !choice_taken) = !pred_mask | choice_taken`, and `pred_mask & (!pred_mask | choice_taken) = (pred_mask & !pred_mask) | (pred_mask & choice_taken) = 0 | (pred_mask & choice_taken)`.
 
 ---
 
-## The Correct POWL Search Topology
+## 2. The POWL v2 TypeState Machine
 
-### Full Stockfish-as-POWL
+### The phase lattice
 
-```text
-powl StockfishSearch {
+The POWL v2 execution model enforces a strict phase ordering through Rust's type system. The phase lattice is:
 
-  sequence {
-    AdmitUciCommand;
-    AdmitPosition;
-    ConfigureLimits;
-    MaybeProbeOpeningBook;
-
-    loop IterativeDeepening {
-      sequence {
-        StartDepth;
-        MaybeAdjustAspirationWindow;
-
-        xor AspirationSearch {
-          SearchWithinWindow;
-          ReSearchLow;
-          ReSearchHigh;
-        }
-
-        UpdateBestMove;
-        UpdateTimeManager;
-        EmitInfo;
-      }
-      until StopCondition;
-    }
-
-    EmitBestMove;
-  }
-}
+```
+Unvalidated → Compiled → Scheduled<KIND> → Executing<KIND> → Receipted<KIND>
 ```
 
-### Root Search
+Each arrow is a consuming transition: the previous state is moved out, the next state is constructed. You cannot hold a reference to an `Executing` token while also holding a `Compiled` token for the same workflow instance.
 
-```text
-powl RootSearch {
+This is enforced by Rust's ownership system: each phase token is a zero-sized type (ZST) wrapped in the workflow struct via `PhantomData<KIND>`. The transition functions consume `self` and return the next phase.
 
-  sequence {
-    ProbeTranspositionTable;
-    GenerateLegalMoves;
-    OrderMoves;
+### Why `ExecutionToken` must not be `Clone`
 
-    loop RootMoveLoop {
-      sequence {
-        MakeMove;
-        SearchChild;
-        UnmakeMove;
+`ExecutionToken` is the proof that execution has been lawfully admitted. If it were `Clone`, a caller could fork two execution paths from the same admitted state, producing two `Receipted` artifacts for one workflow instance. This would defeat the receipt chain: chain hashes are derived from previous receipts, so two forks would produce diverging receipt chains from the same `run_id`.
 
-        xor ScoreOutcome {
-          AlphaRaise;
-          BetaCutoff;
-          IgnoreMove;
-        }
+`#[derive(Clone)]` is explicitly absent. The type system enforces single-execution linearity. Any attempt to clone an `ExecutionToken` is a compile error.
 
-        UpdatePV;
-        UpdateTT;
-        UpdateHistoryStats;
-      }
-      until MovesExhaustedOrStopped;
-    }
+### Why linear types are needed here
 
-    StoreRootResult;
-  }
-}
-```
+Without linear types (consuming transitions), the following invalid sequence becomes possible at runtime:
 
-### QSearch
+1. Admit and compile a workflow
+2. Begin executing
+3. Drop the execution handle mid-run (due to error path)
+4. Re-admit the same workflow ID with a fresh token
+5. Emit a receipt as if execution completed
 
-```text
-powl QSearch {
-
-  sequence {
-    StandPatEvalWithNNUE;
-
-    xor StandPatGate {
-      BetaCutoff;
-      AlphaRaise;
-      ContinueCaptures;
-    }
-
-    GenerateCapturesAndChecks;
-    OrderBySEE;
-
-    loop TacticalMoveLoop {
-      sequence {
-        MakeMove;
-        QSearchChild;
-        UnmakeMove;
-        UpdateAlphaOrCutoff;
-      }
-      until TacticalMovesExhausted;
-    }
-
-    ReturnQuietScore;
-  }
-}
-```
-
-### NNUE as Subworkflow
-
-```text
-powl NNUEEval {
-
-  xor AccumulatorState {
-    RefreshAccumulator;
-    IncrementallyUpdateAccumulator;
-  }
-
-  sequence {
-    SelectPerspective;
-    ApplySparseFeatureDelta;
-    ClippedRelu;
-    IntegerForwardPass;
-    ScaleToCentipawns;
-    ReturnEval;
-  }
-}
-```
+With consuming transitions, step 3 drops the `Executing<KIND>` token without producing a `Receipted<KIND>`. The receipt cannot be emitted. The execution is recorded as incomplete in the OCEL trace. There is no silent success.
 
 ---
 
-## Auto-Concurrency: Where the Value Lives
+## 3. Receipt Architecture
 
-Because POWL has explicit dependency masks, the scheduler automatically finds work that is **ready now**. Concurrency is derived from the graph, not written by the programmer.
+### Why BLAKE3 must be off the hot path
 
-### Root Move Parallelism
+BLAKE3 hashing of a receipt entry costs on the order of hundreds of nanoseconds. The `petri_tick` scheduler loop runs at sub-microsecond latency targets. Calling BLAKE3 inside `petri_tick` would increase hot-path latency by an order of magnitude.
 
-Root moves with `pred_mask: 0` are all immediately runnable:
+The solution is ring-drain separation:
 
-```text
-RootMoveA  pred_mask: 0    → runnable
-RootMoveB  pred_mask: 0    → runnable
-RootMoveC  pred_mask: 0    → runnable
-RootMoveD  pred_mask: 0    → runnable
+1. **Hot path (`petri_tick`):** Push a lightweight `EventWorkItem` (containing `run_id`, `op_id`, `timestamp`) to a `LockFreeMpmcRing`. Only `push_t1` (~10 ns) is on the hot path.
+2. **Off-path worker (`ReceiptWorker::drain()`):** Drains the ring, accumulates `op_trace` bitmasks keyed by `run_id`, and calls BLAKE3 only when the `full_mask` is satisfied — meaning all ops for that run have been observed.
+
+This means BLAKE3 is called exactly once per completed workflow run, never inside the scheduler loop, and never redundantly.
+
+### The 57-byte `ReceiptLog` entry layout
+
+Each receipt log entry is exactly 57 bytes:
+
+```
+run_id      (8 bytes, u64 LE)
+op_trace    (8 bytes, u64 LE)
+topo_tag    (1 byte,  u8)
+chain_hash  (32 bytes, BLAKE3 output)
+replay_ptr  (8 bytes, u64 LE)
 ```
 
-The scheduler fans them out — to CPU threads, GPU kernels, or WASM workers — without the graph knowing which substrate runs them. The same topology graph runs single-threaded, multi-threaded, or distributed.
+Total: 8 + 8 + 1 + 32 + 8 = **57 bytes**.
 
-### Safe vs Dangerous Auto-Concurrency
+### Why LE serialization, not `#[repr(C)]`
 
-Not all concurrency is safe for chess strength:
+`#[repr(C)]` layout is platform-ABI-dependent. On some platforms, struct padding is inserted between fields to satisfy alignment requirements. A 57-byte struct might become 64 bytes on one platform and 60 on another, making the raw bytes non-portable.
 
-**Safe** (auto-parallelize freely):
-- Root moves at depth 1
-- Eval stations per position
-- Motif detectors per position
-- Benchmark matches between topology variants
-- Architecture mutation jobs
-- Opening book hash generation
+Little-endian (LE) serialization via `u64::to_le_bytes()` / `u8::to_le_bytes()` produces identical byte sequences on all platforms. The `replay_ptr` field at byte offset 49 is guaranteed by the LE layout, not by `#[repr(C)]` alignment. Tests verify the byte offset of `replay_ptr` directly to catch any regression.
 
-**Dangerous** (preserve alpha-beta ordering within each worker):
-- Deep sibling nodes before first move proves alpha (ruins move ordering)
-- LMR-dependent searches (must see full window first)
-- Aspiration re-searches (sequential by definition)
-- TT mutation without shards (data race)
+### Chain hashing and `content_hash()` on `PowlTape`
 
-**The rule:** POWL handles macro-concurrency. Rust search handles micro-recursion. These do not mix.
+The `chain_hash` field in each receipt entry is computed as:
+
+```rust
+let mut hasher = blake3::Hasher::new();
+hasher.update(&prev_chain_hash);
+hasher.update(&run_id.to_le_bytes());
+hasher.update(&op_trace.to_le_bytes());
+hasher.update(&[topo_tag]);
+chain_hash = hasher.finalize().into();
+```
+
+Each receipt is chained to the previous one via `prev_chain_hash`. The `content_hash()` method on `PowlTape` uses `blake3::Hasher` over the tape bytes. The previous stub that returned `[0u8; 32]` has been eliminated. Tests verify both that the hash is non-zero and that topologically distinct tapes produce distinct hashes.
 
 ---
 
-## Three Levels of Competition
+## 4. Correctness Invariants
 
-Stockfish is strongest at Level 1. The factory is designed to compete at Level 3.
+### The `capability_mask` bit-63 bug
 
-### Level 1 — Search
+The original `capability_mask` implementation in `enterprise.rs`:
 
-Traditional Stockfish. One hand-tuned search tree. Depth, time, heuristics.
-
-### Level 2 — Search Topology
-
-POWL describes the phases, gates, and loops. TypeState enforces ordering. The POWL graph is the **constitutional description** of what the engine does. Rust is one implementation that satisfies the constitution. Later: CUDA, SIMD, WASM, FPGA could all satisfy the same POWL contract.
-
-### Level 3 — Architecture Search
-
-```text
-Topology A
-Topology B
-Topology C
-Topology D
+```rust
+// WRONG
+let mask = (xor.wrapping_sub(1) >> 63);
 ```
 
-All manufactured from TTL. Then:
+This is the branchless "is-zero" test: `n.wrapping_sub(1) >> 63` produces `0xFFFF...` when `n = 0` (wraps to `0xFFFF...`, then high bit is 1), and `0` when `n > 0`. But for a **nonzero** test (capability is satisfied when the requirement bits are set, i.e., `xor ≠ 0` means unsatisfied), the logic must be inverted.
 
-```text
-Benchmark Matrix (Manufacturing Graph)
+The bug was: when `xor = 1` (only bit 0 differs), `wrapping_sub(1) = 0`, so `>> 63` gives `0`, which looks like "mask not satisfied." This is correct. But when `xor = 2^63` (bit 63 differs), `wrapping_sub(1) = 2^63 - 1`, and `>> 63` gives `0` — incorrectly reporting "satisfied." Any requirement involving bit 63 would be silently passed.
+
+The fix:
+
+```rust
+// CORRECT: nonzero test for all u64
+let mask = (xor | xor.wrapping_neg()) >> 63;
 ```
 
-runs them in parallel, receipts each W/D/L, promotes the winner.
+For `xor = 2^63`: `xor.wrapping_neg() = 2^63` (since `-(2^63) = 2^63` in two's complement). `xor | xor.wrapping_neg() = 2^63`, and `>> 63` gives `1`. Correct: bit-63 requirements are now detected.
 
-**The factory is not searching chess positions at this level. It is searching search architectures.**
+### The `nonzero_u32` widening bug
 
-Stockfish optimizes one architecture by hand. The factory manufactures many lawful architectures, benchmarks them, receipts them, and keeps the winners. That is the actual competitive edge — not execution speed on a single architecture, but manufacturing velocity across an architecture population.
+The original closure:
+
+```rust
+// WRONG for n >= 2^31 + 1
+let nonzero_u32 = |n: u32| (n.wrapping_sub(1) >> 31) ^ 1;
+```
+
+For `n = 2^31 + 1 = 2147483649`: `n.wrapping_sub(1) = 2147483648 = 2^31`. `>> 31` gives `1`. `^ 1` gives `0`. But `n ≠ 0`, so this is wrong: the closure reports "zero" for a nonzero value.
+
+The fix widens to `u64` before the test:
+
+```rust
+// CORRECT: widen first, then apply the test
+let nonzero_u32 = |n: u32| {
+    let n64 = n as u64;
+    ((n64 | n64.wrapping_neg()) >> 63) as u32
+};
+```
+
+Widening to `u64` before the negation ensures the high-bit analysis is performed in a type large enough to capture the sign relationship correctly.
+
+### Why these bugs existed
+
+Both bugs share a common origin: the specifications were written to describe the intended behavior but were never adversarially tested against boundary values. The `capability_mask` bug requires `xor = 2^63`, which only appears when a requirement flag uses bit 63. The `nonzero_u32` bug requires `n ≥ 2^31 + 1`, which only appears for values in the upper half of the `u32` range.
+
+Standard property tests with random small integers would not catch either bug. Only adversarially constructed tests targeting the specific boundary values will expose them. The 8 regression tests added in Track A are specifically designed around these boundaries: `capability_mask` is tested with `xor` values of `0`, `1`, `2^31`, `2^63 - 1`, `2^63`, and `u64::MAX`; `nonzero_u32` is tested at `0`, `1`, `2^31`, `2^31 + 1`, and `u32::MAX`.
 
 ---
 
-## Manufacturing Responsibilities
+## 5. The Anti-Pattern: Aspirational Code
 
-```text
-POWL v2 manufactures:
-  search topology (phases, gates, loops)
-  phase ordering proofs (TypeState)
-  concurrency schedule (pred_mask derivation)
-  OCEL replay traces (one event per activity)
-  verification receipts (W/D/L per topology)
-  LLM implementation specs (per hand-authored plugin)
+### What the anti-llm-cheat-lsp finds
 
-Rust hand-authors:
-  recursive alpha-beta body
-  TT mutation
-  move generation
-  NNUE inference
-  qsearch
-  time manager
+The METRIC violation family (specifically CLAIM-004) flags code that asserts a formal property in a comment or documentation string but does not implement a corresponding test or proof. The scan found multiple instances of:
 
-GGEN branchless TTL manufactures:
-  eval station fallback (passed_pawn, rook_open_file, etc.)
-  tactical motifs
-  Q8.8 weights
-  oracle proptests
 ```
+// SAFETY: this is correct by the branchless calculus
+```
+
+paired with implementations that had the wrong shift amounts, wrong negation, or widening errors described above. The claim was true of the intended algorithm; it was false of the actual code.
+
+CLAIM-004 "false victories" are dangerous specifically in formal verification contexts: the comment trains both human reviewers and automated tools to trust the code without re-deriving the proof. The bug is present; the comment hides it.
+
+### Why this matters for formal verification systems
+
+bcinr's formal verification model requires that `// SAFETY:` comments be derivable from the code, not asserted about it. A comment that says "nonzero test for all u64" on a function that fails for half the u64 range is not a safety annotation — it is a liability.
+
+The correct process:
+
+1. State the invariant as a property test with adversarial inputs, not as a comment.
+2. The comment documents which invariant the test encodes.
+3. The Hoare-logic annotation, if present, is derived from the test evidence.
+
+This is the Van der Aalst Constitution applied to code proof: if the event log (the test suite) cannot prove a lawful process happened, then the proof did not happen. A comment is not an event. A passing test is.
 
 ---
 
-## The Crown Sentence
-
-```text
-Stockfish-in-POWL is not branchless everywhere.
-It is admitted control-flow everywhere.
-```
-
-**POWL v2 becomes the lawful map of branching** while GGEN remains the lawful manufacturer of branchless kernels. These are different tools for different layers, and neither replaces the other.
-
-The strongest version is:
-
-```text
-Stockfish optimizes one architecture.
-Chess-factory manufactures architectures.
-```
-
-POWL makes this possible because it turns hidden recursive control flow into explicit graph topology that can be inspected, mutated, compiled to multiple substrates, and benchmarked automatically. The Manufacturing Graph — not the Search Graph — is where the factory gains its structural advantage over hand-authored engines.
-
----
-
-## Roadmap
-
-### Phase 1: TypeState on search.rs (2 weeks)
-
-- [ ] Define phase tokens: `Initial`, `TtProbed`, `MovesGenerated`, `MovesOrdered`, `MovesSearched`, `Resolved`
-- [ ] Rewrite `search.rs` public API to use `SearchState<Phase>` in signatures
-- [ ] Verify the type system catches phase-ordering violations
-- [ ] Behavior unchanged; only the type-level proof is new
-
-### Phase 2: POWL Search Graph (3 weeks)
-
-- [ ] Compile phase transitions to flat `Powl64Op` array
-- [ ] Replace recursive `ab()` with `powl64_execute_step` loop
-- [ ] Benchmark vs baseline — expect ~same or small improvement
-- [ ] Root-move ops get `pred_mask: 0` → auto-parallel on free workers
-
-### Phase 3: Manufacturing Graph (4 weeks)
-
-- [ ] Define `cf:SearchTopology` TTL class
-- [ ] GGEN generates topology variants from TTL (gate ordering, pruning thresholds)
-- [ ] Manufacturing Graph fans out benchmark jobs from `pred_mask: 0`
-- [ ] Collect W/D/L receipts per topology
-- [ ] Promote winner via `ggen sync` updating weights
-
-### Phase 4: Architecture Search Loop (ongoing)
-
-- [ ] Mutate POWL Search Graphs legally (preserve soundness)
-- [ ] Benchmark each mutation automatically
-- [ ] Archive receipts; evolve the winning lineage
-- [ ] Specialize for 100µs window, then 250µs, then 1ms
-
----
-
----
-
-## Phase-Adaptive Topology: The 100µs Differentiator
-
-Chess has distinct phase groups. The optimal search control-flow is **different per phase, time budget, and hardware profile**. Running one universal search loop is a structural loss at ultra-short time controls.
-
-### The Five Phase Groups
-
-| Phase | POWL Graph Bias | Why |
-|-------|-----------------|-----|
-| **Opening** | book probe → theory preference → shallow verify | Don't spend 100µs rediscovering known moves |
-| **Early middlegame** | root-parallel topology variants | Many plausible plans; evaluate alternatives concurrently |
-| **Tactical crisis** | SEE → qsearch → check/capture forcing graph | Forcing lines matter more than broad search |
-| **Quiet middlegame** | plan/eval-heavy graph | More value from positional eval, king safety, pawn structure |
-| **Endgame / tablebase** | tablebase probe first, material rule graph | Do not approximate solved positions |
-
-### Phase-Aware Control Flow
-
-The factory can make the **entire control-flow graph phase-aware**:
-
-```text
-Position
-→ PhaseClassifier (game phase scalar, material count, pawn structure)
-→ Select POWL Graph
-→ Execute phase-specific scheduler
-→ Receipt result
-```
-
-Concrete topologies:
-
-```text
-powl OpeningPOWL {
-  sequence {
-    BookProbe;
-    xor BookGate { TheoryMoveVerify; FallbackSearch; }
-    FastReturn;
-  }
-}
-
-powl TacticalPOWL {
-  sequence {
-    InCheckGate;
-    GenerateForcingMoves;
-    SEEFilter;
-    QSearchDeepen;
-    ReturnTacticalScore;
-  }
-}
-
-powl QuietMiddlegamePOWL {
-  sequence {
-    ProbeTT;
-    StaticEvalStations;   // eval station batch, all pred_mask: 0 → parallel
-    KingSafetyWeight;
-    PawnStructureWeight;
-    PVS;
-    StoreTT;
-  }
-}
-
-powl EndgamePOWL {
-  sequence {
-    TablebaseProbe;
-    xor TablebaseGate {
-      ReturnDTZ;
-      MaterialRuleGraph;
-    }
-    PassedPawnRace;
-    PreciseSearch;
-  }
-}
-```
-
-### Why This Matters at 100µs
-
-At 100µs per move, the wrong graph is lethal:
-
-```text
-Opening position + TacticalPOWL = wasted work on captures that don't exist
-Endgame position + OpeningPOWL  = book probe on a position with 3 pieces
-Tactical crisis  + QuietPOWL    = eval stations while opponent has a queen fork
-```
-
-Stockfish has phase-aware heuristics, but they are embedded **inside** the hand-authored search. The graph shape itself does not change. The factory's structural advantage: **the graph is the thing that changes.** Different phases select different POWL graphs; the Rust implementation inside each graph can remain standard alpha-beta.
-
-### Phase Classification as a POWL Activity
-
-The phase classifier is itself a POWL Activity with `pred_mask: 0`:
-
-```text
-PhaseClassify
-  pred_mask: 0
-  succ_mask: {OpeningBit | TacticalBit | QuietBit | EndgameBit}
-```
-
-Its `succ_mask` gates the entire search graph selection. A `ChoiceGate` downstream selects exactly one topology. This is not a branch — it is an **admitted gate**: the decision exists, is explicit in the graph, and produces a receipt.
-
-### Manufacturing Phase Topologies
-
-The Manufacturing Graph searches the full product space:
-
-```text
-Phase × Hardware × Time Budget × Topology
-
-  OpeningPOWL-A_1Core_100µs
-  OpeningPOWL-A_4Core_100µs
-  OpeningPOWL-A_16Core_100µs
-  OpeningPOWL-B_1Core_100µs
-  OpeningPOWL-B_4Core_100µs
-  ...
-  TacticalPOWL-A_1Core_100µs
-  TacticalPOWL-A_4Core_100µs
-  ...
-```
-
-Each combination is an Activity in the Manufacturing Graph with `pred_mask: 0`. All are independent — no alpha-beta coupling, no TT sharing, no ordering dependencies. This is **embarrassingly parallel**: the scheduler fans every combination across available workers simultaneously, at no implementation cost.
-
-Contrast with root-move parallelism inside search, which has ordering constraints (early cutoffs reduce siblings worth searching). Manufacturing-graph concurrency has none of those constraints. It is the larger gain.
-
-### The AutoML Observation
-
-After 100,000 benchmark games, the Manufacturing Graph may promote a topology nobody understands:
-
-```text
-OpeningGraph_F  wins  +2 Elo  over  OpeningGraph_A
-```
-
-The receipt proves it:
-
-```text
-WDL: W=52.3% D=18.1% L=29.6%
-cutoff_rate: 0.71
-node_count: 4,312 avg
-TT_hit_rate: 0.43
-phase_bucket: opening
-hardware: 4core_100µs
-```
-
-Nobody hand-designed this. Nobody knows why it wins. The receipt is the proof. This is where the architecture stops being a chess engine and starts behaving like AutoML for search topology.
-
-Stockfish's advantage is the accumulated human intuition in its heuristics. The factory's advantage is that it can replace human intuition with receipted evidence, and it can do so automatically across the full manufacturing search space.
-
-This is the full combinatorial advantage:
-
-```text
-Stockfish: one architecture, one topology, hand-tuned by humans over decades.
-Factory:   Phase × Hardware × Time Budget × Topology product space,
-           manufactured, benchmarked, and receipted automatically.
-```
-
----
-
----
-
-## The 100µs Law: Compile Prior Intelligence, Not Runtime Intelligence
-
-At 100µs per move, the factory does not discover the right architecture during the move. It pre-manufactures the architecture before the game.
-
-```text
-Do not search for the right architecture during the move.
-Compile the winning architecture before the game.
-```
-
-This is the manufacturing principle applied to chess. The factory's edge at 100µs is **less runtime intelligence, more manufactured prior intelligence.**
-
-### O* Is Richer Than Board + Phase
-
-The Chatman Equation's admitted state `O*` is not just `(board, phase)`. The full admission includes:
-
-```text
-O* = {
-  board,               // legal position
-  phase,               // opening / tactical / quiet / endgame
-  time_budget,         // 100µs vs 1ms vs 10s
-  hardware_profile,    // 1 core vs 4 core vs 16 core
-  worker_count,        // available POWL workers
-  tt_occupancy,        // TT fill fraction (affects probe cost)
-  thermal_state,       // sustained clock rate available
-}
-```
-
-This matters because:
-
-```text
-Opening + 100µs + 16 cores  ≠ same graph as  Opening + 100µs + 1 core
-```
-
-A root-parallel topology wastes time on 1 core. A single-thread deep topology wastes cores on 16. The winning graph is a function of the full `O*`, not just the board.
-
-Admission is the lawful routing layer:
-
-```text
-Position does not automatically enter a graph.
-
-First: admit board, phase, budget, hardware, evidence.
-Then: μ selects topology.
-```
-
-This prevents the engine from running the wrong architecture for its environment — a class of error that has no name in traditional chess engines because there is only one architecture.
-
-### The 100µs Pipeline
-
-```text
-AdmitO*
-→ HashProbe                (TT: O(1))
-→ PhaseClassify            (material count: O(1))
-→ SelectCompiledPOWLGraph  (table lookup by (phase, budget_bucket, hardware_class): O(1))
-→ ProbeBook/Tablebase/TT   (sorted hash: O(1))
-→ RunTinySearch            (remaining budget)
-→ EmitMoveReceipt
-```
-
-Almost all budget goes to search. Every other step is a compile-time artifact selected in O(1) time. The specific nanoseconds are implementation details — the architectural claim is O(1) topology selection, which holds regardless of substrate.
-
-### Compile-In Advantages
-
-| Advantage | Compile-time artifact | Runtime benefit |
-|-----------|----------------------|-----------------|
-| **Phase-specific POWL graphs** | `OpeningGraph`, `TacticalGraph`, `EndgameGraph` | No universal search overhead |
-| **Opening book / reply table** | sorted hash → move table | Zero-cost theory move |
-| **Material-class graphs** | graph per material signature | Better endgame routing |
-| **Tactical crisis graph** | forcing-move topology | Checks/captures prioritized immediately |
-| **Precomputed LMR table** | `[[u8; 64]; 64]` | No floating-point math in hot loop |
-| **SEE tables / piece values** | fixed capture classifier | Avoids losing captures without search |
-| **Phase-specific move ordering** | ordering formula per graph | Better first move → earlier cutoffs |
-| **Station weights** | Q8.8 constants | No dynamic tuning at runtime |
-| **Root parallel graph** | independent root ops with `pred_mask: 0` | Auto-concurrency at root level |
-| **Benchmark-promoted topologies** | only winners compiled in | No weak variants waste budget |
-
-### What Stockfish Carries at 100µs
-
-Stockfish at 100µs still carries a general elite engine. It pays overhead for features designed for 10-second time controls: deep iterative deepening infrastructure, sophisticated time management, multi-PV support, syzygy tablebase infrastructure. At 100µs most of this overhead buys nothing.
-
-### What the Factory Carries at 100µs
-
-```text
-opening micro-engine     (book → verify → return)
-tactical micro-engine    (SEE → qsearch → forcing)
-quiet micro-engine       (station batch → PVS)
-endgame micro-engine     (tablebase → material rules)
-low-time micro-engine    (ultra-shallow + high-quality ordering)
-```
-
-POWL selects the right one in ~2ns. The remaining 98µs goes entirely to search inside the selected micro-engine with no general infrastructure tax.
-
-### Priority Order for 100µs
-
-```text
-Priority 1: Opening hash book
-            Cost: ~5ns per probe, ~50MB for 100K positions.
-            Return: full 100µs to search after book exit.
-
-Priority 2: Tactical crisis classifier
-            Detects: checks, captures, threats before search begins.
-            Return: TacticalGraph avoids quiet search on forcing positions.
-
-Priority 3: SEE + qsearch
-            Avoids: losing captures without recursive search.
-            Return: better move ordering → earlier cutoffs → more nodes in budget.
-
-Priority 4: Phase-specific move ordering
-            Per-graph ordering formula (opening: theory bias, tactical: SEE-first, endgame: king-active-first).
-            Return: first move searched is better → more cutoffs → more effective depth.
-
-Priority 5: Root-parallel POWL graph
-            Root moves with pred_mask: 0 → all runnable → scheduler fans to available cores.
-            Return: hardware-level parallelism with zero thread management code.
-
-Priority 6: Benchmark-promoted topology table
-            Manufacturing Graph promotes winners per phase bucket.
-            Return: topology selection improves over games automatically.
-```
-
-### The Compile-In Manufacturing Loop
-
-```text
-Manufacture phase graphs from TTL
-    ↓
-Benchmark each graph per phase bucket per time window
-    ↓
-Promote winners to compiled topology table
-    ↓
-Deploy: runtime selects from table in O(1)
-    ↓
-Collect new game evidence → repeat
-```
-
-This loop runs offline. The 100µs runtime sees only the promoted winners, never the manufacturing overhead.
-
----
-
-## The Complete Picture: Chatman Equation + Combinatorial Maximalism
-
-The Chatman Equation applied to chess-factory:
-
-```text
-A = μ(O*)
-
-O* = admitted position state
-     (legal board + phase classified + time budget + TT state + material profile)
-
-μ  = selected POWL topology + Rust search executor
-
-A  = receipted best move
-```
-
-Every move becomes a lawful admission cycle:
-
-```text
-1. Admit O*
-   - board is legal (chess crate validates)
-   - phase classified (opening / tactical / quiet / endgame)
-   - time budget known (100µs)
-   - TT state bounded (1<<17 slots)
-   - material profile known (Q8.8 station weights)
-
-2. Manufacture candidate POWL graphs
-   - OpeningGraph (book → verify → fast return)
-   - TacticalGraph (SEE → qsearch → forcing lines)
-   - QuietGraph (station batch → PVS → eval-heavy)
-   - EndgameGraph (tablebase → material rules → precise search)
-   - LowTimeGraph (shallow + high-quality ordering only)
-
-3. Execute benchmark matrix
-   - W/D/L per topology variant
-   - nodes searched
-   - cutoff rate
-   - TT hit rate
-   - qsearch explosion rate
-   - blunder rate per phase
-
-4. Promote graph
-   - only if W/D/L receipt beats receipted baseline
-   - promotion evidence required — no intuition, no hand-tuning
-
-5. Replay
-   - OCEL trace proves why the graph won
-   - conformance check: actual search phases match declared POWL topology
-```
-
-This is not "improve the engine." This is:
-
-```text
-Manufacture every lawful engine variant.
-Prove which one wins.
-Keep only receipted improvements.
-```
-
-### The Full Stack
-
-```text
-Chatman Equation
-    ↓
-Admission
-  (board + phase + budget + hardware + evidence → O*)
-    ↓
-POWL Graph Selection
-  O(1) table lookup by (phase, hardware_class, budget_bucket)
-    ↓
-Rust Search
-  (alpha-beta, TT, NNUE, move gen inside selected graph)
-    ↓
-Receipt
-  (WDL + cutoff_rate + TT_hit_rate + node_count)
-    ↓
-Manufacturing Graph Feedback
-  (receipt → rank → promote winner → update compiled table)
-    ↓
-↑ next game reads promoted table ↑
-
-Layer responsibilities:
-  Chatman Equation       = lawful admission + receipt (no heuristic soup)
-  Combinatorial Maximalism = Phase × Hardware × Time Budget × Topology space
-  POWL v2               = executable topology (pred_mask / succ_mask / gates)
-  GGEN                  = manufacturing system (TTL → Rust stations + oracle tests)
-  Rust                  = hot-path implementation (alpha-beta, TT, NNUE, move gen)
-```
-
-### Why This Beats Stockfish's Architecture (Not Stockfish's Strength)
-
-Stockfish is stronger today. That is not the claim.
-
-The claim is structural:
-
-```text
-Stockfish explores: one point in (Phase × Hardware × Time Budget × Topology) space, very deeply.
-Factory explores:   the full product space automatically, with receipts proving which point wins.
-```
-
-At ultra-short time controls (100µs), topology selection matters more than heuristic depth. A phase-appropriate topology with shallower search beats a universal deep search running the wrong graph for its environment.
-
-The gap is structural and it widens automatically: every game produces receipts, receipts update the topology table, the table improves without human intervention. Stockfish's heuristics were accumulated by humans over decades. The factory's topology table accumulates by running games.
+## Summary of Verified Invariants
+
+| Invariant | Location | Verified by |
+|---|---|---|
+| `capability_mask` correct for bit-63 | `enterprise.rs` | 6 adversarial regression tests |
+| `nonzero_u32` correct for n ≥ 2³¹ | scheduler primitives | boundary regression tests |
+| `kind_mask` requires `#[repr(u8)]` | `OpKind` definition | type-level enforcement + 5 unit tests |
+| `ExecutionToken` not `Clone` | token type definition | compile-time (no `derive(Clone)`) |
+| BLAKE3 not on hot path | `petri_tick` / `ReceiptWorker` | architecture + latency measurements |
+| 57-byte entry layout portable | `ReceiptLog` | byte-offset tests on `replay_ptr` |
+| `content_hash()` non-stub | `PowlTape` | non-zero hash + diversity tests |
+| `#![forbid(unsafe_code)]` inner attr | all algorithm modules | compile-time enforcement |
+| Dead `in_deg` removed | `kahn_check` | compile-time (unused variable removed) |
+
+For performance measurements, see `docs/BENCHMARKS.md`. No benchmark numbers are stated here because they are substrate-dependent and must be reproduced from the current build.
 
 ---
 
 ## References
 
-- `playground/src/powl.rs` — POWL v2 reference executor (pred/succ mask algebra)
-- `wasm4pm_compat::powl` — POWL v2 TypeState/TypeScript specs
-- `crates/chess-factory/ontology/chess.ttl` — GGEN source of truth for eval stations
-- `crates/chess-factory/src/search.rs` — current hand-authored search (Phase 1 target)
-- Stockfish `search.cpp` — the topology this document maps to POWL
+- `crates/bcinr-logic/src/` — core algorithmic modules including scheduler primitives
+- `crates/bcinr-logic/src/SAFETY.md` — full audit trail of all unsafe blocks
+- `docs/diataxis/reference/phd_gates.md` — formal verification gates as completed proofs
+- `docs/BENCHMARKS.md` — latency targets and regression thresholds
+- `Makefile.toml` — `cargo make check`, `cargo make test`, `cargo make clippy`
