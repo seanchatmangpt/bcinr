@@ -192,6 +192,7 @@ dependencies = [
  "criterion",
  "proptest",
  "serde",
+ "serde_json",
  "trybuild",
  "wasm4pm-compat 26.6.26 (registry+https://github.com/rust-lang/crates.io-index)",
 ]

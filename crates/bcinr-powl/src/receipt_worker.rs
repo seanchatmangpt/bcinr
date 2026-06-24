@@ -174,6 +174,7 @@ impl ReceiptWorker {
             };
 
             self.pending[slot].op_trace |= item.op_trace_so_far;
+            self.ocel.record_op_fired(item.run_id, item.op_idx, item.kind_tag);
 
             // If all ops have fired, finalise the receipt.
             if self.pending[slot].op_trace & full_mask == full_mask {

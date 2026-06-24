@@ -14,6 +14,7 @@
 #![allow(incomplete_features)] // generic_const_exprs is still being stabilised
 
 pub mod ocel;
+pub use ocel::ConformanceResult;
 pub mod admit;
 pub mod compiler;
 pub mod receipt_worker;
