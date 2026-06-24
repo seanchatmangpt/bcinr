@@ -12,6 +12,42 @@
 //! # Nightly features required
 //!
 //! - `adt_const_params`   — `TopologyKind` as a const generic parameter
+//!
+//! # Compile-time safety guarantees
+//!
+//! The following patterns are rejected at compile time:
+//!
+//! Calling `.schedule()` on an `Unvalidated` runner fails to compile:
+//! ```compile_fail
+//! # use bcinr_powl::typestate::{PowlRunner, TopologyKind, Unvalidated};
+//! # use bcinr_powl::tape::v2::PowlTape;
+//! let r: PowlRunner<Unvalidated, PowlTape> = PowlRunner::new(PowlTape::new());
+//! let _ = r.schedule::<{ TopologyKind::Standard }>();
+//! ```
+//!
+//! Calling `.begin_execution()` on a `Compiled` runner fails to compile:
+//! ```compile_fail
+//! # use bcinr_powl::typestate::{PowlRunner, TopologyKind};
+//! # use bcinr_powl::tape::v2::{PowlTape, Powl64Op};
+//! let mut tape = PowlTape::new();
+//! tape.push(Powl64Op::silent()).unwrap();
+//! let compiled = PowlRunner::new(tape).validate().unwrap();
+//! let _ = compiled.begin_execution();
+//! ```
+//!
+//! Dropping an `ExecutionToken` with unfired ops panics in debug builds:
+//! ```should_panic
+//! # use bcinr_powl::typestate::ExecutionToken;
+//! let _tok = ExecutionToken::new(1);
+//! // _tok drops here — destructor bomb fires
+//! ```
+//!
+//! Cloning an `ExecutionToken` fails to compile (no `Clone` impl):
+//! ```compile_fail
+//! # use bcinr_powl::typestate::ExecutionToken;
+//! let tok = ExecutionToken::new(1);
+//! let _tok2 = tok.clone();
+//! ```
 
 #![allow(incomplete_features)]
 
@@ -185,7 +221,7 @@ impl ExecutionToken {
     /// Construct a fresh token for a tape with `op_count` ops (≤ 64).
     ///
     /// Bits `0..op_count` are set in `remaining`.
-    pub(crate) fn new(op_count: usize) -> Self {
+    pub fn new(op_count: usize) -> Self {
         debug_assert!(op_count <= 64, "op_count must be ≤ 64");
         // Branchless bitmask: if op_count == 64 we want all 64 bits set.
         // `(1u64 << 64)` wraps to 0 on most platforms; handle via wrapping_shl.
@@ -733,7 +769,7 @@ mod tests {
     //
     // The following patterns are illegal and must NOT compile.  They are shown
     // as non-`compile_fail` doc-examples here to serve as living documentation;
-    // a `trybuild` test suite in `tests/compile_fail/` enforces the errors.
+    // The compile_fail examples in the module doc are the authoritative enforcement.
     //
     // 1. Calling `.schedule()` on an `Unvalidated` runner:
     //    ```compile_fail
