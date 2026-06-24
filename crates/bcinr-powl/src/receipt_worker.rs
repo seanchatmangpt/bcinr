@@ -30,6 +30,7 @@
 
 use bcinr_logic::patterns::deterministic_mpmc::LockFreeMpmcRing;
 use crate::scheduler_wired::EventWorkItem;
+use crate::ocel::OcelLog;
 
 const RING_CAPACITY: usize = 64;
 
@@ -347,6 +348,32 @@ mod tests {
         let e1 = worker.log.entry(1).unwrap();
         let ptr1 = u64::from_le_bytes(e1[49..57].try_into().unwrap());
         assert_eq!(ptr1, ENTRY_BYTES as u64, "second entry replay_ptr must be 57");
+    }
+
+    // ---------------------------------------------------------------------------
+    // Proptests
+    // ---------------------------------------------------------------------------
+
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn prop_entry_layout_run_id_at_offset_0(run_id: u64, op_trace: u64) {
+            // Build an entry directly via build_entry and verify run_id is at
+            // bytes [0..8] in LE and op_trace is at bytes [8..16] in LE.
+            let worker = ReceiptWorker::new();
+            let entry = worker.build_entry(run_id, op_trace, 0u8);
+
+            let stored_run_id = u64::from_le_bytes(entry[0..8].try_into().unwrap());
+            prop_assert_eq!(stored_run_id, run_id,
+                "run_id at bytes [0..8]: stored {:#018x}, expected {:#018x}",
+                stored_run_id, run_id);
+
+            let stored_op_trace = u64::from_le_bytes(entry[8..16].try_into().unwrap());
+            prop_assert_eq!(stored_op_trace, op_trace,
+                "op_trace at bytes [8..16]: stored {:#018x}, expected {:#018x}",
+                stored_op_trace, op_trace);
+        }
     }
 
     #[test]

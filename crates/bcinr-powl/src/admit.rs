@@ -234,4 +234,21 @@ mod tests {
             assert!(disc <= 3, "invalid topology discriminant {disc}");
         }
     }
+
+    // ---------------------------------------------------------------------------
+    // Proptests
+    // ---------------------------------------------------------------------------
+
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn prop_admit_lut_exhaustive(ctx: u64) {
+            // admit must not panic for any u64 context, and must return a valid variant.
+            let topo = admit(ctx);
+            let disc = topo as u8;
+            prop_assert!(disc <= 3,
+                "admit({:#018x}) returned invalid discriminant {disc}", ctx);
+        }
+    }
 }

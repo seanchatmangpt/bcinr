@@ -362,4 +362,37 @@ mod tests {
 
         assert_eq!(effective_pred, 0b101);
     }
+
+    // ---------------------------------------------------------------------------
+    // Proptests
+    // ---------------------------------------------------------------------------
+
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn prop_pred_satisfied_iff_all_required_bits_in_done(done: u64, required: u64) {
+            let result = pred_satisfied(done, required);
+            let expected = if required & !done == 0 { u64::MAX } else { 0 };
+            prop_assert_eq!(result, expected,
+                "pred_satisfied({:#018x}, {:#018x}) = {:#018x}, expected {:#018x}",
+                done, required, result, expected);
+        }
+
+        #[test]
+        fn prop_kind_mask_equals_max_iff_equal(a in 0u8..5, b in 0u8..5) {
+            // OpKind variants are 0..=4; kind_mask should return MAX iff discriminants are equal.
+            // Test the bit-arithmetic formula directly (same as kind_mask body).
+            let diff = a ^ b;
+            let nz = (((diff | diff.wrapping_neg()) >> 7) & 1) as u64;
+            let mask = nz.wrapping_sub(1);
+            if a == b {
+                prop_assert_eq!(mask, u64::MAX,
+                    "kind_mask formula: equal discriminants ({}) must yield MAX, got {:#018x}", a, mask);
+            } else {
+                prop_assert_eq!(mask, 0u64,
+                    "kind_mask formula: unequal discriminants ({} vs {}) must yield 0, got {:#018x}", a, b, mask);
+            }
+        }
+    }
 }

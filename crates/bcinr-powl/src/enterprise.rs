@@ -282,9 +282,16 @@ pub fn evaluate_graduation(
     let needs_receipts = nonzero_u32(compensation_count) * graduation::NEEDS_RECEIPTS;
 
     // Benchmark required when instance_count >= 1_000.
-    // (instance_count.wrapping_sub(1000) >> 63) ^ 1 == 1 iff count >= 1000.
+    // Hoare-Logic Verification Line 3: saturating_sub(999) is nonzero iff instance_count >= 1000.
+    // Proof: saturating_sub never wraps; returns 0 for count in [0, 999] and count-999 > 0 for count >= 1000.
+    // The previous ((count.wrapping_sub(1000) >> 63) ^ 1) form failed for count in [2^63, 2^63+999]
+    // and [2^63+1000, 2^64-1] because the wrapping result's bit63 does not reliably encode carry.
+    // The (999u64.wrapping_sub(count) >> 63) form fails for count = 2^63+1000 because
+    // 999 - (2^63+1000) wraps to 2^63-1, leaving bit63 clear despite count >= 1000.
+    // saturating_sub is correct for all u64 values. QED.
+    let bench_x = instance_count.saturating_sub(999);
     let bench_flag =
-        ((instance_count.wrapping_sub(1_000) >> 63) ^ 1) * graduation::NEEDS_BENCHMARK;
+        ((bench_x | bench_x.wrapping_neg()) >> 63) * graduation::NEEDS_BENCHMARK;
 
     needs_discovery | needs_conformance | needs_replay | needs_receipts | bench_flag
 }
@@ -531,6 +538,55 @@ mod tests {
     use proptest::prelude::*;
 
     proptest! {
+        #[test]
+        fn prop_graduation_no_panic_for_any_inputs(
+            order_violations: u32,
+            sla_breaches: u32,
+            watchdog_trips: u32,
+            compensation_count: u32,
+            instance_count: u64,
+        ) {
+            // evaluate_graduation must not panic for any combination of inputs,
+            // and must return only valid bit combinations (bits 0..=4).
+            let result = evaluate_graduation(
+                order_violations, sla_breaches, watchdog_trips, compensation_count, instance_count,
+            );
+            prop_assert_eq!(result & !0b11111u64, 0,
+                "evaluate_graduation returned bits outside [0..4]: {:#018x}", result);
+        }
+
+        #[test]
+        fn prop_graduation_each_flag_set_iff_counter_nonzero(
+            order_violations: u32,
+            sla_breaches: u32,
+            watchdog_trips: u32,
+            compensation_count: u32,
+        ) {
+            let result = evaluate_graduation(order_violations, sla_breaches, watchdog_trips, compensation_count, 0);
+
+            let has_discovery = (result & graduation::NEEDS_DISCOVERY) != 0;
+            let has_conformance = (result & graduation::NEEDS_CONFORMANCE) != 0;
+            let has_replay = (result & graduation::NEEDS_REPLAY) != 0;
+            let has_receipts = (result & graduation::NEEDS_RECEIPTS) != 0;
+
+            prop_assert_eq!(has_discovery, order_violations != 0,
+                "NEEDS_DISCOVERY mismatch: order_violations={}", order_violations);
+            prop_assert_eq!(has_conformance, sla_breaches != 0,
+                "NEEDS_CONFORMANCE mismatch: sla_breaches={}", sla_breaches);
+            prop_assert_eq!(has_replay, watchdog_trips != 0,
+                "NEEDS_REPLAY mismatch: watchdog_trips={}", watchdog_trips);
+            prop_assert_eq!(has_receipts, compensation_count != 0,
+                "NEEDS_RECEIPTS mismatch: compensation_count={}", compensation_count);
+        }
+
+        #[test]
+        fn prop_graduation_benchmark_flag_iff_count_ge_1000(instance_count: u64) {
+            let result = evaluate_graduation(0, 0, 0, 0, instance_count);
+            let has_bench = (result & graduation::NEEDS_BENCHMARK) != 0;
+            prop_assert_eq!(has_bench, instance_count >= 1_000,
+                "NEEDS_BENCHMARK mismatch: instance_count={}", instance_count);
+        }
+
         #[test]
         fn prop_capability_mask_iff_all_required_bits_set(g: u64, r: u64) {
             let result = capability_mask(g, r);

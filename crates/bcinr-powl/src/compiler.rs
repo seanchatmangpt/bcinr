@@ -375,4 +375,41 @@ mod tests {
         };
         assert!(matches!(compile_powl(&ast), Err(CompileError::InvalidEdge { .. })));
     }
+
+    // ---------------------------------------------------------------------------
+    // Proptests
+    // ---------------------------------------------------------------------------
+
+    use proptest::prelude::*;
+    use crate::scheduler::{scheduler_tick, PowlRunState};
+
+    proptest! {
+        #[test]
+        fn prop_linear_chain_fires_in_topo_order(n in 2usize..8) {
+            // Build a Sequence of n Atoms, compile it, then run to completion.
+            // Each tick must fire a slot with index >= the last slot fired.
+            let atoms: Vec<PowlAstNode<'_>> = (0..n).map(|_| PowlAstNode::Atom("x")).collect();
+            let ast = PowlAstNode::Sequence(atoms);
+            let tape = compile_powl(&ast).unwrap();
+
+            let mut state = PowlRunState::new(&tape);
+            let mut last_fired: u32 = 0;
+            let mut first = true;
+
+            for _ in 0..(n + 1) {
+                if state.check_mask == 0 { break; }
+                let fs = scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
+                if fs.0 != 0 {
+                    let slot = fs.0.trailing_zeros();
+                    if first {
+                        first = false;
+                    } else {
+                        prop_assert!(slot >= last_fired,
+                            "slot {slot} fired before previous slot {last_fired} (topo order violated)");
+                    }
+                    last_fired = slot;
+                }
+            }
+        }
+    }
 }
