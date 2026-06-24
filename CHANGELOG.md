@@ -5,6 +5,62 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [26.6.24] - 2026-06-24
+
+### Added
+
+- **`const_scheduler` (Lever 4 — Compile-Time Topology)**: `topo_order()` const fn
+  (Kahn's algorithm), `ConstTopology<N, PREDS>` zero-sized marker type,
+  `static_tick()` and `const_tick<N, PREDS>()`. Unblocked by lifting
+  `SparseEnabledIndex::_OPS_BOUND` out of `const { assert! }` (incompatible with
+  `generic_const_exprs`) to an impl-level `const` item. Enabled
+  `#![feature(generic_const_exprs)]` + `#![allow(incomplete_features)]` in
+  `bcinr-powl`.
+
+- **`scheduler_wide` (Lever 1 — Wide Tape)**: `WidePowlState { done: KBitSet<8>,
+  check: KBitSet<8>, ... }` and `wide_tick()` for 512-op POWL tapes. Uses atomic
+  tick-start snapshot semantics (all pred checks use a `done` snapshot; done is
+  updated only after all firing decisions are made).
+
+- **`hierarchical_time_wheel` (Lever 3 — Hierarchical TimeWheel)**:
+  `HierarchicalTimeWheel<const A, const B, const C>` three-level cascade in
+  `bcinr-logic`. O(1) amortized `tick()`. `schedule()` uses `(delay-1)/A` bucket
+  formula ensuring delay=A maps to bucket 0 (first cascade). Power-of-two bounds
+  checked via impl-level `const _A_POW2: ()` items.
+
+- **Dual-audience thesis** (`thesis.pdf`, 26 pages): arXiv-formal + HBR-strategic
+  dual structure. New Section 9 ("The 1000× Engineering Roadmap") documents all
+  three levers with measured Criterion numbers.
+
+### Changed
+
+- **`dispatcher.rs` blocker resolved**: `const { assert!(OPS <= 512) }` inside
+  `SparseEnabledIndex::new()` moved to `const _OPS_BOUND: () = assert!(...)` at
+  impl level — compatible with `generic_const_exprs`.
+
+- **Benchmark suite extended**: 5 new benchmark groups in `scheduler_bench.rs`:
+  `lever4/const_tick/linear_chain`, `lever4/const_tick/parallel_spo`,
+  `lever1/wide_tick/linear_chain`, `lever1/wide_tick/parallel_spo`,
+  `lever_comparison/N=4_linear_chain`.
+
+### Performance (measured, Apple M-series ARM64)
+
+| Scheduler | Latency (N=4 chain) | vs const_tick |
+|---|---|---|
+| `const_tick` (Lever 4) | **535 ps** | 1× |
+| `legacy` SWAR | 12.9 ns | 24× slower |
+| `wired_petri` | 664 ns | 1,240× slower |
+
+`const_tick` is identical at N=4, 8, and 16 (535–552 ps) — the compiler fully
+unrolls the loop in all cases; the dominant cost is memory round-trip overhead.
+
+### Tests
+
+928 tests pass (825 `bcinr-logic`, 103 `bcinr-powl`). Zero compiler warnings
+under `RUSTFLAGS="-D warnings"`.
+
+---
+
 ## [26.6.15] - 2026-06-13
 
 ### Changed
