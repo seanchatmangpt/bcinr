@@ -28,15 +28,15 @@
 //!
 //! # Performance model
 //!
-//! | Scheduler        | Cost/op | Source              |
-//! |------------------|---------|---------------------|
-//! | Legacy SWAR      | 2.5 ns  | interpretive loop   |
-//! | Wired Petri      | 162 ns  | full reconstruction |
-//! | Const (N=4)      | ~0.4 ns | unrolled arithmetic |
-//! | Const (N=64)     | ~1.0 ns | unrolled, cache-hot |
+//! | Scheduler        | Cost/op  | Criterion group id                        | Source              |
+//! |------------------|----------|-------------------------------------------|---------------------|
+//! | Legacy SWAR      | 12.9 ns  | `lever_comparison/N=4_linear_chain/legacy`| interpretive loop   |
+//! | Wired Petri      | 664 ns   | `lever_comparison/N=4_linear_chain/wired_petri` | full reconstruction |
+//! | Const (N=4)      | 535 ps   | `lever_comparison/N=4_linear_chain/const_tick` | unrolled arithmetic |
 //!
-//! The 0.4 ns/op estimate comes from the conformance gate benchmark (395 ps for
-//! 4 branchless integer comparisons), which is the same instruction pattern.
+//! Measured values from `docs/BENCHMARKS.md` (Criterion run on the dev machine).
+//! The 535 ps figure is the mean wall time for `const_tick` on a 4-op linear
+//! chain; N=8 and N=16 are identical due to full compiler unrolling.
 
 #![allow(incomplete_features)]
 

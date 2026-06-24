@@ -670,6 +670,26 @@ fn bench_lever_comparison_n4(c: &mut Criterion) {
     g.finish();
 }
 
+// ---------------------------------------------------------------------------
+// GROUP: Enterprise primitives — capability_mask and graduation
+// ---------------------------------------------------------------------------
+
+fn bench_enterprise_primitives(c: &mut Criterion) {
+    use bcinr_powl::enterprise::capability_mask;
+    let mut g = c.benchmark_group("primitives/enterprise");
+
+    g.bench_function("capability_mask/all_granted", |b| {
+        b.iter(|| capability_mask(criterion::black_box(u64::MAX), criterion::black_box(u64::MAX)))
+    });
+    g.bench_function("capability_mask/one_bit_missing", |b| {
+        b.iter(|| capability_mask(criterion::black_box(u64::MAX ^ 1), criterion::black_box(u64::MAX)))
+    });
+    g.bench_function("capability_mask/bit63_required_missing", |b| {
+        b.iter(|| capability_mask(criterion::black_box(0u64), criterion::black_box(1u64 << 63)))
+    });
+    g.finish();
+}
+
 criterion_group!(
     benches,
     // Legacy baseline
@@ -698,5 +718,7 @@ criterion_group!(
     bench_wide_tick_linear,
     bench_wide_tick_parallel,
     bench_lever_comparison_n4,
+    // Enterprise primitives
+    bench_enterprise_primitives,
 );
 criterion_main!(benches);
