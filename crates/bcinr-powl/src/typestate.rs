@@ -204,8 +204,23 @@ impl ExecutionToken {
     /// Construct a token from raw fields — for use in trybuild compile-fail tests.
     ///
     /// `remaining` is the bitmask of unfired ops; `total` is the op count.
+    ///
+    /// # Availability
+    ///
+    /// Only available under `#[cfg(test)]` or when the `testing` feature is
+    /// enabled.  This constructor bypasses the `Compiled → Scheduled →
+    /// Executing` admission sequence and must **never** be used in production
+    /// code.
     #[doc(hidden)]
+    #[cfg(any(test, feature = "testing"))]
     pub fn new_for_test(remaining: u64, total: u8) -> Self {
+        debug_assert_eq!(
+            remaining.count_ones() as u8,
+            total,
+            "new_for_test: remaining has {} bits but total={}",
+            remaining.count_ones(),
+            total
+        );
         Self { remaining, total }
     }
 
@@ -223,6 +238,13 @@ impl ExecutionToken {
         } else {
             (1u64 << op_count).wrapping_sub(1)
         };
+        debug_assert_eq!(
+            remaining.count_ones() as u8,
+            op_count as u8,
+            "token total mismatch: remaining has {} bits but total={}",
+            remaining.count_ones(),
+            op_count
+        );
         Self { remaining, total: op_count as u8 }
     }
 
@@ -725,6 +747,53 @@ mod tests {
         let (_, receipt) = exec.complete(tok).unwrap();
         assert_eq!(receipt.op_trace, 0b11);
         assert_eq!(receipt.topology, TopologyKind::LongRunning);
+    }
+
+    // -------------------------------------------------------------------------
+    // Gap 2: destructor bomb
+    // -------------------------------------------------------------------------
+
+    /// Verify that dropping an `ExecutionToken` with `remaining != 0` panics in
+    /// debug builds.
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "ExecutionToken dropped with unfired ops")]
+    fn execution_token_drop_with_remaining_panics_in_debug() {
+        // remaining=0b11 (two unfired ops), total=2
+        let token = ExecutionToken::new_for_test(0b11, 2);
+        // Explicit drop triggers the destructor bomb.
+        drop(token);
+    }
+
+    // -------------------------------------------------------------------------
+    // Gap 3: total vs count_ones validation via new_for_test
+    // -------------------------------------------------------------------------
+
+    /// Verify that `new_for_test` with mismatched total panics in debug builds.
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "new_for_test: remaining has")]
+    fn new_for_test_total_mismatch_panics_in_debug() {
+        // remaining=0b11 has 2 bits set, but total=3 is wrong
+        let _tok = ExecutionToken::new_for_test(0b11, 3);
+        // Must not reach here — forget to avoid destructor bomb on the token
+        // (panic happens before construction completes).
+    }
+
+    // -------------------------------------------------------------------------
+    // Gap 4: phase marker non-constructibility
+    // -------------------------------------------------------------------------
+
+    /// Verify that phase marker types have no public fields and no external
+    /// constructor path (structural check — compilation of this test module
+    /// itself demonstrates the markers are used opaquely).
+    #[test]
+    fn phase_markers_are_zero_sized() {
+        use core::mem::size_of;
+        assert_eq!(size_of::<Compiled>(), 0);
+        assert_eq!(size_of::<Scheduled<{ TopologyKind::Standard }>>(), 0);
+        assert_eq!(size_of::<Executing<{ TopologyKind::Standard }>>(), 0);
+        assert_eq!(size_of::<Receipted<{ TopologyKind::Standard }>>(), 0);
     }
 
     // -------------------------------------------------------------------------

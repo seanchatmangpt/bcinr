@@ -23,6 +23,7 @@ proptest = "1"
 default = []
 std = ["serde"]
 nightly = []
+testing = []
 
 [[bench]]
 name = "scheduler_bench"
