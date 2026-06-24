@@ -447,6 +447,40 @@ mod tests {
     }
 
     #[test]
+    fn ring_overflow_at_65_items_drops_without_corruption() {
+        let ring = make_ring();
+        for i in 0u64..65 {
+            ring.push_t1(EventWorkItem { op_idx: 0, run_id: i, op_trace_so_far: 0b1, kind_tag: 0 });
+        }
+        let mut worker = ReceiptWorker::new();
+        let sealed = worker.drain(&ring, 0b1, 200, 0);
+        assert!(sealed <= 64, "must not seal more than ring capacity: sealed={}", sealed);
+        assert_eq!(worker.log.len() as u32, sealed, "log len must equal sealed count");
+    }
+
+    #[test]
+    fn op_trace_accumulation_is_monotone_under_reordered_ring_drain() {
+        let ring = make_ring();
+        let run_id = 99u64;
+        let full_mask = 0b111u64;
+        // Push in reverse order
+        ring.push_t1(EventWorkItem { op_idx: 2, run_id, op_trace_so_far: 0b100, kind_tag: 0 });
+        ring.push_t1(EventWorkItem { op_idx: 1, run_id, op_trace_so_far: 0b110, kind_tag: 0 });
+        ring.push_t1(EventWorkItem { op_idx: 0, run_id, op_trace_so_far: 0b111, kind_tag: 0 });
+        let mut worker = ReceiptWorker::new();
+        let sealed = worker.drain(&ring, full_mask, 10, 0);
+        assert_eq!(sealed, 1, "must seal after all three ops arrive");
+
+        // Verify partial trace does not seal early
+        let ring2 = make_ring();
+        ring2.push_t1(EventWorkItem { op_idx: 2, run_id: 200, op_trace_so_far: 0b100, kind_tag: 0 });
+        ring2.push_t1(EventWorkItem { op_idx: 1, run_id: 200, op_trace_so_far: 0b110, kind_tag: 0 });
+        let mut worker2 = ReceiptWorker::new();
+        let sealed2 = worker2.drain(&ring2, full_mask, 10, 0);
+        assert_eq!(sealed2, 0, "incomplete trace must not seal");
+    }
+
+    #[test]
     fn overflow_count_zero_when_ring_never_full() {
         let ring = make_ring();
         let full_mask = 0b1u64;

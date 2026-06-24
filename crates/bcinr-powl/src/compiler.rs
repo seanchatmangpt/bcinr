@@ -516,6 +516,16 @@ mod tests {
         assert!(compile_powl(&ast).is_ok());
     }
 
+    #[test]
+    fn kahn_check_rejects_non_loop_cycle() {
+        let ast = PowlAstNode::PartialOrder {
+            children: vec![PowlAstNode::Atom("a"), PowlAstNode::Atom("b")],
+            edges: vec![(0, 1), (1, 0)],
+        };
+        assert_eq!(compile_powl(&ast), Err(CompileError::Cycle),
+            "mutual PartialOrder edges must be rejected as a cycle");
+    }
+
     use proptest::prelude::*;
     use crate::scheduler::{scheduler_tick, PowlRunState};
 

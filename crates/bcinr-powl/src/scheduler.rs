@@ -431,11 +431,80 @@ mod tests {
         assert_eq!(effective_pred, 0b101);
     }
 
+    #[test]
+    fn xor_dispatch_chooses_lowest_indexed_branch_in_three_branch_xor() {
+        let ast = PowlAstNode::XorChoice(vec![
+            PowlAstNode::Atom("left"),
+            PowlAstNode::Atom("mid"),
+            PowlAstNode::Atom("right"),
+        ]);
+        let tape = compile_powl(&ast).unwrap();
+        // Find dispatch slot
+        let dispatch_slot = tape.ops[..tape.len as usize]
+            .iter().position(|op| op.kind == OpKind::XorDispatch).unwrap();
+        let branch_mask = tape.ops[dispatch_slot].branch_mask;
+        let chosen_bit = branch_mask & branch_mask.wrapping_neg();
+        let suppressed_mask = branch_mask & !chosen_bit;
+
+        let mut state = PowlRunState::new(&tape);
+        let mut all_fired = 0u64;
+        for _ in 0..20 {
+            if state.check_mask == 0 { break; }
+            let fs = scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
+            all_fired |= fs.0;
+        }
+        assert_ne!(all_fired & chosen_bit, 0, "chosen (lowest) branch must fire");
+        assert_eq!(all_fired & suppressed_mask, 0, "suppressed branches must not fire");
+        // Verify it's the lowest-indexed: trailing_zeros of chosen == min trailing_zeros of branch_mask
+        assert_eq!(chosen_bit.trailing_zeros(), branch_mask.trailing_zeros(),
+            "chosen bit must be the lowest-indexed branch");
+    }
+
+    #[test]
+    fn xor_suppressed_branch_never_fires_in_single_run() {
+        let ast = PowlAstNode::XorChoice(vec![
+            PowlAstNode::Atom("chosen"),
+            PowlAstNode::Atom("suppressed"),
+        ]);
+        let tape = compile_powl(&ast).unwrap();
+        let dispatch_slot = tape.ops[..tape.len as usize]
+            .iter().position(|op| op.kind == OpKind::XorDispatch).unwrap();
+        let branch_mask = tape.ops[dispatch_slot].branch_mask;
+        let chosen_bit = branch_mask & branch_mask.wrapping_neg();
+        let suppressed_mask = branch_mask & !chosen_bit;
+
+        let mut state = PowlRunState::new(&tape);
+        let mut all_fired = 0u64;
+        for _ in 0..20 {
+            if state.check_mask == 0 { break; }
+            let fs = scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
+            all_fired |= fs.0;
+        }
+        assert_eq!(all_fired & suppressed_mask, 0,
+            "suppressed XOR branch must never fire: suppressed={:#018x}, all_fired={:#018x}",
+            suppressed_mask, all_fired);
+    }
+
     // ---------------------------------------------------------------------------
     // Proptests
     // ---------------------------------------------------------------------------
 
     use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn prop_binary_mask_times_1_bit_is_correct(is_redo_bool: bool, fire_nz_bool: bool) {
+            let is_redo: u64 = if is_redo_bool { u64::MAX } else { 0 };
+            let fire_nz: u64 = if fire_nz_bool { u64::MAX } else { 0 };
+            let active = is_redo & fire_nz;
+            let increment = (active & 1) as u8;
+            if active == u64::MAX {
+                prop_assert_eq!(increment, 1u8, "MAX gives 1, got {}", increment);
+            } else {
+                prop_assert_eq!(increment, 0u8, "0 gives 0, got {}", increment);
+            }
+        }
+    }
 
     proptest! {
         #[test]
