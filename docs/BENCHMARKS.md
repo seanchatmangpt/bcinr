@@ -10,16 +10,16 @@ Version: **v26.6.24** | Hardware: Apple M-series ARM64 (Firestorm, 3.2 GHz) | Ha
 
 | Scheduler | Latency | Cycles | Notes |
 |---|---|---|---|
-| `const_tick` (Lever 4) | **535 ps** | 1.7 | Compile-time topology; N=4,8,16 identical |
-| `legacy` SWAR | 12.9 ns | 41 | Interpretive bit-scan loop |
-| `wired_petri` | 664 ns | 2,125 | Full Petri reconstruction each tick |
+| `const_tick` (Lever 4) | **436 ps** (measured) | 1.4 | Compile-time topology; N=4,8,16 identical |
+| `legacy` SWAR | 16.7 ns (measured) | 53 | Interpretive bit-scan loop |
+| `wired_petri` | 524 ns (measured) | 1,675 | Full Petri reconstruction each tick |
 
 ### Hot-Path Primitives
 
 | Operation | Latency | Cycles | Rate | Path |
 |---|---|---|---|---|
 | Conformance gate (Q16.16) | 395 ps | 1.3 | 2.53 B/s | Hot (per receipt) |
-| `const_tick` N=4 chain | 535 ps | 1.7 | 1.87 B/s | Hot (compile-time) |
+| `const_tick` N=4 chain | 436 ps (measured) | 1.4 | 2.29 B/s | Hot (compile-time) |
 | Petri step (8 transitions) | 581 ps | 1.9 | 1.72 B/s | Warm |
 | TimeWheel tick | 922 ps | 2.9 | 1.08 B/s | Hot (per tick) |
 | Scheduler tick (1 op) | 2.07 ns | 6.6 | 483 M/s | Hot |
@@ -49,9 +49,9 @@ small tapes use `const_tick`.
 
 | N | Time (full run) | Time/op |
 |---|---|---|
-| 4 | 535 ps | 134 ps/op |
-| 8 | 548 ps | 68 ps/op |
-| 16 | 544 ps | 34 ps/op |
+| 4 | 435 ps (measured) | 109 ps/op |
+| 8 | 436 ps (measured) | 54 ps/op |
+| 16 | 432 ps (measured) | 27 ps/op |
 
 All three are within measurement noise — confirming full loop unrolling.
 
