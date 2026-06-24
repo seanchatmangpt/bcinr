@@ -1,6 +1,29 @@
 //! Wired scheduler — bcinr-logic primitives driving the POWL hot path.
 //!
-//! Three primitives from `bcinr-logic` replace hand-rolled equivalents:
+//! # Branchless invariant
+//!
+//! The hot path in `petri_tick` (post-fire loop) is fully branchless for per-op
+//! kind dispatch: `XorDispatch` and `LoopRedo` effects are applied via
+//! `apply_xor_dispatch` / `apply_loop_redo` predicated helpers — no `if`/`match`
+//! inside the per-op body generates a conditional branch instruction.
+//!
+//! `build_transition_arrays` likewise computes `effective_pred` for `Join` ops
+//! with `kind_mask` arithmetic, not a `match` arm.
+//!
+//! The outer `while fm != 0` bit-scan loop in `petri_tick` is the standard CTZ
+//! idiom; its iteration count equals `firing_mask.count_ones()`, not a predicate.
+//!
+//! # What is NOT branchless
+//!
+//! - The early-exit `if candidates == 0 { return 0; }` guard (one branch per tick,
+//!   unavoidable without changing the public API).
+//! - The `if let Some(r)` / `if let Some(er)` ring-push guards (cold path, optional
+//!   feature; not on the hot firing path).
+//! - The `match PriorityPetriEngine::new_checked(...)` error guard (one branch per
+//!   tick, cold path).
+//! - `dispatch_successors`: inner `if let Some(r)` is structural, not per-kind.
+//!
+//! # Primitives from `bcinr-logic`
 //!
 //! - **`PriorityPetriEngine`** — branchless priority-ordered transition firing
 //!   for ≤64 ops. Replaces the `trailing_zeros` bit-scan loop in `scheduler_tick`.
@@ -35,6 +58,63 @@ use bcinr_logic::{
 };
 
 use crate::tape::{OpKind, Powl64Op};
+
+// ---------------------------------------------------------------------------
+// Branchless helpers (duplicated from scheduler.rs — private, proven)
+// ---------------------------------------------------------------------------
+
+/// Branchless OpKind equality mask.
+///
+/// Returns `u64::MAX` when `kind == target`, `0` otherwise.
+///
+/// Proof: `diff = (kind as u8) ^ (target as u8)`. Zero iff equal.
+/// `(diff | diff.wrapping_neg()) >> 7` sets bit 7 iff diff != 0. Then
+/// `nz.wrapping_sub(1)` maps 0 → u64::MAX, 1 → 0. ∎
+#[inline(always)]
+fn kind_mask(kind: OpKind, target: OpKind) -> u64 {
+    let diff = (kind as u8) ^ (target as u8);
+    let nz = (((diff | diff.wrapping_neg()) >> 7) & 1) as u64;
+    nz.wrapping_sub(1)
+}
+
+/// Branchless XorDispatch handler.
+///
+/// When `op.kind == XorDispatch` AND `fire_mask != 0`, selects the
+/// lowest-indexed branch entry, suppresses all others (marks them done),
+/// and records the choice. All side-effects are predicated through `active`.
+///
+/// Returns `done_delta` — caller does `new_done |= done_delta`.
+#[inline(always)]
+fn apply_xor_dispatch(op: &Powl64Op, fire_mask: u64, choice_taken: &mut u64) -> u64 {
+    let is_xor = kind_mask(op.kind, OpKind::XorDispatch);
+    let fire_nz = 0u64.wrapping_sub((fire_mask | fire_mask.wrapping_neg()) >> 63);
+    let active = is_xor & fire_nz;
+
+    let chosen = op.branch_mask & op.branch_mask.wrapping_neg(); // lowest set bit
+    let suppressed = op.branch_mask & !chosen;
+
+    *choice_taken |= chosen & active;
+    suppressed & active
+}
+
+/// Branchless LoopRedo handler.
+///
+/// When `op.kind == LoopRedo` AND `fire_mask != 0`, resets body entries in
+/// done (so they can fire again), adds them to check, and increments the
+/// per-slot loop counter by exactly 0 or 1 — no branch.
+///
+/// Returns `(done_clear_mask, check_delta)`.
+#[inline(always)]
+fn apply_loop_redo(op: &Powl64Op, fire_mask: u64, loop_iter: &mut u8) -> (u64, u64) {
+    let is_redo = kind_mask(op.kind, OpKind::LoopRedo);
+    let fire_nz = 0u64.wrapping_sub((fire_mask | fire_mask.wrapping_neg()) >> 63);
+    let active = is_redo & fire_nz;
+
+    *loop_iter = loop_iter.saturating_add((active & 1) as u8);
+
+    let body = op.succ_mask & active;
+    (body, body)
+}
 
 // ---------------------------------------------------------------------------
 // PowlPetriState — hot state using KBitSet<1> (64-op tapes)
@@ -142,13 +222,12 @@ fn build_transition_arrays(
         let op_bit = 1u64 << i;
 
         // Effective pred for XOR-join: unchosen branches are virtually done.
-        let effective_pred = match op.kind {
-            OpKind::Join => {
-                let unchosen = op.pred_mask & !choice_taken;
-                op.pred_mask & !unchosen
-            }
-            _ => op.pred_mask,
-        };
+        // Branchless: kind_mask selects between join_effective and pred_mask.
+        // For Join: pred_mask & choice_taken (unchosen slots excluded).
+        // For all other kinds: pred_mask unchanged.
+        let is_join = kind_mask(op.kind, OpKind::Join);
+        let join_effective = op.pred_mask & choice_taken;
+        let effective_pred = (join_effective & is_join) | (op.pred_mask & !is_join);
 
         // POWL done-set is monotone: tokens never leave.
         // output = effective_pred | op_bit so net effect is: state gains op_bit.
@@ -262,21 +341,13 @@ pub fn petri_tick(
             });
         }
 
-        // XorDispatch: pick lowest-index branch, suppress others.
-        if op.kind == OpKind::XorDispatch {
-            let chosen = op.branch_mask & op.branch_mask.wrapping_neg();
-            let suppressed = op.branch_mask & !chosen;
-            new_done |= suppressed;
-            state.choice_taken |= chosen;
-        }
+        // XorDispatch: branchless — pick lowest-index branch, suppress others.
+        new_done |= apply_xor_dispatch(op, op_bit, &mut state.choice_taken);
 
-        // LoopRedo: re-enable body entries.
-        if op.kind == OpKind::LoopRedo {
-            new_done &= !op.succ_mask;
-            new_check |= op.succ_mask;
-            let iter = &mut state.loop_iters[i];
-            *iter = iter.saturating_add(1);
-        }
+        // LoopRedo: branchless — re-enable body entries.
+        let (redo_clear, redo_check) = apply_loop_redo(op, op_bit, &mut state.loop_iters[i]);
+        new_done &= !redo_clear;
+        new_check |= redo_check;
 
         // Parallel dispatch: push enabled successors to the ring.
         dispatch_successors(tape, i, new_done, ring);
