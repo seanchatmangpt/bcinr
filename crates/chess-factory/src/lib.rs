@@ -83,4 +83,24 @@ mod eval_debug {
         // White up a queen
         println!("white +queen:      {}", score(&["e2e4","d7d5","e4d5","d8d5","b1c3","d5a2","c1d2","a2a1"]));
     }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn search_prefers_development() {
+        extern crate std;
+        use std::str::FromStr;
+        use chess::{Board, ChessMove};
+        use crate::search::{fixed_depth_best_move};
+        let mut b = Board::default();
+        for m in &["e2e4","e7e5","g1f3","d7d6"] {
+            b = b.make_move_new(ChessMove::from_str(m).unwrap());
+        }
+        let best = fixed_depth_best_move(&b, 1).unwrap();
+        std::println!("Depth-1 best: {}", best);
+        // Bc4, Nc3, or d4 — not a passive pawn move
+        use std::string::ToString;
+        let bad_moves = ["a2a3","b2b3","h2h3","a2a4","g2g3"];
+        assert!(!bad_moves.contains(&best.to_string().as_str()),
+            "Factory should develop, not play {}", best);
+    }
 }
