@@ -30,7 +30,6 @@
 
 use bcinr_logic::patterns::deterministic_mpmc::LockFreeMpmcRing;
 use crate::scheduler_wired::EventWorkItem;
-use crate::ocel::OcelLog;
 
 const RING_CAPACITY: usize = 64;
 
