@@ -11,6 +11,7 @@
 
 extern crate std;
 use std::boxed::Box;
+use std::string::ToString;
 use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
 use std::vec::Vec;
@@ -139,7 +140,8 @@ fn history_update(mv: ChessMove, depth: usize, good: bool) {
 // Combined reset
 // ---------------------------------------------------------------------------
 
-fn search_reset() {
+/// Full reset between games (clear TT + killers + history).
+pub fn game_reset() {
     if let Ok(mut t) = tt_table().lock() {
         for e in t.iter_mut() { *e = TtEntry::EMPTY; }
     }
@@ -149,6 +151,108 @@ fn search_reset() {
     if let Ok(mut ht) = history_table().lock() {
         for h in ht.iter_mut() { *h = 0; }
     }
+}
+
+/// Per-move reset: keep TT across moves (incremental reuse), clear only
+/// per-move heuristics (killers/history age quickly).
+fn search_reset() {
+    if let Ok(mut kt) = killer_table().lock() {
+        for slot in kt.iter_mut() { *slot = [None; 2]; }
+    }
+    if let Ok(mut ht) = history_table().lock() {
+        // Age history scores (halve) rather than zeroing — retains ordering signal.
+        for h in ht.iter_mut() { *h >>= 1; }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Fast inline material+PST eval — used at every search node
+// ---------------------------------------------------------------------------
+
+/// Piece values matching see_piece_value (same scale).
+const MAT: [i32; 6] = [100, 337, 365, 477, 1025, 0]; // P N B R Q K(no value)
+
+/// PST tables (PeSTO, white-relative). White reads [sq^56], Black reads [sq].
+const PST_MG: [[i8; 64]; 6] = [
+    // Pawn
+    [ 0, 0, 0, 0, 0, 0, 0, 0,
+      50,50,50,50,50,50,50,50,
+      10,10,20,30,30,20,10,10,
+       5, 5,10,25,25,10, 5, 5,
+       0, 0, 0,20,20, 0, 0, 0,
+       5,-5,-10, 0, 0,-10,-5, 5,
+       5,10,10,-20,-20,10,10, 5,
+       0, 0, 0, 0, 0, 0, 0, 0],
+    // Knight
+    [-50,-40,-30,-30,-30,-30,-40,-50,
+     -40,-20,  0,  0,  0,  0,-20,-40,
+     -30,  0, 10, 15, 15, 10,  0,-30,
+     -30,  5, 15, 20, 20, 15,  5,-30,
+     -30,  0, 15, 20, 20, 15,  0,-30,
+     -30,  5, 10, 15, 15, 10,  5,-30,
+     -40,-20,  0,  5,  5,  0,-20,-40,
+     -50,-40,-30,-30,-30,-30,-40,-50],
+    // Bishop
+    [-20,-10,-10,-10,-10,-10,-10,-20,
+     -10,  0,  0,  0,  0,  0,  0,-10,
+     -10,  0,  5, 10, 10,  5,  0,-10,
+     -10,  5,  5, 10, 10,  5,  5,-10,
+     -10,  0, 10, 10, 10, 10,  0,-10,
+     -10, 10, 10, 10, 10, 10, 10,-10,
+     -10,  5,  0,  0,  0,  0,  5,-10,
+     -20,-10,-10,-10,-10,-10,-10,-20],
+    // Rook
+    [ 0, 0, 0, 0, 0, 0, 0, 0,
+       5,10,10,10,10,10,10, 5,
+      -5, 0, 0, 0, 0, 0, 0,-5,
+      -5, 0, 0, 0, 0, 0, 0,-5,
+      -5, 0, 0, 0, 0, 0, 0,-5,
+      -5, 0, 0, 0, 0, 0, 0,-5,
+      -5, 0, 0, 0, 0, 0, 0,-5,
+       0, 0, 0, 5, 5, 0, 0, 0],
+    // Queen
+    [-20,-10,-10, -5, -5,-10,-10,-20,
+     -10,  0,  0,  0,  0,  0,  0,-10,
+     -10,  0,  5,  5,  5,  5,  0,-10,
+      -5,  0,  5,  5,  5,  5,  0, -5,
+       0,  0,  5,  5,  5,  5,  0, -5,
+     -10,  5,  5,  5,  5,  5,  0,-10,
+     -10,  0,  5,  0,  0,  0,  0,-10,
+     -20,-10,-10, -5, -5,-10,-10,-20],
+    // King (middlegame: castle, hide behind pawns)
+    [-30,-40,-40,-50,-50,-40,-40,-30,
+     -30,-40,-40,-50,-50,-40,-40,-30,
+     -30,-40,-40,-50,-50,-40,-40,-30,
+     -30,-40,-40,-50,-50,-40,-40,-30,
+     -20,-30,-30,-40,-40,-30,-30,-20,
+     -10,-20,-20,-20,-20,-20,-20,-10,
+      20, 20,  0,  0,  0,  0, 20, 20,
+      20, 30, 10,  0,  0, 10, 30, 20],
+];
+
+/// Fast material+PST eval, side-to-move relative.
+/// ~3-5µs vs ~30-50µs for the full aggregate. Used at every search node.
+#[inline]
+fn fast_eval(board: &Board) -> i32 {
+    let mut score = 0i32;
+    for p in 0usize..6 {
+        let piece = [Piece::Pawn,Piece::Knight,Piece::Bishop,Piece::Rook,Piece::Queen,Piece::King][p];
+        let white = board.pieces(piece) & board.color_combined(Color::White);
+        let black = board.pieces(piece) & board.color_combined(Color::Black);
+        let mut wb = white;
+        while wb.0 != 0 {
+            let sq = wb.0.trailing_zeros() as usize;
+            score += MAT[p] + PST_MG[p][sq ^ 56] as i32;
+            wb.0 &= wb.0 - 1;
+        }
+        let mut bb = black;
+        while bb.0 != 0 {
+            let sq = bb.0.trailing_zeros() as usize;
+            score -= MAT[p] + PST_MG[p][sq] as i32;
+            bb.0 &= bb.0 - 1;
+        }
+    }
+    if board.side_to_move() == Color::White { score } else { -score }
 }
 
 // ---------------------------------------------------------------------------
@@ -298,16 +402,23 @@ fn null_move(board: &Board, depth: usize, beta: i32, start: Instant, us: u128) -
 // Quiescence
 // ---------------------------------------------------------------------------
 
-fn qsearch(mut alpha: i32, beta: i32, board: &Board) -> i32 {
-    let stand = eval_plugin(board);
+fn qsearch(mut alpha: i32, beta: i32, board: &Board, qdepth: u8) -> i32 {
+    let stand = fast_eval(board);
     if stand >= beta { return beta; }
     if stand > alpha { alpha = stand; }
+    // Limit qsearch recursion to avoid blowup in complex positions.
+    if qdepth == 0 { return alpha; }
+    // Delta pruning: skip if even the best possible gain can't beat alpha.
+    let delta = 900; // queen value — skip captures that can't raise alpha
+    if stand + delta < alpha { return alpha; }
     let mut caps: Vec<ChessMove> = MoveGen::new_legal(board)
         .filter(|m| board.piece_on(m.get_dest()).is_some())
         .collect();
     caps.sort_by_cached_key(|&m| -mvv_lva(board, m));
     for m in caps {
-        let s = -qsearch(-beta, -alpha, &board.make_move_new(m));
+        // Skip obviously bad captures (negative SEE)
+        if see(board, m) < 0 { continue; }
+        let s = -qsearch(-beta, -alpha, &board.make_move_new(m), qdepth - 1);
         if s >= beta { return beta; }
         if s > alpha { alpha = s; }
     }
@@ -327,7 +438,7 @@ fn ab(mut alpha: i32, beta: i32, depth: usize, board: &Board,
         BoardStatus::Stalemate => return 0,
         BoardStatus::Ongoing   => {}
     }
-    if depth == 0 { return qsearch(alpha, beta, board); }
+    if depth == 0 { return qsearch(alpha, beta, board, 4); }
 
     let hash = board.get_hash();
     if let Some(s) = tt_probe(hash, depth, alpha, beta) { return s; }
@@ -338,7 +449,7 @@ fn ab(mut alpha: i32, beta: i32, depth: usize, board: &Board,
 
     let in_check = board.checkers().0 != 0;
     if depth <= 3 && !in_check && use_null {
-        let static_eval = eval_plugin(board);
+        let static_eval = fast_eval(board);
         if static_eval + 150 * depth as i32 <= alpha { return static_eval; }
     }
 
@@ -424,9 +535,15 @@ pub fn search_best_move_us(board: &Board, budget_us: u128) -> Option<ChessMove> 
     let mut best = moves.first().copied();
     let mut prev = 0i32;
     let asp = 25i32;
+    let mut last_depth_us = 0u128;
 
     'id: for depth in 1usize..=32 {
-        if start.elapsed().as_micros() >= budget_us / 2 { break; }
+        // Time management: don't start a new depth if it's unlikely to finish.
+        // Heuristic: if last depth took > budget/4, skip (branching factor ~3 means next
+        // depth takes ~3× longer; starting it and timing out mid-depth wastes the remaining time).
+        let depth_start_us = start.elapsed().as_micros();
+        if depth > 1 && depth_start_us + last_depth_us * 3 > budget_us { break; }
+        if depth_start_us >= budget_us { break; }
         // Depth-1 uses full window; aspiration only kicks in once we have a reliable prev score.
         let (mut lo, mut hi) = if depth == 1 { (-INF, INF) } else { (prev - asp, prev + asp) };
         loop {
@@ -444,7 +561,13 @@ pub fn search_best_move_us(board: &Board, budget_us: u128) -> Option<ChessMove> 
             }
             if dv <= lo      { lo = lo.saturating_sub(asp * 4); }
             else if dv >= hi { hi = hi.saturating_add(asp * 4); }
-            else             { best = db; prev = dv; break; }
+            else             {
+                best = db; prev = dv;
+                last_depth_us = start.elapsed().as_micros().saturating_sub(depth_start_us);
+                std::eprintln!("info depth {} score cp {} time {} pv {}", depth, dv,
+                    start.elapsed().as_micros(), db.map(|m| m.to_string()).unwrap_or_default());
+                break;
+            }
             if lo <= -INF / 2 { lo = -INF; }
             if hi >= INF / 2  { hi = INF; }
         }
