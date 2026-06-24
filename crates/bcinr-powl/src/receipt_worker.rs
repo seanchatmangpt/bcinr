@@ -7,7 +7,7 @@
 //!                                           ↓ (drain, off hot path)
 //!                                    ReceiptWorker::drain()
 //!                                           ↓
-//!                                    BLAKE3(run_id ‖ op_trace ‖ topology_tag)
+//!                                    BLAKE3(prev_chain_hash ‖ run_id ‖ op_trace ‖ topology_tag)
 //!                                           ↓
 //!                                    ReceiptLog::append() → 57-byte entry
 //! ```
@@ -117,6 +117,9 @@ impl Pending {
 /// finalises receipts with real BLAKE3 when the full mask is seen.
 pub struct ReceiptWorker {
     pending: [Pending; MAX_PENDING],
+    /// Running chain head: previous receipt's chain_hash, fed into next BLAKE3.
+    /// Initialized to all-zeros; updated after each sealed receipt.
+    prev_chain_hash: [u8; 32],
     pub log: ReceiptLog,
 }
 
@@ -125,6 +128,7 @@ impl ReceiptWorker {
         const EMPTY: Pending = Pending::empty();
         Self {
             pending: [EMPTY; MAX_PENDING],
+            prev_chain_hash: [0u8; 32],
             log: ReceiptLog::new(),
         }
     }
@@ -136,6 +140,8 @@ impl ReceiptWorker {
         full_mask: u64,
         budget: usize,
     ) -> u32 {
+        debug_assert!(full_mask != 0, "full_mask must be nonzero");
+
         let mut sealed = 0u32;
 
         for _ in 0..budget {
@@ -146,7 +152,10 @@ impl ReceiptWorker {
             };
 
             // Find or allocate a pending slot for this run_id.
-            let slot = self.find_or_alloc(item.run_id, item.kind_tag);
+            let slot = match self.find_or_alloc(item.run_id, item.kind_tag) {
+                Ok(s) => s,
+                Err(()) => continue, // all slots full; skip rather than corrupt
+            };
 
             self.pending[slot].op_trace |= item.op_trace_so_far;
 
@@ -158,6 +167,10 @@ impl ReceiptWorker {
                     self.pending[slot].topo_tag,
                 );
                 let entry = self.build_entry(run_id, op_trace, topo_tag);
+                // Update running chain head before appending.
+                let mut chain_hash = [0u8; 32];
+                chain_hash.copy_from_slice(&entry[17..49]);
+                self.prev_chain_hash = chain_hash;
                 self.log.append(entry);
                 self.pending[slot].active = false;
                 sealed += 1;
@@ -167,11 +180,13 @@ impl ReceiptWorker {
         sealed
     }
 
-    fn find_or_alloc(&mut self, run_id: u64, kind_tag: u8) -> usize {
+    /// Returns `Ok(slot)` if an existing or free slot is found, `Err(())` if all
+    /// 16 slots are occupied by different active runs.
+    fn find_or_alloc(&mut self, run_id: u64, kind_tag: u8) -> Result<usize, ()> {
         // Search for existing active slot.
         for (i, p) in self.pending.iter().enumerate() {
             if p.active && p.run_id == run_id {
-                return i;
+                return Ok(i);
             }
         }
         // Find a free slot.
@@ -181,24 +196,23 @@ impl ReceiptWorker {
                 p.op_trace = 0;
                 p.topo_tag = kind_tag;
                 p.active = true;
-                return i;
+                return Ok(i);
             }
         }
-        // Evict slot 0 (oldest) if full — shouldn't happen in normal operation.
-        self.pending[0].active = false;
-        self.pending[0].run_id = run_id;
-        self.pending[0].op_trace = 0;
-        self.pending[0].topo_tag = kind_tag;
-        self.pending[0].active = true;
-        0
+        // All slots occupied — caller must skip this item.
+        Err(())
     }
 
-    /// Build a 57-byte receipt entry using BLAKE3.
+    /// Build a 57-byte receipt entry using BLAKE3, chained from `prev_chain_hash`.
+    ///
+    /// Hash inputs (in order):
+    ///   prev_chain_hash (32 bytes) ‖ run_id (8 LE) ‖ op_trace (8 LE) ‖ topo_tag (1)
     fn build_entry(&self, run_id: u64, op_trace: u64, topo_tag: u8) -> [u8; ENTRY_BYTES] {
         let replay_ptr = self.log.next_offset();
 
-        // BLAKE3 hash of the canonical receipt fields.
         let mut h = blake3::Hasher::new();
+        // Chain link: previous receipt's hash is the first input.
+        h.update(&self.prev_chain_hash);
         h.update(&run_id.to_le_bytes());
         h.update(&op_trace.to_le_bytes());
         h.update(&[topo_tag]);
@@ -292,10 +306,25 @@ mod tests {
         assert_eq!(sealed, 2);
         assert_eq!(worker.log.len(), 2);
 
-        // Chain hashes must differ (different run_ids → different BLAKE3 inputs).
         let e0 = worker.log.entry(0).unwrap();
         let e1 = worker.log.entry(1).unwrap();
+
+        // Chain hashes must differ.
         assert_ne!(&e0[17..49], &e1[17..49], "chain hashes must differ across runs");
+
+        // entry[1]'s chain_hash must include entry[0]'s chain_hash as input.
+        // Recompute: BLAKE3(e0_chain_hash ‖ run_id=2 ‖ op_trace=1 ‖ topo_tag=0)
+        let e0_chain_hash: [u8; 32] = e0[17..49].try_into().unwrap();
+        let run_id_2: u64 = 2;
+        let op_trace_1: u64 = 1;
+        let mut h = blake3::Hasher::new();
+        h.update(&e0_chain_hash);
+        h.update(&run_id_2.to_le_bytes());
+        h.update(&op_trace_1.to_le_bytes());
+        h.update(&[0u8]); // topo_tag
+        let expected_e1_hash = *h.finalize().as_bytes();
+        assert_eq!(&e1[17..49], &expected_e1_hash,
+            "entry[1] chain_hash must be BLAKE3(entry[0].chain_hash ‖ run_id ‖ op_trace ‖ topo_tag)");
     }
 
     #[test]
@@ -318,5 +347,57 @@ mod tests {
         let e1 = worker.log.entry(1).unwrap();
         let ptr1 = u64::from_le_bytes(e1[49..57].try_into().unwrap());
         assert_eq!(ptr1, ENTRY_BYTES as u64, "second entry replay_ptr must be 57");
+    }
+
+    #[test]
+    fn chain_is_linked() {
+        let ring = make_ring();
+        let full_mask = 0b1u64;
+
+        ring.push_t1(EventWorkItem { op_idx: 0, run_id: 100, op_trace_so_far: 0b1, kind_tag: 0 });
+        ring.push_t1(EventWorkItem { op_idx: 0, run_id: 200, op_trace_so_far: 0b1, kind_tag: 1 });
+        ring.push_t1(EventWorkItem { op_idx: 0, run_id: 300, op_trace_so_far: 0b1, kind_tag: 2 });
+
+        let mut worker = ReceiptWorker::new();
+        let sealed = worker.drain(&ring, full_mask, 10);
+        assert_eq!(sealed, 3);
+
+        let e0 = worker.log.entry(0).unwrap();
+        let e1 = worker.log.entry(1).unwrap();
+        let e2 = worker.log.entry(2).unwrap();
+
+        let hash0: [u8; 32] = e0[17..49].try_into().unwrap();
+        let hash1: [u8; 32] = e1[17..49].try_into().unwrap();
+        let hash2: [u8; 32] = e2[17..49].try_into().unwrap();
+
+        // Verify entry[0]: BLAKE3([0u8;32] ‖ run_id=100 ‖ op_trace=1 ‖ topo_tag=0)
+        {
+            let mut h = blake3::Hasher::new();
+            h.update(&[0u8; 32]);
+            h.update(&100u64.to_le_bytes());
+            h.update(&1u64.to_le_bytes());
+            h.update(&[0u8]);
+            assert_eq!(hash0, *h.finalize().as_bytes(), "entry[0] chain_hash mismatch");
+        }
+
+        // Verify entry[1] depends on entry[0]'s hash.
+        {
+            let mut h = blake3::Hasher::new();
+            h.update(&hash0);
+            h.update(&200u64.to_le_bytes());
+            h.update(&1u64.to_le_bytes());
+            h.update(&[1u8]);
+            assert_eq!(hash1, *h.finalize().as_bytes(), "entry[1] must chain from entry[0]");
+        }
+
+        // Verify entry[2] depends on entry[1]'s hash.
+        {
+            let mut h = blake3::Hasher::new();
+            h.update(&hash1);
+            h.update(&300u64.to_le_bytes());
+            h.update(&1u64.to_le_bytes());
+            h.update(&[2u8]);
+            assert_eq!(hash2, *h.finalize().as_bytes(), "entry[2] must chain from entry[1]");
+        }
     }
 }
