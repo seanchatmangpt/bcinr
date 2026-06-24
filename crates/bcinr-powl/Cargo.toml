@@ -1,6 +1,6 @@
 [package]
 name = "bcinr-powl"
-version = "26.6.24"
+version = "26.6.25"
 edition = "2021"
 description = "Partially Ordered Workflow Language runtime with branchless scheduler and cryptographic proof of execution"
 license = "MIT OR Apache-2.0"
