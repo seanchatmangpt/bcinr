@@ -12,6 +12,7 @@ categories = ["algorithms", "data-structures"]
 [dependencies]
 bcinr-logic = { version = "26.6.24", path = "../bcinr-logic" }
 blake3 = "1"
+wasm4pm-compat = "26.6.26"
 serde = { version = "1", features = ["derive"], optional = true }
 
 [dev-dependencies]
