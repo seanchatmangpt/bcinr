@@ -2,9 +2,15 @@
 name = "bcinr-powl"
 version = "26.6.24"
 edition = "2021"
+description = "Partially Ordered Workflow Language runtime with branchless scheduler and cryptographic proof of execution"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/example/bcinr"
+readme = "../../README.md"
+keywords = ["workflow", "branchless", "petri", "conformance", "blake3"]
+categories = ["algorithms", "data-structures"]
 
 [dependencies]
-bcinr-logic = { path = "../bcinr-logic" }
+bcinr-logic = { version = "26.6.24", path = "../bcinr-logic" }
 blake3 = "1"
 serde = { version = "1", features = ["derive"], optional = true }
 
