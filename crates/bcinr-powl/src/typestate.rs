@@ -195,6 +195,11 @@ pub struct ExecutionToken {
     remaining: u64,
     /// Total number of ops (mirrors `remaining.count_ones()` at construction).
     total: u8,
+    /// Topological firing order: topo_order[step] = op_idx of the step-th fired op.
+    /// Slots beyond event_count are u8::MAX (sentinel).
+    pub(crate) topo_order: [u8; 64],
+    /// Number of ops recorded so far (saturates at 64).
+    pub(crate) event_count: u8,
 }
 
 // Explicitly opt out of Clone/Copy — this is the linear-type emulation.
@@ -221,7 +226,7 @@ impl ExecutionToken {
             remaining.count_ones(),
             total
         );
-        Self { remaining, total }
+        Self { remaining, total, topo_order: [u8::MAX; 64], event_count: 0 }
     }
 
     /// Construct a fresh token for a tape with `op_count` ops (≤ 64).
@@ -245,7 +250,16 @@ impl ExecutionToken {
             remaining.count_ones(),
             op_count
         );
-        Self { remaining, total: op_count as u8 }
+        Self { remaining, total: op_count as u8, topo_order: [u8::MAX; 64], event_count: 0 }
+    }
+
+    /// Record that op at index op_idx fired. Branchless bounded write; no-op once event_count == 64.
+    #[inline]
+    pub fn record_fire(&mut self, op_idx: u8) {
+        let slot = (self.event_count as usize).min(63);
+        let guard = (self.event_count < 64) as u8;
+        self.topo_order[slot] = op_idx * guard + u8::MAX * (1 - guard);
+        self.event_count = self.event_count.wrapping_add(guard);
     }
 
     /// Mark an op as fired.
@@ -331,6 +345,10 @@ pub struct Receipt<const KIND: TopologyKind> {
     pub chain_hash: [u8; 32],
     /// Replay pointer — byte offset into a hypothetical event log.
     pub replay_ptr: u64,
+    /// Topological firing order recorded during execution.
+    pub topo_order: [u8; 64],
+    /// Number of ops recorded in topo_order.
+    pub event_count: u8,
 }
 
 impl<const KIND: TopologyKind> core::fmt::Debug for Receipt<KIND> {
@@ -462,8 +480,10 @@ impl<Tape: HasPowlTape, const KIND: TopologyKind> PowlRunner<Executing<KIND>, Ta
         self,
         token: ExecutionToken,
     ) -> Result<(PowlRunner<Receipted<KIND>, Tape>, Receipt<KIND>), ExecutionDefect> {
-        let op_trace  = !token.remaining() & full_mask(self.tape.op_count());
-        let remaining = token.remaining();
+        let op_trace    = !token.remaining() & full_mask(self.tape.op_count());
+        let remaining   = token.remaining();
+        let topo_order  = token.topo_order;
+        let event_count = token.event_count;
         // Consume token without triggering the destructor bomb.
         core::mem::forget(token);
 
@@ -473,11 +493,13 @@ impl<Tape: HasPowlTape, const KIND: TopologyKind> PowlRunner<Executing<KIND>, Ta
 
         let chain_hash = self.tape.content_hash();
         let receipt = Receipt::<KIND> {
-            run_id:     self.run_id,
+            run_id:      self.run_id,
             op_trace,
-            topology:   KIND,
+            topology:    KIND,
             chain_hash,
-            replay_ptr: self.run_id, // placeholder: real impl uses event-log offset
+            replay_ptr:  self.run_id, // placeholder: real impl uses event-log offset
+            topo_order,
+            event_count,
         };
         let runner = PowlRunner {
             tape:   self.tape,
@@ -501,6 +523,47 @@ impl<Tape: HasPowlTape, const KIND: TopologyKind> PowlRunner<Receipted<KIND>, Ta
     /// Return the run identifier assigned at construction.
     pub fn run_id(&self) -> u64 {
         self.run_id
+    }
+}
+
+// =============================================================================
+// Receipt methods
+// =============================================================================
+
+impl<const KIND: TopologyKind> Receipt<KIND> {
+    /// Verify that the recorded topo_order is consistent with the tape's pred_mask constraints.
+    ///
+    /// Returns `true` if:
+    /// 1. Every op bit set in op_trace appears in topo_order.
+    /// 2. For every op in topo_order, all its predecessors (per tape_ops[].pred_mask) appear
+    ///    at an earlier step in topo_order.
+    pub fn verify_topo_order(&self, tape_ops: &[crate::tape::Powl64Op]) -> bool {
+        let count = self.event_count as usize;
+        let mut step_of = [u8::MAX; 64];
+        for step in 0..count {
+            let op = self.topo_order[step] as usize;
+            if op >= 64 || op >= tape_ops.len() { return false; }
+            step_of[op] = step as u8;
+        }
+        // Rule 1: every bit in op_trace must appear in topo_order
+        let mut trace = self.op_trace;
+        while trace != 0 {
+            let bit = trace.trailing_zeros() as usize;
+            trace &= trace - 1;
+            if bit >= 64 || step_of[bit] == u8::MAX { return false; }
+        }
+        // Rule 2: predecessor order
+        for step in 0..count {
+            let op_idx = self.topo_order[step] as usize;
+            if op_idx >= tape_ops.len() { return false; }
+            let mut preds = tape_ops[op_idx].pred_mask;
+            while preds != 0 {
+                let p = preds.trailing_zeros() as usize;
+                preds &= preds - 1;
+                if step_of[p] == u8::MAX || step_of[p] as usize >= step { return false; }
+            }
+        }
+        true
     }
 }
 
@@ -794,6 +857,109 @@ mod tests {
         assert_eq!(size_of::<Scheduled<{ TopologyKind::Standard }>>(), 0);
         assert_eq!(size_of::<Executing<{ TopologyKind::Standard }>>(), 0);
         assert_eq!(size_of::<Receipted<{ TopologyKind::Standard }>>(), 0);
+    }
+
+    // -------------------------------------------------------------------------
+    // Track 3: topo_order tests
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn verify_topo_order_linear_3op() {
+        use crate::compiler::{compile_powl, PowlAstNode};
+
+        let ast = PowlAstNode::Sequence(vec![
+            PowlAstNode::Atom("a"),
+            PowlAstNode::Atom("b"),
+            PowlAstNode::Atom("c"),
+        ]);
+        let tape = compile_powl(&ast).unwrap();
+
+        // Build a runner and run it through the full pipeline.
+        let runner = PowlRunner::new(tape.clone())
+            .validate().unwrap()
+            .schedule::<{ TopologyKind::Standard }>();
+        let (exec, mut token) = runner.begin_execution();
+
+        // Fire ops 0, 1, 2 in order.
+        token.record_fire(0);
+        token.consume_op(1 << 0).unwrap();
+        token.record_fire(1);
+        token.consume_op(1 << 1).unwrap();
+        token.record_fire(2);
+        token.consume_op(1 << 2).unwrap();
+
+        let (_, receipt) = exec.complete(token).unwrap();
+        assert_eq!(&receipt.topo_order[..3], &[0u8, 1, 2]);
+        assert_eq!(receipt.event_count, 3);
+        assert!(receipt.verify_topo_order(&tape.ops[..tape.len as usize]));
+    }
+
+    #[test]
+    fn verify_topo_order_tampered_fails() {
+        use crate::compiler::{compile_powl, PowlAstNode};
+
+        let ast = PowlAstNode::Sequence(vec![
+            PowlAstNode::Atom("a"),
+            PowlAstNode::Atom("b"),
+            PowlAstNode::Atom("c"),
+        ]);
+        let tape = compile_powl(&ast).unwrap();
+
+        let runner = PowlRunner::new(tape.clone())
+            .validate().unwrap()
+            .schedule::<{ TopologyKind::Standard }>();
+        let (exec, mut token) = runner.begin_execution();
+
+        token.record_fire(0);
+        token.consume_op(1 << 0).unwrap();
+        token.record_fire(1);
+        token.consume_op(1 << 1).unwrap();
+        token.record_fire(2);
+        token.consume_op(1 << 2).unwrap();
+
+        let (_, mut receipt) = exec.complete(token).unwrap();
+        // Swap step 0 and step 1 — this violates pred constraint (op 1 requires op 0 first).
+        receipt.topo_order.swap(0, 1);
+        assert!(!receipt.verify_topo_order(&tape.ops[..tape.len as usize]));
+    }
+
+    #[test]
+    fn verify_topo_order_missing_op_fails() {
+        use crate::compiler::{compile_powl, PowlAstNode};
+
+        let ast = PowlAstNode::Sequence(vec![
+            PowlAstNode::Atom("a"),
+            PowlAstNode::Atom("b"),
+        ]);
+        let tape = compile_powl(&ast).unwrap();
+
+        let runner = PowlRunner::new(tape.clone())
+            .validate().unwrap()
+            .schedule::<{ TopologyKind::Standard }>();
+        let (exec, mut token) = runner.begin_execution();
+
+        // Record only op 1 (skip op 0), but consume both.
+        token.consume_op(1 << 0).unwrap();
+        token.record_fire(1);
+        token.consume_op(1 << 1).unwrap();
+
+        let (_, mut receipt) = exec.complete(token).unwrap();
+        // op_trace has bit 0 set but topo_order doesn't include op 0 → fail.
+        // Force op_trace to include bit 0:
+        receipt.op_trace = 0b11;
+        assert!(!receipt.verify_topo_order(&tape.ops[..tape.len as usize]));
+    }
+
+    #[test]
+    fn execution_token_record_fire_saturates_at_64() {
+        // Use new_for_test with u64::MAX (64 bits set).
+        let mut token = ExecutionToken::new(64);
+        for i in 0..65u8 {
+            token.record_fire(i.min(63));
+        }
+        assert_eq!(token.event_count, 64);
+        // Clean up.
+        core::mem::forget(token);
     }
 
     // -------------------------------------------------------------------------

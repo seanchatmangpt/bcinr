@@ -55,6 +55,9 @@ pub enum CompileError {
     Cycle,
     /// A non-LoopRedo slot is unreachable from the entry mask.
     Unreachable,
+    /// XorChoice nested inside Loop body or redo — unsafe; LoopRedo can
+    /// re-enable unchosen XOR branches across iterations.
+    XorInsideLoop { xor_slot: u8, loop_body_entry: u8 },
 }
 
 // ---------------------------------------------------------------------------
@@ -205,11 +208,20 @@ fn compile_loop<'a>(
     max_iters: u8,
     tape: &mut PowlTape,
 ) -> Result<Segment, CompileError> {
+    let pre_len = tape.len;
     let body_seg = compile_node(body, tape)?;
     let redo_seg = compile_node(redo, tape)?;
 
     // Wire body exits → redo entries (the redo path).
     wire(tape, body_seg.exits, redo_seg.entries);
+
+    // Scan newly allocated slots for XorDispatch (forbidden inside loop body/redo).
+    for i in pre_len as usize..tape.len as usize {
+        if tape.ops[i].kind == OpKind::XorDispatch {
+            let loop_body_entry = body_seg.entries.trailing_zeros() as u8;
+            return Err(CompileError::XorInsideLoop { xor_slot: i as u8, loop_body_entry });
+        }
+    }
 
     // Back-edge: redo exits → body entries via a LoopRedo slot.
     let back_idx = tape.alloc(OpKind::LoopRedo).ok_or(CompileError::TapeFull)?;
@@ -475,6 +487,33 @@ mod tests {
         ]);
         let tape = compile_powl(&ast).unwrap();
         assert!(check_all_ops_reachable(&tape).is_ok());
+    }
+
+    #[test]
+    fn compile_xor_inside_loop_rejected() {
+        let ast = PowlAstNode::Loop {
+            body: Box::new(PowlAstNode::XorChoice(vec![
+                PowlAstNode::Atom("a"),
+                PowlAstNode::Atom("b"),
+            ])),
+            redo: Box::new(PowlAstNode::Atom("r")),
+            max_iters: 3,
+        };
+        assert!(matches!(compile_powl(&ast), Err(CompileError::XorInsideLoop { .. })));
+    }
+
+    #[test]
+    fn compile_loop_inside_xor_accepted() {
+        // Loop INSIDE an XorChoice branch — should succeed (loop outside xor is the problem)
+        let ast = PowlAstNode::XorChoice(vec![
+            PowlAstNode::Loop {
+                body: Box::new(PowlAstNode::Atom("x")),
+                redo: Box::new(PowlAstNode::Atom("y")),
+                max_iters: 2,
+            },
+            PowlAstNode::Atom("z"),
+        ]);
+        assert!(compile_powl(&ast).is_ok());
     }
 
     use proptest::prelude::*;

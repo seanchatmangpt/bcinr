@@ -104,6 +104,12 @@ fn apply_xor_dispatch(op: &Powl64Op, fire_mask: u64, choice_taken: &mut u64) -> 
     let chosen = op.branch_mask & op.branch_mask.wrapping_neg(); // lowest set bit
     let suppressed = op.branch_mask & !chosen;
 
+    #[cfg(debug_assertions)]
+    debug_assert!(
+        (*choice_taken & chosen & active) == 0,
+        "XOR branch re-chosen: choice_taken={:#018x} chosen={:#018x}",
+        *choice_taken, chosen
+    );
     *choice_taken |= chosen & active;
     suppressed & active // done_delta (suppressed slots marked done, not fired)
 }
