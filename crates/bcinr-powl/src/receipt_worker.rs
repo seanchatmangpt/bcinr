@@ -30,6 +30,7 @@
 
 use bcinr_logic::patterns::deterministic_mpmc::LockFreeMpmcRing;
 use crate::scheduler_wired::EventWorkItem;
+use crate::ocel::OcelLog;
 
 const RING_CAPACITY: usize = 64;
 
@@ -121,6 +122,8 @@ pub struct ReceiptWorker {
     /// Initialized to all-zeros; updated after each sealed receipt.
     prev_chain_hash: [u8; 32],
     pub log: ReceiptLog,
+    /// Object-Centric Event Log for POWL process conformance verification.
+    pub ocel: OcelLog,
 }
 
 impl ReceiptWorker {
@@ -130,6 +133,7 @@ impl ReceiptWorker {
             pending: [EMPTY; MAX_PENDING],
             prev_chain_hash: [0u8; 32],
             log: ReceiptLog::new(),
+            ocel: OcelLog::new(),
         }
     }
 
