@@ -157,16 +157,12 @@ fn search_reset() {
 
 #[inline(always)]
 fn eval_plugin(board: &Board) -> i32 {
-    // Try NNUE first; fall back to branchless aggregate if lock is poisoned.
-    if let Ok(weights) = crate::nnue::nnue_weights().lock() {
-        let mut acc = crate::nnue::NnueAccumulator::zeroed();
-        crate::nnue::nnue_refresh(board, &weights, &mut acc);
-        crate::nnue::nnue_forward(&acc, board.side_to_move(), &weights)
-    } else {
-        let v = crate::position::PositionView::from_board(board);
-        let cp = aggregate(&v);
-        if board.side_to_move() == Color::White { cp } else { -cp }
-    }
+    // Branchless station aggregate — side-to-move relative (positive = good for mover).
+    // NNUE is scaffolded but L2 weights are untrained (all zero); it returns ~0 for every
+    // position until real weights are loaded. Use aggregate until then.
+    let v = crate::position::PositionView::from_board(board);
+    let cp = aggregate(&v);
+    if board.side_to_move() == Color::White { cp } else { -cp }
 }
 
 // ---------------------------------------------------------------------------
@@ -241,43 +237,49 @@ fn see(board: &Board, mv: ChessMove) -> i32 {
         None => return 0,
         Some(p) => see_piece_value(p),
     };
+    // Value of the moving piece — what we lose if opponent recaptures.
+    let mover = board.piece_on(mv.get_source()).map_or(100, see_piece_value);
     let opp = !board.side_to_move();
-    // Find cheapest attacker of dest from opponent side
-    // Check in order: Pawn, Knight, Bishop, Rook, Queen, King
+
+    // Find cheapest attacker of dest from opponent side.
+    // If opponent can recapture with any piece cheaper than mover:
+    //   SEE = gain - mover  (we win `gain` but lose `mover`)
+    // If opponent's cheapest recapture ≥ mover:
+    //   SEE = gain - cheapest  (exchange favours us or is neutral)
+    // If no recapture: SEE = gain.
+    let find_see = |cheapest: i32| -> i32 {
+        if cheapest <= mover { gain - mover } else { gain - cheapest }
+    };
+
+    // Pawn: get_pawn_attacks(dest, our_color, opp_pawns) returns which
+    // opponent pawns are diagonally adjacent and can recapture on dest.
     let opp_pawns = board.pieces(Piece::Pawn) & board.color_combined(opp);
     if opp_pawns.0 != 0 {
-        let pawn_attacks = chess::get_pawn_attacks(dest, board.side_to_move(), opp_pawns);
-        if pawn_attacks.0 != 0 {
-            return gain - see_piece_value(Piece::Pawn).max(0);
-        }
+        let pa = chess::get_pawn_attacks(dest, board.side_to_move(), opp_pawns);
+        if pa.0 != 0 { return find_see(see_piece_value(Piece::Pawn)); }
     }
     let opp_knights = board.pieces(Piece::Knight) & board.color_combined(opp);
     if opp_knights.0 != 0 {
-        let knight_attacks = chess::get_knight_moves(dest) & opp_knights;
-        if knight_attacks.0 != 0 {
-            return gain - see_piece_value(Piece::Knight);
+        if (chess::get_knight_moves(dest) & opp_knights).0 != 0 {
+            return find_see(see_piece_value(Piece::Knight));
         }
     }
-    let opp_bishops = board.pieces(Piece::Bishop) & board.color_combined(opp);
-    if opp_bishops.0 != 0 {
-        return gain - see_piece_value(Piece::Bishop);
+    // Sliders: conservative — if any slider of this type exists for opponent,
+    // assume it can reach dest (avoids costly ray-trace; may over-refuse some trades).
+    if (board.pieces(Piece::Bishop) & board.color_combined(opp)).0 != 0 {
+        return find_see(see_piece_value(Piece::Bishop));
     }
-    let opp_rooks = board.pieces(Piece::Rook) & board.color_combined(opp);
-    if opp_rooks.0 != 0 {
-        return gain - see_piece_value(Piece::Rook);
+    if (board.pieces(Piece::Rook) & board.color_combined(opp)).0 != 0 {
+        return find_see(see_piece_value(Piece::Rook));
     }
-    let opp_queens = board.pieces(Piece::Queen) & board.color_combined(opp);
-    if opp_queens.0 != 0 {
-        return gain - see_piece_value(Piece::Queen);
+    if (board.pieces(Piece::Queen) & board.color_combined(opp)).0 != 0 {
+        return find_see(see_piece_value(Piece::Queen));
     }
-    let opp_kings = board.pieces(Piece::King) & board.color_combined(opp);
-    if opp_kings.0 != 0 {
-        let king_attacks = chess::get_king_moves(dest) & opp_kings;
-        if king_attacks.0 != 0 {
-            return gain - see_piece_value(Piece::King);
-        }
+    let opp_king = board.pieces(Piece::King) & board.color_combined(opp);
+    if (chess::get_king_moves(dest) & opp_king).0 != 0 {
+        return find_see(see_piece_value(Piece::King));
     }
-    gain
+    gain // No recapture possible
 }
 
 // ---------------------------------------------------------------------------

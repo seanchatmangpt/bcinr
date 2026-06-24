@@ -75,6 +75,11 @@ mod eval_debug {
         println!("after 1.a3:        {}", score(&["a2a3"]));
         println!("after 1.e4 e5:     {}", score(&["e2e4","e7e5"]));
         println!("after 1.e4 a6:     {}", score(&["e2e4","a7a6"]));
+        // Move 3 candidates after 1.e4 e5 2.Nf3 d6
+        println!("1.e4 e5 Nf3 d6 d4:   {}", score(&["e2e4","e7e5","g1f3","d7d6","d2d4"]));
+        println!("1.e4 e5 Nf3 d6 a3:   {}", score(&["e2e4","e7e5","g1f3","d7d6","a2a3"]));
+        println!("1.e4 e5 Nf3 d6 Nc3:  {}", score(&["e2e4","e7e5","g1f3","d7d6","b1c3"]));
+        println!("1.e4 e5 Nf3 d6 Bc4:  {}", score(&["e2e4","e7e5","g1f3","d7d6","f1c4"]));
         // White up a queen
         println!("white +queen:      {}", score(&["e2e4","d7d5","e4d5","d8d5","b1c3","d5a2","c1d2","a2a1"]));
     }
