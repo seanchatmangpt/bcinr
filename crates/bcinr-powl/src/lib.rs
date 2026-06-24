@@ -15,6 +15,7 @@
 
 pub mod admit;
 pub mod compiler;
+pub mod receipt_worker;
 pub mod const_scheduler;
 pub mod enterprise;
 pub mod dispatcher;

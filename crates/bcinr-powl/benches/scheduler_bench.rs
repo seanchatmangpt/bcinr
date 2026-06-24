@@ -43,7 +43,7 @@ fn run_to_done_wired(tape: &PowlTape) -> u32 {
     let mut state = PowlPetriState::new(tape.entry_mask);
     let mut fired = 0u32;
     while state.check.words[0] != 0 {
-        fired += petri_tick(&ops, &mut state, None).count_ones() as u32;
+        fired += petri_tick(&ops, &mut state, None, None, 0).count_ones() as u32;
     }
     fired
 }
@@ -148,7 +148,7 @@ fn bench_wired_linear_scaling(c: &mut Criterion) {
                 let mut state = PowlPetriState::new(tape.entry_mask);
                 let mut fired = 0u32;
                 while state.check.words[0] != 0 {
-                    fired += petri_tick(ops, &mut state, None).count_ones() as u32;
+                    fired += petri_tick(ops, &mut state, None, None, 0).count_ones() as u32;
                 }
                 criterion::black_box(fired)
             })
@@ -168,7 +168,7 @@ fn bench_wired_parallel_scaling(c: &mut Criterion) {
                 let mut state = PowlPetriState::new(tape.entry_mask);
                 let mut fired = 0u32;
                 while state.check.words[0] != 0 {
-                    fired += petri_tick(ops, &mut state, None).count_ones() as u32;
+                    fired += petri_tick(ops, &mut state, None, None, 0).count_ones() as u32;
                 }
                 criterion::black_box(fired)
             })
@@ -183,7 +183,7 @@ fn bench_wired_single_tick(c: &mut Criterion) {
     c.bench_function("wired/single_tick_1op", |b| {
         b.iter(|| {
             let mut state = PowlPetriState::new(tape.entry_mask);
-            criterion::black_box(petri_tick(&ops, &mut state, None))
+            criterion::black_box(petri_tick(&ops, &mut state, None, None, 0))
         })
     });
 }
@@ -200,7 +200,7 @@ fn bench_wired_xor_choice(c: &mut Criterion) {
             let mut state = PowlPetriState::new(tape.entry_mask);
             let mut fired = 0u32;
             while state.check.words[0] != 0 {
-                fired += petri_tick(&ops, &mut state, None).count_ones() as u32;
+                fired += petri_tick(&ops, &mut state, None, None, 0).count_ones() as u32;
             }
             criterion::black_box(fired)
         })
@@ -309,7 +309,7 @@ fn bench_mpmc_ring(c: &mut Criterion) {
             let mut state = PowlPetriState::new(tape.entry_mask);
             let mut fired = 0u32;
             while state.check.words[0] != 0 {
-                fired += petri_tick(&ops, &mut state, Some(&ring)).count_ones() as u32;
+                fired += petri_tick(&ops, &mut state, Some(&ring), None, 0).count_ones() as u32;
             }
             criterion::black_box(fired)
         })
@@ -650,7 +650,7 @@ fn bench_lever_comparison_n4(c: &mut Criterion) {
             let mut state = PowlPetriState::new(tape_wired.entry_mask);
             let mut fired = 0u32;
             while state.check.words[0] != 0 {
-                fired += petri_tick(&ops_wired, &mut state, None).count_ones() as u32;
+                fired += petri_tick(&ops_wired, &mut state, None, None, 0).count_ones() as u32;
             }
             fired
         })

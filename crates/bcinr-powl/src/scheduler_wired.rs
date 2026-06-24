@@ -93,6 +93,25 @@ pub struct WorkItem {
 }
 
 // ---------------------------------------------------------------------------
+// EventWorkItem — dispatched to event ring for off-hot-path BLAKE3 hashing
+// ---------------------------------------------------------------------------
+
+/// One fired-op event, pushed to the event ring after each fire.
+/// The ring drains asynchronously via `ReceiptWorker`; BLAKE3 never called
+/// inside `petri_tick`.
+#[derive(Clone, Copy, Default)]
+pub struct EventWorkItem {
+    /// Op index (0..63) that fired.
+    pub op_idx: u32,
+    /// Run-id of the workflow instance.
+    pub run_id: u64,
+    /// Cumulative op-trace bitmask (all ops fired so far this run, OR'd in).
+    pub op_trace_so_far: u64,
+    /// `OpKind` discriminant for receipt classification.
+    pub kind_tag: u8,
+}
+
+// ---------------------------------------------------------------------------
 // PowlPetriEngine — wired tick
 // ---------------------------------------------------------------------------
 
@@ -115,6 +134,8 @@ pub fn petri_tick(
     tape: &[Powl64Op],
     state: &mut PowlPetriState,
     ring: Option<&LockFreeMpmcRing<WorkItem, RING_CAPACITY>>,
+    event_ring: Option<&LockFreeMpmcRing<EventWorkItem, RING_CAPACITY>>,
+    run_id: u64,
 ) -> u64 {
     // --- SLA wheel: drain any expired deadlines ---
     let sla_due = state.sla_wheel.tick();
@@ -204,6 +225,17 @@ pub fn petri_tick(
         fired_ops |= op_bit;
         new_done  |= op_bit;
         new_check |= op.succ_mask;
+
+        // Off hot-path: push fire event to event_ring for ReceiptWorker to drain.
+        // BLAKE3 is never computed here — only a cheap push_t1 (~10 ns).
+        if let Some(er) = event_ring {
+            er.push_t1(EventWorkItem {
+                op_idx: i as u32,
+                run_id,
+                op_trace_so_far: fired_ops,
+                kind_tag: op.kind as u8,
+            });
+        }
 
         // XorDispatch: pick lowest-index branch, suppress others.
         if op.kind == OpKind::XorDispatch {
@@ -374,7 +406,7 @@ mod tests {
         let mut total_fired = 0u64;
         for _ in 0..10 {
             if state.check.words[0] == 0 { break; }
-            total_fired += petri_tick(&ops, &mut state, None).count_ones() as u64;
+            total_fired += petri_tick(&ops, &mut state, None, None, 0).count_ones() as u64;
         }
         assert_eq!(total_fired, 3, "all 3 ops must fire");
         assert_eq!(state.done.words[0], 0b111, "all done");
@@ -396,7 +428,7 @@ mod tests {
         let mut ticks = 0u32;
         let mut total = 0u64;
         while state.check.words[0] != 0 && ticks < 10 {
-            total += petri_tick(&ops, &mut state, None).count_ones() as u64;
+            total += petri_tick(&ops, &mut state, None, None, 0).count_ones() as u64;
             ticks += 1;
         }
         // 4 parallel + 1 join = 5 ops total
@@ -412,7 +444,7 @@ mod tests {
         state.schedule_sla(3, 0);
         // Run 4 ticks (op fires on tick 1, SLA expires on tick 3).
         for _ in 0..4 {
-            petri_tick(&ops, &mut state, None);
+            petri_tick(&ops, &mut state, None, None, 0);
         }
         // sla_breached should have bit 0 set after tick 3.
         assert_ne!(state.sla_breached & 1, 0, "op 0 SLA breach should be recorded");

@@ -91,6 +91,27 @@ impl HasPowlTape for crate::tape::v2::PowlTape {
     }
 }
 
+// Impl for the primary (compiler-facing) tape type.
+impl HasPowlTape for crate::tape::PowlTape {
+    fn op_count(&self) -> usize {
+        self.len as usize
+    }
+
+    fn entry_mask(&self) -> u64 {
+        self.entry_mask
+    }
+
+    fn content_hash(&self) -> [u8; 32] {
+        let mut h = blake3::Hasher::new();
+        for i in 0..self.len as usize {
+            h.update(&self.ops[i].pred_mask.to_le_bytes());
+            h.update(&self.ops[i].succ_mask.to_le_bytes());
+            h.update(&[self.ops[i].kind as u8]);
+        }
+        *h.finalize().as_bytes()
+    }
+}
+
 // =============================================================================
 // ValidationError
 // =============================================================================
