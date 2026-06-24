@@ -81,6 +81,13 @@ All three are within measurement noise — confirming full loop unrolling.
 - **Determinism:** Identical output across architectures — required for receipt-based proof systems.
 - **Zero-Allocation Steady State:** No heap allocation in scheduler hot path.
 
+## Branch Misprediction Gate
+
+Threshold: < 0.1% (10 basis points) branch misses of total instructions.
+Measurement: `cargo make perf-branch-gate` (Linux only).
+macOS alternative: Instruments > CPU Counters > Branch Mispredictions.
+Benchmark: branchless_gate/linear_chain_32_tick_10k (10,000 scheduler_tick iterations).
+
 ## Benchmark Commands
 
 ```bash

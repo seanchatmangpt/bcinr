@@ -43,7 +43,7 @@ fn run_to_done_wired(tape: &PowlTape) -> u32 {
     let mut state = PowlPetriState::new(tape.entry_mask);
     let mut fired = 0u32;
     while state.check.words[0] != 0 {
-        fired += petri_tick(&ops, &mut state, None, None, 0).count_ones() as u32;
+        fired += petri_tick(&ops, &mut state, None, None, 0).fired_ops.count_ones() as u32;
     }
     fired
 }
@@ -148,7 +148,7 @@ fn bench_wired_linear_scaling(c: &mut Criterion) {
                 let mut state = PowlPetriState::new(tape.entry_mask);
                 let mut fired = 0u32;
                 while state.check.words[0] != 0 {
-                    fired += petri_tick(ops, &mut state, None, None, 0).count_ones() as u32;
+                    fired += petri_tick(ops, &mut state, None, None, 0).fired_ops.count_ones() as u32;
                 }
                 criterion::black_box(fired)
             })
@@ -168,7 +168,7 @@ fn bench_wired_parallel_scaling(c: &mut Criterion) {
                 let mut state = PowlPetriState::new(tape.entry_mask);
                 let mut fired = 0u32;
                 while state.check.words[0] != 0 {
-                    fired += petri_tick(ops, &mut state, None, None, 0).count_ones() as u32;
+                    fired += petri_tick(ops, &mut state, None, None, 0).fired_ops.count_ones() as u32;
                 }
                 criterion::black_box(fired)
             })
@@ -200,7 +200,7 @@ fn bench_wired_xor_choice(c: &mut Criterion) {
             let mut state = PowlPetriState::new(tape.entry_mask);
             let mut fired = 0u32;
             while state.check.words[0] != 0 {
-                fired += petri_tick(&ops, &mut state, None, None, 0).count_ones() as u32;
+                fired += petri_tick(&ops, &mut state, None, None, 0).fired_ops.count_ones() as u32;
             }
             criterion::black_box(fired)
         })
@@ -309,7 +309,7 @@ fn bench_mpmc_ring(c: &mut Criterion) {
             let mut state = PowlPetriState::new(tape.entry_mask);
             let mut fired = 0u32;
             while state.check.words[0] != 0 {
-                fired += petri_tick(&ops, &mut state, Some(&ring), None, 0).count_ones() as u32;
+                fired += petri_tick(&ops, &mut state, Some(&ring), None, 0).fired_ops.count_ones() as u32;
             }
             criterion::black_box(fired)
         })
@@ -454,6 +454,7 @@ fn bench_stress(c: &mut Criterion) {
     let loop_ast = PowlAstNode::Loop {
         body: Box::new(PowlAstNode::Atom("work")),
         redo: Box::new(PowlAstNode::Atom("check")),
+        max_iters: 3,
     };
     let loop_tape = compile_powl(&loop_ast).unwrap();
     let loop_ops: Vec<_> = loop_tape.ops[..loop_tape.len as usize].to_vec();
@@ -650,7 +651,7 @@ fn bench_lever_comparison_n4(c: &mut Criterion) {
             let mut state = PowlPetriState::new(tape_wired.entry_mask);
             let mut fired = 0u32;
             while state.check.words[0] != 0 {
-                fired += petri_tick(&ops_wired, &mut state, None, None, 0).count_ones() as u32;
+                fired += petri_tick(&ops_wired, &mut state, None, None, 0).fired_ops.count_ones() as u32;
             }
             fired
         })
@@ -690,6 +691,33 @@ fn bench_enterprise_primitives(c: &mut Criterion) {
     g.finish();
 }
 
+// ---------------------------------------------------------------------------
+// GROUP: Branchless gate — hot-path measurement (32-op linear chain, 10k ticks)
+// ---------------------------------------------------------------------------
+
+fn bench_branchless_gate(c: &mut Criterion) {
+    // 32-op linear chain for hot-path measurement
+    let tape = linear_chain(32);
+    let ops: Vec<_> = tape.ops[..tape.len as usize].to_vec();
+    let mut group = c.benchmark_group("branchless_gate");
+    group.throughput(Throughput::Elements(10_000));
+    group.bench_function("linear_chain_32_tick_10k", |b| {
+        b.iter(|| {
+            let mut state = PowlRunState::new(&tape);
+            for _ in 0..10_000 {
+                criterion::black_box(scheduler_tick(
+                    criterion::black_box(&ops),
+                    criterion::black_box(&mut state),
+                ));
+                state.done_mask = 0;
+                state.check_mask = tape.entry_mask;
+            }
+        });
+    });
+    group.finish();
+}
+criterion_group!(branchless_benches, bench_branchless_gate);
+
 criterion_group!(
     benches,
     // Legacy baseline
@@ -721,4 +749,4 @@ criterion_group!(
     // Enterprise primitives
     bench_enterprise_primitives,
 );
-criterion_main!(benches);
+criterion_main!(benches, branchless_benches);

@@ -172,6 +172,29 @@ dependencies = [
     "factory-kaizen",
 ]
 
+[tasks.perf-branch-gate]
+category = "Verification"
+description = "Gate: branch mispredictions < 0.1% of retired instructions (Linux perf stat)"
+workspace = false
+condition = { platforms = ["linux"] }
+script_runner = "bash"
+script = [
+    "set -euo pipefail",
+    "echo 'Building benchmark binary...'",
+    "cargo build --release -p bcinr-powl --bench scheduler_bench 2>/dev/null || cargo build --release -p bcinr-powl 2>/dev/null",
+    "BENCH_BIN=$(find target/release -name 'scheduler_bench' -type f | head -1)",
+    "if [ -z \"$BENCH_BIN\" ]; then echo 'ERROR: bench binary not found'; exit 1; fi",
+    "PERF_OUT=$(perf stat -e instructions,branch-misses -- \"$BENCH_BIN\" --bench 2>&1 || true)",
+    "echo \"$PERF_OUT\"",
+    "INSTRUCTIONS=$(echo \"$PERF_OUT\" | grep -E 'instructions' | head -1 | awk '{gsub(/,/,\"\"); print $1}')",
+    "BRANCH_MISSES=$(echo \"$PERF_OUT\" | grep -E 'branch-misses' | head -1 | awk '{gsub(/,/,\"\"); print $1}')",
+    "if [ -z \"$INSTRUCTIONS\" ] || [ \"$INSTRUCTIONS\" = '0' ]; then echo 'NOTE: perf stat not available on this platform. macOS: use Instruments > CPU Counters.'; exit 0; fi",
+    "MISS_BP=$(( BRANCH_MISSES * 10000 / INSTRUCTIONS ))",
+    "echo \"Branch miss rate: ${MISS_BP} basis points (${BRANCH_MISSES} misses / ${INSTRUCTIONS} instructions)\"",
+    "if [ \"$MISS_BP\" -ge 10 ]; then echo \"GATE FAIL: ${MISS_BP} bp >= 10 bp (0.1% threshold)\"; exit 1; fi",
+    "echo \"GATE PASS: ${MISS_BP} bp < 10 bp\"",
+]
+
 [tasks.ci]
 category = "CI"
 description = "Comprehensive CI pipeline"
