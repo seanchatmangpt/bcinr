@@ -1,0 +1,17 @@
+# defects.rq — one row per cf:Defect for the defect taxonomy table
+# (src/defects.rs). Static single-file rule: the template iterates
+# `sparql_results` to emit the DEFECTS table mapping each named-law defect to
+# its Refusal code. ORDER BY ?code for stable, deterministic output.
+#
+# PROVISION LAW (GGEN-TPL-001): template references only code, name, doc.
+
+PREFIX cf: <https://bcinr.dev/chess-factory/ontology#>
+
+SELECT ?code ?name ?doc
+WHERE {
+    ?defect a cf:Defect ;
+        cf:code ?code ;
+        cf:name ?name ;
+        cf:doc  ?doc .
+}
+ORDER BY ?code

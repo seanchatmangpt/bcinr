@@ -1,0 +1,78 @@
+{#- defects.rs.tera — renders src/defects.rs from defects.rq.
+
+    STATIC single-file rule: ggen renders this ONCE with the full row list bound
+    as `sparql_results`. Emits the Defect enum + DEFECTS taxonomy table mapping
+    each named-law defect to its Refusal code.
+
+    PROVISION LAW (GGEN-TPL-001): every row.* below is projected by defects.rq:
+    code, name, doc. Rows arrive ORDER BY code (determinism).
+-#}
+//! Generated defect taxonomy — manufactured from `ontology/chess.ttl`.
+//!
+//! First-class source (GGEN-SRC law): edit the `cf:Defect` individuals in the
+//! ontology and re-run `ggen sync`. Each defect is a named-law refusal class
+//! consumed by the verifier's `Refusal` / `DiagnosticPayload` surface.
+
+/// One named-law defect class.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Defect {
+    /// Stable integer defect code (ORDER BY anchor).
+    pub code: u16,
+    /// snake_case defect name.
+    pub name: &'static str,
+    /// Human-readable law violated.
+    pub doc: &'static str,
+}
+
+/// The defect taxonomy, ordered by code.
+pub static DEFECTS: &[Defect] = &[
+{%- for row in sparql_results %}
+    Defect {
+        code: {{ row.code }},
+        name: "{{ row.name }}",
+        doc: "{{ row.doc }}",
+    },
+{%- endfor %}
+];
+
+{% for row in sparql_results -%}
+/// Defect code for `{{ row.name }}`.
+pub const DEFECT_{{ row.name | upper }}: u16 = {{ row.code }};
+{% endfor %}
+
+/// Number of defect classes.
+pub const DEFECT_COUNT: usize = {{ sparql_results | length }};
+
+/// Look up a defect by code. Returns `None` if the code is unknown.
+#[must_use]
+pub fn defect_by_code(code: u16) -> Option<&'static Defect> {
+    let mut i = 0usize;
+    while i < DEFECTS.len() {
+        if DEFECTS[i].code == code {
+            return Some(&DEFECTS[i]);
+        }
+        i += 1;
+    }
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn taxonomy_is_ordered_and_complete() {
+        assert_eq!(DEFECTS.len(), DEFECT_COUNT);
+        for w in DEFECTS.windows(2) {
+            assert!(w[0].code < w[1].code, "DEFECTS must be ORDER BY code");
+        }
+    }
+
+    #[test]
+    fn lookup_round_trips() {
+        for d in DEFECTS {
+            assert_eq!(defect_by_code(d.code).map(|x| x.code), Some(d.code));
+        }
+        assert!(defect_by_code(u16::MAX).is_none());
+    }
+}

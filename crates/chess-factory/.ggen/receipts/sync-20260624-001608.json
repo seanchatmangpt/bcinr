@@ -1,0 +1,28 @@
+{
+  "operation_id": "0e32ba7a-a87a-413b-afdd-fba222cd73e1",
+  "timestamp": "2026-06-24T00:16:08.769424Z",
+  "input_hashes": [
+    "actuator:ggen-sync@26.6.11",
+    "ggen.toml:e5919672fb7ccb449ee2b7f41920c4fc9a9a672669b5cba619c36636eabfe9c1",
+    "ontology/chess.ttl:030389db1734b284f0e5e14bfe6c406afbb96f9db25f8fb772407d2735da04cc",
+    "queries/feature_stations.rq:d349e5b1f7c0ec9f16252de4c2ebe3dee4ece19dd9102c1d0188346851579e29",
+    "templates/feature_station.rs.tera:d7f37c3b2066797cfe5f1f97e2e063be9691ce21b4aea7888ec321f41f0a6a21",
+    "queries/station_index.rq:5d6b5feb2e62841beaf1ac568e652100e68899c317f02754c80d1d10fc763a05",
+    "templates/stations_mod.rs.tera:7a1962c2b4a4d0847cbcd2b69bc04e53cb0a588364a02757fc3c489271ebe89a",
+    "queries/tactical_motifs.rq:393b827ab09c209ae3c5b928fb11bc7e156f31a6e9ce4a910c32070515f73109",
+    "templates/tactical_motif.rs.tera:ce9559598fc9feaa07c096a74daeb9663867f0713c16410ba25a1fafe3c33c7e",
+    "queries/tactical_motifs.rq:393b827ab09c209ae3c5b928fb11bc7e156f31a6e9ce4a910c32070515f73109",
+    "templates/motifs_mod.rs.tera:89d7698a36f3010fa4f03e6f750e38bba5b42f4dd8f4c8c216a1ecab5710eaf6",
+    "queries/station_weights.rq:738ca65a1ea8b8ea7410802b2233992dd60a22064074e4d6a63b7ea0b9d63805",
+    "templates/station_weights.rs.tera:8fc06131a106dfeaf34ad449e309e49462a1012b0ba7e580d14fd3d0168a6b17",
+    "queries/defects.rq:8d7f8611d3e52af75f74bae68a8580239e56d4545425b66a344582ba9672904f",
+    "templates/defects.rs.tera:5cc19308e9fb8c33a57382f4b326cd1575804e30b15c511f1432bdde0e5fc533",
+    "queries/ocel_schema.rq:e479133f42e1ff11e73e82ee96b117438f51f4b2b4d7e4172a2f9fcc8d7f7ec3",
+    "templates/ocel_schema.rs.tera:6b5f3e4673053553609c7482a6f6ca68c9ee3a923b49e9cda5b938ed9c228f1a"
+  ],
+  "output_hashes": [
+    "./schema/benchmark_matrix.json:f28b5ab6690a46f78976951cd1092ea2b7979ad518e250640a403e2d69cb28d6"
+  ],
+  "signature": "dc070c89c3f95fe71f295e80c16d53e14f04d2f5f510c3ad3a45010356cce20c95591880496baa89a771820c95cfd3a6292be986c13d547fda44a4a56d94b80b",
+  "previous_receipt_hash": "a67830cedcc00fa2b6f1988d2ad3330fd7152ad0ab9fe210849324d491c68e57"
+}

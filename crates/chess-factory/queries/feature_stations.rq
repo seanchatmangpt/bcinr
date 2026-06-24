@@ -1,0 +1,35 @@
+# feature_stations.rq — one row per cf:FeatureStation with every field the
+# feature_station.rs.tera template consumes. Drives a fanout rule
+# (output_file = "src/stations/{{name}}.rs"), so each row renders one station
+# file. ORDER BY ?id for deterministic, stable output (GGEN determinism law).
+#
+# PROVISION LAW (GGEN-TPL-001): the paired template may reference ONLY the
+# variables projected here: id, name, lowering, primitive, inputMask,
+# scoreScale, weight_q8, eventCode, eventName, authority, doc.
+
+PREFIX cf:   <https://bcinr.dev/chess-factory/ontology#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?id ?name ?lowering ?primitive ?inputMask ?scoreScale
+       ?weight_q8 ?eventCode ?eventName ?authority ?doc
+       ?kernelHelpers ?kernelBody ?oracleBody ?firedExpr
+WHERE {
+    ?station a cf:FeatureStation ;
+        cf:id            ?id ;
+        cf:name          ?name ;
+        cf:lowering      ?loweringNode ;
+        cf:primitive     ?primitive ;
+        cf:inputMask     ?inputMask ;
+        cf:scoreScale    ?scoreScale ;
+        cf:weight_q8     ?weight_q8 ;
+        cf:eventCode     ?eventCode ;
+        cf:eventName     ?eventName ;
+        cf:authority     ?authority ;
+        cf:doc           ?doc ;
+        cf:kernelHelpers ?kernelHelpers ;
+        cf:kernelBody    ?kernelBody ;
+        cf:oracleBody    ?oracleBody ;
+        cf:firedExpr     ?firedExpr .
+    ?loweringNode rdfs:label ?lowering .
+}
+ORDER BY ?id

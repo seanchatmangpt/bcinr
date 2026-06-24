@@ -1,0 +1,49 @@
+{#- proof_table.json.tera — machine-readable Crown proof table.
+
+    STATIC single-file rule: ggen renders this ONCE with the full row list bound
+    as `sparql_results` (proof_table.rq), ORDER BY oppId, budId. One JSON object
+    per (opponent x budget) cell. Measured cells carry the empirical stats + the
+    blake3 receipt hash that proves them; not-installed and unmeasured cells carry
+    a status string and NO faked numbers.
+
+    TYPING NOTE: ?measured and ?installed arrive as STRING literals ("true" /
+    "false") and are compared as strings; optional stats are referenced ONLY
+    inside the measured branch (GGEN-TPL-001 provision chain stays clean).
+-#}
+{
+  "schema": "bcinr.chess-factory.proof_table.v1",
+  "doc": "Receipt-cited Crown proof table. Each measured cell's receipt_hash appears verbatim in artifacts/benchmark.receipt.json cell_receipts[]. Not-installed / unmeasured cells are never faked.",
+  "cell_count": {{ sparql_results | length }},
+  "cells": [
+{%- for row in sparql_results %}
+    {
+      "opponent": "{{ row.oppName }}",
+      "tier": "{{ row.tier }}",
+      "budget": "{{ row.budName }}",
+      "budget_micros": {{ row.budMicros }},
+{%- if row.installed == "false" %}
+      "status": "not-installed",
+      "measured": false
+{%- elif row.measured == "true" %}
+      "status": "measured",
+      "measured": true,
+      "score_rate": {{ row.scoreRate }},
+      "ci_lo": {{ row.ciLo }},
+      "ci_hi": {{ row.ciHi }},
+      "perf_elo": {{ row.perfElo }},
+      "wins": {{ row.wins }},
+      "draws": {{ row.draws }},
+      "losses": {{ row.losses }},
+      "factory_us_median": {{ row.factoryUs }},
+      "opponent_us_median": {{ row.oppUs }},
+      "go_command": "{{ row.goCommand }}",
+      "receipt_hash": "{{ row.receiptHash }}",
+      "run_id": "{{ row.runId }}"
+{%- else %}
+      "status": "not-measured",
+      "measured": false
+{%- endif %}
+    }{% if not loop.last %},{% endif %}
+{%- endfor %}
+  ]
+}

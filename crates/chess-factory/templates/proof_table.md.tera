@@ -1,0 +1,35 @@
+# Crown Proof Table — receipt-cited Elo(tau) matrix
+
+Rows = opponents, columns = per-move latency budget tiers. Each measured cell
+reports `score% (95% CI) / perf-Elo / factory_us|opp_us` plus the `blake3`
+receipt hash that proves it (verifiable against `artifacts/benchmark.receipt.json`)
+and the `run_id` that produced it. Engines not installed on this host render
+`not-installed` and are NEVER faked; installed-but-unmeasured cells render
+`(not measured)`. Display strings (score%, CI, perf-Elo) are pre-formatted in
+`artifacts/results.ttl` so this template performs no arithmetic.
+
+| Opponent | tier | t100us | t250us | t500us | t1ms | t10ms |
+|----------|------|--------|--------|--------|------|-------|
+{%- for row in sparql_results %}
+{%- if loop.index0 % 5 == 0 %}
+| {{ row.oppName }} | {{ row.tier }} {% endif -%}
+{%- if row.installed == "false" %}| not-installed {% elif row.measured == "true" %}| {{ row.scorePct }}% (CI {{ row.ciText }}%) / {{ row.perfEloR }}E / {{ row.factoryUs }}\|{{ row.oppUs }}us / `{{ row.receiptHash }}` (run `{{ row.runId }}`) {% else %}| (not measured) {% endif -%}
+{%- if loop.index % 5 == 0 %}|{% endif -%}
+{%- endfor %}
+
+## Honesty footnote — depth-asymmetric bcinr_uci row
+
+The `bcinr_uci` row is **depth-asymmetric**: the factory searches depth-4 while
+`bcinr_uci` is driven at `go movetime 1`, so its headline score is **inflated by
+deeper search**, not by a stronger evaluation. An **equal-footing** head-to-head
+(both engines at exactly 1 ply) is recorded under `parity_check` in
+`artifacts/benchmark.receipt.json`. Read BOTH numbers: the matrix cell is the
+unequal/inflated figure; the parity match is the fair one.
+
+## Receipt verification
+
+Every measured cell's receipt hash is the `blake3` of
+`prev_hash || opponent || budget || go_command || W/D/L || think_micros (both
+sides)`, hash-chained from genesis. The same hashes appear verbatim in the
+`cell_receipts[]` array of `artifacts/benchmark.receipt.json`. Not-installed
+engines and unmeasured cells carry no receipt and are never assigned one.

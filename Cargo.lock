@@ -322,6 +322,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "chess-factory"
+version = "0.1.0"
+dependencies = [
+ "bcinr-logic",
+ "blake3",
+ "chess",
+ "criterion",
+ "proptest",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "chrono"
 version = "0.4.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2206,7 +2219,7 @@ dependencies = [
 
 [[package]]
 name = "wasm4pm-compat"
-version = "26.6.22"
+version = "26.6.23"
 dependencies = [
  "blake3",
  "chrono",

@@ -1,0 +1,216 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix cf:   <https://bcinr.dev/chess-factory/ontology#> .
+
+#################################################################
+# bcinr Chess Factory — MEASUREMENT LAW (Elo(tau) benchmark matrix)
+#
+# `ggen sync --manifest ggen-benchmark.toml` lowers this graph into
+# schema/benchmark_matrix.json: the opponent x budget-tier cross product the
+# `bcinr_benchmark` runner sweeps to measure Decision-Engine Elo(tau).
+#
+# Generated source is FIRST-CLASS (GGEN-SRC law): edit this TTL, never the JSON.
+# Every individual carries a unique cf:id integer ORDER-BY anchor (determinism).
+#################################################################
+
+#################################################################
+# Classes
+#################################################################
+
+cf:Opponent a rdfs:Class ;
+    rdfs:comment "A benchmark adversary the factory plays under a latency budget." .
+
+cf:BudgetTier a rdfs:Class ;
+    rdfs:comment "A fixed per-move latency budget (the tau in Elo(tau))." .
+
+cf:BudgetCommand a rdfs:Class ;
+    rdfs:comment "A per-(opponent, budget) UCI go-line override. When a cell has no BudgetCommand the opponent's default cf:goCommand applies. This is what makes the budget columns REAL: each column drives the opponent at a different search effort." .
+
+#################################################################
+# Opponents
+#   cf:engineKind  = uci | internal
+#   cf:tier        = reference | sanity
+#   cf:enginePath  = filesystem path (uci) or internal bin name
+#   cf:goCommand   = UCI go-line sent each move (uci kind only)
+#   cf:calibratable= whether UCI_Elo throttling is meaningful for this opponent
+#################################################################
+
+cf:stockfish a cf:Opponent ;
+    cf:id           1 ;
+    cf:name         "stockfish" ;
+    cf:engineKind   "uci" ;
+    cf:enginePath   "/opt/homebrew/bin/stockfish" ;
+    cf:goCommand    "go depth 1" ;
+    cf:tier         "reference" ;
+    cf:calibratable true ;
+    cf:installed    true ;
+    rdfs:comment    "Reference UCI engine at absolute-fastest (go depth 1)." .
+
+cf:bcinr_uci a cf:Opponent ;
+    cf:id           4 ;
+    cf:name         "bcinr_uci" ;
+    cf:engineKind   "uci" ;
+    cf:enginePath   "/Users/sac/bcinr/target/release/bcinr_uci" ;
+    cf:goCommand    "go depth 1" ;
+    cf:tier         "reference" ;
+    cf:calibratable false ;
+    cf:installed    true ;
+    rdfs:comment    "Playground-minimal parity target (alpha-beta + NNUE + quiescence, ~1500 Elo)." .
+
+cf:bcinr_az a cf:Opponent ;
+    cf:id           5 ;
+    cf:name         "bcinr_az" ;
+    cf:engineKind   "uci" ;
+    cf:enginePath   "/Users/sac/bcinr/target/release/bcinr_az" ;
+    cf:goCommand    "go movetime 10" ;
+    cf:tier         "reference" ;
+    cf:calibratable false ;
+    cf:installed    true ;
+    rdfs:comment    "AlphaZero-style playground engine (movetime-budgeted MCTS), reference tier." .
+
+#################################################################
+# Declared-but-absent opponents (cf:installed false).
+#   These render as not-installed in the proof table — NEVER faked. To
+#   activate one, install the binary and flip cf:installed to true.
+#################################################################
+
+cf:berserk a cf:Opponent ;
+    cf:id           6 ;
+    cf:name         "berserk" ;
+    cf:engineKind   "uci" ;
+    cf:enginePath   "berserk" ;
+    cf:goCommand    "go depth 1" ;
+    cf:tier         "reference" ;
+    cf:calibratable false ;
+    cf:installed    false ;
+    rdfs:comment    "Declared-but-absent: Berserk UCI engine not installed on this host." .
+
+cf:rubichess a cf:Opponent ;
+    cf:id           7 ;
+    cf:name         "rubichess" ;
+    cf:engineKind   "uci" ;
+    cf:enginePath   "rubichess" ;
+    cf:goCommand    "go depth 1" ;
+    cf:tier         "reference" ;
+    cf:calibratable false ;
+    cf:installed    false ;
+    rdfs:comment    "Declared-but-absent: RubiChess UCI engine not installed on this host." .
+
+cf:lc0 a cf:Opponent ;
+    cf:id           8 ;
+    cf:name         "lc0" ;
+    cf:engineKind   "uci" ;
+    cf:enginePath   "lc0" ;
+    cf:goCommand    "go nodes 1" ;
+    cf:tier         "reference" ;
+    cf:calibratable false ;
+    cf:installed    false ;
+    rdfs:comment    "Declared-but-absent: Leela Chess Zero not installed on this host." .
+
+cf:sanity_random a cf:Opponent ;
+    cf:id           2 ;
+    cf:name         "sanity_random" ;
+    cf:engineKind   "internal" ;
+    cf:enginePath   "sanity_random" ;
+    cf:goCommand    "go depth 1" ;
+    cf:tier         "sanity" ;
+    cf:calibratable false ;
+    cf:installed    true ;
+    rdfs:comment    "Seeded random-legal mover; the sanity floor the factory must crush." .
+
+cf:sanity_greedy a cf:Opponent ;
+    cf:id           3 ;
+    cf:name         "sanity_greedy" ;
+    cf:engineKind   "internal" ;
+    cf:enginePath   "sanity_greedy" ;
+    cf:goCommand    "go depth 1" ;
+    cf:tier         "sanity" ;
+    cf:calibratable false ;
+    cf:installed    true ;
+    rdfs:comment    "Max-immediate-material greedy mover; a slightly stronger sanity floor." .
+
+#################################################################
+# Budget tiers (the tau axis of Elo(tau)).
+#   cf:micros = per-move budget in microseconds (ORDER-BY anchor for the curve)
+#################################################################
+
+cf:t100us a cf:BudgetTier ;
+    cf:id      10 ;
+    cf:name    "t100us" ;
+    cf:micros  100 ;
+    rdfs:comment "100 microsecond per-move budget (the headline Elo-at-100us point)." .
+
+cf:t250us a cf:BudgetTier ;
+    cf:id      11 ;
+    cf:name    "t250us" ;
+    cf:micros  250 ;
+    rdfs:comment "250 microsecond per-move budget." .
+
+cf:t500us a cf:BudgetTier ;
+    cf:id      12 ;
+    cf:name    "t500us" ;
+    cf:micros  500 ;
+    rdfs:comment "500 microsecond per-move budget." .
+
+cf:t1ms a cf:BudgetTier ;
+    cf:id      13 ;
+    cf:name    "t1ms" ;
+    cf:micros  1000 ;
+    rdfs:comment "1 millisecond per-move budget." .
+
+cf:t10ms a cf:BudgetTier ;
+    cf:id      14 ;
+    cf:name    "t10ms" ;
+    cf:micros  10000 ;
+    rdfs:comment "10 millisecond per-move budget." .
+
+#################################################################
+# Per-(opponent, budget) go-command overrides (cf:BudgetCommand).
+#   cf:forOpponent -> the cf:Opponent this command drives
+#   cf:forBudget   -> the cf:BudgetTier it applies at
+#   cf:goCommand   -> the UCI go-line sent at that cell
+#
+# Each row makes a DISTINCT search effort per budget column, so the five
+# columns are genuinely different games rather than five labels on one game.
+# Cells with no BudgetCommand fall back to the opponent's default cf:goCommand
+# (query COALESCE). cf:id is the determinism ORDER-BY anchor.
+#
+# Stockfish: depth ladder (1->2->3) at the sub-millisecond tiers, then a real
+# movetime budget (1ms, 10ms) at the larger tiers.
+#################################################################
+
+cf:sf_t100us a cf:BudgetCommand ;
+    cf:id 100 ; cf:forOpponent cf:stockfish ; cf:forBudget cf:t100us ; cf:goCommand "go depth 1" .
+cf:sf_t250us a cf:BudgetCommand ;
+    cf:id 101 ; cf:forOpponent cf:stockfish ; cf:forBudget cf:t250us ; cf:goCommand "go depth 2" .
+cf:sf_t500us a cf:BudgetCommand ;
+    cf:id 102 ; cf:forOpponent cf:stockfish ; cf:forBudget cf:t500us ; cf:goCommand "go depth 3" .
+cf:sf_t1ms a cf:BudgetCommand ;
+    cf:id 103 ; cf:forOpponent cf:stockfish ; cf:forBudget cf:t1ms ; cf:goCommand "go movetime 1" .
+cf:sf_t10ms a cf:BudgetCommand ;
+    cf:id 104 ; cf:forOpponent cf:stockfish ; cf:forBudget cf:t10ms ; cf:goCommand "go movetime 10" .
+
+# bcinr_uci: movetime tiers (it is an alpha-beta engine; movetime scales effort).
+cf:uci_t100us a cf:BudgetCommand ;
+    cf:id 110 ; cf:forOpponent cf:bcinr_uci ; cf:forBudget cf:t100us ; cf:goCommand "go movetime 1" .
+cf:uci_t250us a cf:BudgetCommand ;
+    cf:id 111 ; cf:forOpponent cf:bcinr_uci ; cf:forBudget cf:t250us ; cf:goCommand "go movetime 1" .
+cf:uci_t500us a cf:BudgetCommand ;
+    cf:id 112 ; cf:forOpponent cf:bcinr_uci ; cf:forBudget cf:t500us ; cf:goCommand "go movetime 1" .
+cf:uci_t1ms a cf:BudgetCommand ;
+    cf:id 113 ; cf:forOpponent cf:bcinr_uci ; cf:forBudget cf:t1ms ; cf:goCommand "go movetime 1" .
+cf:uci_t10ms a cf:BudgetCommand ;
+    cf:id 114 ; cf:forOpponent cf:bcinr_uci ; cf:forBudget cf:t10ms ; cf:goCommand "go movetime 10" .
+
+# bcinr_az: movetime tiers (MCTS scales by think time).
+cf:az_t100us a cf:BudgetCommand ;
+    cf:id 120 ; cf:forOpponent cf:bcinr_az ; cf:forBudget cf:t100us ; cf:goCommand "go movetime 1" .
+cf:az_t250us a cf:BudgetCommand ;
+    cf:id 121 ; cf:forOpponent cf:bcinr_az ; cf:forBudget cf:t250us ; cf:goCommand "go movetime 1" .
+cf:az_t500us a cf:BudgetCommand ;
+    cf:id 122 ; cf:forOpponent cf:bcinr_az ; cf:forBudget cf:t500us ; cf:goCommand "go movetime 1" .
+cf:az_t1ms a cf:BudgetCommand ;
+    cf:id 123 ; cf:forOpponent cf:bcinr_az ; cf:forBudget cf:t1ms ; cf:goCommand "go movetime 1" .
+cf:az_t10ms a cf:BudgetCommand ;
+    cf:id 124 ; cf:forOpponent cf:bcinr_az ; cf:forBudget cf:t10ms ; cf:goCommand "go movetime 10" .

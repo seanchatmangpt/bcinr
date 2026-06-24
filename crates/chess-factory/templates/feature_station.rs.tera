@@ -1,0 +1,145 @@
+{#- feature_station.rs.tera — renders ONE branchless feature-station file per row.
+
+    FANOUT: paired with feature_stations.rq under a rule whose
+    output_file = "src/stations/{{name}}.rs". Because the output path contains
+    "{{", ggen renders this template ONCE PER ROW with that row's scalars bound
+    directly in context ({{ id }}, {{ name }}, ...). Do NOT use
+    `{% for row in sparql_results %}` here — that would emit every row into every
+    file. Use the bare row scalars.
+
+    PROVISION LAW (GGEN-TPL-001): every variable below is projected by
+    feature_stations.rq: id, name, lowering, primitive, inputMask, scoreScale,
+    weight_q8, eventCode, eventName, authority, doc, kernelHelpers, kernelBody,
+    oracleBody, firedExpr.
+
+    BRANCHLESS CONTRACT: the public `raw_cp`/`evaluate` kernels are cyclomatic
+    complexity 1 (no if/match/for/while/loop). All looping projections (popcount
+    folds, attack-span sweeps) live in PRIVATE helpers rendered from
+    `kernelHelpers`, which are outside the CC=1 station boundary. The branchful
+    `_reference` oracle (test-only, `oracleBody`) mirrors the named law and a
+    proptest asserts kernel == oracle for all inputs.
+-#}
+#![forbid(unsafe_code)]
+
+//! Feature station: {{ eventName }} (id {{ id }}).
+//!
+//! # Branchless Contract
+//! **Ensures:** `evaluate` matches the branchful `_reference` oracle for all inputs.
+//! **Invariant:** the execution path is independent of input data values (CC=1).
+//!
+//! Lowering: {{ lowering }}. Primitive: `{{ primitive }}`.
+//! Input mask: `{{ inputMask }}`. Score scale: {{ scoreScale }} cp/unit.
+//! Authority: {{ authority }}
+//!
+//! {{ doc }}
+
+use crate::position::{PositionView, BLACK, WHITE};
+use crate::station::{Evidence, Station, StationResult};
+
+/// Stable ordinal identifier of this station (ORDER BY anchor in the ontology).
+pub const STATION_ID: u16 = {{ id }};
+/// OCEL event code emitted when this station fires.
+pub const EVENT_CODE: u16 = {{ eventCode }};
+/// Q8.8 aggregation weight (256 == 1.0).
+pub const WEIGHT_Q8: i32 = {{ weight_q8 }};
+/// Centipawn scale applied to the raw differential.
+pub const SCORE_SCALE: i32 = {{ scoreScale }};
+
+{{ kernelHelpers }}
+
+/// Branchless feature kernel for **{{ name }}**.
+///
+/// Reduces the position to a white-relative centipawn contribution per the
+/// station's named law (Authority above). The public entry is CC = 1: every
+/// loop is delegated to a private helper above (the looping-projection rule).
+///
+/// # Examples
+///
+/// ```
+/// use chess_factory::position::PositionView;
+/// use chess_factory::stations::{{ name }};
+/// let v = PositionView::default();
+/// // Empty board: balanced, zero contribution.
+/// assert_eq!({{ name }}::raw_cp(&v), 0);
+/// ```
+#[must_use]
+#[inline(always)]
+pub fn raw_cp(v: &PositionView) -> i32 {
+    {{ kernelBody }}
+}
+
+/// Branchless evaluation entry point. CC = 1: a single straight-line reduction
+/// producing the [`StationResult`] (weighted score + evidence) for receipts.
+#[must_use]
+#[inline(always)]
+pub fn evaluate(v: &PositionView) -> StationResult {
+    let raw = raw_cp(v);
+    let fired = {{ firedExpr }};
+    StationResult {
+        score_cp: raw.wrapping_mul(WEIGHT_Q8) >> 8,
+        evidence: Evidence {
+            station_id: STATION_ID,
+            fired_mask: fired,
+            raw_cp: raw,
+            weight_q8: WEIGHT_Q8,
+        },
+    }
+}
+
+/// Zero-sized station marker implementing the [`Station`] trait.
+/// Named `Station<id>` for a deterministic, collision-free type identity.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Station{{ id }};
+
+impl Station for Station{{ id }} {
+    #[inline(always)]
+    fn evaluate(v: &PositionView) -> StationResult {
+        evaluate(v)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::position::PositionView;
+    use proptest::prelude::*;
+
+    /// Branchful reference oracle for the **{{ name }}** law. Test-only, so it
+    /// MAY branch; the kernel above MUST match it on every input.
+    /// Authority: {{ authority }}
+    fn reference_raw_cp(v: &PositionView) -> i32 {
+        {{ oracleBody }}
+    }
+
+    fn view_from(by_piece: [[u64; 6]; 2], stm: usize) -> PositionView {
+        PositionView::from_bitboards(by_piece, stm)
+    }
+
+    proptest! {
+        /// Kernel == oracle for arbitrary packed positions.
+        #[test]
+        fn prop_kernel_matches_oracle(
+            wp in any::<[u64; 6]>(),
+            bp in any::<[u64; 6]>(),
+            stm in 0usize..2,
+        ) {
+            let v = view_from([wp, bp], stm);
+            prop_assert_eq!(raw_cp(&v), reference_raw_cp(&v));
+        }
+    }
+
+    #[test]
+    fn empty_board_is_balanced() {
+        let v = PositionView::default();
+        assert_eq!(raw_cp(&v), 0);
+        assert_eq!(reference_raw_cp(&v), 0);
+    }
+
+    #[test]
+    fn evidence_carries_station_identity() {
+        let v = PositionView::default();
+        let r = evaluate(&v);
+        assert_eq!(r.evidence.station_id, STATION_ID);
+        assert_eq!(r.evidence.weight_q8, WEIGHT_Q8);
+    }
+}

@@ -1,0 +1,28 @@
+{
+  "operation_id": "6856ffef-7b88-435b-a2a2-38d08cacb39c",
+  "timestamp": "2026-06-24T02:00:21.443014Z",
+  "input_hashes": [
+    "actuator:ggen-sync@26.6.11",
+    "ggen.toml:e5919672fb7ccb449ee2b7f41920c4fc9a9a672669b5cba619c36636eabfe9c1",
+    "ontology/chess.ttl:41a77eff3416de70d5a2886f127cdec71d3f0cf3d74dc12a5ea5961c8b1dfc8b",
+    "queries/feature_stations.rq:16f7b6c4728055be6c503a30bf36238b6505a06e9ec4a6594b85ad529a1f5028",
+    "templates/feature_station.rs.tera:c160aa665d983c0b91868ef2b3460b0e00acd6bdedddf15687fa50ca2fa19f35",
+    "queries/station_index.rq:5d6b5feb2e62841beaf1ac568e652100e68899c317f02754c80d1d10fc763a05",
+    "templates/stations_mod.rs.tera:7a1962c2b4a4d0847cbcd2b69bc04e53cb0a588364a02757fc3c489271ebe89a",
+    "queries/tactical_motifs.rq:393b827ab09c209ae3c5b928fb11bc7e156f31a6e9ce4a910c32070515f73109",
+    "templates/tactical_motif.rs.tera:ce9559598fc9feaa07c096a74daeb9663867f0713c16410ba25a1fafe3c33c7e",
+    "queries/tactical_motifs.rq:393b827ab09c209ae3c5b928fb11bc7e156f31a6e9ce4a910c32070515f73109",
+    "templates/motifs_mod.rs.tera:89d7698a36f3010fa4f03e6f750e38bba5b42f4dd8f4c8c216a1ecab5710eaf6",
+    "queries/station_weights.rq:738ca65a1ea8b8ea7410802b2233992dd60a22064074e4d6a63b7ea0b9d63805",
+    "templates/station_weights.rs.tera:8fc06131a106dfeaf34ad449e309e49462a1012b0ba7e580d14fd3d0168a6b17",
+    "queries/defects.rq:8d7f8611d3e52af75f74bae68a8580239e56d4545425b66a344582ba9672904f",
+    "templates/defects.rs.tera:5cc19308e9fb8c33a57382f4b326cd1575804e30b15c511f1432bdde0e5fc533",
+    "queries/ocel_schema.rq:e479133f42e1ff11e73e82ee96b117438f51f4b2b4d7e4172a2f9fcc8d7f7ec3",
+    "templates/ocel_schema.rs.tera:6b5f3e4673053553609c7482a6f6ca68c9ee3a923b49e9cda5b938ed9c228f1a"
+  ],
+  "output_hashes": [
+    "./schema/benchmark_matrix.json:5fd89ae6649e2fc1ed89a3116c3d6e57ba4e839cb93549d25b6461a7b4f6672c"
+  ],
+  "signature": "b7bdb691f0a93a7f68e7b47b52d52427918cc237b5a8b14415a854933ef591a73cefd1577819650ebac2b07b6f462445f4fa56e59415aff4953e0c7e7b8bcc0c",
+  "previous_receipt_hash": "02c65561e56b2e26855ab334a0164b2c04be3cbfe1c22625ee9eca75ac11bb8d"
+}

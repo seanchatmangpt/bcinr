@@ -1,0 +1,1141 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix cf:   <https://bcinr.dev/chess-factory/ontology#> .
+
+#################################################################
+# bcinr Chess Factory — PROGRAM LAW
+#
+# The semantic source of truth for the chess decision-system manufacturing
+# cell. `ggen sync` lowers this graph through SPARQL (queries/*.rq) and Tera
+# (templates/*.tera) into first-class Rust source under src/. Swap this file
+# for market.ttl to retarget the same machinery to UHFT.
+#
+# Material values updated to PeSTO midgame values (stronger conversion):
+#   piece_values = [Pawn 82, Knight 337, Bishop 365, Rook 477, Queen 1025,
+#                   King 20000]  (centipawns; PeSTO midgame; PST added).
+# material weight_q8 raised from 128 to 256 (was 0.5x, now full weight).
+# mobility scoreScale raised from 4 to 6 cp/square.
+# king_safety scoreScale raised from 12 to 20 cp/ring-square.
+#
+# Generated source is FIRST-CLASS (GGEN-SRC law): no generated/ paths, no
+# DO-NOT-EDIT caste. Edit this TTL and regenerate; never hand-edit output.
+#
+# PARITY: 6 cf:FeatureStation + 4 cf:TacticalMotif + 6 cf:Defect individuals.
+# Every cf:id is a unique integer ORDER-BY anchor (determinism).
+#################################################################
+
+#################################################################
+# Classes
+#################################################################
+
+cf:Piece a rdfs:Class ;
+    rdfs:comment "A chess piece type carrying a centipawn base material value." .
+
+cf:Square a rdfs:Class ;
+    rdfs:comment "A board square (0..63, a1=0, sq = rank*8 + file)." .
+
+cf:FeatureStation a rdfs:Class ;
+    rdfs:comment "A branchless evaluation station: PositionView -> Score(cp) -> Evidence. CC=1 kernel." .
+
+cf:StrategyStation a rdfs:Class ;
+    rdfs:comment "A composed station aggregating feature stations into a strategic verdict." .
+
+cf:TacticalMotif a rdfs:Class ;
+    rdfs:comment "A bitwise tactical detector producing a fired mask (hanging, fork, pin, skewer)." .
+
+cf:Defect a rdfs:Class ;
+    rdfs:comment "A named-law defect class mapped to a Refusal + DiagnosticPayload." .
+
+cf:Lowering a rdfs:Class ;
+    rdfs:comment "A branchless lowering strategy a station compiles into (Mask/Bitset/Network/Lut/Saturating)." .
+
+#################################################################
+# Lowering individuals (the branchless calculus primitives)
+#################################################################
+
+cf:Mask        a cf:Lowering ; rdfs:label "Mask" .
+cf:Bitset      a cf:Lowering ; rdfs:label "Bitset" .
+cf:Network     a cf:Lowering ; rdfs:label "Network" .
+cf:Lut         a cf:Lowering ; rdfs:label "Lut" .
+cf:Saturating  a cf:Lowering ; rdfs:label "Saturating" .
+
+#################################################################
+# Properties — Piece
+#################################################################
+
+cf:baseValue a rdf:Property ; rdfs:domain cf:Piece ; rdfs:range xsd:integer ;
+    rdfs:comment "Base material value in centipawns (from nnue.rs piece_values)." .
+
+#################################################################
+# Properties — FeatureStation
+#################################################################
+
+cf:id a rdf:Property ; rdfs:range xsd:integer ;
+    rdfs:comment "Unique integer identity and stable ORDER BY anchor (determinism)." .
+
+cf:name a rdf:Property ; rdfs:range xsd:string ;
+    rdfs:comment "snake_case station name; becomes the generated module/file name." .
+
+cf:lowering a rdf:Property ; rdfs:domain cf:FeatureStation ; rdfs:range cf:Lowering ;
+    rdfs:comment "Branchless lowering strategy the station kernel compiles into." .
+
+cf:primitive a rdf:Property ; rdfs:range xsd:string ;
+    rdfs:comment "use-path into the branchless primitive (rays / bcinr-logic) the kernel calls." .
+
+cf:inputMask a rdf:Property ; rdfs:domain cf:FeatureStation ; rdfs:range xsd:string ;
+    rdfs:comment "PositionView bitboard accessor the kernel consumes as its packed input." .
+
+cf:scoreScale a rdf:Property ; rdfs:domain cf:FeatureStation ; rdfs:range xsd:integer ;
+    rdfs:comment "Centipawn multiplier applied to the station's raw count to produce raw_cp." .
+
+cf:weight_q8 a rdf:Property ; rdfs:range xsd:integer ;
+    rdfs:comment "Q8.8 fixed-point aggregation weight (256 == 1.0). Default 256." .
+
+cf:eventCode a rdf:Property ; rdfs:range xsd:integer ;
+    rdfs:comment "OCEL event code emitted when the station fires (evidence stream)." .
+
+cf:eventName a rdf:Property ; rdfs:range xsd:string ;
+    rdfs:comment "OCEL event name for the station's evidence edge." .
+
+cf:authority a rdf:Property ; rdfs:range xsd:string ;
+    rdfs:comment "One-line oracle predicate: the branchful reference equality a proptest must hold." .
+
+cf:doc a rdf:Property ; rdfs:range xsd:string ;
+    rdfs:comment "Human-readable doc comment for the generated station." .
+
+cf:kernelHelpers a rdf:Property ; rdfs:domain cf:FeatureStation ; rdfs:range xsd:string ;
+    rdfs:comment "Private (non-public) Rust helpers — uses/consts/looping folds — rendered above the CC=1 kernel. Outside the station boundary (looping-projection rule)." .
+
+cf:kernelBody a rdf:Property ; rdfs:domain cf:FeatureStation ; rdfs:range xsd:string ;
+    rdfs:comment "Body of the public branchless `raw_cp` kernel: a single CC=1 reduction (no if/match/for/while/loop) calling the private helpers." .
+
+cf:oracleBody a rdf:Property ; rdfs:domain cf:FeatureStation ; rdfs:range xsd:string ;
+    rdfs:comment "Body of the branchful test-only `_reference` oracle that the kernel must equal for every input." .
+
+cf:firedExpr a rdf:Property ; rdfs:domain cf:FeatureStation ; rdfs:range xsd:string ;
+    rdfs:comment "Branchless expression producing the evidence fired_mask (squares/features that contributed)." .
+
+#################################################################
+# Properties — StrategyStation
+#################################################################
+
+cf:composedOf a rdf:Property ; rdfs:domain cf:StrategyStation ; rdfs:range cf:FeatureStation ;
+    rdfs:comment "Feature stations a strategy station aggregates." .
+
+#################################################################
+# Properties — Defect
+#################################################################
+
+cf:code a rdf:Property ; rdfs:domain cf:Defect ; rdfs:range xsd:integer ;
+    rdfs:comment "Stable integer defect code (ORDER BY anchor for the taxonomy table)." .
+
+#################################################################
+# Pieces — material law (centipawns, from nnue.rs piece_values)
+#################################################################
+
+cf:Pawn   a cf:Piece ; cf:name "pawn"   ; cf:id 0 ; cf:baseValue 82    .
+cf:Knight a cf:Piece ; cf:name "knight" ; cf:id 1 ; cf:baseValue 337   .
+cf:Bishop a cf:Piece ; cf:name "bishop" ; cf:id 2 ; cf:baseValue 365   .
+cf:Rook   a cf:Piece ; cf:name "rook"   ; cf:id 3 ; cf:baseValue 477   .
+cf:Queen  a cf:Piece ; cf:name "queen"  ; cf:id 4 ; cf:baseValue 1025  .
+cf:King   a cf:Piece ; cf:name "king"   ; cf:id 5 ; cf:baseValue 20000 .
+
+#################################################################
+# Feature stations — 6 (decompose nnue.rs neuron 0)
+#################################################################
+
+cf:material a cf:FeatureStation ;
+    cf:id 0 ;
+    cf:name "material" ;
+    cf:lowering cf:Saturating ;
+    cf:primitive "bcinr_logic::bitset::popcount_u64" ;
+    cf:inputMask "occupancy_by_piece" ;
+    cf:scoreScale 1 ;
+    cf:weight_q8 256 ;
+    cf:eventCode 1000 ;
+    cf:eventName "material_evaluated" ;
+    cf:authority "raw_cp == sum_over_pieces(popcount(my[p]) - popcount(opp[p])) * baseValue[p]" ;
+    cf:doc "White-relative material balance: signed Q0 popcount of each piece type scaled by its centipawn base value (Pawn 100 .. King 20000)." ;
+    cf:kernelHelpers """/// Per-piece centipawn base values (PeSTO midgame), indexed
+/// pawn..king. King is valued at 20000 so material dominates.
+const BASE_VALUE: [i32; 6] = [82, 337, 365, 477, 1025, 20000];
+
+/// Weighted popcount fold for one color (private; loops, so outside CC=1).
+#[inline]
+fn weighted_material(v: &PositionView, color: usize) -> i32 {
+    let mut acc = 0i32;
+    let mut p = 0usize;
+    while p < 6 {
+        acc += (v.by_piece[color][p].count_ones() as i32) * BASE_VALUE[p];
+        p += 1;
+    }
+    acc
+}""" ;
+    cf:kernelBody """(weighted_material(v, WHITE) - weighted_material(v, BLACK)).wrapping_mul(SCORE_SCALE)""" ;
+    cf:oracleBody """const BASE: [i32; 6] = [82, 337, 365, 477, 1025, 20000];
+        let mut white = 0i32;
+        let mut black = 0i32;
+        let mut p = 0usize;
+        while p < 6 {
+            white += v.by_piece[WHITE][p].count_ones() as i32 * BASE[p];
+            black += v.by_piece[BLACK][p].count_ones() as i32 * BASE[p];
+            p += 1;
+        }
+        (white - black) * SCORE_SCALE""" ;
+    cf:firedExpr """v.by_color[WHITE] | v.by_color[BLACK]""" .
+
+cf:pst a cf:FeatureStation ;
+    cf:id 1 ;
+    cf:name "pst" ;
+    cf:lowering cf:Lut ;
+    cf:primitive "crate::tables::PST_Q0" ;
+    cf:inputMask "occupancy_by_piece_square" ;
+    cf:scoreScale 1 ;
+    cf:weight_q8 256 ;
+    cf:eventCode 1001 ;
+    cf:eventName "pst_evaluated" ;
+    cf:authority "raw_cp == sum_over_pieces_squares(white_bit ? +pst[p][sq^56] : 0) - (black_bit ? +pst[p][sq] : 0)" ;
+    cf:doc "Piece-square-table positional bonus (PeSTO-style middlegame): central advancement rewarded, rim/edge penalised; black mirrors rank (sq^56) for white-relative score." ;
+    cf:kernelHelpers """/// PeSTO-style middlegame piece-square tables, listed a8..h1 (table row 0
+/// = rank 8). White reads `PST[p][sq ^ 56]` (rank-flip), black reads
+/// `PST[p][sq]`, giving a white-relative positional score.
+const PST: [[i32; 64]; 6] = [
+    // Pawn
+    [  0,  0,  0,  0,  0,  0,  0,  0,
+      98,134, 61, 95, 68,126, 34,-11,
+      -6,  7, 26, 31, 65, 56, 25,-20,
+     -14, 13,  6, 21, 23, 12, 17,-23,
+     -27, -2, -5, 12, 17,  6, 10,-25,
+     -26, -4, -4,-10,  3,  3, 33,-12,
+     -35, -1,-20,-23,-15, 24, 38,-22,
+       0,  0,  0,  0,  0,  0,  0,  0],
+    // Knight
+    [-167,-89,-34,-49, 61,-97,-15,-107,
+      -73,-41, 72, 36, 23, 62,  7, -17,
+      -47, 60, 37, 65, 84,129, 73,  44,
+       -9, 17, 19, 53, 37, 69, 18,  22,
+      -13,  4, 16, 13, 28, 19, 21,  -8,
+      -23, -9, 12, 10, 19, 17, 25, -16,
+      -29,-53,-12, -3, -1, 18,-14, -19,
+     -105,-21,-58,-33,-17,-28,-19, -23],
+    // Bishop
+    [-29,  4,-82,-37,-25,-42,  7, -8,
+     -26, 16,-18,-13, 30, 59, 18,-47,
+     -16, 37, 43, 40, 35, 50, 37, -2,
+      -4,  5, 19, 50, 37, 37,  7, -2,
+      -6, 13, 13, 26, 34, 12, 10,  4,
+       0, 15, 15, 15, 14, 27, 18, 10,
+       4, 15, 16,  0,  7, 21, 33,  1,
+     -33, -3,-14,-21,-13,-12,-39,-21],
+    // Rook
+    [ 32, 42, 32, 51, 63,  9, 31, 43,
+      27, 32, 58, 62, 80, 67, 26, 44,
+      -5, 19, 26, 36, 17, 45, 61, 16,
+     -24,-11,  7, 26, 24, 35, -8,-20,
+     -36,-26,-12, -1,  9, -7,  6,-23,
+     -45,-25,-16,-17,  3,  0, -5,-33,
+     -44,-16,-20, -9, -1, 11, -6,-71,
+     -19,-13,  1, 17, 16,  7,-37,-26],
+    // Queen
+    [-28,  0, 29, 12, 59, 44, 43, 45,
+     -24,-39, -5,  1,-16, 57, 28, 54,
+     -13,-17,  7,  8, 29, 56, 47, 57,
+     -27,-27,-16,-16, -1, 17, -2,  1,
+      -9,-26, -9,-10, -2, -4,  3, -3,
+     -14,  2,-11, -2, -5,  2, 14,  5,
+     -35, -8, 11,  2,  8, 15, -3,  1,
+      -1,-18, -9, 10,-15,-25,-31,-50],
+    // King
+    [-65, 23, 16,-15,-56,-34,  2, 13,
+      29, -1,-20, -7, -8, -4,-38,-29,
+      -9, 24,  2,-16,-20,  6, 22,-22,
+     -17,-20,-12,-27,-30,-25,-14,-36,
+     -49, -1,-27,-39,-46,-44,-33,-51,
+     -14,-14,-22,-46,-44,-30,-15,-27,
+       1,  7, -8,-64,-43,-16,  9,  8,
+     -15, 36, 12,-54,  8,-28, 24, 14],
+];
+
+/// Folded white-relative PST score over all pieces/squares (private; loops).
+#[inline]
+fn pst_score(v: &PositionView) -> i32 {
+    let mut acc = 0i32;
+    let mut p = 0usize;
+    while p < 6 {
+        let mut w = v.by_piece[WHITE][p];
+        while w != 0 {
+            let sq = w.trailing_zeros() as usize;
+            acc += PST[p][sq ^ 56];
+            w &= w - 1;
+        }
+        let mut b = v.by_piece[BLACK][p];
+        while b != 0 {
+            let sq = b.trailing_zeros() as usize;
+            acc -= PST[p][sq];
+            b &= b - 1;
+        }
+        p += 1;
+    }
+    acc
+}""" ;
+    cf:kernelBody """pst_score(v).wrapping_mul(SCORE_SCALE)""" ;
+    cf:oracleBody """const T: [[i32; 64]; 6] = [
+            [  0,  0,  0,  0,  0,  0,  0,  0, 98,134, 61, 95, 68,126, 34,-11, -6,  7, 26, 31, 65, 56, 25,-20,-14, 13,  6, 21, 23, 12, 17,-23,-27, -2, -5, 12, 17,  6, 10,-25,-26, -4, -4,-10,  3,  3, 33,-12,-35, -1,-20,-23,-15, 24, 38,-22,  0,  0,  0,  0,  0,  0,  0,  0],
+            [-167,-89,-34,-49, 61,-97,-15,-107,-73,-41, 72, 36, 23, 62,  7, -17,-47, 60, 37, 65, 84,129, 73,  44, -9, 17, 19, 53, 37, 69, 18,  22,-13,  4, 16, 13, 28, 19, 21,  -8,-23, -9, 12, 10, 19, 17, 25, -16,-29,-53,-12, -3, -1, 18,-14, -19,-105,-21,-58,-33,-17,-28,-19, -23],
+            [-29,  4,-82,-37,-25,-42,  7, -8,-26, 16,-18,-13, 30, 59, 18,-47,-16, 37, 43, 40, 35, 50, 37, -2, -4,  5, 19, 50, 37, 37,  7, -2, -6, 13, 13, 26, 34, 12, 10,  4,  0, 15, 15, 15, 14, 27, 18, 10,  4, 15, 16,  0,  7, 21, 33,  1,-33, -3,-14,-21,-13,-12,-39,-21],
+            [ 32, 42, 32, 51, 63,  9, 31, 43, 27, 32, 58, 62, 80, 67, 26, 44, -5, 19, 26, 36, 17, 45, 61, 16,-24,-11,  7, 26, 24, 35, -8,-20,-36,-26,-12, -1,  9, -7,  6,-23,-45,-25,-16,-17,  3,  0, -5,-33,-44,-16,-20, -9, -1, 11, -6,-71,-19,-13,  1, 17, 16,  7,-37,-26],
+            [-28,  0, 29, 12, 59, 44, 43, 45,-24,-39, -5,  1,-16, 57, 28, 54,-13,-17,  7,  8, 29, 56, 47, 57,-27,-27,-16,-16, -1, 17, -2,  1, -9,-26, -9,-10, -2, -4,  3, -3,-14,  2,-11, -2, -5,  2, 14,  5,-35, -8, 11,  2,  8, 15, -3,  1, -1,-18, -9, 10,-15,-25,-31,-50],
+            [-65, 23, 16,-15,-56,-34,  2, 13, 29, -1,-20, -7, -8, -4,-38,-29, -9, 24,  2,-16,-20,  6, 22,-22,-17,-20,-12,-27,-30,-25,-14,-36,-49, -1,-27,-39,-46,-44,-33,-51,-14,-14,-22,-46,-44,-30,-15,-27,  1,  7, -8,-64,-43,-16,  9,  8,-15, 36, 12,-54,  8,-28, 24, 14],
+        ];
+        let mut acc = 0i32;
+        let mut p = 0usize;
+        while p < 6 {
+            let mut sq = 0usize;
+            while sq < 64 {
+                let m = 1u64 << sq;
+                if v.by_piece[WHITE][p] & m != 0 {
+                    acc += T[p][sq ^ 56];
+                }
+                if v.by_piece[BLACK][p] & m != 0 {
+                    acc -= T[p][sq];
+                }
+                sq += 1;
+            }
+            p += 1;
+        }
+        acc * SCORE_SCALE""" ;
+    cf:firedExpr """v.by_color[WHITE] | v.by_color[BLACK]""" .
+
+cf:mobility a cf:FeatureStation ;
+    cf:id 2 ;
+    cf:name "mobility" ;
+    cf:lowering cf:Bitset ;
+    cf:primitive "crate::rays::kogge_stone_attacks" ;
+    cf:inputMask "sliders_and_leapers" ;
+    cf:scoreScale 6 ;
+    cf:weight_q8 256 ;
+    cf:eventCode 1002 ;
+    cf:eventName "mobility_evaluated" ;
+    cf:authority "raw_cp == (popcount(my_attacks & empty) - popcount(opp_attacks & empty)) * 6" ;
+    cf:doc "Mobility differential: Kogge-Stone rook/bishop/queen attack spans plus knight/king masks, counting reachable empty squares; 4 cp per square (reuses legal_moves)." ;
+    cf:kernelHelpers """use crate::rays::{bishop_attacks, queen_attacks, rook_attacks, KING_MASKS, KNIGHT_MASKS};
+use crate::position::{BISHOP, KING, KNIGHT, QUEEN, ROOK};
+
+/// Full attack span of one color: slider rays (Kogge-Stone, over `empty`)
+/// plus knight/king leaper masks. Private (loops), outside CC=1.
+#[inline]
+pub(super) fn attack_span(v: &PositionView, color: usize) -> u64 {
+    let empty = v.empty;
+    let mut span = 0u64;
+    let mut bb = v.by_piece[color][ROOK];
+    while bb != 0 {
+        span |= rook_attacks(bb & bb.wrapping_neg(), empty);
+        bb &= bb - 1;
+    }
+    let mut bb = v.by_piece[color][BISHOP];
+    while bb != 0 {
+        span |= bishop_attacks(bb & bb.wrapping_neg(), empty);
+        bb &= bb - 1;
+    }
+    let mut bb = v.by_piece[color][QUEEN];
+    while bb != 0 {
+        span |= queen_attacks(bb & bb.wrapping_neg(), empty);
+        bb &= bb - 1;
+    }
+    let mut bb = v.by_piece[color][KNIGHT];
+    while bb != 0 {
+        span |= KNIGHT_MASKS[bb.trailing_zeros() as usize];
+        bb &= bb - 1;
+    }
+    let mut bb = v.by_piece[color][KING];
+    while bb != 0 {
+        span |= KING_MASKS[bb.trailing_zeros() as usize];
+        bb &= bb - 1;
+    }
+    span
+}""" ;
+    cf:kernelBody """let my = (attack_span(v, WHITE) & v.empty).count_ones() as i32;
+    let opp = (attack_span(v, BLACK) & v.empty).count_ones() as i32;
+    (my - opp).wrapping_mul(SCORE_SCALE)""" ;
+    cf:oracleBody """let white_span = super::attack_span(v, WHITE);
+        let black_span = super::attack_span(v, BLACK);
+        let mut white = 0i32;
+        let mut black = 0i32;
+        let mut sq = 0usize;
+        while sq < 64 {
+            let m = 1u64 << sq;
+            if (white_span & v.empty & m) != 0 {
+                white += 1;
+            }
+            if (black_span & v.empty & m) != 0 {
+                black += 1;
+            }
+            sq += 1;
+        }
+        (white - black) * SCORE_SCALE""" ;
+    cf:firedExpr """attack_span(v, WHITE) | attack_span(v, BLACK)""" .
+
+cf:king_safety a cf:FeatureStation ;
+    cf:id 3 ;
+    cf:name "king_safety" ;
+    cf:lowering cf:Mask ;
+    cf:primitive "crate::rays::king_ring" ;
+    cf:inputMask "king_ring_and_attacks" ;
+    cf:scoreScale 20 ;
+    cf:weight_q8 256 ;
+    cf:eventCode 1003 ;
+    cf:eventName "king_safety_evaluated" ;
+    cf:authority "raw_cp == (popcount(my_attacks & opp_king_ring) - popcount(opp_attacks & my_king_ring)) * 20" ;
+    cf:doc "King safety: net attackers on the enemy king ring (8-neighbourhood) minus attackers on our own king ring, 12 cp per attacked ring square; white-relative and signed." ;
+    cf:kernelHelpers """use crate::rays::{bishop_attacks, queen_attacks, rook_attacks, KING_MASKS, KNIGHT_MASKS};
+use crate::position::{BISHOP, KING, KNIGHT, QUEEN, ROOK};
+
+/// Full attack span of one color (see mobility). Private, loops.
+#[inline]
+pub(super) fn attack_span(v: &PositionView, color: usize) -> u64 {
+    let empty = v.empty;
+    let mut span = 0u64;
+    let mut bb = v.by_piece[color][ROOK];
+    while bb != 0 {
+        span |= rook_attacks(bb & bb.wrapping_neg(), empty);
+        bb &= bb - 1;
+    }
+    let mut bb = v.by_piece[color][BISHOP];
+    while bb != 0 {
+        span |= bishop_attacks(bb & bb.wrapping_neg(), empty);
+        bb &= bb - 1;
+    }
+    let mut bb = v.by_piece[color][QUEEN];
+    while bb != 0 {
+        span |= queen_attacks(bb & bb.wrapping_neg(), empty);
+        bb &= bb - 1;
+    }
+    let mut bb = v.by_piece[color][KNIGHT];
+    while bb != 0 {
+        span |= KNIGHT_MASKS[bb.trailing_zeros() as usize];
+        bb &= bb - 1;
+    }
+    let mut bb = v.by_piece[color][KING];
+    while bb != 0 {
+        span |= KING_MASKS[bb.trailing_zeros() as usize];
+        bb &= bb - 1;
+    }
+    span
+}
+
+/// 8-neighbourhood ring around every king of `color`. Private, loops.
+#[inline]
+pub(super) fn king_ring(v: &PositionView, color: usize) -> u64 {
+    let mut ring = 0u64;
+    let mut bb = v.by_piece[color][KING];
+    while bb != 0 {
+        ring |= KING_MASKS[bb.trailing_zeros() as usize];
+        bb &= bb - 1;
+    }
+    ring
+}""" ;
+    cf:kernelBody """let on_opp = (attack_span(v, WHITE) & king_ring(v, BLACK)).count_ones() as i32;
+    let on_my = (attack_span(v, BLACK) & king_ring(v, WHITE)).count_ones() as i32;
+    (on_opp - on_my).wrapping_mul(SCORE_SCALE)""" ;
+    cf:oracleBody """let white_span = super::attack_span(v, WHITE);
+        let black_span = super::attack_span(v, BLACK);
+        let white_ring = super::king_ring(v, WHITE);
+        let black_ring = super::king_ring(v, BLACK);
+        let mut on_opp = 0i32;
+        let mut on_my = 0i32;
+        let mut sq = 0usize;
+        while sq < 64 {
+            let m = 1u64 << sq;
+            if (white_span & black_ring & m) != 0 {
+                on_opp += 1;
+            }
+            if (black_span & white_ring & m) != 0 {
+                on_my += 1;
+            }
+            sq += 1;
+        }
+        (on_opp - on_my) * SCORE_SCALE""" ;
+    cf:firedExpr """king_ring(v, WHITE) | king_ring(v, BLACK)""" .
+
+cf:pawn_structure a cf:FeatureStation ;
+    cf:id 4 ;
+    cf:name "pawn_structure" ;
+    cf:lowering cf:Bitset ;
+    cf:primitive "crate::rays::file_fill" ;
+    cf:inputMask "pawns_by_color" ;
+    cf:scoreScale 15 ;
+    cf:weight_q8 256 ;
+    cf:eventCode 1004 ;
+    cf:eventName "pawn_structure_evaluated" ;
+    cf:authority "raw_cp == (opp_doubled + opp_isolated - my_doubled - my_isolated) * 15" ;
+    cf:doc "Pawn structure: doubled (extra pawns beyond one per file) and isolated (no friendly pawn on either adjacent file) pawns penalised 15 cp each; white-relative." ;
+    cf:kernelHelpers """use crate::position::PAWN;
+
+/// File masks (A..H); FILES[f] selects every square on file f.
+const FILES: [u64; 8] = [
+    0x0101_0101_0101_0101,
+    0x0202_0202_0202_0202,
+    0x0404_0404_0404_0404,
+    0x0808_0808_0808_0808,
+    0x1010_1010_1010_1010,
+    0x2020_2020_2020_2020,
+    0x4040_4040_4040_4040,
+    0x8080_8080_8080_8080,
+];
+
+/// doubled+isolated penalty count for one color's pawns. Private, loops.
+#[inline]
+pub(super) fn pawn_penalty(v: &PositionView, color: usize) -> i32 {
+    let pawns = v.by_piece[color][PAWN];
+    let mut penalty = 0i32;
+    let mut f = 0usize;
+    while f < 8 {
+        let on_file = (pawns & FILES[f]).count_ones() as i32;
+        if on_file > 0 {
+            // doubled: every pawn beyond the first on this file.
+            penalty += on_file - 1;
+            // isolated: no friendly pawn on either adjacent file.
+            let mut neighbour = false;
+            if f > 0 && (pawns & FILES[f - 1]) != 0 {
+                neighbour = true;
+            }
+            if f < 7 && (pawns & FILES[f + 1]) != 0 {
+                neighbour = true;
+            }
+            if !neighbour {
+                penalty += on_file;
+            }
+        }
+        f += 1;
+    }
+    penalty
+}""" ;
+    cf:kernelBody """(pawn_penalty(v, BLACK) - pawn_penalty(v, WHITE)).wrapping_mul(SCORE_SCALE)""" ;
+    cf:oracleBody """fn pen(pawns: u64) -> i32 {
+            const FILE_A: u64 = 0x0101_0101_0101_0101;
+            let mut p = 0i32;
+            let mut f = 0usize;
+            while f < 8 {
+                let file = FILE_A << f;
+                let n = (pawns & file).count_ones() as i32;
+                if n > 0 {
+                    p += n - 1;
+                    let mut has_neighbour = false;
+                    if f > 0 && (pawns & (FILE_A << (f - 1))) != 0 {
+                        has_neighbour = true;
+                    }
+                    if f < 7 && (pawns & (FILE_A << (f + 1))) != 0 {
+                        has_neighbour = true;
+                    }
+                    if !has_neighbour {
+                        p += n;
+                    }
+                }
+                f += 1;
+            }
+            p
+        }
+        (pen(v.by_piece[BLACK][PAWN]) - pen(v.by_piece[WHITE][PAWN])) * SCORE_SCALE""" ;
+    cf:firedExpr """v.by_piece[WHITE][PAWN] | v.by_piece[BLACK][PAWN]""" .
+
+cf:center_control a cf:FeatureStation ;
+    cf:id 5 ;
+    cf:name "center_control" ;
+    cf:lowering cf:Mask ;
+    cf:primitive "crate::rays::CENTER_MASK" ;
+    cf:inputMask "attacks_by_color" ;
+    cf:scoreScale 10 ;
+    cf:weight_q8 256 ;
+    cf:eventCode 1005 ;
+    cf:eventName "center_control_evaluated" ;
+    cf:authority "raw_cp == (popcount(my_attacks & CENTER) - popcount(opp_attacks & CENTER)) * 10" ;
+    cf:doc "Center control: net attacks on the d4/e4/d5/e5 center mask, 10 cp per controlled central square; white-relative bitwise AND with the fixed center LUT." ;
+    cf:kernelHelpers """use crate::rays::{bishop_attacks, queen_attacks, rook_attacks, KING_MASKS, KNIGHT_MASKS};
+use crate::position::{BISHOP, KING, KNIGHT, QUEEN, ROOK};
+
+/// d4 | e4 | d5 | e5 center squares (sq = rank*8 + file).
+const CENTER: u64 = (1u64 << 27) | (1u64 << 28) | (1u64 << 35) | (1u64 << 36);
+
+/// Full attack span of one color (see mobility). Private, loops.
+#[inline]
+pub(super) fn attack_span(v: &PositionView, color: usize) -> u64 {
+    let empty = v.empty;
+    let mut span = 0u64;
+    let mut bb = v.by_piece[color][ROOK];
+    while bb != 0 {
+        span |= rook_attacks(bb & bb.wrapping_neg(), empty);
+        bb &= bb - 1;
+    }
+    let mut bb = v.by_piece[color][BISHOP];
+    while bb != 0 {
+        span |= bishop_attacks(bb & bb.wrapping_neg(), empty);
+        bb &= bb - 1;
+    }
+    let mut bb = v.by_piece[color][QUEEN];
+    while bb != 0 {
+        span |= queen_attacks(bb & bb.wrapping_neg(), empty);
+        bb &= bb - 1;
+    }
+    let mut bb = v.by_piece[color][KNIGHT];
+    while bb != 0 {
+        span |= KNIGHT_MASKS[bb.trailing_zeros() as usize];
+        bb &= bb - 1;
+    }
+    let mut bb = v.by_piece[color][KING];
+    while bb != 0 {
+        span |= KING_MASKS[bb.trailing_zeros() as usize];
+        bb &= bb - 1;
+    }
+    span
+}""" ;
+    cf:kernelBody """let my = (attack_span(v, WHITE) & CENTER).count_ones() as i32;
+    let opp = (attack_span(v, BLACK) & CENTER).count_ones() as i32;
+    (my - opp).wrapping_mul(SCORE_SCALE)""" ;
+    cf:oracleBody """const C: u64 = (1u64 << 27) | (1u64 << 28) | (1u64 << 35) | (1u64 << 36);
+        let white_span = super::attack_span(v, WHITE);
+        let black_span = super::attack_span(v, BLACK);
+        let mut white = 0i32;
+        let mut black = 0i32;
+        let mut sq = 0usize;
+        while sq < 64 {
+            let m = 1u64 << sq;
+            if (white_span & C & m) != 0 {
+                white += 1;
+            }
+            if (black_span & C & m) != 0 {
+                black += 1;
+            }
+            sq += 1;
+        }
+        (white - black) * SCORE_SCALE""" ;
+    cf:firedExpr """(attack_span(v, WHITE) | attack_span(v, BLACK)) & CENTER""" .
+
+#################################################################
+# Tactical motifs — 4 (bitwise detectors -> fired mask)
+#################################################################
+
+cf:hanging a cf:TacticalMotif ;
+    cf:id 0 ;
+    cf:name "hanging" ;
+    cf:lowering cf:Mask ;
+    cf:primitive "crate::rays::attack_sets" ;
+    cf:inputMask "my & opp_attacks & !own_defends" ;
+    cf:eventCode 2000 ;
+    cf:eventName "hanging_detected" ;
+    cf:authority "fired == (stm_pieces & enemy_attacks & !stm_attacks)" ;
+    cf:doc "Hanging piece: side-to-move pieces attacked by the enemy and not defended by a friendly piece (stm & enemy_attacks & !stm_defends)." ;
+    cf:kernelHelpers """use crate::rays::{bishop_attacks, queen_attacks, rook_attacks, KING_MASKS, KNIGHT_MASKS};
+
+/// Full attack span of one color: slider rays (Kogge-Stone over `empty`) plus
+/// knight/king leaper masks. Private (loops), outside the CC=1 boundary.
+#[inline]
+pub(super) fn attack_span(v: &PositionView, color: usize) -> u64 {
+    let empty = v.empty;
+    let mut span = 0u64;
+    let mut bb = v.by_piece[color][ROOK];
+    while bb != 0 {
+        span |= rook_attacks(bb & bb.wrapping_neg(), empty);
+        bb &= bb - 1;
+    }
+    let mut bb = v.by_piece[color][BISHOP];
+    while bb != 0 {
+        span |= bishop_attacks(bb & bb.wrapping_neg(), empty);
+        bb &= bb - 1;
+    }
+    let mut bb = v.by_piece[color][QUEEN];
+    while bb != 0 {
+        span |= queen_attacks(bb & bb.wrapping_neg(), empty);
+        bb &= bb - 1;
+    }
+    let mut bb = v.by_piece[color][KNIGHT];
+    while bb != 0 {
+        span |= KNIGHT_MASKS[bb.trailing_zeros() as usize];
+        bb &= bb - 1;
+    }
+    let mut bb = v.by_piece[color][KING];
+    while bb != 0 {
+        span |= KING_MASKS[bb.trailing_zeros() as usize];
+        bb &= bb - 1;
+    }
+    span
+}
+
+/// Hanging squares for the side to move: own pieces hit by enemy attacks and
+/// not defended by a friendly attack. Private (calls looping spans).
+#[inline]
+pub(super) fn hanging_mask(v: &PositionView) -> u64 {
+    let stm = v.stm;
+    let enemy = stm ^ 1;
+    v.by_color[stm] & attack_span(v, enemy) & !attack_span(v, stm)
+}""" ;
+    cf:detectBody """hanging_mask(v)""" ;
+    cf:firedBody """let m = hanging_mask(v); (((m | m.wrapping_neg()) >> 63) & 1).wrapping_neg()""" ;
+    cf:oracleBody """// Independent oracle: recompute each color's full attack set square by
+        // square via per-piece masks, then test every stm square for the law.
+        fn span(v: &PositionView, color: usize) -> u64 {
+            use crate::rays::{bishop_attacks, queen_attacks, rook_attacks, KING_MASKS, KNIGHT_MASKS};
+            let mut out = 0u64;
+            let mut sq = 0usize;
+            while sq < 64 {
+                let bit = 1u64 << sq;
+                if v.by_piece[color][ROOK] & bit != 0 { out |= rook_attacks(bit, v.empty); }
+                if v.by_piece[color][BISHOP] & bit != 0 { out |= bishop_attacks(bit, v.empty); }
+                if v.by_piece[color][QUEEN] & bit != 0 { out |= queen_attacks(bit, v.empty); }
+                if v.by_piece[color][KNIGHT] & bit != 0 { out |= KNIGHT_MASKS[sq]; }
+                if v.by_piece[color][KING] & bit != 0 { out |= KING_MASKS[sq]; }
+                sq += 1;
+            }
+            out
+        }
+        let stm = v.stm;
+        let enemy = stm ^ 1;
+        let atk = span(v, enemy);
+        let def = span(v, stm);
+        let mut fired = 0u64;
+        let mut sq = 0usize;
+        while sq < 64 {
+            let bit = 1u64 << sq;
+            let mine = v.by_color[stm] & bit != 0;
+            let attacked = atk & bit != 0;
+            let defended = def & bit != 0;
+            if mine && attacked && !defended {
+                fired |= bit;
+            }
+            sq += 1;
+        }
+        fired""" .
+
+cf:fork a cf:TacticalMotif ;
+    cf:id 1 ;
+    cf:name "fork" ;
+    cf:lowering cf:Bitset ;
+    cf:primitive "crate::rays::attack_sets" ;
+    cf:inputMask "attacker_targets >= 2" ;
+    cf:eventCode 2001 ;
+    cf:eventName "fork_detected" ;
+    cf:authority "fired == { stm attacker | popcount(attacks(attacker) & enemy_valuables) >= 2 }" ;
+    cf:doc "Fork: a side-to-move knight, bishop, rook or queen whose attack set covers two or more enemy valuable pieces (rook/queen/king) simultaneously." ;
+    cf:kernelHelpers """use crate::rays::{bishop_attacks, queen_attacks, rook_attacks, KNIGHT_MASKS};
+
+/// Attack set of a single piece of `piece` type on square bit `bit`.
+#[inline]
+pub(super) fn piece_attacks(v: &PositionView, piece: usize, bit: u64) -> u64 {
+    let empty = v.empty;
+    match piece {
+        KNIGHT => KNIGHT_MASKS[bit.trailing_zeros() as usize],
+        BISHOP => bishop_attacks(bit, empty),
+        ROOK => rook_attacks(bit, empty),
+        QUEEN => queen_attacks(bit, empty),
+        _ => 0,
+    }
+}
+
+/// Side-to-move forking pieces: knights/sliders attacking >= 2 enemy valuables
+/// (rook, queen, king). Returns the bitmask of forking-piece squares.
+#[inline]
+pub(super) fn fork_mask(v: &PositionView) -> u64 {
+    let stm = v.stm;
+    let enemy = stm ^ 1;
+    let valuables =
+        v.by_piece[enemy][ROOK] | v.by_piece[enemy][QUEEN] | v.by_piece[enemy][KING];
+    let mut fired = 0u64;
+    let pieces = [KNIGHT, BISHOP, ROOK, QUEEN];
+    let mut i = 0;
+    while i < pieces.len() {
+        let piece = pieces[i];
+        let mut bb = v.by_piece[stm][piece];
+        while bb != 0 {
+            let bit = bb & bb.wrapping_neg();
+            let hits = (piece_attacks(v, piece, bit) & valuables).count_ones();
+            if hits >= 2 {
+                fired |= bit;
+            }
+            bb &= bb - 1;
+        }
+        i += 1;
+    }
+    fired
+}""" ;
+    cf:detectBody """fork_mask(v)""" ;
+    cf:firedBody """let m = fork_mask(v); (((m | m.wrapping_neg()) >> 63) & 1).wrapping_neg()""" ;
+    cf:oracleBody """// Independent oracle: iterate all 64 squares, for each stm knight/slider
+        // recompute its attack set inline and count enemy valuables hit.
+        use crate::rays::{bishop_attacks, queen_attacks, rook_attacks, KNIGHT_MASKS};
+        let stm = v.stm;
+        let enemy = stm ^ 1;
+        let valuables =
+            v.by_piece[enemy][ROOK] | v.by_piece[enemy][QUEEN] | v.by_piece[enemy][KING];
+        let mut fired = 0u64;
+        let mut sq = 0usize;
+        while sq < 64 {
+            let bit = 1u64 << sq;
+            let attacks = if v.by_piece[stm][KNIGHT] & bit != 0 {
+                KNIGHT_MASKS[sq]
+            } else if v.by_piece[stm][BISHOP] & bit != 0 {
+                bishop_attacks(bit, v.empty)
+            } else if v.by_piece[stm][ROOK] & bit != 0 {
+                rook_attacks(bit, v.empty)
+            } else if v.by_piece[stm][QUEEN] & bit != 0 {
+                queen_attacks(bit, v.empty)
+            } else {
+                0
+            };
+            let mut hits = 0u32;
+            let mut t = 0usize;
+            while t < 64 {
+                let tb = 1u64 << t;
+                if attacks & tb != 0 && valuables & tb != 0 {
+                    hits += 1;
+                }
+                t += 1;
+            }
+            if hits >= 2 {
+                fired |= bit;
+            }
+            sq += 1;
+        }
+        fired""" .
+
+cf:pin a cf:TacticalMotif ;
+    cf:id 2 ;
+    cf:name "pin" ;
+    cf:lowering cf:Network ;
+    cf:primitive "crate::rays::xray_attacks" ;
+    cf:inputMask "xray_span_to_king" ;
+    cf:eventCode 2002 ;
+    cf:eventName "pin_detected" ;
+    cf:authority "fired == { enemy non-king p1 | a stm slider ray hits p1 then the enemy king p2 with no piece between }" ;
+    cf:doc "Pin: an enemy non-king piece p1 such that, walking a friendly slider's ray, p1 is the first piece and the enemy king is the second — p1 is pinned to its king. fired = pinned enemy-piece squares." ;
+    cf:kernelHelpers """/// The 8 ray steps as (file delta, rank delta). First 4 are orthogonal
+/// (rook/queen), last 4 diagonal (bishop/queen).
+pub(super) const DIRS: [(i32, i32); 8] = [
+    (1, 0), (-1, 0), (0, 1), (0, -1),
+    (1, 1), (1, -1), (-1, 1), (-1, -1),
+];
+
+/// Whether a (file, rank) delta direction is a rook line (orthogonal).
+#[inline]
+pub(super) fn is_orth(df: i32, dr: i32) -> bool {
+    df == 0 || dr == 0
+}
+
+/// Walk from square `sq` in direction `dir` and return the first two occupied
+/// squares encountered as `(p1, p2)` bit masks (0 if the ray runs off-board or
+/// finds fewer than two pieces). Private (loops).
+#[inline]
+pub(super) fn first_two(v: &PositionView, sq: usize, dir: (i32, i32)) -> (u64, u64) {
+    let (df, dr) = dir;
+    let mut file = (sq % 8) as i32;
+    let mut rank = (sq / 8) as i32;
+    let mut found = [0u64; 2];
+    let mut n = 0usize;
+    loop {
+        file += df;
+        rank += dr;
+        if !(0..8).contains(&file) || !(0..8).contains(&rank) {
+            break;
+        }
+        let bit = 1u64 << (rank * 8 + file);
+        if v.occ & bit != 0 {
+            found[n] = bit;
+            n += 1;
+            if n == 2 {
+                break;
+            }
+        }
+    }
+    (found[0], found[1])
+}
+
+/// stm slider bitmask matching a direction: rook+queen for orthogonal lines,
+/// bishop+queen for diagonal lines.
+#[inline]
+pub(super) fn sliders_for(v: &PositionView, color: usize, orth: bool) -> u64 {
+    if orth {
+        v.by_piece[color][ROOK] | v.by_piece[color][QUEEN]
+    } else {
+        v.by_piece[color][BISHOP] | v.by_piece[color][QUEEN]
+    }
+}
+
+/// Pinned enemy pieces: for each stm slider, walk its lines; if the first piece
+/// is an enemy non-king and the second is the enemy king, the first is pinned.
+#[inline]
+pub(super) fn pin_mask(v: &PositionView) -> u64 {
+    let stm = v.stm;
+    let enemy = stm ^ 1;
+    let enemy_king = v.by_piece[enemy][KING];
+    let enemy_nonking = v.by_color[enemy] & !enemy_king;
+    let mut fired = 0u64;
+    let mut bb = v.by_piece[stm][ROOK] | v.by_piece[stm][BISHOP] | v.by_piece[stm][QUEEN];
+    while bb != 0 {
+        let bit = bb & bb.wrapping_neg();
+        let sq = bit.trailing_zeros() as usize;
+        let mut d = 0usize;
+        while d < 8 {
+            let dir = DIRS[d];
+            let orth = is_orth(dir.0, dir.1);
+            if sliders_for(v, stm, orth) & bit != 0 {
+                let (p1, p2) = first_two(v, sq, dir);
+                if p1 & enemy_nonking != 0 && p2 & enemy_king != 0 {
+                    fired |= p1;
+                }
+            }
+            d += 1;
+        }
+        bb &= bb - 1;
+    }
+    fired
+}""" ;
+    cf:detectBody """pin_mask(v)""" ;
+    cf:firedBody """let m = pin_mask(v); (((m | m.wrapping_neg()) >> 63) & 1).wrapping_neg()""" ;
+    cf:oracleBody """// Independent oracle: anchor the walk at the ENEMY KING instead of the
+        // slider. From the king, step outward in each direction; if the first
+        // piece is an enemy non-king and the next is a stm slider of the
+        // matching type, the first piece is pinned.
+        let stm = v.stm;
+        let enemy = stm ^ 1;
+        let enemy_king_bb = v.by_piece[enemy][KING];
+        if enemy_king_bb == 0 {
+            return 0;
+        }
+        let ksq = enemy_king_bb.trailing_zeros() as usize;
+        let kf = (ksq % 8) as i32;
+        let kr = (ksq / 8) as i32;
+        let dirs: [(i32, i32); 8] = [
+            (1, 0), (-1, 0), (0, 1), (0, -1),
+            (1, 1), (1, -1), (-1, 1), (-1, -1),
+        ];
+        let mut fired = 0u64;
+        let mut d = 0usize;
+        while d < 8 {
+            let (df, dr) = dirs[d];
+            let orth = df == 0 || dr == 0;
+            let stm_sliders = if orth {
+                v.by_piece[stm][ROOK] | v.by_piece[stm][QUEEN]
+            } else {
+                v.by_piece[stm][BISHOP] | v.by_piece[stm][QUEEN]
+            };
+            let mut f = kf;
+            let mut r = kr;
+            let mut first = 0u64;
+            let mut second = 0u64;
+            let mut n = 0;
+            loop {
+                f += df;
+                r += dr;
+                if !(0..8).contains(&f) || !(0..8).contains(&r) {
+                    break;
+                }
+                let bit = 1u64 << (r * 8 + f);
+                if v.occ & bit != 0 {
+                    if n == 0 { first = bit; } else { second = bit; break; }
+                    n += 1;
+                }
+            }
+            let p1_enemy_nonking = first & v.by_color[enemy] != 0 && first & v.by_piece[enemy][KING] == 0;
+            let p2_stm_slider = second & stm_sliders != 0;
+            if p1_enemy_nonking && p2_stm_slider {
+                fired |= first;
+            }
+            d += 1;
+        }
+        fired""" .
+
+cf:skewer a cf:TacticalMotif ;
+    cf:id 3 ;
+    cf:name "skewer" ;
+    cf:lowering cf:Network ;
+    cf:primitive "crate::rays::xray_attacks" ;
+    cf:inputMask "xray_span_value_descending" ;
+    cf:eventCode 2003 ;
+    cf:eventName "skewer_detected" ;
+    cf:authority "fired == { rear enemy p2 | a stm slider ray hits enemy front p1 then enemy rear p2 with value(p1) > value(p2) }" ;
+    cf:doc "Skewer: a friendly slider's ray hits a more valuable enemy front piece p1 that shields a less valuable enemy rear piece p2 (value(p1) > value(p2)). fired = rear-piece squares (inverse of a pin)." ;
+    cf:kernelHelpers """/// The 8 ray steps (file delta, rank delta); 4 orthogonal then 4 diagonal.
+pub(super) const DIRS: [(i32, i32); 8] = [
+    (1, 0), (-1, 0), (0, 1), (0, -1),
+    (1, 1), (1, -1), (-1, 1), (-1, -1),
+];
+
+/// Centipawn rank used only to order front vs rear value (king is highest).
+pub(super) const VALUE: [i32; 6] = [100, 320, 330, 500, 900, 20000];
+
+/// Piece type (0..6) of the piece occupying bit `bit` for `color`, or 6 if none.
+#[inline]
+pub(super) fn piece_of(v: &PositionView, color: usize, bit: u64) -> usize {
+    let mut p = 0usize;
+    while p < 6 {
+        if v.by_piece[color][p] & bit != 0 {
+            return p;
+        }
+        p += 1;
+    }
+    6
+}
+
+/// Walk from `sq` in `dir`, returning the first two occupied bits `(p1, p2)`.
+#[inline]
+pub(super) fn first_two(v: &PositionView, sq: usize, dir: (i32, i32)) -> (u64, u64) {
+    let (df, dr) = dir;
+    let mut file = (sq % 8) as i32;
+    let mut rank = (sq / 8) as i32;
+    let mut found = [0u64; 2];
+    let mut n = 0usize;
+    loop {
+        file += df;
+        rank += dr;
+        if !(0..8).contains(&file) || !(0..8).contains(&rank) {
+            break;
+        }
+        let bit = 1u64 << (rank * 8 + file);
+        if v.occ & bit != 0 {
+            found[n] = bit;
+            n += 1;
+            if n == 2 {
+                break;
+            }
+        }
+    }
+    (found[0], found[1])
+}
+
+/// stm slider bitmask matching a direction (orth: rook+queen, diag: bishop+queen).
+#[inline]
+pub(super) fn sliders_for(v: &PositionView, color: usize, orth: bool) -> u64 {
+    if orth {
+        v.by_piece[color][ROOK] | v.by_piece[color][QUEEN]
+    } else {
+        v.by_piece[color][BISHOP] | v.by_piece[color][QUEEN]
+    }
+}
+
+/// Skewered rear pieces: for each stm slider, walk its lines; if both blockers
+/// are enemy pieces and the FRONT one is worth strictly more than the REAR one,
+/// the rear square is skewered.
+#[inline]
+pub(super) fn skewer_mask(v: &PositionView) -> u64 {
+    let stm = v.stm;
+    let enemy = stm ^ 1;
+    let mut fired = 0u64;
+    let mut bb = v.by_piece[stm][ROOK] | v.by_piece[stm][BISHOP] | v.by_piece[stm][QUEEN];
+    while bb != 0 {
+        let bit = bb & bb.wrapping_neg();
+        let sq = bit.trailing_zeros() as usize;
+        let mut d = 0usize;
+        while d < 8 {
+            let dir = DIRS[d];
+            let orth = dir.0 == 0 || dir.1 == 0;
+            if sliders_for(v, stm, orth) & bit != 0 {
+                let (p1, p2) = first_two(v, sq, dir);
+                let both_enemy = p1 & v.by_color[enemy] != 0 && p2 & v.by_color[enemy] != 0;
+                if both_enemy {
+                    let v1 = VALUE[piece_of(v, enemy, p1)];
+                    let v2 = VALUE[piece_of(v, enemy, p2)];
+                    if v1 > v2 {
+                        fired |= p2;
+                    }
+                }
+            }
+            d += 1;
+        }
+        bb &= bb - 1;
+    }
+    fired
+}""" ;
+    cf:detectBody """skewer_mask(v)""" ;
+    cf:firedBody """let m = skewer_mask(v); (((m | m.wrapping_neg()) >> 63) & 1).wrapping_neg()""" ;
+    cf:oracleBody """// Independent oracle: scan all 64 squares for a stm slider; for each,
+        // independently re-walk every one of its directions and apply the
+        // front>rear value law to the first two enemy blockers.
+        const VAL: [i32; 6] = [100, 320, 330, 500, 900, 20000];
+        let stm = v.stm;
+        let enemy = stm ^ 1;
+        let dirs: [(i32, i32); 8] = [
+            (1, 0), (-1, 0), (0, 1), (0, -1),
+            (1, 1), (1, -1), (-1, 1), (-1, -1),
+        ];
+        let type_at = |bit: u64| -> usize {
+            let mut p = 0usize;
+            while p < 6 {
+                if v.by_piece[enemy][p] & bit != 0 { return p; }
+                p += 1;
+            }
+            6
+        };
+        let mut fired = 0u64;
+        let mut sq = 0usize;
+        while sq < 64 {
+            let bit = 1u64 << sq;
+            let is_rook = v.by_piece[stm][ROOK] & bit != 0;
+            let is_bishop = v.by_piece[stm][BISHOP] & bit != 0;
+            let is_queen = v.by_piece[stm][QUEEN] & bit != 0;
+            if is_rook || is_bishop || is_queen {
+                let mut d = 0usize;
+                while d < 8 {
+                    let (df, dr) = dirs[d];
+                    let orth = df == 0 || dr == 0;
+                    let active = (orth && (is_rook || is_queen)) || (!orth && (is_bishop || is_queen));
+                    if active {
+                        let mut f = (sq % 8) as i32;
+                        let mut r = (sq / 8) as i32;
+                        let mut p1 = 0u64;
+                        let mut p2 = 0u64;
+                        let mut n = 0;
+                        loop {
+                            f += df;
+                            r += dr;
+                            if !(0..8).contains(&f) || !(0..8).contains(&r) { break; }
+                            let b = 1u64 << (r * 8 + f);
+                            if v.occ & b != 0 {
+                                if n == 0 { p1 = b; } else { p2 = b; break; }
+                                n += 1;
+                            }
+                        }
+                        if p1 & v.by_color[enemy] != 0 && p2 & v.by_color[enemy] != 0 {
+                            let v1 = VAL[type_at(p1)];
+                            let v2 = VAL[type_at(p2)];
+                            if v1 > v2 { fired |= p2; }
+                        }
+                    }
+                    d += 1;
+                }
+            }
+            sq += 1;
+        }
+        fired""" .
+
+#################################################################
+# Defect taxonomy — 6 named-law refusals
+#################################################################
+
+cf:illegal_move a cf:Defect ;
+    cf:code 100 ;
+    cf:name "illegal_move" ;
+    cf:doc "Chosen move is not legal in the position (POWL validate_chess_move_powl rejects it)." .
+
+cf:timeout a cf:Defect ;
+    cf:code 101 ;
+    cf:name "timeout" ;
+    cf:doc "Decision exceeded its deterministic node budget (node-bounded, not wall-clock)." .
+
+cf:missing_receipt a cf:Defect ;
+    cf:code 102 ;
+    cf:name "missing_receipt" ;
+    cf:doc "A move was played without an emitted MoveReceipt linking into the chain." .
+
+cf:invalid_transition a cf:Defect ;
+    cf:code 103 ;
+    cf:name "invalid_transition" ;
+    cf:doc "Petri-net pipeline replay did not reach a lawful marking (fitness != 1.0)." .
+
+cf:strategy_divergence a cf:Defect ;
+    cf:code 104 ;
+    cf:name "strategy_divergence" ;
+    cf:doc "Replayed station evaluation diverged from the recorded receipt (recompute_and_match failed)." .
+
+cf:benchmark_regression a cf:Defect ;
+    cf:code 105 ;
+    cf:name "benchmark_regression" ;
+    cf:doc "Measured Elo-at-budget fell below the prior baseline beyond the regression threshold." .

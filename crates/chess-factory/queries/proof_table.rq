@@ -1,0 +1,60 @@
+# proof_table.rq — the receipt-cited Crown proof table: one row per
+# (opponent x budget) cell of the full cross product.
+#
+# STATIC single-file rule: the template iterates `sparql_results`, grouping by
+# opponent to lay out the markdown matrix (rows = opponents, columns = budgets).
+#
+# Every opponent x budget pair appears exactly once. A measured cell LEFT-JOINs
+# its cf:ResultCell (score, CI, perf-Elo, per-side micros, and the blake3 receipt
+# hash that proves it). Unmeasured installed cells render "(not measured)";
+# not-installed opponents render "not-installed". Nothing is faked.
+#
+# PROVISION LAW (GGEN-TPL-001): the template references only the columns projected
+# here. ORDER BY (oppId, budId) gives a stable, replayable layout (determinism).
+
+PREFIX cf: <https://bcinr.dev/chess-factory/ontology#>
+
+SELECT ?oppId ?oppName ?tier ?installed
+       ?budId ?budName ?budMicros
+       ?measured ?scoreRate ?ciLo ?ciHi ?perfElo
+       ?scorePct ?ciText ?perfEloR
+       ?wins ?draws ?losses
+       ?factoryUs ?factoryUsP99 ?oppUs ?oppUsP99
+       ?goCommand ?receiptHash ?prevHash ?runId ?replayPtr
+WHERE {
+    ?opp a cf:ResultOpponent ;
+        cf:rOppId     ?oppId ;
+        cf:rOppName   ?oppName ;
+        cf:rTier      ?tier ;
+        cf:rInstalled ?installed .
+    ?bud a cf:ResultBudget ;
+        cf:rBudId     ?budId ;
+        cf:rBudName   ?budName ;
+        cf:rBudMicros ?budMicros .
+    OPTIONAL {
+        ?cell a cf:ResultCell ;
+            cf:rCellOpp     ?opp ;
+            cf:rCellBud     ?bud ;
+            cf:rScoreRate   ?scoreRate ;
+            cf:rCiLo        ?ciLo ;
+            cf:rCiHi        ?ciHi ;
+            cf:rPerfElo     ?perfElo ;
+            cf:rScorePct    ?scorePct ;
+            cf:rCiText      ?ciText ;
+            cf:rPerfEloR    ?perfEloR ;
+            cf:rWins        ?wins ;
+            cf:rDraws       ?draws ;
+            cf:rLosses      ?losses ;
+            cf:rFactoryUs   ?factoryUs ;
+            cf:rFactoryUsP99 ?factoryUsP99 ;
+            cf:rOppUs       ?oppUs ;
+            cf:rOppUsP99    ?oppUsP99 ;
+            cf:rGoCommand   ?goCommand ;
+            cf:rReceiptHash ?receiptHash ;
+            cf:rPrevHash    ?prevHash ;
+            cf:rRunId       ?runId ;
+            cf:rReplayPtr   ?replayPtr .
+    }
+    BIND(BOUND(?receiptHash) AS ?measured)
+}
+ORDER BY ?oppId ?budId

@@ -1,0 +1,33 @@
+# ocel_schema.rq — the object-centric event schema: one row per evaluation
+# cell (feature station OR tactical motif) that emits an OCEL event. Static
+# single-file rule -> src/evidence/ocel_schema.rs: the template iterates
+# `sparql_results` to emit the OCEL_SCHEMA edge table (cell id, activity code,
+# activity name, object kind). The ?kind literal partitions the two event
+# families. ORDER BY (?eventCode) for stable, deterministic output.
+#
+# PROVISION LAW (GGEN-TPL-001): template references only id, name, eventCode,
+# eventName, kind.
+
+PREFIX cf: <https://bcinr.dev/chess-factory/ontology#>
+
+SELECT ?id ?name ?eventCode ?eventName ?kind
+WHERE {
+    {
+        ?cell a cf:FeatureStation ;
+            cf:id        ?id ;
+            cf:name      ?name ;
+            cf:eventCode ?eventCode ;
+            cf:eventName ?eventName .
+        BIND("feature" AS ?kind)
+    }
+    UNION
+    {
+        ?cell a cf:TacticalMotif ;
+            cf:id        ?id ;
+            cf:name      ?name ;
+            cf:eventCode ?eventCode ;
+            cf:eventName ?eventName .
+        BIND("tactical" AS ?kind)
+    }
+}
+ORDER BY ?eventCode

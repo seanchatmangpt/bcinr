@@ -1,0 +1,43 @@
+{
+  "operation_id": "4cd997b8-97ae-4d8b-97b6-8dc321bf3135",
+  "timestamp": "2026-06-24T02:41:07.212473Z",
+  "input_hashes": [
+    "actuator:ggen-sync@26.6.11",
+    "ggen.toml:40b00be846dc6dfd9b0db96657ecb2db60a23fec675266bf55cfe90c283f35e4",
+    "ontology/chess.ttl:6b66ee36d6a8a2b6f9e33b54f5400b9481ed1851fd3149312ae009ae8e82f0d5",
+    "artifacts/results.ttl:e95d27c6fb3da226aac25f67fd3848ce6fd618cae4e699d6f3b3520e42b5e5ef",
+    "queries/feature_stations.rq:16f7b6c4728055be6c503a30bf36238b6505a06e9ec4a6594b85ad529a1f5028",
+    "templates/feature_station.rs.tera:c160aa665d983c0b91868ef2b3460b0e00acd6bdedddf15687fa50ca2fa19f35",
+    "queries/station_index.rq:5d6b5feb2e62841beaf1ac568e652100e68899c317f02754c80d1d10fc763a05",
+    "templates/stations_mod.rs.tera:7a1962c2b4a4d0847cbcd2b69bc04e53cb0a588364a02757fc3c489271ebe89a",
+    "queries/tactical_motifs.rq:c6f34b074470c612ed5337c64425efdc8c69f84eb9c22846ba4c8dbdbde396ed",
+    "templates/tactical_motif.rs.tera:5a1f4fa3d5753f50964b8156a42432f6da43852f3670641be384a48d2ea2ddec",
+    "queries/tactical_motifs.rq:c6f34b074470c612ed5337c64425efdc8c69f84eb9c22846ba4c8dbdbde396ed",
+    "templates/motifs_mod.rs.tera:df88d6f92d7c7a733da8e9beb23a6e829998a62c1a8f8917cbfb15b3010194e0",
+    "queries/station_weights.rq:738ca65a1ea8b8ea7410802b2233992dd60a22064074e4d6a63b7ea0b9d63805",
+    "templates/station_weights.rs.tera:8fc06131a106dfeaf34ad449e309e49462a1012b0ba7e580d14fd3d0168a6b17",
+    "queries/defects.rq:8d7f8611d3e52af75f74bae68a8580239e56d4545425b66a344582ba9672904f",
+    "templates/defects.rs.tera:5cc19308e9fb8c33a57382f4b326cd1575804e30b15c511f1432bdde0e5fc533",
+    "queries/ocel_schema.rq:e479133f42e1ff11e73e82ee96b117438f51f4b2b4d7e4172a2f9fcc8d7f7ec3",
+    "templates/ocel_schema.rs.tera:6b5f3e4673053553609c7482a6f6ca68c9ee3a923b49e9cda5b938ed9c228f1a"
+  ],
+  "output_hashes": [
+    "./src/stations/material.rs:64e627fc1498b4cc49beaca42223d5630a8adee7cc9687a0d5c9d63f4080e7ee",
+    "./src/stations/pst.rs:e2c3902bdfce06109e47008cf1a5fc6095f67c985e2fb023283bf05210718878",
+    "./src/stations/mobility.rs:bc265ff5dcdaec788e608d4c9c5c79c6900e4c480f1eab8881dfe60b8a84c02c",
+    "./src/stations/king_safety.rs:4973ee0b3dcfe6b451b23acca4f02d2f1e34f57420b842a88372ed561f19ca3a",
+    "./src/stations/pawn_structure.rs:71b5c56fd1f59a047bdae8e14113e71cae994e41e98ee62cf072ebeac1eacb6d",
+    "./src/stations/center_control.rs:09ce489dea2178f1226f03837663f67247e06a0c01371a9a5622db53a489cbdc",
+    "./src/stations/mod.rs:23ffdb4ba04096a7c6ef62d57b97478b8ad1c215cf51c111992cb683b31e9fcc",
+    "./src/motifs/hanging.rs:3314da2abc57bae9ef163a77341a0cd7fc13d258e3fcad313c9cf45c49777c76",
+    "./src/motifs/fork.rs:e66c70940a9938f43a62e1a8027648483c1deab8ec970ecb702248e34529d96d",
+    "./src/motifs/pin.rs:2f55626b057b7d69ea937360ef91ea01ced770af5bb092817c8c92f3ccbd9bdd",
+    "./src/motifs/skewer.rs:99cbfa625eec26c5811bdfee0a1a36d1856bd0f9837e9cbf7e0cc00bb542fa78",
+    "./src/motifs/mod.rs:cc77c4248501d9b9418adcedd5e48d8c79683e290082c2d57c79fad589a1adaa",
+    "./src/weights.rs:cdf909f7bc77d3b34539ea9039bee8425473530ca3c3430b82c0399c1d01d1d0",
+    "./src/defects.rs:09cf8895c2788f954c58d11b5c5b11851c05511bd88eef8dc54acde9015f2112",
+    "./src/evidence/ocel_schema.rs:b202d8a395865bb3a20955abaea5e3876d64020532b8685e936f1405bb9aaff4"
+  ],
+  "signature": "fc227ee0003db6cc26872310fab145bef0f1ea3f2326cdc4982a3ce23811eff8f42e00d8b0fb068b27e17024471c17f632e0dd061bb1fdb6b41147f6ac21510c",
+  "previous_receipt_hash": "901d8d256e30e16bfb56c72cf3f2b9ad7cf741e5a7fdcbae01da06a0296afa8b"
+}
