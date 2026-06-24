@@ -1,6 +1,6 @@
 [package]
 name = "bcinr-bench-auditor"
-version = "26.6.13"
+version = "26.6.24"
 edition = "2021"
 
 license = "MIT OR Apache-2.0"

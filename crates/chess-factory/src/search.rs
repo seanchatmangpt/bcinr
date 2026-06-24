@@ -239,7 +239,9 @@ const PST_MG: [[i8; 64]; 6] = [
 ];
 
 // Passed-pawn rank bonuses (cp, indexed by rank 0-7).
-const PASSED_BONUS: [i32; 8] = [0, 0, 5, 15, 30, 60, 100, 0];
+// Passed-pawn rank bonus in cp (calibrated from SF depth-5 eval data).
+// Values doubled from original: SF training showed these were ~2x too conservative.
+const PASSED_BONUS: [i32; 8] = [0, 0, 10, 25, 50, 100, 160, 0];
 
 /// Fast material+PST+positional eval, side-to-move relative.
 /// Public wrapper around fast_eval for use by the Manufacturing Graph benchmark.
@@ -272,11 +274,11 @@ fn fast_eval(board: &Board) -> i32 {
         }
     }
 
-    // --- Bishop pair (+30 cp each side, branchless O(1)) ---
+    // --- Bishop pair (+50 cp, calibrated from SF training data) ---
     let wbishops = board.pieces(Piece::Bishop) & board.color_combined(Color::White);
     let bbishops = board.pieces(Piece::Bishop) & board.color_combined(Color::Black);
-    if wbishops.popcnt() >= 2 { score += 30; }
-    if bbishops.popcnt() >= 2 { score -= 30; }
+    if wbishops.popcnt() >= 2 { score += 50; }
+    if bbishops.popcnt() >= 2 { score -= 50; }
 
     // --- Passed pawns (O(pawns), rank-scaled bonus) ---
     let wp = board.pieces(Piece::Pawn) & board.color_combined(Color::White);
@@ -323,6 +325,34 @@ fn fast_eval(board: &Board) -> i32 {
             if wp.0 & shadow == 0 {
                 score -= PASSED_BONUS[rank];
             }
+            bb.0 &= bb.0 - 1;
+        }
+    }
+
+    // --- Rook on open/semi-open file (+50 cp open, +25 cp semi-open) ---
+    // Calibrated from SF training: rook open file was the 3rd most predictive feature (151 cp/rook).
+    {
+        let file_masks: [u64; 8] = {
+            let mut m = [0u64; 8];
+            for f in 0..8usize { m[f] = 0x0101_0101_0101_0101u64 << f; }
+            m
+        };
+        let wrooks = board.pieces(Piece::Rook) & board.color_combined(Color::White);
+        let brooks = board.pieces(Piece::Rook) & board.color_combined(Color::Black);
+        let mut bb = wrooks;
+        while bb.0 != 0 {
+            let sq = bb.0.trailing_zeros() as usize;
+            let fm = file_masks[sq & 7];
+            if wp.0 & fm == 0 && bp.0 & fm == 0 { score += 50; }      // open file
+            else if wp.0 & fm == 0 { score += 25; }                    // semi-open (no friendly pawn)
+            bb.0 &= bb.0 - 1;
+        }
+        let mut bb = brooks;
+        while bb.0 != 0 {
+            let sq = bb.0.trailing_zeros() as usize;
+            let fm = file_masks[sq & 7];
+            if bp.0 & fm == 0 && wp.0 & fm == 0 { score -= 50; }
+            else if bp.0 & fm == 0 { score -= 25; }
             bb.0 &= bb.0 - 1;
         }
     }
@@ -412,6 +442,7 @@ fn order(board: &Board, moves: &mut Vec<ChessMove>, hint: Option<ChessMove>, dep
 // Plugin: Late-Move Reduction (precomputed table)
 // ---------------------------------------------------------------------------
 
+#[allow(dead_code)]
 fn lmr_table() -> &'static [[u8; 64]; 64] {
     static LMR: OnceLock<Box<[[u8; 64]; 64]>> = OnceLock::new();
     LMR.get_or_init(|| {
@@ -697,7 +728,7 @@ pub fn fixed_depth_best_move(board: &Board, depth: usize) -> Option<ChessMove> {
 /// predecessor bits are satisfied (branchless SWAR dependency evaluation).
 #[must_use]
 pub fn search_best_move_us(board: &Board, budget_us: u128) -> Option<ChessMove> {
-    use crate::phase::{Phase, TopologyId};
+    use crate::phase::TopologyId;
     use crate::powl_runner::{OpKind, SearchCtx, ops_for_topology, run_topology};
 
     // STEP 1: Phase admission (O* → topology, O(1) table lookup).

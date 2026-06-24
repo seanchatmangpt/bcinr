@@ -1,0 +1,107 @@
+--- Anti-LLM Admissibility Scan Findings ---
+Observations: 976
+Diagnostics emitted: 104
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/latest.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-000059.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-000215.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-000232.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-000240.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-000249.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-001608.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-001940.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-002048.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-002426.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-002504.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-002549.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-002604.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-002612.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-002833.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-011156.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-013924.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-014110.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-014128.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-014516.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-014542.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-014911.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-014929.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-020006.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-020021.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-020902.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-021357.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-024107.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-RECEIPT-003] /Users/sac/bcinr/crates/chess-factory/.ggen/receipts/sync-20260624-024157.json:1: Receipt path or required field is missing.
+  - [ANTI-LLM-CLAIM-004] /Users/sac/bcinr/crates/chess-factory/ocel/ocel_gap_report.md:3: Victory/overclaim language detected: 'no gaps found'. Bounded status vocabulary required.
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/bin/bcinr_benchmark.rs:119: Function 'wait_for' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/bin/bcinr_benchmark.rs:131: Function 'bestmove' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-METRIC-002] /Users/sac/bcinr/crates/chess-factory/src/bin/bcinr_benchmark.rs:178: Function 'play_game' has cyclomatic complexity 13 (threshold 10)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/bin/bcinr_benchmark.rs:178: Function 'play_game' max nesting depth 7 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/bin/bcinr_benchmark.rs:348: Function 'resolve_engine_path' max nesting depth 6 (threshold 4)
+  - [ANTI-LLM-ORACLE-004] /Users/sac/bcinr/crates/chess-factory/src/bin/bcinr_benchmark.rs:348: std::env::var() called in production code path 'resolve_engine_path' — environment oracle channel.
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/bin/bcinr_benchmark.rs:384: Function 'run_cell' max nesting depth 6 (threshold 4)
+  - [ANTI-LLM-METRIC-001] /Users/sac/bcinr/crates/chess-factory/src/bin/bcinr_benchmark.rs:484: Function 'main' is 240 LOC (threshold 80)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/bin/bcinr_benchmark.rs:484: Function 'main' max nesting depth 6 (threshold 4)
+  - [ANTI-LLM-ORACLE-004] /Users/sac/bcinr/crates/chess-factory/src/bin/bcinr_benchmark.rs:484: std::env::var() called in production code path 'main' — environment oracle channel.
+  - [ANTI-LLM-MUT-001] /Users/sac/bcinr/crates/chess-factory/src/bin/bcinr_benchmark.rs:580: Direct file write or file creation found in LSP authority path. The server is read-only by default.
+  - [ANTI-LLM-MUT-001] /Users/sac/bcinr/crates/chess-factory/src/bin/bcinr_benchmark.rs:635: Direct file write or file creation found in LSP authority path. The server is read-only by default.
+  - [ANTI-LLM-MUT-001] /Users/sac/bcinr/crates/chess-factory/src/bin/bcinr_benchmark.rs:713: Direct file write or file creation found in LSP authority path. The server is read-only by default.
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/bin/bcinr_factory.rs:54: Function 'apply_moves' max nesting depth 7 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/bin/bcinr_factory.rs:65: Function 'one_shot' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-METRIC-001] /Users/sac/bcinr/crates/chess-factory/src/bin/bcinr_factory.rs:83: Function 'uci_loop' is 83 LOC (threshold 80)
+  - [ANTI-LLM-METRIC-002] /Users/sac/bcinr/crates/chess-factory/src/bin/bcinr_factory.rs:83: Function 'uci_loop' has cyclomatic complexity 21 (threshold 10)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/bin/bcinr_factory.rs:83: Function 'uci_loop' max nesting depth 11 (threshold 4)
+  - [ANTI-LLM-METRIC-001] /Users/sac/bcinr/crates/chess-factory/src/bin/bcinr_kaizen.rs:82: Function 'main' is 134 LOC (threshold 80)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/bin/bcinr_kaizen.rs:82: Function 'main' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-MUT-001] /Users/sac/bcinr/crates/chess-factory/src/bin/bcinr_kaizen.rs:200: Direct file write or file creation found in LSP authority path. The server is read-only by default.
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/bin/bcinr_verify.rs:31: Function 'parse_receipts' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/bin/sanity_greedy.rs:34: Function 'board_from_position' max nesting depth 9 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/bin/sanity_greedy.rs:61: Function 'capture_gain' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/bin/sanity_greedy.rs:78: Function 'pick_move' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/bin/sanity_greedy.rs:99: Function 'main' max nesting depth 10 (threshold 4)
+  - [ANTI-LLM-ORACLE-004] /Users/sac/bcinr/crates/chess-factory/src/bin/sanity_greedy.rs:99: std::env::var() called in production code path 'main' — environment oracle channel.
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/bin/sanity_random.rs:32: Function 'board_from_position' max nesting depth 9 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/bin/sanity_random.rs:72: Function 'main' max nesting depth 10 (threshold 4)
+  - [ANTI-LLM-ORACLE-004] /Users/sac/bcinr/crates/chess-factory/src/bin/sanity_random.rs:72: std::env::var() called in production code path 'main' — environment oracle channel.
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/defects.rs:72: Function 'defect_by_code' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-STRANGE-010] /Users/sac/bcinr/crates/chess-factory/src/motifs/fork.rs:16: Suppression attribute #[allow(...)] for dead_code/unused/warnings detected — silences real violations.
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/motifs/fork.rs:42: Function 'fork_mask' max nesting depth 7 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/motifs/fork.rs:94: Function 'reference_detect' max nesting depth 8 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/motifs/fork.rs:137: Function 'legal_position' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-STRANGE-010] /Users/sac/bcinr/crates/chess-factory/src/motifs/hanging.rs:16: Suppression attribute #[allow(...)] for dead_code/unused/warnings detected — silences real violations.
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/motifs/hanging.rs:97: Function 'reference_detect' max nesting depth 6 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/motifs/hanging.rs:100: Function 'span' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/motifs/hanging.rs:137: Function 'legal_position' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-STRANGE-010] /Users/sac/bcinr/crates/chess-factory/src/motifs/pin.rs:16: Suppression attribute #[allow(...)] for dead_code/unused/warnings detected — silences real violations.
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/motifs/pin.rs:41: Function 'first_two' max nesting depth 7 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/motifs/pin.rs:79: Function 'pin_mask' max nesting depth 9 (threshold 4)
+  - [ANTI-LLM-METRIC-002] /Users/sac/bcinr/crates/chess-factory/src/motifs/pin.rs:134: Function 'reference_detect' has cyclomatic complexity 13 (threshold 10)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/motifs/pin.rs:134: Function 'reference_detect' max nesting depth 9 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/motifs/pin.rs:192: Function 'legal_position' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-STRANGE-010] /Users/sac/bcinr/crates/chess-factory/src/motifs/skewer.rs:16: Suppression attribute #[allow(...)] for dead_code/unused/warnings detected — silences real violations.
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/motifs/skewer.rs:35: Function 'piece_of' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/motifs/skewer.rs:48: Function 'first_two' max nesting depth 7 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/motifs/skewer.rs:86: Function 'skewer_mask' max nesting depth 11 (threshold 4)
+  - [ANTI-LLM-METRIC-002] /Users/sac/bcinr/crates/chess-factory/src/motifs/skewer.rs:144: Function 'reference_detect' has cyclomatic complexity 23 (threshold 10)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/motifs/skewer.rs:144: Function 'reference_detect' max nesting depth 15 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/motifs/skewer.rs:209: Function 'legal_position' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/position.rs:45: Function 'from_bitboards' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/position.rs:75: Function 'from_board' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/receipts/mod.rs:118: Function 'record_game' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-PLACEHOLDER-001] /Users/sac/bcinr/crates/chess-factory/src/receipts/petri_pipeline.rs:85: Hardcoded fitness=1.0 — fake conformance claim detected
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/receipts/petri_pipeline.rs:125: Function 'replay' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/receipts/verifier.rs:75: Function 'verify_move' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/receipts/verifier.rs:143: Function 'verify_chain' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/search.rs:39: Function 'move_score' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/search.rs:72: Function 'quiescence' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-STRANGE-010] /Users/sac/bcinr/crates/chess-factory/src/search.rs:99: Suppression attribute #[allow(...)] for dead_code/unused/warnings detected — silences real violations.
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/search.rs:100: Function 'alphabeta' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/search.rs:150: Function 'fixed_depth_best_move' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/search.rs:175: Function 'search_best_move' max nesting depth 7 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/stations/center_control.rs:129: Function 'reference_raw_cp' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/stations/king_safety.rs:138: Function 'reference_raw_cp' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/stations/mobility.rs:127: Function 'reference_raw_cp' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/stations/pawn_structure.rs:44: Function 'pawn_penalty' max nesting depth 7 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/stations/pawn_structure.rs:130: Function 'reference_raw_cp' max nesting depth 8 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/stations/pawn_structure.rs:131: Function 'pen' max nesting depth 7 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/stations/pst.rs:90: Function 'pst_score' max nesting depth 5 (threshold 4)
+  - [ANTI-LLM-METRIC-003] /Users/sac/bcinr/crates/chess-factory/src/stations/pst.rs:171: Function 'reference_raw_cp' max nesting depth 7 (threshold 4)
+  - [ANTI-LLM-TEST-005] /Users/sac/bcinr/crates/chess-factory/tests/replay_completeness.rs:23: assert_eq!(...len(), 8) verifies quantity not quality — an LLM that generates exactly 8 items trivially passes this. Combine with at least one structural check on a specific element.

@@ -358,12 +358,12 @@ unsafe fn horizontal_sum_u8x16_neon(a: [u8; 16]) -> u32 {
 // Scalar fallbacks (always correct, used when no SIMD target feature active)
 // ---------------------------------------------------------------------------
 
-#[inline(always)]
+#[allow(dead_code)] #[inline(always)]
 fn splat_u8x16_scalar(value: u8) -> [u8; 16] {
     [value; 16]
 }
 
-#[inline(always)]
+#[allow(dead_code)] #[inline(always)]
 fn movemask_u8x16_scalar(a: [u8; 16]) -> u16 {
     let mut result = 0u16;
     let mut i = 0usize;
@@ -374,7 +374,7 @@ fn movemask_u8x16_scalar(a: [u8; 16]) -> u16 {
     result
 }
 
-#[inline(always)]
+#[allow(dead_code)] #[inline(always)]
 fn compare_eq_u8x16_scalar(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     let mut out = [0u8; 16];
     let mut i = 0usize;
@@ -386,7 +386,7 @@ fn compare_eq_u8x16_scalar(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     out
 }
 
-#[inline(always)]
+#[allow(dead_code)] #[inline(always)]
 fn add_saturating_u8x16_scalar(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     let mut out = [0u8; 16];
     let mut i = 0usize;
@@ -397,7 +397,7 @@ fn add_saturating_u8x16_scalar(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     out
 }
 
-#[inline(always)]
+#[allow(dead_code)] #[inline(always)]
 fn and_u8x16_scalar(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     let mut out = [0u8; 16];
     let mut i = 0usize;
@@ -408,7 +408,7 @@ fn and_u8x16_scalar(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     out
 }
 
-#[inline(always)]
+#[allow(dead_code)] #[inline(always)]
 fn or_u8x16_scalar(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     let mut out = [0u8; 16];
     let mut i = 0usize;
@@ -419,7 +419,7 @@ fn or_u8x16_scalar(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     out
 }
 
-#[inline(always)]
+#[allow(dead_code)] #[inline(always)]
 fn max_u8x16_scalar(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     let mut out = [0u8; 16];
     let mut i = 0usize;
@@ -436,7 +436,7 @@ fn max_u8x16_scalar(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     out
 }
 
-#[inline(always)]
+#[allow(dead_code)] #[inline(always)]
 fn min_u8x16_scalar(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     let mut out = [0u8; 16];
     let mut i = 0usize;
@@ -453,7 +453,7 @@ fn min_u8x16_scalar(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     out
 }
 
-#[inline(always)]
+#[allow(dead_code)] #[inline(always)]
 fn shuffle_u8x16_branchless_scalar(a: [u8; 16], mask: [u8; 16]) -> [u8; 16] {
     let mut out = [0u8; 16];
     let mut i = 0usize;
@@ -468,7 +468,7 @@ fn shuffle_u8x16_branchless_scalar(a: [u8; 16], mask: [u8; 16]) -> [u8; 16] {
     out
 }
 
-#[inline(always)]
+#[allow(dead_code)] #[inline(always)]
 fn horizontal_sum_u8x16_scalar(a: [u8; 16]) -> u32 {
     let mut sum = 0u32;
     let mut i = 0usize;
@@ -886,7 +886,7 @@ unsafe fn blend_u8x16_neon(mask: [u8; 16], a: [u8; 16], b: [u8; 16]) -> [u8; 16]
     out
 }
 
-#[inline(always)]
+#[allow(dead_code)] #[inline(always)]
 fn blend_u8x16_scalar(mask: [u8; 16], a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     let mut out = [0u8; 16];
     let mut i = 0usize;

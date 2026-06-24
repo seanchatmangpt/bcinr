@@ -1,7 +1,7 @@
 #![cfg(feature = "std")]
 extern crate std;
 
-use chess::{Board, ChessMove};
+use chess::Board;
 use std::time::Instant;
 use std::vec::Vec;
 use std::str::FromStr;

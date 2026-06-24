@@ -100,10 +100,82 @@ workspace = false
 command = "cargo"
 args = ["run", "--manifest-path", "tools/ggen/Cargo.toml", "--release", "--quiet"]
 
+# ---------------------------------------------------------------------------
+# GGEN Chess Factory — manufacturing cell tasks (TTL -> ggen -> Rust).
+# Edit ontology/chess.ttl, never hand-edit generated source.
+# ---------------------------------------------------------------------------
+
+[tasks.chess-factory-sync]
+category = "Factory"
+description = "Manufacture chess-factory stations from law (ggen sync over chess.ttl)"
+workspace = false
+cwd = "crates/chess-factory"
+command = "/Users/sac/.local/bin/ggen"
+args = ["sync"]
+
+[tasks.factory-build]
+category = "Factory"
+description = "Build the chess-factory crate (lib + bins) with all features"
+workspace = false
+command = "cargo"
+args = ["build", "-p", "chess-factory", "--all-features"]
+# The factory cell is self-contained: do not inherit the workspace-wide
+# `-D warnings` (sibling bcinr-logic carries pre-existing dead-code lint debt
+# in its SIMD fallbacks; that is out of this manufacturing cell's scope).
+env = { RUSTFLAGS = "" }
+dependencies = ["chess-factory-sync"]
+
+[tasks.factory-verify]
+category = "Factory"
+description = "CC=1 contract gate over the generated stations + motifs"
+workspace = false
+command = "cargo"
+args = [
+    "run", "--manifest-path", "tools/bcinr-contract-gate/Cargo.toml",
+    "--release", "--quiet", "--",
+    "crates/chess-factory/src/stations",
+]
+env = { RUSTFLAGS = "" }
+dependencies = ["factory-build"]
+
+[tasks.factory-bench]
+category = "Factory"
+description = "Smoke benchmark: one sanity_random cell, emits the Elo curve"
+workspace = false
+command = "cargo"
+args = [
+    "run", "-p", "chess-factory", "--bin", "bcinr_benchmark",
+    "--all-features", "--",
+    "--opponent", "sanity_random", "--budget", "t100us", "--games", "2",
+]
+env = { RUSTFLAGS = "" }
+dependencies = ["factory-build"]
+
+[tasks.factory-kaizen]
+category = "Factory"
+description = "Emit one DemoteStationWeight Kaizen recommendation from the curve"
+workspace = false
+command = "cargo"
+args = ["run", "-p", "chess-factory", "--bin", "bcinr_kaizen", "--all-features"]
+env = { RUSTFLAGS = "" }
+dependencies = ["factory-bench"]
+
+[tasks.factory]
+category = "Factory"
+description = "Full factory chain: sync -> build -> contract-gate -> smoke bench -> kaizen"
+workspace = false
+dependencies = [
+    "chess-factory-sync",
+    "factory-build",
+    "factory-verify",
+    "factory-bench",
+    "factory-kaizen",
+]
+
 [tasks.ci]
 category = "CI"
 description = "Comprehensive CI pipeline"
-dependencies = ["fmt", "check", "clippy", "scan-cheats", "contract-gate", "test", "audit", "deny"]
+dependencies = ["fmt", "check", "clippy", "scan-cheats", "contract-gate", "factory-verify", "test", "audit", "deny"]
 
 [tasks.default]
 alias = "ci"

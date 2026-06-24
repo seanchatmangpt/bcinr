@@ -115,7 +115,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr"
-version = "26.6.13"
+version = "26.6.24"
 dependencies = [
  "bcinr-api",
  "bcinr-core",
@@ -125,14 +125,14 @@ dependencies = [
 
 [[package]]
 name = "bcinr-api"
-version = "26.6.13"
+version = "26.6.24"
 dependencies = [
  "bcinr-logic",
 ]
 
 [[package]]
 name = "bcinr-bench"
-version = "26.6.13"
+version = "26.6.24"
 dependencies = [
  "bcinr-core",
  "bcinr-logic",
@@ -142,7 +142,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-bench-auditor"
-version = "26.6.13"
+version = "26.6.24"
 dependencies = [
  "syn 2.0.117",
  "walkdir",
@@ -150,7 +150,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-cheat-scanner"
-version = "26.6.13"
+version = "26.6.24"
 dependencies = [
  "syn 2.0.117",
  "walkdir",
@@ -158,7 +158,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-contract-gate"
-version = "26.6.13"
+version = "26.6.24"
 dependencies = [
  "quote",
  "syn 2.0.117",
@@ -167,7 +167,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-core"
-version = "26.6.13"
+version = "26.6.24"
 dependencies = [
  "bcinr-api",
  "bcinr-logic",
@@ -177,15 +177,37 @@ dependencies = [
 
 [[package]]
 name = "bcinr-logic"
-version = "26.6.13"
+version = "26.6.24"
 dependencies = [
  "criterion",
  "proptest",
 ]
 
 [[package]]
+name = "bcinr-powl"
+version = "26.6.24"
+dependencies = [
+ "bcinr-logic",
+ "blake3",
+ "criterion",
+ "serde",
+]
+
+[[package]]
+name = "bcinr-powl-receipt"
+version = "26.6.24"
+dependencies = [
+ "bcinr-logic",
+ "bcinr-powl",
+ "blake3",
+ "criterion",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "bcinr-reporter"
-version = "26.6.13"
+version = "26.6.24"
 dependencies = [
  "prettytable-rs",
  "regex",

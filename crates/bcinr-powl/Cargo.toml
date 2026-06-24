@@ -1,0 +1,21 @@
+[package]
+name = "bcinr-powl"
+version = "26.6.24"
+edition = "2021"
+
+[dependencies]
+bcinr-logic = { path = "../bcinr-logic" }
+blake3 = "1"
+serde = { version = "1", features = ["derive"], optional = true }
+
+[dev-dependencies]
+criterion = "0.5"
+
+[features]
+default = []
+std = ["serde"]
+nightly = []
+
+[[bench]]
+name = "scheduler_bench"
+harness = false

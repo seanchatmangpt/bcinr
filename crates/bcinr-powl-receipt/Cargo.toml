@@ -1,0 +1,18 @@
+[package]
+name = "bcinr-powl-receipt"
+version = "26.6.24"
+edition = "2021"
+
+[dependencies]
+bcinr-powl = { path = "../bcinr-powl" }
+bcinr-logic = { path = "../bcinr-logic" }
+blake3 = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "receipt_bench"
+harness = false

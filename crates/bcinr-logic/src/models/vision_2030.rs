@@ -55,7 +55,7 @@ impl<const WORDS: usize> Vision2030Engine<WORDS> {
         let mut activity_table = PackedKeyTable::new();
         let activities = ["Start", "Process", "End"];
         (0..activities.len()).for_each(|i| {
-            activity_table.insert(fnv1a_64(activities[i].as_bytes()), i as u8);
+            let _ = activity_table.insert(fnv1a_64(activities[i].as_bytes()), i as u8);
         });
 
         let mut t_in = Vec::new();

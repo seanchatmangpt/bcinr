@@ -45,6 +45,11 @@ pub mod search;
 #[cfg(feature = "std")]
 pub mod nnue;
 
+/// Stockfish NNUE file loader (HalfKAv2, COMPRESSED_LEB128).
+/// Loads the actual SF18 weight file and runs the full 3-layer forward pass.
+#[cfg(feature = "std")]
+pub mod nnue_sf;
+
 /// Phase classification and O(1) topology selection.
 /// Implements the Chatman Equation admission layer: O* → μ → topology.
 /// The topology table is promoted by the Manufacturing Graph (offline benchmarks).

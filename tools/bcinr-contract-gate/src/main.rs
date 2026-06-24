@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use syn::visit::{self, Visit};
 use syn::{Attribute, BinOp, Expr, ItemFn, Lit, Meta, Visibility};
 use walkdir::WalkDir;
@@ -143,7 +143,12 @@ impl<'ast> Visit<'ast> for GateVisitor {
 
 fn main() {
     let mut visitor = GateVisitor::default();
-    let src_dir = Path::new("crates/bcinr-logic/src/algorithms");
+    let arg = std::env::args().nth(1);
+    let src_dir: PathBuf = match arg {
+        Some(p) => PathBuf::from(p),
+        None => PathBuf::from("crates/bcinr-logic/src/algorithms"),
+    };
+    let src_dir = src_dir.as_path();
 
     let mut parse_warnings: Vec<String> = Vec::new();
     for entry in WalkDir::new(src_dir).into_iter().filter_map(|e| e.ok()) {

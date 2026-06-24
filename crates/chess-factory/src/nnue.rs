@@ -5,7 +5,6 @@ use chess::{Board, Color, Piece};
 use std::sync::{Mutex, OnceLock};
 use std::vec;
 use std::vec::Vec;
-use std::boxed::Box;
 
 // Network dimensions
 pub const FT_IN: usize = 40960;  // HalfKP features

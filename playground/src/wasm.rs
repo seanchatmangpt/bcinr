@@ -1,9 +1,9 @@
 #![allow(unsafe_code)]
 
-use bcinr::mask::{select_u64, select_u32, nonzero_mask_u32};
+use bcinr::mask::{select_u32, nonzero_mask_u32};
 use bcinr::int::popcount_u64;
-use crate::yawl::{BYawlEngine, BYawlTask, JoinType, SplitType};
-use crate::powl::{Powl64Op, PowlState, powl64_execute_step, Powl64OpKind};
+use crate::yawl::{BYawlEngine, BYawlTask};
+use crate::powl::{Powl64Op, PowlState, powl64_execute_step};
 
 /// Results of the token replay operation exported to C/WASM.
 #[repr(C)]
