@@ -628,8 +628,8 @@ cf:passed_pawn a cf:FeatureStation ;
 /// Rank bonus table (index = rank 0..7). Rank 0 and 7 are impossible for pawns.
 const RANK_BONUS: [i32; 8] = [0, 0, 0, 20, 40, 80, 160, 0];
 
-/// Fill all squares south of (and including) occupied bits — produces the
-/// "already controlled" span below the enemy pawn frontspan.
+/// Fill all squares south of (and including) occupied bits — produces all
+/// squares that can be reached by the pawns moving in their direction.
 #[inline]
 fn south_fill(mut bb: u64) -> u64 {
     bb |= bb >> 8;
@@ -638,46 +638,80 @@ fn south_fill(mut bb: u64) -> u64 {
     bb
 }
 
-/// Enemy block mask: any square on the same or adjacent file reachable by an
-/// enemy pawn going forward (from white's perspective the enemy is black, whose
-/// pawns move south, so we south-fill their pawn positions and also spread to
-/// adjacent files).
+/// Enemy block mask: any square on the same or adjacent file blocked by an
+/// enemy pawn. For white: marks all squares below black pawns (white pawns in
+/// these squares are blocked from advancing).
 #[inline]
 fn enemy_block(enemy_pawns: u64) -> u64 {
     let fill = south_fill(enemy_pawns);
-    // spread one file left and right (mask off wrap-around)
-    fill | ((fill & 0xFEFEFEFEFEFEFEFEu64) >> 1) | ((fill & 0x7F7F7F7F7F7F7F7Fu64) << 1)
+    // spread one file left and right (within each rank, mask off wrap-around)
+    // NOT_FILE_A = 0x7F7F7F7F7F7F7F7Fu64 (clears file 0, keeps files 1-7)
+    // NOT_FILE_H = 0xFEFEFEFEFEFEFEFEu64 (clears file 7, keeps files 0-6)
+    let left = (fill & 0x7F7F7F7F7F7F7F7Fu64) << 1;    // shift left within ranks (file++)
+    let right = (fill & 0xFEFEFEFEFEFEFEFEu64) >> 1;   // shift right within ranks (file--)
+    fill | left | right
 }
 
 /// Sum passed-pawn bonuses for one color. Loops — private, outside CC=1 boundary.
 #[inline]
 pub(super) fn passed_score(v: &PositionView, color: usize) -> i32 {
-    let opp = 1 - color;
-    let my_pawns = v.by_piece[color][PAWN];
-    let opp_pawns = v.by_piece[opp][PAWN];
-    // For white (color=0), passed = pawn with no black pawn on same/adj file ahead (north).
-    // For black (color=1), mirror: we reflect rank so rank increases towards promotion.
-    let block = if color == 0 {
-        // white pawns move north; enemy block is south-fill of black pawns + adj files
-        enemy_block(opp_pawns)
-    } else {
-        // black pawns move south; enemy block is north-fill of white pawns + adj files
-        let mut fill = opp_pawns;
-        fill |= fill << 8;
-        fill |= fill << 16;
-        fill |= fill << 32;
-        let fill = fill;
-        fill | ((fill & 0xFEFEFEFEFEFEFEFEu64) >> 1) | ((fill & 0x7F7F7F7F7F7F7F7Fu64) << 1)
-    };
-    let passed = my_pawns & !block;
-    let mut bb = passed;
+    let rank_bonus = [0i32, 0, 0, 20, 40, 80, 160, 0];
     let mut score = 0i32;
-    while bb != 0 {
-        let sq = bb.trailing_zeros() as usize;
-        let rank = if color == 0 { sq / 8 } else { 7 - sq / 8 };
-        score += RANK_BONUS[rank];
-        bb &= bb - 1;
+
+    if color == 0 {
+        // White pawns: check if each pawn is passed (no black pawn ahead on same/adj files)
+        let mut bb = v.by_piece[WHITE][PAWN];
+        while bb != 0 {
+            let sq = bb.trailing_zeros() as usize;
+            let rank = sq / 8;
+            let file = sq % 8;
+            let mut blocked = false;
+
+            // Check ranks ahead (north)
+            let mut r = rank + 1;
+            while r < 8 {
+                let bit = 1u64 << (r * 8 + file);
+                let left = if file > 0 { 1u64 << (r * 8 + file - 1) } else { 0 };
+                let right = if file < 7 { 1u64 << (r * 8 + file + 1) } else { 0 };
+                if (v.by_piece[BLACK][PAWN] & (bit | left | right)) != 0 {
+                    blocked = true;
+                }
+                r += 1;
+            }
+
+            if !blocked {
+                score += rank_bonus[rank];
+            }
+            bb &= bb - 1;
+        }
+    } else {
+        // Black pawns: check if each pawn is passed (no white pawn ahead on same/adj files)
+        let mut bb = v.by_piece[BLACK][PAWN];
+        while bb != 0 {
+            let sq = bb.trailing_zeros() as usize;
+            let rank = 7 - sq / 8;
+            let file = sq % 8;
+            let mut blocked = false;
+
+            // Check ranks ahead (south)
+            let mut r = (sq / 8) as i32 - 1;
+            while r >= 0 {
+                let bit = 1u64 << (r as usize * 8 + file);
+                let left = if file > 0 { 1u64 << (r as usize * 8 + file - 1) } else { 0 };
+                let right = if file < 7 { 1u64 << (r as usize * 8 + file + 1) } else { 0 };
+                if (v.by_piece[WHITE][PAWN] & (bit | left | right)) != 0 {
+                    blocked = true;
+                }
+                r -= 1;
+            }
+
+            if !blocked {
+                score += rank_bonus[rank as usize];
+            }
+            bb &= bb - 1;
+        }
     }
+
     score
 }""" ;
     cf:kernelBody """(passed_score(v, WHITE) - passed_score(v, BLACK)).wrapping_mul(SCORE_SCALE)""" ;

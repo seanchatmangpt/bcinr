@@ -28,79 +28,69 @@ pub const SCORE_SCALE: i32 = 20;
 use crate::position::PAWN;
 
 /// Rank bonus table (index = rank 0..7). Rank 0 and 7 are impossible for pawns.
+#[allow(dead_code)]
 const RANK_BONUS: [i32; 8] = [0, 0, 0, 20, 40, 80, 160, 0];
-
-/// Fill all squares south of (and including) occupied bits — produces the
-/// "already controlled" span below the enemy pawn frontspan.
-#[inline]
-fn south_fill(mut bb: u64) -> u64 {
-    bb |= bb >> 8;
-    bb |= bb >> 16;
-    bb |= bb >> 32;
-    bb
-}
-
-/// North-fill: propagates bits toward higher ranks (rank 7).
-#[inline]
-fn north_fill(mut bb: u64) -> u64 {
-    bb |= bb << 8;
-    bb |= bb << 16;
-    bb |= bb << 32;
-    bb
-}
-
-/// Spread a bitboard one file left and right (masking wrap-around).
-#[inline]
-fn adj_files(bb: u64) -> u64 {
-    bb | ((bb & 0xFEFEFEFEFEFEFEFEu64) >> 1) | ((bb & 0x7F7F7F7F7F7F7F7Fu64) << 1)
-}
-
-/// Block mask for WHITE passed-pawn detection.
-///
-/// A white pawn is blocked if any black pawn exists strictly north of it on
-/// the same or adjacent file. We mark "strictly south of each black pawn"
-/// by south-filling from one rank below the black pawns, then spreading to
-/// adjacent files. Same-rank black pawns are excluded (they cannot block).
-#[inline]
-fn white_block(black_pawns: u64) -> u64 {
-    // Shift black pawns one rank south before filling so we get squares
-    // strictly south of each black pawn (i.e., squares where a white pawn
-    // would have a black blocker ahead of it).
-    adj_files(south_fill(black_pawns >> 8))
-}
-
-/// Block mask for BLACK passed-pawn detection.
-///
-/// A black pawn is blocked if any white pawn exists strictly south of it on
-/// the same or adjacent file. North-fill from one rank above the white pawns
-/// then spread to adjacent files.
-#[inline]
-fn black_block(white_pawns: u64) -> u64 {
-    adj_files(north_fill(white_pawns << 8))
-}
 
 /// Sum passed-pawn bonuses for one color. Loops — private, outside CC=1 boundary.
 #[inline]
 pub(super) fn passed_score(v: &PositionView, color: usize) -> i32 {
-    let opp = 1 - color;
-    let my_pawns = v.by_piece[color][PAWN];
-    let opp_pawns = v.by_piece[opp][PAWN];
-    // For white (color=0), passed = pawn with no black pawn on same/adj file ahead (north).
-    // For black (color=1), mirror: we reflect rank so rank increases towards promotion.
-    let block = if color == 0 {
-        white_block(opp_pawns)
-    } else {
-        black_block(opp_pawns)
-    };
-    let passed = my_pawns & !block;
-    let mut bb = passed;
+    let rank_bonus = [0i32, 0, 0, 20, 40, 80, 160, 0];
     let mut score = 0i32;
-    while bb != 0 {
-        let sq = bb.trailing_zeros() as usize;
-        let rank = if color == 0 { sq / 8 } else { 7 - sq / 8 };
-        score += RANK_BONUS[rank];
-        bb &= bb - 1;
+
+    if color == 0 {
+        // White pawns: check if each pawn is passed (no black pawn ahead on same/adj files)
+        let mut bb = v.by_piece[WHITE][PAWN];
+        while bb != 0 {
+            let sq = bb.trailing_zeros() as usize;
+            let rank = sq / 8;
+            let file = sq % 8;
+            let mut blocked = false;
+
+            // Check ranks ahead (north)
+            let mut r = rank + 1;
+            while r < 8 {
+                let bit = 1u64 << (r * 8 + file);
+                let left = if file > 0 { 1u64 << (r * 8 + file - 1) } else { 0 };
+                let right = if file < 7 { 1u64 << (r * 8 + file + 1) } else { 0 };
+                if (v.by_piece[BLACK][PAWN] & (bit | left | right)) != 0 {
+                    blocked = true;
+                }
+                r += 1;
+            }
+
+            if !blocked {
+                score += rank_bonus[rank];
+            }
+            bb &= bb - 1;
+        }
+    } else {
+        // Black pawns: check if each pawn is passed (no white pawn ahead on same/adj files)
+        let mut bb = v.by_piece[BLACK][PAWN];
+        while bb != 0 {
+            let sq = bb.trailing_zeros() as usize;
+            let rank = 7 - sq / 8;
+            let file = sq % 8;
+            let mut blocked = false;
+
+            // Check ranks ahead (south)
+            let mut r = (sq / 8) as i32 - 1;
+            while r >= 0 {
+                let bit = 1u64 << (r as usize * 8 + file);
+                let left = if file > 0 { 1u64 << (r as usize * 8 + file - 1) } else { 0 };
+                let right = if file < 7 { 1u64 << (r as usize * 8 + file + 1) } else { 0 };
+                if (v.by_piece[WHITE][PAWN] & (bit | left | right)) != 0 {
+                    blocked = true;
+                }
+                r -= 1;
+            }
+
+            if !blocked {
+                score += rank_bonus[rank as usize];
+            }
+            bb &= bb - 1;
+        }
     }
+
     score
 }
 
@@ -168,7 +158,8 @@ mod tests {
         let mut white = 0i32;
         let mut black = 0i32;
         let rank_bonus = [0i32, 0, 0, 20, 40, 80, 160, 0];
-        let mut bb = v.by_piece[WHITE][crate::position::PAWN];
+        // Use hardcoded indices to debug
+        let mut bb = v.by_piece[0][0];  // WHITE = 0, PAWN = 0
         while bb != 0 {
             let sq = bb.trailing_zeros() as usize;
             let rank = sq / 8;
@@ -180,7 +171,7 @@ mod tests {
                 let bit = 1u64 << (r * 8 + file);
                 let left = if file > 0 { 1u64 << (r * 8 + file - 1) } else { 0 };
                 let right = if file < 7 { 1u64 << (r * 8 + file + 1) } else { 0 };
-                if (v.by_piece[BLACK][crate::position::PAWN] & (bit | left | right)) != 0 {
+                if (v.by_piece[1][0] & (bit | left | right)) != 0 {  // BLACK = 1, PAWN = 0
                     blocked = true;
                 }
                 r += 1;
@@ -190,7 +181,7 @@ mod tests {
             }
             bb &= bb - 1;
         }
-        let mut bb = v.by_piece[BLACK][crate::position::PAWN];
+        let mut bb = v.by_piece[1][0];  // BLACK = 1, PAWN = 0
         while bb != 0 {
             let sq = bb.trailing_zeros() as usize;
             let rank = 7 - sq / 8;
@@ -201,7 +192,7 @@ mod tests {
                 let bit = 1u64 << (r as usize * 8 + file);
                 let left = if file > 0 { 1u64 << (r as usize * 8 + file - 1) } else { 0 };
                 let right = if file < 7 { 1u64 << (r as usize * 8 + file + 1) } else { 0 };
-                if (v.by_piece[WHITE][crate::position::PAWN] & (bit | left | right)) != 0 {
+                if (v.by_piece[0][0] & (bit | left | right)) != 0 {  // WHITE = 0, PAWN = 0
                     blocked = true;
                 }
                 r -= 1;
@@ -245,4 +236,5 @@ mod tests {
         assert_eq!(r.evidence.station_id, STATION_ID);
         assert_eq!(r.evidence.weight_q8, WEIGHT_Q8);
     }
+
 }

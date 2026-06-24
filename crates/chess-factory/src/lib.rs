@@ -45,6 +45,12 @@ pub mod search;
 #[cfg(feature = "std")]
 pub mod nnue;
 
+/// Phase classification and O(1) topology selection.
+/// Implements the Chatman Equation admission layer: O* → μ → topology.
+/// The topology table is promoted by the Manufacturing Graph (offline benchmarks).
+#[cfg(feature = "std")]
+pub mod phase;
+
 #[cfg(test)]
 mod eval_debug {
     extern crate std;

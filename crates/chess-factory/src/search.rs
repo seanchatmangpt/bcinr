@@ -403,8 +403,14 @@ pub fn fixed_depth_best_move(board: &Board, depth: usize) -> Option<ChessMove> {
 }
 
 /// Time-bounded iterative deepening with aspiration windows.
+/// Admits O* = (board, budget, hardware, phase) → selects compiled topology → executes.
 #[must_use]
 pub fn search_best_move_us(board: &Board, budget_us: u128) -> Option<ChessMove> {
+    // Admission layer: O* → topology (O(1) table lookup, no search).
+    let (_admitted, _topology) = crate::phase::admit(board, budget_us);
+    // TODO Phase 2: branch search graph based on topology.
+    // Currently all topologies route to the same iterative deepening graph.
+
     if let Some(bm) = crate::opening_book::book_probe(board.get_hash()) {
         if board.legal(bm) { return Some(bm); }
     }
