@@ -10,8 +10,10 @@
 //!
 //! # Branchless invariant
 //!
-//! The inner per-slot evaluation uses only bitwise and arithmetic operations —
-//! no `if`/`match` that would generate a conditional branch instruction.
+//! The pred-sat core (computing `pred_satisfied` and `fire_mask`) uses only
+//! bitwise and arithmetic operations — no conditional branch instructions.
+//! Op-kind dispatch (`XorDispatch`, `LoopRedo`, `Join`) uses conditional
+//! branches on the cold side-effect path, not in the pred-sat hot path.
 //! The outer `while bits != 0` loop is a standard bit-scan idiom whose
 //! iteration count is bounded by the number of bits set, not by a predicate.
 
