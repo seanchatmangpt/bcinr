@@ -13,6 +13,7 @@
 #![feature(generic_const_exprs)]
 #![allow(incomplete_features)] // generic_const_exprs is still being stabilised
 
+pub mod ocel;
 pub mod admit;
 pub mod compiler;
 pub mod const_scheduler;
