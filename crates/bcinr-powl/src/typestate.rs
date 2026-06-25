@@ -963,6 +963,93 @@ mod tests {
     }
 
     // -------------------------------------------------------------------------
+    // ExecutionToken: 256 consume_op cycles wrapping correctly
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn consume_op_256_cycles_no_panic() {
+        for _ in 0..4 {
+            let mut tok = ExecutionToken::new(64);
+            assert_eq!(tok.total(), 64);
+            for bit_idx in 0..64u64 {
+                tok.consume_op(1u64 << bit_idx).expect("consume_op must not fail");
+            }
+            tok.assert_exhausted().expect("all ops consumed, must be exhausted");
+        }
+    }
+
+    #[test]
+    fn consume_op_wraps_at_bit_63() {
+        let mut tok = ExecutionToken::new(64);
+        tok.consume_op(1u64 << 63).unwrap();
+        for i in 0..63u64 {
+            tok.consume_op(1u64 << i).unwrap();
+        }
+        tok.assert_exhausted().unwrap();
+    }
+
+    // -------------------------------------------------------------------------
+    // Typestate consuming transitions — each phase is single-use
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn typestate_unvalidated_to_compiled_consuming() {
+        let tape = two_op_tape();
+        let runner = PowlRunner::new(tape);
+        let compiled = runner.validate().expect("must compile");
+        let _ = compiled;
+    }
+
+    #[test]
+    fn typestate_compiled_to_scheduled_consuming() {
+        let tape = two_op_tape();
+        let compiled = PowlRunner::new(tape).validate().unwrap();
+        let scheduled = compiled.schedule::<{ TopologyKind::Standard }>();
+        let _ = scheduled;
+    }
+
+    #[test]
+    fn typestate_scheduled_to_executing_consuming() {
+        let tape = two_op_tape();
+        let scheduled = PowlRunner::new(tape)
+            .validate()
+            .unwrap()
+            .schedule::<{ TopologyKind::Priority }>();
+        let (executing, tok) = scheduled.begin_execution();
+        core::mem::forget(tok);
+        let _ = executing;
+    }
+
+    #[test]
+    fn typestate_executing_to_receipted_consuming() {
+        let tape = two_op_tape();
+        let (exec, mut tok) = PowlRunner::new(tape)
+            .validate()
+            .unwrap()
+            .schedule::<{ TopologyKind::Background }>()
+            .begin_execution();
+        tok.consume_op(1 << 0).unwrap();
+        tok.consume_op(1 << 1).unwrap();
+        let (receipted, receipt) = exec.complete(tok).unwrap();
+        assert_eq!(receipt.topology, TopologyKind::Background);
+        assert_eq!(receipted.run_id(), receipt.run_id);
+    }
+
+    #[test]
+    fn typestate_receipted_tape_accessible() {
+        let tape = two_op_tape();
+        let (exec, mut tok) = PowlRunner::new(tape)
+            .validate()
+            .unwrap()
+            .schedule::<{ TopologyKind::LongRunning }>()
+            .begin_execution();
+        tok.consume_op(1 << 0).unwrap();
+        tok.consume_op(1 << 1).unwrap();
+        let (receipted, receipt) = exec.complete(tok).unwrap();
+        assert_eq!(receipted.run_id(), receipt.run_id);
+    }
+
+    // -------------------------------------------------------------------------
     // Compile-fail documentation
     // -------------------------------------------------------------------------
     //

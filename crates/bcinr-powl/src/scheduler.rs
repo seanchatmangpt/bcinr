@@ -485,6 +485,91 @@ mod tests {
             suppressed_mask, all_fired);
     }
 
+    // -----------------------------------------------------------------------
+    // apply_loop_redo — max_iters=0 semantic and liveness tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn apply_loop_redo_body_executes_at_least_once() {
+        let ast = PowlAstNode::Loop {
+            body: Box::new(PowlAstNode::Atom("work")),
+            redo: Box::new(PowlAstNode::Atom("redo_work")),
+            max_iters: 0,
+        };
+        let tape = compile_powl(&ast).unwrap();
+        let mut state = PowlRunState::new(&tape);
+        let mut body_fired_count = 0u32;
+        for _ in 0..3 {
+            let fs = scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
+            if fs.0 & 1 != 0 {
+                body_fired_count += 1;
+            }
+        }
+        assert!(body_fired_count >= 1, "loop body must execute at least once");
+    }
+
+    #[test]
+    fn apply_loop_redo_iters_counter_increments() {
+        let ast = PowlAstNode::Loop {
+            body: Box::new(PowlAstNode::Atom("w")),
+            redo: Box::new(PowlAstNode::Atom("r")),
+            max_iters: 0,
+        };
+        let tape = compile_powl(&ast).unwrap();
+        let mut state = PowlRunState::new(&tape);
+        let redo_slot = tape.ops[..tape.len as usize]
+            .iter()
+            .position(|op| op.kind == crate::tape::OpKind::LoopRedo)
+            .expect("must have LoopRedo slot");
+        for _ in 0..4 {
+            scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
+        }
+        assert!(state.loop_iters[redo_slot] >= 1,
+            "loop_iters must increment each time LoopRedo fires");
+    }
+
+    #[test]
+    fn scheduler_tick_no_progress_returns_zero_does_not_spin() {
+        let ast = PowlAstNode::Sequence(vec![
+            PowlAstNode::Atom("a"),
+            PowlAstNode::Atom("b"),
+        ]);
+        let tape = compile_powl(&ast).unwrap();
+        let mut state = PowlRunState::new(&tape);
+        // Manually force check_mask to op1 without having fired op0.
+        state.done_mask = 0;
+        state.check_mask = 0b10;
+        let fs = scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
+        assert_eq!(fs.0, 0, "no op fires when predecessor not satisfied");
+    }
+
+    #[test]
+    fn scheduler_tick_completes_within_bounded_ticks() {
+        let ast = PowlAstNode::Sequence(vec![
+            PowlAstNode::Atom("a"),
+            PowlAstNode::Atom("b"),
+            PowlAstNode::Atom("c"),
+        ]);
+        let tape = compile_powl(&ast).unwrap();
+        let max_ticks = (tape.len as u32) * 2;
+        let mut state = PowlRunState::new(&tape);
+        for _ in 0..max_ticks {
+            if state.check_mask == 0 { break; }
+            scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
+        }
+        assert_eq!(state.check_mask, 0, "scheduler must terminate within 2*len ticks");
+    }
+
+    #[test]
+    fn pred_mask_zero_means_entry_fires_on_first_tick() {
+        let ast = PowlAstNode::Atom("entry");
+        let tape = compile_powl(&ast).unwrap();
+        assert_eq!(tape.ops[0].pred_mask, 0, "entry op must have pred_mask=0");
+        let mut state = PowlRunState::new(&tape);
+        let fs = scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
+        assert_ne!(fs.0 & 1, 0, "op with pred_mask=0 must fire on the very first tick");
+    }
+
     // ---------------------------------------------------------------------------
     // Proptests
     // ---------------------------------------------------------------------------

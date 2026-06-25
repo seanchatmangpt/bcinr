@@ -75,7 +75,7 @@ fn powl_linear_chain_conformance_receipted() {
         PowlAstNode::Atom("teardown"),
     ]);
     let tape = compile_powl(&ast).expect("linear chain must compile");
-    let full_mask = tape.entry_mask | {
+    let _full_mask = tape.entry_mask | {
         let ops = &tape.ops[..tape.len as usize];
         ops.iter().fold(0u64, |acc, op| acc | op.pred_mask | op.succ_mask)
     };
@@ -95,11 +95,11 @@ fn powl_linear_chain_conformance_receipted() {
         while b != 0 {
             let idx = b.trailing_zeros() as u32;
             b &= b - 1;
-            ocel_log.record_op_fired(run_id, idx, 0);
+            ocel_log.record_op_fired(run_id, idx, 0).unwrap();
             op_trace |= 1u64 << idx;
         }
     }
-    ocel_log.record_run_sealed(run_id, op_trace);
+    ocel_log.record_run_sealed(run_id, op_trace).unwrap();
 
     // Conformance check: all predecessor constraints satisfied.
     let result = ocel_log.validate_against_tape(&tape);
@@ -145,8 +145,8 @@ fn powl_predecessor_violation_detected_and_receipted() {
     // Build an invalid log: seal with only op 1 fired, skipping op 0.
     let mut bad_log = OcelLog::new();
     let run_id: u64 = 99;
-    bad_log.record_op_fired(run_id, 1, 0); // op 1 fires without op 0
-    bad_log.record_run_sealed(run_id, 0b10); // op_trace has bit 1 only
+    bad_log.record_op_fired(run_id, 1, 0).unwrap(); // op 1 fires without op 0
+    bad_log.record_run_sealed(run_id, 0b10).unwrap(); // op_trace has bit 1 only
 
     let result = bad_log.validate_against_tape(&tape);
     assert!(
@@ -206,39 +206,88 @@ fn powl_xor_workflow_ocel_export() {
         while b != 0 {
             let idx = b.trailing_zeros() as u32;
             b &= b - 1;
-            ocel_log.record_op_fired(run_id, idx, 0);
+            ocel_log.record_op_fired(run_id, idx, 0).unwrap();
             op_trace |= 1u64 << idx;
         }
     }
-    ocel_log.record_run_sealed(run_id, op_trace);
+    ocel_log.record_run_sealed(run_id, op_trace).unwrap();
 
     // Export OCEL 2.0 JSON.
     let json = ocel_log.to_ocel_json().expect("to_ocel_json must succeed with std feature");
     assert!(!json.is_empty(), "OCEL JSON must be non-empty");
 
-    // Structural assertions on the JSON.
+    // Structural assertions on the JSON — strict OCEL 2.0 per-key checks.
     let parsed: serde_json::Value =
         serde_json::from_str(&json).expect("OCEL JSON must be valid JSON");
 
-    // Must have eventTypes / event_types.
-    let has_event_types = parsed.get("eventTypes").is_some()
-        || parsed.get("event_types").is_some()
-        || parsed.get("ocel:event-types").is_some()
-        || json.contains("op_fired")
-        || json.contains("run_sealed");
-    assert!(has_event_types, "OCEL JSON must reference op_fired or run_sealed event types");
-
-    // Must reference PowlRun objects.
+    // objectTypes must be present.
     assert!(
-        json.contains("PowlRun") || json.contains("powl_run"),
-        "OCEL JSON must contain PowlRun object type"
+        parsed.get("objectTypes").is_some(),
+        "OCEL 2.0 JSON must contain top-level 'objectTypes' key"
+    );
+    // eventTypes must be present.
+    assert!(
+        parsed.get("eventTypes").is_some(),
+        "OCEL 2.0 JSON must contain top-level 'eventTypes' key"
+    );
+    // objects must be present.
+    assert!(
+        parsed.get("objects").is_some(),
+        "OCEL 2.0 JSON must contain top-level 'objects' key"
+    );
+    // events must be present.
+    assert!(
+        parsed.get("events").is_some(),
+        "OCEL 2.0 JSON must contain top-level 'events' key"
     );
 
-    // Must reference PowlOp objects.
-    assert!(
-        json.contains("PowlOp") || json.contains("powl_op"),
-        "OCEL JSON must contain PowlOp object type"
-    );
+    // eventTypes must include op_fired and run_sealed.
+    let event_types = parsed["eventTypes"].as_array()
+        .expect("'eventTypes' must be an array");
+    let et_names: Vec<&str> = event_types.iter()
+        .filter_map(|t| t.get("name").and_then(|n| n.as_str()))
+        .collect();
+    assert!(et_names.contains(&"op_fired"), "eventTypes must contain 'op_fired'");
+    assert!(et_names.contains(&"run_sealed"), "eventTypes must contain 'run_sealed'");
+
+    // objectTypes must include PowlRun and PowlOp.
+    let object_types = parsed["objectTypes"].as_array()
+        .expect("'objectTypes' must be an array");
+    let ot_names: Vec<&str> = object_types.iter()
+        .filter_map(|t| t.get("name").and_then(|n| n.as_str()))
+        .collect();
+    assert!(ot_names.contains(&"PowlRun"), "objectTypes must contain 'PowlRun'");
+    assert!(ot_names.contains(&"PowlOp"), "objectTypes must contain 'PowlOp'");
+
+    // Every event must carry a time field (OCEL 2.0 uses "time").
+    let events_arr = parsed["events"].as_array()
+        .expect("'events' must be an array");
+    for (i, evt) in events_arr.iter().enumerate() {
+        assert!(
+            evt.get("time").is_some(),
+            "event at index {i} is missing 'time' field"
+        );
+    }
+
+    // Every event relationship must reference an object declared in the objects array.
+    let objects_arr = parsed["objects"].as_array()
+        .expect("'objects' must be an array");
+    let declared_ids: std::collections::HashSet<&str> = objects_arr.iter()
+        .filter_map(|o| o.get("id").and_then(|id| id.as_str()))
+        .collect();
+    for (i, evt) in events_arr.iter().enumerate() {
+        if let Some(rels) = evt.get("relationships").and_then(|r| r.as_array()) {
+            for rel in rels {
+                // OCEL 2.0 serializes as "objectId" (camelCase via serde rename).
+                if let Some(oid) = rel.get("objectId").and_then(|o| o.as_str()) {
+                    assert!(
+                        declared_ids.contains(oid),
+                        "event {i} relationship references undeclared object '{oid}'"
+                    );
+                }
+            }
+        }
+    }
 
     // Write to disk for external tooling.
     std::fs::create_dir_all("target").ok();

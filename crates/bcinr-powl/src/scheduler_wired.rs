@@ -577,6 +577,18 @@ mod tests {
         assert_eq!(check_mask[0], 0b10, "op 1 should be in check_mask");
     }
 
+    // -----------------------------------------------------------------------
+    // RING_CAPACITY — must be a power of two for CAS modular arithmetic
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn ring_capacity_is_power_of_two() {
+        assert!(RING_CAPACITY.is_power_of_two(),
+            "RING_CAPACITY={} must be a power of two", RING_CAPACITY);
+        let mask = RING_CAPACITY - 1;
+        assert_eq!(RING_CAPACITY & mask, 0, "power-of-two: N & (N-1) must be 0");
+    }
+
     #[test]
     fn petri_tick_result_has_fired_ops_field() {
         let tape = compile_powl(&PowlAstNode::Sequence(vec![
