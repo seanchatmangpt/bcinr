@@ -1,0 +1,274 @@
+//! BRCE execution loop: Prolog8 admission per tape op → OCEL → BLAKE3 receipt.
+
+use crate::error::Pddl8Error;
+use std::collections::{BTreeSet, HashMap};
+use wasm4pm_compat::pddl::{
+    Pddl8ExecutionLog, Pddl8ExecutionReceipt, Pddl8GroundAtom, Pddl8StepResult, Pddl8Tape,
+};
+use wasm4pm_compat::ocel::{
+    OCEL, OCELAttributeValue, OCELEvent, OCELEventAttribute, OCELObject, OCELRelationship,
+    OCELType, OCELTypeAttribute,
+};
+
+use prolog8::{
+    Atom8 as P8Atom, Catalog, CatalogId, EpochId, FactBlock8, FactRow8, FeatureBit, Kernel,
+    PredicateId, PredicateMeta, PredicateProofPolicy, ProofMode, QueryAtom8, QueryResult, Rule8,
+    RuleId, SourceId, TermId,
+};
+
+const SRC: SourceId = SourceId(0);
+
+struct Ctx {
+    kernel: Kernel,
+    pred_ids: HashMap<String, PredicateId>,
+    term_ids: HashMap<String, TermId>,
+    next_pred: u32,
+    next_rule: u32,
+    epoch: u64,
+}
+
+impl Ctx {
+    fn new() -> Self {
+        Self {
+            kernel: Kernel::new(Catalog::new(CatalogId(1))),
+            pred_ids: HashMap::new(),
+            term_ids: HashMap::new(),
+            next_pred: 1,
+            next_rule: 1,
+            epoch: 0,
+        }
+    }
+
+    fn pred(&mut self, name: &str, arity: u8) -> PredicateId {
+        let key = format!("{name}/{arity}");
+        if let Some(&id) = self.pred_ids.get(&key) { return id; }
+        let id = PredicateId(self.next_pred);
+        self.next_pred += 1;
+        self.kernel.catalog.add_predicate(PredicateMeta {
+            pred_id: id, label: name.to_owned(), arity,
+            access_orders: vec![], proof_policy: PredicateProofPolicy::OnRequest, materialized: false,
+        });
+        self.pred_ids.insert(key, id);
+        id
+    }
+
+    fn term(&mut self, s: &str) -> TermId {
+        if let Some(&t) = self.term_ids.get(s) { return t; }
+        let t = self.kernel.catalog.intern_term(s);
+        self.term_ids.insert(s.to_owned(), t);
+        t
+    }
+
+    fn load_ground_atom(&mut self, atom: &Pddl8GroundAtom) {
+        let arity = atom.args.len() as u8;
+        let pred = self.pred(&atom.pred, arity);
+        let args: Vec<TermId> = atom.args.iter().map(|a| self.term(a)).collect();
+        let row = FactRow8::new(pred, arity, &args, SRC);
+        let _ = self.kernel.load_facts(FactBlock8::new(pred, arity, vec![row]));
+    }
+
+    fn load_may_fire(&mut self, label: &str) {
+        let pred = self.pred("may_fire", 1);
+        let term = self.term(label);
+        let row = FactRow8::new(pred, 1, &[term], SRC);
+        let _ = self.kernel.load_facts(FactBlock8::new(pred, 1, vec![row]));
+    }
+
+    fn query_may_fire(&mut self, label: &str) -> bool {
+        let pred = self.pred("may_fire", 1);
+        let term = self.term(label);
+        let mut atom = P8Atom::new(pred, 1, &[term]);
+        atom.binding_mask = 0b1;
+        let q = QueryAtom8 {
+            atom, output_mask: 0,
+            proof_mode: ProofMode::PositiveOnly,
+            epoch: EpochId(self.epoch),
+        };
+        matches!(self.kernel.query(&q), QueryResult::Answered(_))
+    }
+
+    fn query_goal_reached(&mut self) -> bool {
+        let pred = self.pred("goal_reached", 1);
+        let term = self.term("__goal__");
+        let mut atom = P8Atom::new(pred, 1, &[term]);
+        atom.binding_mask = 0b1;
+        let q = QueryAtom8 {
+            atom, output_mask: 0,
+            proof_mode: ProofMode::PositiveOnly,
+            epoch: EpochId(self.epoch),
+        };
+        matches!(self.kernel.query(&q), QueryResult::Answered(_))
+    }
+
+    fn tick_epoch(&mut self) { self.epoch += 1; }
+}
+
+/// Execute a `Pddl8Tape` through the Prolog8 admission gate.
+///
+/// Returns `(Pddl8ExecutionLog, Pddl8ExecutionReceipt, OCEL)`.
+///
+/// `case_id` identifies this execution in the OCEL log.
+/// `policy_rules` are `(head_label, [body_labels])` May-fire Horn rules.
+/// If empty, every scheduled op is pre-admitted via a fact.
+pub fn execute_tape(
+    tape: &Pddl8Tape,
+    initial_state: &BTreeSet<Pddl8GroundAtom>,
+    goal: &[Pddl8GroundAtom],
+    case_id: &str,
+    policy_rules: &[(&str, Vec<&str>)],
+) -> Result<(Pddl8ExecutionLog, Pddl8ExecutionReceipt, OCEL), Pddl8Error> {
+    let mut ctx = Ctx::new();
+
+    // Load initial world state
+    for atom in initial_state { ctx.load_ground_atom(atom); }
+
+    // Load policy rules or pre-admit all ops
+    if policy_rules.is_empty() {
+        for op in &tape.ops { ctx.load_may_fire(&op.label); }
+    } else {
+        for (i, (head, body)) in policy_rules.iter().enumerate() {
+            load_may_fire_rule(&mut ctx, i as u32 + 1, head, body)?;
+        }
+    }
+
+    let mut chain: [u8; 32] = [0; 32];
+    let mut steps = Vec::new();
+    let mut state = initial_state.clone();
+    let mut ocel_events = Vec::new();
+
+    for op in &tape.ops {
+        if !ctx.query_may_fire(&op.label) {
+            return Err(Pddl8Error::StepDenied {
+                op_index: op.index,
+                reason: format!("Prolog8 denied may_fire({})", op.label),
+            });
+        }
+
+        // Apply effects
+        for add in &op.action.add_effects {
+            ctx.load_ground_atom(add);
+            state.insert(add.clone());
+        }
+        for del in &op.action.del_effects { state.remove(del); }
+        ctx.tick_epoch();
+
+        // Receipt chain step
+        let mut h = blake3::Hasher::new();
+        h.update(&chain); h.update(op.label.as_bytes()); h.update(&[op.index]); h.update(&ctx.epoch.to_le_bytes());
+        chain = *h.finalize().as_bytes();
+        let hash_hex = hex(&chain);
+
+        steps.push(Pddl8StepResult {
+            op_index: op.index,
+            label: op.label.clone(),
+            admitted: true,
+            epoch_after: ctx.epoch,
+            receipt_hash: hash_hex.clone(),
+        });
+
+        // OCEL event
+        let adds_str = op.action.add_effects.iter().map(|a| a.label()).collect::<Vec<_>>().join(";");
+        let dels_str = op.action.del_effects.iter().map(|a| a.label()).collect::<Vec<_>>().join(";");
+        ocel_events.push(OCELEvent {
+            id: format!("{case_id}-op{}", op.index),
+            event_type: "pddl8-step".to_string(),
+            time: chrono::Utc::now().fixed_offset(),
+            attributes: vec![
+                OCELEventAttribute { name: "activity".to_string(), value: OCELAttributeValue::String(op.label.clone()) },
+                OCELEventAttribute { name: "epoch".to_string(), value: OCELAttributeValue::Integer(ctx.epoch as i64) },
+                OCELEventAttribute { name: "adds".to_string(), value: OCELAttributeValue::String(adds_str) },
+                OCELEventAttribute { name: "dels".to_string(), value: OCELAttributeValue::String(dels_str) },
+                OCELEventAttribute { name: "receipt".to_string(), value: OCELAttributeValue::String(hash_hex) },
+            ],
+            relationships: vec![OCELRelationship { object_id: case_id.to_string(), qualifier: "case".to_string() }],
+        });
+    }
+
+    // Goal gate
+    let goal_set: BTreeSet<Pddl8GroundAtom> = goal.iter().cloned().collect();
+    let goal_atoms_met = goal_set.iter().all(|g| state.contains(g));
+    if goal_atoms_met {
+        let pred = ctx.pred("goal_reached", 1);
+        let term = ctx.term("__goal__");
+        let row = FactRow8::new(pred, 1, &[term], SRC);
+        let _ = ctx.kernel.load_facts(FactBlock8::new(pred, 1, vec![row]));
+    }
+    let goal_reached = goal_atoms_met && ctx.query_goal_reached();
+
+    let mut h = blake3::Hasher::new();
+    h.update(&chain); h.update(if goal_reached { b"GOAL_MET" } else { b"GOAL_MISS" });
+    chain = *h.finalize().as_bytes();
+    let final_chain = hex(&chain);
+
+    // Build receipt
+    let op_labels: Vec<String> = tape.ops.iter().map(|o| o.label.clone()).collect();
+    let init_labels: Vec<String> = initial_state.iter().map(|a| a.label()).collect();
+    let goal_labels: Vec<String> = goal.iter().map(|a| a.label()).collect();
+
+    let receipt = Pddl8ExecutionReceipt {
+        plan_root: hash_strings(&op_labels),
+        state_root: hash_strings(&init_labels),
+        goal_root: hash_strings(&goal_labels),
+        chain_hash: final_chain.clone(),
+        goal_reached,
+        step_count: steps.len(),
+    };
+
+    let log = Pddl8ExecutionLog { steps, goal_reached, chain_hash: final_chain };
+
+    // OCEL wrapper
+    let ocel = OCEL {
+        event_types: vec![OCELType { name: "pddl8-step".to_string(), attributes: vec![
+            OCELTypeAttribute { name: "activity".to_string(), value_type: "string".to_string() },
+            OCELTypeAttribute { name: "epoch".to_string(), value_type: "integer".to_string() },
+            OCELTypeAttribute { name: "adds".to_string(), value_type: "string".to_string() },
+            OCELTypeAttribute { name: "dels".to_string(), value_type: "string".to_string() },
+            OCELTypeAttribute { name: "receipt".to_string(), value_type: "string".to_string() },
+        ]}],
+        object_types: vec![OCELType { name: "plan-case".to_string(), attributes: vec![] }],
+        events: ocel_events,
+        objects: vec![OCELObject { id: case_id.to_string(), object_type: "plan-case".to_string(), attributes: vec![], relationships: vec![] }],
+    };
+
+    Ok((log, receipt, ocel))
+}
+
+fn load_may_fire_rule(ctx: &mut Ctx, id: u32, head: &str, body: &[&str]) -> Result<(), Pddl8Error> {
+    if body.len() > 8 {
+        return Err(Pddl8Error::BoundExceeded { what: "rule body atoms", limit: 8, got: body.len() });
+    }
+    let head_pred = ctx.pred("may_fire", 1);
+    let head_term = ctx.term(head);
+    let mut head_atom = P8Atom::new(head_pred, 1, &[head_term]);
+    head_atom.binding_mask = 0b1;
+
+    let mut body_arr = [P8Atom::new(PredicateId(0), 0, &[]); 8];
+    for (i, bl) in body.iter().enumerate() {
+        let bp = ctx.pred("may_fire", 1);
+        let bt = ctx.term(bl);
+        let mut ba = P8Atom::new(bp, 1, &[bt]);
+        ba.binding_mask = 0b1;
+        body_arr[i] = ba;
+    }
+    let body_len = body.len() as u8;
+    let rule = Rule8 {
+        rule_id: RuleId(ctx.next_rule),
+        head: head_atom,
+        body: body_arr,
+        body_len,
+        body_mask: if body_len == 0 { 0 } else { (1u8 << body_len) - 1 },
+        negation_mask: 0, builtin_mask: 0, var_count: 0, var_live_mask: 0,
+        feature_mask: FeatureBit::Facts.mask() | FeatureBit::HornRules.mask(),
+        proof_mask: 0, plan_id: prolog8::types::PlanId::default(),
+    };
+    ctx.next_rule += 1;
+    ctx.kernel.load_rule(rule).map_err(|e| Pddl8Error::AdmissionLoadError(format!("{e:?}")))
+}
+
+fn hex(b: &[u8; 32]) -> String { b.iter().map(|x| format!("{x:02x}")).collect() }
+
+fn hash_strings(items: &[String]) -> String {
+    let mut h = blake3::Hasher::new();
+    for s in items { h.update(s.as_bytes()); h.update(b"\x00"); }
+    h.finalize().to_hex().to_string()
+}

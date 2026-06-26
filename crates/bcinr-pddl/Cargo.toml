@@ -1,0 +1,37 @@
+[package]
+name = "bcinr-pddl"
+version = "26.6.26"
+edition = "2021"
+description = "PDDL8 → POWL tape → Prolog8 admission → OCEL → BLAKE3 receipt: the BRCE candidate-future execution loop"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/seanchatmangpt/bcinr"
+keywords = ["pddl", "planning", "workflow", "prolog", "receipt"]
+categories = ["algorithms"]
+
+# No path deps on bcinr-powl or wasm4pm-cognition — PDDL must not bleed into
+# every consumer. Opt-in only via this crate.
+
+[dependencies]
+# PDDL 3.1 parser — strongly typed AST, nom-based, no planner bundled.
+pddl = { version = "0.2", features = ["parser"] }
+# BLAKE3 for receipt chaining
+blake3 = "1"
+# Prolog8 kernel — admission gate (R ⊢ A)
+prolog8 = { path = "../../../wasm4pm/crates/prolog8" }
+# wasm4pm-compat — canonical OCEL types + PDDL types (once landed there)
+wasm4pm-compat = { version = "26.6.28" }
+# Serde for serialization (wasm4pm-compat re-exports most of what's needed)
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
+# Nothing from bcinr-powl or wasm4pm-cognition in dev-deps either.
+
+[[test]]
+name = "logistics"
+path = "tests/logistics.rs"
+
+[[test]]
+name = "brce_loop"
+path = "tests/brce_loop.rs"

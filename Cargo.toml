@@ -1,5 +1,5 @@
 [workspace]
-members = ["bcinr", "bcinr-core", "bcinr-bench", "crates/bcinr-api", "crates/bcinr-logic", "tools/bcinr-reporter", "tools/bcinr-contract-gate", "tools/bcinr-bench-auditor", "tools/bcinr-cheat-scanner", "tools/rust_audit", "crates/encode_unicode_patch", "tools/ggen", "playground", "crates/chess-factory", "crates/bcinr-powl", "crates/bcinr-powl-receipt"]
+members = ["bcinr", "bcinr-core", "bcinr-bench", "crates/bcinr-api", "crates/bcinr-logic", "tools/bcinr-reporter", "tools/bcinr-contract-gate", "tools/bcinr-bench-auditor", "tools/bcinr-cheat-scanner", "tools/rust_audit", "crates/encode_unicode_patch", "tools/ggen", "playground", "crates/chess-factory", "crates/bcinr-powl", "crates/bcinr-powl-receipt", "crates/bcinr-pddl"]
 resolver = "2"
 
 [profile.release]
