@@ -47,7 +47,7 @@ pub fn lifecycle_diagnostics(lifecycle: &ProjectLifecycle) -> Vec<Diagnostic> {
             ),
             LifecycleStage::ArdAdmitted => (
                 "ARD_NOT_ADMITTED",
-                "ARD exists but is not admitted. Add 'ADMITTED' status marker.".into(),
+                "ARD exists but is not admitted — next lawful action is admit_ard, not derive_ard. Add 'ADMITTED' status marker.".into(),
                 DiagnosticSeverity::WARNING,
             ),
             LifecycleStage::WorkUnitsGenerated => (

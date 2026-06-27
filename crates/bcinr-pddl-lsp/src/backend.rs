@@ -32,10 +32,15 @@ use crate::{
     virtual_docs,
 };
 
-/// Cached plan result for a workspace root.
+/// Cached projection state for a workspace root.
+///
+/// Two-tier: CANDIDATE (always present after any analysis) vs ADMITTED (explicit executeTape only).
 struct CachedPlan {
     projection: projection::Pddl8Projection,
-    result: Option<planner_client::PlanResult>,
+    /// Phase 1: candidate plan — always updated on scan/project/plan
+    candidate: Option<planner_client::PlanCandidate>,
+    /// Phase 2: admitted result — only updated by explicit bcinrPddl.executeTape command
+    admission: Option<planner_client::PlanResult>,
     gate: publish_gate::PublishGate,
 }
 
@@ -65,61 +70,122 @@ impl PddlLspBackend {
             .unwrap_or_else(|| PathBuf::from("."))
     }
 
-    /// Full analysis cycle: scan → project → plan → publish gate → diagnostics.
-    async fn analyze_and_publish(&self, trigger_uri: Uri) {
+    /// Projection mode: scan → project → plan (candidate) → diagnostics.
+    ///
+    /// Safe to call on every didOpen/didChange/didSave.
+    /// Does NOT execute the tape. Does NOT emit receipts. Does NOT produce OCEL.
+    /// Gate stays at PARTIAL at most — never advances to ADMITTED here.
+    async fn project_and_cache(&self, trigger_uri: Uri) {
         let root = self.root().await;
         let lc = lifecycle::scan(&root);
-
-        // Bound check on lifecycle
         let bound_violations = bounds::check_lifecycle_domain();
-
-        // Projection
         let proj = projection::project(&lc);
 
-        // Attempt planning
-        let case_id = format!("lsp-{}", lc.project_name);
-        let plan_result = planner_client::plan_and_execute(&proj, &case_id);
+        // Phase 1: find candidate plan only
+        let candidate = planner_client::plan(&proj).ok();
 
-        let gate = match &plan_result {
-            Ok(r) => publish_gate::from_plan_result(&lc, r),
-            Err(_) => publish_gate::from_lifecycle(&lc),
-        };
+        let gate = publish_gate::from_lifecycle(&lc);
 
-        // Update cache
         {
             let mut cache = self.plan_cache.lock().await;
+            // Preserve any existing admission result — projection mode never clears it
+            let existing_admission = cache.as_ref().and_then(|c| c.admission.as_ref().map(|_| ())).is_some();
+            let admission = if existing_admission {
+                cache.as_mut().and_then(|c| c.admission.take())
+            } else {
+                None
+            };
+            // Re-derive gate: if we have an existing admission, honour it
+            let final_gate = if admission.is_some() {
+                // keep the ADMITTED gate from the cached result
+                cache.as_ref().map(|c| c.gate.clone()).unwrap_or(gate)
+            } else {
+                gate
+            };
             *cache = Some(CachedPlan {
                 projection: proj.clone(),
-                result: plan_result.ok(),
-                gate: gate.clone(),
+                candidate,
+                admission,
+                gate: final_gate.clone(),
             });
         }
 
-        // Collect all diagnostics
         let mut all_diags = diag_mod::lifecycle_diagnostics(&lc);
         all_diags.extend(diag_mod::bound_diagnostics(&bound_violations));
-
-        // If planner failed and lifecycle is otherwise complete, surface that too
-        {
-            let cache = self.plan_cache.lock().await;
-            if let Some(ref c) = *cache {
-                if c.result.is_none() && lc.missing.len() <= 2 {
-                    // Only surface planner error when we're close to publish
-                    // (avoid noise when lifecycle is far from complete)
-                }
-            }
-        }
-
         self.client.publish_diagnostics(trigger_uri, all_diags, None).await;
 
-        // Emit semantic notifications via window/showMessage for gate changes
-        let gate_msg = format!(
-            "bcinr-pddl-lsp: project '{}' publish gate = {}. Next: {:?}",
-            lc.project_name,
-            gate.status_label(),
-            lc.next_missing().map(|s| s.predicate_name())
-        );
-        self.client.log_message(MessageType::INFO, gate_msg).await;
+        let gate_label = {
+            let cache = self.plan_cache.lock().await;
+            cache.as_ref().map(|c| c.gate.status_label().to_string()).unwrap_or_default()
+        };
+        self.client.log_message(
+            MessageType::INFO,
+            format!(
+                "bcinr-pddl-lsp CANDIDATE: project '{}' gate={} next={:?}",
+                lc.project_name,
+                gate_label,
+                lc.next_missing().map(|s| s.predicate_name()),
+            ),
+        ).await;
+    }
+
+    /// Admission mode: execute cached candidate tape → receipt + OCEL → gate ADMITTED.
+    ///
+    /// ONLY called by explicit bcinrPddl.executeTape command.
+    /// Candidate ≠ Admitted. This is the BRCE gate.
+    async fn execute_tape_and_admit(&self, trigger_uri: Uri) {
+        let root = self.root().await;
+        let lc = lifecycle::scan(&root);
+
+        let (candidate, proj) = {
+            let cache = self.plan_cache.lock().await;
+            match cache.as_ref() {
+                Some(c) => (c.candidate.clone(), c.projection.clone()),
+                None => {
+                    self.client.log_message(
+                        MessageType::WARNING,
+                        "bcinr-pddl-lsp: no candidate plan cached — run project first",
+                    ).await;
+                    return;
+                }
+            }
+        };
+
+        let Some(candidate) = candidate else {
+            self.client.log_message(
+                MessageType::WARNING,
+                "bcinr-pddl-lsp: candidate plan is empty — nothing to execute",
+            ).await;
+            return;
+        };
+
+        let case_id = format!("lsp-{}", lc.project_name);
+        match planner_client::admit(&candidate, &case_id) {
+            Ok(result) => {
+                let gate = publish_gate::from_plan_result(&lc, &result);
+                let gate_label = gate.status_label().to_string();
+                {
+                    let mut cache = self.plan_cache.lock().await;
+                    if let Some(ref mut c) = *cache {
+                        c.admission = Some(result);
+                        c.gate = gate;
+                    }
+                }
+                self.client.log_message(
+                    MessageType::INFO,
+                    format!("bcinr-pddl-lsp ADMITTED: gate={gate_label}"),
+                ).await;
+                // Re-publish diagnostics with updated gate state
+                let all_diags = diag_mod::lifecycle_diagnostics(&lc);
+                self.client.publish_diagnostics(trigger_uri, all_diags, None).await;
+            }
+            Err(e) => {
+                self.client.log_message(
+                    MessageType::ERROR,
+                    format!("bcinr-pddl-lsp executeTape FAILED: {e}"),
+                ).await;
+            }
+        }
     }
 
     /// Render a virtual document by URI scheme.
@@ -145,22 +211,31 @@ impl PddlLspBackend {
                     .unwrap_or_else(|| projection::emit_problem(&lc))
             }
             virtual_docs::URI_PLAN | virtual_docs::URI_TAPE => {
-                cache.as_ref().and_then(|c| c.result.as_ref())
-                    .map(virtual_docs::render_plan)
-                    .unwrap_or_else(|| r#"{"status":"NO_ADMITTED_PLAN"}"#.into())
+                // Prefer admitted result; fall back to candidate plan steps
+                if let Some(result) = cache.as_ref().and_then(|c| c.admission.as_ref()) {
+                    virtual_docs::render_plan(result)
+                } else if let Some(candidate) = cache.as_ref().and_then(|c| c.candidate.as_ref()) {
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "status": "CANDIDATE",
+                        "plan_steps": candidate.plan_steps,
+                        "note": "Run bcinrPddl.executeTape to admit"
+                    })).unwrap_or_default()
+                } else {
+                    r#"{"status":"NO_PLAN"}"#.into()
+                }
             }
             virtual_docs::URI_LOG => {
-                cache.as_ref().and_then(|c| c.result.as_ref())
+                cache.as_ref().and_then(|c| c.admission.as_ref())
                     .map(virtual_docs::render_log)
                     .unwrap_or_else(|| r#"{"status":"CANDIDATE"}"#.into())
             }
             virtual_docs::URI_RECEIPT => {
-                cache.as_ref().and_then(|c| c.result.as_ref())
+                cache.as_ref().and_then(|c| c.admission.as_ref())
                     .map(virtual_docs::render_receipt)
                     .unwrap_or_else(|| r#"{"status":"CANDIDATE"}"#.into())
             }
             virtual_docs::URI_OCEL => {
-                cache.as_ref().and_then(|c| c.result.as_ref())
+                cache.as_ref().and_then(|c| c.admission.as_ref())
                     .map(virtual_docs::render_ocel)
                     .unwrap_or_else(|| r#"{"status":"CANDIDATE"}"#.into())
             }
@@ -235,7 +310,7 @@ impl LanguageServer for PddlLspBackend {
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
         let uri_str = params.text_document.uri.to_string();
         self.documents.insert(uri_str, params.text_document.text);
-        self.analyze_and_publish(params.text_document.uri).await;
+        self.project_and_cache(params.text_document.uri).await;
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
@@ -243,11 +318,11 @@ impl LanguageServer for PddlLspBackend {
             let uri_str = params.text_document.uri.to_string();
             self.documents.insert(uri_str, change.text);
         }
-        self.analyze_and_publish(params.text_document.uri).await;
+        self.project_and_cache(params.text_document.uri).await;
     }
 
     async fn did_save(&self, params: DidSaveTextDocumentParams) {
-        self.analyze_and_publish(params.text_document.uri).await;
+        self.project_and_cache(params.text_document.uri).await;
     }
 
     async fn code_action(
@@ -292,16 +367,29 @@ impl LanguageServer for PddlLspBackend {
         params: ExecuteCommandParams,
     ) -> lsp_max::jsonrpc::Result<Option<serde_json::Value>> {
         match params.command.as_str() {
-            "bcinrPddl.refreshLifecycle" | "bcinrPddl.runPlan" | "bcinrPddl.executeTape"
-            | "bcinrPddl.generateProjection" => {
+            // Projection mode: safe, always runs on command
+            "bcinrPddl.refreshLifecycle" | "bcinrPddl.runPlan" | "bcinrPddl.generateProjection" => {
                 let root = self.root().await;
-                // Trigger re-analysis using workspace root as a synthetic URI
                 let uri_str = format!("file://{}", root.to_string_lossy());
                 let uri: Uri = uri_str.parse().unwrap_or_else(|_| {
                     "file:///workspace".parse().unwrap()
                 });
-                self.analyze_and_publish(uri).await;
+                self.project_and_cache(uri).await;
                 Ok(Some(serde_json::json!({"status": "CANDIDATE"})))
+            }
+            // Admission mode: explicit only — executes tape, emits receipt + OCEL
+            "bcinrPddl.executeTape" => {
+                let root = self.root().await;
+                let uri_str = format!("file://{}", root.to_string_lossy());
+                let uri: Uri = uri_str.parse().unwrap_or_else(|_| {
+                    "file:///workspace".parse().unwrap()
+                });
+                self.execute_tape_and_admit(uri).await;
+                let gate_label = {
+                    let cache = self.plan_cache.lock().await;
+                    cache.as_ref().map(|c| c.gate.status_label().to_string()).unwrap_or_default()
+                };
+                Ok(Some(serde_json::json!({"status": gate_label})))
             }
             "bcinrPddl.openVirtualDocument" => {
                 let uri_str = params.arguments
