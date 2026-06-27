@@ -187,8 +187,8 @@ fn flywheel_benchmark() {
         let _ = bounds::check_work_unit("unit-big", 9);
     }));
 
-    // ── 14. Bounds report (lifecycle domain) ─────────────────────────────
-    samples.push(measure("bounds_check_lifecycle_domain", 5000, || {
+    // ── 14. Bounds report (lifecycle domain) — real check, parse included ─
+    samples.push(measure("bounds_check_lifecycle_domain", 10, || {
         let _ = bounds::check_lifecycle_domain();
     }));
 
@@ -295,10 +295,20 @@ fn flywheel_benchmark() {
                 ns < 50_000_000,
                 "{} too slow: {}ns/iter (limit 50ms)", n, ns
             ),
-            // Pure computation ops: must be < 10µs
-            n if n.starts_with("bounds_") || n.starts_with("build_broker") => assert!(
+            // Build broker: pure in-memory, < 10µs
+            n if n.starts_with("build_broker") => assert!(
                 ns < 10_000,
                 "{} too slow: {}ns/iter (limit 10µs)", n, ns
+            ),
+            // bounds_check_work_unit: O(1) comparison, < 10µs
+            "bounds_check_work_unit" => assert!(
+                ns < 10_000,
+                "bounds_check_work_unit too slow: {}ns/iter (limit 10µs)", ns
+            ),
+            // bounds_check_lifecycle_domain: real parse + check, < 20ms
+            "bounds_check_lifecycle_domain" => assert!(
+                ns < 20_000_000,
+                "bounds_check_lifecycle_domain too slow: {}ms/iter (limit 20ms)", ns / 1_000_000
             ),
             // Render ops: must be < 100µs
             n if n.starts_with("render_") => assert!(

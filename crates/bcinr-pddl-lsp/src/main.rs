@@ -1,3 +1,4 @@
+mod andon_bus;
 mod backend;
 mod bounds;
 mod build_broker;

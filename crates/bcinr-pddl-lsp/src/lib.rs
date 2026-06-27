@@ -1,3 +1,4 @@
+pub mod andon_bus;
 pub mod bounds;
 pub mod build_broker;
 pub mod code_actions;

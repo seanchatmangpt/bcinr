@@ -1,6 +1,7 @@
 //! Virtual document registry for bcinr-pddl:// URIs.
 
 use serde_json::json;
+use crate::andon_bus::{AndonEvent, AndonSeverity};
 use crate::build_broker::BuildBrokerState;
 use crate::bounds::BoundReport;
 use crate::lifecycle::ProjectLifecycle;
@@ -171,6 +172,66 @@ pub fn render_build_broker(state: &BuildBrokerState) -> String {
         "denial_count": state.denial_count,
         "last_ocel_event": state.last_ocel_event,
         "can_acquire": state.can_acquire(),
+    })).unwrap_or_default()
+}
+
+// ── Truth-table virtual docs ──────────────────────────────────────────────────
+
+pub const URI_TRUTH_TABLE: &str = "bcinr-pddl://truth/table";
+pub const URI_TRUTH_COUNTERFACTUALS: &str = "bcinr-pddl://truth/counterfactuals";
+pub const URI_TRUTH_ANDON: &str = "bcinr-pddl://truth/andon";
+
+pub fn render_truth_table(events: &[AndonEvent]) -> String {
+    let rows: Vec<_> = events.iter().map(|e| {
+        let status = match e.severity {
+            AndonSeverity::Stop | AndonSeverity::Refuse => "ANDON",
+            AndonSeverity::Warning => "WARN",
+            AndonSeverity::Info => "INFO",
+        };
+        json!({
+            "id": e.id,
+            "code": e.code,
+            "severity": format!("{:?}", e.severity),
+            "blocking": e.blocking,
+            "admission_allowed": e.admission_allowed,
+            "status": status,
+        })
+    }).collect();
+    serde_json::to_string_pretty(&rows).unwrap_or_default()
+}
+
+pub fn render_truth_counterfactuals(events: &[AndonEvent]) -> String {
+    let filtered: Vec<_> = events.iter().filter(|e| {
+        e.code.contains("COUNTERFACTUAL")
+            || matches!(e.severity, AndonSeverity::Refuse)
+    }).map(|e| json!({
+        "id": e.id,
+        "code": e.code,
+        "severity": format!("{:?}", e.severity),
+        "message": e.message,
+        "admission_allowed": e.admission_allowed,
+    })).collect();
+    serde_json::to_string_pretty(&filtered).unwrap_or_default()
+}
+
+pub fn render_truth_andon(events: &[AndonEvent]) -> String {
+    let andon_count = events.iter().filter(|e| matches!(e.severity, AndonSeverity::Stop)).count();
+    let stop_count = andon_count;
+    let refuse_count = events.iter().filter(|e| matches!(e.severity, AndonSeverity::Refuse)).count();
+    let blocking: Vec<_> = events.iter().filter(|e| e.blocking).map(|e| json!({
+        "id": e.id,
+        "code": e.code,
+        "severity": format!("{:?}", e.severity),
+        "message": e.message,
+        "next_lawful_step": e.next_lawful_step,
+        "admission_allowed": e.admission_allowed,
+    })).collect();
+    serde_json::to_string_pretty(&json!({
+        "andon_count": andon_count,
+        "stop_count": stop_count,
+        "refuse_count": refuse_count,
+        "blocking_event_count": blocking.len(),
+        "events": blocking,
     })).unwrap_or_default()
 }
 
