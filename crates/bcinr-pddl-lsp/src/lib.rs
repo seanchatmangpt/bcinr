@@ -2,6 +2,7 @@ pub mod bounds;
 pub mod build_broker;
 pub mod code_actions;
 pub mod diagnostics;
+pub mod education;
 pub mod lifecycle;
 pub mod planner_client;
 pub mod projection;
