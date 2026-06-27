@@ -6,3 +6,5 @@ thesis.out
 thesis.toc
 *.swp
 /.claude/attribution.json
+.venv/
+.agents/
