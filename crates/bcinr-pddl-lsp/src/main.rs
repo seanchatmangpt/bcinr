@@ -1,5 +1,6 @@
 mod backend;
 mod bounds;
+mod build_broker;
 mod code_actions;
 mod diagnostics;
 mod lifecycle;

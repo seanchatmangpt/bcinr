@@ -13,6 +13,7 @@ pub enum LifecycleStage {
     PrdAdmitted,
     ArdExists,
     ArdAdmitted,
+    AdrRecorded,
     WorkUnitsGenerated,
     ImplementationComplete,
     TestsPassed,
@@ -29,6 +30,7 @@ impl LifecycleStage {
             Self::PrdAdmitted => "prd_admitted",
             Self::ArdExists => "ard_exists",
             Self::ArdAdmitted => "ard_admitted",
+            Self::AdrRecorded => "adr_recorded",
             Self::WorkUnitsGenerated => "work_units_generated",
             Self::ImplementationComplete => "implementation_complete",
             Self::TestsPassed => "tests_passed",
@@ -46,6 +48,7 @@ impl LifecycleStage {
             LifecycleStage::PrdAdmitted,
             LifecycleStage::ArdExists,
             LifecycleStage::ArdAdmitted,
+            LifecycleStage::AdrRecorded,
             LifecycleStage::WorkUnitsGenerated,
             LifecycleStage::ImplementationComplete,
             LifecycleStage::TestsPassed,
@@ -102,7 +105,7 @@ pub fn scan(root: &Path) -> ProjectLifecycle {
     let mut true_stages = Vec::new();
     let mut evidence = Vec::new();
 
-    // intent_captured: any CLAUDE.md, README, or intent*.md
+    // intent_captured
     if exists_any(root, &["CLAUDE.md", "README.md", "intent.md", "INTENT.md"]) {
         true_stages.push(LifecycleStage::IntentCaptured);
         evidence.push(LifecycleEvidence {
@@ -112,7 +115,7 @@ pub fn scan(root: &Path) -> ProjectLifecycle {
         });
     }
 
-    // prd_exists: docs/prd.md or PRD.md or docs/PRD.md
+    // prd_exists / prd_admitted
     let prd_path = find_first(root, &["docs/prd.md", "docs/PRD.md", "PRD.md", "prd.md"]);
     if prd_path.is_some() {
         true_stages.push(LifecycleStage::PrdExists);
@@ -121,8 +124,6 @@ pub fn scan(root: &Path) -> ProjectLifecycle {
             source_path: prd_path.clone(),
             note: "PRD file present".into(),
         });
-
-        // prd_admitted: PRD contains "## Status: ADMITTED" or "admitted: true"
         if let Some(ref p) = prd_path {
             if file_contains(p, "ADMITTED") {
                 true_stages.push(LifecycleStage::PrdAdmitted);
@@ -135,7 +136,7 @@ pub fn scan(root: &Path) -> ProjectLifecycle {
         }
     }
 
-    // ard_exists: docs/ard.md or ARD.md
+    // ard_exists / ard_admitted
     let ard_path = find_first(root, &["docs/ard.md", "docs/ARD.md", "ARD.md", "ard.md"]);
     if ard_path.is_some() {
         true_stages.push(LifecycleStage::ArdExists);
@@ -144,7 +145,6 @@ pub fn scan(root: &Path) -> ProjectLifecycle {
             source_path: ard_path.clone(),
             note: "ARD file present".into(),
         });
-
         if let Some(ref p) = ard_path {
             if file_contains(p, "ADMITTED") {
                 true_stages.push(LifecycleStage::ArdAdmitted);
@@ -157,7 +157,18 @@ pub fn scan(root: &Path) -> ProjectLifecycle {
         }
     }
 
-    // work_units_generated: docs/work-units.md or .bcinr/work-units.json
+    // adr_recorded: docs/adr/ directory with at least one .md
+    let adr_path = find_adr(root);
+    if adr_path.is_some() {
+        true_stages.push(LifecycleStage::AdrRecorded);
+        evidence.push(LifecycleEvidence {
+            stage: LifecycleStage::AdrRecorded,
+            source_path: adr_path,
+            note: "ADR directory present with at least one decision record".into(),
+        });
+    }
+
+    // work_units_generated
     if find_first(root, &["docs/work-units.md", ".bcinr/work-units.json"]).is_some() {
         true_stages.push(LifecycleStage::WorkUnitsGenerated);
         evidence.push(LifecycleEvidence {
@@ -167,7 +178,7 @@ pub fn scan(root: &Path) -> ProjectLifecycle {
         });
     }
 
-    // implementation_complete: src/ or crates/ with at least one .rs file
+    // implementation_complete
     if has_source_files(root) {
         true_stages.push(LifecycleStage::ImplementationComplete);
         evidence.push(LifecycleEvidence {
@@ -177,7 +188,7 @@ pub fn scan(root: &Path) -> ProjectLifecycle {
         });
     }
 
-    // tests_passed: .bcinr/test-report.json or test_results.json with passed=true
+    // tests_passed
     if let Some(p) = find_first(root, &[".bcinr/test-report.json", "test_results.json"]) {
         if file_contains(&p, "\"passed\": true") || file_contains(&p, "\"status\": \"passed\"") {
             true_stages.push(LifecycleStage::TestsPassed);
@@ -189,7 +200,7 @@ pub fn scan(root: &Path) -> ProjectLifecycle {
         }
     }
 
-    // docs_projected: docs/ has more than just prd/ard
+    // docs_projected
     if has_projected_docs(root) {
         true_stages.push(LifecycleStage::DocsProjected);
         evidence.push(LifecycleEvidence {
@@ -199,7 +210,7 @@ pub fn scan(root: &Path) -> ProjectLifecycle {
         });
     }
 
-    // release_ready: .bcinr/release.json or Cargo.toml with publish=true
+    // release_ready
     if find_first(root, &[".bcinr/release.json", "docs/publish.md"]).is_some() {
         true_stages.push(LifecycleStage::ReleaseReady);
         evidence.push(LifecycleEvidence {
@@ -209,7 +220,7 @@ pub fn scan(root: &Path) -> ProjectLifecycle {
         });
     }
 
-    // published: .bcinr/receipts/latest.json with goal_reached=true
+    // published: receipt with goal_reached=true
     if let Some(p) = find_first(root, &[".bcinr/receipts/latest.json", "receipts/latest.json"]) {
         if file_contains(&p, "\"goal_reached\": true") {
             true_stages.push(LifecycleStage::Published);
@@ -247,6 +258,17 @@ fn file_contains(path: &Path, needle: &str) -> bool {
         .unwrap_or(false)
 }
 
+fn find_adr(root: &Path) -> Option<PathBuf> {
+    let adr_dir = root.join("docs/adr");
+    if !adr_dir.is_dir() { return None; }
+    walkdir::WalkDir::new(&adr_dir)
+        .max_depth(2)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .find(|e| e.path().extension().and_then(|x| x.to_str()) == Some("md"))
+        .map(|e| e.path().to_path_buf())
+}
+
 fn has_source_files(root: &Path) -> bool {
     for dir in &["src", "crates", "lib"] {
         let p = root.join(dir);
@@ -267,7 +289,7 @@ fn has_source_files(root: &Path) -> bool {
 fn has_projected_docs(root: &Path) -> bool {
     let docs = root.join("docs");
     if !docs.is_dir() { return false; }
-    let non_prd_ard: Vec<_> = walkdir::WalkDir::new(&docs)
+    walkdir::WalkDir::new(&docs)
         .max_depth(2)
         .into_iter()
         .filter_map(|e| e.ok())
@@ -277,6 +299,5 @@ fn has_projected_docs(root: &Path) -> bool {
                 && name != "prd.md"
                 && name != "ard.md"
         })
-        .collect();
-    non_prd_ard.len() >= 1
+        .count() >= 1
 }

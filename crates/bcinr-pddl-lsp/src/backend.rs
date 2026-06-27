@@ -23,6 +23,7 @@ fn uri_to_path(uri: &Uri) -> Option<PathBuf> {
 
 use crate::{
     bounds,
+    build_broker,
     code_actions,
     diagnostics as diag_mod,
     lifecycle,
@@ -37,6 +38,8 @@ use crate::{
 /// Two-tier: CANDIDATE (always present after any analysis) vs ADMITTED (explicit executeTape only).
 struct CachedPlan {
     projection: projection::Pddl8Projection,
+    lifecycle: lifecycle::ProjectLifecycle,
+    bounds_report: bounds::BoundReport,
     /// Phase 1: candidate plan — always updated on scan/project/plan
     candidate: Option<planner_client::PlanCandidate>,
     /// Phase 2: admitted result — only updated by explicit bcinrPddl.executeTape command
@@ -52,6 +55,8 @@ pub struct PddlLspBackend {
     plan_cache: Arc<Mutex<Option<CachedPlan>>>,
     /// workspace root detected on initialize
     workspace_root: Arc<Mutex<Option<PathBuf>>>,
+    /// build broker state
+    broker: Arc<Mutex<build_broker::BuildBrokerState>>,
 }
 
 impl PddlLspBackend {
@@ -61,6 +66,7 @@ impl PddlLspBackend {
             documents: DashMap::new(),
             plan_cache: Arc::new(Mutex::new(None)),
             workspace_root: Arc::new(Mutex::new(None)),
+            broker: Arc::new(Mutex::new(build_broker::BuildBrokerState::default())),
         }
     }
 
@@ -78,40 +84,34 @@ impl PddlLspBackend {
     async fn project_and_cache(&self, trigger_uri: Uri) {
         let root = self.root().await;
         let lc = lifecycle::scan(&root);
-        let bound_violations = bounds::check_lifecycle_domain();
+        let bounds_report = bounds::check_lifecycle_domain();
         let proj = projection::project(&lc);
 
         // Phase 1: find candidate plan only
         let candidate = planner_client::plan(&proj).ok();
-
         let gate = publish_gate::from_lifecycle(&lc);
 
         {
             let mut cache = self.plan_cache.lock().await;
-            // Preserve any existing admission result — projection mode never clears it
-            let existing_admission = cache.as_ref().and_then(|c| c.admission.as_ref().map(|_| ())).is_some();
-            let admission = if existing_admission {
-                cache.as_mut().and_then(|c| c.admission.take())
-            } else {
-                None
-            };
-            // Re-derive gate: if we have an existing admission, honour it
+            // Preserve any existing admission — projection mode never clears it
+            let admission = cache.as_mut().and_then(|c| c.admission.take());
             let final_gate = if admission.is_some() {
-                // keep the ADMITTED gate from the cached result
                 cache.as_ref().map(|c| c.gate.clone()).unwrap_or(gate)
             } else {
                 gate
             };
             *cache = Some(CachedPlan {
                 projection: proj.clone(),
+                lifecycle: lc.clone(),
+                bounds_report: bounds_report.clone(),
                 candidate,
                 admission,
-                gate: final_gate.clone(),
+                gate: final_gate,
             });
         }
 
         let mut all_diags = diag_mod::lifecycle_diagnostics(&lc);
-        all_diags.extend(diag_mod::bound_diagnostics(&bound_violations));
+        all_diags.extend(diag_mod::bound_diagnostics(&bounds_report));
         self.client.publish_diagnostics(trigger_uri, all_diags, None).await;
 
         let gate_label = {
@@ -164,6 +164,8 @@ impl PddlLspBackend {
             Ok(result) => {
                 let gate = publish_gate::from_plan_result(&lc, &result);
                 let gate_label = gate.status_label().to_string();
+                // Persist receipt + OCEL to .bcinr/
+                let _ = planner_client::persist_admission(&root, &result);
                 {
                     let mut cache = self.plan_cache.lock().await;
                     if let Some(ref mut c) = *cache {
@@ -175,7 +177,6 @@ impl PddlLspBackend {
                     MessageType::INFO,
                     format!("bcinr-pddl-lsp ADMITTED: gate={gate_label}"),
                 ).await;
-                // Re-publish diagnostics with updated gate state
                 let all_diags = diag_mod::lifecycle_diagnostics(&lc);
                 self.client.publish_diagnostics(trigger_uri, all_diags, None).await;
             }
@@ -193,6 +194,7 @@ impl PddlLspBackend {
         let root = self.root().await;
         let lc = lifecycle::scan(&root);
         let cache = self.plan_cache.lock().await;
+        let broker = self.broker.lock().await;
 
         Some(match uri_str {
             virtual_docs::URI_LIFECYCLE => virtual_docs::render_lifecycle(&lc),
@@ -202,24 +204,32 @@ impl PddlLspBackend {
                     .unwrap_or_else(|| publish_gate::from_lifecycle(&lc));
                 virtual_docs::render_status(&lc, &gate)
             }
+            virtual_docs::URI_EVIDENCE => virtual_docs::render_evidence(&lc),
+            virtual_docs::URI_NEXT_STEP => {
+                let gate = cache.as_ref()
+                    .map(|c| c.gate.clone())
+                    .unwrap_or_else(|| publish_gate::from_lifecycle(&lc));
+                virtual_docs::render_next_step(&lc, &gate)
+            }
+            virtual_docs::URI_BOUNDS_REPORT => {
+                let report = cache.as_ref()
+                    .map(|c| c.bounds_report.clone())
+                    .unwrap_or_default();
+                virtual_docs::render_bounds_report(&report)
+            }
             virtual_docs::URI_DOMAIN => {
                 cache.as_ref().map(|c| c.projection.domain_text.clone())
-                    .unwrap_or_else(|| projection::emit_domain())
+                    .unwrap_or_else(projection::emit_domain)
             }
             virtual_docs::URI_PROBLEM => {
                 cache.as_ref().map(|c| c.projection.problem_text.clone())
                     .unwrap_or_else(|| projection::emit_problem(&lc))
             }
             virtual_docs::URI_PLAN | virtual_docs::URI_TAPE => {
-                // Prefer admitted result; fall back to candidate plan steps
                 if let Some(result) = cache.as_ref().and_then(|c| c.admission.as_ref()) {
                     virtual_docs::render_plan(result)
                 } else if let Some(candidate) = cache.as_ref().and_then(|c| c.candidate.as_ref()) {
-                    serde_json::to_string_pretty(&serde_json::json!({
-                        "status": "CANDIDATE",
-                        "plan_steps": candidate.plan_steps,
-                        "note": "Run bcinrPddl.executeTape to admit"
-                    })).unwrap_or_default()
+                    virtual_docs::render_plan_candidate(candidate)
                 } else {
                     r#"{"status":"NO_PLAN"}"#.into()
                 }
@@ -244,6 +254,13 @@ impl PddlLspBackend {
                     .map(|c| c.gate.clone())
                     .unwrap_or_else(|| publish_gate::from_lifecycle(&lc));
                 virtual_docs::render_publish_gate(&gate)
+            }
+            virtual_docs::URI_BUILD_BROKER => virtual_docs::render_build_broker(&broker),
+            virtual_docs::URI_AGENT_ASSIGNMENTS => {
+                let gate = cache.as_ref()
+                    .map(|c| c.gate.clone())
+                    .unwrap_or_else(|| publish_gate::from_lifecycle(&lc));
+                virtual_docs::render_agent_assignments(&lc, &gate)
             }
             _ => return None,
         })
@@ -275,15 +292,31 @@ impl LanguageServer for PddlLspBackend {
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 execute_command_provider: Some(ExecuteCommandOptions {
                     commands: vec![
-                        "bcinrPddl.generateProjection".into(),
-                        "bcinrPddl.runPlan".into(),
-                        "bcinrPddl.executeTape".into(),
-                        "bcinrPddl.openVirtualDocument".into(),
-                        "bcinrPddl.explainPublishGate".into(),
-                        "bcinrPddl.splitNeed9".into(),
+                        // Projection mode
                         "bcinrPddl.refreshLifecycle".into(),
+                        "bcinrPddl.runPlan".into(),
+                        "bcinrPddl.generateProjection".into(),
+                        // Admission mode
+                        "bcinrPddl.executeTape".into(),
+                        // Virtual docs
+                        "bcinrPddl.openVirtualDocument".into(),
+                        // Lifecycle repair
                         "bcinrPddl.createPrd".into(),
+                        "bcinrPddl.createArd".into(),
+                        "bcinrPddl.createAdr".into(),
+                        "bcinrPddl.generateWorkUnits".into(),
                         "bcinrPddl.deriveArd".into(),
+                        // Gate
+                        "bcinrPddl.explainPublishGate".into(),
+                        "bcinrPddl.verifyReceipt".into(),
+                        // Bounds
+                        "bcinrPddl.splitNeed9".into(),
+                        // Build broker
+                        "bcinrPddl.requestBuildSlot".into(),
+                        "bcinrPddl.releaseBuildSlot".into(),
+                        "bcinrPddl.wrapHeavyCommand".into(),
+                        // OCEL
+                        "bcinrPddl.emitOcelSnapshot".into(),
                     ],
                     work_done_progress_options: Default::default(),
                 }),
@@ -408,7 +441,7 @@ impl LanguageServer for PddlLspBackend {
             "bcinrPddl.splitNeed9" => {
                 Ok(Some(serde_json::json!({
                     "status": "CANDIDATE",
-                    "message": "Need9 split: decompose work package into ≤8 tasks. Edit docs/work-units.md."
+                    "message": "Need9: decompose work package into ≤8 tasks. Edit docs/work-units.md."
                 })))
             }
             "bcinrPddl.createPrd" => {
@@ -417,11 +450,77 @@ impl LanguageServer for PddlLspBackend {
                     "template": "# PRD\n\n## Status: CANDIDATE\n\n## Intent\n\n## Goals\n\n## Non-Goals\n"
                 })))
             }
-            "bcinrPddl.deriveArd" => {
+            "bcinrPddl.createArd" | "bcinrPddl.deriveArd" => {
                 Ok(Some(serde_json::json!({
                     "status": "CANDIDATE",
                     "template": "# ARD\n\n## Status: CANDIDATE\n\n## Architecture Thesis\n\n## Modules\n"
                 })))
+            }
+            "bcinrPddl.createAdr" => {
+                Ok(Some(serde_json::json!({
+                    "status": "CANDIDATE",
+                    "template": "# ADR-001: Title\n\n## Status: CANDIDATE\n\n## Context\n\n## Decision\n\n## Consequences\n",
+                    "path": "docs/adr/001-title.md"
+                })))
+            }
+            "bcinrPddl.generateWorkUnits" => {
+                Ok(Some(serde_json::json!({
+                    "status": "CANDIDATE",
+                    "template": "# Work Units\n\n## Unit 1: Name (≤8 tasks)\n\n- [ ] Task 1\n- [ ] Task 2\n",
+                    "path": "docs/work-units.md"
+                })))
+            }
+            "bcinrPddl.verifyReceipt" => {
+                let root = self.root().await;
+                let receipt_path = root.join(".bcinr/receipts/latest.json");
+                if receipt_path.exists() {
+                    match std::fs::read_to_string(&receipt_path) {
+                        Ok(content) => {
+                            let goal_reached = content.contains("\"goal_reached\": true");
+                            Ok(Some(serde_json::json!({
+                                "status": if goal_reached { "ADMITTED" } else { "REFUSED" },
+                                "receipt_path": receipt_path.to_string_lossy(),
+                                "goal_reached": goal_reached,
+                            })))
+                        }
+                        Err(e) => Ok(Some(serde_json::json!({
+                            "status": "RECEIPT_INTEGRITY_ERROR",
+                            "error": e.to_string(),
+                        }))),
+                    }
+                } else {
+                    Ok(Some(serde_json::json!({"status": "CANDIDATE", "error": "no receipt found"})))
+                }
+            }
+            "bcinrPddl.requestBuildSlot" => {
+                let cmd = params.arguments.first().and_then(|v| v.as_str()).unwrap_or("build");
+                let mut broker = self.broker.lock().await;
+                match broker.request_slot(cmd) {
+                    Ok(()) => Ok(Some(serde_json::json!({"status": "AVAILABLE", "command": cmd}))),
+                    Err(e) => Ok(Some(serde_json::json!({"status": "BUILD_SLOT_DENIED", "reason": e.reason}))),
+                }
+            }
+            "bcinrPddl.releaseBuildSlot" => {
+                let mut broker = self.broker.lock().await;
+                broker.release_slot();
+                Ok(Some(serde_json::json!({"status": "RELEASED"})))
+            }
+            "bcinrPddl.wrapHeavyCommand" => {
+                let cmd = params.arguments.first().and_then(|v| v.as_str()).unwrap_or("");
+                if build_broker::is_heavy_command(cmd) {
+                    Ok(Some(serde_json::json!({
+                        "status": "CANDIDATE",
+                        "wrapped": format!("bcinrPddl.requestBuildSlot && {cmd} && bcinrPddl.releaseBuildSlot"),
+                        "note": "Route heavy commands through the build broker to advance lifecycle."
+                    })))
+                } else {
+                    Ok(Some(serde_json::json!({"status": "OK", "note": "Not a heavy command — no broker needed"})))
+                }
+            }
+            "bcinrPddl.emitOcelSnapshot" => {
+                let content = self.render_virtual_doc(virtual_docs::URI_OCEL).await
+                    .unwrap_or_else(|| r#"{"status":"CANDIDATE"}"#.into());
+                Ok(Some(serde_json::json!({"status": "CANDIDATE", "ocel": content})))
             }
             _ => Ok(None),
         }

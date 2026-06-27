@@ -1,8 +1,8 @@
 //! M2: PDDL8 projection — lifecycle facts → domain.pddl + problem.pddl.
 //!
-//! The generated PDDL8 lifecycle domain encodes the PRD→Publish lifecycle
-//! as STRIPS actions. The problem encodes the current lifecycle state as init
-//! atoms and `published(project)` as the goal.
+//! The generated domain includes lifecycle actions AND build-slot coordination.
+//! publish_release has exactly 8 preconditions — at the Need9 boundary.
+//! Any additional condition would require splitting into prepare + finalize.
 
 use crate::lifecycle::{LifecycleStage, ProjectLifecycle};
 
@@ -13,8 +13,11 @@ pub struct Pddl8Projection {
     pub problem_text: String,
 }
 
-/// Generate the lifecycle domain — fixed set of lifecycle actions.
-/// All actions respect PDDL8 bounds (≤8 params, ≤8 preconditions, ≤8 effects).
+/// Generate the lifecycle + build-slot domain.
+///
+/// Actions: 11 lifecycle + 6 build coordination = 17 total.
+/// Every action: ≤1 parameter, ≤8 preconditions, ≤1 add effect. All bounds satisfied.
+/// publish_release has exactly 8 preconditions (at the Need9 limit).
 pub fn emit_domain() -> String {
     r#"(define (domain bcinr-lifecycle)
   (:requirements :strips)
@@ -24,11 +27,17 @@ pub fn emit_domain() -> String {
     (prd_admitted ?p)
     (ard_exists ?p)
     (ard_admitted ?p)
+    (adr_recorded ?p)
     (work_units_generated ?p)
+    (build_slot_available ?p)
+    (build_slot_acquired ?p)
     (implementation_complete ?p)
+    (heavy_build_complete ?p)
     (tests_passed ?p)
+    (ocel_present ?p)
     (docs_projected ?p)
     (release_ready ?p)
+    (receipt_present ?p)
     (published ?p))
 
   (:action create_prd
@@ -51,34 +60,69 @@ pub fn emit_domain() -> String {
     :precondition (ard_exists ?p)
     :effect (ard_admitted ?p))
 
-  (:action generate_work_units
+  (:action record_adr
     :parameters (?p)
     :precondition (ard_admitted ?p)
+    :effect (adr_recorded ?p))
+
+  (:action generate_work_units
+    :parameters (?p)
+    :precondition (and
+      (ard_admitted ?p)
+      (adr_recorded ?p))
     :effect (work_units_generated ?p))
+
+  (:action request_build_slot
+    :parameters (?p)
+    :precondition (work_units_generated ?p)
+    :effect (build_slot_available ?p))
+
+  (:action acquire_build_slot
+    :parameters (?p)
+    :precondition (build_slot_available ?p)
+    :effect (build_slot_acquired ?p))
 
   (:action implement_work_units
     :parameters (?p)
-    :precondition (work_units_generated ?p)
+    :precondition (and
+      (work_units_generated ?p)
+      (build_slot_acquired ?p))
     :effect (implementation_complete ?p))
 
   (:action run_tests
     :parameters (?p)
-    :precondition (implementation_complete ?p)
+    :precondition (and
+      (implementation_complete ?p)
+      (build_slot_acquired ?p))
     :effect (tests_passed ?p))
+
+  (:action record_build_ocel
+    :parameters (?p)
+    :precondition (tests_passed ?p)
+    :effect (ocel_present ?p))
 
   (:action project_docs
     :parameters (?p)
-    :precondition (tests_passed ?p)
+    :precondition (and
+      (tests_passed ?p)
+      (implementation_complete ?p))
     :effect (docs_projected ?p))
 
   (:action prepare_release
     :parameters (?p)
     :precondition (and
-      (docs_projected ?p)
-      (tests_passed ?p)
       (prd_admitted ?p)
-      (ard_admitted ?p))
+      (ard_admitted ?p)
+      (adr_recorded ?p)
+      (tests_passed ?p)
+      (docs_projected ?p)
+      (ocel_present ?p))
     :effect (release_ready ?p))
+
+  (:action emit_receipt
+    :parameters (?p)
+    :precondition (release_ready ?p)
+    :effect (receipt_present ?p))
 
   (:action publish_release
     :parameters (?p)
@@ -88,7 +132,9 @@ pub fn emit_domain() -> String {
       (implementation_complete ?p)
       (tests_passed ?p)
       (docs_projected ?p)
-      (release_ready ?p))
+      (release_ready ?p)
+      (receipt_present ?p)
+      (ocel_present ?p))
     :effect (published ?p))
 )
 "#.to_string()
@@ -96,14 +142,7 @@ pub fn emit_domain() -> String {
 
 /// Generate the problem from current lifecycle state.
 pub fn emit_problem(lifecycle: &ProjectLifecycle) -> String {
-    let name = &lifecycle.project_name;
-    // Escape to a PDDL-safe identifier: lowercase, hyphens, must start with letter
-    let raw = name.to_lowercase().replace('_', "-").replace(' ', "-").replace('.', "");
-    let pddl_name = if raw.starts_with(|c: char| c.is_ascii_alphabetic()) {
-        raw
-    } else {
-        format!("p-{raw}")
-    };
+    let pddl_name = sanitize_pddl_identifier(&lifecycle.project_name);
 
     let mut init_atoms: Vec<String> = lifecycle
         .true_stages
@@ -111,7 +150,7 @@ pub fn emit_problem(lifecycle: &ProjectLifecycle) -> String {
         .map(|s| format!("    ({} {})", s.predicate_name(), pddl_name))
         .collect();
 
-    // intent_captured is always true if we're generating a problem
+    // intent_captured is always injected if missing (needed for BFS start)
     if !lifecycle.has(&LifecycleStage::IntentCaptured) {
         init_atoms.insert(0, format!("    (intent_captured {})", pddl_name));
     }
@@ -132,6 +171,22 @@ pub fn emit_problem(lifecycle: &ProjectLifecycle) -> String {
 )
 "#
     )
+}
+
+/// Sanitize a string to a PDDL-safe identifier:
+/// lowercase, hyphens only, must start with ASCII letter.
+pub fn sanitize_pddl_identifier(name: &str) -> String {
+    let raw = name
+        .to_lowercase()
+        .replace('_', "-")
+        .replace(' ', "-")
+        .replace('.', "")
+        .replace('/', "-");
+    if raw.starts_with(|c: char| c.is_ascii_alphabetic()) {
+        raw
+    } else {
+        format!("p-{raw}")
+    }
 }
 
 /// Full projection from lifecycle state.

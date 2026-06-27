@@ -90,6 +90,7 @@ pub fn plan(projection: &Pddl8Projection) -> Result<PlanCandidate, PlannerError>
 ///
 /// ONLY called by bcinrPddl.executeTape (explicit command).
 /// Elevates gate from PARTIAL → ADMITTED iff goal_reached = true.
+/// Optionally persists receipt + OCEL to `output_dir` (`.bcinr/`).
 pub fn admit(candidate: &PlanCandidate, case_id: &str) -> Result<PlanResult, PlannerError> {
     let (log, receipt, ocel) = bcinr_execute_tape(
         &candidate.tape,
@@ -106,6 +107,44 @@ pub fn admit(candidate: &PlanCandidate, case_id: &str) -> Result<PlanResult, Pla
         receipt,
         ocel,
     })
+}
+
+/// Persist receipt and OCEL to `.bcinr/` after admission.
+///
+/// Creates `.bcinr/receipts/latest.json` and `.bcinr/ocel/latest.json`.
+pub fn persist_admission(root: &std::path::Path, result: &PlanResult) -> std::io::Result<()> {
+    let bcinr = root.join(".bcinr");
+    let receipts_dir = bcinr.join("receipts");
+    let ocel_dir = bcinr.join("ocel");
+    std::fs::create_dir_all(&receipts_dir)?;
+    std::fs::create_dir_all(&ocel_dir)?;
+
+    let receipt_json = serde_json::json!({
+        "plan_root": result.receipt.plan_root,
+        "state_root": result.receipt.state_root,
+        "goal_root": result.receipt.goal_root,
+        "chain_hash": result.receipt.chain_hash,
+        "goal_reached": result.receipt.goal_reached,
+        "step_count": result.receipt.step_count,
+    });
+    std::fs::write(
+        receipts_dir.join("latest.json"),
+        serde_json::to_string_pretty(&receipt_json).unwrap_or_default(),
+    )?;
+
+    let ocel_json = serde_json::json!({
+        "event_count": result.ocel.events.len(),
+        "events": result.ocel.events.iter().map(|e| serde_json::json!({
+            "id": e.id,
+            "type": e.event_type,
+        })).collect::<Vec<_>>(),
+    });
+    std::fs::write(
+        ocel_dir.join("latest.json"),
+        serde_json::to_string_pretty(&ocel_json).unwrap_or_default(),
+    )?;
+
+    Ok(())
 }
 
 /// Convenience: plan + execute in one call (for tests and explicit runPlan commands).
