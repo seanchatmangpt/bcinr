@@ -1,0 +1,178 @@
+//! Bounded schedule analyzer: reads a `TemporalPlan` + its POWL partial-order
+//! tape and derives structure — critical path, slack, parallelism, binding
+//! resources, and capacity sensitivity — without introducing a new planner,
+//! LP solver, or polytope representation. Everything here is either a direct
+//! graph computation over the existing `pred_mask`/`succ_mask` DAG (bounded by
+//! the 64-op tape cap) or a finite-difference re-run of the existing greedy
+//! `find_temporal_plan`.
+//!
+//! This is deliberately *not* sensitivity over an optimal scheduler, and not
+//! a feasible-region boundary/polytope. It explains the one schedule the
+//! planner already found.
+
+use crate::ground::GroundTemporalProblem;
+use crate::powl_bridge::{temporal_plan_to_powl_tape, PowlOpSpec};
+use crate::Pddl8Error;
+
+/// Per-resource finite-difference probe: does makespan change if this
+/// resource's initial capacity moves by ±1?
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CapacityDelta {
+    /// Makespan with capacity − 1 (clamped at 0), or `None` if no plan was found at that capacity.
+    pub minus_one_makespan: Option<f64>,
+    /// Makespan at the resource's actual initial capacity.
+    pub baseline_makespan: f64,
+    /// Makespan with capacity + 1, or `None` if no plan was found at that capacity.
+    pub plus_one_makespan: Option<f64>,
+}
+
+/// Bounded analysis of a single temporal plan's POWL tape (≤ 64 ops).
+#[derive(Debug, Clone)]
+pub struct ScheduleAnalysis64 {
+    pub makespan: f64,
+    /// Bitmask (bit i = op i) of ops with zero slack — the critical path.
+    pub critical_path_mask: u64,
+    /// Maximum number of ops with overlapping [start, end) intervals at any instant.
+    pub max_parallelism: u8,
+    /// Bitmask (bit i = resource_keys[i]) of resources whose capacity is binding —
+    /// i.e. decreasing that resource's initial value by 1 changes the makespan.
+    pub binding_resource_mask: u64,
+    /// `latest_start[i] - earliest_start[i]` for each op, zero-padded past `op_count`.
+    pub slack_by_op: [f64; 64],
+    /// Number of real ops analyzed (≤ 64).
+    pub op_count: usize,
+    /// Capacity sensitivity for `resource_keys[0]`, if any resources were given.
+    pub capacity_delta: Option<CapacityDelta>,
+}
+
+/// Analyze the schedule `gtp.find_temporal_plan()` produces, plus capacity
+/// sensitivity for the named numeric-fluent resources (e.g. `"available-workers"`,
+/// matching the key format `fn_key`/`eval_numeric` use for zero-param functions).
+///
+/// `resource_keys` is capped at 64 entries (bitmask width); extras are ignored.
+pub fn analyze_schedule(
+    gtp: &GroundTemporalProblem,
+    resource_keys: &[String],
+) -> Result<ScheduleAnalysis64, Pddl8Error> {
+    let plan = gtp.find_temporal_plan()?;
+    let ops = temporal_plan_to_powl_tape(&plan);
+    let n = ops.len().min(64);
+
+    let (earliest_start, earliest_finish) = forward_pass(&ops, n);
+    let makespan = earliest_finish.iter().cloned().fold(0.0_f64, f64::max);
+    let (latest_start, _latest_finish) = backward_pass(&ops, n, makespan);
+
+    let mut slack_by_op = [0.0_f64; 64];
+    let mut critical_path_mask = 0u64;
+    for i in 0..n {
+        let slack = latest_start[i] - earliest_start[i];
+        slack_by_op[i] = slack;
+        if slack.abs() < 1e-9 {
+            critical_path_mask |= 1u64 << i;
+        }
+    }
+
+    let max_parallelism = max_parallelism(&earliest_start, &earliest_finish, n);
+
+    let mut binding_resource_mask = 0u64;
+    let mut capacity_delta = None;
+    for (idx, key) in resource_keys.iter().enumerate().take(64) {
+        let minus = replan_with_perturbed_capacity(gtp, key, -1.0);
+        let plus = replan_with_perturbed_capacity(gtp, key, 1.0);
+        let changed = match minus {
+            Some(m) => (m - makespan).abs() > 1e-9,
+            None => true, // infeasible at capacity-1 is itself evidence the resource binds
+        };
+        if changed {
+            binding_resource_mask |= 1u64 << idx;
+        }
+        if idx == 0 {
+            capacity_delta = Some(CapacityDelta {
+                minus_one_makespan: minus,
+                baseline_makespan: makespan,
+                plus_one_makespan: plus,
+            });
+        }
+    }
+
+    Ok(ScheduleAnalysis64 {
+        makespan,
+        critical_path_mask,
+        max_parallelism,
+        binding_resource_mask,
+        slack_by_op,
+        op_count: n,
+        capacity_delta,
+    })
+}
+
+/// Earliest start/finish per op via a forward pass over `pred_mask`
+/// (ops are already topologically ordered by index, since `pred_mask` for op
+/// `i` only ever references indices `< i` — see `temporal_plan_to_powl_tape`).
+fn forward_pass(ops: &[PowlOpSpec], n: usize) -> (Vec<f64>, Vec<f64>) {
+    let mut earliest_start = vec![0.0_f64; n];
+    let mut earliest_finish = vec![0.0_f64; n];
+    for i in 0..n {
+        let mut es = ops[i].start_time.unwrap_or(0.0);
+        for j in 0..i {
+            if (ops[i].pred_mask >> j) & 1 == 1 {
+                es = es.max(earliest_finish[j]);
+            }
+        }
+        earliest_start[i] = es;
+        earliest_finish[i] = es + ops[i].duration.unwrap_or(0.0);
+    }
+    (earliest_start, earliest_finish)
+}
+
+/// Latest start/finish per op via a backward pass over `succ_mask`-implied
+/// dependents (any op `k` whose `pred_mask` bit `i` is set depends on `i`).
+fn backward_pass(ops: &[PowlOpSpec], n: usize, makespan: f64) -> (Vec<f64>, Vec<f64>) {
+    let mut latest_finish = vec![makespan; n];
+    let mut latest_start = vec![0.0_f64; n];
+    for i in (0..n).rev() {
+        let mut lf = makespan;
+        for k in 0..n {
+            if (ops[k].pred_mask >> i) & 1 == 1 {
+                lf = lf.min(latest_start[k]);
+            }
+        }
+        latest_finish[i] = lf;
+        latest_start[i] = lf - ops[i].duration.unwrap_or(0.0);
+    }
+    (latest_start, latest_finish)
+}
+
+/// Maximum number of ops simultaneously in-flight, via a sweep over start/end events.
+fn max_parallelism(earliest_start: &[f64], earliest_finish: &[f64], n: usize) -> u8 {
+    let mut events: Vec<(f64, i32)> = Vec::with_capacity(n * 2);
+    for i in 0..n {
+        events.push((earliest_start[i], 1));
+        events.push((earliest_finish[i], -1));
+    }
+    // Process ends before starts at the same instant: intervals are
+    // half-open [start, end), so an op ending exactly when another starts
+    // does not count as overlapping.
+    events.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap().then(a.1.cmp(&b.1)));
+    let mut cur = 0i32;
+    let mut max_seen = 0i32;
+    for (_, delta) in events {
+        cur += delta;
+        max_seen = max_seen.max(cur);
+    }
+    max_seen.max(0) as u8
+}
+
+/// Re-solve `find_temporal_plan` with `resource_key`'s initial value moved by
+/// `delta` (clamped at 0), returning the resulting makespan, or `None` if no
+/// plan was found at that capacity.
+fn replan_with_perturbed_capacity(
+    gtp: &GroundTemporalProblem,
+    resource_key: &str,
+    delta: f64,
+) -> Option<f64> {
+    let mut perturbed = gtp.clone();
+    let entry = perturbed.initial_fn_values.entry(resource_key.to_string()).or_insert(0.0);
+    *entry = (*entry + delta).max(0.0);
+    perturbed.find_temporal_plan().ok().map(|p| p.makespan)
+}

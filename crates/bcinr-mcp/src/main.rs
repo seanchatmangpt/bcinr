@@ -76,6 +76,17 @@ pub struct PlanInput {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct AnalyzeScheduleInput {
+    /// PDDL domain text (must declare durative actions)
+    pub domain_text: String,
+    /// PDDL problem text
+    pub problem_text: String,
+    /// Numeric-fluent resource keys to probe for capacity sensitivity (e.g. "available-workers")
+    #[serde(default)]
+    pub resource_keys: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ManufactureInput {
     /// PDDL domain text
     pub domain_text: String,
@@ -563,7 +574,7 @@ impl BcinrServer {
         &self,
         Parameters(input): Parameters<PlanInput>,
     ) -> String {
-        use bcinr_pddl::{domain_from_pddl, problem_from_pddl, GroundProblem, TemporalPlan, TemporalPlanStep};
+        use bcinr_pddl::{domain_from_pddl, problem_from_pddl, GroundProblem, GroundTemporalProblem, TemporalPlan, TemporalPlanStep};
         use bcinr_pddl::powl_bridge::temporal_plan_to_powl_tape;
 
         let domain = match domain_from_pddl(&input.domain_text) {
@@ -574,26 +585,40 @@ impl BcinrServer {
             Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
             Ok(p) => p,
         };
-        let ground = match GroundProblem::build(&domain, &problem, None) {
-            Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
-            Ok(g) => g,
-        };
-        let tape = match ground.find_plan() {
-            Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
-            Ok(t) => t,
-        };
 
-        let step_count = tape.ops.len();
-        let steps: Vec<TemporalPlanStep> = tape.ops.iter().enumerate().map(|(i, op)| TemporalPlanStep {
-            action_name: op.label.clone(),
-            args: vec![],
-            start_time: i as f64,
-            duration: 1.0,
-        }).collect();
-        let temporal_plan = TemporalPlan {
-            steps,
-            makespan: step_count as f64,
-            metric_value: None,
+        let temporal_plan = if !domain.durative_actions.is_empty() {
+            // Real temporal planning for domains with durative actions.
+            let ground = match GroundTemporalProblem::build(&domain, &problem) {
+                Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+                Ok(g) => g,
+            };
+            match ground.find_temporal_plan() {
+                Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+                Ok(p) => p,
+            }
+        } else {
+            // Fall back to classical STRIPS planning with synthesized unit timing.
+            let ground = match GroundProblem::build(&domain, &problem, None) {
+                Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+                Ok(g) => g,
+            };
+            let tape = match ground.find_plan() {
+                Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+                Ok(t) => t,
+            };
+
+            let step_count = tape.ops.len();
+            let steps: Vec<TemporalPlanStep> = tape.ops.iter().enumerate().map(|(i, op)| TemporalPlanStep {
+                action_name: op.label.clone(),
+                args: vec![],
+                start_time: i as f64,
+                duration: 1.0,
+            }).collect();
+            TemporalPlan {
+                steps,
+                makespan: step_count as f64,
+                metric_value: None,
+            }
         };
 
         let specs = temporal_plan_to_powl_tape(&temporal_plan);
@@ -602,12 +627,55 @@ impl BcinrServer {
             "kind": format!("{:?}", s.kind),
             "pred_mask": s.pred_mask,
             "succ_mask": s.succ_mask,
+            "start_time": s.start_time,
+            "duration": s.duration,
         })).collect();
 
         serde_json::json!({
             "ok": true,
             "op_count": ops_arr.len(),
             "ops": ops_arr,
+        })
+        .to_string()
+    }
+
+    #[tool(description = "Bounded schedule analyzer (domain must declare durative actions). Returns JSON with ok, makespan, critical_path_mask, max_parallelism, binding_resource_mask, slack_by_op, op_count, capacity_delta (minus_one/baseline/plus_one makespan for the first resource_key).")]
+    async fn analyze_schedule64(
+        &self,
+        Parameters(input): Parameters<AnalyzeScheduleInput>,
+    ) -> String {
+        use bcinr_pddl::{analyze_schedule, domain_from_pddl, problem_from_pddl, GroundTemporalProblem};
+
+        let domain = match domain_from_pddl(&input.domain_text) {
+            Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+            Ok(d) => d,
+        };
+        let problem = match problem_from_pddl(&input.problem_text) {
+            Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+            Ok(p) => p,
+        };
+        let gtp = match GroundTemporalProblem::build(&domain, &problem) {
+            Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+            Ok(g) => g,
+        };
+        let analysis = match analyze_schedule(&gtp, &input.resource_keys) {
+            Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+            Ok(a) => a,
+        };
+
+        serde_json::json!({
+            "ok": true,
+            "makespan": analysis.makespan,
+            "critical_path_mask": analysis.critical_path_mask,
+            "max_parallelism": analysis.max_parallelism,
+            "binding_resource_mask": analysis.binding_resource_mask,
+            "slack_by_op": analysis.slack_by_op[..analysis.op_count],
+            "op_count": analysis.op_count,
+            "capacity_delta": analysis.capacity_delta.map(|d| serde_json::json!({
+                "minus_one_makespan": d.minus_one_makespan,
+                "baseline_makespan": d.baseline_makespan,
+                "plus_one_makespan": d.plus_one_makespan,
+            })),
         })
         .to_string()
     }

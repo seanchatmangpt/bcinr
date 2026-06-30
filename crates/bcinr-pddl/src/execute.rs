@@ -4,7 +4,7 @@ use crate::error::Pddl8Error;
 use std::collections::{BTreeSet, HashMap};
 use wasm4pm_compat::pddl::{
     Pddl8Domain, Pddl8ExecutionLog, Pddl8ExecutionReceipt, Pddl8GroundAtom, Pddl8Problem,
-    Pddl8StepResult, Pddl8Tape, TemporalExecutionReceipt, TemporalPlan,
+    Pddl8StepResult, Pddl8Tape, PddlEffect, TemporalExecutionReceipt, TemporalPlan,
 };
 use wasm4pm_compat::ocel::{
     OCEL, OCELAttributeValue, OCELEvent, OCELEventAttribute, OCELObject, OCELRelationship,
@@ -295,6 +295,47 @@ fn atom_key(pred: &str, args: &[String]) -> String {
     if args.is_empty() { pred.to_string() } else { format!("({} {})", pred, args.join(" ")) }
 }
 
+/// Apply the propositional (add/del) parts of a `PddlEffect` to `state`,
+/// substituting schema variables via `subst` and recursing through
+/// `Timed`/`Forall`/`When` wrappers. Numeric effects are skipped — this is
+/// only used for the post-hoc goal check in `execute_temporal_plan`, which
+/// (like its classical-action counterpart above) only tracks propositional
+/// atoms, not numeric fluents.
+fn apply_pddl_effect_propositional(
+    eff: &PddlEffect,
+    subst: &HashMap<&str, &str>,
+    state: &mut BTreeSet<String>,
+) {
+    use wasm4pm_compat::pddl::Pddl8Atom;
+    let ground_args = |args: &[String]| -> Vec<String> {
+        args.iter()
+            .map(|a| {
+                if Pddl8Atom::is_variable(a) {
+                    subst.get(a.as_str()).map(|s| s.to_string()).unwrap_or_else(|| a.clone())
+                } else {
+                    a.clone()
+                }
+            })
+            .collect()
+    };
+    match eff {
+        PddlEffect::Add(a) => {
+            state.insert(atom_key(&a.pred, &ground_args(&a.args)));
+        }
+        PddlEffect::Del(a) => {
+            state.remove(&atom_key(&a.pred, &ground_args(&a.args)));
+        }
+        PddlEffect::Numeric(_) => {}
+        PddlEffect::Timed(_, inner) => apply_pddl_effect_propositional(inner, subst, state),
+        PddlEffect::Forall { effects, .. } => {
+            for e in effects { apply_pddl_effect_propositional(e, subst, state); }
+        }
+        PddlEffect::When { effects, .. } => {
+            for e in effects { apply_pddl_effect_propositional(e, subst, state); }
+        }
+    }
+}
+
 fn parse_action_label(label: &str) -> (&str, Vec<&str>) {
     if let Some(i) = label.find('(') {
         let name = &label[..i];
@@ -418,6 +459,23 @@ pub fn execute_temporal_plan(
                     .map(|a| subst.get(a.as_str()).map(|&s| s.to_string()).unwrap_or_else(|| a.clone()))
                     .collect();
                 state.remove(&atom_key(&eff.pred, &grounded));
+            }
+        } else if let Some(da) = domain.durative_actions.iter().find(|d| d.name == step.action_name) {
+            // Durative-action counterpart of the classical-action branch above.
+            // Unlike classical action labels ("pick-up(a)"), `step.action_name`
+            // for a durative step is the bare schema name (e.g. "assign-worker")
+            // with the bound args in the separate `step.args` field — see
+            // `GroundTemporalProblem::find_temporal_plan` / `ground_durative_schema`.
+            // Apply all propositional add/del effects (both at-start and
+            // at-end, ignoring intra-step timing) so goal checks against
+            // durative-action plans see the same final state the planner
+            // already verified in `find_temporal_plan`.
+            let subst: HashMap<&str, &str> = da.params.iter()
+                .map(|(p, _)| p.as_str())
+                .zip(step.args.iter().map(|s| s.as_str()))
+                .collect();
+            for eff in &da.effects {
+                apply_pddl_effect_propositional(eff, &subst, &mut state);
             }
         }
 

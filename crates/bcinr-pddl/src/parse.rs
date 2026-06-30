@@ -15,7 +15,7 @@ use pddl::{
 use wasm4pm_compat::pddl::{
     Pddl8ActionSchema, Pddl8Atom, Pddl8Domain, Pddl8Problem,
     PDDL8_MAX_ARITY, PDDL8_MAX_CONJUNCTS, PDDL8_MAX_PARAMS,
-    PddlType, PddlCondition, PddlEffect, NumericExpr, NumericOp, NumericEffect,
+    PddlType, PddlCondition, CompareOp, PddlEffect, NumericExpr, NumericOp, NumericEffect,
     PddlFunction, TimeSpecifier, DurationConstraint, DurativeAction, TimedLiteral,
     Metric, MetricDir, MetricExpr, TrajectoryConstraint, PddlConstraint,
     DerivedPredicate, PddlPreference, PddlProcess, PddlEvent,
@@ -345,7 +345,9 @@ fn collect_gd(gd: &GoalDefinition, out: &mut Vec<Pddl8Atom>) {
             collect_gd(body, out);
         }
         GoalDefinition::FluentComparison(_) => {
-            // Numeric comparison — not representable as STRIPS8 atom.
+            // Numeric comparison — not representable as a STRIPS8 atom.
+            // Full fidelity is available via the `PddlCondition` algebra
+            // (see `lower_condition`), used by durative-action grounding.
         }
     }
 }
@@ -622,9 +624,20 @@ fn lower_condition(gd: &GoalDefinition) -> PddlCondition {
                 body: Box::new(lower_condition(body)),
             }
         }
-        GoalDefinition::FluentComparison(_) => {
-            // TODO: numeric comparisons as PddlCondition
-            PddlCondition::And(vec![])
+        GoalDefinition::FluentComparison(fc) => {
+            use pddl::BinaryComparison;
+            let op = match fc.comparison() {
+                BinaryComparison::GreaterOrEqual => CompareOp::Ge,
+                BinaryComparison::LessThanOrEqual => CompareOp::Le,
+                BinaryComparison::GreaterThan => CompareOp::Gt,
+                BinaryComparison::LessThan => CompareOp::Lt,
+                BinaryComparison::Equal => CompareOp::Eq,
+            };
+            PddlCondition::Compare(
+                lower_fluent_expression(fc.first()),
+                op,
+                lower_fluent_expression(fc.second()),
+            )
         }
     }
 }
@@ -735,6 +748,41 @@ fn lower_fluent_expression(fe: &FluentExpression) -> NumericExpr {
                 }
             })
         }
+    }
+}
+
+fn lower_da_fluent_expression(fe: &pddl::DurativeActionFluentExpression) -> NumericExpr {
+    use pddl::DurativeActionFluentExpression;
+    match fe {
+        DurativeActionFluentExpression::Assign(op, head, inner) => {
+            // A nested assignment expression inside a duration-relative fluent
+            // expression; lower it as the inner expression's value (the
+            // assignment's effect is applied by the outer TimedEffect, this
+            // path only matters for the value it evaluates to).
+            let _ = (op, head);
+            lower_da_fluent_expression(inner)
+        }
+        DurativeActionFluentExpression::BinaryOp(op, lhs, rhs) => NumericExpr::BinOp {
+            op: lower_binary_op(op),
+            lhs: Box::new(lower_da_fluent_expression(lhs)),
+            rhs: Box::new(lower_da_fluent_expression(rhs)),
+        },
+        DurativeActionFluentExpression::MultiOp(op, lhs, rhs) => {
+            let nop = lower_multi_op(op);
+            rhs.iter().fold(lower_da_fluent_expression(lhs), |acc, r| {
+                NumericExpr::BinOp { op: nop, lhs: Box::new(acc), rhs: Box::new(lower_da_fluent_expression(r)) }
+            })
+        }
+        DurativeActionFluentExpression::Negative(inner) => {
+            NumericExpr::Neg(Box::new(lower_da_fluent_expression(inner)))
+        }
+        DurativeActionFluentExpression::Duration => {
+            // `?duration` reference — not tracked as a numeric fluent key;
+            // callers needing the actual duration value read it from the
+            // GroundDurativeAction's resolved duration_min/duration_max instead.
+            NumericExpr::Number(0.0)
+        }
+        DurativeActionFluentExpression::FluentExpression(inner) => lower_fluent_expression(inner),
     }
 }
 
@@ -889,12 +937,12 @@ fn lower_timed_effect(te: &TimedEffect) -> PddlEffect {
             let inner = lower_effect_condition_ec(ec);
             PddlEffect::Timed(ts_out, Box::new(inner))
         }
-        TimedEffect::NumericFluent(ts, _fa) => {
+        TimedEffect::NumericFluent(ts, fa) => {
             let ts_out = lower_time_specifier(ts);
-            // TODO: lower DurativeActionFunctionAssignment fully
-            PddlEffect::Timed(ts_out, Box::new(
-                PddlEffect::Add(Pddl8Atom { pred: "_numeric_fluent".to_string(), args: vec![] })
-            ))
+            let func = lower_function_head(fa.function());
+            let expr = lower_da_fluent_expression(fa.function_expr());
+            let numeric = lower_assign_op_numeric(fa.operation(), func, expr);
+            PddlEffect::Timed(ts_out, Box::new(PddlEffect::Numeric(numeric)))
         }
         TimedEffect::ContinuousEffect(_, _, _) => {
             // TODO: lower continuous effects

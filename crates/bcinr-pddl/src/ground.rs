@@ -3,9 +3,9 @@
 use crate::error::Pddl8Error;
 use std::collections::{BTreeSet, HashMap};
 use wasm4pm_compat::pddl::{
-    DurationConstraint, NumericExpr, Pddl8ActionSchema, Pddl8Atom, Pddl8Domain,
-    Pddl8GroundAction, Pddl8GroundAtom, Pddl8Problem, Pddl8Tape, PddlCondition, PddlEffect,
-    PddlFunction, TemporalPlan, TemporalPlanStep, TimedLiteral, PDDL8_MAX_GROUND,
+    CompareOp, DurationConstraint, DurativeAction, NumericExpr, Pddl8ActionSchema, Pddl8Atom,
+    Pddl8Domain, Pddl8GroundAction, Pddl8GroundAtom, Pddl8Problem, Pddl8Tape, PddlCondition,
+    PddlEffect, PddlFunction, TemporalPlan, TemporalPlanStep, TimedLiteral, PDDL8_MAX_GROUND,
     PDDL8_MAX_PLAN_DEPTH,
 };
 
@@ -174,9 +174,12 @@ impl GroundProblem {
 // ---------------------------------------------------------------------------
 
 /// A grounded durative action — duration bounds resolved, conditions/effects kept.
+#[derive(Clone)]
 pub struct GroundDurativeAction {
     pub schema_name: String,
     pub label: String,
+    /// Bound object names, in schema parameter order (empty for zero-param schemas).
+    pub args: Vec<String>,
     pub duration_min: f64,
     pub duration_max: f64,
     pub conditions: Vec<PddlCondition>,
@@ -184,6 +187,7 @@ pub struct GroundDurativeAction {
 }
 
 /// Grounded temporal problem: classical + durative actions, numeric fluents, timed inits.
+#[derive(Clone)]
 pub struct GroundTemporalProblem {
     pub initial_atoms: BTreeSet<Pddl8GroundAtom>,
     pub initial_fn_values: HashMap<String, f64>,
@@ -228,18 +232,20 @@ impl GroundTemporalProblem {
             }
         }
 
-        // Ground durative actions
+        // Ground durative actions over objects, mirroring `ground_schema` for
+        // classical actions: enumerate type-compatible bindings for each
+        // schema's params and substitute the bound object names into the
+        // schema's conditions/effects.
         let mut durative_actions = Vec::new();
         for da in &domain.durative_actions {
-            let (dur_min, dur_max) = resolve_duration(&da.duration);
-            durative_actions.push(GroundDurativeAction {
-                schema_name: da.name.clone(),
-                label: da.name.clone(),
-                duration_min: dur_min,
-                duration_max: dur_max,
-                conditions: da.conditions.clone(),
-                effects: da.effects.clone(),
-            });
+            ground_durative_schema(da, &problem.objects, &type_index, &mut durative_actions)?;
+            if durative_actions.len() > PDDL8_MAX_GROUND {
+                return Err(Pddl8Error::BoundExceeded {
+                    what: "ground durative actions",
+                    limit: PDDL8_MAX_GROUND as u8,
+                    got: durative_actions.len(),
+                });
+            }
         }
 
         Ok(Self { initial_atoms, initial_fn_values, timed_inits, goal, actions, durative_actions })
@@ -288,31 +294,43 @@ impl GroundTemporalProblem {
                 return Ok(TemporalPlan { steps, makespan, metric_value: None });
             }
 
-            // Try to schedule an applicable durative action
+            // Try to schedule every applicable durative action at this tick.
+            // Re-scan after each start (bounded by durative_actions.len() passes)
+            // so at-start effects (e.g. numeric capacity decrements) from one
+            // start are visible when checking the next candidate's
+            // preconditions in the same tick — this is what lets concurrent
+            // starts correctly gate on shared resource fluents.
             let mut scheduled = false;
-            for (i, da) in self.durative_actions.iter().enumerate() {
-                let applicable = da.conditions.iter().all(|c| {
-                    eval_condition(c, &state, &fn_vals)
-                });
-                if !applicable { continue; }
+            let mut started_this_tick: BTreeSet<usize> = BTreeSet::new();
+            for _pass in 0..self.durative_actions.len().max(1) {
+                let mut started_this_pass = false;
+                for (i, da) in self.durative_actions.iter().enumerate() {
+                    if started_this_tick.contains(&i) { continue; }
+                    let applicable = da.conditions.iter().all(|c| {
+                        eval_condition(c, &state, &fn_vals)
+                    });
+                    if !applicable { continue; }
 
-                let dur = da.duration_min;
-                let end = current_time + dur;
+                    let dur = da.duration_min;
+                    let end = current_time + dur;
 
-                // Apply at-start effects
-                for eff in &da.effects {
-                    apply_effect_at_start(eff, &mut state, &mut fn_vals);
+                    // Apply at-start effects
+                    for eff in &da.effects {
+                        apply_effect_at_start(eff, &mut state, &mut fn_vals);
+                    }
+
+                    steps.push(TemporalPlanStep {
+                        start_time: current_time,
+                        duration: dur,
+                        action_name: da.schema_name.clone(),
+                        args: da.args.clone(),
+                    });
+                    pending.push((end, i));
+                    scheduled = true;
+                    started_this_pass = true;
+                    started_this_tick.insert(i);
                 }
-
-                steps.push(TemporalPlanStep {
-                    start_time: current_time,
-                    duration: dur,
-                    action_name: da.schema_name.clone(),
-                    args: vec![],
-                });
-                pending.push((end, i));
-                scheduled = true;
-                break;
+                if !started_this_pass { break; }
             }
 
             // Advance to the next pending completion
@@ -365,6 +383,17 @@ pub fn eval_condition(
         PddlCondition::Timed(_, inner) => eval_condition(inner, state, fn_vals),
         PddlCondition::Forall { .. } => true,
         PddlCondition::Exists { .. } => false,
+        PddlCondition::Compare(lhs, op, rhs) => {
+            let l = eval_numeric(lhs, fn_vals);
+            let r = eval_numeric(rhs, fn_vals);
+            match op {
+                CompareOp::Ge => l >= r,
+                CompareOp::Le => l <= r,
+                CompareOp::Gt => l > r,
+                CompareOp::Lt => l < r,
+                CompareOp::Eq => (l - r).abs() < 1e-9,
+            }
+        }
     }
 }
 
@@ -564,6 +593,215 @@ fn ground_schema(
             if indices[pos] < candidates[pos].len() { break; }
             indices[pos] = 0;
         }
+    }
+}
+
+/// Ground a `DurativeAction` schema over `objects`, mirroring `ground_schema`
+/// for classical actions: enumerate type-compatible bindings for `da.params`
+/// and substitute the bound object names into the schema's conditions and
+/// effects. A zero-param schema collapses to exactly one ground instance.
+fn ground_durative_schema(
+    da: &DurativeAction,
+    objects: &[String],
+    type_index: &TypeIndex,
+    out: &mut Vec<GroundDurativeAction>,
+) -> Result<(), Pddl8Error> {
+    let n = da.params.len();
+    let (dur_min, dur_max) = resolve_duration(&da.duration);
+
+    if n == 0 {
+        out.push(GroundDurativeAction {
+            schema_name: da.name.clone(),
+            label: da.name.clone(),
+            args: vec![],
+            duration_min: dur_min,
+            duration_max: dur_max,
+            conditions: da.conditions.clone(),
+            effects: da.effects.clone(),
+        });
+        return Ok(());
+    }
+
+    // Per-parameter candidate lists, restricted to type-compatible objects —
+    // same scheme as `ground_schema`'s `typed_params` lookup.
+    let candidates: Vec<Vec<&String>> = da
+        .params
+        .iter()
+        .map(|(_, required_type)| {
+            objects.iter().filter(|o| type_index.satisfies(o, required_type)).collect()
+        })
+        .collect();
+    if candidates.iter().any(|c| c.is_empty()) {
+        return Ok(());
+    }
+
+    let mut indices = vec![0usize; n];
+    loop {
+        let binding: HashMap<String, String> = da
+            .params
+            .iter()
+            .enumerate()
+            .map(|(i, (p, _))| (p.clone(), candidates[i][indices[i]].clone()))
+            .collect();
+
+        let args: Vec<String> =
+            da.params.iter().filter_map(|(p, _)| binding.get(p)).cloned().collect();
+        let label = format!("{}({})", da.name, args.join(","));
+
+        out.push(GroundDurativeAction {
+            schema_name: da.name.clone(),
+            label,
+            args,
+            duration_min: dur_min,
+            duration_max: dur_max,
+            conditions: da.conditions.iter().map(|c| subst_condition(c, &binding)).collect(),
+            effects: da.effects.iter().map(|e| subst_effect(e, &binding)).collect(),
+        });
+
+        // odometer increment, bounded per-slot by candidates[i].len()
+        let mut pos = n;
+        loop {
+            if pos == 0 { return Ok(()); }
+            pos -= 1;
+            indices[pos] += 1;
+            if indices[pos] < candidates[pos].len() { break; }
+            indices[pos] = 0;
+        }
+    }
+}
+
+/// Substitute schema parameter variables (e.g. `?v`) with bound object names
+/// throughout a `Pddl8Atom`'s args. Non-variable args (and variables absent
+/// from `binding`, e.g. universally-quantified ones) pass through unchanged.
+fn subst_atom(a: &Pddl8Atom, binding: &HashMap<String, String>) -> Pddl8Atom {
+    Pddl8Atom {
+        pred: a.pred.clone(),
+        args: a
+            .args
+            .iter()
+            .map(|arg| {
+                if Pddl8Atom::is_variable(arg) {
+                    binding.get(arg).cloned().unwrap_or_else(|| arg.clone())
+                } else {
+                    arg.clone()
+                }
+            })
+            .collect(),
+    }
+}
+
+fn subst_numeric(expr: &NumericExpr, binding: &HashMap<String, String>) -> NumericExpr {
+    match expr {
+        NumericExpr::Number(n) => NumericExpr::Number(*n),
+        NumericExpr::FunctionTerm(name, args) => NumericExpr::FunctionTerm(
+            name.clone(),
+            args.iter()
+                .map(|arg| {
+                    if Pddl8Atom::is_variable(arg) {
+                        binding.get(arg).cloned().unwrap_or_else(|| arg.clone())
+                    } else {
+                        arg.clone()
+                    }
+                })
+                .collect(),
+        ),
+        NumericExpr::BinOp { op, lhs, rhs } => NumericExpr::BinOp {
+            op: *op,
+            lhs: Box::new(subst_numeric(lhs, binding)),
+            rhs: Box::new(subst_numeric(rhs, binding)),
+        },
+        NumericExpr::Neg(inner) => NumericExpr::Neg(Box::new(subst_numeric(inner, binding))),
+    }
+}
+
+fn subst_function(f: &PddlFunction, binding: &HashMap<String, String>) -> PddlFunction {
+    PddlFunction {
+        name: f.name.clone(),
+        params: f
+            .params
+            .iter()
+            .map(|arg| {
+                if Pddl8Atom::is_variable(arg) {
+                    binding.get(arg).cloned().unwrap_or_else(|| arg.clone())
+                } else {
+                    arg.clone()
+                }
+            })
+            .collect(),
+    }
+}
+
+fn subst_condition(cond: &PddlCondition, binding: &HashMap<String, String>) -> PddlCondition {
+    match cond {
+        PddlCondition::Atom(a) => PddlCondition::Atom(subst_atom(a, binding)),
+        PddlCondition::Not(inner) => PddlCondition::Not(Box::new(subst_condition(inner, binding))),
+        PddlCondition::And(subs) => {
+            PddlCondition::And(subs.iter().map(|s| subst_condition(s, binding)).collect())
+        }
+        PddlCondition::Or(subs) => {
+            PddlCondition::Or(subs.iter().map(|s| subst_condition(s, binding)).collect())
+        }
+        PddlCondition::Forall { vars, body } => PddlCondition::Forall {
+            vars: vars.clone(),
+            body: Box::new(subst_condition(body, binding)),
+        },
+        PddlCondition::Exists { vars, body } => PddlCondition::Exists {
+            vars: vars.clone(),
+            body: Box::new(subst_condition(body, binding)),
+        },
+        PddlCondition::Imply(lhs, rhs) => PddlCondition::Imply(
+            Box::new(subst_condition(lhs, binding)),
+            Box::new(subst_condition(rhs, binding)),
+        ),
+        PddlCondition::Timed(spec, inner) => {
+            PddlCondition::Timed(*spec, Box::new(subst_condition(inner, binding)))
+        }
+        PddlCondition::Compare(lhs, op, rhs) => {
+            PddlCondition::Compare(subst_numeric(lhs, binding), *op, subst_numeric(rhs, binding))
+        }
+    }
+}
+
+fn subst_numeric_effect(
+    ne: &wasm4pm_compat::pddl::NumericEffect,
+    binding: &HashMap<String, String>,
+) -> wasm4pm_compat::pddl::NumericEffect {
+    use wasm4pm_compat::pddl::NumericEffect;
+    match ne {
+        NumericEffect::Assign(f, expr) => {
+            NumericEffect::Assign(subst_function(f, binding), subst_numeric(expr, binding))
+        }
+        NumericEffect::Increase(f, expr) => {
+            NumericEffect::Increase(subst_function(f, binding), subst_numeric(expr, binding))
+        }
+        NumericEffect::Decrease(f, expr) => {
+            NumericEffect::Decrease(subst_function(f, binding), subst_numeric(expr, binding))
+        }
+        NumericEffect::ScaleUp(f, expr) => {
+            NumericEffect::ScaleUp(subst_function(f, binding), subst_numeric(expr, binding))
+        }
+        NumericEffect::ScaleDown(f, expr) => {
+            NumericEffect::ScaleDown(subst_function(f, binding), subst_numeric(expr, binding))
+        }
+    }
+}
+
+fn subst_effect(eff: &PddlEffect, binding: &HashMap<String, String>) -> PddlEffect {
+    match eff {
+        PddlEffect::Add(a) => PddlEffect::Add(subst_atom(a, binding)),
+        PddlEffect::Del(a) => PddlEffect::Del(subst_atom(a, binding)),
+        PddlEffect::Numeric(ne) => PddlEffect::Numeric(subst_numeric_effect(ne, binding)),
+        PddlEffect::Timed(spec, inner) => {
+            PddlEffect::Timed(*spec, Box::new(subst_effect(inner, binding)))
+        }
+        PddlEffect::Forall { vars, effects } => PddlEffect::Forall {
+            vars: vars.clone(),
+            effects: effects.iter().map(|e| subst_effect(e, binding)).collect(),
+        },
+        PddlEffect::When { condition, effects } => PddlEffect::When {
+            condition: subst_condition(condition, binding),
+            effects: effects.iter().map(|e| subst_effect(e, binding)).collect(),
+        },
     }
 }
 

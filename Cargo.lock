@@ -248,6 +248,7 @@ name = "bcinr-pddl"
 version = "26.6.26"
 dependencies = [
  "blake3",
+ "chicago-tdd-tools",
  "chrono",
  "pddl",
  "prolog8",

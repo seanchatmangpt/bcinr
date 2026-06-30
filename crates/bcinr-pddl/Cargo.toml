@@ -34,6 +34,11 @@ chrono = { version = "0.4", features = ["serde"] }
 
 [dev-dependencies]
 # Nothing from bcinr-powl or wasm4pm-cognition in dev-deps either.
+# chicago-tdd-tools: Chicago-style (state-based, real-collaborator) test
+# tooling, used only for its `ocel-generation` feature's OcelCollector to
+# emit an OCEL trace of the propose->admit->schedule->receipt pipeline in
+# tests/proposer_substrate.rs. Registry version, matching bcinr-powl's dep.
+chicago-tdd-tools = { version = "26.7.1", features = ["ocel-generation"] }
 
 [[test]]
 name = "logistics"
