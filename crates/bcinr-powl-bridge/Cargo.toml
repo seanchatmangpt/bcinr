@@ -1,0 +1,16 @@
+[package]
+name = "bcinr-powl-bridge"
+version = "26.6.30"
+edition = "2021"
+description = "MCP Tool-Call Bridge: maps PDDL action names to MCP tool dispatches with BLAKE3 chain commitment"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/seanchatmangpt/bcinr"
+keywords = ["mcp", "pddl", "tool-call", "blake3", "bridge"]
+categories = ["algorithms"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+blake3 = "1"
+
+[dev-dependencies]
