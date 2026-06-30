@@ -18,13 +18,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```
 bcinr/
-├── bcinr/              # Main crate (re-exports public API)
-├── bcinr-core/         # Public facade and ergonomic wrappers
-├── crates/bcinr-api/   # Additional API layer
-├── crates/bcinr-logic/ # Core algorithmic calculus (Mask, Int, Fix, Network, Bitset, Scan, UTF-8, Parse, DFA, Reduce, Sketch)
-├── tools/              # Utility and analysis tools
-├── bcinr-bench/        # Benchmarks and performance testing
-└── docs/               # Diátaxis documentation (Tutorials, How-To, Explanations, References)
+├── bcinr/                  # Main crate (re-exports public API)
+├── bcinr-core/             # Public facade and ergonomic wrappers
+├── crates/bcinr-api/       # Additional API layer
+├── crates/bcinr-logic/     # Core algorithmic calculus (Mask, Int, Fix, Network, Bitset, Scan, UTF-8, Parse, DFA, Reduce, Sketch)
+├── crates/bcinr-mcp/       # MCP server: 23 tools across 6 groups (PDDL, POWL, algorithms, receipts)
+├── crates/bcinr-pddl/      # PDDL 3.1 planner: parsing, grounding, BFS planning
+├── crates/bcinr-pddl-lsp/  # Language server for PDDL (planning as protocol)
+├── crates/bcinr-powl/      # POWL runtime: workflow compilation, O(1) admission, execution
+├── crates/bcinr-powl-receipt/ # Receipt verification & inspection (BLAKE3 proofs)
+├── tools/                  # Utility and analysis tools
+├── bcinr-bench/            # Benchmarks and performance testing
+└── docs/                   # Diátaxis documentation (Tutorials, How-To, Explanations, References)
 ```
 
 ### Core Modules (in `crates/bcinr-logic/src/`)
@@ -46,6 +51,101 @@ bcinr/
 | `dfa.rs` | Deterministic finite automata |
 | `sketch.rs` | Probabilistic sketches (HyperLogLog, Bloom filters) |
 | `utf8.rs` | UTF-8 validation and classification |
+
+## bcinr-mcp: Model Context Protocol Server
+
+**bcinr-mcp** exposes the entire bcinr ecosystem as an MCP server with **23 tools** for use in Claude Code.
+
+### Tool Inventory (23 total)
+
+| Group | Tools | Purpose |
+|-------|-------|---------|
+| **PDDL** (7) | `pddl_parse_domain`, `pddl_parse_problem`, `pddl_plan`, `pddl_admit_domain`, `pddl_domain_info`, `pddl_temporal_plan_info`, `manufacture_world` | Planning via PDDL 3.1 (parsing, grounding, BFS search, Prolog8 admission gate, atomic manufacturing loop with BLAKE3 receipt) |
+| **POWL** (5) | `powl_compile_sequence`, `powl_compile_choice`, `powl_admit_context`, `powl_capability_check`, `powl_plan_to_tape` | Workflow orchestration (AST → tape, O(1) context LUT, bitset permission checks, PDDL→POWL bridge) |
+| **bcinr-core** (3) | `bcinr_library_info`, `bcinr_mask_ops`, `bcinr_powl_info` | System introspection (library overview, branchless bitset algebra, POWL runtime description) |
+| **Algorithms** (6) | `utf8_validate`, `bitset_operations`, `dfa_info`, `scan_patterns`, `reduce_sequence`, `simd_string_info` | Branchless algorithms (UTF-8 validation, O(1) bitset ops, DFA capabilities, pattern scanning, reduction, SIMD throughput info) |
+| **Receipts** (1) | `receipt_inspect` | Verification & inspection of POWL execution receipts (BLAKE3 proofs, goal verification) |
+| **Cross-crate** (1) | `system_capabilities` | Unified capability report (all crates, tool counts, pipeline diagram) |
+
+### Registration & Usage
+
+**Binary:** `/Users/sac/bcinr/target/debug/bcinr-mcp` (23 tools ready)
+
+**Registration:** Configured in `~/.claude/settings.json`
+```json
+{
+  "mcpServers": {
+    "bcinr": {
+      "command": "/Users/sac/bcinr/target/debug/bcinr-mcp"
+    }
+  }
+}
+```
+
+**How to Use:**
+1. The MCP is automatically available in Claude Code sessions
+2. Call any of the 23 tools to access PDDL planning, POWL workflows, and algorithms
+3. Example: Use `manufacture_world` for end-to-end admission → plan → execute → receipt loop
+
+### Integration Tests
+
+**Location:** `crates/bcinr-mcp/tests/integration_tests.rs` (18 dynamic tests, 100% pass)
+
+**What They Verify:**
+- ✓ All 23 tools extracted from source (no hardcoding)
+- ✓ Tool names, groups, and definitions consistent
+- ✓ PDDL planning pipeline complete
+- ✓ POWL orchestration pipeline complete
+- ✓ Algorithm tools accessible
+- ✓ End-to-end flow coverage
+- ✓ Documentation completeness
+
+**Run Tests:**
+```bash
+cargo test -p bcinr-mcp --test integration_tests
+# Output: running 18 tests / test result: ok. 18 passed; 0 failed
+```
+
+### Architecture: Vision 2030 (BRCE Loop)
+
+```
+PDDL Domain + Problem
+    ↓ (parse & validate)
+Prolog8 Admission Gate (R ⊢ A)
+    ↓ (BFS planner)
+Temporal Plan
+    ↓ (POWL compilation)
+POWL Tape (Sequence/Choice/PartialOrder)
+    ↓ (context admission)
+Execution Context (Priority/Standard/Background/Quarantine)
+    ↓ (capability check: bitset AND)
+Branchless Execution (O(1/log n))
+    ├→ utf8_validate (text input)
+    ├→ bitset_operations (permission algebra)
+    ├→ dfa_info (state machine)
+    ├→ scan_patterns (search)
+    ├→ reduce_sequence (aggregation)
+    └→ simd_string_info (throughput)
+    ↓ (receipt generation)
+BLAKE3 Receipt (proof of work)
+    ↓ (verification)
+receipt_inspect → goal_reached ✓
+```
+
+**Key Properties:**
+- **Zero-trust**: Admission gates + bitset capability checks
+- **Deterministic**: All paths O(1) or O(log n), branchless
+- **Cryptographic**: BLAKE3-chained receipts
+- **Real-time**: Priority queue scheduling with SLA tokens
+- **Auditable**: Full execution trace in receipts
+
+### Changelog
+
+See `BCINR_MCP_CHANGELOG.md` for:
+- Tool definitions (v0.2.0)
+- Integration history (v0.1.0 legacy)
+- Quality assurance results
+- Known issues and roadmap
 
 ## Build & Development Commands
 
@@ -102,6 +202,14 @@ cargo test --test name_of_test  # Specific integration test
 **Run specific test by name:**
 ```bash
 cargo test -p bcinr-logic test_name -- --nocapture  # with output
+```
+
+**Test bcinr-mcp (MCP server):**
+```bash
+cargo test -p bcinr-mcp                    # All tests
+cargo test -p bcinr-mcp --test integration_tests  # MCP tools verification
+cargo build -p bcinr-mcp                   # Build MCP binary
+/Users/sac/bcinr/target/debug/bcinr-mcp    # Run MCP server
 ```
 
 **Run benchmarks for specific algorithm family:**
@@ -447,5 +555,7 @@ See `docs/BENCHMARKS.md` for:
 
 ---
 
-**Last Updated:** June 2026
-**Version:** 26.6.24
+**Last Updated:** 2026-06-30 (bcinr-mcp v0.2.0 integrated)
+**Version:** 26.6.30
+**MCP Tools:** 23 across 6 groups (PDDL, POWL, core, algorithms, receipts, cross-crate)
+**Test Status:** 18/18 integration tests passing (100%)
