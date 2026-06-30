@@ -13,6 +13,55 @@ pub struct GroundProblem {
     pub initial_state: BTreeSet<Pddl8GroundAtom>,
     pub goal: Vec<Pddl8GroundAtom>,
     pub actions: Vec<Pddl8GroundAction>,
+    /// precondition atom -> indices of actions that require it. Lets
+    /// `find_plan`'s BFS only consider actions that could possibly apply at
+    /// a given state instead of linearly scanning every ground action.
+    action_index: HashMap<Pddl8GroundAtom, Vec<usize>>,
+    /// Indices of actions with no preconditions — always candidates.
+    always_applicable: Vec<usize>,
+}
+
+/// Object/type lookup used to restrict grounding to type-compatible bindings.
+///
+/// Built once per `GroundProblem`/`GroundTemporalProblem`. A parameter with no
+/// entry in `typed_params`, or a required type of `"object"` (PDDL's
+/// universal type), matches every object — this is what keeps untyped/legacy
+/// domains behaving exactly as before.
+struct TypeIndex {
+    /// object name -> declared type (objects absent from `object_types` are
+    /// treated as type `"object"`, matching untyped-domain semantics).
+    object_type: HashMap<String, String>,
+    /// type name -> parent type name, for `(:types child - parent)` subtyping.
+    parent: HashMap<String, String>,
+}
+
+impl TypeIndex {
+    fn build(domain: &Pddl8Domain, problem: &Pddl8Problem) -> Self {
+        let object_type = problem.object_types.iter().cloned().collect();
+        let parent = domain
+            .types
+            .iter()
+            .filter_map(|t| t.parent.clone().map(|p| (t.name.clone(), p)))
+            .collect();
+        Self { object_type, parent }
+    }
+
+    /// Does `obj`'s actual (or inherited) type satisfy `required`?
+    fn satisfies(&self, obj: &str, required: &str) -> bool {
+        if required == "object" {
+            return true;
+        }
+        let mut cur: &str = self.object_type.get(obj).map(String::as_str).unwrap_or("object");
+        loop {
+            if cur == required {
+                return true;
+            }
+            match self.parent.get(cur) {
+                Some(p) => cur = p.as_str(),
+                None => return false,
+            }
+        }
+    }
 }
 
 impl GroundProblem {
@@ -36,10 +85,11 @@ impl GroundProblem {
             .collect();
 
         let objects = &problem.objects;
+        let type_index = TypeIndex::build(domain, problem);
         let mut actions = Vec::new();
 
         for schema in &domain.actions {
-            ground_schema(schema, objects, &mut actions)?;
+            ground_schema(schema, objects, &type_index, &mut actions)?;
             if actions.len() > limit {
                 return Err(Pddl8Error::BoundExceeded {
                     what: "ground actions",
@@ -53,7 +103,18 @@ impl GroundProblem {
             return Err(Pddl8Error::EmptyGrounding);
         }
 
-        Ok(Self { initial_state, goal, actions })
+        let mut action_index: HashMap<Pddl8GroundAtom, Vec<usize>> = HashMap::new();
+        let mut always_applicable: Vec<usize> = Vec::new();
+        for (i, action) in actions.iter().enumerate() {
+            if action.preconditions.is_empty() {
+                always_applicable.push(i);
+            }
+            for p in &action.preconditions {
+                action_index.entry(p.clone()).or_default().push(i);
+            }
+        }
+
+        Ok(Self { initial_state, goal, actions, action_index, always_applicable })
     }
 
     /// BFS forward search — returns a `Pddl8Tape` ready for execution.
@@ -77,7 +138,18 @@ impl GroundProblem {
                     path.into_iter().map(|i| self.actions[i].clone()).collect();
                 return Ok(Pddl8Tape::from_plan(plan));
             }
-            for (i, action) in self.actions.iter().enumerate() {
+            // Only consider actions that could possibly apply: always-applicable
+            // (no preconditions) plus those keyed by an atom currently true.
+            // Full precondition check below still runs per candidate — this just
+            // avoids scanning the whole action list at every BFS node.
+            let mut candidates: BTreeSet<usize> = self.always_applicable.iter().copied().collect();
+            for atom in state.iter() {
+                if let Some(idxs) = self.action_index.get(atom) {
+                    candidates.extend(idxs.iter().copied());
+                }
+            }
+            for i in candidates {
+                let action = &self.actions[i];
                 if action.preconditions.iter().all(|p| state.contains(p)) {
                     let mut next = state.clone();
                     for d in &action.del_effects { next.remove(d); }
@@ -143,9 +215,10 @@ impl GroundTemporalProblem {
         );
 
         // Ground classical actions
+        let type_index = TypeIndex::build(domain, problem);
         let mut actions = Vec::new();
         for schema in &domain.actions {
-            ground_schema(schema, &problem.objects, &mut actions)?;
+            ground_schema(schema, &problem.objects, &type_index, &mut actions)?;
             if actions.len() > PDDL8_MAX_GROUND {
                 return Err(Pddl8Error::BoundExceeded {
                     what: "ground actions",
@@ -438,6 +511,7 @@ fn fn_key(f: &PddlFunction) -> String {
 fn ground_schema(
     schema: &Pddl8ActionSchema,
     objects: &[String],
+    type_index: &TypeIndex,
     out: &mut Vec<Pddl8GroundAction>,
 ) -> Result<(), Pddl8Error> {
     let n = schema.params.len();
@@ -447,24 +521,47 @@ fn ground_schema(
         }
         return Ok(());
     }
+
+    // Per-parameter candidate lists, restricted to type-compatible objects
+    // when the schema declares a type for that parameter — this is what
+    // shrinks grounding from |objects|^n to ∏ᵢ |objects_of_type(paramᵢ)|.
+    // A parameter absent from `typed_params` falls back to the full object
+    // list, preserving exact behavior for untyped/legacy domains.
+    let typed: HashMap<&str, &str> = schema
+        .typed_params
+        .iter()
+        .map(|(p, t)| (p.as_str(), t.as_str()))
+        .collect();
+    let candidates: Vec<Vec<&String>> = schema
+        .params
+        .iter()
+        .map(|p| match typed.get(p.as_str()) {
+            Some(required) => objects.iter().filter(|o| type_index.satisfies(o, required)).collect(),
+            None => objects.iter().collect(),
+        })
+        .collect();
+    if candidates.iter().any(|c| c.is_empty()) {
+        return Ok(());
+    }
+
     let mut indices = vec![0usize; n];
     loop {
         let binding: HashMap<String, String> = schema
             .params
             .iter()
             .enumerate()
-            .map(|(i, p)| (p.clone(), objects[indices[i]].clone()))
+            .map(|(i, p)| (p.clone(), candidates[i][indices[i]].clone()))
             .collect();
         if let Some(ga) = instantiate(schema, &binding) {
             out.push(ga);
         }
-        // odometer increment
+        // odometer increment, now bounded per-slot by candidates[i].len()
         let mut pos = n;
         loop {
             if pos == 0 { return Ok(()); }
             pos -= 1;
             indices[pos] += 1;
-            if indices[pos] < objects.len() { break; }
+            if indices[pos] < candidates[pos].len() { break; }
             indices[pos] = 0;
         }
     }

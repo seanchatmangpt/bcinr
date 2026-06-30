@@ -1,5 +1,8 @@
 [workspace]
-members = ["bcinr", "bcinr-core", "bcinr-bench", "crates/bcinr-api", "crates/bcinr-logic", "tools/bcinr-reporter", "tools/bcinr-contract-gate", "tools/bcinr-bench-auditor", "tools/bcinr-cheat-scanner", "tools/rust_audit", "crates/encode_unicode_patch", "tools/ggen", "playground", "crates/bcinr-powl", "crates/bcinr-powl-receipt", "crates/bcinr-pddl", "crates/bcinr-pddl-lsp", "crates/bcinr-mcp", "crates/bcinr-pm-bridge"]
+members = ["bcinr", "bcinr-core", "bcinr-bench", "crates/bcinr-api", "crates/bcinr-logic", "tools/bcinr-reporter", "tools/bcinr-contract-gate", "tools/bcinr-bench-auditor", "tools/bcinr-cheat-scanner", "tools/rust_audit", "crates/encode_unicode_patch", "tools/ggen", "playground", "crates/bcinr-powl", "crates/bcinr-powl-receipt", "crates/bcinr-pddl", "crates/bcinr-mcp"]
+# crates/bcinr-pddl-lsp is disabled: it depends on lsp-max-andon, which is
+# `publish = false` (no crates.io release exists) and is only reachable via
+# an external filesystem path dep into the 54G ../../../lsp-max sibling repo.
 resolver = "2"
 
 [profile.release]
@@ -7,6 +10,22 @@ lto = "fat"
 codegen-units = 1
 panic = "abort"
 
+# `bench` inherits from `release` by default, which means fat LTO +
+# codegen-units=1 over the *entire* dependency graph (nom, the pddl parser,
+# wasm4pm-compat, criterion, ...) for every one of the bench binaries in
+# bcinr-bench — that's what spiked target/ to 24-30GiB after a handful of
+# `cargo bench` runs. Relative-timing benchmarks don't need whole-program
+# LTO; override it to a cheap profile instead. (`panic` cannot be overridden
+# here — cargo always forces `unwind` for bench/test harnesses regardless of
+# what's configured, and emits a warning if you try.)
+[profile.bench]
+lto = false
+codegen-units = 16
+opt-level = 3
+
 [patch.crates-io]
 encode_unicode = { path = "crates/encode_unicode_patch" }
-wasm4pm-compat = { path = "/Users/sac/wasm4pm-compat" }
+# wasm4pm-compat and prolog8 are consumed from crates.io (26.6.28 / 26.6.25)
+# by every crate that needs them — no local path overrides. This also
+# eliminates the prior firmlink/dylib-collision issue, since only one
+# (registry) copy of each crate is ever resolved.

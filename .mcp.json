@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "bcinr": {
+      "command": "/Users/sac/bcinr/target/debug/bcinr-mcp"
+    }
+  }
+}

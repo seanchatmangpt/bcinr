@@ -14,8 +14,14 @@
 //!                                        ├── problem_witness (BLAKE3)
 //!                                        ├── plan (TemporalPlan)
 //!                                        ├── plan_receipt (TemporalExecutionReceipt)
-//!                                        └── manufacture_chain (BLAKE3 over all)
+//!                                        ├── manufacture_chain (BLAKE3 over all)
+//!                                        └── ocel_export (OCEL 2.0 JSON trace)
 //! ```
+//!
+//! bcinr is a planner and receipt producer, not a process-mining engine: every
+//! receipt always carries its OCEL 2.0 export so a real PM consumer (e.g.
+//! wasm4pm, which already depends on bcinr) can run discovery/conformance over
+//! it. bcinr itself never computes fitness or conformance scores.
 
 use crate::error::Pddl8Error;
 use crate::parse::{domain31_from_pddl, problem31_from_pddl, domain_from_pddl, problem_from_pddl};
@@ -26,6 +32,7 @@ use wasm4pm_compat::pddl::{
     TemporalPlan, TemporalExecutionReceipt,
 };
 use blake3::Hasher;
+use serde_json::{Value, json};
 
 // ─── Admitted wrapper types ──────────────────────────────────────────────────
 
@@ -62,6 +69,10 @@ pub struct WorldManufactureReceipt {
     pub admitted: bool,
     /// Human-readable refusal reason if admitted=false.
     pub refusal_reason: Option<String>,
+    /// OCEL 2.0 JSON event log derived from `plan` (one event per plan step).
+    /// Always present — bcinr exports unconditionally, it does not compute
+    /// conformance/fitness itself. Empty event/object maps when there is no plan.
+    pub ocel_export: Value,
 }
 
 // ─── Admission functions ─────────────────────────────────────────────────────
@@ -136,6 +147,7 @@ pub fn manufacture_world(
             manufacture_chain: String::new(),
             admitted: false,
             refusal_reason: Some(format!("domain admission failed: {e}")),
+            ocel_export: build_ocel_export(&TemporalPlan::default(), case_id),
         },
     };
 
@@ -152,6 +164,7 @@ pub fn manufacture_world(
             manufacture_chain: String::new(),
             admitted: false,
             refusal_reason: Some(format!("problem admission failed: {e}")),
+            ocel_export: build_ocel_export(&TemporalPlan::default(), case_id),
         },
     };
 
@@ -176,11 +189,13 @@ pub fn manufacture_world(
                 manufacture_chain: chain,
                 admitted: false,
                 refusal_reason: Some(format!("planning failed: {e}")),
+                ocel_export: build_ocel_export(&TemporalPlan::default(), case_id),
             };
         }
     };
 
     let manufacture_chain = chain_witnesses_full(&domain_witness, &problem_witness, &plan_receipt.chain_hash, plan_receipt.goal_reached, plan_receipt.step_count as u64);
+    let ocel_export = build_ocel_export(&plan, case_id);
 
     WorldManufactureReceipt {
         domain_name,
@@ -192,7 +207,61 @@ pub fn manufacture_world(
         manufacture_chain,
         admitted: true,
         refusal_reason: None,
+        ocel_export,
     }
+}
+
+// ─── OCEL 2.0 export ─────────────────────────────────────────────────────────
+
+/// Convert a [`TemporalPlan`] into an OCEL 2.0 JSON event log.
+///
+/// Every receipt carries this unconditionally — bcinr exports its own
+/// execution trace, it does not run discovery or conformance checking over
+/// it. One event per plan step; object ids are synthesised from each step's
+/// action arguments so the object-centric structure of OCEL 2.0 is preserved.
+pub fn build_ocel_export(plan: &TemporalPlan, case_id: &str) -> Value {
+    let mut ocel_events = serde_json::Map::new();
+    let mut ocel_objects = serde_json::Map::new();
+
+    for (seq, step) in plan.steps.iter().enumerate() {
+        let event_id = format!("{case_id}-e{seq}");
+        let ts_ns = (step.start_time * 1_000_000_000.0) as u64;
+
+        let object_ids: Vec<String> = if step.args.is_empty() {
+            vec![format!("{case_id}-case")]
+        } else {
+            step.args.clone()
+        };
+
+        let omap: Vec<Value> = object_ids.iter().map(|id| Value::String(id.clone())).collect();
+
+        ocel_events.insert(
+            event_id,
+            json!({
+                "ocel:type":      step.action_name,
+                "ocel:timestamp": format!("{}.{:09}Z", ts_ns / 1_000_000_000, ts_ns % 1_000_000_000),
+                "ocel:omap":      omap,
+                "ocel:vmap":      { "duration": step.duration }
+            }),
+        );
+
+        for obj_id in &object_ids {
+            ocel_objects
+                .entry(obj_id.clone())
+                .or_insert_with(|| json!({ "ocel:type": "pddl-object", "ocel:ovmap": {} }));
+        }
+    }
+
+    json!({
+        "ocel:type":            "pddl-temporal-trace",
+        "ocel:attribute-names": ["activity", "duration", "ts_ns"],
+        "ocel:global-log": {
+            "ocel:attribute-names": ["activity", "duration"],
+            "ocel:case-id":          case_id
+        },
+        "ocel:events":  Value::Object(ocel_events),
+        "ocel:objects": Value::Object(ocel_objects)
+    })
 }
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
@@ -286,4 +355,46 @@ fn refused_receipt() -> TemporalExecutionReceipt {
 
 fn hex(b: &[u8; 32]) -> String {
     b.iter().map(|x| format!("{x:02x}")).collect()
+}
+
+#[cfg(test)]
+mod ocel_export_tests {
+    use super::*;
+
+    const DOMAIN: &str = r#"(define (domain d)
+  (:requirements :strips)
+  (:predicates (p))
+  (:action a :parameters () :precondition (p) :effect (not (p))))"#;
+
+    const PROBLEM: &str = r#"(define (problem pr)
+  (:domain d)
+  (:init (p))
+  (:goal (not (p))))"#;
+
+    #[test]
+    fn receipt_always_carries_ocel_export() {
+        let receipt = manufacture_world(DOMAIN, PROBLEM, "unit-1", &[]);
+        assert_eq!(receipt.ocel_export["ocel:type"], "pddl-temporal-trace");
+    }
+
+    #[test]
+    fn ocel_event_count_matches_plan_steps() {
+        let receipt = manufacture_world(DOMAIN, PROBLEM, "unit-2", &[]);
+        let events = receipt.ocel_export["ocel:events"].as_object().unwrap();
+        assert_eq!(events.len(), receipt.plan.steps.len());
+    }
+
+    #[test]
+    fn ocel_case_id_matches_caller_supplied_case_id() {
+        let receipt = manufacture_world(DOMAIN, PROBLEM, "unit-3", &[]);
+        assert_eq!(receipt.ocel_export["ocel:global-log"]["ocel:case-id"], "unit-3");
+    }
+
+    #[test]
+    fn refused_receipt_still_carries_empty_ocel_export() {
+        let receipt = manufacture_world("not valid pddl", PROBLEM, "unit-4", &[]);
+        assert!(!receipt.admitted);
+        assert_eq!(receipt.ocel_export["ocel:type"], "pddl-temporal-trace");
+        assert!(receipt.ocel_export["ocel:events"].as_object().unwrap().is_empty());
+    }
 }

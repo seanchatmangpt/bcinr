@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 bcinr = { path = "../bcinr" }
 bcinr-logic = { path = "../crates/bcinr-logic" }
-wasm4pm-compat = { path = "../../wasm4pm-compat" }
+wasm4pm-compat = { version = "26.6.28" }
 rayon = "1.10.0"
 wgpu = "0.20"
 pollster = "0.3"

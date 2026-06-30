@@ -355,6 +355,7 @@ impl BcinrServer {
                 "makespan": r.plan_receipt.makespan,
                 "goal_reached": r.plan_receipt.goal_reached,
                 "refusal_reason": null,
+                "ocel_export": r.ocel_export,
             })
             .to_string()
         } else {
@@ -380,6 +381,7 @@ impl BcinrServer {
                 "step_count": r.plan_receipt.step_count,
                 "makespan": r.plan_receipt.makespan,
                 "goal_reached": false,
+                "ocel_export": r.ocel_export,
             })
             .to_string()
         }

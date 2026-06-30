@@ -66,6 +66,9 @@ pub fn problem_from_pddl(text: &str) -> Result<Pddl8Problem, Pddl8Error> {
     let objects: Vec<String> = prob.objects().values().value().iter()
         .map(|t| t.value().to_string())
         .collect();
+    let object_types: Vec<(String, String)> = prob.objects().values().value().iter()
+        .map(|t| (t.value().to_string(), type_to_string(t.type_())))
+        .collect();
 
     let (init, timed_inits, fn_values) = lower_init_full(prob.init())?;
     let goal = lower_precond_defs(prob.goals())?;
@@ -76,6 +79,7 @@ pub fn problem_from_pddl(text: &str) -> Result<Pddl8Problem, Pddl8Error> {
         name: prob.name().to_string(),
         domain: prob.domain().to_string(),
         objects,
+        object_types,
         init,
         goal,
         timed_inits,
