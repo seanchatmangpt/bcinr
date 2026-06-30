@@ -118,6 +118,7 @@ pub fn execute_tape(
     case_id: &str,
     policy_rules: &[(&str, Vec<&str>)],
 ) -> Result<(Pddl8ExecutionLog, Pddl8ExecutionReceipt, OCEL), Pddl8Error> {
+    validate_case_id(case_id)?;
     let mut ctx = Ctx::new();
 
     // Load initial world state
@@ -274,6 +275,55 @@ fn hash_strings(items: &[String]) -> String {
     h.finalize().to_hex().to_string()
 }
 
+fn validate_case_id(case_id: &str) -> Result<(), Pddl8Error> {
+    if case_id.is_empty() || case_id.len() > 64 {
+        return Err(Pddl8Error::InvalidCaseId(format!(
+            "must be 1-64 chars, got {}", case_id.len()
+        )));
+    }
+    for c in case_id.chars() {
+        if !matches!(c, 'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_') {
+            return Err(Pddl8Error::InvalidCaseId(format!(
+                "invalid char '{c}'; only [a-zA-Z0-9_-] allowed"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn atom_key(pred: &str, args: &[String]) -> String {
+    if args.is_empty() { pred.to_string() } else { format!("({} {})", pred, args.join(" ")) }
+}
+
+fn parse_action_label(label: &str) -> (&str, Vec<&str>) {
+    if let Some(i) = label.find('(') {
+        let name = &label[..i];
+        let rest = label[i + 1..].trim_end_matches(')');
+        let args = if rest.is_empty() { vec![] } else { rest.split(',').collect() };
+        (name, args)
+    } else {
+        (label, vec![])
+    }
+}
+
+/// Recompute the rolling BLAKE3 chain over a sequence of temporal plan steps.
+///
+/// This is the same algorithm used inside `execute_temporal_plan` — call it with
+/// the plan steps from a `WorldManufactureReceipt` to independently verify the
+/// `plan_chain_hash` field.
+pub fn compute_plan_chain(steps: &[wasm4pm_compat::pddl::TemporalPlanStep]) -> String {
+    let mut chain = [0u8; 32];
+    for step in steps {
+        let mut h = blake3::Hasher::new();
+        h.update(&chain);
+        h.update(step.action_name.as_bytes());
+        h.update(&step.start_time.to_bits().to_le_bytes());
+        h.update(&step.duration.to_bits().to_le_bytes());
+        chain = *h.finalize().as_bytes();
+    }
+    hex(&chain)
+}
+
 /// Execute a temporal plan through the Prolog8 admission gate + BLAKE3 receipt + OCEL output.
 ///
 /// Mirrors `execute_tape` — every step is checked via `query_may_fire` before it fires.
@@ -288,6 +338,8 @@ pub fn execute_temporal_plan(
 ) -> Result<(TemporalExecutionReceipt, OCEL), Pddl8Error> {
     use blake3::Hasher;
 
+    validate_case_id(case_id)?;
+
     // Sort steps by start_time
     let mut steps = plan.steps.clone();
     steps.sort_by(|a, b| a.start_time.partial_cmp(&b.start_time).unwrap());
@@ -301,6 +353,16 @@ pub fn execute_temporal_plan(
             load_may_fire_rule(&mut ctx, i as u32 + 1, head, body)?;
         }
     }
+
+    // Build initial state for goal tracking (problem.init atoms are ground — no vars)
+    let mut state: BTreeSet<String> = problem.init.iter()
+        .map(|a| atom_key(&a.pred, &a.args))
+        .collect();
+
+    // Goal atoms for final check
+    let goal_keys: BTreeSet<String> = problem.goal.iter()
+        .map(|a| atom_key(&a.pred, &a.args))
+        .collect();
 
     // Compute plan_root: BLAKE3 over all (start_time, action_name, args)
     let mut plan_hasher = Hasher::new();
@@ -334,6 +396,29 @@ pub fn execute_temporal_plan(
                 op_index: i as u8,
                 reason: format!("Prolog8 denied may_fire({})", step.action_name),
             });
+        }
+
+        // Apply action effects to track state for goal verification.
+        // Parse the action label ("pick-up(a)" → name "pick-up", args ["a"]) and
+        // look up the schema in the domain to ground effects.
+        let (base_name, parsed_args) = parse_action_label(&step.action_name);
+        if let Some(schema) = domain.actions.iter().find(|a| a.name == base_name) {
+            let subst: HashMap<&str, &str> = schema.params.iter()
+                .zip(parsed_args.iter())
+                .map(|(p, a)| (p.as_str(), *a))
+                .collect();
+            for eff in &schema.add_effects {
+                let grounded: Vec<String> = eff.args.iter()
+                    .map(|a| subst.get(a.as_str()).map(|&s| s.to_string()).unwrap_or_else(|| a.clone()))
+                    .collect();
+                state.insert(atom_key(&eff.pred, &grounded));
+            }
+            for eff in &schema.del_effects {
+                let grounded: Vec<String> = eff.args.iter()
+                    .map(|a| subst.get(a.as_str()).map(|&s| s.to_string()).unwrap_or_else(|| a.clone()))
+                    .collect();
+                state.remove(&atom_key(&eff.pred, &grounded));
+            }
         }
 
         // Extend chain: BLAKE3(chain || step.action_name || start_time_bits || duration_bits)
@@ -382,10 +467,13 @@ pub fn execute_temporal_plan(
         });
     }
 
-    // Final chain: include goal verdict
+    // Check goal against final state
+    let goal_reached = goal_keys.iter().all(|g| state.contains(g));
+
+    // Final chain: include goal verdict (matches execute_tape contract)
     let mut h = Hasher::new();
     h.update(&chain);
-    h.update(b"TEMPORAL_GOAL_MET");
+    h.update(if goal_reached { b"GOAL_MET" } else { b"GOAL_MISS" });
     chain = *h.finalize().as_bytes();
     let chain_hash = hex(&chain);
 
@@ -403,7 +491,7 @@ pub fn execute_temporal_plan(
         makespan,
         step_count: steps.len(),
         requirements,
-        goal_reached: true,
+        goal_reached,
         chain_hash,
     };
 

@@ -45,6 +45,6 @@ pub use wasm4pm_compat::pddl::{
 pub use wasm4pm_compat::ocel::{OCEL, OCELEvent};
 
 pub use error::Pddl8Error;
-pub use execute::execute_tape;
+pub use execute::{execute_tape, compute_plan_chain};
 pub use ground::{GroundProblem, GroundTemporalProblem, GroundDurativeAction};
 pub use parse::{domain_from_pddl, problem_from_pddl, domain31_from_pddl, problem31_from_pddl};

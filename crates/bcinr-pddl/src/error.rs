@@ -19,6 +19,8 @@ pub enum Pddl8Error {
     GoalNotReached,
     /// Receipt chain integrity failure.
     ReceiptIntegrity(String),
+    /// case_id contains disallowed characters or is out of the 1-64 char range.
+    InvalidCaseId(String),
 }
 
 impl std::fmt::Display for Pddl8Error {
@@ -35,6 +37,7 @@ impl std::fmt::Display for Pddl8Error {
                 write!(f, "step {op_index} denied: {reason}"),
             Self::GoalNotReached => write!(f, "goal not reached after plan execution"),
             Self::ReceiptIntegrity(s) => write!(f, "receipt integrity failure: {s}"),
+            Self::InvalidCaseId(s) => write!(f, "invalid case_id: {s}"),
         }
     }
 }

@@ -7,6 +7,10 @@ edition = "2021"
 name = "bcinr-mcp"
 path = "src/main.rs"
 
+[dev-dependencies]
+chicago-tdd-mcp = { version = "26.7.1", features = ["testing"] }
+tokio = { version = "1", features = ["full"] }
+
 [dependencies]
 rmcp = { version = "2.0.0", features = ["server", "transport-io", "macros"] }
 serde = { version = "1", features = ["derive"] }
@@ -17,6 +21,7 @@ bcinr-powl = { path = "../bcinr-powl" }
 bcinr-logic = { path = "../bcinr-logic" }
 bcinr-api = { path = "../bcinr-api" }
 bcinr-powl-receipt = { path = "../bcinr-powl-receipt" }
+wasm4pm-compat = "26.6"
 blake3 = "1"
 anyhow = "1"
 tracing = "0.1"
