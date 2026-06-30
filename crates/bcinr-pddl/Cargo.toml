@@ -19,8 +19,14 @@ blake3 = "1"
 # Prolog8 kernel — admission gate (R ⊢ A). Pulled from crates.io, not a
 # local path, so only one copy of the crate is ever resolved workspace-wide.
 prolog8 = { version = "26.6.25" }
-# wasm4pm-compat — canonical OCEL types + PDDL types (once landed there)
-wasm4pm-compat = { version = "26.6.28" }
+# wasm4pm-compat — canonical OCEL types + PDDL types.
+# KNOWN EXCEPTION to "no path deps": the published 26.6.28 on crates.io is
+# missing fields (fn_values, preferences, metric, object_types, typed_params,
+# condition, effects, numeric_effects) that exist in the local checkout under
+# the same version number — the local copy was edited post-publish without a
+# version bump. Pin to path until wasm4pm-compat is republished under a new
+# version that includes these fields; switch back to `version = "..."` then.
+wasm4pm-compat = { path = "/Users/sac/wasm4pm-compat" }
 # Serde for serialization (wasm4pm-compat re-exports most of what's needed)
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

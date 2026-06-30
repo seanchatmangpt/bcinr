@@ -25,7 +25,16 @@ opt-level = 3
 
 [patch.crates-io]
 encode_unicode = { path = "crates/encode_unicode_patch" }
-# wasm4pm-compat and prolog8 are consumed from crates.io (26.6.28 / 26.6.25)
-# by every crate that needs them — no local path overrides. This also
-# eliminates the prior firmlink/dylib-collision issue, since only one
-# (registry) copy of each crate is ever resolved.
+# prolog8 is consumed from crates.io (26.6.25) by every crate that needs it —
+# no local path override, no collision risk.
+#
+# wasm4pm-compat IS patched to the local path: bcinr-pddl needs fields
+# (fn_values, preferences, metric, object_types, typed_params, condition,
+# effects, numeric_effects) that exist locally but were never published in
+# crates.io's 26.6.28 (same version number, drifted content). Patching here
+# forces every consumer (bcinr-pddl, bcinr-powl, playground) onto the same
+# local copy, avoiding the registry/path dylib-collision bug this caused
+# previously. Remove once wasm4pm-compat is republished with these fields
+# under a new version and bcinr-pddl's Cargo.toml is switched back to a
+# version dependency.
+wasm4pm-compat = { path = "/Users/sac/wasm4pm-compat" }
