@@ -35,3 +35,7 @@ path = "tests/logistics.rs"
 [[test]]
 name = "brce_loop"
 path = "tests/brce_loop.rs"
+
+[[test]]
+name = "vision2030"
+path = "tests/vision2030.rs"

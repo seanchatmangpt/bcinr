@@ -22,6 +22,9 @@ pub mod error;
 pub mod ground;
 pub mod execute;
 pub mod parse;
+pub mod powl_bridge;
+pub mod llm_bridge;
+pub use llm_bridge::{AdmittedDomain, AdmittedProblem, WorldManufactureReceipt, admit_candidate_domain, admit_candidate_problem, manufacture_world};
 
 // Re-export canonical types from wasm4pm-compat so callers only need one import.
 pub use wasm4pm_compat::pddl::{
@@ -29,10 +32,19 @@ pub use wasm4pm_compat::pddl::{
     Pddl8GroundAction, Pddl8GroundAtom, Pddl8Problem, Pddl8StepResult, Pddl8Tape, Pddl8TapeOp,
     PDDL8_MAX_ARITY, PDDL8_MAX_CONJUNCTS, PDDL8_MAX_GROUND, PDDL8_MAX_PARAMS,
     PDDL8_MAX_PLAN_DEPTH,
+    // New PDDL 3.1 types:
+    PddlType, PddlCondition, PddlEffect,
+    NumericExpr, NumericOp, NumericEffect, PddlFunction,
+    TimeSpecifier, DurationConstraint, DurativeAction,
+    TimedLiteral, Metric, MetricDir, MetricExpr,
+    TrajectoryConstraint, PddlConstraint, PddlPreference,
+    DerivedPredicate, PddlProcess, PddlEvent,
+    Pddl31Domain, Pddl31Problem, Pddl31Action,
+    TemporalPlanStep, TemporalPlan, TemporalExecutionReceipt,
 };
 pub use wasm4pm_compat::ocel::{OCEL, OCELEvent};
 
 pub use error::Pddl8Error;
 pub use execute::execute_tape;
-pub use ground::GroundProblem;
-pub use parse::{domain_from_pddl, problem_from_pddl};
+pub use ground::{GroundProblem, GroundTemporalProblem, GroundDurativeAction};
+pub use parse::{domain_from_pddl, problem_from_pddl, domain31_from_pddl, problem31_from_pddl};

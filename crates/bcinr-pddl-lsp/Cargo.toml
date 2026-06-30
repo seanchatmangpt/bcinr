@@ -18,6 +18,7 @@ path = "src/lib.rs"
 bcinr-pddl = { path = "../bcinr-pddl" }
 wasm4pm-compat = { version = "26.6.28" }
 lsp-max = { path = "../../../lsp-max" }
+lsp-max-andon = { path = "../../../lsp-max/crates/lsp-max-andon" }
 lsp-types-max = { version = "26.6.24", features = ["proposed"] }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }

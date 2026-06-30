@@ -11,6 +11,16 @@ use dashmap::DashMap;
 use lsp_max::{Client, LanguageServer};
 use lsp_types_max::*;
 use tokio::sync::Mutex;
+use std::sync::Mutex as StdMutex;
+
+use lsp_max_andon::core::InvariantRegistry;
+use lsp_max_andon::andon::{AndonBus, AndonEvent};
+use lsp_max_andon::analysis::AnalysisPipeline;
+use lsp_max_andon::lsp::{LspPushAdapter, LspMaxAndonRaised};
+use lsp_max_andon::patterns::{
+    build_empty_registry_invariant, build_required_artifact_invariant, build_marker_admission,
+    build_need_n_invariant, build_non_empty_check_set, build_brokered_command, build_receipt_required,
+};
 
 fn uri_to_path(uri: &Uri) -> Option<PathBuf> {
     let s = uri.as_str();
@@ -57,16 +67,29 @@ pub struct PddlLspBackend {
     workspace_root: Arc<Mutex<Option<PathBuf>>>,
     /// build broker state
     broker: Arc<Mutex<build_broker::BuildBrokerState>>,
+    pub registry: Arc<StdMutex<InvariantRegistry>>,
+    pub andon_bus: Arc<StdMutex<AndonBus>>,
 }
 
 impl PddlLspBackend {
     pub fn new(client: Client) -> Self {
+        let mut registry = InvariantRegistry::new();
+        registry.register(build_empty_registry_invariant());
+        registry.register(build_required_artifact_invariant("docs/prd.md"));
+        registry.register(build_marker_admission("ADMITTED"));
+        registry.register(build_need_n_invariant(8));
+        registry.register(build_non_empty_check_set());
+        registry.register(build_brokered_command());
+        registry.register(build_receipt_required());
+
         Self {
             client,
             documents: DashMap::new(),
             plan_cache: Arc::new(Mutex::new(None)),
             workspace_root: Arc::new(Mutex::new(None)),
             broker: Arc::new(Mutex::new(build_broker::BuildBrokerState::default())),
+            registry: Arc::new(StdMutex::new(registry)),
+            andon_bus: Arc::new(StdMutex::new(AndonBus::new())),
         }
     }
 
@@ -112,6 +135,17 @@ impl PddlLspBackend {
 
         let mut all_diags = diag_mod::lifecycle_diagnostics(&lc);
         all_diags.extend(diag_mod::bound_diagnostics(&bounds_report));
+
+        let andon_events = {
+            let registry = self.registry.lock().unwrap();
+            AnalysisPipeline::evaluate_registry(&registry)
+        };
+
+        for event in andon_events {
+            all_diags.push(LspPushAdapter::event_to_diagnostic(&event));
+            self.push_andon(event).await;
+        }
+
         self.client.publish_diagnostics(trigger_uri, all_diags, None).await;
 
         let gate_label = {
@@ -122,11 +156,32 @@ impl PddlLspBackend {
             MessageType::INFO,
             format!(
                 "bcinr-pddl-lsp CANDIDATE: project '{}' gate={} next={:?}",
-                lc.project_name,
+                root.display(),
                 gate_label,
-                lc.next_missing().map(|s| s.predicate_name()),
+                lc.next_missing().map(|s| s.predicate_name())
             ),
-        ).await;
+        )
+        .await;
+    }
+
+    async fn push_andon(&self, event: AndonEvent) {
+        let _ = self.client.send_notification::<LspMaxAndonRaised>(event.clone()).await;
+
+        if event.requires_ack {
+            let _ = self.client.show_message_request(
+                MessageType::ERROR,
+                event.message.clone(),
+                Some(vec![MessageActionItem {
+                    title: "Acknowledge".to_string(),
+                    properties: std::collections::HashMap::new(),
+                }]),
+            ).await;
+        } else if event.blocking {
+            self.client.show_message(MessageType::ERROR, event.message.clone()).await;
+        }
+        
+        let mut bus = self.andon_bus.lock().unwrap();
+        bus.push(event);
     }
 
     /// Admission mode: execute cached candidate tape → receipt + OCEL → gate ADMITTED.
