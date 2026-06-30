@@ -17,6 +17,7 @@ bcinr-powl = { path = "../bcinr-powl" }
 bcinr-logic = { path = "../bcinr-logic" }
 bcinr-api = { path = "../bcinr-api" }
 bcinr-powl-receipt = { path = "../bcinr-powl-receipt" }
+blake3 = "1"
 anyhow = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

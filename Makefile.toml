@@ -79,6 +79,21 @@ script = [
     "rm -rf target/criterion"
 ]
 
+[tasks.lint-anti-llm]
+category = "Lint"
+description = "Scan bcinr-mcp for LLM-generated stubs, hedge comments, and unverified claims"
+workspace = false
+command = "cargo"
+args = ["run", "--manifest-path", "/Users/sac/anti-llm-cheat-lsp/Cargo.toml", "--quiet", "--", "scan", "--dir", "crates/bcinr-mcp/src"]
+
+# Wire anti-llm scan into clippy so CI always catches stub code in the MCP layer.
+[tasks.clippy]
+category = "Lint"
+description = "Run clippy with strict pedantic lints (+ anti-LLM stub scan)"
+dependencies = ["lint-anti-llm"]
+command = "cargo"
+args = ["clippy", "--workspace", "--all-targets", "--all-features", "--", "-D", "warnings"]
+
 [tasks.scan-cheats]
 category = "Lint"
 description = "Scan for algorithmic cheats and anti-patterns"

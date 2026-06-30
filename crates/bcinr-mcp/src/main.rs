@@ -9,10 +9,10 @@
 //!    powl_capability_check, powl_plan_to_tape
 //!  Group 3 — Core bcinr (3 tools):
 //!    bcinr_library_info, bcinr_mask_ops, bcinr_powl_info
-//!  Group 4 — bcinr-logic Algorithms (6+ tools):
+//!  Group 4 — bcinr-logic Algorithms (6 tools):
 //!    utf8_validate, bitset_operations, dfa_info, scan_patterns, reduce_sequence, simd_string_info
-//!  Group 5 — POWL Receipts (2 tools):
-//!    receipt_verify, receipt_inspect
+//!  Group 5 — POWL Receipts (1 tool):
+//!    receipt_inspect
 //!  Group 6 — Cross-crate Info (1 tool):
 //!    system_capabilities
 
@@ -24,6 +24,34 @@ use rmcp::{
     transport::stdio,
 };
 use serde::Deserialize;
+
+// ─── Flexible u64 deserializer ────────────────────────────────────────────────
+//
+// JSON has no native u64. Values > 2^53 round to f64 before serde sees them,
+// causing "invalid type: floating point, expected u64". This deserializer also
+// accepts decimal strings ("18446744073709551615"), which LLMs often generate.
+
+fn de_u64_flex<'de, D: serde::Deserializer<'de>>(d: D) -> Result<u64, D::Error> {
+    use serde::de::Error as _;
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum NumOrStr {
+        Int(u64),
+        Float(f64),
+        Str(String),
+    }
+    match NumOrStr::deserialize(d)? {
+        NumOrStr::Int(n) => Ok(n),
+        NumOrStr::Float(f) => {
+            if f >= 0.0 && f <= u64::MAX as f64 && f.fract() == 0.0 {
+                Ok(f as u64)
+            } else {
+                Err(D::Error::custom(format!("{f} is not a valid u64")))
+            }
+        }
+        NumOrStr::Str(s) => s.parse::<u64>().map_err(D::Error::custom),
+    }
+}
 
 // ─── Parameter structs ───────────────────────────────────────────────────────
 
@@ -66,10 +94,13 @@ pub struct LabelsInput {
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct AdmitContextInput {
     /// Tenant class (0=free, 1=standard, 2=enterprise, 3=sovereign)
+    #[serde(deserialize_with = "de_u64_flex")]
     pub tenant_class: u64,
     /// Urgency tier (0-15)
+    #[serde(deserialize_with = "de_u64_flex")]
     pub urgency_tier: u64,
     /// Resource load (0-15)
+    #[serde(deserialize_with = "de_u64_flex")]
     pub resource_load: u64,
     /// Whether a SLA token is present
     pub has_sla_token: bool,
@@ -86,8 +117,10 @@ pub struct CapabilityInput {
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct MaskOpsInput {
     /// First 64-bit value
+    #[serde(deserialize_with = "de_u64_flex")]
     pub a: u64,
     /// Second 64-bit value
+    #[serde(deserialize_with = "de_u64_flex")]
     pub b: u64,
 }
 
@@ -102,6 +135,7 @@ pub struct BitsetInput {
     /// Bitset operation: "popcount", "leading_zeros", "trailing_zeros", "msb", "lsb"
     pub operation: String,
     /// Value to operate on
+    #[serde(deserialize_with = "de_u64_flex")]
     pub value: u64,
 }
 
@@ -264,6 +298,9 @@ impl BcinrServer {
     }
 
     /// Full Vision 2030 world manufacturing loop (admit + plan + execute + BLAKE3 receipt).
+    ///
+    /// Returns ok=true with full receipt on success. Returns ok=false with refusal_code on
+    /// any admission failure, planning failure, or bound violation — never panics.
     #[tool(description = "Run the bcinr world-manufacturing loop: admit domain+problem, plan, return BLAKE3-chained WorldManufactureReceipt as JSON.")]
     async fn manufacture_world(
         &self,
@@ -274,20 +311,49 @@ impl BcinrServer {
             &input.problem_text,
             &input.case_id,
         );
-        serde_json::json!({
-            "ok": true,
-            "admitted": r.admitted,
-            "domain_name": r.domain_name,
-            "problem_name": r.problem_name,
-            "domain_witness": r.domain_witness,
-            "problem_witness": r.problem_witness,
-            "manufacture_chain": r.manufacture_chain,
-            "step_count": r.plan_receipt.step_count,
-            "makespan": r.plan_receipt.makespan,
-            "goal_reached": r.plan_receipt.goal_reached,
-            "refusal_reason": r.refusal_reason,
-        })
-        .to_string()
+
+        if r.admitted {
+            serde_json::json!({
+                "ok": true,
+                "admitted": true,
+                "domain_name": r.domain_name,
+                "problem_name": r.problem_name,
+                "domain_witness": r.domain_witness,
+                "problem_witness": r.problem_witness,
+                "manufacture_chain": r.manufacture_chain,
+                "plan_chain_hash": r.plan_receipt.chain_hash,
+                "step_count": r.plan_receipt.step_count,
+                "makespan": r.plan_receipt.makespan,
+                "goal_reached": r.plan_receipt.goal_reached,
+                "refusal_reason": null,
+            })
+            .to_string()
+        } else {
+            let refusal_code = match r.refusal_reason.as_deref().unwrap_or("") {
+                s if s.contains("step") && s.contains("denied") => "STEP_DENIED",
+                s if s.contains("bound exceeded") => "BOUND_EXCEEDED",
+                s if s.contains("domain admission failed") => "DOMAIN_REFUSED",
+                s if s.contains("problem admission failed") => "PROBLEM_REFUSED",
+                s if s.contains("empty") || s.contains("no applicable") => "EMPTY_PLAN",
+                _ => "PLANNING_FAILED",
+            };
+            serde_json::json!({
+                "ok": false,
+                "admitted": false,
+                "refusal_code": refusal_code,
+                "refusal_reason": r.refusal_reason,
+                "domain_name": r.domain_name,
+                "problem_name": r.problem_name,
+                "domain_witness": r.domain_witness,
+                "problem_witness": r.problem_witness,
+                "manufacture_chain": r.manufacture_chain,
+                "plan_chain_hash": r.plan_receipt.chain_hash,
+                "step_count": r.plan_receipt.step_count,
+                "makespan": r.plan_receipt.makespan,
+                "goal_reached": false,
+            })
+            .to_string()
+        }
     }
 
     /// Admit a PDDL domain through the Prolog8 R ⊢ A gate.
@@ -368,7 +434,6 @@ impl BcinrServer {
         if labels.is_empty() {
             return serde_json::json!({ "ok": false, "error": "empty label list" }).to_string();
         }
-        // Build atoms using owned strings stored in labels vec
         let atoms: Vec<PowlAstNode> = labels.iter().map(|l| PowlAstNode::Atom(l.as_str())).collect();
         let ast = PowlAstNode::Sequence(atoms);
         match compile_powl(&ast) {
@@ -470,7 +535,6 @@ impl BcinrServer {
         use bcinr_pddl::{domain_from_pddl, problem_from_pddl, GroundProblem, TemporalPlan, TemporalPlanStep};
         use bcinr_pddl::powl_bridge::temporal_plan_to_powl_tape;
 
-        // Plan via STRIPS BFS then synthesize a linear temporal plan
         let domain = match domain_from_pddl(&input.domain_text) {
             Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
             Ok(d) => d,
@@ -488,7 +552,6 @@ impl BcinrServer {
             Ok(t) => t,
         };
 
-        // Synthesize linear temporal plan from STRIPS steps
         let step_count = tape.ops.len();
         let steps: Vec<TemporalPlanStep> = tape.ops.iter().enumerate().map(|(i, op)| TemporalPlanStep {
             action_name: op.label.clone(),
@@ -583,7 +646,7 @@ impl BcinrServer {
 
     // ── Group 4: bcinr-logic Algorithms ──────────────────────────────────────
 
-    /// Validate UTF-8 sequences using branchless algorithms.
+    /// Validate UTF-8 sequences.
     #[tool(description = "Validate UTF-8 byte sequences. Returns JSON with ok, is_valid, char_count, error_position.")]
     async fn utf8_validate(
         &self,
@@ -624,18 +687,10 @@ impl BcinrServer {
             "leading_zeros" => v.leading_zeros() as u64,
             "trailing_zeros" => v.trailing_zeros() as u64,
             "msb" => {
-                if v == 0 {
-                    u64::MAX
-                } else {
-                    63 - v.leading_zeros() as u64
-                }
+                if v == 0 { u64::MAX } else { 63 - v.leading_zeros() as u64 }
             }
             "lsb" => {
-                if v == 0 {
-                    u64::MAX
-                } else {
-                    v.trailing_zeros() as u64
-                }
+                if v == 0 { u64::MAX } else { v.trailing_zeros() as u64 }
             }
             _ => return serde_json::json!({ "ok": false, "error": "unknown operation" }).to_string(),
         };
@@ -706,27 +761,70 @@ impl BcinrServer {
 
     // ── Group 5: POWL Receipts ──────────────────────────────────────────────
 
-    /// Inspect a POWL execution receipt for details.
+    /// Inspect and cryptographically verify a WorldManufactureReceipt.
+    ///
+    /// Verifies the BLAKE3 manufacture_chain by recomputing
+    /// BLAKE3(domain_witness || problem_witness || plan_chain_hash) and comparing
+    /// against the stored chain. Returns chain_valid: false on any tampering.
     #[tool(description = "Inspect a POWL execution receipt. Returns JSON with status, op_count, makespan, admitted, refusal_reason.")]
     async fn receipt_inspect(
         &self,
         Parameters(input): Parameters<ReceiptInput>,
     ) -> String {
-        match serde_json::from_str::<serde_json::Value>(&input.receipt_data) {
-            Ok(data) => {
-                serde_json::json!({
-                    "ok": true,
-                    "receipt_type": data.get("receipt_type").and_then(|v| v.as_str()).unwrap_or("unknown"),
-                    "admitted": data.get("admitted").and_then(|v| v.as_bool()).unwrap_or(false),
-                    "op_count": data.get("step_count").and_then(|v| v.as_u64()).unwrap_or(0),
-                    "makespan": data.get("makespan").and_then(|v| v.as_f64()),
-                    "goal_reached": data.get("goal_reached").and_then(|v| v.as_bool()),
-                    "refusal_reason": data.get("refusal_reason").and_then(|v| v.as_str()),
-                })
-                .to_string()
-            }
-            Err(e) => serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
-        }
+        let data = match serde_json::from_str::<serde_json::Value>(&input.receipt_data) {
+            Ok(d) => d,
+            Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+        };
+
+        let domain_w = data.get("domain_witness").and_then(|v| v.as_str()).unwrap_or("");
+        let problem_w = data.get("problem_witness").and_then(|v| v.as_str()).unwrap_or("");
+        let plan_chain = data.get("plan_chain_hash").and_then(|v| v.as_str()).unwrap_or("");
+        let stored_chain = data.get("manufacture_chain").and_then(|v| v.as_str()).unwrap_or("");
+
+        // Recompute BLAKE3(domain_witness || problem_witness || plan_chain_hash) as UTF-8 strings.
+        // This mirrors chain_witnesses() in bcinr-pddl/src/llm_bridge.rs exactly.
+        let chain_valid = if !domain_w.is_empty() && !problem_w.is_empty()
+            && !plan_chain.is_empty() && !stored_chain.is_empty()
+            && plan_chain != "REFUSED"
+        {
+            let mut h = blake3::Hasher::new();
+            h.update(domain_w.as_bytes());
+            h.update(problem_w.as_bytes());
+            h.update(plan_chain.as_bytes());
+            let computed: String = h.finalize().as_bytes().iter()
+                .map(|x| format!("{x:02x}"))
+                .collect();
+            computed == stored_chain
+        } else {
+            false
+        };
+
+        let chain_mismatch = if !chain_valid && !stored_chain.is_empty() && plan_chain != "REFUSED" {
+            // Recompute for the error message
+            let mut h = blake3::Hasher::new();
+            h.update(domain_w.as_bytes());
+            h.update(problem_w.as_bytes());
+            h.update(plan_chain.as_bytes());
+            let computed: String = h.finalize().as_bytes().iter()
+                .map(|x| format!("{x:02x}"))
+                .collect();
+            Some(format!("expected {computed}, stored {stored_chain}"))
+        } else {
+            None
+        };
+
+        serde_json::json!({
+            "ok": true,
+            "receipt_type": "WorldManufactureReceipt",
+            "chain_valid": chain_valid,
+            "chain_mismatch_detail": chain_mismatch,
+            "admitted": data.get("admitted").and_then(|v| v.as_bool()).unwrap_or(false),
+            "op_count": data.get("step_count").and_then(|v| v.as_u64()).unwrap_or(0),
+            "makespan": data.get("makespan").and_then(|v| v.as_f64()),
+            "goal_reached": data.get("goal_reached").and_then(|v| v.as_bool()),
+            "refusal_reason": data.get("refusal_reason").and_then(|v| v.as_str()),
+        })
+        .to_string()
     }
 
     // ── Group 6: Cross-crate Info ───────────────────────────────────────────
@@ -744,7 +842,7 @@ impl BcinrServer {
                 "bcinr-powl-receipt": { "status": "ready", "tools": 1, "capability": "Receipt verification and inspection" },
             },
             "pipeline": "PDDL domain+problem → ground & plan → POWL tape → branchless execute → receipt",
-            "total_tools": 25,
+            "total_tools": 23,
             "admission_model": "Prolog8 (R ⊢ A gate) with SLA tokens",
             "isolation": "zero-trust, branchless, deterministic",
         })
@@ -767,7 +865,14 @@ async fn main() {
     tracing::info!("bcinr-mcp starting — 23 tools ready (PDDL:7 + POWL:5 + core:3 + algorithms:6 + receipts:1 + cross-crate:1)");
 
     let server = BcinrServer;
-    if let Err(e) = server.serve(stdio()).await {
+    let running = match server.serve(stdio()).await {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::error!("MCP server init error: {}", e);
+            std::process::exit(1);
+        }
+    };
+    if let Err(e) = running.waiting().await {
         tracing::error!("MCP server error: {}", e);
         std::process::exit(1);
     }
