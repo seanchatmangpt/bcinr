@@ -234,7 +234,7 @@ pub fn execute_tape(
     Ok((log, receipt, ocel))
 }
 
-fn load_may_fire_rule(ctx: &mut Ctx, id: u32, head: &str, body: &[&str]) -> Result<(), Pddl8Error> {
+fn load_may_fire_rule(ctx: &mut Ctx, _id: u32, head: &str, body: &[&str]) -> Result<(), Pddl8Error> {
     if body.len() > 8 {
         return Err(Pddl8Error::BoundExceeded { what: "rule body atoms", limit: 8, got: body.len() });
     }
@@ -274,21 +274,33 @@ fn hash_strings(items: &[String]) -> String {
     h.finalize().to_hex().to_string()
 }
 
-/// Execute a temporal plan and produce a BLAKE3-chained receipt + OCEL output.
+/// Execute a temporal plan through the Prolog8 admission gate + BLAKE3 receipt + OCEL output.
 ///
-/// This is the temporal analogue of execute_tape() — same admission model,
-/// different plan structure (timed steps with durations instead of sequential ops).
+/// Mirrors `execute_tape` — every step is checked via `query_may_fire` before it fires.
+/// `policy_rules` are `(head_label, [body_labels])` Horn rules. Empty slice = permissive
+/// (every unique action name is pre-admitted as a ground fact, identical to today's behavior).
 pub fn execute_temporal_plan(
     plan: &TemporalPlan,
     domain: &Pddl8Domain,
     problem: &Pddl8Problem,
     case_id: &str,
+    policy_rules: &[(&str, Vec<&str>)],
 ) -> Result<(TemporalExecutionReceipt, OCEL), Pddl8Error> {
     use blake3::Hasher;
 
     // Sort steps by start_time
     let mut steps = plan.steps.clone();
     steps.sort_by(|a, b| a.start_time.partial_cmp(&b.start_time).unwrap());
+
+    // Initialize Prolog8 admission gate — mirrors execute_tape lines 121-133.
+    let mut ctx = Ctx::new();
+    if policy_rules.is_empty() {
+        for step in &steps { ctx.load_may_fire(&step.action_name); }
+    } else {
+        for (i, (head, body)) in policy_rules.iter().enumerate() {
+            load_may_fire_rule(&mut ctx, i as u32 + 1, head, body)?;
+        }
+    }
 
     // Compute plan_root: BLAKE3 over all (start_time, action_name, args)
     let mut plan_hasher = Hasher::new();
@@ -316,6 +328,14 @@ pub fn execute_temporal_plan(
     let mut ocel_events = Vec::new();
 
     for (i, step) in steps.iter().enumerate() {
+        // Prolog8 admission gate — same contract as execute_tape.
+        if !ctx.query_may_fire(&step.action_name) {
+            return Err(Pddl8Error::StepDenied {
+                op_index: i as u8,
+                reason: format!("Prolog8 denied may_fire({})", step.action_name),
+            });
+        }
+
         // Extend chain: BLAKE3(chain || step.action_name || start_time_bits || duration_bits)
         let mut h = Hasher::new();
         h.update(&chain);

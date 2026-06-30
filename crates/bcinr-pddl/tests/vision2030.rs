@@ -26,7 +26,7 @@ fn test_witness_determinism() {
 
 #[test]
 fn test_manufacture_world_classical() {
-    let receipt = manufacture_world(CLASSICAL_DOMAIN, CLASSICAL_PROBLEM, "test-001");
+    let receipt = manufacture_world(CLASSICAL_DOMAIN, CLASSICAL_PROBLEM, "test-001", &[]);
     assert!(receipt.admitted, "world must be admitted; refusal: {:?}", receipt.refusal_reason);
     assert!(!receipt.manufacture_chain.is_empty(), "manufacture_chain must not be empty");
     assert!(receipt.plan_receipt.goal_reached, "goal must be reached");
@@ -34,7 +34,7 @@ fn test_manufacture_world_classical() {
 
 #[test]
 fn test_manufacture_world_refusal_malformed() {
-    let receipt = manufacture_world("not pddl", "also not", "t");
+    let receipt = manufacture_world("not pddl", "also not", "t", &[]);
     assert!(!receipt.admitted, "malformed input must be refused");
     assert!(receipt.refusal_reason.is_some(), "refusal_reason must be set");
 }
@@ -45,13 +45,14 @@ fn test_manufacture_world_wrong_domain() {
         CLASSICAL_DOMAIN,
         "(define (problem p) (:domain wrong) (:objects a) (:init (clear a)) (:goal (clear a)))",
         "t",
+        &[],
     );
     assert!(!receipt.admitted, "mismatched domain reference must be refused");
 }
 
 #[test]
 fn test_powl_bridge() {
-    let receipt = manufacture_world(CLASSICAL_DOMAIN, CLASSICAL_PROBLEM, "test-powl-001");
+    let receipt = manufacture_world(CLASSICAL_DOMAIN, CLASSICAL_PROBLEM, "test-powl-001", &[]);
     if receipt.admitted {
         let tape = temporal_plan_to_powl_tape(&receipt.plan);
         assert!(tape.len() > 0, "POWL tape must not be empty");

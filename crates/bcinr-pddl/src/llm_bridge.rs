@@ -121,6 +121,7 @@ pub fn manufacture_world(
     domain_text: &str,
     problem_text: &str,
     case_id: &str,
+    policy_rules: &[(&str, Vec<&str>)],
 ) -> WorldManufactureReceipt {
     // Admit domain
     let admitted_domain = match admit_candidate_domain(domain_text) {
@@ -160,7 +161,7 @@ pub fn manufacture_world(
     let problem_witness = admitted_problem.witness.clone();
 
     // Ground and plan — try temporal first, fall back to STRIPS
-    let (plan, plan_receipt) = match ground_and_plan(&admitted_domain, &admitted_problem, case_id) {
+    let (plan, plan_receipt) = match ground_and_plan(&admitted_domain, &admitted_problem, case_id, policy_rules) {
         Ok(result) => result,
         Err(e) => {
             let receipt = refused_receipt();
@@ -200,12 +201,13 @@ fn ground_and_plan(
     domain: &AdmittedDomain,
     problem: &AdmittedProblem,
     case_id: &str,
+    policy_rules: &[(&str, Vec<&str>)],
 ) -> Result<(TemporalPlan, TemporalExecutionReceipt), Pddl8Error> {
     // Try temporal planning if there are durative actions
     if !domain.domain31.durative_actions.is_empty() {
         let ground = GroundTemporalProblem::build(&domain.domain8, &problem.problem8)?;
         let plan = ground.find_temporal_plan()?;
-        let (receipt, _ocel) = execute_temporal_plan(&plan, &domain.domain8, &problem.problem8, case_id)?;
+        let (receipt, _ocel) = execute_temporal_plan(&plan, &domain.domain8, &problem.problem8, case_id, policy_rules)?;
         return Ok((plan, receipt));
     }
 
@@ -229,7 +231,7 @@ fn ground_and_plan(
 
     let makespan = steps.len() as f64;
     let plan = TemporalPlan { steps, makespan, metric_value: None };
-    let (receipt, _ocel) = execute_temporal_plan(&plan, &domain.domain8, &problem.problem8, case_id)?;
+    let (receipt, _ocel) = execute_temporal_plan(&plan, &domain.domain8, &problem.problem8, case_id, policy_rules)?;
     Ok((plan, receipt))
 }
 

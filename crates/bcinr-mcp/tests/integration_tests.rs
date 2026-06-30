@@ -442,15 +442,6 @@ mod brce_conformance {
 )
 "#;
 
-    const UNAPPROVED_PROBLEM: &str = r#"
-(define (problem unapproved-api-v3)
-  (:domain bcinr-deploy)
-  (:objects api-v3)
-  (:init)
-  (:goal (healthy api-v3))
-)
-"#;
-
     // Domain that violates PDDL8_MAX_ARITY (8): one predicate with 9 arguments.
     const OVERBOUND_DOMAIN: &str = r#"
 (define (domain bcinr-overbound)
@@ -488,7 +479,7 @@ mod brce_conformance {
     /// A1 — BFS finds optimal 3-step plan: deploy → run-smoke → mark-healthy.
     #[test]
     fn a1_bfs_soundness_three_step_plan() {
-        let r = manufacture_world(DEPLOY_DOMAIN, APPROVED_PROBLEM, "a1");
+        let r = manufacture_world(DEPLOY_DOMAIN, APPROVED_PROBLEM, "a1", &[]);
 
         assert!(r.admitted, "admitted should be true for approved service; refusal: {:?}", r.refusal_reason);
         assert_eq!(r.plan_receipt.step_count, 3,
@@ -504,32 +495,31 @@ mod brce_conformance {
         println!("A1 PASS: {} steps, chain={}", r.plan_receipt.step_count, &r.manufacture_chain[..16]);
     }
 
-    /// A2 — Prolog8 gate: unapproved service ⟹ admitted=false. This is R ⊢ A in executable form.
+    /// A2 — Prolog8 gate enforced at EXECUTION time: plan exists, policy denies it.
+    ///
+    /// This is R ⊢ A in its strongest form: the APPROVED_PROBLEM has `(approved api-v2)` in
+    /// init, so BFS finds the 3-step plan. But policy_rules only admit `"__noadmit__"`, which
+    /// matches no actual action label. Step 0 (`deploy(api-v2)`) is denied by the Prolog8 gate
+    /// before any effect fires. This is execution-time denial, not planning-layer denial.
     #[test]
-    fn a2_prolog8_gate_denies_unapproved_service() {
-        let r = manufacture_world(DEPLOY_DOMAIN, UNAPPROVED_PROBLEM, "a2");
+    fn a2_prolog8_gate_denies_execution_time() {
+        // Permit only a label that matches nothing real → every step is denied.
+        let r = manufacture_world(DEPLOY_DOMAIN, APPROVED_PROBLEM, "a2", &[("__noadmit__", vec![])]);
 
-        assert!(!r.admitted, "unapproved service must be denied by Prolog8 gate");
-        assert!(r.refusal_reason.is_some(), "denied receipt must have refusal_reason");
-
+        assert!(!r.admitted, "Prolog8 gate must deny execution even when the plan exists");
         let reason = r.refusal_reason.as_deref().unwrap_or("");
-        // Planner cannot reach goal because (approved api-v3) is never true.
-        // Expect either NoAdmittedPlan or GoalNotReached.
-        let is_expected_denial = reason.contains("exhausted")
-            || reason.contains("goal not reached")
-            || reason.contains("no applicable");
-        assert!(is_expected_denial,
-            "unexpected refusal_reason for unapproved service: '{reason}'. \
-             Expected NoAdmittedPlan/GoalNotReached; \
-             the Prolog8 gate must be the reason no plan exists.");
+        assert!(
+            reason.contains("denied") || reason.contains("Denied"),
+            "refusal_reason must indicate Prolog8 gate denial at execution time, got: '{reason}'"
+        );
 
-        println!("A2 PASS: admission correctly denied — {reason}");
+        println!("A2 PASS: Prolog8 gate stopped execution at step 0 — {}", &reason[..reason.len().min(80)]);
     }
 
     /// A3 — BLAKE3 tamper evidence: valid chain verifies; mutated chain fails.
     #[test]
     fn a3_blake3_tamper_evidence() {
-        let r = manufacture_world(DEPLOY_DOMAIN, APPROVED_PROBLEM, "a3");
+        let r = manufacture_world(DEPLOY_DOMAIN, APPROVED_PROBLEM, "a3", &[]);
         assert!(r.admitted);
 
         // Valid: recomputed chain must match stored chain.
@@ -551,7 +541,7 @@ mod brce_conformance {
     /// A4 — PDDL8 bounds: domain with 9-arity predicate ⟹ admitted=false + BOUND_EXCEEDED.
     #[test]
     fn a4_pddl8_bounds_enforced_at_parse_time() {
-        let r = manufacture_world(OVERBOUND_DOMAIN, OVERBOUND_PROBLEM, "a4");
+        let r = manufacture_world(OVERBOUND_DOMAIN, OVERBOUND_PROBLEM, "a4", &[]);
 
         assert!(!r.admitted, "domain violating PDDL8_MAX_ARITY must be denied");
         let reason = r.refusal_reason.as_deref().unwrap_or("");
@@ -566,8 +556,8 @@ mod brce_conformance {
     /// A5 — Determinism: two identical manufacture_world calls produce identical witnesses + chains.
     #[test]
     fn a5_deterministic_blake3_witnesses() {
-        let r1 = manufacture_world(DEPLOY_DOMAIN, APPROVED_PROBLEM, "a5-run1");
-        let r2 = manufacture_world(DEPLOY_DOMAIN, APPROVED_PROBLEM, "a5-run2");
+        let r1 = manufacture_world(DEPLOY_DOMAIN, APPROVED_PROBLEM, "a5-run1", &[]);
+        let r2 = manufacture_world(DEPLOY_DOMAIN, APPROVED_PROBLEM, "a5-run2", &[]);
 
         // Both must admit
         assert!(r1.admitted && r2.admitted, "both runs must admit the same valid domain+problem");

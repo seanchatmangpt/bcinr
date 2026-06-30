@@ -97,6 +97,40 @@ fn empty_tape_goal_not_reached() {
     assert_eq!(log.steps.len(), 0);
 }
 
+/// Falsification: Prolog8 Horn clause denies an unadmitted action at execution time.
+///
+/// This is the first test to exercise the `else` branch of `execute_tape` with a real
+/// Horn policy (non-empty `policy_rules`). It proves `StepDenied` is reachable and that
+/// the kernel performs real backward-chain evaluation, not a stub.
+#[test]
+fn prolog8_horn_denies_unadmitted_action() {
+    let domain = domain_from_pddl(BLOCKSWORLD_DOMAIN).unwrap();
+    let problem = problem_from_pddl(BLOCKSWORLD_PROBLEM).unwrap();
+    let gp = GroundProblem::build(&domain, &problem, None).unwrap();
+    let tape = gp.find_plan().unwrap();
+    assert!(tape.len() >= 2, "blocksworld plan must have at least 2 steps");
+
+    let init: BTreeSet<Pddl8GroundAtom> = problem.init.iter()
+        .map(|a| Pddl8GroundAtom { pred: a.pred.clone(), args: a.args.clone() })
+        .collect();
+    let goal: Vec<Pddl8GroundAtom> = problem.goal.iter()
+        .map(|a| Pddl8GroundAtom { pred: a.pred.clone(), args: a.args.clone() })
+        .collect();
+
+    // Admit all ops EXCEPT the first one. Step 0 has no matching rule → StepDenied.
+    let permitted: Vec<String> = tape.ops[1..].iter().map(|op| op.label.clone()).collect();
+    let rules: Vec<(&str, Vec<&str>)> = permitted.iter()
+        .map(|label| (label.as_str(), vec![]))
+        .collect();
+
+    let result = execute_tape(&tape, &init, &goal, "horn-denial", &rules);
+    assert!(
+        matches!(result, Err(Pddl8Error::StepDenied { op_index: 0, .. })),
+        "expected StepDenied at step 0 ({:?}), got: {:?}",
+        tape.ops[0].label, result
+    );
+}
+
 /// Receipt chain differs across distinct case IDs (same plan, different run identity).
 #[test]
 fn receipt_differs_by_case_id() {

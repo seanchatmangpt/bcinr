@@ -83,6 +83,9 @@ pub struct ManufactureInput {
     pub problem_text: String,
     /// Case ID for the manufacture receipt
     pub case_id: String,
+    /// Optional Horn policy: list of [head, [body_atom, ...]] pairs.
+    /// Empty or absent = permissive (every action pre-admitted).
+    pub policy_rules: Option<Vec<(String, Vec<String>)>>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -306,10 +309,16 @@ impl BcinrServer {
         &self,
         Parameters(input): Parameters<ManufactureInput>,
     ) -> String {
+        let owned_rules: Vec<(String, Vec<String>)> = input.policy_rules.unwrap_or_default();
+        let rule_refs: Vec<(&str, Vec<&str>)> = owned_rules
+            .iter()
+            .map(|(h, b)| (h.as_str(), b.iter().map(String::as_str).collect()))
+            .collect();
         let r = bcinr_pddl::manufacture_world(
             &input.domain_text,
             &input.problem_text,
             &input.case_id,
+            &rule_refs,
         );
 
         if r.admitted {
