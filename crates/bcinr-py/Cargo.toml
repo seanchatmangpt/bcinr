@@ -1,0 +1,23 @@
+[package]
+name = "bcinr-py"
+version = "0.1.0"
+edition = "2021"
+description = "Python bindings for bcinr via PyO3"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/seanchatmangpt/bcinr"
+
+[lib]
+name = "bcinr"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.22", features = ["extension-module", "abi3-py38"] }
+bcinr-logic = { path = "../bcinr-logic", features = ["std"] }
+bcinr-powl = { path = "../bcinr-powl" }
+serde_json = "1"
+
+[features]
+extension-module = ["pyo3/extension-module"]
+
+[package.metadata.maturin]
+python-source = "python"

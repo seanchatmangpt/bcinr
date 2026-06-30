@@ -1,0 +1,17 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "bcinr"
+version = "0.1.0"
+description = "Python bindings for bcinr — branchless algorithms, POWL workflows, admission control"
+license = { text = "MIT OR Apache-2.0" }
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+]
+
+[tool.maturin]
+features = ["extension-module"]
