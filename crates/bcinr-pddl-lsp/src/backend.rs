@@ -142,7 +142,7 @@ impl PddlLspBackend {
         };
 
         for event in andon_events {
-            all_diags.push(LspPushAdapter::event_to_diagnostic(&event));
+            // Andon events are pushed as custom LSP notifications, not as standard diagnostics
             self.push_andon(event).await;
         }
 

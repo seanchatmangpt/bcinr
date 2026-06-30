@@ -1,1 +1,5 @@
 error[E0599]: no method named `clone` found for struct `ExecutionToken` in the current scope
+  --> tests/compile_fail/clone_execution_token.rs:20:21
+   |
+20 |     let _tok2 = tok.clone(); // ERROR: no method `clone` — ExecutionToken is non-Clone
+   |                     ^^^^^ method not found in `ExecutionToken`

@@ -11,6 +11,61 @@ pub struct BranchTorchNNUE {
 }
 
 impl BranchTorchNNUE {
+    /// Branchless forward pass: 12 bitboards -> (value, hidden, activated)
+    pub fn forward(&self, bb: &[u64; 12]) -> (i32, [i32; 16], [i32; 16]) {
+        let mut hidden = [0i32; 16];
+        // Accumulate L1: weight[neuron][feature] * feature_active
+        for neuron in 0..16 {
+            let mut acc = self.l1_biases[neuron];
+            for piece in 0..12 {
+                let mut bits = bb[piece];
+                while bits != 0 {
+                    let sq = bits.trailing_zeros() as usize;
+                    acc = acc.wrapping_add(self.l1_weights[neuron][piece * 64 + sq]);
+                    bits &= bits - 1;
+                }
+            }
+            hidden[neuron] = acc;
+        }
+        // ReLU activation (branchless: max(0, x) = (x + |x|) >> 1 for positive range)
+        let mut activated = [0i32; 16];
+        for i in 0..16 {
+            activated[i] = hidden[i].max(0);
+        }
+        // L2 value head
+        let mut value = self.l2_bias_value;
+        for i in 0..16 {
+            value = value.wrapping_add(activated[i].wrapping_mul(self.l2_weights_value[i]));
+        }
+        (value, hidden, activated)
+    }
+
+    /// Branchless SGD backprop step (learning rate 1/256 approximated with shift)
+    pub fn backprop(&mut self, bb: &[u64; 12], _hidden: [i32; 16], activated: [i32; 16], pred: i32, target: i32) {
+        let err = pred.wrapping_sub(target);
+        // Update L2 weights
+        for i in 0..16 {
+            let grad = err.wrapping_mul(activated[i]) >> 8;
+            self.l2_weights_value[i] = self.l2_weights_value[i].wrapping_sub(grad);
+        }
+        // Update L1 weights (only for active ReLU neurons)
+        for neuron in 0..16 {
+            if activated[neuron] > 0 {
+                let l2_w = self.l2_weights_value[neuron];
+                let delta = err.wrapping_mul(l2_w) >> 8;
+                for piece in 0..12 {
+                    let mut bits = bb[piece];
+                    while bits != 0 {
+                        let sq = bits.trailing_zeros() as usize;
+                        self.l1_weights[neuron][piece * 64 + sq] =
+                            self.l1_weights[neuron][piece * 64 + sq].wrapping_sub(delta);
+                        bits &= bits - 1;
+                    }
+                }
+            }
+        }
+    }
+
     pub const fn new() -> Self {
         let mut nnue = Self {
             l1_weights: [[0; 768]; 16],

@@ -2,7 +2,7 @@
 //!
 //! The result can be fed to bcinr-powl's compiler to produce an executable Powl64Op tape.
 
-use wasm4pm_compat::pddl::{TemporalPlan, TemporalPlanStep};
+use wasm4pm_compat::pddl::TemporalPlan;
 
 /// A single op in the POWL tape description.
 #[derive(Debug, Clone)]

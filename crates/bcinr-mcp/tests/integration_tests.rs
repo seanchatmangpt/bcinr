@@ -469,10 +469,16 @@ mod brce_conformance {
     // Recompute manufacture_chain the same way llm_bridge.rs does:
     // BLAKE3(domain_witness.as_bytes() || problem_witness.as_bytes() || plan_chain_hash.as_bytes())
     fn recompute_chain(domain_w: &str, problem_w: &str, plan_chain: &str) -> String {
+        recompute_chain_full(domain_w, problem_w, plan_chain, false, 0)
+    }
+
+    fn recompute_chain_full(domain_w: &str, problem_w: &str, plan_chain: &str, goal_reached: bool, step_count: u64) -> String {
         let mut h = blake3::Hasher::new();
         h.update(domain_w.as_bytes());
         h.update(problem_w.as_bytes());
         h.update(plan_chain.as_bytes());
+        h.update(if goal_reached { b"1" } else { b"0" });
+        h.update(&step_count.to_le_bytes());
         h.finalize().as_bytes().iter().map(|x| format!("{x:02x}")).collect()
     }
 
@@ -488,8 +494,8 @@ mod brce_conformance {
         assert!(!r.domain_witness.is_empty(), "domain_witness must be non-empty");
         assert!(!r.manufacture_chain.is_empty(), "manufacture_chain must be non-empty");
 
-        // Verify manufacture_chain = BLAKE3(domain_w || problem_w || plan_chain)
-        let expected = recompute_chain(&r.domain_witness, &r.problem_witness, &r.plan_receipt.chain_hash);
+        // Verify manufacture_chain = BLAKE3(domain_w || problem_w || plan_chain || goal_reached || step_count)
+        let expected = recompute_chain_full(&r.domain_witness, &r.problem_witness, &r.plan_receipt.chain_hash, r.plan_receipt.goal_reached, r.plan_receipt.step_count as u64);
         assert_eq!(r.manufacture_chain, expected, "manufacture_chain must match BLAKE3 recomputation");
 
         println!("A1 PASS: {} steps, chain={}", r.plan_receipt.step_count, &r.manufacture_chain[..16]);
@@ -523,7 +529,7 @@ mod brce_conformance {
         assert!(r.admitted);
 
         // Valid: recomputed chain must match stored chain.
-        let recomputed = recompute_chain(&r.domain_witness, &r.problem_witness, &r.plan_receipt.chain_hash);
+        let recomputed = recompute_chain_full(&r.domain_witness, &r.problem_witness, &r.plan_receipt.chain_hash, r.plan_receipt.goal_reached, r.plan_receipt.step_count as u64);
         assert_eq!(recomputed, r.manufacture_chain, "valid receipt: chain must verify");
 
         // Tampered: flip the last hex digit of manufacture_chain.

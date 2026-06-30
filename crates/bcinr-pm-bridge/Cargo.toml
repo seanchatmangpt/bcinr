@@ -1,0 +1,31 @@
+[package]
+name = "bcinr-pm-bridge"
+version = "26.6.30"
+edition = "2021"
+description = "PM Conformance Loop (Innovation 3): OCEL export + lightweight replay conformance over WorldManufactureReceipt"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/seanchatmangpt/bcinr"
+keywords = ["process-mining", "ocel", "conformance", "pddl", "receipt"]
+categories = ["algorithms"]
+
+# Path B implementation:
+#   - OcelExporter: WorldManufactureReceipt → OCEL 2.0 JSON (stable, zero new deps)
+#   - ConformanceStub + lightweight step-replay counter (stable, no wasm4pm needed)
+#   - manufacture_with_conformance: wraps manufacture_world + OCEL export + replay
+#
+# Full wasm4pm integration (InductiveMiner + token_replay_pure) is gated behind
+# the optional `pm_engine` feature. That feature requires a nightly compiler and
+# drags in wasm-bindgen, so it is excluded from `make check` / `make test` until
+# the workspace migrates to nightly.
+
+[dependencies]
+bcinr-pddl           = { path = "../bcinr-pddl" }
+bcinr-powl-receipt   = { path = "../bcinr-powl-receipt" }
+serde                = { version = "1", features = ["derive"] }
+serde_json           = "1"
+wasm4pm-compat       = { version = "26.6.28" }
+
+[features]
+# Enable wasm4pm InductiveMiner + token_replay_pure integration.
+# Requires nightly Rust and wasm-bindgen toolchain.
+pm_engine = []

@@ -810,8 +810,10 @@ impl BcinrServer {
         let plan_chain = data.get("plan_chain_hash").and_then(|v| v.as_str()).unwrap_or("");
         let stored_chain = data.get("manufacture_chain").and_then(|v| v.as_str()).unwrap_or("");
 
-        // Recompute BLAKE3(domain_witness || problem_witness || plan_chain_hash) as UTF-8 strings.
-        // This mirrors chain_witnesses() in bcinr-pddl/src/llm_bridge.rs exactly.
+        // Recompute BLAKE3(domain_witness || problem_witness || plan_chain_hash || goal_reached_byte || step_count_le8).
+        // This mirrors chain_witnesses_full() in bcinr-pddl/src/llm_bridge.rs exactly.
+        let goal_reached_flag = data.get("goal_reached").and_then(|v| v.as_bool()).unwrap_or(false);
+        let step_count_val = data.get("step_count").and_then(|v| v.as_u64()).unwrap_or(0u64);
         let chain_valid = if !domain_w.is_empty() && !problem_w.is_empty()
             && !plan_chain.is_empty() && !stored_chain.is_empty()
             && plan_chain != "REFUSED"
@@ -820,6 +822,8 @@ impl BcinrServer {
             h.update(domain_w.as_bytes());
             h.update(problem_w.as_bytes());
             h.update(plan_chain.as_bytes());
+            h.update(if goal_reached_flag { b"1" } else { b"0" });
+            h.update(&step_count_val.to_le_bytes());
             let computed: String = h.finalize().as_bytes().iter()
                 .map(|x| format!("{x:02x}"))
                 .collect();
@@ -834,6 +838,8 @@ impl BcinrServer {
             h.update(domain_w.as_bytes());
             h.update(problem_w.as_bytes());
             h.update(plan_chain.as_bytes());
+            h.update(if goal_reached_flag { b"1" } else { b"0" });
+            h.update(&step_count_val.to_le_bytes());
             let computed: String = h.finalize().as_bytes().iter()
                 .map(|x| format!("{x:02x}"))
                 .collect();

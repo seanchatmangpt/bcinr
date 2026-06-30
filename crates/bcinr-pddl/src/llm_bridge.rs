@@ -180,7 +180,7 @@ pub fn manufacture_world(
         }
     };
 
-    let manufacture_chain = chain_witnesses(&domain_witness, &problem_witness, &plan_receipt.chain_hash);
+    let manufacture_chain = chain_witnesses_full(&domain_witness, &problem_witness, &plan_receipt.chain_hash, plan_receipt.goal_reached, plan_receipt.step_count as u64);
 
     WorldManufactureReceipt {
         domain_name,
@@ -254,10 +254,20 @@ fn compute_problem_witness(problem: &Pddl31Problem) -> String {
 }
 
 fn chain_witnesses(domain_w: &str, problem_w: &str, plan_chain: &str) -> String {
+    chain_witnesses_with_goal(domain_w, problem_w, plan_chain, false)
+}
+
+pub fn chain_witnesses_with_goal(domain_w: &str, problem_w: &str, plan_chain: &str, goal_reached: bool) -> String {
+    chain_witnesses_full(domain_w, problem_w, plan_chain, goal_reached, 0)
+}
+
+pub fn chain_witnesses_full(domain_w: &str, problem_w: &str, plan_chain: &str, goal_reached: bool, step_count: u64) -> String {
     let mut h = Hasher::new();
     h.update(domain_w.as_bytes());
     h.update(problem_w.as_bytes());
     h.update(plan_chain.as_bytes());
+    h.update(if goal_reached { b"1" } else { b"0" });
+    h.update(&step_count.to_le_bytes());
     hex(h.finalize().as_bytes())
 }
 

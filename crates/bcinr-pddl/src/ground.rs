@@ -1,9 +1,9 @@
 //! PDDL8 grounding and forward-search plan finding.
 
 use crate::error::Pddl8Error;
-use std::collections::{BTreeSet, BinaryHeap, HashMap};
+use std::collections::{BTreeSet, HashMap};
 use wasm4pm_compat::pddl::{
-    DurativeAction, DurationConstraint, NumericExpr, Pddl8ActionSchema, Pddl8Atom, Pddl8Domain,
+    DurationConstraint, NumericExpr, Pddl8ActionSchema, Pddl8Atom, Pddl8Domain,
     Pddl8GroundAction, Pddl8GroundAtom, Pddl8Problem, Pddl8Tape, PddlCondition, PddlEffect,
     PddlFunction, TemporalPlan, TemporalPlanStep, TimedLiteral, PDDL8_MAX_GROUND,
     PDDL8_MAX_PLAN_DEPTH,
@@ -324,7 +324,6 @@ fn apply_effect_ground(
     state: &mut BTreeSet<Pddl8GroundAtom>,
     fn_vals: &mut HashMap<String, f64>,
 ) {
-    use wasm4pm_compat::pddl::NumericEffect;
     match eff {
         PddlEffect::Add(a) => {
             state.insert(Pddl8GroundAtom { pred: a.pred.clone(), args: a.args.clone() });

@@ -255,6 +255,9 @@ pub fn compile_powl_to_swar(powl: &Powl, out: &mut [Powl64Op]) -> Result<usize, 
                     op_count += 1;
                 }
             }
+            PowlNodeKind::Start | PowlNodeKind::End => {
+                // Start/End sentinel nodes compile to no-ops
+            }
             PowlNodeKind::ChoiceGraph { nodes: _, edges: cg_edges } => {
                 // Flatten unified choice/cyclic topology directly into branchless jump masks!
                 for edge in cg_edges {

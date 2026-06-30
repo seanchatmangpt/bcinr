@@ -274,7 +274,7 @@ mod explicit_admission {
         let lc = scan(dir.path());
         let proj = projection::project(&lc);
         let candidate = planner_client::plan(&proj).expect("plan required");
-        let result = planner_client::admit(&candidate, "test-admit-10.6");
+        let result = planner_client::admit(&candidate, "test-admit-10-6");
 
         match result {
             Ok(r) => {
@@ -310,7 +310,7 @@ mod explicit_admission {
         let lc = scan(dir.path());
         let proj = projection::project(&lc);
         let candidate = planner_client::plan(&proj).unwrap();
-        let result = planner_client::admit(&candidate, "test-receipt-10.6").unwrap();
+        let result = planner_client::admit(&candidate, "test-receipt-10-6").unwrap();
         assert!(!result.receipt.chain_hash.is_empty());
         // Falsification: zero the chain_hash computation → empty hash breaks receipt integrity.
     }

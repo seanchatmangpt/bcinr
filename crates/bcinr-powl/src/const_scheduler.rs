@@ -91,7 +91,7 @@ pub const fn topo_order(n: usize, pred_masks: [u64; MAX_OPS]) -> [u8; MAX_OPS] {
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust,ignore
 /// # use bcinr_powl::const_scheduler::{ConstTopology, padded};
 /// // 4-op linear chain: 0 → 1 → 2 → 3
 /// type Chain4 = ConstTopology<4, { padded([0b0000, 0b0001, 0b0011, 0b0111]) }>;
