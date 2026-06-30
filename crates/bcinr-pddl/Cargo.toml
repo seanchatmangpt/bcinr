@@ -17,7 +17,7 @@ pddl = { version = "0.2", features = ["parser"] }
 # BLAKE3 for receipt chaining
 blake3 = "1"
 # Prolog8 kernel — admission gate (R ⊢ A)
-prolog8 = { path = "../../../wasm4pm/crates/prolog8" }
+prolog8 = { path = "/Users/sac/wasm4pm/crates/prolog8" }
 # wasm4pm-compat — canonical OCEL types + PDDL types (once landed there)
 wasm4pm-compat = { version = "26.6.28" }
 # Serde for serialization (wasm4pm-compat re-exports most of what's needed)

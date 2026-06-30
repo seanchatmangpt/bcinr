@@ -11,8 +11,8 @@
 //!    bcinr_library_info, bcinr_mask_ops, bcinr_powl_info
 //!  Group 4 — bcinr-logic Algorithms (6 tools):
 //!    utf8_validate, bitset_operations, dfa_info, scan_patterns, reduce_sequence, simd_string_info
-//!  Group 5 — POWL Receipts (1 tool):
-//!    receipt_inspect
+//!  Group 5 — POWL Receipts (2 tools):
+//!    receipt_inspect, generate_compliance_report
 //!  Group 6 — Cross-crate Info (1 tool):
 //!    system_capabilities
 
@@ -154,6 +154,17 @@ pub struct PatternInput {
 pub struct ReceiptInput {
     /// Receipt data as JSON string
     pub receipt_data: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ComplianceInput {
+    /// JSON string — the WorldManufactureReceipt output from manufacture_world
+    pub receipt_data: String,
+    /// Regulatory framework: "EU_AI_ACT", "NIST", or "SOC2"
+    pub standard: String,
+    /// Named policy bundles to evaluate: "gdpr_data_minimisation", "hipaa_phi_handling", "financial_best_execution"
+    #[serde(default)]
+    pub policies: Vec<String>,
 }
 
 // ─── Server ──────────────────────────────────────────────────────────────────
@@ -891,6 +902,51 @@ impl BcinrServer {
         .to_string()
     }
 
+    // ── Group 5b: Compliance Report ─────────────────────────────────────────
+
+    /// Generate a regulatory compliance report from a WorldManufactureReceipt.
+    ///
+    /// Maps BLAKE3-chained receipt fields to EU AI Act Article 13, NIST AI RMF,
+    /// or SOC2 CC6 compliance evidence. Optionally evaluates named policy bundles.
+    #[tool(description = "Convert a WorldManufactureReceipt into a regulatory compliance report. \
+        Evaluates EU AI Act Article 13, NIST AI RMF, or SOC2 CC6 fields from the receipt. \
+        Returns JSON ComplianceReport with framework-specific fields and policy bundle verdicts.")]
+    async fn generate_compliance_report(
+        &self,
+        Parameters(input): Parameters<ComplianceInput>,
+    ) -> String {
+        let standard = match bcinr_compliance::ComplianceStandard::from_str(&input.standard) {
+            Some(s) => s,
+            None => {
+                return serde_json::json!({
+                    "ok": false,
+                    "error": format!(
+                        "unknown standard {:?}; valid values: EU_AI_ACT, NIST, SOC2",
+                        input.standard
+                    )
+                })
+                .to_string();
+            }
+        };
+
+        let policies: Vec<&str> = input.policies.iter().map(String::as_str).collect();
+
+        match bcinr_compliance::generate_report(&input.receipt_data, standard, &policies) {
+            Ok(report) => match serde_json::to_string(&report) {
+                Ok(json) => {
+                    // Wrap with ok:true for consistency with other tools.
+                    let mut v: serde_json::Value = serde_json::from_str(&json).unwrap_or_default();
+                    if let serde_json::Value::Object(ref mut m) = v {
+                        m.insert("ok".to_string(), serde_json::json!(true));
+                    }
+                    v.to_string()
+                }
+                Err(e) => serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+            },
+            Err(e) => serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+        }
+    }
+
     // ── Group 6: Cross-crate Info ───────────────────────────────────────────
 
     /// Report all available system capabilities across all crates.
@@ -906,7 +962,7 @@ impl BcinrServer {
                 "bcinr-powl-receipt": { "status": "ready", "tools": 1, "capability": "Receipt verification and inspection" },
             },
             "pipeline": "PDDL domain+problem → ground & plan → POWL tape → branchless execute → receipt",
-            "total_tools": 23,
+            "total_tools": 24,
             "admission_model": "Prolog8 (R ⊢ A gate) with SLA tokens",
             "isolation": "zero-trust, branchless, deterministic",
         })
@@ -926,7 +982,7 @@ async fn main() {
         .with_writer(std::io::stderr)
         .init();
 
-    tracing::info!("bcinr-mcp starting — 23 tools ready (PDDL:7 + POWL:5 + core:3 + algorithms:6 + receipts:1 + cross-crate:1)");
+    tracing::info!("bcinr-mcp starting — 24 tools ready (PDDL:7 + POWL:5 + core:3 + algorithms:6 + receipts:2 + cross-crate:1)");
 
     let server = BcinrServer;
     let running = match server.serve(stdio()).await {

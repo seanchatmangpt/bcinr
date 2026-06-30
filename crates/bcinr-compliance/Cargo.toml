@@ -1,0 +1,10 @@
+[package]
+name = "bcinr-compliance"
+version = "0.1.0"
+edition = "2021"
+description = "Regulatory compliance report generation from WorldManufactureReceipts (EU AI Act Art.13, NIST AI RMF, SOC2 CC6)"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+blake3 = "1"

@@ -21,6 +21,7 @@ bcinr-powl = { path = "../bcinr-powl" }
 bcinr-logic = { path = "../bcinr-logic" }
 bcinr-api = { path = "../bcinr-api" }
 bcinr-powl-receipt = { path = "../bcinr-powl-receipt" }
+bcinr-compliance = { path = "../bcinr-compliance" }
 wasm4pm-compat = "26.6"
 blake3 = "1"
 anyhow = "1"
