@@ -20,13 +20,12 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn count_consecutive_set_bits_u64(val: u64, aux: u64) -> u64 {
-    let mut count = 0;
-    let mut v = val;
-    for _ in 0..64 {
+    let (count, _) = (0u32..64).fold((0u64, val), |(count, v), _| {
         let mask = 0u64.wrapping_sub((v != 0) as u64);
-        count += 1 & mask;
-        v &= v << 1;
-    }
+        let new_count = count + (1 & mask);
+        let new_v = v & (v << 1);
+        (new_count, new_v)
+    });
     count
 }
 

@@ -35,8 +35,10 @@ pub fn fp_sin_u32_q16(val: u64, _aux: u64) -> u64 {
     let prod = folded * (180 - folded);
     let num = 4 * prod;
     let den = 40500 - prod;
-    // Scale to Q16: result in [0, 65536] representing [0.0, 1.0]
-    let abs_result: i64 = if den == 0 { 65536 } else { (num * 65536) / den };
+    // Scale to Q16: result in [0, 65536] representing [0.0, 1.0].
+    // den = 40500 - prod where prod = folded*(180-folded) ∈ [0, 8100], so den ∈ [32400, 40500].
+    // den is never 0 for any folded ∈ [0, 180]; guard removed for branchless contract.
+    let abs_result: i64 = (num * 65536) / den;
     // Apply sign: negate via two's complement if in second semicircle
     let result: i64 = (abs_result ^ negate_mask) - negate_mask;
     result as u64

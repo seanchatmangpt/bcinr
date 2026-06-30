@@ -25,19 +25,19 @@ pub fn norm_u32(val: u64, aux: u64) -> u64 {
     // Branchless 2D Euclidean magnitude: floor(sqrt(x^2 + y^2)).
     // val_sq < 2^65, so the highest even power of four is 4^32 = 2^64;
     // 33 reduction steps cover bits 64,62,...,0.
-    let mut val_sq = x * x + y * y;
-    let mut res = 0u128;
-    let mut bit = 1u128 << 64;
-    let mut k = 0u32;
-    while k < 33 {
-        let candidate = res + bit;
-        let cond = val_sq >= candidate;
-        let m = (cond as u128).wrapping_neg();
-        val_sq -= candidate & m;
-        res = (res >> 1) + (bit & m);
-        bit >>= 2;
-        k += 1;
-    }
+    let val_sq_init = x * x + y * y;
+    let (_, res, _) = (0u32..33).fold(
+        (val_sq_init, 0u128, 1u128 << 64),
+        |(val_sq, res, bit), _| {
+            let candidate = res + bit;
+            let cond = val_sq >= candidate;
+            let m = (cond as u128).wrapping_neg();
+            let new_val_sq = val_sq - (candidate & m);
+            let new_res = (res >> 1) + (bit & m);
+            let new_bit = bit >> 2;
+            (new_val_sq, new_res, new_bit)
+        },
+    );
     res as u64
 }
 

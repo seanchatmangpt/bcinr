@@ -63,16 +63,13 @@ pub fn murmur3_32_hash(data: &[u8], seed: u32) -> u32 {
     let chunks = data.chunks_exact(4);
     let tail = chunks.remainder();
 
-    for chunk in chunks {
-        let mut k1 = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
-        k1 = k1.wrapping_mul(C1);
-        k1 = k1.rotate_left(15);
-        k1 = k1.wrapping_mul(C2);
-
-        h1 ^= k1;
-        h1 = h1.rotate_left(13);
-        h1 = h1.wrapping_mul(5).wrapping_add(0xe6546b64);
-    }
+    let mut h1 = chunks.fold(h1, |h1, chunk| {
+        let k1 = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])
+            .wrapping_mul(C1)
+            .rotate_left(15)
+            .wrapping_mul(C2);
+        (h1 ^ k1).rotate_left(13).wrapping_mul(5).wrapping_add(0xe6546b64)
+    });
 
     // --- Tail: 0–3 remaining bytes (branchless masked assembly) ---
     let tail_len = tail.len(); // 0, 1, 2, or 3

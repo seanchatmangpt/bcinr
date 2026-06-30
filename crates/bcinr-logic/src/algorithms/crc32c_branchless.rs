@@ -61,12 +61,10 @@ static CRC32C_TABLE: [u32; 256] = build_crc32c_table();
 /// assert_eq!(crc32c_branchless(b"123456789", !0) ^ !0, 0xE3069283);
 /// ```
 pub fn crc32c_branchless(data: &[u8], initial: u32) -> u32 {
-    let mut crc = initial;
-    for &byte in data {
+    data.iter().fold(initial, |crc, &byte| {
         let idx = ((crc ^ byte as u32) & 0xFF) as usize;
-        crc = CRC32C_TABLE[idx] ^ (crc >> 8);
-    }
-    crc
+        CRC32C_TABLE[idx] ^ (crc >> 8)
+    })
 }
 
 #[cfg(test)]

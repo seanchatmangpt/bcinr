@@ -28,16 +28,11 @@ extern crate alloc;
 // Let result = AND_{i=0}^{n-2} (slice[i] <= slice[i+1])
 // { return value = (result ≠ 0) ↔ slice is non-decreasingly sorted }
 pub fn sorting_network_verify_u32(slice: &[u32]) -> bool {
-    let mut result = 1u32;
-    let n = slice.len();
     // Branchlessly fold all adjacent comparisons into a single bit.
-    // Each (slice[i] <= slice[i+1]) yields 1 if true, 0 if false.
-    // ANDing accumulates: if any pair is out of order, result becomes 0.
-    let mut i = 0;
-    while i + 1 < n {
-        result &= (slice[i] <= slice[i + 1]) as u32;
-        i += 1;
-    }
+    // Each (w[0] <= w[1]) yields 1 if true, 0 if false; AND accumulates.
+    let result = slice
+        .windows(2)
+        .fold(1u32, |acc, w| acc & (w[0] <= w[1]) as u32);
     result != 0
 }
 

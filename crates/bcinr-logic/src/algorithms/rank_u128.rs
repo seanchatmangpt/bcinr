@@ -21,11 +21,10 @@
 #[allow(unused_variables)]
 pub fn rank_u128(val: u64, aux: u64) -> u64 {
     let limit = (aux & 0x7F) as u32;
-    let mut count = 0u64;
-    for i in 0..64 {
+    let count = (0u32..64).fold(0u64, |count, i| {
         let mask = (i < limit) as u64;
-        count += (val >> i) & mask;
-    }
+        count + ((val >> i) & mask)
+    });
     count
 }
 

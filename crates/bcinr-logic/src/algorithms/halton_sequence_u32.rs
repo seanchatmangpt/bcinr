@@ -22,16 +22,13 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn halton_sequence_u32(val: u64, aux: u64) -> u64 {
-    let mut f = 1.0f64;
-    let mut r = 0.0f64;
-    let mut i = val;
-    let base = 3.0;
-    for _ in 0..40 {
+    let (_, r, _) = (0u32..40).fold((1.0f64, 0.0f64, val), |(f, r, i), _| {
         let m = (i > 0) as u64;
-        f /= 3.0;
-        r += (f * (i % 3) as f64) * m as f64;
-        i /= 3;
-    }
+        let new_f = f / 3.0;
+        let new_r = r + (new_f * (i % 3) as f64) * m as f64;
+        let new_i = i / 3;
+        (new_f, new_r, new_i)
+    });
     (r * u64::MAX as f64) as u64
 }
 

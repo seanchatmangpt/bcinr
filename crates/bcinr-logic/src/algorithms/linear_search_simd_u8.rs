@@ -32,12 +32,11 @@
 #[allow(unused_variables)]
 pub fn linear_search_simd_u8(val: u64, aux: u64) -> u64 {
     let target = aux & 0xFF;
-    let mut res = 8u64;
-    for i in 0..8 {
+    let res = (0u64..8).fold(8u64, |res, i| {
         let b = (val >> ((7 - i) * 8)) & 0xFF;
         let is_eq = (b == target) as u64;
-        res = (is_eq * (7 - i)) | ((1 - is_eq) * res);
-    }
+        (is_eq * (7 - i)) | ((1 - is_eq) * res)
+    });
     res
 }
 

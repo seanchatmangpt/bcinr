@@ -22,12 +22,11 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn locality_sensitive_hash_cosine(val: u64, aux: u64) -> u64 {
-    let mut dot = 0i64;
-    for i in 0..8 {
+    let dot = (0u64..8).fold(0i64, |dot, i| {
         let a = (((val >> (i * 8)) & 0xFF) as i8) as i64;
         let b = (((aux >> (i * 8)) & 0xFF) as i8) as i64;
-        dot += a * b;
-    }
+        dot + a * b
+    });
     (dot > 0) as u64
 }
 

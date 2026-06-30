@@ -26,20 +26,24 @@
 /// let _ = xor_filter_lookup(0, &table, 0);
 /// ```
 pub fn xor_filter_lookup(key: u64, table: &[u8], seed: u64) -> bool {
-    // A table with fewer than 3 entries cannot hold a valid filter.
-    if table.len() < 3 {
-        return false;
-    }
-    // n = number of entries per block (table.len() / 3, minimum 1).
-    let n = (table.len() / 3).max(1);
+    // Branchless validity: a table with fewer than 3 entries cannot hold a valid filter.
+    // valid_mask is all-ones when table.len() >= 3, zero otherwise.
+    let valid = (table.len() >= 3) as u8;
+    // Use .max(3) so that n >= 1 and indices always land within a 3-entry window,
+    // ensuring get() below always returns Some when valid=1.
+    let len_safe = table.len().max(3);
+    let n = len_safe / 3;
     let fp = xor_filter_fingerprint(key, seed);
     let h0 = xor_filter_hash(key, seed, 0) as usize % n;
     let h1 = xor_filter_hash(key, seed, 1) as usize % n + n;
     let h2 = xor_filter_hash(key, seed, 2) as usize % n + 2 * n;
-    // All three indices are within [0, 3*n) ⊆ [0, table.len()), so indexing is safe.
-    let xor_val = table[h0] ^ table[h1] ^ table[h2];
-    // Branchless: true iff XOR of three table cells equals the key's fingerprint.
-    xor_val == fp
+    // table.get() returns None only when table.len() < 3; we return false in that case.
+    let t0 = table.get(h0).copied().unwrap_or(0);
+    let t1 = table.get(h1).copied().unwrap_or(0);
+    let t2 = table.get(h2).copied().unwrap_or(0);
+    let xor_val = t0 ^ t1 ^ t2;
+    // Branchless: true iff XOR equals fingerprint AND table was valid.
+    (xor_val == fp) & (valid != 0)
 }
 
 /// Derive an 8-bit fingerprint for a key.

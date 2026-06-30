@@ -32,11 +32,10 @@
 #[allow(unused_variables)]
 pub fn normalize_slice_branchless(val: u64, aux: u64) -> u64 {
     let scale = (aux & 0xFF) | ((aux & 0xFF) == 0) as u64;
-    let mut res = 0u64;
-    for i in 0..8 {
+    let res = (0u64..8).fold(0u64, |res, i| {
         let b = ((val >> (i * 8)) & 0xFF) / scale;
-        res |= (b & 0xFF) << (i * 8);
-    }
+        res | (b & 0xFF) << (i * 8)
+    });
     res
 }
 

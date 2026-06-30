@@ -20,14 +20,13 @@
 #[no_mangle]
 #[allow(unused_variables)]
 pub fn parallel_bits_deposit_u64(val: u64, aux: u64) -> u64 {
-    let mut res = 0;
-    let mut v_idx = 0;
-    for i in 0..64 {
+    let (res, _) = (0u32..64).fold((0u64, 0u32), |(res, v_idx), i| {
         let mask_bit = (aux >> i) & 1;
         let val_bit = (val.wrapping_shr(v_idx)) & 1;
-        res |= (val_bit & mask_bit) << i;
-        v_idx += mask_bit as u32;
-    }
+        let new_res = res | (val_bit & mask_bit) << i;
+        let new_v_idx = v_idx + mask_bit as u32;
+        (new_res, new_v_idx)
+    });
     res
 }
 

@@ -32,13 +32,13 @@ pub fn lcm_u64_branchless(val: u64, aux: u64) -> u64 {
     let v_safe = v | zero_mask;
 
     let shift = (u_safe | v_safe).trailing_zeros();
-    let mut u_val = u_safe >> u_safe.trailing_zeros();
-    let mut v_val = v_safe;
+    let init_u = u_safe >> u_safe.trailing_zeros();
+    let init_v = v_safe;
 
-    for _ in 0..64 {
+    let (u_val, _) = (0u32..64).fold((init_u, init_v), |(u_val, v_val), _| {
         let v_nz = (v_val != 0) as u64;
         let tz = v_val.trailing_zeros() as u64 & 63;
-        v_val >>= tz & v_nz.wrapping_neg();
+        let v_val = v_val >> (tz & v_nz.wrapping_neg());
 
         let diff = (u_val as i128 - v_val as i128).unsigned_abs() as u64;
         let cond = (u_val > v_val) as u64;
@@ -46,9 +46,10 @@ pub fn lcm_u64_branchless(val: u64, aux: u64) -> u64 {
         let m_update = v_nz.wrapping_neg();
 
         let next_u = (v_val & cond.wrapping_neg()) | (u_val & !cond.wrapping_neg());
-        u_val = (next_u & m_update) | (u_val & !m_update);
-        v_val = diff & m_update;
-    }
+        let new_u = (next_u & m_update) | (u_val & !m_update);
+        let new_v = diff & m_update;
+        (new_u, new_v)
+    });
 
     let gcd = u_val << shift;
     let gcd_safe = (fallback & zero_mask.wrapping_neg()) | (gcd & !zero_mask.wrapping_neg());

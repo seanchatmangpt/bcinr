@@ -64,9 +64,7 @@ pub fn linear_counting_add(bitmap: &mut [u64], hash: u64) {
 pub fn linear_counting_estimate(bitmap: &[u64]) -> u64 {
     // m = total bits in the bitmap.
     let m = bitmap.len() as u64 * 64;
-    if m == 0 {
-        return 0;
-    }
+    // Branchless: when m==0, set_bits=0, zeros=0, is_saturated=1 but r_saturated=m*1=0.
     // Count set bits (elements that were inserted, modulo collisions).
     let set_bits: u64 = bitmap.iter().map(|w| w.count_ones() as u64).sum();
     let zeros = m.saturating_sub(set_bits);
