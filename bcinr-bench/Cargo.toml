@@ -55,5 +55,9 @@ harness = false
 name = "logic_dfa_swar_bench"
 harness = false
 
+[[bench]]
+name = "dfcm_crown_bench"
+harness = false
+
 [[example]]
 name = "timing"

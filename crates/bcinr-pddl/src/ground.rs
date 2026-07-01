@@ -260,8 +260,24 @@ impl GroundTemporalProblem {
     /// - Checks goal (PddlCondition) after each completion
     /// - Limits to PDDL8_MAX_PLAN_DEPTH iterations
     pub fn find_temporal_plan(&self) -> Result<TemporalPlan, Pddl8Error> {
+        self.find_temporal_plan_with_fn_overrides(&HashMap::new())
+    }
+
+    /// Same as `find_temporal_plan`, but with `overrides` merged into a
+    /// cloned copy of `initial_fn_values` before planning starts — lets
+    /// callers probe a perturbed numeric fluent (e.g. capacity sensitivity
+    /// in `schedule_analysis::replan_with_perturbed_capacity`) without
+    /// cloning the whole `GroundTemporalProblem` (grounded actions,
+    /// conditions, atoms), just the small fn_values map.
+    pub fn find_temporal_plan_with_fn_overrides(
+        &self,
+        overrides: &HashMap<String, f64>,
+    ) -> Result<TemporalPlan, Pddl8Error> {
         let mut state = self.initial_atoms.clone();
         let mut fn_vals = self.initial_fn_values.clone();
+        for (k, v) in overrides {
+            fn_vals.insert(k.clone(), *v);
+        }
         let mut steps: Vec<TemporalPlanStep> = Vec::new();
         let mut current_time = 0.0_f64;
 

@@ -166,13 +166,18 @@ fn max_parallelism(earliest_start: &[f64], earliest_finish: &[f64], n: usize) ->
 /// Re-solve `find_temporal_plan` with `resource_key`'s initial value moved by
 /// `delta` (clamped at 0), returning the resulting makespan, or `None` if no
 /// plan was found at that capacity.
+///
+/// Uses `find_temporal_plan_with_fn_overrides` instead of cloning the whole
+/// `GroundTemporalProblem` (grounded actions, conditions, atoms) just to
+/// perturb one numeric fluent — only the small fn_values map gets cloned,
+/// by `find_temporal_plan_with_fn_overrides` itself.
 fn replan_with_perturbed_capacity(
     gtp: &GroundTemporalProblem,
     resource_key: &str,
     delta: f64,
 ) -> Option<f64> {
-    let mut perturbed = gtp.clone();
-    let entry = perturbed.initial_fn_values.entry(resource_key.to_string()).or_insert(0.0);
-    *entry = (*entry + delta).max(0.0);
-    perturbed.find_temporal_plan().ok().map(|p| p.makespan)
+    let base = *gtp.initial_fn_values.get(resource_key).unwrap_or(&0.0);
+    let mut overrides = std::collections::HashMap::with_capacity(1);
+    overrides.insert(resource_key.to_string(), (base + delta).max(0.0));
+    gtp.find_temporal_plan_with_fn_overrides(&overrides).ok().map(|p| p.makespan)
 }

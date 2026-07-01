@@ -8,3 +8,4 @@ thesis.toc
 /.claude/attribution.json
 .venv/
 .agents/
+.DS_Store
