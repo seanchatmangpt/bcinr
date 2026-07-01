@@ -17,6 +17,10 @@ divan = "0.1"
 bcinr-core = { path = "../bcinr-core", version = "26.6.24" }
 bcinr-logic = { path = "../crates/bcinr-logic", version = "26.6.24", features = ["bench", "alloc"] }
 bcinr-pddl = { path = "../crates/bcinr-pddl" }
+bcinr-mcp = { path = "../crates/bcinr-mcp" }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 prettytable-rs = "0.10.0"
 
 [features]
@@ -57,6 +61,10 @@ harness = false
 
 [[bench]]
 name = "dfcm_crown_bench"
+harness = false
+
+[[bench]]
+name = "mcp_cache_bench"
 harness = false
 
 [[example]]
