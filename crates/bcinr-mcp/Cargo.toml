@@ -3,6 +3,10 @@ name = "bcinr-mcp"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "bcinr_mcp"
+path = "src/lib.rs"
+
 [[bin]]
 name = "bcinr-mcp"
 path = "src/main.rs"
@@ -23,6 +27,9 @@ bcinr-api = { path = "../bcinr-api" }
 bcinr-powl-receipt = { path = "../bcinr-powl-receipt" }
 wasm4pm-compat = "26.6"
 blake3 = "1"
+# MCP+ admission-key cache (docs/DFCM... see cache.rs) — async-aware, matches
+# the Tokio runtime rmcp already requires.
+moka = { version = "0.12", features = ["future"] }
 anyhow = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
