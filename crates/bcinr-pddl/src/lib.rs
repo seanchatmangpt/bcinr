@@ -25,6 +25,7 @@ pub mod parse;
 pub mod powl_bridge;
 pub mod schedule_analysis;
 pub mod dfcm_crown;
+pub mod alloc_counter;
 pub mod llm_bridge;
 pub use llm_bridge::{AdmittedDomain, AdmittedProblem, WorldManufactureReceipt, admit_candidate_domain, admit_candidate_problem, manufacture_world};
 pub use schedule_analysis::{analyze_schedule, CapacityDelta, ScheduleAnalysis64};

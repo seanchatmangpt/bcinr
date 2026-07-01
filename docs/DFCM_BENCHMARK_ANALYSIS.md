@@ -84,6 +84,143 @@ A follow-up 80/20 optimization pass checked two hypotheses from a code audit:
    bottleneck (legitimate per-query proof/receipt hashing), which isn't
    "waste" to begin with.
 
+## Cold/warm attribution split (follow-up pass)
+
+A further pass split the suite's timing into cold-once vs. warm-per-cell
+buckets, and — separately — measured what a *cheaper* replay path would
+actually cost, instead of assuming today's `replay_ns` (full re-execution)
+is the only option.
+
+```text
+cold_topology_once_ns            = 55,459 ns   (55.5 µs — one domain parse, outside the 16-cell loop)
+warm_replay_existing_receipt_ns  = 76,001 ns   (76 µs total across 16 cells — chain-only validation)
+replay_ns (full re-execution)    = 103,346,251 ns (103.3 ms total across 16 cells — unchanged)
+```
+
+**`cold_topology_once_ns` confirms surface 6's expectation**: domain parsing
+is a true one-time compile-time cost (55.5µs total, not per-cell), already
+correctly hoisted outside the loop in `dfcm_crown.rs` — nothing to fix here.
+
+**The replay comparison is the headline finding of this pass.** Chain-only
+replay validation (`compute_plan_chain` recomputed and compared against the
+receipt's steps) costs **~76µs total across all 16 cells — roughly 1,360x
+cheaper than the 103.3ms full re-execution replay** the crown suite
+currently measures as `replay_ns`. This is not a small optimization; it is a
+genuine semantic fork that the architecture needs to make explicitly rather
+than silently default:
+
+- **Full re-execution** (`execute_temporal_plan` called again) proves *"this
+  plan would be re-admitted under the same policy today"* — it re-runs every
+  Prolog8 `may_fire` query from scratch. This is the right guarantee if
+  policy can change between the original execution and the replay, and you
+  need to know whether it *still* holds.
+- **Chain-only validation** (`compute_plan_chain` alone) proves only *"this
+  receipt's chain hash is a pure, reproducible function of these exact
+  plan steps"* — it does not re-check admission at all. This is the right
+  guarantee if the question is "did this receipt get tampered with / is this
+  the same execution that was recorded," not "would this still be legal."
+
+**Neither is a drop-in replacement for the other.** The PRD backlog's
+`replay_receipt` MCP tool (task #15, not yet implemented) needs to pick one
+of these two guarantees explicitly, and should probably expose *both* as
+distinct operations (e.g. `replay_receipt` for the cheap chain check,
+`re_admit_plan` or similar for the expensive full re-admission check) rather
+than conflating them under one name the way this benchmark's `replay_ns`
+metric currently does.
+
+### Surfaces 3-6: inspected, no further code changes made
+
+- **Surface 3 (Prolog8 proof/receipt assembly, one level deeper than
+  `Kernel::new`)**: reasoned qualitatively from the already-read `prolog8`
+  source rather than adding new instrumentation probes inside
+  `execute_temporal_plan`'s loop (which would itself add per-step
+  bookkeeping overhead to a hot path). `Kernel::query`'s fact scan is
+  `O(fact_blocks × rows)` — bounded by the number of loaded facts, which is
+  itself bounded by the 64-op cap — and `assemble_fact_answer`/
+  `assemble_negative` build exactly one `ProofNode` plus a hashed `Receipt`
+  per query, regardless of how many facts exist. Also newly noted: the
+  per-step OCEL event construction inside `execute_temporal_plan`'s loop
+  (`OCELEvent`/`OCELEventAttribute` allocation) shares the same `admission_ns`
+  timing bucket as the actual Prolog8 query and was never separated from it
+  — this is a real, previously-uncounted contributor to `admission_ns`/
+  `replay_ns`, though separating it cleanly requires adding timing probes
+  inside a hot loop, which was deferred pending surface 7's allocation data
+  (a cheap-vs-expensive allocation count is a better signal for whether this
+  is worth a dedicated timing split than guessing).
+- **Surface 4 (schedule_analysis replan multiplicity)**: confirmed by
+  reading the code that `resource_keys` are neither de-duplicated nor
+  filtered for relevance (`schedule_analysis.rs`'s loop over
+  `resource_keys.iter().enumerate().take(64)` replans unconditionally for
+  every entry, twice, regardless of whether the key appears in any grounded
+  action's conditions). **Not fixed**: the crown suite itself only ever
+  passes one resource key (`["available-workers"]`), so this pattern isn't
+  currently exercised as waste by anything in this codebase — flagging it
+  for future callers that might pass duplicate/irrelevant keys, not treating
+  it as a live 80/20 win today (per the plan's "not optimizing before
+  measurement shows it matters" fence).
+- **Surface 5 (`ground.rs` planner scan pattern)**: `warm_plan_ns`
+  (=`planning_ns`) stayed at ~577µs/cell even at the largest (64-worker)
+  cell, both before and after this pass — the full-rescan pattern in
+  `find_temporal_plan`'s scheduling loop and its `timed_inits` rescan are
+  confirmed to be "ALIVE bounded scan," not a live cost, at the sizes this
+  benchmark exercises. Left unchanged.
+- **Surface 6 (parse/topology compile-artifact boundary)**: confirmed via
+  `cold_topology_once_ns` (55.5µs total, one call) that the domain is
+  already correctly parsed once outside the per-cell loop — this
+  architectural property already held before this pass; nothing to fix.
+  `GroundTemporalProblem::build`'s per-cell `TypeIndex::build` re-derivation
+  is correct, not waste, since the crown suite's object/type declarations
+  (worker count) genuinely change per cell.
+
+## Surface 7: allocation profiling (real numbers, confirms surface 3)
+
+Implemented as a lightweight feature-gated global counting allocator
+(`crates/bcinr-pddl/src/alloc_counter.rs`, `dhat-heap` Cargo feature) rather
+than the `dhat` crate — `dhat` produces a JSON file for its own viewer, which
+doesn't cleanly map onto `DfcmBenchReceipt`'s structured
+`alloc_count_by_stage`/`bytes_allocated_by_stage` fields; a direct atomic
+counter wrapping the system allocator gives exact per-stage counts with a
+two-line `snapshot()`/subtract around each stage, at the cost of no call-tree
+visualization. Run via
+`cargo run -p bcinr-pddl --example dfcm_alloc_profile --features dhat-heap --release`.
+
+```text
+                allocations   bytes
+topology        1,456         58,420
+planning        189,678       2,282,409
+analysis        521,983       6,343,282
+admission       179,560       33,981,740
+receipt         560           5,888
+replay          179,560       33,981,740
+```
+
+**This confirms surface 3's hypothesis with real data, not speculation.**
+`admission` and `replay` allocate ~34MB and ~180K allocations each across the
+16-cell suite (≈2.1MB, ≈11,200 allocations *per cell*) — a genuinely large
+allocation volume that lines up with their dominant time cost far better than
+"proof-search algorithmic complexity" does (the actual proof search, per the
+`prolog8` source read in the original pass, is O(1) per query). The likely
+sources, matching surface 3's qualitative note: per-step `OCELEvent`/
+`OCELEventAttribute` construction (`Vec` and `String` allocation per plan
+step, per `execute_temporal_plan`'s loop) and `Ctx::pred`/`Ctx::term`'s
+`String`-keyed `HashMap` interning inside the same loop. Both are real,
+addressable allocation sources — but per the plan's own fence ("do not
+optimize before measurement," and this pass's scope was attribution, not a
+third optimization round), no code changes were made based on this data.
+**This is the concrete next-optimization candidate** for a future pass,
+now backed by allocation counts instead of a falsified construction-cost
+guess.
+
+`analysis`'s unexpectedly high allocation count (521,983 — more than
+`admission`/`replay` combined) despite its small time cost (~25ms) is also
+notable: `find_temporal_plan_with_fn_overrides`'s two replans per resource
+key (`replan_with_perturbed_capacity`, called twice per cell after the
+surface-1-era fix) still clone `self.initial_atoms` (a `BTreeSet`) and
+`self.initial_fn_values` fully inside `find_temporal_plan` itself, once per
+replan — the earlier fix eliminated the *outer* `GroundTemporalProblem`
+clone but not the *inner* per-call state clones that `find_temporal_plan`
+always does, regardless of caller. Flagged, not fixed, in this pass.
+
 ## Why this isn't a SOTA planning comparison
 
 Automated planning research measures planners on a different axis entirely:

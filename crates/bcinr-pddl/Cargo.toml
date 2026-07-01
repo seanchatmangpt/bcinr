@@ -32,6 +32,13 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = { version = "0.4", features = ["serde"] }
 
+[features]
+# Surface 7 (docs/DFCM_CONTRACT.md): per-stage allocation attribution for the
+# DfCM crown suite via a global counting allocator (see src/alloc_counter.rs).
+# No extra dependency — std-only. Off by default; normal builds/tests never
+# install a non-default global allocator.
+dhat-heap = []
+
 [dev-dependencies]
 # Nothing from bcinr-powl or wasm4pm-cognition in dev-deps either.
 # chicago-tdd-tools: Chicago-style (state-based, real-collaborator) test
@@ -51,3 +58,7 @@ path = "tests/brce_loop.rs"
 [[test]]
 name = "vision2030"
 path = "tests/vision2030.rs"
+
+[[example]]
+name = "dfcm_alloc_profile"
+required-features = ["dhat-heap"]

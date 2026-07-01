@@ -39,6 +39,12 @@ fn main() {
             receipt.max_parallelism,
             receipt.suite_passed_5s_gate,
         );
+        eprintln!(
+            "dfcm_crown_bench cold/warm split: cold_topology_once_ns={} warm_replay_existing_receipt_ns={} (vs. full-reexecution replay_ns={} above)",
+            receipt.cold_topology_once_ns,
+            receipt.warm_replay_existing_receipt_ns,
+            receipt.replay_ns,
+        );
     }
 
     eprintln!("dfcm_crown_bench wall clock: {:?}", start.elapsed());
