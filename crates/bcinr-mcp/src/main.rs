@@ -1,9 +1,10 @@
 //! bcinr-mcp — MCP server exposing the ENTIRE bcinr library as MCP tools over stdio.
 //!
 //! Tools:
-//!  Group 1 — PDDL (7 tools):
+//!  Group 1 — PDDL (8 tools):
 //!    pddl_domain_info, pddl_parse_domain, pddl_parse_problem, pddl_plan,
-//!    manufacture_world, pddl_admit_domain, pddl_temporal_plan_info
+//!    manufacture_world, pddl_admit_domain, pddl_temporal_plan_info,
+//!    route_capability_plan
 //!  Group 2 — POWL (6 tools):
 //!    powl_compile_sequence, powl_compile_choice, powl_admit_context,
 //!    powl_capability_check, powl_plan_to_tape, analyze_schedule64
@@ -100,6 +101,17 @@ pub struct ManufactureInput {
     /// Optional Horn policy: list of [head, [body_atom, ...]] pairs.
     /// Empty or absent = permissive (every action pre-admitted).
     pub policy_rules: Option<Vec<(String, Vec<String>)>>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct RouteCapabilityInput {
+    /// Desired effects, each "edited:FILE", "form-filled:FILE", or "drafted:FILE"
+    /// (e.g. "edited:f1") over the fixed capability set (claude-code-edit-file,
+    /// claude-chrome-fill-form, claude-desktop-draft)
+    pub desired_effects: Vec<String>,
+    /// How many capabilities may run concurrently (the human's attention capacity)
+    #[serde(deserialize_with = "de_u64_flex")]
+    pub attention_capacity: u64,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -699,6 +711,65 @@ impl BcinrServer {
         .to_string()
     }
 
+    #[tool(description = "Deterministic capability router (minimal viable slice): routes a task over a fixed capability set (claude-code-edit-file, claude-chrome-fill-form, claude-desktop-draft) via PDDL temporal planning + schedule analysis, returning a cost-ordered, receipted route. desired_effects entries are \"kind:file\" (kind one of edited/form-filled/drafted). Returns JSON with ok, admitted, refusal_reason, plan steps, cost vector, and a route_chain BLAKE3 hash. Same task + same fixed capability set always returns the same route.")]
+    async fn route_capability_plan(
+        &self,
+        Parameters(input): Parameters<RouteCapabilityInput>,
+    ) -> String {
+        use bcinr_pddl::{route_capability_plan, CapabilityTask, DesiredEffect};
+
+        let mut desired_effects = Vec::with_capacity(input.desired_effects.len());
+        for raw in &input.desired_effects {
+            let Some((kind, file)) = raw.split_once(':') else {
+                return serde_json::json!({ "ok": false, "error": format!("desired_effects entry '{raw}' must be \"kind:file\"") }).to_string();
+            };
+            let effect = match kind {
+                "edited" => DesiredEffect::Edited(file.to_string()),
+                "form-filled" => DesiredEffect::FormFilled(file.to_string()),
+                "drafted" => DesiredEffect::Drafted(file.to_string()),
+                other => return serde_json::json!({ "ok": false, "error": format!("unknown desired_effect kind '{other}' (expected edited/form-filled/drafted)") }).to_string(),
+            };
+            desired_effects.push(effect);
+        }
+
+        let task = CapabilityTask {
+            desired_effects,
+            attention_capacity: input.attention_capacity as u32,
+        };
+
+        let receipt = match route_capability_plan(&task) {
+            Ok(r) => r,
+            Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+        };
+
+        let steps: Vec<_> = receipt.plan.steps.iter().map(|s| serde_json::json!({
+            "action_name": s.action_name,
+            "args": s.args,
+            "start_time": s.start_time,
+            "duration": s.duration,
+        })).collect();
+
+        serde_json::json!({
+            "ok": true,
+            "admitted": receipt.admitted,
+            "refusal_reason": receipt.refusal_reason,
+            "plan_steps": steps,
+            "makespan": receipt.plan.makespan,
+            "max_parallelism": receipt.analysis.as_ref().map(|a| a.max_parallelism),
+            "binding_resource_mask": receipt.analysis.as_ref().map(|a| a.binding_resource_mask),
+            "cost": {
+                "admitted": receipt.cost.admitted,
+                "unreceipted_mutation_risk": receipt.cost.unreceipted_mutation_risk,
+                "human_attention_seconds": receipt.cost.human_attention_seconds,
+                "token_cost": receipt.cost.token_cost,
+                "latency_ms": receipt.cost.latency_ms,
+                "context_switches": receipt.cost.context_switches,
+            },
+            "route_chain": receipt.route_chain,
+        })
+        .to_string()
+    }
+
     // ── Group 3: Core bcinr Library Tools ───────────────────────────────────
 
     /// Return a human-readable description of the bcinr library.
@@ -1021,7 +1092,7 @@ async fn main() {
         .with_writer(std::io::stderr)
         .init();
 
-    tracing::info!("bcinr-mcp starting — 24 tools ready (PDDL:7 + POWL:6 + core:3 + algorithms:6 + receipts:1 + cross-crate:1)");
+    tracing::info!("bcinr-mcp starting — 25 tools ready (PDDL:8 + POWL:6 + core:3 + algorithms:6 + receipts:1 + cross-crate:1)");
 
     let server = BcinrServer::default();
     let running = match server.serve(stdio()).await {

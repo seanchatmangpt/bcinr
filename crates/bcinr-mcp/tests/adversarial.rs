@@ -292,7 +292,7 @@ async fn tool_list_has_expected_tools() {
         "utf8_validate", "bitset_operations", "dfa_info", "scan_patterns",
         "reduce_sequence", "simd_string_info",
         "receipt_inspect", "system_capabilities",
-        "analyze_schedule64",
+        "analyze_schedule64", "route_capability_plan",
     ];
 
     let tool_names: Vec<String> = tools.iter().map(|t| t.name.to_string()).collect();
@@ -304,6 +304,83 @@ async fn tool_list_has_expected_tools() {
     assert_eq!(tools.len(), expected.len(),
         "tool count changed: expected {}, got {}; list: {name_refs:?}",
         expected.len(), tools.len());
+}
+
+// ── route_capability_plan determinism ─────────────────────────────────────────
+
+#[tokio::test]
+async fn route_capability_plan_is_deterministic() {
+    let session = McpSession::new(
+        McpServerHarnessBuilder::new(bcinr_mcp_cmd())
+            .spawn()
+            .await
+            .expect("server must start"),
+    )
+    .initialize()
+    .await
+    .expect("initialize must succeed");
+
+    let input = serde_json::json!({
+        "desired_effects": ["edited:f1", "form-filled:f2"],
+        "attention_capacity": 2,
+    });
+
+    let first = session
+        .call_tool("route_capability_plan", input.clone())
+        .await
+        .expect("route_capability_plan must not crash");
+    let first_val: serde_json::Value =
+        serde_json::from_str(text_from_content(&first.content)).expect("must be valid JSON");
+    assert!(first_val.get("ok").and_then(|v| v.as_bool()).unwrap_or(false),
+        "expected ok=true, got: {first_val}");
+    assert!(first_val.get("admitted").and_then(|v| v.as_bool()).unwrap_or(false),
+        "expected admitted=true, got: {first_val}");
+
+    let second = session
+        .call_tool("route_capability_plan", input)
+        .await
+        .expect("route_capability_plan must not crash");
+    let second_val: serde_json::Value =
+        serde_json::from_str(text_from_content(&second.content)).expect("must be valid JSON");
+
+    assert_eq!(
+        first_val.get("route_chain"), second_val.get("route_chain"),
+        "same task + same fixed capability set must produce an identical route_chain"
+    );
+
+    session.shutdown().await;
+}
+
+#[tokio::test]
+async fn route_capability_plan_refuses_infeasible_task_without_crashing() {
+    let session = McpSession::new(
+        McpServerHarnessBuilder::new(bcinr_mcp_cmd())
+            .spawn()
+            .await
+            .expect("server must start"),
+    )
+    .initialize()
+    .await
+    .expect("initialize must succeed");
+
+    let result = session
+        .call_tool(
+            "route_capability_plan",
+            serde_json::json!({
+                "desired_effects": ["edited:f1"],
+                "attention_capacity": 0,
+            }),
+        )
+        .await
+        .expect("route_capability_plan must not crash on an infeasible task");
+    let val: serde_json::Value =
+        serde_json::from_str(text_from_content(&result.content)).expect("must be valid JSON");
+    assert!(val.get("ok").and_then(|v| v.as_bool()).unwrap_or(false));
+    assert!(!val.get("admitted").and_then(|v| v.as_bool()).unwrap_or(true),
+        "zero attention capacity must refuse, not admit: {val}");
+    assert!(val.get("refusal_reason").and_then(|v| v.as_str()).is_some());
+
+    session.shutdown().await;
 }
 
 // ── Rice quarantine: open-ended inputs never enter the lawful core silently ──

@@ -27,8 +27,10 @@ pub mod schedule_analysis;
 pub mod dfcm_crown;
 pub mod alloc_counter;
 pub mod llm_bridge;
+pub mod capability_router;
 pub use llm_bridge::{AdmittedDomain, AdmittedProblem, WorldManufactureReceipt, admit_candidate_domain, admit_candidate_problem, manufacture_world};
-pub use schedule_analysis::{analyze_schedule, CapacityDelta, ScheduleAnalysis64};
+pub use capability_router::{route_capability_plan, CapabilityTask, DesiredEffect, CostVector, CapabilityRouteReceipt};
+pub use schedule_analysis::{analyze_schedule, analyze_schedule_instrumented, AnalysisSubstageNs, CapacityDelta, ScheduleAnalysis64};
 pub use dfcm_crown::{run_dfcm_crown_suite, DfcmBenchReceipt};
 
 // Re-export canonical types from wasm4pm-compat so callers only need one import.
@@ -50,6 +52,6 @@ pub use wasm4pm_compat::pddl::{
 pub use wasm4pm_compat::ocel::{OCEL, OCELEvent};
 
 pub use error::Pddl8Error;
-pub use execute::{execute_tape, compute_plan_chain};
+pub use execute::{execute_tape, compute_plan_chain, execute_temporal_plan_instrumented, SubstageNs};
 pub use ground::{GroundProblem, GroundTemporalProblem, GroundDurativeAction};
 pub use parse::{domain_from_pddl, problem_from_pddl, domain31_from_pddl, problem31_from_pddl};
