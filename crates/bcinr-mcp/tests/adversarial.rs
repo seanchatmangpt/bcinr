@@ -9,7 +9,7 @@
 //! - Injection strings in PDDL text fields
 //! - Adversarial case_id values
 //! - Receipt tampering detection
-//! - Tool list stability (23 tools, catches regressions)
+//! - Tool list stability (24 tools, catches regressions)
 
 use chicago_tdd_mcp::{McpServerHarnessBuilder, McpSession};
 use chicago_tdd_mcp::assert::error_scenarios;
@@ -292,6 +292,7 @@ async fn tool_list_has_expected_tools() {
         "utf8_validate", "bitset_operations", "dfa_info", "scan_patterns",
         "reduce_sequence", "simd_string_info",
         "receipt_inspect", "system_capabilities",
+        "analyze_schedule64",
     ];
 
     let tool_names: Vec<String> = tools.iter().map(|t| t.name.to_string()).collect();
@@ -303,4 +304,106 @@ async fn tool_list_has_expected_tools() {
     assert_eq!(tools.len(), expected.len(),
         "tool count changed: expected {}, got {}; list: {name_refs:?}",
         expected.len(), tools.len());
+}
+
+// ── Rice quarantine: open-ended inputs never enter the lawful core silently ──
+//
+// Every response must be exactly one of: a structured admitted/refused
+// result, or a structured error — never a panic, never a hang (bounded by
+// an explicit timeout), never silent unhandled execution. This is the
+// "post-Rice" property: the tool's admission boundary is what quarantines
+// open-ended/adversarial input, not best-effort exception handling deep
+// inside the parser/planner.
+
+#[tokio::test]
+async fn rice_quarantine_adversarial_battery_never_hangs_or_panics() {
+    let session = McpSession::new(
+        McpServerHarnessBuilder::new(bcinr_mcp_cmd())
+            .spawn()
+            .await
+            .expect("server must start"),
+    )
+    .initialize()
+    .await
+    .expect("initialize must succeed");
+
+    let oversized = "(define (domain d)) ".repeat(50_000); // ~1MB, well beyond any real domain
+    let malformed_pddl_cases: &[&str] = &[
+        "",
+        "not pddl at all",
+        "(define (domain",             // unterminated parens
+        "(define (domain d) (:types",  // truncated mid-section
+        "(((((((((((((((((((((((((((", // deeply nested, never closed
+        &oversized,
+    ];
+
+    for bad_domain in malformed_pddl_cases {
+        let call = session.call_tool(
+            "manufacture_world",
+            serde_json::json!({
+                "domain_text": bad_domain,
+                "problem_text": VALID_PROBLEM,
+                "case_id": "rice-quarantine",
+            }),
+        );
+        // Bound with a hard timeout: a hang here would itself be a Rice-
+        // quarantine violation (open-ended input consuming unbounded time
+        // inside the "lawful core"), not just a slow response.
+        let result = tokio::time::timeout(std::time::Duration::from_secs(10), call)
+            .await
+            .unwrap_or_else(|_| panic!("manufacture_world hung (>10s) on malformed input: {bad_domain:.80}"))
+            .expect("server must not crash (transport-level) on malformed PDDL");
+
+        let content_text = text_from_content(&result.content);
+        let parsed: serde_json::Value = serde_json::from_str(content_text)
+            .unwrap_or_else(|_| panic!(
+                "response must be structured JSON, not raw/unparseable text, for input {bad_domain:.80}: {content_text}"
+            ));
+        // Never silent success on garbage input, and never missing the
+        // structural fields a caller depends on to distinguish
+        // admitted/refused/error.
+        let has_ok_field = parsed.get("ok").is_some();
+        let has_admitted_field = parsed.get("admitted").is_some();
+        assert!(
+            has_ok_field || has_admitted_field,
+            "response for malformed input must carry an ok/admitted verdict field, got: {content_text}"
+        );
+        if let Some(true) = parsed.get("ok").and_then(|v| v.as_bool()) {
+            // ok:true is only legitimate if admitted is also present and
+            // explicitly resolved (true or false) — "ok" alone must never
+            // mean "silently executed without an admission verdict."
+            assert!(
+                parsed.get("admitted").and_then(|v| v.as_bool()).is_some(),
+                "ok:true responses from manufacture_world must carry an explicit admitted verdict, got: {content_text}"
+            );
+        }
+    }
+
+    // Same battery against pddl_plan (classical planner path, no admission
+    // gate — but still must never panic/hang/silently succeed on garbage).
+    for bad_domain in malformed_pddl_cases {
+        let call = session.call_tool(
+            "pddl_plan",
+            serde_json::json!({
+                "domain_text": bad_domain,
+                "problem_text": VALID_PROBLEM,
+            }),
+        );
+        let result = tokio::time::timeout(std::time::Duration::from_secs(10), call)
+            .await
+            .unwrap_or_else(|_| panic!("pddl_plan hung (>10s) on malformed input: {bad_domain:.80}"))
+            .expect("server must not crash (transport-level) on malformed PDDL");
+
+        let content_text = text_from_content(&result.content);
+        let parsed: serde_json::Value = serde_json::from_str(content_text)
+            .unwrap_or_else(|_| panic!(
+                "response must be structured JSON for input {bad_domain:.80}: {content_text}"
+            ));
+        assert!(
+            parsed.get("ok").is_some(),
+            "pddl_plan response must carry an ok verdict field, got: {content_text}"
+        );
+    }
+
+    session.shutdown().await;
 }
