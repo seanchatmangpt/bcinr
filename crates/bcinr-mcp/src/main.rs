@@ -4,9 +4,9 @@
 //!  Group 1 — PDDL (7 tools):
 //!    pddl_domain_info, pddl_parse_domain, pddl_parse_problem, pddl_plan,
 //!    manufacture_world, pddl_admit_domain, pddl_temporal_plan_info
-//!  Group 2 — POWL (5 tools):
+//!  Group 2 — POWL (6 tools):
 //!    powl_compile_sequence, powl_compile_choice, powl_admit_context,
-//!    powl_capability_check, powl_plan_to_tape
+//!    powl_capability_check, powl_plan_to_tape, analyze_schedule64
 //!  Group 3 — Core bcinr (3 tools):
 //!    bcinr_library_info, bcinr_mask_ops, bcinr_powl_info
 //!  Group 4 — bcinr-logic Algorithms (6 tools):
@@ -16,6 +16,9 @@
 //!  Group 6 — Cross-crate Info (1 tool):
 //!    system_capabilities
 
+use bcinr_mcp::cache;
+
+use cache::CapabilityCache;
 use rmcp::{
     ServiceExt,
     handler::server::wrapper::Parameters,
@@ -67,7 +70,7 @@ pub struct ProblemInput {
     pub problem_text: String,
 }
 
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Deserialize, serde::Serialize, schemars::JsonSchema)]
 pub struct PlanInput {
     /// PDDL domain text
     pub domain_text: String,
@@ -86,7 +89,7 @@ pub struct AnalyzeScheduleInput {
     pub resource_keys: Vec<String>,
 }
 
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Deserialize, serde::Serialize, schemars::JsonSchema)]
 pub struct ManufactureInput {
     /// PDDL domain text
     pub domain_text: String,
@@ -169,8 +172,10 @@ pub struct ReceiptInput {
 
 // ─── Server ──────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone)]
-pub struct BcinrServer;
+#[derive(Clone, Default)]
+pub struct BcinrServer {
+    cache: CapabilityCache,
+}
 
 #[tool_router(server_handler)]
 impl BcinrServer {
@@ -274,6 +279,11 @@ impl BcinrServer {
         &self,
         Parameters(input): Parameters<PlanInput>,
     ) -> String {
+        let canonical = serde_json::to_vec(&input).unwrap_or_default();
+        let key = CapabilityCache::key("pddl_plan", &canonical);
+        if let Some(cached) = self.cache.get(&key).await {
+            return cached;
+        }
         let domain = match bcinr_pddl::domain_from_pddl(&input.domain_text) {
             Ok(d) => d,
             Err(e) => {
@@ -304,8 +314,10 @@ impl BcinrServer {
                     .map(|(i, op)| format!("{i}: {}", op.label))
                     .collect();
                 let step_count = steps.len();
-                serde_json::json!({ "ok": true, "steps": steps, "step_count": step_count })
-                    .to_string()
+                let result = serde_json::json!({ "ok": true, "steps": steps, "step_count": step_count })
+                    .to_string();
+                self.cache.insert(key.clone(), result.clone()).await;
+                result
             }
             Err(e) => serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
         }
@@ -320,6 +332,11 @@ impl BcinrServer {
         &self,
         Parameters(input): Parameters<ManufactureInput>,
     ) -> String {
+        let canonical = serde_json::to_vec(&input).unwrap_or_default();
+        let key = CapabilityCache::key("manufacture_world", &canonical);
+        if let Some(cached) = self.cache.get(&key).await {
+            return cached;
+        }
         let owned_rules: Vec<(String, Vec<String>)> = input.policy_rules.unwrap_or_default();
         let rule_refs: Vec<(&str, Vec<&str>)> = owned_rules
             .iter()
@@ -352,7 +369,7 @@ impl BcinrServer {
                 "duration": s.duration,
                 "args": s.args,
             })).collect();
-            serde_json::json!({
+            let result = serde_json::json!({
                 "ok": true,
                 "admitted": true,
                 "domain_name": r.domain_name,
@@ -368,7 +385,9 @@ impl BcinrServer {
                 "refusal_reason": null,
                 "ocel_export": r.ocel_export,
             })
-            .to_string()
+            .to_string();
+            self.cache.insert(key.clone(), result.clone()).await;
+            result
         } else {
             let refusal_code = match r.refusal_reason.as_deref().unwrap_or("") {
                 s if s.contains("step") && s.contains("denied") => "STEP_DENIED",
@@ -1002,9 +1021,9 @@ async fn main() {
         .with_writer(std::io::stderr)
         .init();
 
-    tracing::info!("bcinr-mcp starting — 23 tools ready (PDDL:7 + POWL:5 + core:3 + algorithms:6 + receipts:1 + cross-crate:1)");
+    tracing::info!("bcinr-mcp starting — 24 tools ready (PDDL:7 + POWL:6 + core:3 + algorithms:6 + receipts:1 + cross-crate:1)");
 
-    let server = BcinrServer;
+    let server = BcinrServer::default();
     let running = match server.serve(stdio()).await {
         Ok(r) => r,
         Err(e) => {
