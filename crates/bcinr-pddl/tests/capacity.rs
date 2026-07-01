@@ -8,7 +8,10 @@
 //! assigned at a time, forcing the two `assign-worker` steps to run
 //! sequentially. With capacity 2, both workers can be assigned concurrently.
 
-use bcinr_pddl::{analyze_schedule, domain_from_pddl, problem_from_pddl, GroundTemporalProblem};
+use bcinr_pddl::{
+    analyze_schedule, domain_from_pddl, execute::execute_temporal_plan, problem_from_pddl,
+    GroundTemporalProblem,
+};
 
 const DOMAIN: &str = r#"
 (define (domain capacity-demo)
@@ -145,4 +148,109 @@ fn schedule_analysis_capacity_two_allows_full_parallelism() {
         "capacity 3 has no further benefit once both workers already run concurrently: {:?}",
         delta
     );
+}
+
+/// Regression test for the may_fire fact-deduplication fix
+/// (docs/DFCM_BENCHMARK_ANALYSIS.md's "duplicate `may_fire` fact loading"
+/// finding): every `assign-worker` step in this plan shares the *same*
+/// bare action label (durative-action steps are labeled by schema name,
+/// not per-instance — see `GroundTemporalProblem::find_temporal_plan`).
+/// Before the fix, `execute_temporal_plan` loaded one `FactBlock8` per
+/// step for this identical label; after the fix, it loads exactly one.
+/// Either way, admission must behave identically: `may_fire(label)` is a
+/// set-membership fact keyed on the label alone, not a per-instance one,
+/// so five duplicate-labeled steps must admit exactly as one would.
+#[test]
+fn duplicate_action_labels_admit_identically_to_a_single_label() {
+    let domain = domain_from_pddl(DOMAIN).expect("domain parse");
+    let problem = problem_from_pddl(&problem_with_capacity(5)).expect("problem parse");
+    let gtp = GroundTemporalProblem::build(&domain, &problem).expect("grounding");
+    let plan = gtp.find_temporal_plan().expect("temporal plan found");
+
+    // Sanity: this plan really does have multiple steps sharing one label —
+    // otherwise this test wouldn't be exercising the dedup path at all.
+    let assign_worker_steps = plan.steps.iter().filter(|s| s.action_name == "assign-worker").count();
+    assert!(
+        assign_worker_steps >= 2,
+        "expected multiple assign-worker steps sharing one label, got {}",
+        assign_worker_steps
+    );
+
+    let (receipt, _ocel) = execute_temporal_plan(&plan, &domain, &problem, "dedup-regression", &[])
+        .expect("execute_temporal_plan admits every duplicate-labeled step");
+    assert_eq!(receipt.step_count, plan.steps.len());
+    assert!(receipt.goal_reached, "all workers must be admitted and reach done despite sharing one action label");
+}
+
+/// Regression test for a same-instance double-scheduling bug found while
+/// testing `route_capability_plan`: the same grounded durative-action
+/// instance (one schema, one object) could be started a second time while
+/// its first instance was still in flight, because only `started_this_tick`
+/// guarded against re-starting within one scheduling tick — nothing checked
+/// whether the instance was already in `pending`. Any action with no
+/// exclusive-lock predicate (only consuming/releasing a shared numeric
+/// fluent) was vulnerable: once a *different* pending action completed and
+/// freed capacity, the scheduler could re-trigger an instance that was
+/// still mid-flight, producing two overlapping, identical steps.
+///
+/// Domain here has no completion-guard predicates at all (deliberately, to
+/// isolate the fix from any domain-level idempotency guard like the
+/// capability router's `(not (edited ?f))`): `worker-a`/`worker-b` share one
+/// worker object and a capacity-2 resource, with `worker-b` shorter than
+/// `worker-a` so its completion frees capacity while `worker-a` is still
+/// running — exactly the interleaving that triggered the bug.
+const DOUBLE_SCHEDULE_DOMAIN: &str = r#"
+(define (domain double-schedule-regression)
+  (:requirements :durative-actions :numeric-fluents :typing)
+  (:types worker)
+  (:predicates (done-a ?w - worker) (done-b ?w - worker))
+  (:functions (cap))
+  (:durative-action worker-a
+    :parameters (?w - worker)
+    :duration (= ?duration 5)
+    :condition (at start (>= (cap) 1))
+    :effect (and (at start (decrease (cap) 1)) (at end (increase (cap) 1)) (at end (done-a ?w))))
+  (:durative-action worker-b
+    :parameters (?w - worker)
+    :duration (= ?duration 2)
+    :condition (at start (>= (cap) 1))
+    :effect (and (at start (decrease (cap) 1)) (at end (increase (cap) 1)) (at end (done-b ?w)))))
+"#;
+
+const DOUBLE_SCHEDULE_PROBLEM: &str = r#"
+(define (problem double-schedule-regression-problem)
+  (:domain double-schedule-regression)
+  (:objects w1 - worker)
+  (:init (= (cap) 2))
+  (:goal (and (done-a w1) (done-b w1))))
+"#;
+
+#[test]
+fn same_instance_is_never_scheduled_twice_while_in_flight() {
+    let domain = domain_from_pddl(DOUBLE_SCHEDULE_DOMAIN).expect("domain parse");
+    let problem = problem_from_pddl(DOUBLE_SCHEDULE_PROBLEM).expect("problem parse");
+    let gtp = GroundTemporalProblem::build(&domain, &problem).expect("grounding");
+    let plan = gtp.find_temporal_plan().expect("temporal plan found");
+
+    // Group steps by (action_name, args) and confirm no two intervals for
+    // the same instance overlap — before the fix, worker-b(w1) (or
+    // worker-a(w1)) could appear twice with identical, overlapping
+    // start/duration.
+    for name in ["worker-a", "worker-b"] {
+        let intervals: Vec<(f64, f64)> = plan
+            .steps
+            .iter()
+            .filter(|s| s.action_name == name)
+            .map(|s| (s.start_time, s.start_time + s.duration))
+            .collect();
+        for i in 0..intervals.len() {
+            for j in (i + 1)..intervals.len() {
+                assert!(
+                    !intervals_overlap(intervals[i], intervals[j]),
+                    "{name}(w1) was scheduled twice while in flight: {:?} and {:?}",
+                    intervals[i], intervals[j]
+                );
+            }
+        }
+    }
 }

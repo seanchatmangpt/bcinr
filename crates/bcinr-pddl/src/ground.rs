@@ -322,6 +322,15 @@ impl GroundTemporalProblem {
                 let mut started_this_pass = false;
                 for (i, da) in self.durative_actions.iter().enumerate() {
                     if started_this_tick.contains(&i) { continue; }
+                    // An action already in flight (started but not yet
+                    // completed) must not be started again against itself —
+                    // its own "already running" state isn't otherwise
+                    // tracked for actions with no exclusive lock predicate
+                    // (e.g. one that only consumes/releases a shared
+                    // numeric fluent): only its *finished* effect blocks a
+                    // restart, so without this guard the same grounded
+                    // instance can be scheduled concurrently with itself.
+                    if pending.iter().any(|(_, idx)| *idx == i) { continue; }
                     let applicable = da.conditions.iter().all(|c| {
                         eval_condition(c, &state, &fn_vals)
                     });
