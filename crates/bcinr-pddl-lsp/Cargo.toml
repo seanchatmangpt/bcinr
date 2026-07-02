@@ -2,6 +2,7 @@
 name = "bcinr-pddl-lsp"
 version = "26.6.26"
 edition = "2021"
+repository = "https://github.com/seanchatmangpt/bcinr"
 description = "Lifecycle planning language server: PRD/ARD → PDDL8 → bcinr-pddl → receipts → LSP surfaces"
 license = "MIT OR Apache-2.0"
 publish = false
