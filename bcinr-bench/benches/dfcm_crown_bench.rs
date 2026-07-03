@@ -45,6 +45,31 @@ fn main() {
             receipt.warm_replay_existing_receipt_ns,
             receipt.replay_ns,
         );
+        eprintln!(
+            "dfcm_crown_bench L3 admission substage: fact_load_ns={} query_ns={} effects_apply_ns={} proof_receipt_build_ns={} trace_build_ns={}",
+            receipt.admission_substage.fact_load_ns,
+            receipt.admission_substage.query_ns,
+            receipt.admission_substage.effects_apply_ns,
+            receipt.admission_substage.proof_receipt_build_ns,
+            receipt.admission_substage.trace_build_ns,
+        );
+        eprintln!(
+            "dfcm_crown_bench L3 replay substage: fact_load_ns={} query_ns={} effects_apply_ns={} proof_receipt_build_ns={} trace_build_ns={}",
+            receipt.replay_substage.fact_load_ns,
+            receipt.replay_substage.query_ns,
+            receipt.replay_substage.effects_apply_ns,
+            receipt.replay_substage.proof_receipt_build_ns,
+            receipt.replay_substage.trace_build_ns,
+        );
+        eprintln!(
+            "dfcm_crown_bench L3 analysis substage: resource_key_collect_ns={} base_plan_ns={} perturb_minus_ns={} perturb_plus_ns={} sensitivity_compute_ns={} result_build_ns={}",
+            receipt.analysis_substage.resource_key_collect_ns,
+            receipt.analysis_substage.base_plan_ns,
+            receipt.analysis_substage.perturb_minus_ns,
+            receipt.analysis_substage.perturb_plus_ns,
+            receipt.analysis_substage.sensitivity_compute_ns,
+            receipt.analysis_substage.result_build_ns,
+        );
     }
 
     eprintln!("dfcm_crown_bench wall clock: {:?}", start.elapsed());

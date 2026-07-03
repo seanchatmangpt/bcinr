@@ -67,7 +67,8 @@ pub struct OcelCausalFrame {
     pub activity_idx: u16,
     /// Classifier byte for the POWL node kind (XOR, SEQ, LOOP, etc.).
     pub node_kind: u8,
-    _pad: [u8; 5],
+    /// Internal padding to maintain 128-byte alignment.
+    pub pad: [u8; 5],
     /// BLAKE3 hash of the preceding frame (or genesis zeros for the first frame).
     pub prior_hash: [u8; 32],
 }
@@ -236,7 +237,7 @@ mod tests {
             ts_ns: 1_000_000,
             activity_idx: 0,
             node_kind: 0,
-            _pad: [0u8; 5],
+            pad: [0u8; 5],
             prior_hash: [0u8; 32],
         }
     }

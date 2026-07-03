@@ -11,10 +11,10 @@
 
 use std::time::Instant;
 
-use crate::execute::{compute_plan_chain, execute_temporal_plan};
+use crate::execute::{compute_plan_chain, execute_temporal_plan_instrumented, SubstageNs};
 use crate::ground::GroundTemporalProblem;
 use crate::powl_bridge::temporal_plan_to_powl_tape;
-use crate::schedule_analysis::analyze_schedule;
+use crate::schedule_analysis::{analyze_schedule_instrumented, AnalysisSubstageNs};
 use crate::{domain_from_pddl, problem_from_pddl, Pddl8Error};
 
 /// Headline metrics for one run of the full crown suite (all 16 cells).
@@ -71,6 +71,17 @@ pub struct DfcmBenchReceipt {
     pub alloc_count_by_stage: Option<AllocStageStats>,
     /// Per-stage bytes allocated, `dhat-heap` feature only.
     pub bytes_allocated_by_stage: Option<AllocStageStats>,
+
+    /// L3 substage attribution for the admission call (summed across all 16
+    /// cells) — see `execute::SubstageNs` and
+    /// `docs/DFCM_BENCHMARK_ANALYSIS.md`'s resolution-ladder section.
+    pub admission_substage: SubstageNs,
+    /// L3 substage attribution for the full-re-execution replay call.
+    pub replay_substage: SubstageNs,
+    /// L3 substage attribution for `analyze_schedule` — see
+    /// `AnalysisSubstageNs` and `docs/DFCM_BENCHMARK_ANALYSIS.md`'s
+    /// "Analysis bottleneck after may_fire dedupe" section.
+    pub analysis_substage: AnalysisSubstageNs,
 }
 
 /// Per-stage allocation totals (either counts or bytes, depending on which
@@ -131,6 +142,9 @@ pub fn run_dfcm_crown_suite() -> Result<DfcmBenchReceipt, Pddl8Error> {
     let mut warm_replay_existing_receipt_ns: u128 = 0;
     let mut max_ops_seen: u8 = 0;
     let mut max_parallelism_seen: u8 = 0;
+    let mut admission_substage = SubstageNs::default();
+    let mut replay_substage = SubstageNs::default();
+    let mut analysis_substage = AnalysisSubstageNs::default();
 
     #[cfg(feature = "dhat-heap")]
     let mut alloc_count = AllocStageStats::default();
@@ -165,25 +179,33 @@ pub fn run_dfcm_crown_suite() -> Result<DfcmBenchReceipt, Pddl8Error> {
             max_ops_seen = max_ops_seen.max(ops.len().min(u8::MAX as usize) as u8);
             #[cfg(feature = "dhat-heap")]
             record_stage_alloc(&mut alloc_count.topology, &mut alloc_bytes.topology, alloc_before);
-            #[cfg(feature = "dhat-heap")]
-            let alloc_before = crate::alloc_counter::counting_alloc::snapshot();
 
+            #[cfg(feature = "dhat-heap")]
+            let analysis_alloc_before = crate::alloc_counter::counting_alloc::snapshot();
             let t2 = Instant::now();
-            let analysis = analyze_schedule(&gtp, &["available-workers".to_string()])?;
+            let (analysis, analysis_stage_ns) =
+                analyze_schedule_instrumented(&gtp, &["available-workers".to_string()])?;
             analysis_ns += t2.elapsed().as_nanos();
             max_parallelism_seen = max_parallelism_seen.max(analysis.max_parallelism);
+            add_analysis_substage(&mut analysis_substage, &analysis_stage_ns);
             #[cfg(feature = "dhat-heap")]
-            record_stage_alloc(&mut alloc_count.analysis, &mut alloc_bytes.analysis, alloc_before);
+            record_stage_alloc(&mut alloc_count.analysis, &mut alloc_bytes.analysis, analysis_alloc_before);
             #[cfg(feature = "dhat-heap")]
             let alloc_before = crate::alloc_counter::counting_alloc::snapshot();
 
-            // admission_ns times execute_temporal_plan as a whole — admission-gate
-            // checking dominates its cost, but this is not a precise sub-component
-            // split (see docs/DFCM_CONTRACT.md's measurement honesty note).
+            // admission_ns times execute_temporal_plan_instrumented as a whole
+            // (L1); its four L3 substage checkpoints (fact_load/query/
+            // effects_apply/proof_receipt_build/trace_build) are accumulated
+            // into admission_substage below — see docs/DFCM_BENCHMARK_ANALYSIS.md's
+            // resolution-ladder section. The instrumented variant produces the
+            // identical receipt as plain execute_temporal_plan (same logic,
+            // just with Instant::now() checkpoints added); it is bench-only,
+            // never used by production callers.
             let t3 = Instant::now();
-            let (receipt, _ocel) =
-                execute_temporal_plan(&plan, &domain, &problem, "dfcm-crown", &[])?;
+            let (receipt, _ocel, admission_stage_ns) =
+                execute_temporal_plan_instrumented(&plan, &domain, &problem, "dfcm-crown", &[])?;
             admission_ns += t3.elapsed().as_nanos();
+            add_substage(&mut admission_substage, &admission_stage_ns);
             #[cfg(feature = "dhat-heap")]
             record_stage_alloc(&mut alloc_count.admission, &mut alloc_bytes.admission, alloc_before);
             #[cfg(feature = "dhat-heap")]
@@ -203,10 +225,11 @@ pub fn run_dfcm_crown_suite() -> Result<DfcmBenchReceipt, Pddl8Error> {
             // receipt chain is reproducible — full re-execution, proving
             // "this plan would be re-admitted under the same policy today."
             let t5 = Instant::now();
-            let (replay_receipt, _ocel) =
-                execute_temporal_plan(&plan, &domain, &problem, "dfcm-crown", &[])?;
+            let (replay_receipt, _ocel, replay_stage_ns) =
+                execute_temporal_plan_instrumented(&plan, &domain, &problem, "dfcm-crown", &[])?;
             replay_ns += t5.elapsed().as_nanos();
             debug_assert_eq!(receipt.chain_hash, replay_receipt.chain_hash);
+            add_substage(&mut replay_substage, &replay_stage_ns);
             #[cfg(feature = "dhat-heap")]
             record_stage_alloc(&mut alloc_count.replay, &mut alloc_bytes.replay, alloc_before);
 
@@ -249,7 +272,20 @@ pub fn run_dfcm_crown_suite() -> Result<DfcmBenchReceipt, Pddl8Error> {
         bytes_allocated_by_stage: Some(alloc_bytes),
         #[cfg(not(feature = "dhat-heap"))]
         bytes_allocated_by_stage: None,
+        admission_substage,
+        replay_substage,
+        analysis_substage,
     })
+}
+
+/// Accumulate one cell's `AnalysisSubstageNs` into a running total across the suite.
+fn add_analysis_substage(total: &mut AnalysisSubstageNs, delta: &AnalysisSubstageNs) {
+    total.resource_key_collect_ns += delta.resource_key_collect_ns;
+    total.base_plan_ns += delta.base_plan_ns;
+    total.perturb_minus_ns += delta.perturb_minus_ns;
+    total.perturb_plus_ns += delta.perturb_plus_ns;
+    total.sensitivity_compute_ns += delta.sensitivity_compute_ns;
+    total.result_build_ns += delta.result_build_ns;
 }
 
 /// Add `(after - before)` allocation-count/byte deltas since `before` into
@@ -259,4 +295,13 @@ fn record_stage_alloc(count_total: &mut u64, bytes_total: &mut u64, before: (u64
     let after = crate::alloc_counter::counting_alloc::snapshot();
     *count_total += after.0.saturating_sub(before.0);
     *bytes_total += after.1.saturating_sub(before.1);
+}
+
+/// Accumulate one cell's `SubstageNs` into a running total across the suite.
+fn add_substage(total: &mut SubstageNs, delta: &SubstageNs) {
+    total.fact_load_ns += delta.fact_load_ns;
+    total.query_ns += delta.query_ns;
+    total.effects_apply_ns += delta.effects_apply_ns;
+    total.proof_receipt_build_ns += delta.proof_receipt_build_ns;
+    total.trace_build_ns += delta.trace_build_ns;
 }

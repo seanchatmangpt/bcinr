@@ -14,6 +14,26 @@ use crate::ground::GroundTemporalProblem;
 use crate::powl_bridge::{temporal_plan_to_powl_tape, PowlOpSpec};
 use crate::Pddl8Error;
 
+/// L3 substage timing for one `analyze_schedule_instrumented` call — see
+/// `docs/DFCM_BENCHMARK_ANALYSIS.md`'s resolution-ladder section.
+///
+/// `base_plan_ns` covers the initial `find_temporal_plan` call plus the
+/// forward/backward-pass critical-path computation; `perturb_minus_ns`/
+/// `perturb_plus_ns` cover the two `replan_with_perturbed_capacity` calls
+/// for `resource_keys[0]` specifically (the ones `capacity_delta` reports);
+/// remaining resource keys, if any, are folded into `sensitivity_compute_ns`
+/// since the crown suite only ever exercises one key today (see
+/// docs/DFCM_BENCHMARK_ANALYSIS.md's L5 deferral note).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct AnalysisSubstageNs {
+    pub resource_key_collect_ns: u128,
+    pub base_plan_ns: u128,
+    pub perturb_minus_ns: u128,
+    pub perturb_plus_ns: u128,
+    pub sensitivity_compute_ns: u128,
+    pub result_build_ns: u128,
+}
+
 /// Per-resource finite-difference probe: does makespan change if this
 /// resource's initial capacity moves by ±1?
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -54,6 +74,23 @@ pub fn analyze_schedule(
     gtp: &GroundTemporalProblem,
     resource_keys: &[String],
 ) -> Result<ScheduleAnalysis64, Pddl8Error> {
+    analyze_schedule_instrumented(gtp, resource_keys).map(|(result, _substage)| result)
+}
+
+/// Same as `analyze_schedule`, but also returns L3 substage timing
+/// (`AnalysisSubstageNs`). The extra `Instant::now()` checkpoints are cheap
+/// relative to `analyze_schedule`'s ~3-6 total sub-calls (unlike
+/// `execute_temporal_plan`'s per-step hot loop, which needed a separate
+/// bench-only duplicate to avoid adding overhead) — `analyze_schedule`
+/// delegates to this function directly rather than duplicating it.
+pub fn analyze_schedule_instrumented(
+    gtp: &GroundTemporalProblem,
+    resource_keys: &[String],
+) -> Result<(ScheduleAnalysis64, AnalysisSubstageNs), Pddl8Error> {
+    use std::time::Instant;
+    let mut substage = AnalysisSubstageNs::default();
+
+    let t_base = Instant::now();
     let plan = gtp.find_temporal_plan()?;
     let ops = temporal_plan_to_powl_tape(&plan);
     let n = ops.len().min(64);
@@ -71,14 +108,25 @@ pub fn analyze_schedule(
             critical_path_mask |= 1u64 << i;
         }
     }
-
     let max_parallelism = max_parallelism(&earliest_start, &earliest_finish, n);
+    substage.base_plan_ns = t_base.elapsed().as_nanos();
+
+    let t_collect = Instant::now();
+    let keys: Vec<&String> = resource_keys.iter().take(64).collect();
+    substage.resource_key_collect_ns = t_collect.elapsed().as_nanos();
 
     let mut binding_resource_mask = 0u64;
     let mut capacity_delta = None;
-    for (idx, key) in resource_keys.iter().enumerate().take(64) {
+    for (idx, key) in keys.into_iter().enumerate() {
+        let t_minus = Instant::now();
         let minus = replan_with_perturbed_capacity(gtp, key, -1.0);
+        substage.perturb_minus_ns += t_minus.elapsed().as_nanos();
+
+        let t_plus = Instant::now();
         let plus = replan_with_perturbed_capacity(gtp, key, 1.0);
+        substage.perturb_plus_ns += t_plus.elapsed().as_nanos();
+
+        let t_sensitivity = Instant::now();
         let changed = match minus {
             Some(m) => (m - makespan).abs() > 1e-9,
             None => true, // infeasible at capacity-1 is itself evidence the resource binds
@@ -93,9 +141,11 @@ pub fn analyze_schedule(
                 plus_one_makespan: plus,
             });
         }
+        substage.sensitivity_compute_ns += t_sensitivity.elapsed().as_nanos();
     }
 
-    Ok(ScheduleAnalysis64 {
+    let t_result = Instant::now();
+    let result = ScheduleAnalysis64 {
         makespan,
         critical_path_mask,
         max_parallelism,
@@ -103,7 +153,10 @@ pub fn analyze_schedule(
         slack_by_op,
         op_count: n,
         capacity_delta,
-    })
+    };
+    substage.result_build_ns = t_result.elapsed().as_nanos();
+
+    Ok((result, substage))
 }
 
 /// Earliest start/finish per op via a forward pass over `pred_mask`

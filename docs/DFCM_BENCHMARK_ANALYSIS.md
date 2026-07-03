@@ -6,6 +6,12 @@ planning. **Short version: this benchmark is not measuring planning quality
 against IPC-class planners, and a direct number-to-number comparison would be
 misleading.** It measures something different — and narrower — on purpose.
 
+**Note on the numbers below**: the "What was actually measured" section
+records a historical snapshot (243ms total) from before the `may_fire`
+fact-deduplication fix. See "Fixed: `may_fire` fact deduplication" further
+down for the current numbers (41ms total, ~6.1x faster) — kept as a
+historical record of the investigation sequence, not silently overwritten.
+
 ## What was actually measured
 
 `run_dfcm_crown_suite()` runs a fixed 16-cell matrix (worker count ∈
@@ -220,6 +226,211 @@ surface-1-era fix) still clone `self.initial_atoms` (a `BTreeSet`) and
 replan — the earlier fix eliminated the *outer* `GroundTemporalProblem`
 clone but not the *inner* per-call state clones that `find_temporal_plan`
 always does, regardless of caller. Flagged, not fixed, in this pass.
+
+## L3 substage attribution: admission/replay cost is almost entirely `query_ns`
+
+A follow-up pass added `execute_temporal_plan_instrumented` (a bench-only
+duplicate of `execute_temporal_plan` with `Instant::now()` checkpoints
+around fact-loading, per-step Prolog8 querying, effect application, chain
+hashing, and OCEL trace construction — zero overhead added to the real,
+production `execute_temporal_plan` used by every other caller). Real numbers
+from the largest cells:
+
+```text
+fact_load_ns            = 287,124 ns   (admission) /   262,540 ns (replay)
+query_ns                = 103,794,486 ns (admission) / 104,418,206 ns (replay)
+effects_apply_ns        = 598,536 ns   (admission) /   639,627 ns (replay)
+proof_receipt_build_ns  = 90,840 ns    (admission) /    91,291 ns (replay)
+trace_build_ns          = 391,700 ns   (admission) /   392,460 ns (replay)
+```
+
+**`query_ns` — the per-step `ctx.query_may_fire` call — is ~98% of the total
+`admission_ns`/`replay_ns` cost.** Every other substage combined
+(fact-loading, effect application, chain hashing, OCEL construction) is
+under 1.3ms out of ~105ms. This corrects the prior pass's speculative note
+that OCEL event construction or Prolog8 string interning were likely
+culprits — `trace_build_ns` and `fact_load_ns` are both negligible. The real
+cost is inside `ctx.query_may_fire`, i.e. inside `prolog8::Kernel::query`.
+
+**A concrete, textually-confirmed root cause was found — a real redundancy,
+not proof-algorithm cost.** `Ctx::load_may_fire` (`execute.rs`) creates one
+new `FactBlock8` per call, with **no deduplication**:
+
+```rust
+fn load_may_fire(&mut self, label: &str) {
+    let pred = self.pred("may_fire", 1);
+    let term = self.term(label);
+    let row = FactRow8::new(pred, 1, &[term], SRC);
+    let _ = self.kernel.load_facts(FactBlock8::new(pred, 1, vec![row]));
+}
+```
+
+`execute_temporal_plan`'s fact-loading loop calls this **once per plan
+step** (`for step in &steps { ctx.load_may_fire(&step.action_name); }`).
+For durative-action plans, every step of the same schema shares the *same*
+`step.action_name` (the bare schema name — see the durative-action label fix
+from an earlier pass), so at the 64-worker cell, `may_fire("assign-worker")`
+gets loaded as **64 separate, byte-identical `FactBlock8`s**. `prolog8`'s
+`Kernel::scan_facts` (source-confirmed in an earlier pass) does not
+short-circuit on the first match — it scans **every** fact block, filters,
+and collects **all** matches into a `Vec<(FactRow8, [u8;32])>`; `query()`
+then builds a proof/receipt answer (`assemble_fact_answer`) for **every**
+element of that vector, not just one. So at n=64 identical steps, a single
+query scans up to 64 fact blocks and assembles up to 64 redundant proof
+answers, and this happens once per step — a real O(n²)-shaped redundancy
+inside `query_ns`, not O(1) proof-search cost.
+
+This was flagged as a genuine, evidence-backed optimization candidate
+satisfying the project's own bar: *"An optimization candidate is admitted
+only if it appears at L3 or deeper with measured ns/alloc impact and a
+preserved guarantee boundary."* It was then fixed in a dedicated follow-up
+pass — see "Fixed: may_fire fact deduplication" below.
+
+## Fixed: `may_fire` fact deduplication
+
+**The fix**: `Ctx::load_may_fire`'s three call sites (`execute_tape`,
+`execute_temporal_plan`, `execute_temporal_plan_instrumented`, all in
+`crates/bcinr-pddl/src/execute.rs`) now track a `BTreeSet` of already-loaded
+labels and only call `ctx.load_may_fire(label)` the first time a label is
+seen, instead of once per op/step unconditionally. **Guarantee preserved**:
+`may_fire(label)` is queried by label alone
+(`ctx.query_may_fire(&step.action_name)`), never by step index or instance
+identity — it is already a set-membership fact under the current admission
+model, not a multiset one, so loading it once vs. N times cannot change
+what's provable. The fix was scoped narrowly to these three call sites, not
+to `prolog8::Kernel::scan_facts`/`assemble_fact_answer` internals, which
+remain untouched — a separate crate with its own design authority.
+
+A dedicated regression test,
+`duplicate_action_labels_admit_identically_to_a_single_label`
+(`crates/bcinr-pddl/tests/capacity.rs`), documents the guarantee directly:
+multiple `assign-worker` steps sharing one label all admit and reach their
+goal, exactly as before the fix.
+
+**Measured before/after** (release-mode `dfcm_crown_bench`, full 16-cell suite):
+
+```text
+                        before          after         speedup
+wall_clock_ms           251             41            ~6.1x
+admission_ns            105,672,164     2,038,791     ~51.8x
+replay_ns               106,282,418     2,025,501     ~52.5x
+admission.query_ns      103,794,486     730,961       ~142x
+replay.query_ns         104,418,206     729,871       ~143x
+admission alloc_count   179,560         32,608        ~5.5x fewer
+admission alloc_bytes   33,981,740      1,483,532     ~22.9x fewer
+replay alloc_count      179,560         32,608        ~5.5x fewer
+replay alloc_bytes      33,981,740      1,483,532     ~22.9x fewer
+```
+
+The debug-mode 5s gate test dropped from ~3.0s to ~0.21s (~14x) in the same
+change — consistent with the release numbers, just at debug-build constant
+factors. `debug_assert_eq!(receipt.chain_hash, replay_receipt.chain_hash)`
+in `dfcm_crown.rs`'s loop continued to hold throughout, confirming the fix
+doesn't change what's provable, only how much redundant work proving it
+took. All 26 `bcinr-pddl` tests (25 prior + 1 new regression test) pass.
+
+**The bottleneck moved, honestly reported, not hidden**: post-fix,
+`analysis_ns` (~25.4ms, unchanged by this fix) is now the largest single L1
+stage — larger than `admission_ns`+`replay_ns`+`planning_ns` combined
+(~13.3ms). Its allocation count (521,983, unchanged) already exceeds
+`admission`+`replay` combined (65,216, post-fix) by ~8x. This was flagged in
+an earlier pass ("NEXT LEAD: `find_temporal_plan`'s internal per-call
+`BTreeSet`/`HashMap` state clones, which survive even after the
+`find_temporal_plan_with_fn_overrides` fix eliminated the outer
+`GroundTemporalProblem` clone") and was investigated directly in the
+following pass — see below.
+
+## Analysis bottleneck after may_fire dedupe
+
+A dedicated attribution pass added `analyze_schedule_instrumented`
+(`crates/bcinr-pddl/src/schedule_analysis.rs`) — `analyze_schedule` now
+delegates to it directly rather than duplicating it, since `analyze_schedule`
+only makes ~3-6 sub-calls total (unlike `execute_temporal_plan`'s per-step
+hot loop, which needed a separate bench-only duplicate to avoid measurement
+overhead in a tight loop). New `AnalysisSubstageNs` fields:
+`resource_key_collect_ns`, `base_plan_ns`, `perturb_minus_ns`,
+`perturb_plus_ns`, `sensitivity_compute_ns`, `result_build_ns`.
+
+**Post-dedup baseline** (release, full 16-cell suite, before this pass):
+
+```text
+wall_clock_ms   = 41
+analysis_ns     = 25,482,211 ns  (~62% of wall clock)
+analysis alloc  = 521,983 allocations / 6,343,282 bytes
+```
+
+**L3 analysis substage attribution** (real numbers):
+
+```text
+resource_key_collect_ns = 416 ns
+base_plan_ns            = 9,340,544 ns
+perturb_minus_ns        = 6,989,209 ns
+perturb_plus_ns         = 9,124,711 ns
+sensitivity_compute_ns  = 293 ns
+result_build_ns         = 332 ns
+```
+
+`base_plan_ns + perturb_minus_ns + perturb_plus_ns ≈ 25.45ms`, matching
+`analysis_ns`'s ~25.48ms almost exactly. `resource_key_collect_ns`,
+`sensitivity_compute_ns`, and `result_build_ns` are all sub-microsecond,
+combined negligible.
+
+**Finding: no hidden extra redundancy — the cost is fully explained by
+three proportional `find_temporal_plan`-family calls.** `analyze_schedule`
+calls the planner three times per cell (once for the base plan, once each
+for the −1/+1 capacity perturbations via
+`replan_with_perturbed_capacity`/`find_temporal_plan_with_fn_overrides`),
+and each of those three calls costs roughly what one standalone
+`find_temporal_plan` call costs (`planning_ns` totals 9.26ms across the
+suite for one call per cell; `base_plan_ns`/`perturb_plus_ns` are both
+~9.1-9.3ms, `perturb_minus_ns` slightly less at 6.99ms, plausibly because
+lower capacity plans terminate sooner). This is the **expected, inherent
+cost of the finite-difference sensitivity method** chosen deliberately in
+an earlier pass over building a full LP/polytope solver — not a bug, and
+not evidence of a *separate* redundancy layered on top of that method's
+known cost.
+
+**Phase 2 decision: no optimization candidate admitted in this pass.** Per
+the project's own admission rule, a candidate needs a source-confirmed root
+cause distinct from the method's inherent cost, with a small,
+guarantee-preserving, low-risk fix. The one real remaining lever —
+`find_temporal_plan`'s internal per-call `state`/`fn_vals` clones
+(`self.initial_atoms.clone()`, `self.initial_fn_values.clone()`) — is real,
+but reducing it would mean changing `find_temporal_plan`'s core signature
+and loop (e.g. a mutable scratch-state parameter reused across calls), which
+is shared by *every* planning call in the codebase, not an analysis-specific
+fix. That is a broader, higher-risk change appropriate for its own
+dedicated, carefully-tested pass — not a "surgical" fix to squeeze into an
+attribution pass, per this project's explicit "one candidate, narrow scope,
+no broad rewrites" discipline. Stopping here, as prescribed: *"Stop after
+attribution if no candidate satisfies the admission bar."*
+
+**Guarantee boundary preserved**: `TemporalPlan.makespan`, `.steps`,
+capacity-sensitivity result shape, `max_ops`/`max_parallelism`, and all
+admission/replay behavior are unchanged — this pass added instrumentation
+only, no optimization, no semantic change. 26/26 tests pass (unchanged from
+before this pass; no new regression test was needed since no behavior
+changed).
+
+**Remaining bottleneck after this pass**: `analysis_ns` (~25.4ms) remains
+the dominant L1 stage, now understood precisely rather than suspected. The
+next evidence-backed candidate, if this becomes a priority, is a
+planner-wide (not analysis-specific) scratch-state reuse mechanism inside
+`find_temporal_plan` — scoped as its own future pass.
+
+## Resolution ladder: what's implemented vs. deferred
+
+Per the multi-resolution benchmarking framework:
+
+| Layer | Status | Notes |
+|---|---|---|
+| L0 crown gate | Implemented | `dfcm_crown_suite_completes_under_5_seconds`, ≤5s contract |
+| L1 stage timing | Implemented | `topology_ns`/`planning_ns`/`analysis_ns`/`admission_ns`/`receipt_ns`/`replay_ns` |
+| L2 lifecycle split | Implemented | `cold_topology_once_ns`, `warm_*_ns`, `warm_replay_existing_receipt_ns` (chain-only) vs. `replay_ns` (full re-execution) |
+| L3 substage attribution | Implemented (admission, replay, analysis) | `execute_temporal_plan_instrumented`'s `SubstageNs` (fact_load/query/effects_apply/proof_receipt_build/trace_build); `analyze_schedule_instrumented`'s `AnalysisSubstageNs` (resource_key_collect/base_plan/perturb_minus/perturb_plus/sensitivity_compute/result_build) |
+| L4 allocation | Implemented (L1 granularity only) | `dhat-heap` feature, `alloc_counter.rs`; not extended to L3 substage granularity for analysis (the ns-level split alone was sufficient to reach a conclusion — see "Analysis bottleneck after may_fire dedupe") |
+| L5 scaling slopes | **Deferred** | Requires new domain/problem generators varying resource-key count, timed-init count, and condition-tree depth independently of worker count — none of which today's `dfcm-crown` domain varies. Needs its own scoping pass. |
+| L6 guarantee-mode benchmarks | **Partially implicit, not formalized** | `chain_validate_only` ≈ `warm_replay_existing_receipt_ns`; `replay_against_current_law` ≈ `replay_ns`/`admission_ns`. `trace_compare_only` (needs `compare_traces`, PRD backlog task #15) and `replay_against_recorded_law` (needs a policy-versioning concept absent from `Ctx` entirely) require functionality that doesn't exist yet — not benchmarked against code that doesn't exist. |
 
 ## Why this isn't a SOTA planning comparison
 

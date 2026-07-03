@@ -124,9 +124,18 @@ pub fn execute_tape(
     // Load initial world state
     for atom in initial_state { ctx.load_ground_atom(atom); }
 
-    // Load policy rules or pre-admit all ops
+    // Load policy rules or pre-admit all ops. `may_fire(label)` is a set
+    // membership fact keyed on label alone (queried the same way below) —
+    // loading the same label more than once creates duplicate FactBlock8s
+    // that prolog8's scan_facts then scans and assembles proof/receipt
+    // answers for redundantly, so labels are deduplicated before loading.
     if policy_rules.is_empty() {
-        for op in &tape.ops { ctx.load_may_fire(&op.label); }
+        let mut loaded_labels = BTreeSet::new();
+        for op in &tape.ops {
+            if loaded_labels.insert(op.label.as_str()) {
+                ctx.load_may_fire(&op.label);
+            }
+        }
     } else {
         for (i, (head, body)) in policy_rules.iter().enumerate() {
             load_may_fire_rule(&mut ctx, i as u32 + 1, head, body)?;
@@ -365,6 +374,236 @@ pub fn compute_plan_chain(steps: &[wasm4pm_compat::pddl::TemporalPlanStep]) -> S
     hex(&chain)
 }
 
+/// L3 substage timing for one `execute_temporal_plan_instrumented` call —
+/// see `docs/DFCM_BENCHMARK_ANALYSIS.md`'s resolution-ladder section.
+///
+/// `proof_receipt_build_ns` is a proxy, not a true isolation of
+/// `prolog8::Kernel::query`'s internal proof/receipt assembly: that code is
+/// private to the `prolog8` crate and not independently instrumentable from
+/// outside it. This field times the externally-visible per-step BLAKE3
+/// chain-extension block that consumes each query's result instead — the
+/// closest observable stand-in for "receipt-building work per step."
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SubstageNs {
+    pub fact_load_ns: u128,
+    pub query_ns: u128,
+    pub effects_apply_ns: u128,
+    pub proof_receipt_build_ns: u128,
+    pub trace_build_ns: u128,
+}
+
+/// Bench-only instrumented variant of `execute_temporal_plan`, duplicating
+/// its logic with `Instant::now()` checkpoints around each L3 substage.
+/// Exists *only* so DfCM crown-suite benchmarking can attribute
+/// admission/replay cost by substage without adding timing overhead to
+/// `execute_temporal_plan` itself, which every production caller uses.
+/// Keep this in sync with `execute_temporal_plan` if that function's
+/// structure changes.
+pub fn execute_temporal_plan_instrumented(
+    plan: &TemporalPlan,
+    domain: &Pddl8Domain,
+    problem: &Pddl8Problem,
+    case_id: &str,
+    policy_rules: &[(&str, Vec<&str>)],
+) -> Result<(TemporalExecutionReceipt, OCEL, SubstageNs), Pddl8Error> {
+    use blake3::Hasher;
+    use std::time::Instant;
+
+    validate_case_id(case_id)?;
+
+    let mut steps = plan.steps.clone();
+    steps.sort_by(|a, b| a.start_time.partial_cmp(&b.start_time).unwrap());
+
+    let mut substage = SubstageNs::default();
+
+    let t_fact_load = Instant::now();
+    let mut ctx = Ctx::new();
+    if policy_rules.is_empty() {
+        // Deduplicate labels before loading — see the dedup comment on the
+        // production execute_temporal_plan below for the full rationale.
+        let mut loaded_labels = BTreeSet::new();
+        for step in &steps {
+            if loaded_labels.insert(step.action_name.as_str()) {
+                ctx.load_may_fire(&step.action_name);
+            }
+        }
+    } else {
+        for (i, (head, body)) in policy_rules.iter().enumerate() {
+            load_may_fire_rule(&mut ctx, i as u32 + 1, head, body)?;
+        }
+    }
+    substage.fact_load_ns += t_fact_load.elapsed().as_nanos();
+
+    let mut state: BTreeSet<String> = problem.init.iter()
+        .map(|a| atom_key(&a.pred, &a.args))
+        .collect();
+    let goal_keys: BTreeSet<String> = problem.goal.iter()
+        .map(|a| atom_key(&a.pred, &a.args))
+        .collect();
+
+    let mut plan_hasher = Hasher::new();
+    for step in &steps {
+        plan_hasher.update(step.start_time.to_bits().to_le_bytes().as_ref());
+        plan_hasher.update(step.action_name.as_bytes());
+        for arg in &step.args {
+            plan_hasher.update(arg.as_bytes());
+        }
+    }
+    let plan_root = hex(plan_hasher.finalize().as_bytes());
+    let state_root = hash_strings(&problem.init.iter().map(|a| {
+        format!("({} {})", a.pred, a.args.join(" "))
+    }).collect::<Vec<_>>());
+    let goal_root = hash_strings(&problem.goal.iter().map(|a| {
+        format!("({} {})", a.pred, a.args.join(" "))
+    }).collect::<Vec<_>>());
+
+    let mut chain = [0u8; 32];
+    let mut ocel_events = Vec::new();
+
+    for (i, step) in steps.iter().enumerate() {
+        let t_query = Instant::now();
+        let admitted = ctx.query_may_fire(&step.action_name);
+        substage.query_ns += t_query.elapsed().as_nanos();
+        if !admitted {
+            return Err(Pddl8Error::StepDenied {
+                op_index: i as u8,
+                reason: format!("Prolog8 denied may_fire({})", step.action_name),
+            });
+        }
+
+        let t_effects = Instant::now();
+        let (base_name, parsed_args) = parse_action_label(&step.action_name);
+        if let Some(schema) = domain.actions.iter().find(|a| a.name == base_name) {
+            let subst: HashMap<&str, &str> = schema.params.iter()
+                .zip(parsed_args.iter())
+                .map(|(p, a)| (p.as_str(), *a))
+                .collect();
+            for eff in &schema.add_effects {
+                let grounded: Vec<String> = eff.args.iter()
+                    .map(|a| subst.get(a.as_str()).map(|&s| s.to_string()).unwrap_or_else(|| a.clone()))
+                    .collect();
+                state.insert(atom_key(&eff.pred, &grounded));
+            }
+            for eff in &schema.del_effects {
+                let grounded: Vec<String> = eff.args.iter()
+                    .map(|a| subst.get(a.as_str()).map(|&s| s.to_string()).unwrap_or_else(|| a.clone()))
+                    .collect();
+                state.remove(&atom_key(&eff.pred, &grounded));
+            }
+        } else if let Some(da) = domain.durative_actions.iter().find(|d| d.name == step.action_name) {
+            let subst: HashMap<&str, &str> = da.params.iter()
+                .map(|(p, _)| p.as_str())
+                .zip(step.args.iter().map(|s| s.as_str()))
+                .collect();
+            for eff in &da.effects {
+                apply_pddl_effect_propositional(eff, &subst, &mut state);
+            }
+        }
+        substage.effects_apply_ns += t_effects.elapsed().as_nanos();
+
+        let t_chain = Instant::now();
+        let mut h = Hasher::new();
+        h.update(&chain);
+        h.update(step.action_name.as_bytes());
+        h.update(&step.start_time.to_bits().to_le_bytes());
+        h.update(&step.duration.to_bits().to_le_bytes());
+        chain = *h.finalize().as_bytes();
+        substage.proof_receipt_build_ns += t_chain.elapsed().as_nanos();
+
+        let t_trace = Instant::now();
+        let relationships = step.args.iter().enumerate().map(|(j, arg)| {
+            OCELRelationship {
+                object_id: format!("obj:{case_id}:{j}:{arg}"),
+                qualifier: "arg".to_string(),
+            }
+        }).collect();
+        ocel_events.push(OCELEvent {
+            id: format!("{case_id}:temporal:{i}"),
+            event_type: "temporal-step".to_string(),
+            time: chrono::Utc::now().fixed_offset(),
+            attributes: vec![
+                OCELEventAttribute { name: "activity".to_string(), value: OCELAttributeValue::String(step.action_name.clone()) },
+                OCELEventAttribute { name: "duration".to_string(), value: OCELAttributeValue::Float(step.duration) },
+                OCELEventAttribute { name: "start_time".to_string(), value: OCELAttributeValue::Float(step.start_time) },
+                OCELEventAttribute { name: "step_index".to_string(), value: OCELAttributeValue::Integer(i as i64) },
+                OCELEventAttribute { name: "args".to_string(), value: OCELAttributeValue::String(step.args.join(",")) },
+            ],
+            relationships,
+        });
+        substage.trace_build_ns += t_trace.elapsed().as_nanos();
+    }
+
+    let goal_reached = goal_keys.iter().all(|g| state.contains(g));
+
+    let t_final_chain = Instant::now();
+    let mut h = Hasher::new();
+    h.update(&chain);
+    h.update(if goal_reached { b"GOAL_MET" } else { b"GOAL_MISS" });
+    chain = *h.finalize().as_bytes();
+    let chain_hash = hex(&chain);
+    substage.proof_receipt_build_ns += t_final_chain.elapsed().as_nanos();
+
+    let makespan = steps.iter().map(|s| s.start_time + s.duration).fold(0.0_f64, f64::max);
+    let _ = domain;
+    let requirements: Vec<String> = vec![];
+
+    let receipt = TemporalExecutionReceipt {
+        plan_root,
+        state_root,
+        goal_root,
+        makespan,
+        step_count: steps.len(),
+        requirements,
+        goal_reached,
+        chain_hash,
+    };
+
+    let t_ocel_objects = Instant::now();
+    let mut seen_objects = std::collections::BTreeSet::new();
+    let mut objects = Vec::new();
+    for step in &steps {
+        for (j, arg) in step.args.iter().enumerate() {
+            let obj_id = format!("obj:{case_id}:{j}:{arg}");
+            if seen_objects.insert(obj_id.clone()) {
+                objects.push(OCELObject {
+                    id: obj_id,
+                    object_type: "pddl-object".to_string(),
+                    attributes: vec![],
+                    relationships: vec![],
+                });
+            }
+        }
+    }
+    objects.push(OCELObject {
+        id: case_id.to_string(),
+        object_type: "plan-case".to_string(),
+        attributes: vec![],
+        relationships: vec![],
+    });
+
+    let ocel = OCEL {
+        event_types: vec![OCELType {
+            name: "temporal-step".to_string(),
+            attributes: vec![
+                OCELTypeAttribute { name: "activity".to_string(), value_type: "string".to_string() },
+                OCELTypeAttribute { name: "duration".to_string(), value_type: "float".to_string() },
+                OCELTypeAttribute { name: "start_time".to_string(), value_type: "float".to_string() },
+                OCELTypeAttribute { name: "step_index".to_string(), value_type: "integer".to_string() },
+                OCELTypeAttribute { name: "args".to_string(), value_type: "string".to_string() },
+            ],
+        }],
+        object_types: vec![
+            OCELType { name: "plan-case".to_string(), attributes: vec![] },
+            OCELType { name: "pddl-object".to_string(), attributes: vec![] },
+        ],
+        events: ocel_events,
+        objects,
+    };
+    substage.trace_build_ns += t_ocel_objects.elapsed().as_nanos();
+
+    Ok((receipt, ocel, substage))
+}
+
 /// Execute a temporal plan through the Prolog8 admission gate + BLAKE3 receipt + OCEL output.
 ///
 /// Mirrors `execute_tape` — every step is checked via `query_may_fire` before it fires.
@@ -388,7 +627,24 @@ pub fn execute_temporal_plan(
     // Initialize Prolog8 admission gate — mirrors execute_tape lines 121-133.
     let mut ctx = Ctx::new();
     if policy_rules.is_empty() {
-        for step in &steps { ctx.load_may_fire(&step.action_name); }
+        // `may_fire(label)` is a set-membership fact keyed on the bare
+        // action label alone — queried the same way in the loop below
+        // (`ctx.query_may_fire(&step.action_name)`), never by step index
+        // or instance identity. Under this existing schema-level admission
+        // model, loading the same label once vs. N times cannot change
+        // what's provable, so labels are deduplicated before loading: with
+        // durative-action plans, every step of the same schema shares the
+        // same bare action_name, and loading it once per step created N
+        // byte-identical FactBlock8s that prolog8's scan_facts then scanned
+        // and assembled a redundant proof/receipt answer for on every
+        // query (see docs/DFCM_BENCHMARK_ANALYSIS.md's L3 substage finding
+        // — this was ~98% of admission_ns/replay_ns).
+        let mut loaded_labels = BTreeSet::new();
+        for step in &steps {
+            if loaded_labels.insert(step.action_name.as_str()) {
+                ctx.load_may_fire(&step.action_name);
+            }
+        }
     } else {
         for (i, (head, body)) in policy_rules.iter().enumerate() {
             load_may_fire_rule(&mut ctx, i as u32 + 1, head, body)?;
