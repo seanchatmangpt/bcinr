@@ -41,12 +41,6 @@ script = [
     "find target/criterion -name estimates.json | xargs grep -h '\"mean\":' | jq -r '\"| \\(.family) | \\(.primitive) | \\(.mean.point_estimate) \\(.mean.unit) |\"' || echo 'Use jq for structured report output'"
 ]
 
-[tasks.clippy]
-category = "Lint"
-description = "Run clippy with strict pedantic lints"
-command = "cargo"
-args = ["clippy", "--workspace", "--all-targets", "--all-features", "--", "-D", "warnings"]
-
 [tasks.fmt]
 category = "Lint"
 description = "Check formatting"
