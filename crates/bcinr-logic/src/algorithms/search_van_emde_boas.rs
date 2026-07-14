@@ -74,22 +74,22 @@ mod tests {
             search_van_emde_boas_reference(42, 1337)
         );
         // boundaries
-            assert_eq!(
-                search_van_emde_boas(0, 0),
-                search_van_emde_boas_reference(0, 0)
-            );
-            assert_eq!(
-                search_van_emde_boas(u64::MAX, u64::MAX),
-                search_van_emde_boas_reference(u64::MAX, u64::MAX)
-            );
-            assert_eq!(
-                search_van_emde_boas(u64::MAX, 0),
-                search_van_emde_boas_reference(u64::MAX, 0)
-            );
-            assert_eq!(
-                search_van_emde_boas(0, u64::MAX),
-                search_van_emde_boas_reference(0, u64::MAX)
-            );
+        assert_eq!(
+            search_van_emde_boas(0, 0),
+            search_van_emde_boas_reference(0, 0)
+        );
+        assert_eq!(
+            search_van_emde_boas(u64::MAX, u64::MAX),
+            search_van_emde_boas_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            search_van_emde_boas(u64::MAX, 0),
+            search_van_emde_boas_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            search_van_emde_boas(0, u64::MAX),
+            search_van_emde_boas_reference(0, u64::MAX)
+        );
         // mutants
         let base = search_van_emde_boas_reference(42, 1337);
         assert_ne!(mutant_search_van_emde_boas_1(42, 1337), base, "mutant 1");

@@ -29,7 +29,7 @@ pub fn exp2_u64_fixed(val: u64, _aux: u64) -> u64 {
     // Branchless saturation: if int_exp >= 48, sat_mask = 0xFFF...F, else 0x0
     let saturated = (int_exp >= 48) as u64;
     let sat_mask = saturated.wrapping_neg(); // all-ones if saturated, zero otherwise
-    // Clamp shift to prevent undefined behavior (Rust panics on shift >= 64)
+                                             // Clamp shift to prevent undefined behavior (Rust panics on shift >= 64)
     let safe_exp = int_exp & 63;
     let result = 65536u64.wrapping_shl(safe_exp);
     // Select: if saturated return u64::MAX, else return result
@@ -153,13 +153,18 @@ mod tests {
         let m1 = mutant_exp2_u64_fixed_1(42, 1337);
         let m2 = mutant_exp2_u64_fixed_2(42, 1337);
         let m3 = mutant_exp2_u64_fixed_3(42, 1337);
-        if m1 != baseline { assert_ne!(m1, baseline, "mutant 1"); }
-        if m2 != baseline { assert_ne!(m2, baseline, "mutant 2"); }
-        if m3 != baseline { assert_ne!(m3, baseline, "mutant 3"); }
+        if m1 != baseline {
+            assert_ne!(m1, baseline, "mutant 1");
+        }
+        if m2 != baseline {
+            assert_ne!(m2, baseline, "mutant 2");
+        }
+        if m3 != baseline {
+            assert_ne!(m3, baseline, "mutant 3");
+        }
     }
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
-
 }
 
 #[cfg(feature = "bench")]

@@ -65,7 +65,6 @@ mod tests {
         zigzag_encode_i64_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------

@@ -51,13 +51,20 @@ pub enum CompileError {
     EmptySequence,
     EmptyChoice,
     EmptyPartialOrder,
-    InvalidEdge { from: usize, to: usize, len: usize },
+    InvalidEdge {
+        from: usize,
+        to: usize,
+        len: usize,
+    },
     Cycle,
     /// A non-LoopRedo slot is unreachable from the entry mask.
     Unreachable,
     /// XorChoice nested inside Loop body or redo — unsafe; LoopRedo can
     /// re-enable unchosen XOR branches across iterations.
-    XorInsideLoop { xor_slot: u8, loop_body_entry: u8 },
+    XorInsideLoop {
+        xor_slot: u8,
+        loop_body_entry: u8,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -97,13 +104,19 @@ fn wire(tape: &mut PowlTape, from_exits: u64, to_entries: u64) {
 fn compile_atom(tape: &mut PowlTape) -> Result<Segment, CompileError> {
     let idx = tape.alloc(OpKind::Atom).ok_or(CompileError::TapeFull)?;
     let bit = 1u64 << idx;
-    Ok(Segment { entries: bit, exits: bit })
+    Ok(Segment {
+        entries: bit,
+        exits: bit,
+    })
 }
 
 fn compile_silent(tape: &mut PowlTape) -> Result<Segment, CompileError> {
     let idx = tape.alloc(OpKind::Silent).ok_or(CompileError::TapeFull)?;
     let bit = 1u64 << idx;
-    Ok(Segment { entries: bit, exits: bit })
+    Ok(Segment {
+        entries: bit,
+        exits: bit,
+    })
 }
 
 fn compile_sequence<'a>(
@@ -117,7 +130,10 @@ fn compile_sequence<'a>(
     for child in &children[1..] {
         let next = compile_node(child, tape)?;
         wire(tape, seg.exits, next.entries);
-        seg = Segment { entries: seg.entries, exits: next.exits };
+        seg = Segment {
+            entries: seg.entries,
+            exits: next.exits,
+        };
     }
     Ok(seg)
 }
@@ -139,7 +155,11 @@ fn compile_partial_order<'a>(
     // Wire explicit dependency edges.
     for &(from, to) in edges {
         if from >= children.len() || to >= children.len() {
-            return Err(CompileError::InvalidEdge { from, to, len: children.len() });
+            return Err(CompileError::InvalidEdge {
+                from,
+                to,
+                len: children.len(),
+            });
         }
         wire(tape, child_segs[from].exits, child_segs[to].entries);
     }
@@ -155,8 +175,12 @@ fn compile_partial_order<'a>(
     let mut entries = 0u64;
     let mut exits = 0u64;
     for (i, seg) in child_segs.iter().enumerate() {
-        if !has_incoming[i] { entries |= seg.entries; }
-        if !has_outgoing[i] { exits |= seg.exits; }
+        if !has_incoming[i] {
+            entries |= seg.entries;
+        }
+        if !has_outgoing[i] {
+            exits |= seg.exits;
+        }
     }
 
     // If there are multiple exits, emit a synthetic silent join.
@@ -180,7 +204,9 @@ fn compile_xor_choice<'a>(
         return Err(CompileError::EmptyChoice);
     }
 
-    let dispatch_idx = tape.alloc(OpKind::XorDispatch).ok_or(CompileError::TapeFull)?;
+    let dispatch_idx = tape
+        .alloc(OpKind::XorDispatch)
+        .ok_or(CompileError::TapeFull)?;
     let dispatch_bit = 1u64 << dispatch_idx;
     let join_idx = tape.alloc(OpKind::Join).ok_or(CompileError::TapeFull)?;
     let join_bit = 1u64 << join_idx;
@@ -199,7 +225,10 @@ fn compile_xor_choice<'a>(
     // via choice_taken. See scheduler.rs for the XOR suppression protocol.
     tape.ops[join_idx as usize].pred_mask = branch_entries;
 
-    Ok(Segment { entries: dispatch_bit, exits: join_bit })
+    Ok(Segment {
+        entries: dispatch_bit,
+        exits: join_bit,
+    })
 }
 
 fn compile_loop<'a>(
@@ -219,7 +248,10 @@ fn compile_loop<'a>(
     for i in pre_len as usize..tape.len as usize {
         if tape.ops[i].kind == OpKind::XorDispatch {
             let loop_body_entry = body_seg.entries.trailing_zeros() as u8;
-            return Err(CompileError::XorInsideLoop { xor_slot: i as u8, loop_body_entry });
+            return Err(CompileError::XorInsideLoop {
+                xor_slot: i as u8,
+                loop_body_entry,
+            });
         }
     }
 
@@ -234,7 +266,10 @@ fn compile_loop<'a>(
     // Store max_iters in branch_count (0 = unlimited).
     tape.ops[back_idx as usize].branch_count = max_iters;
 
-    Ok(Segment { entries: body_seg.entries, exits: body_seg.exits })
+    Ok(Segment {
+        entries: body_seg.entries,
+        exits: body_seg.exits,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -246,12 +281,18 @@ fn compile_node<'a>(
     tape: &mut PowlTape,
 ) -> Result<Segment, CompileError> {
     match node {
-        PowlAstNode::Atom(_label)                       => compile_atom(tape),
-        PowlAstNode::Silent                             => compile_silent(tape),
-        PowlAstNode::Sequence(children)                 => compile_sequence(children, tape),
-        PowlAstNode::PartialOrder { children, edges }   => compile_partial_order(children, edges, tape),
-        PowlAstNode::XorChoice(branches)                => compile_xor_choice(branches, tape),
-        PowlAstNode::Loop { body, redo, max_iters }     => compile_loop(body, redo, *max_iters, tape),
+        PowlAstNode::Atom(_label) => compile_atom(tape),
+        PowlAstNode::Silent => compile_silent(tape),
+        PowlAstNode::Sequence(children) => compile_sequence(children, tape),
+        PowlAstNode::PartialOrder { children, edges } => {
+            compile_partial_order(children, edges, tape)
+        }
+        PowlAstNode::XorChoice(branches) => compile_xor_choice(branches, tape),
+        PowlAstNode::Loop {
+            body,
+            redo,
+            max_iters,
+        } => compile_loop(body, redo, *max_iters, tape),
     }
 }
 
@@ -300,8 +341,14 @@ fn run_kahn_walk(tape: &PowlTape, n: usize, mut in_deg: [u32; 64]) -> Result<(),
         }
     }
 
-    let non_redo_count = (0..n).filter(|&i| tape.ops[i].kind != OpKind::LoopRedo).count();
-    if visited < non_redo_count { Err(CompileError::Cycle) } else { Ok(()) }
+    let non_redo_count = (0..n)
+        .filter(|&i| tape.ops[i].kind != OpKind::LoopRedo)
+        .count();
+    if visited < non_redo_count {
+        Err(CompileError::Cycle)
+    } else {
+        Ok(())
+    }
 }
 
 /// Phase 1 of two-phase Kahn: detect non-loop cycles.
@@ -383,10 +430,7 @@ mod tests {
 
     #[test]
     fn compile_sequence_two() {
-        let ast = PowlAstNode::Sequence(vec![
-            PowlAstNode::Atom("a"),
-            PowlAstNode::Atom("b"),
-        ]);
+        let ast = PowlAstNode::Sequence(vec![PowlAstNode::Atom("a"), PowlAstNode::Atom("b")]);
         let tape = compile_powl(&ast).unwrap();
         // slot 0 = a, slot 1 = b
         assert_eq!(tape.len, 2);
@@ -396,10 +440,8 @@ mod tests {
 
     #[test]
     fn compile_xor_choice() {
-        let ast = PowlAstNode::XorChoice(vec![
-            PowlAstNode::Atom("left"),
-            PowlAstNode::Atom("right"),
-        ]);
+        let ast =
+            PowlAstNode::XorChoice(vec![PowlAstNode::Atom("left"), PowlAstNode::Atom("right")]);
         let tape = compile_powl(&ast).unwrap();
         // dispatch(0) + left(1) + right(2) + join(3) — but dispatch alloc'd first
         // Actually: dispatch=0, join=1, left=2, right=3 (join alloc after dispatch)
@@ -434,7 +476,10 @@ mod tests {
             children: vec![PowlAstNode::Atom("a")],
             edges: vec![(0, 5)],
         };
-        assert!(matches!(compile_powl(&ast), Err(CompileError::InvalidEdge { .. })));
+        assert!(matches!(
+            compile_powl(&ast),
+            Err(CompileError::InvalidEdge { .. })
+        ));
     }
 
     // -------------------------------------------------------------------------
@@ -549,7 +594,10 @@ mod tests {
             redo: Box::new(PowlAstNode::Atom("r")),
             max_iters: 3,
         };
-        assert!(matches!(compile_powl(&ast), Err(CompileError::XorInsideLoop { .. })));
+        assert!(matches!(
+            compile_powl(&ast),
+            Err(CompileError::XorInsideLoop { .. })
+        ));
     }
 
     #[test]
@@ -572,12 +620,15 @@ mod tests {
             children: vec![PowlAstNode::Atom("a"), PowlAstNode::Atom("b")],
             edges: vec![(0, 1), (1, 0)],
         };
-        assert_eq!(compile_powl(&ast), Err(CompileError::Cycle),
-            "mutual PartialOrder edges must be rejected as a cycle");
+        assert_eq!(
+            compile_powl(&ast),
+            Err(CompileError::Cycle),
+            "mutual PartialOrder edges must be rejected as a cycle"
+        );
     }
 
-    use proptest::prelude::*;
     use crate::scheduler::{scheduler_tick, PowlRunState};
+    use proptest::prelude::*;
 
     proptest! {
         #[test]

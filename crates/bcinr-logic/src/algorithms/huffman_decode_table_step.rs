@@ -65,8 +65,6 @@ mod tests {
         huffman_decode_table_step_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
-
     #[test]
     fn test_huffman_decode_table_step_all() {
         // equivalence oracle
@@ -96,9 +94,15 @@ mod tests {
         let m1 = mutant_huffman_decode_table_step_1(42, 1337);
         let m2 = mutant_huffman_decode_table_step_2(42, 1337);
         let m3 = mutant_huffman_decode_table_step_3(42, 1337);
-        if m1 != baseline { assert_ne!(m1, baseline, "mutant 1"); }
-        if m2 != baseline { assert_ne!(m2, baseline, "mutant 2"); }
-        if m3 != baseline { assert_ne!(m3, baseline, "mutant 3"); }
+        if m1 != baseline {
+            assert_ne!(m1, baseline, "mutant 1");
+        }
+        if m2 != baseline {
+            assert_ne!(m2, baseline, "mutant 2");
+        }
+        if m3 != baseline {
+            assert_ne!(m3, baseline, "mutant 3");
+        }
     }
 
     // -------------------------------------------------------------------------

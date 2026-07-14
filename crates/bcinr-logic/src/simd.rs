@@ -181,7 +181,11 @@ mod tests_phd_simd {
         assert_eq!(simd_reference(0, 0), 0);
         let cases: &[fn(u64, u64) -> u64] = &[mutant_simd_1, mutant_simd_2, mutant_simd_3];
         for (i, m) in cases.iter().enumerate() {
-            assert!(simd_reference(1, 1) != m(1, 1), "mutant {} not rejected", i + 1);
+            assert!(
+                simd_reference(1, 1) != m(1, 1),
+                "mutant {} not rejected",
+                i + 1
+            );
         }
         // splat: boundary values and arbitrary
         assert_eq!(splat_u8x16(0), [0u8; 16]);
@@ -191,9 +195,11 @@ mod tests_phd_simd {
         // movemask: no lanes, all lanes, first lane, last lane
         assert_eq!(movemask_u8x16([0x00; 16]), 0x0000);
         assert_eq!(movemask_u8x16([0xFF; 16]), 0xFFFF);
-        let mut v = [0u8; 16]; v[0] = 0x80;
+        let mut v = [0u8; 16];
+        v[0] = 0x80;
         assert_eq!(movemask_u8x16(v), 0x0001);
-        let mut v = [0u8; 16]; v[15] = 0x80;
+        let mut v = [0u8; 16];
+        v[15] = 0x80;
         assert_eq!(movemask_u8x16(v), 0x8000);
 
         // round-trip: splat(0x80) → movemask == 0xFFFF; splat(0x7F) → 0x0000
@@ -204,7 +210,7 @@ mod tests_phd_simd {
     // --- shuffle_u8x16 correctness ---
     #[test]
     fn test_shuffle() {
-        let a: [u8; 16] = core::array::from_fn(|i| i as u8);          // 0..15
+        let a: [u8; 16] = core::array::from_fn(|i| i as u8); // 0..15
         let b: [u8; 16] = core::array::from_fn(|i| (i as u8) + 100); // 100..115
 
         // zero mask: all lanes select a[0] = 0

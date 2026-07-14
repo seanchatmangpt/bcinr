@@ -76,8 +76,8 @@ mod tests {
         // tick() drains slot[current_tick] then advances current_tick.
         // So delay=1 → slot 1 fires on 2nd tick(), delay=2 → slot 2 fires on 3rd tick().
         let cases: &[(usize, u32, &[u64])] = &[
-            (1, 0, &[0, 1, 0]),      // bit 0 placed in slot 1; fires on 2nd tick
-            (2, 0, &[0, 0, 1, 0]),   // bit 0 placed in slot 2; fires on 3rd tick
+            (1, 0, &[0, 1, 0]),       // bit 0 placed in slot 1; fires on 2nd tick
+            (2, 0, &[0, 0, 1, 0]),    // bit 0 placed in slot 2; fires on 3rd tick
             (3, 1, &[0, 0, 0, 2, 0]), // bit 1 placed in slot 3; fires on 4th tick
         ];
         for &(delay, event_bit, ticks) in cases {

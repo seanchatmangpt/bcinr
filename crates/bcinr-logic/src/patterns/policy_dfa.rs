@@ -88,11 +88,7 @@ mod tests_policy_dfa {
         // PHD Gate: DFA run on trivial table stays at state 0; table-driven oracle
         static TABLE: [usize; 3 * 256] = [0; 3 * 256];
         let dfa = ConstantShapePolicyDfa::new_checked(&TABLE, 256, 3, 0, 0).unwrap();
-        let cases: &[(&[u8], usize)] = &[
-            (b"", 0),
-            (b"abc", 0),
-            (b"xyz", 0),
-        ];
+        let cases: &[(&[u8], usize)] = &[(b"", 0), (b"abc", 0), (b"xyz", 0)];
         for &(input, expected_state) in cases {
             assert_eq!(dfa.run(input, 0), expected_state);
         }

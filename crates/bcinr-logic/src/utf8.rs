@@ -171,19 +171,23 @@ mod tests_phd_utf8 {
         assert_eq!(utf8_reference(0, 0), 0);
         let cases: &[fn(u64, u64) -> u64] = &[mutant_utf8_1, mutant_utf8_2, mutant_utf8_3];
         for (i, m) in cases.iter().enumerate() {
-            assert!(utf8_reference(1, 1) != m(1, 1), "mutant {} not rejected", i + 1);
+            assert!(
+                utf8_reference(1, 1) != m(1, 1),
+                "mutant {} not rejected",
+                i + 1
+            );
         }
         // (byte, is_ascii, is_continuation, is_2byte_lead, is_3byte_lead, is_4byte_lead)
         let cases: &[(u8, bool, bool, bool, bool, bool)] = &[
-            (0x00, true,  false, false, false, false),
-            (b'A', true,  false, false, false, false),
-            (0x7F, true,  false, false, false, false),
-            (0x80, false, true,  false, false, false),
-            (0xBF, false, true,  false, false, false),
-            (0xC2, false, false, true,  false, false),
-            (0xDF, false, false, true,  false, false),
-            (0xE0, false, false, false, true,  false),
-            (0xEF, false, false, false, true,  false),
+            (0x00, true, false, false, false, false),
+            (b'A', true, false, false, false, false),
+            (0x7F, true, false, false, false, false),
+            (0x80, false, true, false, false, false),
+            (0xBF, false, true, false, false, false),
+            (0xC2, false, false, true, false, false),
+            (0xDF, false, false, true, false, false),
+            (0xE0, false, false, false, true, false),
+            (0xEF, false, false, false, true, false),
             (0xF0, false, false, false, false, true),
             (0xF4, false, false, false, false, true),
             (0xF8, false, false, false, false, false),
@@ -191,7 +195,12 @@ mod tests_phd_utf8 {
         ];
         for &(b, ascii, cont, lead2, lead3, lead4) in cases {
             assert_eq!(is_ascii_byte(b), ascii, "is_ascii_byte(0x{:02X})", b);
-            assert_eq!(is_continuation_byte(b), cont, "is_continuation_byte(0x{:02X})", b);
+            assert_eq!(
+                is_continuation_byte(b),
+                cont,
+                "is_continuation_byte(0x{:02X})",
+                b
+            );
             assert_eq!(is_2byte_lead(b), lead2, "is_2byte_lead(0x{:02X})", b);
             assert_eq!(is_3byte_lead(b), lead3, "is_3byte_lead(0x{:02X})", b);
             assert_eq!(is_4byte_lead(b), lead4, "is_4byte_lead(0x{:02X})", b);

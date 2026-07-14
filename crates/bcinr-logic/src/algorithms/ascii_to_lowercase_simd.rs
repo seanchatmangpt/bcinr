@@ -72,7 +72,6 @@ mod tests {
         ascii_to_lowercase_simd_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -87,13 +86,22 @@ mod tests {
             "equivalence oracle failed"
         );
         // --- boundaries ---
-        assert_eq!(ascii_to_lowercase_simd(0, 0), ascii_to_lowercase_simd_reference(0, 0));
+        assert_eq!(
+            ascii_to_lowercase_simd(0, 0),
+            ascii_to_lowercase_simd_reference(0, 0)
+        );
         assert_eq!(
             ascii_to_lowercase_simd(u64::MAX, u64::MAX),
             ascii_to_lowercase_simd_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(ascii_to_lowercase_simd(u64::MAX, 0), ascii_to_lowercase_simd_reference(u64::MAX, 0));
-        assert_eq!(ascii_to_lowercase_simd(0, u64::MAX), ascii_to_lowercase_simd_reference(0, u64::MAX));
+        assert_eq!(
+            ascii_to_lowercase_simd(u64::MAX, 0),
+            ascii_to_lowercase_simd_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            ascii_to_lowercase_simd(0, u64::MAX),
+            ascii_to_lowercase_simd_reference(0, u64::MAX)
+        );
         // --- mutant divergence ---
         let baseline = ascii_to_lowercase_simd_reference(42, 1337);
         assert_ne!(

@@ -19,22 +19,14 @@ fn bench_byte_search(c: &mut Criterion) {
         group.throughput(Throughput::Bytes(size as u64));
 
         // Naive baseline: iterator position search
-        group.bench_with_input(
-            BenchmarkId::new("naive_find", size),
-            &data,
-            |b, data| {
-                b.iter(|| data.iter().position(|&x| x == black_box(42u8)));
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("naive_find", size), &data, |b, data| {
+            b.iter(|| data.iter().position(|&x| x == black_box(42u8)));
+        });
 
         // SWAR scan: processes up to 64 bytes branchlessly via bitmask
-        group.bench_with_input(
-            BenchmarkId::new("swar_scan", size),
-            &data,
-            |b, data| {
-                b.iter(|| find_byte_mask(black_box(data), black_box(42u8)));
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("swar_scan", size), &data, |b, data| {
+            b.iter(|| find_byte_mask(black_box(data), black_box(42u8)));
+        });
     }
 
     group.finish();
@@ -61,7 +53,10 @@ fn bench_popcount(c: &mut Criterion) {
             &data,
             |b, data| {
                 b.iter(|| {
-                    black_box(data.iter().fold(0u64, |acc, &x| acc + popcount_u64(black_box(x))))
+                    black_box(
+                        data.iter()
+                            .fold(0u64, |acc, &x| acc + popcount_u64(black_box(x))),
+                    )
                 });
             },
         );
@@ -71,7 +66,10 @@ fn bench_popcount(c: &mut Criterion) {
             &data,
             |b, data| {
                 b.iter(|| {
-                    black_box(data.iter().fold(0u64, |acc, &x| acc + x.count_ones() as u64))
+                    black_box(
+                        data.iter()
+                            .fold(0u64, |acc, &x| acc + x.count_ones() as u64),
+                    )
                 });
             },
         );
@@ -99,68 +97,52 @@ fn bench_hash_throughput(c: &mut Criterion) {
         // xxhash64: chain across the buffer in 8-byte chunks so throughput numbers
         // reflect processing the full buffer rather than a single 8-byte word.
         // Remainder bytes (size % 8 != 0) are ignored via chunks_exact.
-        group.bench_with_input(
-            BenchmarkId::new("xxhash64", size),
-            &data,
-            |b, data| {
-                b.iter(|| {
-                    let mut h = 0u64;
-                    for chunk in data.chunks_exact(8) {
-                        let word = u64::from_le_bytes(chunk.try_into().unwrap());
-                        h = xxhash64(black_box(word), h);
-                    }
-                    black_box(h)
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("xxhash64", size), &data, |b, data| {
+            b.iter(|| {
+                let mut h = 0u64;
+                for chunk in data.chunks_exact(8) {
+                    let word = u64::from_le_bytes(chunk.try_into().unwrap());
+                    h = xxhash64(black_box(word), h);
+                }
+                black_box(h)
+            });
+        });
 
         // adler32: chain across the buffer in 8-byte chunks
-        group.bench_with_input(
-            BenchmarkId::new("adler32", size),
-            &data,
-            |b, data| {
-                b.iter(|| {
-                    let mut h = 0u64;
-                    for chunk in data.chunks_exact(8) {
-                        let word = u64::from_le_bytes(chunk.try_into().unwrap());
-                        h = adler32_branchless(black_box(word), h);
-                    }
-                    black_box(h)
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("adler32", size), &data, |b, data| {
+            b.iter(|| {
+                let mut h = 0u64;
+                for chunk in data.chunks_exact(8) {
+                    let word = u64::from_le_bytes(chunk.try_into().unwrap());
+                    h = adler32_branchless(black_box(word), h);
+                }
+                black_box(h)
+            });
+        });
 
         // farmhash64: chain across the buffer in 8-byte chunks
-        group.bench_with_input(
-            BenchmarkId::new("farmhash64", size),
-            &data,
-            |b, data| {
-                b.iter(|| {
-                    let mut h = 0u64;
-                    for chunk in data.chunks_exact(8) {
-                        let word = u64::from_le_bytes(chunk.try_into().unwrap());
-                        h = farmhash64(black_box(word), h);
-                    }
-                    black_box(h)
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("farmhash64", size), &data, |b, data| {
+            b.iter(|| {
+                let mut h = 0u64;
+                for chunk in data.chunks_exact(8) {
+                    let word = u64::from_le_bytes(chunk.try_into().unwrap());
+                    h = farmhash64(black_box(word), h);
+                }
+                black_box(h)
+            });
+        });
 
         // siphash_2_4: chain across the buffer in 8-byte chunks
-        group.bench_with_input(
-            BenchmarkId::new("siphash_2_4", size),
-            &data,
-            |b, data| {
-                b.iter(|| {
-                    let mut h = 0u64;
-                    for chunk in data.chunks_exact(8) {
-                        let word = u64::from_le_bytes(chunk.try_into().unwrap());
-                        h = siphash_2_4_branchless(black_box(word), h);
-                    }
-                    black_box(h)
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("siphash_2_4", size), &data, |b, data| {
+            b.iter(|| {
+                let mut h = 0u64;
+                for chunk in data.chunks_exact(8) {
+                    let word = u64::from_le_bytes(chunk.try_into().unwrap());
+                    h = siphash_2_4_branchless(black_box(word), h);
+                }
+                black_box(h)
+            });
+        });
     }
 
     group.finish();
@@ -286,13 +268,9 @@ fn bench_reductions(c: &mut Criterion) {
             },
         );
 
-        group.bench_with_input(
-            BenchmarkId::new("std_fold_or", size),
-            &data,
-            |b, data| {
-                b.iter(|| data.iter().fold(0u32, |acc, &x| acc | black_box(x)));
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("std_fold_or", size), &data, |b, data| {
+            b.iter(|| data.iter().fold(0u32, |acc, &x| acc | black_box(x)));
+        });
     }
 
     group.finish();
@@ -312,21 +290,13 @@ fn bench_ascii_classify(c: &mut Criterion) {
         let data: Vec<u8> = (0..size).map(|i| (32 + (i % 96)) as u8).collect();
         group.throughput(Throughput::Bytes(size as u64));
 
-        group.bench_with_input(
-            BenchmarkId::new("swar_is_ascii", size),
-            &data,
-            |b, data| {
-                b.iter(|| is_ascii_u64_slice(black_box(data)));
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("swar_is_ascii", size), &data, |b, data| {
+            b.iter(|| is_ascii_u64_slice(black_box(data)));
+        });
 
-        group.bench_with_input(
-            BenchmarkId::new("std_is_ascii", size),
-            &data,
-            |b, data| {
-                b.iter(|| data.iter().all(|c| black_box(*c).is_ascii()));
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("std_is_ascii", size), &data, |b, data| {
+            b.iter(|| data.iter().all(|c| black_box(*c).is_ascii()));
+        });
     }
 
     group.finish();
@@ -347,7 +317,13 @@ fn bench_fixed_point(c: &mut Criterion) {
 
     // Branchless saturating add from fix module
     group.bench_function("add_sat_u32_branchless", |b| {
-        b.iter(|| black_box(values.iter().fold(0u32, |acc, &x| add_sat(acc, black_box(x)))));
+        b.iter(|| {
+            black_box(
+                values
+                    .iter()
+                    .fold(0u32, |acc, &x| add_sat(acc, black_box(x))),
+            )
+        });
     });
 
     // std saturating_add as baseline

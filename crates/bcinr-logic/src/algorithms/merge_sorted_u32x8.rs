@@ -179,12 +179,7 @@ pub mod bench {
 
     pub fn bench_merge_sorted_u32x8(c: &mut Criterion) {
         c.bench_function("merge_sorted_u32x8", |b| {
-            b.iter(|| {
-                merge_sorted_u32x8(
-                    black_box([1, 3, 5, 7]),
-                    black_box([2, 4, 6, 8]),
-                )
-            })
+            b.iter(|| merge_sorted_u32x8(black_box([1, 3, 5, 7]), black_box([2, 4, 6, 8])))
         });
     }
 }

@@ -2,10 +2,10 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 // Import fix algorithms and saturating arithmetic
 use bcinr_logic::algorithms::add_sat_i32::add_sat_i32;
-use bcinr_logic::algorithms::sub_sat_i32::sub_sat_i32;
+use bcinr_logic::algorithms::div_sat_u64::div_sat_u64;
 use bcinr_logic::algorithms::mul_sat_i32::mul_sat_i32;
 use bcinr_logic::algorithms::mul_sat_u64::mul_sat_u64;
-use bcinr_logic::algorithms::div_sat_u64::div_sat_u64;
+use bcinr_logic::algorithms::sub_sat_i32::sub_sat_i32;
 
 fn bench_add_sat_i32(c: &mut Criterion) {
     c.bench_function("add_sat_i32_avg", |b| {

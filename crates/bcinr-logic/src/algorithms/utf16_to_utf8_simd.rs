@@ -71,7 +71,6 @@ mod tests {
         utf16_to_utf8_simd_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------

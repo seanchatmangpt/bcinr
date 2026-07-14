@@ -200,23 +200,23 @@ pub fn prefix_sum_u32x16(arr: [u32; 16]) -> [u32; 16] {
     let mut a = arr;
 
     // Pass 1: stride 1 — a[i] += a[i-1] for odd i
-    a[1]  = a[1].wrapping_add(a[0]);
-    a[3]  = a[3].wrapping_add(a[2]);
-    a[5]  = a[5].wrapping_add(a[4]);
-    a[7]  = a[7].wrapping_add(a[6]);
-    a[9]  = a[9].wrapping_add(a[8]);
+    a[1] = a[1].wrapping_add(a[0]);
+    a[3] = a[3].wrapping_add(a[2]);
+    a[5] = a[5].wrapping_add(a[4]);
+    a[7] = a[7].wrapping_add(a[6]);
+    a[9] = a[9].wrapping_add(a[8]);
     a[11] = a[11].wrapping_add(a[10]);
     a[13] = a[13].wrapping_add(a[12]);
     a[15] = a[15].wrapping_add(a[14]);
 
     // Pass 2: stride 2
-    a[3]  = a[3].wrapping_add(a[1]);
-    a[7]  = a[7].wrapping_add(a[5]);
+    a[3] = a[3].wrapping_add(a[1]);
+    a[7] = a[7].wrapping_add(a[5]);
     a[11] = a[11].wrapping_add(a[9]);
     a[15] = a[15].wrapping_add(a[13]);
 
     // Pass 3: stride 4
-    a[7]  = a[7].wrapping_add(a[3]);
+    a[7] = a[7].wrapping_add(a[3]);
     a[15] = a[15].wrapping_add(a[11]);
 
     // Pass 4: stride 8
@@ -232,19 +232,19 @@ pub fn prefix_sum_u32x16(arr: [u32; 16]) -> [u32; 16] {
     a[11] = a[11].wrapping_add(a[7]);
 
     // Stride 4 down
-    a[5]  = a[5].wrapping_add(a[3]);
-    a[9]  = a[9].wrapping_add(a[7]);
+    a[5] = a[5].wrapping_add(a[3]);
+    a[9] = a[9].wrapping_add(a[7]);
     a[13] = a[13].wrapping_add(a[11]);
 
     // Stride 2 down
-    a[2]  = a[2].wrapping_add(a[1]);
-    a[6]  = a[6].wrapping_add(a[5]);
+    a[2] = a[2].wrapping_add(a[1]);
+    a[6] = a[6].wrapping_add(a[5]);
     a[10] = a[10].wrapping_add(a[9]);
     a[14] = a[14].wrapping_add(a[13]);
 
     // Stride 1 down — fill remaining even positions
-    a[4]  = a[4].wrapping_add(a[3]);
-    a[8]  = a[8].wrapping_add(a[7]);
+    a[4] = a[4].wrapping_add(a[3]);
+    a[8] = a[8].wrapping_add(a[7]);
     a[12] = a[12].wrapping_add(a[11]);
 
     a
@@ -265,10 +265,8 @@ pub fn prefix_sum_u32x16(arr: [u32; 16]) -> [u32; 16] {
 pub fn exclusive_scan_u32x16(arr: [u32; 16]) -> [u32; 16] {
     let inc = prefix_sum_u32x16(arr);
     [
-        0,
-        inc[0], inc[1], inc[2],  inc[3],  inc[4],  inc[5],  inc[6],
-        inc[7], inc[8], inc[9],  inc[10], inc[11], inc[12], inc[13],
-        inc[14],
+        0, inc[0], inc[1], inc[2], inc[3], inc[4], inc[5], inc[6], inc[7], inc[8], inc[9], inc[10],
+        inc[11], inc[12], inc[13], inc[14],
     ]
 }
 
@@ -413,22 +411,20 @@ pub fn swar_find_all_positions(bytes: &[u8], target: u8) -> u64 {
         let xored = word ^ broadcast;
 
         // SWAR zero-byte detection: sets 0x80 in each zero byte lane.
-        let zero_bytes = xored
-            .wrapping_sub(0x0101_0101_0101_0101u64)
-            & !xored
-            & 0x8080_8080_8080_8080u64;
+        let zero_bytes =
+            xored.wrapping_sub(0x0101_0101_0101_0101u64) & !xored & 0x8080_8080_8080_8080u64;
 
         // Extract one bit per lane and pack into 8 consecutive result bits.
-        let b0 = (zero_bytes       ) >> 7 & 1;
-        let b1 = (zero_bytes >>  8 ) >> 7 & 1;
-        let b2 = (zero_bytes >> 16 ) >> 7 & 1;
-        let b3 = (zero_bytes >> 24 ) >> 7 & 1;
-        let b4 = (zero_bytes >> 32 ) >> 7 & 1;
-        let b5 = (zero_bytes >> 40 ) >> 7 & 1;
-        let b6 = (zero_bytes >> 48 ) >> 7 & 1;
-        let b7 = (zero_bytes >> 56 ) >> 7 & 1;
-        let packed = b0 | (b1 << 1) | (b2 << 2) | (b3 << 3)
-                       | (b4 << 4) | (b5 << 5) | (b6 << 6) | (b7 << 7);
+        let b0 = (zero_bytes) >> 7 & 1;
+        let b1 = (zero_bytes >> 8) >> 7 & 1;
+        let b2 = (zero_bytes >> 16) >> 7 & 1;
+        let b3 = (zero_bytes >> 24) >> 7 & 1;
+        let b4 = (zero_bytes >> 32) >> 7 & 1;
+        let b5 = (zero_bytes >> 40) >> 7 & 1;
+        let b6 = (zero_bytes >> 48) >> 7 & 1;
+        let b7 = (zero_bytes >> 56) >> 7 & 1;
+        let packed =
+            b0 | (b1 << 1) | (b2 << 2) | (b3 << 3) | (b4 << 4) | (b5 << 5) | (b6 << 6) | (b7 << 7);
 
         result |= packed << (w * 8);
     });
@@ -465,21 +461,20 @@ pub fn count_leading_eq_u8(bytes: &[u8], target: u8) -> usize {
     let len = bytes.len();
     let full_words = len / 8;
     let mut count = 0usize;
-    let mut done  = 0usize; // becomes 1 once any mismatch is found
+    let mut done = 0usize; // becomes 1 once any mismatch is found
 
     (0..full_words).for_each(|w| {
         let mut buf = [0u8; 8];
         (0..8usize).for_each(|k| buf[k] = bytes[w * 8 + k]);
         let word = u64::from_le_bytes(buf);
 
-        let xored      = word ^ broadcast;
-        let zero_bytes = xored.wrapping_sub(0x0101_0101_0101_0101u64)
-                         & !xored
-                         & 0x8080_8080_8080_8080u64;
+        let xored = word ^ broadcast;
+        let zero_bytes =
+            xored.wrapping_sub(0x0101_0101_0101_0101u64) & !xored & 0x8080_8080_8080_8080u64;
         // All 8 lanes matched iff all 8 sentinel bits are set.
         let all_match = (zero_bytes == 0x8080_8080_8080_8080u64) as usize;
         count += 8 * all_match * (1 - done);
-        done  |= 1 - all_match;
+        done |= 1 - all_match;
     });
 
     // Tail — byte-at-a-time, branchless.
@@ -487,7 +482,7 @@ pub fn count_leading_eq_u8(bytes: &[u8], target: u8) -> usize {
     (tail_start..len).for_each(|i| {
         let eq = (bytes[i] == target) as usize;
         count += eq * (1 - done);
-        done  |= 1 - eq;
+        done |= 1 - eq;
     });
 
     count
@@ -520,7 +515,11 @@ mod tests {
         // counterfactual mutant rejection
         let cases: &[fn(u64, u64) -> u64] = &[mutant_scan_1, mutant_scan_2, mutant_scan_3];
         for (i, m) in cases.iter().enumerate() {
-            assert!(scan_reference(1, 1) != m(1, 1), "mutant {} not rejected", i + 1);
+            assert!(
+                scan_reference(1, 1) != m(1, 1),
+                "mutant {} not rejected",
+                i + 1
+            );
         }
     }
 
@@ -555,7 +554,7 @@ mod tests {
     #[test]
     fn test_prefix_sum_all_ones() {
         let out = prefix_sum_u32x16([1u32; 16]);
-        assert_eq!(out, [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]);
+        assert_eq!(out, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
     }
 
     #[test]
@@ -599,7 +598,7 @@ mod tests {
     #[test]
     fn test_exclusive_scan_ones() {
         let out = exclusive_scan_u32x16([1u32; 16]);
-        assert_eq!(out, [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]);
+        assert_eq!(out, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
     }
 
     #[test]
@@ -645,21 +644,21 @@ mod tests {
 
     #[test]
     fn test_prefix_max_monotone() {
-        let a: [u32; 16] = [3,1,4,1,5,9,2,6,5,3,5,8,9,7,9,3];
+        let a: [u32; 16] = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3];
         let out = prefix_max_u32x16(a);
         assert!(out.windows(2).all(|w| w[1] >= w[0]));
     }
 
     #[test]
     fn test_prefix_max_first_element() {
-        let a: [u32; 16] = [3,1,4,1,5,9,2,6,5,3,5,8,9,7,9,3];
+        let a: [u32; 16] = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3];
         let out = prefix_max_u32x16(a);
         assert_eq!(out[0], a[0]);
     }
 
     #[test]
     fn test_prefix_max_last_is_global() {
-        let a: [u32; 16] = [3,1,4,1,5,9,2,6,5,3,5,8,9,7,9,3];
+        let a: [u32; 16] = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3];
         let out = prefix_max_u32x16(a);
         assert_eq!(out[15], *a.iter().max().unwrap());
     }
@@ -680,11 +679,14 @@ mod tests {
 
     #[test]
     fn test_prefix_xor_natural() {
-        let natural: [u64; 8] = [0,1,2,3,4,5,6,7];
+        let natural: [u64; 8] = [0, 1, 2, 3, 4, 5, 6, 7];
         let out = prefix_xor_u64x8(natural);
         let mut expected = [0u64; 8];
         let mut acc = 0u64;
-        (0..8usize).for_each(|i| { acc ^= natural[i]; expected[i] = acc; });
+        (0..8usize).for_each(|i| {
+            acc ^= natural[i];
+            expected[i] = acc;
+        });
         assert_eq!(out, expected);
     }
 

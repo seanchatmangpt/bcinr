@@ -311,9 +311,15 @@ mod tests {
     fn mask_reference(val: u64, aux: u64) -> u64 {
         val ^ aux
     }
-    fn mutant_mask_1(val: u64, aux: u64) -> u64 { !mask_reference(val, aux) }
-    fn mutant_mask_2(val: u64, aux: u64) -> u64 { mask_reference(val, aux).wrapping_add(1) }
-    fn mutant_mask_3(val: u64, aux: u64) -> u64 { mask_reference(val, aux) ^ 0xFF }
+    fn mutant_mask_1(val: u64, aux: u64) -> u64 {
+        !mask_reference(val, aux)
+    }
+    fn mutant_mask_2(val: u64, aux: u64) -> u64 {
+        mask_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_mask_3(val: u64, aux: u64) -> u64 {
+        mask_reference(val, aux) ^ 0xFF
+    }
 
     #[test]
     fn test_mask_equivalence_and_boundaries() {
@@ -342,7 +348,7 @@ mod tests {
         assert_eq!(max_u32(u32::MAX, 0), u32::MAX);
         assert_eq!(abs_i32(-5), 5);
         assert_eq!(abs_i32(i32::MIN), i32::MIN); // documented wrapping behavior
-        // phd gate boundaries
+                                                 // phd gate boundaries
         assert_eq!(mask_reference(1, 2), 3);
         assert_eq!(mask_reference(0, 0), 0);
     }

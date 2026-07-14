@@ -68,8 +68,6 @@ mod tests {
         reverse_slice_branchless_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
-
     #[test]
     fn test_reverse_slice_branchless_all() {
         // equivalence oracle
@@ -99,9 +97,15 @@ mod tests {
         let m1 = mutant_reverse_slice_branchless_1(42, 1337);
         let m2 = mutant_reverse_slice_branchless_2(42, 1337);
         let m3 = mutant_reverse_slice_branchless_3(42, 1337);
-        if m1 != baseline { assert_ne!(m1, baseline, "mutant 1"); }
-        if m2 != baseline { assert_ne!(m2, baseline, "mutant 2"); }
-        if m3 != baseline { assert_ne!(m3, baseline, "mutant 3"); }
+        if m1 != baseline {
+            assert_ne!(m1, baseline, "mutant 1");
+        }
+        if m2 != baseline {
+            assert_ne!(m2, baseline, "mutant 2");
+        }
+        if m3 != baseline {
+            assert_ne!(m3, baseline, "mutant 3");
+        }
     }
 
     // -------------------------------------------------------------------------

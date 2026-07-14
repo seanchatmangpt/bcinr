@@ -27,8 +27,7 @@ impl OcelEmitArena {
         // SAFETY: OcelCausalFrame is repr(C) with all-zero being a valid
         // bit-pattern for every field (all integers zero, all arrays zeroed).
         let frames = unsafe {
-            let layout =
-                std::alloc::Layout::array::<OcelCausalFrame>(ARENA_CAPACITY).unwrap();
+            let layout = std::alloc::Layout::array::<OcelCausalFrame>(ARENA_CAPACITY).unwrap();
             let ptr = std::alloc::alloc_zeroed(layout) as *mut OcelCausalFrame;
             assert!(!ptr.is_null(), "OcelEmitArena: allocation failed");
             Box::from_raw(ptr as *mut [OcelCausalFrame; ARENA_CAPACITY])

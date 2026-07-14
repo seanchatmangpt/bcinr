@@ -14,19 +14,20 @@
 
 use blake3::Hasher;
 use chess::{Board, Color, MoveGen};
-
-use playground::branchtorch::{mutate_weights_branchless, BranchlessRng};
-use playground::chess::{evaluate_board_branchless, ChessBitboard};
-use playground::chess_validator::validate_chess_move_powl;
-use playground::gnn::BinarizedGnnLayer;
-use playground::hoeg::{compile_hoeg_matrix, Hoeg64Node};
-use playground::legal_moves::queen_attacks;
-use playground::nnue::BranchTorchNNUE;
-use playground::petri::{petri_fire_transition, ReplayResult};
-use playground::powl::PowlState;
-use playground::tekg::{compile_snapshot_chain, Tekg64Node, TekgLabel};
-use playground::wasm::{WasmBYawlState, WasmPowlState, WasmReplayResult};
-use playground::yawl::{BYawlEngine, BYawlTask, JoinType, SplitType};
+use playground::{
+    branchtorch::{mutate_weights_branchless, BranchlessRng},
+    chess::{evaluate_board_branchless, ChessBitboard},
+    chess_validator::validate_chess_move_powl,
+    gnn::BinarizedGnnLayer,
+    hoeg::{compile_hoeg_matrix, Hoeg64Node},
+    legal_moves::queen_attacks,
+    nnue::BranchTorchNNUE,
+    petri::{petri_fire_transition, ReplayResult},
+    powl::PowlState,
+    tekg::{compile_snapshot_chain, Tekg64Node, TekgLabel},
+    wasm::{WasmBYawlState, WasmPowlState, WasmReplayResult},
+    yawl::{BYawlEngine, BYawlTask, JoinType, SplitType},
+};
 
 fn nnue_white_cp(b: &Board, nnue: &BranchTorchNNUE) -> i32 {
     let mut h0 = nnue.l1_biases[0];
@@ -58,12 +59,7 @@ fn main() {
     // ---- 1. chess: bitboard projection of the position ----
     let white = board.color_combined(Color::White).0;
     let black = board.color_combined(Color::Black).0;
-    let bb = ChessBitboard {
-        white_pieces: white,
-        black_pieces: black,
-        turn: 0,
-        _pad: [0; 46],
-    };
+    let bb = ChessBitboard { white_pieces: white, black_pieces: black, turn: 0, _pad: [0; 46] };
     h.update(&white.to_le_bytes());
     h.update(&black.to_le_bytes());
     println!("[1] chess        bitboards: white=0x{white:016x} black=0x{black:016x}");
@@ -87,22 +83,19 @@ fn main() {
     let n_nodes = compile_hoeg_matrix(&[1, 2], &[white, black], &[black, white], &mut hoeg_out)
         .expect("hoeg compile");
     h.update(&hoeg_out[0].feature_mask.to_le_bytes());
-    println!("[3] hoeg         compiled {n_nodes} event-graph nodes (white=feature, black=adjacency)");
+    println!(
+        "[3] hoeg         compiled {n_nodes} event-graph nodes (white=feature, black=adjacency)"
+    );
 
     // ---- 4. gnn: branchless binarized GNN eval of the board (uses hoeg internally) ----
-    let mut layer = BinarizedGnnLayer {
-        weights: [0xA5A5_5A5A_A5A5_5A5A; 64],
-        bias: 0x0F0F_0F0F_0F0F_0F0F,
-    };
+    let mut layer =
+        BinarizedGnnLayer { weights: [0xA5A5_5A5A_A5A5_5A5A; 64], bias: 0x0F0F_0F0F_0F0F_0F0F };
     let gnn_eval = evaluate_board_branchless(&bb, &layer).expect("gnn eval");
     h.update(&gnn_eval.to_le_bytes());
     println!("[4] gnn          binarized GNN board eval (XNOR-popcount): {gnn_eval}");
 
     // ---- 5. branchtorch: one generation of branchless evolutionary training ----
-    let mut rng = BranchlessRng {
-        seed: 0xDEAD_BEEF_CAFE_BABE,
-        _pad: [0; 56],
-    };
+    let mut rng = BranchlessRng { seed: 0xDEAD_BEEF_CAFE_BABE, _pad: [0; 56] };
     let before = layer.weights[0];
     mutate_weights_branchless(&mut layer, &mut rng).expect("mutate");
     let gnn_eval2 = evaluate_board_branchless(&bb, &layer).expect("gnn eval2");
@@ -136,7 +129,10 @@ fn main() {
         "[7] validator    POWL v2 legality of {first}: {}",
         if lawful { "LAWFUL" } else { "rejected" }
     );
-    println!("[8] powl         POWL state: active_scopes={} stack_depth={}", powl_state.active_scopes, powl_state.stack_depth);
+    println!(
+        "[8] powl         POWL state: active_scopes={} stack_depth={}",
+        powl_state.active_scopes, powl_state.stack_depth
+    );
 
     // ---- 9. yawl: model the decision as a workflow (AND-join eval+validate -> select) ----
     let mut engine = BYawlEngine::new();
@@ -146,7 +142,7 @@ fn main() {
     engine.state_mask = eval_place | valid_place; // both inputs ready
     let task = BYawlTask {
         id: 1,
-        join_type: JoinType::AND, // require BOTH eval and validate
+        join_type: JoinType::AND,   // require BOTH eval and validate
         split_type: SplitType::XOR, // choose ONE move
         min_instances: 1,
         max_instances: 1,
@@ -170,13 +166,8 @@ fn main() {
 
     // ---- 10. petri: process conformance of the decision pipeline ----
     // Pipeline: READY -> Perceive -> Evaluate -> Validate -> Select -> Commit -> READY
-    let places: [(u64, u64); 5] = [
-        (1 << 0, 1 << 1),
-        (1 << 1, 1 << 2),
-        (1 << 2, 1 << 3),
-        (1 << 3, 1 << 4),
-        (1 << 4, 1 << 0),
-    ];
+    let places: [(u64, u64); 5] =
+        [(1 << 0, 1 << 1), (1 << 1, 1 << 2), (1 << 2, 1 << 3), (1 << 3, 1 << 4), (1 << 4, 1 << 0)];
     let mut marking = 1u64; // READY
     let (mut missing, mut consumed, mut produced) = (0u32, 0u32, 0u32);
     for (inp, outp) in places {
@@ -206,12 +197,8 @@ fn main() {
     println!("[11] tekg        temporal knowledge graph: {n_snap} snapshot nodes (1 entity + {} updates)", ts.len());
 
     // ---- 12. wasm: export every engine state across the C/WASM boundary as receipts ----
-    let wasm_petri = WasmReplayResult {
-        missing,
-        remaining: (marking & !1).count_ones(),
-        consumed,
-        produced,
-    };
+    let wasm_petri =
+        WasmReplayResult { missing, remaining: (marking & !1).count_ones(), consumed, produced };
     let wasm_yawl = WasmBYawlState {
         state_mask: engine.state_mask,
         active_instances: engine.active_instances,
@@ -230,7 +217,9 @@ fn main() {
     h.update(&wasm_petri.produced.to_le_bytes());
     h.update(&wasm_yawl.state_mask.to_le_bytes());
     h.update(&wasm_powl.active_scopes.to_le_bytes());
-    println!("[12] wasm        boundary receipts exported (petri/yawl/powl states -> C-ABI structs)");
+    println!(
+        "[12] wasm        boundary receipts exported (petri/yawl/powl states -> C-ABI structs)"
+    );
 
     // ---- Combined cryptographic receipt over all 12 modules ----
     let receipt = h.finalize();

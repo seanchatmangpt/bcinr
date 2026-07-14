@@ -21,11 +21,7 @@ use bcinr_mcp::cache;
 
 use cache::CapabilityCache;
 use rmcp::{
-    ServiceExt,
-    handler::server::wrapper::Parameters,
-    schemars,
-    tool, tool_router,
-    transport::stdio,
+    handler::server::wrapper::Parameters, schemars, tool, tool_router, transport::stdio, ServiceExt,
 };
 use serde::Deserialize;
 
@@ -194,11 +190,10 @@ impl BcinrServer {
     // ── Group 1: PDDL Tools ──────────────────────────────────────────────────
 
     /// Return a human-readable description of a PDDL domain.
-    #[tool(description = "Describe a PDDL domain in human-readable text: name, requirements, predicates (name/arity), actions (name + params), durative actions.")]
-    async fn pddl_domain_info(
-        &self,
-        Parameters(input): Parameters<DomainInput>,
-    ) -> String {
+    #[tool(
+        description = "Describe a PDDL domain in human-readable text: name, requirements, predicates (name/arity), actions (name + params), durative actions."
+    )]
+    async fn pddl_domain_info(&self, Parameters(input): Parameters<DomainInput>) -> String {
         // Try PDDL 3.1 parser first (richer info), fall back to STRIPS8
         match bcinr_pddl::domain31_from_pddl(&input.domain_text) {
             Ok(d) => {
@@ -212,11 +207,15 @@ impl BcinrServer {
                 }
                 out.push_str(&format!("Actions ({}):\n", d.actions.len()));
                 for a in &d.actions {
-                    let params: Vec<String> = a.params.iter().map(|(v, t)| format!("{v}: {t}")).collect();
+                    let params: Vec<String> =
+                        a.params.iter().map(|(v, t)| format!("{v}: {t}")).collect();
                     out.push_str(&format!("  {}({})\n", a.name, params.join(", ")));
                 }
                 if !d.durative_actions.is_empty() {
-                    out.push_str(&format!("Durative Actions ({}):\n", d.durative_actions.len()));
+                    out.push_str(&format!(
+                        "Durative Actions ({}):\n",
+                        d.durative_actions.len()
+                    ));
                     for da in &d.durative_actions {
                         out.push_str(&format!("  {}\n", da.name));
                     }
@@ -243,11 +242,10 @@ impl BcinrServer {
     }
 
     /// Parse a PDDL domain and return JSON admission summary.
-    #[tool(description = "Parse a PDDL domain text. Returns JSON with ok, name, requirement_count, predicate_count, action_count, durative_action_count, witness.")]
-    async fn pddl_parse_domain(
-        &self,
-        Parameters(input): Parameters<DomainInput>,
-    ) -> String {
+    #[tool(
+        description = "Parse a PDDL domain text. Returns JSON with ok, name, requirement_count, predicate_count, action_count, durative_action_count, witness."
+    )]
+    async fn pddl_parse_domain(&self, Parameters(input): Parameters<DomainInput>) -> String {
         match bcinr_pddl::admit_candidate_domain(&input.domain_text) {
             Ok(ad) => {
                 let d = &ad.domain31;
@@ -267,11 +265,10 @@ impl BcinrServer {
     }
 
     /// Parse a PDDL problem and return JSON summary.
-    #[tool(description = "Parse a PDDL problem text. Returns JSON with ok, name, domain, object_count, init_count.")]
-    async fn pddl_parse_problem(
-        &self,
-        Parameters(input): Parameters<ProblemInput>,
-    ) -> String {
+    #[tool(
+        description = "Parse a PDDL problem text. Returns JSON with ok, name, domain, object_count, init_count."
+    )]
+    async fn pddl_parse_problem(&self, Parameters(input): Parameters<ProblemInput>) -> String {
         match bcinr_pddl::problem_from_pddl(&input.problem_text) {
             Ok(p) => serde_json::json!({
                 "ok": true,
@@ -286,11 +283,10 @@ impl BcinrServer {
     }
 
     /// Run PDDL BFS planner and return plan steps as JSON.
-    #[tool(description = "Find a STRIPS plan. Returns JSON with ok, steps (list of '0: action-label'), step_count.")]
-    async fn pddl_plan(
-        &self,
-        Parameters(input): Parameters<PlanInput>,
-    ) -> String {
+    #[tool(
+        description = "Find a STRIPS plan. Returns JSON with ok, steps (list of '0: action-label'), step_count."
+    )]
+    async fn pddl_plan(&self, Parameters(input): Parameters<PlanInput>) -> String {
         let canonical = serde_json::to_vec(&input).unwrap_or_default();
         let key = CapabilityCache::key("pddl_plan", &canonical);
         if let Some(cached) = self.cache.get(&key).await {
@@ -326,8 +322,9 @@ impl BcinrServer {
                     .map(|(i, op)| format!("{i}: {}", op.label))
                     .collect();
                 let step_count = steps.len();
-                let result = serde_json::json!({ "ok": true, "steps": steps, "step_count": step_count })
-                    .to_string();
+                let result =
+                    serde_json::json!({ "ok": true, "steps": steps, "step_count": step_count })
+                        .to_string();
                 self.cache.insert(key.clone(), result.clone()).await;
                 result
             }
@@ -339,11 +336,10 @@ impl BcinrServer {
     ///
     /// Returns ok=true with full receipt on success. Returns ok=false with refusal_code on
     /// any admission failure, planning failure, or bound violation — never panics.
-    #[tool(description = "Run the bcinr world-manufacturing loop: admit domain+problem, plan, return BLAKE3-chained WorldManufactureReceipt as JSON.")]
-    async fn manufacture_world(
-        &self,
-        Parameters(input): Parameters<ManufactureInput>,
-    ) -> String {
+    #[tool(
+        description = "Run the bcinr world-manufacturing loop: admit domain+problem, plan, return BLAKE3-chained WorldManufactureReceipt as JSON."
+    )]
+    async fn manufacture_world(&self, Parameters(input): Parameters<ManufactureInput>) -> String {
         let canonical = serde_json::to_vec(&input).unwrap_or_default();
         let key = CapabilityCache::key("manufacture_world", &canonical);
         if let Some(cached) = self.cache.get(&key).await {
@@ -356,8 +352,11 @@ impl BcinrServer {
             .collect();
         // Validate case_id at the MCP boundary before calling into the library.
         let case_id = &input.case_id;
-        if case_id.is_empty() || case_id.len() > 64
-            || case_id.chars().any(|c| !matches!(c, 'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_'))
+        if case_id.is_empty()
+            || case_id.len() > 64
+            || case_id
+                .chars()
+                .any(|c| !matches!(c, 'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_'))
         {
             return serde_json::json!({
                 "ok": false,
@@ -375,12 +374,19 @@ impl BcinrServer {
         );
 
         if r.admitted {
-            let plan_steps: Vec<serde_json::Value> = r.plan.steps.iter().map(|s| serde_json::json!({
-                "action_name": s.action_name,
-                "start_time": s.start_time,
-                "duration": s.duration,
-                "args": s.args,
-            })).collect();
+            let plan_steps: Vec<serde_json::Value> = r
+                .plan
+                .steps
+                .iter()
+                .map(|s| {
+                    serde_json::json!({
+                        "action_name": s.action_name,
+                        "start_time": s.start_time,
+                        "duration": s.duration,
+                        "args": s.args,
+                    })
+                })
+                .collect();
             let result = serde_json::json!({
                 "ok": true,
                 "admitted": true,
@@ -430,11 +436,10 @@ impl BcinrServer {
     }
 
     /// Admit a PDDL domain through the Prolog8 R ⊢ A gate.
-    #[tool(description = "Admit a PDDL 3.1 domain. Returns JSON with ok, name, witness, requirement_count, action_count, durative_action_count.")]
-    async fn pddl_admit_domain(
-        &self,
-        Parameters(input): Parameters<DomainInput>,
-    ) -> String {
+    #[tool(
+        description = "Admit a PDDL 3.1 domain. Returns JSON with ok, name, witness, requirement_count, action_count, durative_action_count."
+    )]
+    async fn pddl_admit_domain(&self, Parameters(input): Parameters<DomainInput>) -> String {
         match bcinr_pddl::admit_candidate_domain(&input.domain_text) {
             Ok(ad) => {
                 let d = &ad.domain31;
@@ -453,11 +458,10 @@ impl BcinrServer {
     }
 
     /// Summarize temporal features of a PDDL 3.1 domain+problem.
-    #[tool(description = "Summarize temporal features: durative actions (name, duration), timed initial literals count, metric.")]
-    async fn pddl_temporal_plan_info(
-        &self,
-        Parameters(input): Parameters<PlanInput>,
-    ) -> String {
+    #[tool(
+        description = "Summarize temporal features: durative actions (name, duration), timed initial literals count, metric."
+    )]
+    async fn pddl_temporal_plan_info(&self, Parameters(input): Parameters<PlanInput>) -> String {
         let domain = match bcinr_pddl::domain31_from_pddl(&input.domain_text) {
             Ok(d) => d,
             Err(e) => return format!("Domain parse error: {e}"),
@@ -479,10 +483,7 @@ impl BcinrServer {
             problem.timed_inits.len()
         ));
         if let Some(metric) = &problem.metric {
-            out.push_str(&format!(
-                "Metric: {:?} {:?}\n",
-                metric.dir, metric.expr
-            ));
+            out.push_str(&format!("Metric: {:?} {:?}\n", metric.dir, metric.expr));
         } else {
             out.push_str("Metric: none\n");
         }
@@ -492,12 +493,11 @@ impl BcinrServer {
     // ── Group 2: POWL Tools ──────────────────────────────────────────────────
 
     /// Compile comma-separated labels into a POWL Sequence tape.
-    #[tool(description = "Compile comma-separated labels (e.g. 'A,B,C') into a POWL Sequence tape. Returns JSON with ok, op_count, entry_mask, topology.")]
-    async fn powl_compile_sequence(
-        &self,
-        Parameters(input): Parameters<LabelsInput>,
-    ) -> String {
-        use bcinr_powl::compiler::{PowlAstNode, compile_powl};
+    #[tool(
+        description = "Compile comma-separated labels (e.g. 'A,B,C') into a POWL Sequence tape. Returns JSON with ok, op_count, entry_mask, topology."
+    )]
+    async fn powl_compile_sequence(&self, Parameters(input): Parameters<LabelsInput>) -> String {
+        use bcinr_powl::compiler::{compile_powl, PowlAstNode};
         let labels: Vec<String> = input
             .labels
             .split(',')
@@ -507,7 +507,10 @@ impl BcinrServer {
         if labels.is_empty() {
             return serde_json::json!({ "ok": false, "error": "empty label list" }).to_string();
         }
-        let atoms: Vec<PowlAstNode> = labels.iter().map(|l| PowlAstNode::Atom(l.as_str())).collect();
+        let atoms: Vec<PowlAstNode> = labels
+            .iter()
+            .map(|l| PowlAstNode::Atom(l.as_str()))
+            .collect();
         let ast = PowlAstNode::Sequence(atoms);
         match compile_powl(&ast) {
             Err(e) => serde_json::json!({ "ok": false, "error": format!("{e:?}") }).to_string(),
@@ -522,12 +525,11 @@ impl BcinrServer {
     }
 
     /// Compile comma-separated labels into a POWL XorChoice tape.
-    #[tool(description = "Compile comma-separated labels into a POWL XorChoice tape. Returns JSON with ok, op_count, branch_count.")]
-    async fn powl_compile_choice(
-        &self,
-        Parameters(input): Parameters<LabelsInput>,
-    ) -> String {
-        use bcinr_powl::compiler::{PowlAstNode, compile_powl};
+    #[tool(
+        description = "Compile comma-separated labels into a POWL XorChoice tape. Returns JSON with ok, op_count, branch_count."
+    )]
+    async fn powl_compile_choice(&self, Parameters(input): Parameters<LabelsInput>) -> String {
+        use bcinr_powl::compiler::{compile_powl, PowlAstNode};
         let labels: Vec<String> = input
             .labels
             .split(',')
@@ -538,7 +540,10 @@ impl BcinrServer {
             return serde_json::json!({ "ok": false, "error": "empty label list" }).to_string();
         }
         let branch_count = labels.len();
-        let atoms: Vec<PowlAstNode> = labels.iter().map(|l| PowlAstNode::Atom(l.as_str())).collect();
+        let atoms: Vec<PowlAstNode> = labels
+            .iter()
+            .map(|l| PowlAstNode::Atom(l.as_str()))
+            .collect();
         let ast = PowlAstNode::XorChoice(atoms);
         match compile_powl(&ast) {
             Err(e) => serde_json::json!({ "ok": false, "error": format!("{e:?}") }).to_string(),
@@ -552,11 +557,10 @@ impl BcinrServer {
     }
 
     /// Admit a POWL execution context — branchless O(1) LUT dispatch.
-    #[tool(description = "Admit a POWL execution context. Returns JSON with topology (Priority/Standard/Background/Quarantine) and ctx_hex.")]
-    async fn powl_admit_context(
-        &self,
-        Parameters(input): Parameters<AdmitContextInput>,
-    ) -> String {
+    #[tool(
+        description = "Admit a POWL execution context. Returns JSON with topology (Priority/Standard/Background/Quarantine) and ctx_hex."
+    )]
+    async fn powl_admit_context(&self, Parameters(input): Parameters<AdmitContextInput>) -> String {
         use bcinr_powl::admit::admit;
         let ctx: u64 = (input.tenant_class & 0xF)
             | ((input.urgency_tier & 0xF) << 4)
@@ -571,7 +575,9 @@ impl BcinrServer {
     }
 
     /// Branchless O(1) capability check.
-    #[tool(description = "Check if granted capability mask satisfies required mask. Returns JSON with granted_bits, required_bits, passes (bool), mask_hex.")]
+    #[tool(
+        description = "Check if granted capability mask satisfies required mask. Returns JSON with granted_bits, required_bits, passes (bool), mask_hex."
+    )]
     async fn powl_capability_check(
         &self,
         Parameters(input): Parameters<CapabilityInput>,
@@ -600,51 +606,70 @@ impl BcinrServer {
     }
 
     /// Plan via PDDL then convert the temporal plan to POWL op specs.
-    #[tool(description = "Plan via PDDL then convert temporal plan to POWL op specs. Returns JSON with ok, op_count, ops array.")]
-    async fn powl_plan_to_tape(
-        &self,
-        Parameters(input): Parameters<PlanInput>,
-    ) -> String {
-        use bcinr_pddl::{domain_from_pddl, problem_from_pddl, GroundProblem, GroundTemporalProblem, TemporalPlan, TemporalPlanStep};
+    #[tool(
+        description = "Plan via PDDL then convert temporal plan to POWL op specs. Returns JSON with ok, op_count, ops array."
+    )]
+    async fn powl_plan_to_tape(&self, Parameters(input): Parameters<PlanInput>) -> String {
         use bcinr_pddl::powl_bridge::temporal_plan_to_powl_tape;
+        use bcinr_pddl::{
+            domain_from_pddl, problem_from_pddl, GroundProblem, GroundTemporalProblem,
+            TemporalPlan, TemporalPlanStep,
+        };
 
         let domain = match domain_from_pddl(&input.domain_text) {
-            Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+            Err(e) => {
+                return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string()
+            }
             Ok(d) => d,
         };
         let problem = match problem_from_pddl(&input.problem_text) {
-            Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+            Err(e) => {
+                return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string()
+            }
             Ok(p) => p,
         };
 
         let temporal_plan = if !domain.durative_actions.is_empty() {
             // Real temporal planning for domains with durative actions.
             let ground = match GroundTemporalProblem::build(&domain, &problem) {
-                Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+                Err(e) => {
+                    return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string()
+                }
                 Ok(g) => g,
             };
             match ground.find_temporal_plan() {
-                Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+                Err(e) => {
+                    return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string()
+                }
                 Ok(p) => p,
             }
         } else {
             // Fall back to classical STRIPS planning with synthesized unit timing.
             let ground = match GroundProblem::build(&domain, &problem, None) {
-                Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+                Err(e) => {
+                    return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string()
+                }
                 Ok(g) => g,
             };
             let tape = match ground.find_plan() {
-                Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+                Err(e) => {
+                    return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string()
+                }
                 Ok(t) => t,
             };
 
             let step_count = tape.ops.len();
-            let steps: Vec<TemporalPlanStep> = tape.ops.iter().enumerate().map(|(i, op)| TemporalPlanStep {
-                action_name: op.label.clone(),
-                args: vec![],
-                start_time: i as f64,
-                duration: 1.0,
-            }).collect();
+            let steps: Vec<TemporalPlanStep> = tape
+                .ops
+                .iter()
+                .enumerate()
+                .map(|(i, op)| TemporalPlanStep {
+                    action_name: op.label.clone(),
+                    args: vec![],
+                    start_time: i as f64,
+                    duration: 1.0,
+                })
+                .collect();
             TemporalPlan {
                 steps,
                 makespan: step_count as f64,
@@ -653,14 +678,19 @@ impl BcinrServer {
         };
 
         let specs = temporal_plan_to_powl_tape(&temporal_plan);
-        let ops_arr: Vec<serde_json::Value> = specs.iter().map(|s| serde_json::json!({
-            "label": s.label,
-            "kind": format!("{:?}", s.kind),
-            "pred_mask": s.pred_mask,
-            "succ_mask": s.succ_mask,
-            "start_time": s.start_time,
-            "duration": s.duration,
-        })).collect();
+        let ops_arr: Vec<serde_json::Value> = specs
+            .iter()
+            .map(|s| {
+                serde_json::json!({
+                    "label": s.label,
+                    "kind": format!("{:?}", s.kind),
+                    "pred_mask": s.pred_mask,
+                    "succ_mask": s.succ_mask,
+                    "start_time": s.start_time,
+                    "duration": s.duration,
+                })
+            })
+            .collect();
 
         serde_json::json!({
             "ok": true,
@@ -670,27 +700,39 @@ impl BcinrServer {
         .to_string()
     }
 
-    #[tool(description = "Bounded schedule analyzer (domain must declare durative actions). Returns JSON with ok, makespan, critical_path_mask, max_parallelism, binding_resource_mask, slack_by_op, op_count, capacity_delta (minus_one/baseline/plus_one makespan for the first resource_key).")]
+    #[tool(
+        description = "Bounded schedule analyzer (domain must declare durative actions). Returns JSON with ok, makespan, critical_path_mask, max_parallelism, binding_resource_mask, slack_by_op, op_count, capacity_delta (minus_one/baseline/plus_one makespan for the first resource_key)."
+    )]
     async fn analyze_schedule64(
         &self,
         Parameters(input): Parameters<AnalyzeScheduleInput>,
     ) -> String {
-        use bcinr_pddl::{analyze_schedule, domain_from_pddl, problem_from_pddl, GroundTemporalProblem};
+        use bcinr_pddl::{
+            analyze_schedule, domain_from_pddl, problem_from_pddl, GroundTemporalProblem,
+        };
 
         let domain = match domain_from_pddl(&input.domain_text) {
-            Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+            Err(e) => {
+                return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string()
+            }
             Ok(d) => d,
         };
         let problem = match problem_from_pddl(&input.problem_text) {
-            Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+            Err(e) => {
+                return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string()
+            }
             Ok(p) => p,
         };
         let gtp = match GroundTemporalProblem::build(&domain, &problem) {
-            Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+            Err(e) => {
+                return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string()
+            }
             Ok(g) => g,
         };
         let analysis = match analyze_schedule(&gtp, &input.resource_keys) {
-            Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+            Err(e) => {
+                return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string()
+            }
             Ok(a) => a,
         };
 
@@ -711,7 +753,9 @@ impl BcinrServer {
         .to_string()
     }
 
-    #[tool(description = "Deterministic capability router (minimal viable slice): routes a task over a fixed capability set (claude-code-edit-file, claude-chrome-fill-form, claude-desktop-draft) via PDDL temporal planning + schedule analysis, returning a cost-ordered, receipted route. desired_effects entries are \"kind:file\" (kind one of edited/form-filled/drafted). Returns JSON with ok, admitted, refusal_reason, plan steps, cost vector, and a route_chain BLAKE3 hash. Same task + same fixed capability set always returns the same route.")]
+    #[tool(
+        description = "Deterministic capability router (minimal viable slice): routes a task over a fixed capability set (claude-code-edit-file, claude-chrome-fill-form, claude-desktop-draft) via PDDL temporal planning + schedule analysis, returning a cost-ordered, receipted route. desired_effects entries are \"kind:file\" (kind one of edited/form-filled/drafted). Returns JSON with ok, admitted, refusal_reason, plan steps, cost vector, and a route_chain BLAKE3 hash. Same task + same fixed capability set always returns the same route."
+    )]
     async fn route_capability_plan(
         &self,
         Parameters(input): Parameters<RouteCapabilityInput>,
@@ -739,15 +783,24 @@ impl BcinrServer {
 
         let receipt = match route_capability_plan(&task) {
             Ok(r) => r,
-            Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+            Err(e) => {
+                return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string()
+            }
         };
 
-        let steps: Vec<_> = receipt.plan.steps.iter().map(|s| serde_json::json!({
-            "action_name": s.action_name,
-            "args": s.args,
-            "start_time": s.start_time,
-            "duration": s.duration,
-        })).collect();
+        let steps: Vec<_> = receipt
+            .plan
+            .steps
+            .iter()
+            .map(|s| {
+                serde_json::json!({
+                    "action_name": s.action_name,
+                    "args": s.args,
+                    "start_time": s.start_time,
+                    "duration": s.duration,
+                })
+            })
+            .collect();
 
         serde_json::json!({
             "ok": true,
@@ -773,7 +826,9 @@ impl BcinrServer {
     // ── Group 3: Core bcinr Library Tools ───────────────────────────────────
 
     /// Return a human-readable description of the bcinr library.
-    #[tool(description = "Return human-readable description of the bcinr library: crates, modules, and key capabilities.")]
+    #[tool(
+        description = "Return human-readable description of the bcinr library: crates, modules, and key capabilities."
+    )]
     async fn bcinr_library_info(&self) -> String {
         "BranchlessCInRust (bcinr) v26.x — academic-grade branchless algorithm library\n\
          Crates: bcinr-core (facade), bcinr-logic (algorithms), bcinr-api (API surface)\n\
@@ -795,11 +850,10 @@ impl BcinrServer {
     }
 
     /// Compute common branchless mask operations between two u64 values.
-    #[tool(description = "Compute branchless mask operations (and, or, xor, andn, nand, nor, popcount, leading_zeros, trailing_zeros) on two u64 values.")]
-    async fn bcinr_mask_ops(
-        &self,
-        Parameters(input): Parameters<MaskOpsInput>,
-    ) -> String {
+    #[tool(
+        description = "Compute branchless mask operations (and, or, xor, andn, nand, nor, popcount, leading_zeros, trailing_zeros) on two u64 values."
+    )]
+    async fn bcinr_mask_ops(&self, Parameters(input): Parameters<MaskOpsInput>) -> String {
         let a = input.a;
         let b = input.b;
         serde_json::json!({
@@ -820,7 +874,9 @@ impl BcinrServer {
     }
 
     /// Return human-readable description of the bcinr-powl POWL runtime.
-    #[tool(description = "Return human-readable description of the bcinr-powl POWL runtime: phase lattice, topology kinds, op kinds, AST nodes.")]
+    #[tool(
+        description = "Return human-readable description of the bcinr-powl POWL runtime: phase lattice, topology kinds, op kinds, AST nodes."
+    )]
     async fn bcinr_powl_info(&self) -> String {
         "bcinr-powl — Partially Ordered Workflow Language runtime\n\
          Phase lattice: Unvalidated → Compiled → Scheduled<KIND> → Executing<KIND> → Receipted<KIND>\n\
@@ -836,52 +892,56 @@ impl BcinrServer {
     // ── Group 4: bcinr-logic Algorithms ──────────────────────────────────────
 
     /// Validate UTF-8 sequences.
-    #[tool(description = "Validate UTF-8 byte sequences. Returns JSON with ok, is_valid, char_count, error_position.")]
-    async fn utf8_validate(
-        &self,
-        Parameters(input): Parameters<Utf8Input>,
-    ) -> String {
+    #[tool(
+        description = "Validate UTF-8 byte sequences. Returns JSON with ok, is_valid, char_count, error_position."
+    )]
+    async fn utf8_validate(&self, Parameters(input): Parameters<Utf8Input>) -> String {
         let bytes = input.data.as_bytes();
         match std::str::from_utf8(bytes) {
-            Ok(s) => {
-                serde_json::json!({
-                    "ok": true,
-                    "is_valid": true,
-                    "char_count": s.chars().count(),
-                    "byte_count": bytes.len(),
-                })
-                .to_string()
-            }
-            Err(e) => {
-                serde_json::json!({
-                    "ok": true,
-                    "is_valid": false,
-                    "error": e.to_string(),
-                    "error_position": e.valid_up_to(),
-                })
-                .to_string()
-            }
+            Ok(s) => serde_json::json!({
+                "ok": true,
+                "is_valid": true,
+                "char_count": s.chars().count(),
+                "byte_count": bytes.len(),
+            })
+            .to_string(),
+            Err(e) => serde_json::json!({
+                "ok": true,
+                "is_valid": false,
+                "error": e.to_string(),
+                "error_position": e.valid_up_to(),
+            })
+            .to_string(),
         }
     }
 
     /// Compute branchless bitset operations.
-    #[tool(description = "Perform branchless bitset operations: popcount, leading_zeros, trailing_zeros, msb, lsb. Returns JSON with operation, value, result.")]
-    async fn bitset_operations(
-        &self,
-        Parameters(input): Parameters<BitsetInput>,
-    ) -> String {
+    #[tool(
+        description = "Perform branchless bitset operations: popcount, leading_zeros, trailing_zeros, msb, lsb. Returns JSON with operation, value, result."
+    )]
+    async fn bitset_operations(&self, Parameters(input): Parameters<BitsetInput>) -> String {
         let v = input.value;
         let result = match input.operation.as_str() {
             "popcount" => v.count_ones() as u64,
             "leading_zeros" => v.leading_zeros() as u64,
             "trailing_zeros" => v.trailing_zeros() as u64,
             "msb" => {
-                if v == 0 { u64::MAX } else { 63 - v.leading_zeros() as u64 }
+                if v == 0 {
+                    u64::MAX
+                } else {
+                    63 - v.leading_zeros() as u64
+                }
             }
             "lsb" => {
-                if v == 0 { u64::MAX } else { v.trailing_zeros() as u64 }
+                if v == 0 {
+                    u64::MAX
+                } else {
+                    v.trailing_zeros() as u64
+                }
             }
-            _ => return serde_json::json!({ "ok": false, "error": "unknown operation" }).to_string(),
+            _ => {
+                return serde_json::json!({ "ok": false, "error": "unknown operation" }).to_string()
+            }
         };
         serde_json::json!({
             "ok": true,
@@ -893,7 +953,9 @@ impl BcinrServer {
     }
 
     /// Get information about DFA and automata capabilities.
-    #[tool(description = "Return information about DFA (Deterministic Finite Automata) support in bcinr-logic.")]
+    #[tool(
+        description = "Return information about DFA (Deterministic Finite Automata) support in bcinr-logic."
+    )]
     async fn dfa_info(&self) -> String {
         "bcinr-logic DFA module — Deterministic Finite Automata\n\
          Capabilities:\n\
@@ -906,7 +968,9 @@ impl BcinrServer {
     }
 
     /// Get information about scanning algorithms.
-    #[tool(description = "Return information about scanning algorithms in bcinr-logic for pattern search and text analysis.")]
+    #[tool(
+        description = "Return information about scanning algorithms in bcinr-logic for pattern search and text analysis."
+    )]
     async fn scan_patterns(&self) -> String {
         "bcinr-logic scan module — Pattern scanning algorithms\n\
          Capabilities:\n\
@@ -920,7 +984,9 @@ impl BcinrServer {
     }
 
     /// Get information about reduction algorithms.
-    #[tool(description = "Return information about reduction algorithms for aggregation and folding.")]
+    #[tool(
+        description = "Return information about reduction algorithms for aggregation and folding."
+    )]
     async fn reduce_sequence(&self) -> String {
         "bcinr-logic reduce module — Reduction algorithms\n\
          Capabilities:\n\
@@ -934,7 +1000,9 @@ impl BcinrServer {
     }
 
     /// Get information about SIMD string processing.
-    #[tool(description = "Return information about SIMD and SWAR (SIMD Within A Register) string algorithms.")]
+    #[tool(
+        description = "Return information about SIMD and SWAR (SIMD Within A Register) string algorithms."
+    )]
     async fn simd_string_info(&self) -> String {
         "bcinr-logic SIMD/SWAR string module — Vectorized text processing\n\
          Capabilities:\n\
@@ -955,27 +1023,48 @@ impl BcinrServer {
     /// Verifies the BLAKE3 manufacture_chain by recomputing
     /// BLAKE3(domain_witness || problem_witness || plan_chain_hash) and comparing
     /// against the stored chain. Returns chain_valid: false on any tampering.
-    #[tool(description = "Inspect a POWL execution receipt. Returns JSON with status, op_count, makespan, admitted, refusal_reason.")]
-    async fn receipt_inspect(
-        &self,
-        Parameters(input): Parameters<ReceiptInput>,
-    ) -> String {
+    #[tool(
+        description = "Inspect a POWL execution receipt. Returns JSON with status, op_count, makespan, admitted, refusal_reason."
+    )]
+    async fn receipt_inspect(&self, Parameters(input): Parameters<ReceiptInput>) -> String {
         let data = match serde_json::from_str::<serde_json::Value>(&input.receipt_data) {
             Ok(d) => d,
-            Err(e) => return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string(),
+            Err(e) => {
+                return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string()
+            }
         };
 
-        let domain_w = data.get("domain_witness").and_then(|v| v.as_str()).unwrap_or("");
-        let problem_w = data.get("problem_witness").and_then(|v| v.as_str()).unwrap_or("");
-        let plan_chain = data.get("plan_chain_hash").and_then(|v| v.as_str()).unwrap_or("");
-        let stored_chain = data.get("manufacture_chain").and_then(|v| v.as_str()).unwrap_or("");
+        let domain_w = data
+            .get("domain_witness")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let problem_w = data
+            .get("problem_witness")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let plan_chain = data
+            .get("plan_chain_hash")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let stored_chain = data
+            .get("manufacture_chain")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
 
         // Recompute BLAKE3(domain_witness || problem_witness || plan_chain_hash || goal_reached_byte || step_count_le8).
         // This mirrors chain_witnesses_full() in bcinr-pddl/src/llm_bridge.rs exactly.
-        let goal_reached_flag = data.get("goal_reached").and_then(|v| v.as_bool()).unwrap_or(false);
-        let step_count_val = data.get("step_count").and_then(|v| v.as_u64()).unwrap_or(0u64);
-        let chain_valid = if !domain_w.is_empty() && !problem_w.is_empty()
-            && !plan_chain.is_empty() && !stored_chain.is_empty()
+        let goal_reached_flag = data
+            .get("goal_reached")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let step_count_val = data
+            .get("step_count")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0u64);
+        let chain_valid = if !domain_w.is_empty()
+            && !problem_w.is_empty()
+            && !plan_chain.is_empty()
+            && !stored_chain.is_empty()
             && plan_chain != "REFUSED"
         {
             let mut h = blake3::Hasher::new();
@@ -984,7 +1073,10 @@ impl BcinrServer {
             h.update(plan_chain.as_bytes());
             h.update(if goal_reached_flag { b"1" } else { b"0" });
             h.update(&step_count_val.to_le_bytes());
-            let computed: String = h.finalize().as_bytes().iter()
+            let computed: String = h
+                .finalize()
+                .as_bytes()
+                .iter()
                 .map(|x| format!("{x:02x}"))
                 .collect();
             computed == stored_chain
@@ -992,7 +1084,8 @@ impl BcinrServer {
             false
         };
 
-        let chain_mismatch = if !chain_valid && !stored_chain.is_empty() && plan_chain != "REFUSED" {
+        let chain_mismatch = if !chain_valid && !stored_chain.is_empty() && plan_chain != "REFUSED"
+        {
             // Recompute for the error message
             let mut h = blake3::Hasher::new();
             h.update(domain_w.as_bytes());
@@ -1000,7 +1093,10 @@ impl BcinrServer {
             h.update(plan_chain.as_bytes());
             h.update(if goal_reached_flag { b"1" } else { b"0" });
             h.update(&step_count_val.to_le_bytes());
-            let computed: String = h.finalize().as_bytes().iter()
+            let computed: String = h
+                .finalize()
+                .as_bytes()
+                .iter()
                 .map(|x| format!("{x:02x}"))
                 .collect();
             Some(format!("expected {computed}, stored {stored_chain}"))
@@ -1018,7 +1114,10 @@ impl BcinrServer {
                     let action_name = s.get("action_name").and_then(|v| v.as_str()).unwrap_or("");
                     let start_time = s.get("start_time").and_then(|v| v.as_f64()).unwrap_or(0.0);
                     let duration = s.get("duration").and_then(|v| v.as_f64()).unwrap_or(0.0);
-                    if action_name.is_empty() { ok = false; break; }
+                    if action_name.is_empty() {
+                        ok = false;
+                        break;
+                    }
                     parsed.push(wasm4pm_compat::pddl::TemporalPlanStep {
                         action_name: action_name.to_string(),
                         start_time,
@@ -1060,7 +1159,9 @@ impl BcinrServer {
     // ── Group 6: Cross-crate Info ───────────────────────────────────────────
 
     /// Report all available system capabilities across all crates.
-    #[tool(description = "Report all available system capabilities: PDDL, POWL, bcinr-logic, receipts, and cross-crate integration status.")]
+    #[tool(
+        description = "Report all available system capabilities: PDDL, POWL, bcinr-logic, receipts, and cross-crate integration status."
+    )]
     async fn system_capabilities(&self) -> String {
         serde_json::json!({
             "system": "bcinr unified execution platform",

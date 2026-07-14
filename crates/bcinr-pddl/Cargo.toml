@@ -46,6 +46,7 @@ dhat-heap = []
 # emit an OCEL trace of the propose->admit->schedule->receipt pipeline in
 # tests/proposer_substrate.rs. Registry version, matching bcinr-powl's dep.
 chicago-tdd-tools = { version = "26.7.1", features = ["ocel-generation"] }
+divan = "0.1.21"
 
 [[test]]
 name = "logistics"
@@ -62,3 +63,18 @@ path = "tests/vision2030.rs"
 [[example]]
 name = "dfcm_alloc_profile"
 required-features = ["dhat-heap"]
+
+[[test]]
+name = "indexed_grounding"
+path = "tests/indexed_grounding.rs"
+divan = "0.1"
+
+[[bench]]
+name = "pddl_80_20"
+path = "benches/pddl_80_20.rs"
+harness = false
+
+[[bench]]
+name = "scaling"
+path = "benches/scaling.rs"
+harness = false

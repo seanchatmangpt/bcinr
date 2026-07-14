@@ -65,7 +65,6 @@ mod tests {
         clamp_slice_branchless_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -80,13 +79,22 @@ mod tests {
             "equivalence oracle failed"
         );
         // --- boundaries ---
-        assert_eq!(clamp_slice_branchless(0, 0), clamp_slice_branchless_reference(0, 0));
+        assert_eq!(
+            clamp_slice_branchless(0, 0),
+            clamp_slice_branchless_reference(0, 0)
+        );
         assert_eq!(
             clamp_slice_branchless(u64::MAX, u64::MAX),
             clamp_slice_branchless_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(clamp_slice_branchless(u64::MAX, 0), clamp_slice_branchless_reference(u64::MAX, 0));
-        assert_eq!(clamp_slice_branchless(0, u64::MAX), clamp_slice_branchless_reference(0, u64::MAX));
+        assert_eq!(
+            clamp_slice_branchless(u64::MAX, 0),
+            clamp_slice_branchless_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            clamp_slice_branchless(0, u64::MAX),
+            clamp_slice_branchless_reference(0, u64::MAX)
+        );
         // --- mutant divergence ---
         let baseline = clamp_slice_branchless_reference(42, 1337);
         assert_ne!(

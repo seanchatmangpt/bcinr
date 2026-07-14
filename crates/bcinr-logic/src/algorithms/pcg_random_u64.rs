@@ -69,8 +69,6 @@ mod tests {
         pcg_random_u64_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
-
     #[test]
     fn test_pcg_random_u64_all() {
         // equivalence oracle
@@ -79,10 +77,7 @@ mod tests {
         assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
         // boundaries
 
-        assert_eq!(
-            pcg_random_u64(0, 0),
-            pcg_random_u64_reference(0, 0)
-        );
+        assert_eq!(pcg_random_u64(0, 0), pcg_random_u64_reference(0, 0));
         assert_eq!(
             pcg_random_u64(u64::MAX, u64::MAX),
             pcg_random_u64_reference(u64::MAX, u64::MAX)
@@ -100,9 +95,15 @@ mod tests {
         let m1 = mutant_pcg_random_u64_1(42, 1337);
         let m2 = mutant_pcg_random_u64_2(42, 1337);
         let m3 = mutant_pcg_random_u64_3(42, 1337);
-        if m1 != baseline { assert_ne!(m1, baseline, "mutant 1"); }
-        if m2 != baseline { assert_ne!(m2, baseline, "mutant 2"); }
-        if m3 != baseline { assert_ne!(m3, baseline, "mutant 3"); }
+        if m1 != baseline {
+            assert_ne!(m1, baseline, "mutant 1");
+        }
+        if m2 != baseline {
+            assert_ne!(m2, baseline, "mutant 2");
+        }
+        if m3 != baseline {
+            assert_ne!(m3, baseline, "mutant 3");
+        }
     }
 
     // -------------------------------------------------------------------------

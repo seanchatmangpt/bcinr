@@ -90,7 +90,10 @@ mod tests {
 
     #[test]
     fn test_rl_state_checksum_equivalence_and_boundaries() {
-        assert_eq!(rl_state_checksum_reference(10, 20), rl_state_checksum(10, 20));
+        assert_eq!(
+            rl_state_checksum_reference(10, 20),
+            rl_state_checksum(10, 20)
+        );
         assert_eq!(rl_state_checksum(0, 0), 0);
         assert_eq!(rl_state_checksum(u64::MAX, u64::MAX), 0);
     }

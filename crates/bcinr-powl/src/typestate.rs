@@ -28,10 +28,10 @@ use core::marker::PhantomData;
 #[derive(PartialEq, Eq, Clone, Copy, Debug, core::marker::ConstParamTy)]
 #[repr(u8)]
 pub enum TopologyKind {
-    Priority     = 0,
-    Standard     = 1,
-    Background   = 2,
-    LongRunning  = 3,
+    Priority = 0,
+    Standard = 1,
+    Background = 2,
+    LongRunning = 3,
     Compensating = 4,
 }
 
@@ -144,12 +144,14 @@ pub enum ValidationError {
 impl core::fmt::Display for ValidationError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::EmptyTape                            => write!(f, "tape has no ops"),
-            Self::TapeTooLarge { len }                 => write!(f, "tape has {len} ops; max is 64"),
-            Self::NoEntryOp                            => write!(f, "no entry op found (all ops have predecessors)"),
-            Self::CyclicDependency                     => write!(f, "tape contains a cycle"),
-            Self::InvalidPredecessorIndex { op, pred } =>
-                write!(f, "op {op} references predecessor {pred} which is out of bounds"),
+            Self::EmptyTape => write!(f, "tape has no ops"),
+            Self::TapeTooLarge { len } => write!(f, "tape has {len} ops; max is 64"),
+            Self::NoEntryOp => write!(f, "no entry op found (all ops have predecessors)"),
+            Self::CyclicDependency => write!(f, "tape contains a cycle"),
+            Self::InvalidPredecessorIndex { op, pred } => write!(
+                f,
+                "op {op} references predecessor {pred} which is out of bounds"
+            ),
         }
     }
 }
@@ -172,9 +174,9 @@ pub enum ExecutionDefect {
 impl core::fmt::Display for ExecutionDefect {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::OpAlreadyConsumed { bit }        => write!(f, "op bit {bit:#b} already consumed"),
-            Self::UnexhaustedOps { remaining }     => write!(f, "unfired ops remain: {remaining:#b}"),
-            Self::TokenMismatch                    => write!(f, "execution token does not match this runner"),
+            Self::OpAlreadyConsumed { bit } => write!(f, "op bit {bit:#b} already consumed"),
+            Self::UnexhaustedOps { remaining } => write!(f, "unfired ops remain: {remaining:#b}"),
+            Self::TokenMismatch => write!(f, "execution token does not match this runner"),
         }
     }
 }
@@ -226,7 +228,12 @@ impl ExecutionToken {
             remaining.count_ones(),
             total
         );
-        Self { remaining, total, topo_order: [u8::MAX; 64], event_count: 0 }
+        Self {
+            remaining,
+            total,
+            topo_order: [u8::MAX; 64],
+            event_count: 0,
+        }
     }
 
     /// Construct a fresh token for a tape with `op_count` ops (≤ 64).
@@ -250,7 +257,12 @@ impl ExecutionToken {
             remaining.count_ones(),
             op_count
         );
-        Self { remaining, total: op_count as u8, topo_order: [u8::MAX; 64], event_count: 0 }
+        Self {
+            remaining,
+            total: op_count as u8,
+            topo_order: [u8::MAX; 64],
+            event_count: 0,
+        }
     }
 
     /// Record that op at index op_idx fired. Branchless bounded write; no-op once event_count == 64.
@@ -354,9 +366,9 @@ pub struct Receipt<const KIND: TopologyKind> {
 impl<const KIND: TopologyKind> core::fmt::Debug for Receipt<KIND> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Receipt")
-            .field("run_id",     &self.run_id)
-            .field("op_trace",   &format_args!("{:#b}", self.op_trace))
-            .field("topology",   &self.topology)
+            .field("run_id", &self.run_id)
+            .field("op_trace", &format_args!("{:#b}", self.op_trace))
+            .field("topology", &self.topology)
             .field("chain_hash", &self.chain_hash)
             .field("replay_ptr", &self.replay_ptr)
             .finish()
@@ -380,7 +392,7 @@ impl<const KIND: TopologyKind> core::fmt::Debug for Receipt<KIND> {
 ///   .complete(token)  → Result<(PowlRunner<Receipted<KIND>, T>, Receipt<KIND>), ExecutionDefect>
 /// ```
 pub struct PowlRunner<Phase, Tape> {
-    tape:   Tape,
+    tape: Tape,
     run_id: u64,
     _phase: PhantomData<Phase>,
 }
@@ -425,7 +437,7 @@ impl<Tape: HasPowlTape> PowlRunner<Unvalidated, Tape> {
             return Err(ValidationError::NoEntryOp);
         }
         Ok(PowlRunner {
-            tape:   self.tape,
+            tape: self.tape,
             run_id: self.run_id,
             _phase: PhantomData,
         })
@@ -440,7 +452,7 @@ impl<Tape: HasPowlTape> PowlRunner<Compiled, Tape> {
     /// Assign a scheduling topology and advance to `Scheduled<KIND>`.
     pub fn schedule<const KIND: TopologyKind>(self) -> PowlRunner<Scheduled<KIND>, Tape> {
         PowlRunner {
-            tape:   self.tape,
+            tape: self.tape,
             run_id: self.run_id,
             _phase: PhantomData,
         }
@@ -460,7 +472,7 @@ impl<Tape: HasPowlTape, const KIND: TopologyKind> PowlRunner<Scheduled<KIND>, Ta
         let op_count = self.tape.op_count();
         let token = ExecutionToken::new(op_count);
         let runner = PowlRunner {
-            tape:   self.tape,
+            tape: self.tape,
             run_id: self.run_id,
             _phase: PhantomData,
         };
@@ -480,9 +492,9 @@ impl<Tape: HasPowlTape, const KIND: TopologyKind> PowlRunner<Executing<KIND>, Ta
         self,
         token: ExecutionToken,
     ) -> Result<(PowlRunner<Receipted<KIND>, Tape>, Receipt<KIND>), ExecutionDefect> {
-        let op_trace    = !token.remaining() & full_mask(self.tape.op_count());
-        let remaining   = token.remaining();
-        let topo_order  = token.topo_order;
+        let op_trace = !token.remaining() & full_mask(self.tape.op_count());
+        let remaining = token.remaining();
+        let topo_order = token.topo_order;
         let event_count = token.event_count;
         // Consume token without triggering the destructor bomb.
         core::mem::forget(token);
@@ -493,16 +505,16 @@ impl<Tape: HasPowlTape, const KIND: TopologyKind> PowlRunner<Executing<KIND>, Ta
 
         let chain_hash = self.tape.content_hash();
         let receipt = Receipt::<KIND> {
-            run_id:      self.run_id,
+            run_id: self.run_id,
             op_trace,
-            topology:    KIND,
+            topology: KIND,
             chain_hash,
-            replay_ptr:  self.run_id, // placeholder: real impl uses event-log offset
+            replay_ptr: self.run_id, // placeholder: real impl uses event-log offset
             topo_order,
             event_count,
         };
         let runner = PowlRunner {
-            tape:   self.tape,
+            tape: self.tape,
             run_id: self.run_id,
             _phase: PhantomData,
         };
@@ -542,7 +554,9 @@ impl<const KIND: TopologyKind> Receipt<KIND> {
         let mut step_of = [u8::MAX; 64];
         for step in 0..count {
             let op = self.topo_order[step] as usize;
-            if op >= 64 || op >= tape_ops.len() { return false; }
+            if op >= 64 || op >= tape_ops.len() {
+                return false;
+            }
             step_of[op] = step as u8;
         }
         // Rule 1: every bit in op_trace must appear in topo_order
@@ -550,17 +564,23 @@ impl<const KIND: TopologyKind> Receipt<KIND> {
         while trace != 0 {
             let bit = trace.trailing_zeros() as usize;
             trace &= trace - 1;
-            if bit >= 64 || step_of[bit] == u8::MAX { return false; }
+            if bit >= 64 || step_of[bit] == u8::MAX {
+                return false;
+            }
         }
         // Rule 2: predecessor order
         for step in 0..count {
             let op_idx = self.topo_order[step] as usize;
-            if op_idx >= tape_ops.len() { return false; }
+            if op_idx >= tape_ops.len() {
+                return false;
+            }
             let mut preds = tape_ops[op_idx].pred_mask;
             while preds != 0 {
                 let p = preds.trailing_zeros() as usize;
                 preds &= preds - 1;
-                if step_of[p] == u8::MAX || step_of[p] as usize >= step { return false; }
+                if step_of[p] == u8::MAX || step_of[p] as usize >= step {
+                    return false;
+                }
             }
         }
         true
@@ -622,17 +642,17 @@ mod tests {
         let mut op0 = Powl64Op::silent();
         op0.pred_mask = 0;
         op0.succ_mask = 1 << 1;
-        op0.op_kind   = OpKind::Activity;
+        op0.op_kind = OpKind::Activity;
         tape.push(op0).unwrap();
 
         let mut op1 = Powl64Op::silent();
         op1.pred_mask = 1 << 0;
         op1.succ_mask = 0;
-        op1.op_kind   = OpKind::Activity;
+        op1.op_kind = OpKind::Activity;
         tape.push(op1).unwrap();
 
         tape.entry_op = 0;
-        tape.exit_op  = 1;
+        tape.exit_op = 1;
         tape
     }
 
@@ -642,7 +662,7 @@ mod tests {
 
     #[test]
     fn happy_path_standard_topology() {
-        let tape   = two_op_tape();
+        let tape = two_op_tape();
         let runner = PowlRunner::new(tape);
 
         // Validate
@@ -670,9 +690,9 @@ mod tests {
 
     #[test]
     fn happy_path_priority_topology() {
-        let tape     = two_op_tape();
+        let tape = two_op_tape();
         let compiled = PowlRunner::new(tape).validate().unwrap();
-        let sched    = compiled.schedule::<{ TopologyKind::Priority }>();
+        let sched = compiled.schedule::<{ TopologyKind::Priority }>();
         let (exec, mut tok) = sched.begin_execution();
         tok.consume_op(1).unwrap();
         tok.consume_op(2).unwrap();
@@ -682,9 +702,9 @@ mod tests {
 
     #[test]
     fn happy_path_background_topology() {
-        let tape     = two_op_tape();
+        let tape = two_op_tape();
         let compiled = PowlRunner::new(tape).validate().unwrap();
-        let sched    = compiled.schedule::<{ TopologyKind::Background }>();
+        let sched = compiled.schedule::<{ TopologyKind::Background }>();
         let (exec, mut tok) = sched.begin_execution();
         tok.consume_op(1).unwrap();
         tok.consume_op(2).unwrap();
@@ -699,7 +719,7 @@ mod tests {
     #[test]
     fn validate_empty_tape_fails() {
         let tape = PowlTape::new(); // no ops pushed
-        let err  = PowlRunner::new(tape).validate().unwrap_err();
+        let err = PowlRunner::new(tape).validate().unwrap_err();
         assert_eq!(err, ValidationError::EmptyTape);
     }
 
@@ -707,7 +727,7 @@ mod tests {
     fn validate_no_entry_op_fails() {
         // Build a tape where every op has a predecessor → entry_mask == 0.
         let mut tape = PowlTape::new();
-        let mut op0  = Powl64Op::silent();
+        let mut op0 = Powl64Op::silent();
         op0.pred_mask = 1 << 1; // op0 waits for op1
         op0.succ_mask = 0;
         tape.push(op0).unwrap();
@@ -727,15 +747,20 @@ mod tests {
 
     #[test]
     fn complete_with_unfired_ops_fails() {
-        let tape   = two_op_tape();
-        let runner = PowlRunner::new(tape).validate().unwrap()
-                                          .schedule::<{ TopologyKind::Standard }>();
+        let tape = two_op_tape();
+        let runner = PowlRunner::new(tape)
+            .validate()
+            .unwrap()
+            .schedule::<{ TopologyKind::Standard }>();
         let (exec, mut tok) = runner.begin_execution();
         // Only fire op 0; leave op 1 unfired.
         tok.consume_op(1 << 0).unwrap();
 
         let err = exec.complete(tok).unwrap_err();
-        assert!(matches!(err, ExecutionDefect::UnexhaustedOps { remaining: 0b10 }));
+        assert!(matches!(
+            err,
+            ExecutionDefect::UnexhaustedOps { remaining: 0b10 }
+        ));
     }
 
     #[test]
@@ -752,7 +777,7 @@ mod tests {
     #[test]
     fn assert_exhausted_with_remaining_fails() {
         let tok = ExecutionToken::new(1); // bit 0 still set
-        // forget to avoid destructor bomb in this error path
+                                          // forget to avoid destructor bomb in this error path
         let err = tok.assert_exhausted().unwrap_err();
         assert!(matches!(err, ExecutionDefect::UnexhaustedOps { .. }));
     }
@@ -788,10 +813,10 @@ mod tests {
 
     #[test]
     fn full_mask_helper() {
-        assert_eq!(full_mask(0),  0);
-        assert_eq!(full_mask(1),  1);
-        assert_eq!(full_mask(2),  0b11);
-        assert_eq!(full_mask(8),  0xFF);
+        assert_eq!(full_mask(0), 0);
+        assert_eq!(full_mask(1), 1);
+        assert_eq!(full_mask(2), 0b11);
+        assert_eq!(full_mask(8), 0xFF);
         assert_eq!(full_mask(64), u64::MAX);
     }
 
@@ -801,9 +826,11 @@ mod tests {
 
     #[test]
     fn receipt_op_trace_is_all_bits_for_two_op_tape() {
-        let tape   = two_op_tape();
-        let runner = PowlRunner::new(tape).validate().unwrap()
-                                          .schedule::<{ TopologyKind::LongRunning }>();
+        let tape = two_op_tape();
+        let runner = PowlRunner::new(tape)
+            .validate()
+            .unwrap()
+            .schedule::<{ TopologyKind::LongRunning }>();
         let (exec, mut tok) = runner.begin_execution();
         tok.consume_op(0b01).unwrap();
         tok.consume_op(0b10).unwrap();
@@ -876,7 +903,8 @@ mod tests {
 
         // Build a runner and run it through the full pipeline.
         let runner = PowlRunner::new(tape.clone())
-            .validate().unwrap()
+            .validate()
+            .unwrap()
             .schedule::<{ TopologyKind::Standard }>();
         let (exec, mut token) = runner.begin_execution();
 
@@ -906,7 +934,8 @@ mod tests {
         let tape = compile_powl(&ast).unwrap();
 
         let runner = PowlRunner::new(tape.clone())
-            .validate().unwrap()
+            .validate()
+            .unwrap()
             .schedule::<{ TopologyKind::Standard }>();
         let (exec, mut token) = runner.begin_execution();
 
@@ -927,14 +956,12 @@ mod tests {
     fn verify_topo_order_missing_op_fails() {
         use crate::compiler::{compile_powl, PowlAstNode};
 
-        let ast = PowlAstNode::Sequence(vec![
-            PowlAstNode::Atom("a"),
-            PowlAstNode::Atom("b"),
-        ]);
+        let ast = PowlAstNode::Sequence(vec![PowlAstNode::Atom("a"), PowlAstNode::Atom("b")]);
         let tape = compile_powl(&ast).unwrap();
 
         let runner = PowlRunner::new(tape.clone())
-            .validate().unwrap()
+            .validate()
+            .unwrap()
             .schedule::<{ TopologyKind::Standard }>();
         let (exec, mut token) = runner.begin_execution();
 
@@ -972,9 +999,11 @@ mod tests {
             let mut tok = ExecutionToken::new(64);
             assert_eq!(tok.total(), 64);
             for bit_idx in 0..64u64 {
-                tok.consume_op(1u64 << bit_idx).expect("consume_op must not fail");
+                tok.consume_op(1u64 << bit_idx)
+                    .expect("consume_op must not fail");
             }
-            tok.assert_exhausted().expect("all ops consumed, must be exhausted");
+            tok.assert_exhausted()
+                .expect("all ops consumed, must be exhausted");
         }
     }
 

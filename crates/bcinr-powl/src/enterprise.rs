@@ -61,7 +61,7 @@ pub fn capability_mask(granted: CapabilitySet, required: CapabilitySet) -> u64 {
     // Previous formula (xor.wrapping_sub(1) >> 63) fails when xor >= 2^63:
     // xor-1 still has bit63 set, yielding 1 (grant) when it should yield 0 (deny).
     let nz = (xor | xor.wrapping_neg()) >> 63; // 1 iff xor != 0
-    let ok = 1u64.wrapping_sub(nz);             // 1 iff all required bits present
+    let ok = 1u64.wrapping_sub(nz); // 1 iff all required bits present
     0u64.wrapping_sub(ok)
 }
 
@@ -290,8 +290,7 @@ pub fn evaluate_graduation(
     // 999 - (2^63+1000) wraps to 2^63-1, leaving bit63 clear despite count >= 1000.
     // saturating_sub is correct for all u64 values. QED.
     let bench_x = instance_count.saturating_sub(999);
-    let bench_flag =
-        ((bench_x | bench_x.wrapping_neg()) >> 63) * graduation::NEEDS_BENCHMARK;
+    let bench_flag = ((bench_x | bench_x.wrapping_neg()) >> 63) * graduation::NEEDS_BENCHMARK;
 
     needs_discovery | needs_conformance | needs_replay | needs_receipts | bench_flag
 }
@@ -499,15 +498,21 @@ mod tests {
     fn graduation_nonzero_u32_high_bit_set_triggers_flag() {
         let n = 2_147_483_649u32; // 2^31 + 1: n-1 = 2^31, bit31 set → old formula fails
         let bits = evaluate_graduation(n, 0, 0, 0, 0);
-        assert_ne!(bits & graduation::NEEDS_DISCOVERY, 0,
-            "nonzero_u32({n}) must return 1 but old formula returned 0");
+        assert_ne!(
+            bits & graduation::NEEDS_DISCOVERY,
+            0,
+            "nonzero_u32({n}) must return 1 but old formula returned 0"
+        );
     }
 
     #[test]
     fn graduation_nonzero_u32_max_triggers_flag() {
         let bits = evaluate_graduation(u32::MAX, 0, 0, 0, 0);
-        assert_ne!(bits & graduation::NEEDS_DISCOVERY, 0,
-            "nonzero_u32(u32::MAX) must return 1");
+        assert_ne!(
+            bits & graduation::NEEDS_DISCOVERY,
+            0,
+            "nonzero_u32(u32::MAX) must return 1"
+        );
     }
 
     #[test]
@@ -612,14 +617,26 @@ mod tests {
     fn graduation_nonzero_u32_boundary_matrix() {
         let nonzero_vals: &[u32] = &[1, (1u32 << 31), (1u32 << 31).wrapping_add(1), u32::MAX];
         for &n in nonzero_vals {
-            assert_ne!(evaluate_graduation(n, 0, 0, 0, 0) & graduation::NEEDS_DISCOVERY, 0,
-                "order_violations={n} must set NEEDS_DISCOVERY");
-            assert_ne!(evaluate_graduation(0, n, 0, 0, 0) & graduation::NEEDS_CONFORMANCE, 0,
-                "sla_breaches={n} must set NEEDS_CONFORMANCE");
-            assert_ne!(evaluate_graduation(0, 0, n, 0, 0) & graduation::NEEDS_REPLAY, 0,
-                "watchdog_trips={n} must set NEEDS_REPLAY");
-            assert_ne!(evaluate_graduation(0, 0, 0, n, 0) & graduation::NEEDS_RECEIPTS, 0,
-                "compensation_count={n} must set NEEDS_RECEIPTS");
+            assert_ne!(
+                evaluate_graduation(n, 0, 0, 0, 0) & graduation::NEEDS_DISCOVERY,
+                0,
+                "order_violations={n} must set NEEDS_DISCOVERY"
+            );
+            assert_ne!(
+                evaluate_graduation(0, n, 0, 0, 0) & graduation::NEEDS_CONFORMANCE,
+                0,
+                "sla_breaches={n} must set NEEDS_CONFORMANCE"
+            );
+            assert_ne!(
+                evaluate_graduation(0, 0, n, 0, 0) & graduation::NEEDS_REPLAY,
+                0,
+                "watchdog_trips={n} must set NEEDS_REPLAY"
+            );
+            assert_ne!(
+                evaluate_graduation(0, 0, 0, n, 0) & graduation::NEEDS_RECEIPTS,
+                0,
+                "compensation_count={n} must set NEEDS_RECEIPTS"
+            );
         }
     }
 }

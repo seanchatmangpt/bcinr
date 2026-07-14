@@ -43,7 +43,9 @@ fn run_to_done_wired(tape: &PowlTape) -> u32 {
     let mut state = PowlPetriState::new(tape.entry_mask);
     let mut fired = 0u32;
     while state.check.words[0] != 0 {
-        fired += petri_tick(&ops, &mut state, None, None, 0).fired_ops.count_ones();
+        fired += petri_tick(&ops, &mut state, None, None, 0)
+            .fired_ops
+            .count_ones();
     }
     fired
 }
@@ -53,7 +55,10 @@ fn run_to_done_wired(tape: &PowlTape) -> u32 {
 #[divan::bench(args = [4, 16, 64], sample_count = 10, sample_size = 5)]
 fn compile_powl_bench(n: usize) {
     let nodes: Vec<String> = (0..n).map(|i| format!("op{i}")).collect();
-    let atoms: Vec<PowlAstNode> = nodes.iter().map(|s| PowlAstNode::Atom(s.as_str())).collect();
+    let atoms: Vec<PowlAstNode> = nodes
+        .iter()
+        .map(|s| PowlAstNode::Atom(s.as_str()))
+        .collect();
     divan::black_box(compile_powl(&PowlAstNode::Sequence(atoms)).ok());
 }
 

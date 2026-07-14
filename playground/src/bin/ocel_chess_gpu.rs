@@ -1,7 +1,8 @@
 #![allow(unsafe_code)]
-use pollster::FutureExt;
 use std::time::Instant;
+
 use bytemuck::{Pod, Zeroable};
+use pollster::FutureExt;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -26,11 +27,14 @@ unsafe impl Zeroable for GameState {}
 
 async fn run() {
     let instance = wgpu::Instance::default();
-    let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
-        power_preference: wgpu::PowerPreference::HighPerformance,
-        force_fallback_adapter: false,
-        compatible_surface: None,
-    }).await.unwrap();
+    let adapter = instance
+        .request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::HighPerformance,
+            force_fallback_adapter: false,
+            compatible_surface: None,
+        })
+        .await
+        .unwrap();
 
     let (device, queue) = adapter.request_device(&Default::default(), None).await.unwrap();
 
@@ -84,19 +88,31 @@ async fn run() {
             wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStages::COMPUTE,
-                ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: true }, has_dynamic_offset: false, min_binding_size: None },
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
                 count: None,
             },
             wgpu::BindGroupLayoutEntry {
                 binding: 1,
                 visibility: wgpu::ShaderStages::COMPUTE,
-                ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: true }, has_dynamic_offset: false, min_binding_size: None },
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
                 count: None,
             },
             wgpu::BindGroupLayoutEntry {
                 binding: 2,
                 visibility: wgpu::ShaderStages::COMPUTE,
-                ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: None },
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
                 count: None,
             },
         ],
@@ -135,12 +151,12 @@ async fn run() {
         cpass.set_bind_group(0, &bind_group, &[]);
         cpass.dispatch_workgroups((num_games as u32 + 63) / 64, 1, 1);
     }
-    
+
     queue.submit(Some(encoder.finish()));
     device.poll(wgpu::Maintain::Wait); // Block until GPU finishes all 1 million matrices!
 
     let duration = start.elapsed();
-    
+
     println!("--- METAL GPU 40-CORE NNUE EXECUTION PASS ---");
     println!("Games Evaluated: {}", num_games);
     println!("Total Execution Time: {:?}", duration);

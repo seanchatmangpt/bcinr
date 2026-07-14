@@ -1,9 +1,14 @@
 #![allow(unsafe_code)]
 
-use bcinr::mask::{select_u32, nonzero_mask_u32};
-use bcinr::int::popcount_u64;
-use crate::yawl::{BYawlEngine, BYawlTask};
-use crate::powl::{Powl64Op, PowlState, powl64_execute_step};
+use bcinr::{
+    int::popcount_u64,
+    mask::{nonzero_mask_u32, select_u32},
+};
+
+use crate::{
+    powl::{powl64_execute_step, Powl64Op, PowlState},
+    yawl::{BYawlEngine, BYawlTask},
+};
 
 /// Results of the token replay operation exported to C/WASM.
 #[repr(C)]
@@ -65,48 +70,52 @@ pub unsafe extern "C" fn wasm_petri_replay(
     let is_null_out = transitions_out.is_null();
     let is_null_trace = trace_events.is_null();
     let is_null_res = out_result.is_null();
-    
+
     let is_any_null = is_null_in | is_null_out | is_null_trace | is_null_res;
-    
+
     let any_null_mask_u32 = nonzero_mask_u32(is_any_null as u32);
     let null_mask = (any_null_mask_u32 as i32 as i64) as u64;
     let valid_mask = !null_mask as usize;
-    
+
     let mut marking = initial_mask;
     let mut missing = 0u32;
     let mut consumed = 0u32;
     let mut produced = popcount_u64(initial_mask) as u32;
 
     let safe_in = ((transitions_in as usize & valid_mask) | (8 & null_mask as usize)) as *const u64;
-    let safe_out = ((transitions_out as usize & valid_mask) | (8 & null_mask as usize)) as *const u64;
-    let safe_trace = ((trace_events as usize & valid_mask) | (4 & null_mask as usize)) as *const u32;
-    let safe_res = ((out_result as usize & valid_mask) | (&mut marking as *mut _ as usize & null_mask as usize)) as *mut WasmReplayResult;
-    
+    let safe_out =
+        ((transitions_out as usize & valid_mask) | (8 & null_mask as usize)) as *const u64;
+    let safe_trace =
+        ((trace_events as usize & valid_mask) | (4 & null_mask as usize)) as *const u32;
+    let safe_res = ((out_result as usize & valid_mask)
+        | (&mut marking as *mut _ as usize & null_mask as usize))
+        as *mut WasmReplayResult;
+
     let clean_n_transitions = select_u32(any_null_mask_u32, 0, n_transitions);
     let clean_trace_len = select_u32(any_null_mask_u32, 0, trace_len);
-    
+
     let trans_in = core::slice::from_raw_parts(safe_in, clean_n_transitions as usize);
     let trans_out = core::slice::from_raw_parts(safe_out, clean_n_transitions as usize);
     let trace = core::slice::from_raw_parts(safe_trace, clean_trace_len as usize);
-    
+
     let mut out_of_bounds_detected = false;
-    
+
     for i in 0..(clean_trace_len as usize) {
         let t_idx = trace[i];
         let is_valid_idx = t_idx < clean_n_transitions;
         out_of_bounds_detected |= !is_valid_idx;
-        
+
         let valid_idx_mask = nonzero_mask_u32(is_valid_idx as u32);
         let safe_t_idx = select_u32(valid_idx_mask, t_idx, 0) as usize;
-        
+
         let in_mask = trans_in[safe_t_idx];
         let out_mask = trans_out[safe_t_idx];
-        
+
         let fire_mask = (valid_idx_mask as i32 as i64) as u64;
-        
+
         let actual_in_mask = in_mask & fire_mask;
         let actual_out_mask = out_mask & fire_mask;
-        
+
         crate::petri::petri_fire_transition(
             &mut marking,
             actual_in_mask,
@@ -116,22 +125,22 @@ pub unsafe extern "C" fn wasm_petri_replay(
             &mut produced,
         );
     }
-    
+
     // Final marking consumption
     let final_needed = popcount_u64(final_mask) as u32;
     let final_have = popcount_u64(marking & final_mask) as u32;
     let diff = final_needed.saturating_sub(final_have);
     missing += diff;
     consumed += final_needed;
-    
+
     (*safe_res).missing = missing;
     (*safe_res).remaining = popcount_u64(marking & !final_mask) as u32;
     (*safe_res).produced = produced;
     (*safe_res).consumed = consumed;
-    
+
     let out_of_bounds_mask = nonzero_mask_u32(out_of_bounds_detected as u32);
     let code_oob = select_u32(out_of_bounds_mask, -2i32 as u32, 0);
-    
+
     select_u32(any_null_mask_u32, -1i32 as u32, code_oob) as i32
 }
 
@@ -146,11 +155,11 @@ pub unsafe extern "C" fn wasm_yawl_execute_task(
     let is_null_state = state_ptr.is_null();
     let is_null_task = task_ptr.is_null();
     let is_any_null = is_null_state | is_null_task;
-    
+
     let any_null_mask_u32 = nonzero_mask_u32(is_any_null as u32);
     let null_mask = (any_null_mask_u32 as i32 as i64) as u64;
     let valid_mask = !null_mask as usize;
-    
+
     let mut engine = BYawlEngine {
         state_mask: 0,
         active_instances: [0; 64],
@@ -158,24 +167,28 @@ pub unsafe extern "C" fn wasm_yawl_execute_task(
         fired_joins_mask: 0,
         active_locks: 0,
     };
-    
-    let safe_state = ((state_ptr as usize & valid_mask) | (&mut engine as *mut _ as usize & null_mask as usize)) as *mut WasmBYawlState;
-    let safe_task = ((task_ptr as usize & valid_mask) | (&mut engine as *mut _ as usize & null_mask as usize)) as *const BYawlTask;
-    
+
+    let safe_state = ((state_ptr as usize & valid_mask)
+        | (&mut engine as *mut _ as usize & null_mask as usize))
+        as *mut WasmBYawlState;
+    let safe_task = ((task_ptr as usize & valid_mask)
+        | (&mut engine as *mut _ as usize & null_mask as usize))
+        as *const BYawlTask;
+
     engine.state_mask = (*safe_state).state_mask;
     engine.active_instances = (*safe_state).active_instances;
     engine.active_triggers = (*safe_state).active_triggers;
     engine.fired_joins_mask = (*safe_state).fired_joins_mask;
     engine.active_locks = (*safe_state).active_locks;
-    
+
     let result = engine.execute_task_branchless(&*safe_task);
-    
+
     (*safe_state).state_mask = engine.state_mask;
     (*safe_state).active_instances = engine.active_instances;
     (*safe_state).active_triggers = engine.active_triggers;
     (*safe_state).fired_joins_mask = engine.fired_joins_mask;
     (*safe_state).active_locks = engine.active_locks;
-    
+
     select_u32(any_null_mask_u32, -1i32 as u32, result as u32) as i32
 }
 
@@ -192,11 +205,11 @@ pub unsafe extern "C" fn wasm_powl_execute_step(
     let is_null_state = state_ptr.is_null();
     let is_null_op = op_ptr.is_null();
     let is_any_null = is_null_state | is_null_op;
-    
+
     let any_null_mask_u32 = nonzero_mask_u32(is_any_null as u32);
     let null_mask = (any_null_mask_u32 as i32 as i64) as u64;
     let valid_mask = !null_mask as usize;
-    
+
     let mut engine_state = PowlState {
         completed_ops: 0,
         completed_branches: 0,
@@ -205,26 +218,30 @@ pub unsafe extern "C" fn wasm_powl_execute_step(
         stack_depth: 0,
         completed_loops: 0,
     };
-    
-    let safe_state = ((state_ptr as usize & valid_mask) | (&mut engine_state as *mut _ as usize & null_mask as usize)) as *mut WasmPowlState;
-    let safe_op = ((op_ptr as usize & valid_mask) | (&mut engine_state as *mut _ as usize & null_mask as usize)) as *const Powl64Op;
-    
+
+    let safe_state = ((state_ptr as usize & valid_mask)
+        | (&mut engine_state as *mut _ as usize & null_mask as usize))
+        as *mut WasmPowlState;
+    let safe_op = ((op_ptr as usize & valid_mask)
+        | (&mut engine_state as *mut _ as usize & null_mask as usize))
+        as *const Powl64Op;
+
     engine_state.completed_ops = (*safe_state).completed_ops;
     engine_state.completed_branches = (*safe_state).completed_branches;
     engine_state.active_scopes = (*safe_state).active_scopes;
     engine_state.scope_stack = (*safe_state).scope_stack;
     engine_state.stack_depth = (*safe_state).stack_depth;
     engine_state.completed_loops = (*safe_state).completed_loops;
-    
+
     powl64_execute_step(&mut engine_state, &*safe_op, input_choice, loop_repeat);
-    
+
     (*safe_state).completed_ops = engine_state.completed_ops;
     (*safe_state).completed_branches = engine_state.completed_branches;
     (*safe_state).active_scopes = engine_state.active_scopes;
     (*safe_state).scope_stack = engine_state.scope_stack;
     (*safe_state).stack_depth = engine_state.stack_depth;
     (*safe_state).completed_loops = engine_state.completed_loops;
-    
+
     select_u32(any_null_mask_u32, -1i32 as u32, 0) as i32
 }
 
@@ -237,12 +254,8 @@ mod tests {
         let trans_in = [1u64, 2u64];
         let trans_out = [2u64, 4u64];
         let trace = [0u32, 1u32];
-        let mut result = WasmReplayResult {
-            missing: 99,
-            remaining: 99,
-            produced: 99,
-            consumed: 99,
-        };
+        let mut result =
+            WasmReplayResult { missing: 99, remaining: 99, produced: 99, consumed: 99 };
 
         let rc = unsafe {
             wasm_petri_replay(
@@ -286,12 +299,8 @@ mod tests {
         let trans_in = [1u64];
         let trans_out = [2u64];
         let trace = [5u32]; // Out of bounds!
-        let mut result = WasmReplayResult {
-            missing: 99,
-            remaining: 99,
-            produced: 99,
-            consumed: 99,
-        };
+        let mut result =
+            WasmReplayResult { missing: 99, remaining: 99, produced: 99, consumed: 99 };
 
         let rc = unsafe {
             wasm_petri_replay(

@@ -3,21 +3,27 @@
 
 mod reference;
 
+use playground::{
+    petri::{petri_fire_invisible, petri_fire_transition},
+    powl::{powl64_execute_step, Powl64Op, Powl64OpKind, PowlState},
+    wasm::{wasm_petri_replay, wasm_yawl_execute_task, WasmBYawlState, WasmReplayResult},
+    yawl::{
+        BYawlEngine as BranchlessBYawlEngine, BYawlTask as BranchlessBYawlTask,
+        JoinType as BranchlessJoinType, SplitType as BranchlessSplitType,
+    },
+};
 use proptest::prelude::*;
 
-use playground::petri::{petri_fire_transition, petri_fire_invisible};
-use playground::yawl::BYawlEngine as BranchlessBYawlEngine;
-use playground::yawl::BYawlTask as BranchlessBYawlTask;
-use playground::yawl::JoinType as BranchlessJoinType;
-use playground::yawl::SplitType as BranchlessSplitType;
-use playground::powl::{powl64_execute_step, PowlState, Powl64Op, Powl64OpKind};
-use playground::wasm::{wasm_petri_replay, wasm_yawl_execute_task, WasmReplayResult, WasmBYawlState};
-
-use crate::reference::petri::{NetBitmask64, PetriNet, Place, Transition, Arc, Marking, replay_trace, Trace, Event, Attribute, AttributeValue};
-use crate::reference::yawl::BYawlEngine as RefBYawlEngine;
-use crate::reference::yawl::BYawlTask as RefBYawlTask;
-use crate::reference::yawl::JoinType as RefJoinType;
-use crate::reference::yawl::SplitType as RefSplitType;
+use crate::reference::{
+    petri::{
+        replay_trace, Arc, Attribute, AttributeValue, Event, Marking, NetBitmask64, PetriNet,
+        Place, Trace, Transition,
+    },
+    yawl::{
+        BYawlEngine as RefBYawlEngine, BYawlTask as RefBYawlTask, JoinType as RefJoinType,
+        SplitType as RefSplitType,
+    },
+};
 
 // --- Helper Mappers for YAWL ---
 
@@ -160,7 +166,7 @@ proptest! {
         fired_joins_mask in any::<u64>(),
         active_locks in any::<u64>(),
         active_instances_vec in prop::collection::vec(any::<u8>(), 64),
-        
+
         task_id in any::<u16>(),
         join_type_idx in 0..5u8,
         split_type_idx in 0..10u8,
@@ -250,7 +256,7 @@ proptest! {
         scope_stack in prop::array::uniform16(any::<u16>()),
         stack_depth in 1..16u32,
         completed_loops in any::<u64>(),
-        
+
         op_kind_idx in 0..9u8,
         lane in any::<u8>(),
         activity in any::<u16>(),
@@ -261,7 +267,7 @@ proptest! {
         succ_mask in any::<u64>(),
         ctrl_mask in any::<u64>(),
         intensity in any::<u8>(),
-        
+
         input_choice in any::<u64>(),
         loop_repeat in any::<u64>(),
     ) {
@@ -276,7 +282,7 @@ proptest! {
             7 => Powl64OpKind::Demote,
             _ => Powl64OpKind::Watchdog,
         };
-        
+
         let op = Powl64Op {
             kind,
             lane,
@@ -290,7 +296,7 @@ proptest! {
             intensity,
             _pad: [0; 7],
         };
-        
+
         let mut state = PowlState {
             completed_ops,
             completed_branches,
@@ -299,21 +305,21 @@ proptest! {
             stack_depth,
             completed_loops,
         };
-        
+
         // Execute branchless step
         powl64_execute_step(&mut state, &op, input_choice, loop_repeat);
-        
+
         // Determine enablement conditions branchingly
         let is_enter = op.kind as u32 == Powl64OpKind::EnterScope as u32;
         let parent_scope = scope_stack[(stack_depth.wrapping_sub(1) & 15) as usize];
         let scope_to_check = if is_enter { parent_scope } else { op.scope };
         let scope_bit = (active_scopes >> (scope_to_check & 63)) & 1;
         let is_scope_active = scope_bit == 1;
-        
+
         let diff = (completed_ops & op.pred_mask) ^ op.pred_mask;
         let is_preds_completed = diff == 0;
         let exec = is_scope_active && is_preds_completed;
-        
+
         if !exec {
             // State fields should remain unchanged if not executable
             assert_eq!(state.completed_ops, completed_ops);
@@ -342,7 +348,7 @@ proptest! {
                     let is_choice_enabled = is_start || has_pred;
                     let choice_selected = ((input_choice >> (branch & 63)) & 1) != 0;
                     let fires_and_chosen = is_choice_enabled && choice_selected;
-                    
+
                     if fires_and_chosen {
                         assert_eq!(state.completed_ops, completed_ops);
                         assert_eq!(state.completed_branches, completed_branches | self_bit);
@@ -355,7 +361,7 @@ proptest! {
                     let loop_bit = 1u64 << (loop_id & 63);
                     let is_enter = ctrl_mask != 0;
                     let should_repeat = ((loop_repeat >> (loop_id & 63)) & 1) != 0;
-                    
+
                     if is_enter {
                         if !should_repeat {
                             assert_eq!(state.completed_loops, completed_loops | loop_bit);
@@ -384,15 +390,8 @@ proptest! {
 #[test]
 fn test_wasm_petri_replay_e2e_differential() {
     // Construct a standard workflow net
-    let places = vec![
-        Place::new("p0"),
-        Place::new("p1"),
-        Place::new("p2"),
-    ];
-    let transitions = vec![
-        Transition::new("t0", "A"),
-        Transition::new("t1", "B"),
-    ];
+    let places = vec![Place::new("p0"), Place::new("p1"), Place::new("p2")];
+    let transitions = vec![Transition::new("t0", "A"), Transition::new("t1", "B")];
     let arcs = vec![
         Arc::place_to_transition("p0", "t0"),
         Arc::transition_to_place("t0", "p1"),
@@ -419,11 +418,7 @@ fn test_wasm_petri_replay_e2e_differential() {
             value: AttributeValue::String("B".to_string()),
         }],
     });
-    let ref_trace = Trace {
-        id: "case1".to_string(),
-        attributes: vec![],
-        events: trace_events,
-    };
+    let ref_trace = Trace { id: "case1".to_string(), attributes: vec![], events: trace_events };
     let ref_result = replay_trace(&bitmask_net, &ref_trace);
 
     // WASM API Replay
@@ -431,12 +426,8 @@ fn test_wasm_petri_replay_e2e_differential() {
     let out_masks = vec![2u64, 4u64];
     let trace_indices = vec![0u32, 1u32];
 
-    let mut branchless_result = WasmReplayResult {
-        missing: 99,
-        remaining: 99,
-        produced: 99,
-        consumed: 99,
-    };
+    let mut branchless_result =
+        WasmReplayResult { missing: 99, remaining: 99, produced: 99, consumed: 99 };
 
     let rc = unsafe {
         wasm_petri_replay(

@@ -17,8 +17,10 @@
 
 use blake3::Hasher;
 use chess::{Board, ChessMove, Color, MoveGen, Piece};
-use playground::nnue::BranchTorchNNUE;
-use playground::petri::{petri_fire_transition, ReplayResult};
+use playground::{
+    nnue::BranchTorchNNUE,
+    petri::{petri_fire_transition, ReplayResult},
+};
 
 // --- Decision-process Petri net: one bit per place in the u64 marking. ---
 const READY: u64 = 1 << 0;
@@ -40,14 +42,8 @@ const TRANSITIONS: &[(&str, u64, u64)] = &[
 /// Signed white-relative eval = NNUE neuron 0 (material + PST), branchless accum.
 fn eval_white_cp(board: &Board, nnue: &BranchTorchNNUE) -> i32 {
     let mut h0 = nnue.l1_biases[0];
-    let pieces = [
-        Piece::Pawn,
-        Piece::Knight,
-        Piece::Bishop,
-        Piece::Rook,
-        Piece::Queen,
-        Piece::King,
-    ];
+    let pieces =
+        [Piece::Pawn, Piece::Knight, Piece::Bishop, Piece::Rook, Piece::Queen, Piece::King];
     for (p_idx, &p) in pieces.iter().enumerate() {
         for sq in *board.color_combined(Color::White) & *board.pieces(p) {
             h0 += nnue.l1_weights[0][p_idx * 64 + sq.to_index()];
@@ -84,11 +80,7 @@ fn decide(
         h.update(stage.as_bytes());
         h.update(detail.as_bytes());
         *prev_hash = *h.finalize().as_bytes();
-        log.push(Event {
-            stage,
-            detail,
-            receipt: hex(prev_hash),
-        });
+        log.push(Event { stage, detail, receipt: hex(prev_hash) });
     };
 
     // 1. Perceive: enumerate the legal action set.

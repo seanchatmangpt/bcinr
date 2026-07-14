@@ -82,27 +82,39 @@ mod tests {
             set_intersection_branchless_reference(42, 1337)
         );
         // boundaries
-            assert_eq!(
-                set_intersection_branchless(0, 0),
-                set_intersection_branchless_reference(0, 0)
-            );
-            assert_eq!(
-                set_intersection_branchless(u64::MAX, u64::MAX),
-                set_intersection_branchless_reference(u64::MAX, u64::MAX)
-            );
-            assert_eq!(
-                set_intersection_branchless(u64::MAX, 0),
-                set_intersection_branchless_reference(u64::MAX, 0)
-            );
-            assert_eq!(
-                set_intersection_branchless(0, u64::MAX),
-                set_intersection_branchless_reference(0, u64::MAX)
-            );
+        assert_eq!(
+            set_intersection_branchless(0, 0),
+            set_intersection_branchless_reference(0, 0)
+        );
+        assert_eq!(
+            set_intersection_branchless(u64::MAX, u64::MAX),
+            set_intersection_branchless_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            set_intersection_branchless(u64::MAX, 0),
+            set_intersection_branchless_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            set_intersection_branchless(0, u64::MAX),
+            set_intersection_branchless_reference(0, u64::MAX)
+        );
         // mutants
         let base = set_intersection_branchless_reference(42, 1337);
-        assert_ne!(mutant_set_intersection_branchless_1(42, 1337), base, "mutant 1");
-        assert_ne!(mutant_set_intersection_branchless_2(42, 1337), base, "mutant 2");
-        assert_ne!(mutant_set_intersection_branchless_3(42, 1337), base, "mutant 3");
+        assert_ne!(
+            mutant_set_intersection_branchless_1(42, 1337),
+            base,
+            "mutant 1"
+        );
+        assert_ne!(
+            mutant_set_intersection_branchless_2(42, 1337),
+            base,
+            "mutant 2"
+        );
+        assert_ne!(
+            mutant_set_intersection_branchless_3(42, 1337),
+            base,
+            "mutant 3"
+        );
     }
 
     // -------------------------------------------------------------------------

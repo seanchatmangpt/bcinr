@@ -67,11 +67,7 @@ mod tests {
     #[test]
     fn test_bit_transcoder_phd_oracle() {
         // PHD Gate: table-driven oracle + structural round-trip check
-        let cases: &[(u64, u64, u64)] = &[
-            (1, 0, 1),
-            (0xFF, 0, 0xFF),
-            (0, 0, 0),
-        ];
+        let cases: &[(u64, u64, u64)] = &[(1, 0, 1), (0xFF, 0, 0xFF), (0, 0, 0)];
         for &(val, _aux, expected) in cases {
             assert_eq!(val, expected);
             assert_ne!(val, !val); // mutant_1

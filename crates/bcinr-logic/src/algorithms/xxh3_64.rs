@@ -80,17 +80,13 @@ mod tests {
         xxh3_64_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
     #[test]
     fn test_xxh3_64_all() {
         // oracle
-        assert_eq!(
-            xxh3_64(42, 1337),
-            xxh3_64_reference(42, 1337)
-        );
+        assert_eq!(xxh3_64(42, 1337), xxh3_64_reference(42, 1337));
         // boundaries
         assert_eq!(xxh3_64(0, 0), xxh3_64_reference(0, 0));
         assert_eq!(

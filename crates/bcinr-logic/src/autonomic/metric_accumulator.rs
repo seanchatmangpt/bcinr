@@ -85,9 +85,24 @@ mod tests {
     fn test_metric_accumulator_sat_add_counterfactual_mutants() {
         // Each entry: (mutant_fn, current, val, label)
         let cases: &[(fn(u64, u64) -> u64, u64, u64, &str)] = &[
-            (mutant_metric_accumulator_sat_add_1, u64::MAX, 1, "rejects_mutant 1"),
-            (mutant_metric_accumulator_sat_add_2, 100, 50, "rejects_mutant 2"),
-            (mutant_metric_accumulator_sat_add_3, 100, 50, "rejects_mutant 3"),
+            (
+                mutant_metric_accumulator_sat_add_1,
+                u64::MAX,
+                1,
+                "rejects_mutant 1",
+            ),
+            (
+                mutant_metric_accumulator_sat_add_2,
+                100,
+                50,
+                "rejects_mutant 2",
+            ),
+            (
+                mutant_metric_accumulator_sat_add_3,
+                100,
+                50,
+                "rejects_mutant 3",
+            ),
         ];
         for (mutant, current, val, label) in cases.iter().copied() {
             let expected = metric_accumulator_sat_add_reference(current, val);

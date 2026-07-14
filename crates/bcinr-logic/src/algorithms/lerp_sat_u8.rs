@@ -68,8 +68,6 @@ mod tests {
         lerp_sat_u8_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
-
     #[test]
     fn test_lerp_sat_u8_all() {
         // equivalence oracle
@@ -78,30 +76,27 @@ mod tests {
         assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
         // boundaries
 
-        assert_eq!(
-            lerp_sat_u8(0, 0),
-            lerp_sat_u8_reference(0, 0)
-        );
+        assert_eq!(lerp_sat_u8(0, 0), lerp_sat_u8_reference(0, 0));
         assert_eq!(
             lerp_sat_u8(u64::MAX, u64::MAX),
             lerp_sat_u8_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(
-            lerp_sat_u8(u64::MAX, 0),
-            lerp_sat_u8_reference(u64::MAX, 0)
-        );
-        assert_eq!(
-            lerp_sat_u8(0, u64::MAX),
-            lerp_sat_u8_reference(0, u64::MAX)
-        );
+        assert_eq!(lerp_sat_u8(u64::MAX, 0), lerp_sat_u8_reference(u64::MAX, 0));
+        assert_eq!(lerp_sat_u8(0, u64::MAX), lerp_sat_u8_reference(0, u64::MAX));
         // mutant divergence
         let baseline = lerp_sat_u8_reference(42, 1337);
         let m1 = mutant_lerp_sat_u8_1(42, 1337);
         let m2 = mutant_lerp_sat_u8_2(42, 1337);
         let m3 = mutant_lerp_sat_u8_3(42, 1337);
-        if m1 != baseline { assert_ne!(m1, baseline, "mutant 1"); }
-        if m2 != baseline { assert_ne!(m2, baseline, "mutant 2"); }
-        if m3 != baseline { assert_ne!(m3, baseline, "mutant 3"); }
+        if m1 != baseline {
+            assert_ne!(m1, baseline, "mutant 1");
+        }
+        if m2 != baseline {
+            assert_ne!(m2, baseline, "mutant 2");
+        }
+        if m3 != baseline {
+            assert_ne!(m3, baseline, "mutant 3");
+        }
     }
 
     // -------------------------------------------------------------------------

@@ -217,7 +217,7 @@ mod tests {
     // Pre: { key: u32, tables: &[[u64;256];4] initialised by tabulation_hash_init_tables }
     // Post: { res == tables[0][key&FF] ^ tables[1][(key>>8)&FF]
     //               ^ tables[2][(key>>16)&FF] ^ tables[3][(key>>24)&FF] }
-                                                    }
+}
 
 #[cfg(feature = "bench")]
 pub mod bench {
@@ -228,7 +228,12 @@ pub mod bench {
         let mut tables = [[0u64; 256]; 4];
         tabulation_hash_init_tables(123456789, &mut tables);
         c.bench_function("tabulation_hash_u64", |b| {
-            b.iter(|| black_box(tabulation_hash_u64(black_box(0x12345678u32), black_box(&tables))))
+            b.iter(|| {
+                black_box(tabulation_hash_u64(
+                    black_box(0x12345678u32),
+                    black_box(&tables),
+                ))
+            })
         });
     }
 }

@@ -85,7 +85,6 @@ mod tests {
         benes_network_u64_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -105,8 +104,14 @@ mod tests {
             benes_network_u64(u64::MAX, u64::MAX),
             benes_network_u64_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(benes_network_u64(u64::MAX, 0), benes_network_u64_reference(u64::MAX, 0));
-        assert_eq!(benes_network_u64(0, u64::MAX), benes_network_u64_reference(0, u64::MAX));
+        assert_eq!(
+            benes_network_u64(u64::MAX, 0),
+            benes_network_u64_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            benes_network_u64(0, u64::MAX),
+            benes_network_u64_reference(0, u64::MAX)
+        );
         // --- mutant divergence ---
         let baseline = benes_network_u64_reference(42, 1337);
         assert_ne!(

@@ -59,7 +59,6 @@ mod tests {
         clamped_scaling_u64_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -74,13 +73,22 @@ mod tests {
             "equivalence oracle failed"
         );
         // --- boundaries ---
-        assert_eq!(clamped_scaling_u64(0, 0), clamped_scaling_u64_reference(0, 0));
+        assert_eq!(
+            clamped_scaling_u64(0, 0),
+            clamped_scaling_u64_reference(0, 0)
+        );
         assert_eq!(
             clamped_scaling_u64(u64::MAX, u64::MAX),
             clamped_scaling_u64_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(clamped_scaling_u64(u64::MAX, 0), clamped_scaling_u64_reference(u64::MAX, 0));
-        assert_eq!(clamped_scaling_u64(0, u64::MAX), clamped_scaling_u64_reference(0, u64::MAX));
+        assert_eq!(
+            clamped_scaling_u64(u64::MAX, 0),
+            clamped_scaling_u64_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            clamped_scaling_u64(0, u64::MAX),
+            clamped_scaling_u64_reference(0, u64::MAX)
+        );
         // --- mutant divergence ---
         let baseline = clamped_scaling_u64_reference(42, 1337);
         assert_ne!(

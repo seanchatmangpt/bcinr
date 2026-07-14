@@ -24,19 +24,28 @@ fn dfa_run_avg() {
 
 #[divan::bench]
 fn dfa_is_accepting_avg() {
-    divan::black_box(dfa_is_accepting(divan::black_box(1), divan::black_box(&ACCEPT_STATES)));
+    divan::black_box(dfa_is_accepting(
+        divan::black_box(1),
+        divan::black_box(&ACCEPT_STATES),
+    ));
 }
 
 #[divan::bench]
 fn count_byte_in_slice_avg() {
     let text = "the quick brown fox jumps over the lazy dog ".repeat(8);
-    divan::black_box(count_byte_in_slice(divan::black_box(text.as_bytes()), divan::black_box(b'o')));
+    divan::black_box(count_byte_in_slice(
+        divan::black_box(text.as_bytes()),
+        divan::black_box(b'o'),
+    ));
 }
 
 #[divan::bench]
 fn find_first_byte_in_slice_avg() {
     let text = "the quick brown fox jumps over the lazy dog ".repeat(8);
-    divan::black_box(find_first_byte_in_slice(divan::black_box(text.as_bytes()), divan::black_box(b'z')));
+    divan::black_box(find_first_byte_in_slice(
+        divan::black_box(text.as_bytes()),
+        divan::black_box(b'z'),
+    ));
 }
 
 #[divan::bench]

@@ -7,7 +7,7 @@
 
 /// Q16.16 fixed-point conformance metrics.
 ///
-/// Value encoding: `0x0001_0000` == 1.0, `0x8000_0000` == 0.5, `0x0000_0000` == 0.0.
+/// Value encoding: `0x0001_0000` == 1.0, `0x0000_8000` == 0.5, `0x0000_0000` == 0.0.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConformanceMetrics {
     pub fitness: u32,
@@ -33,19 +33,19 @@ impl ConformancePredicate {
     /// Strict predicate: all four dimensions must be ≥ 1.0 (fitness/precision) or ≥ 0.5
     /// (generalization/simplicity).
     pub const STRICT: Self = Self {
-        min_fitness: 0xFFFF_0000,
-        min_precision: 0xFFFF_0000,
-        min_generalization: 0x8000_0000,
-        min_simplicity: 0x8000_0000,
+        min_fitness: 0x0001_0000,
+        min_precision: 0x0001_0000,
+        min_generalization: 0x0000_8000,
+        min_simplicity: 0x0000_8000,
     };
 
     /// Lenient predicate: all four dimensions must be ≥ 0.5 (fitness/precision) or ≥ 0.25
     /// (generalization/simplicity).
     pub const LENIENT: Self = Self {
-        min_fitness: 0x8000_0000,
-        min_precision: 0x8000_0000,
-        min_generalization: 0x4000_0000,
-        min_simplicity: 0x4000_0000,
+        min_fitness: 0x0000_8000,
+        min_precision: 0x0000_8000,
+        min_generalization: 0x0000_4000,
+        min_simplicity: 0x0000_4000,
     };
 
     /// Branchless conformance check.
@@ -175,10 +175,10 @@ mod tests {
     #[test]
     fn strict_predicate_passes_at_threshold() {
         let m = ConformanceMetrics {
-            fitness: 0xFFFF_0000,
-            precision: 0xFFFF_0000,
-            generalization: 0x8000_0000,
-            simplicity: 0x8000_0000,
+            fitness: 0x0001_0000,
+            precision: 0x0001_0000,
+            generalization: 0x0000_8000,
+            simplicity: 0x0000_8000,
         };
         assert!(ConformancePredicate::STRICT.check(&m).is_ok());
     }
@@ -186,10 +186,10 @@ mod tests {
     #[test]
     fn strict_predicate_fails_on_precision() {
         let m = ConformanceMetrics {
-            fitness: 0xFFFF_0000,
-            precision: 0x7000_0000, // below 0xFFFF_0000
-            generalization: 0x8000_0000,
-            simplicity: 0x8000_0000,
+            fitness: 0x0001_0000,
+            precision: 0x0000_7000, // below 0x0001_0000
+            generalization: 0x0000_8000,
+            simplicity: 0x0000_8000,
         };
         let err = ConformancePredicate::STRICT.check(&m).unwrap_err();
         assert_eq!(err.dim, ConformanceDimension::Precision);

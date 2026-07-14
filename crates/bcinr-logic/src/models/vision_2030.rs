@@ -172,9 +172,15 @@ mod tests {
         val
     }
 
-    fn mutant_vision_1(val: u64, aux: u64) -> u64 { !vision_reference(val, aux) }
-    fn mutant_vision_2(val: u64, aux: u64) -> u64 { vision_reference(val, aux).wrapping_add(1) }
-    fn mutant_vision_3(val: u64, aux: u64) -> u64 { vision_reference(val, aux) ^ 0xFF }
+    fn mutant_vision_1(val: u64, aux: u64) -> u64 {
+        !vision_reference(val, aux)
+    }
+    fn mutant_vision_2(val: u64, aux: u64) -> u64 {
+        vision_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_vision_3(val: u64, aux: u64) -> u64 {
+        vision_reference(val, aux) ^ 0xFF
+    }
 
     #[test]
     fn test_vision_equivalence_and_boundaries() {

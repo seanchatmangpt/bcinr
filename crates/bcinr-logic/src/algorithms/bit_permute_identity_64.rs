@@ -73,7 +73,6 @@ mod tests {
         bit_permute_identity_64_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Key bit-permutation properties
     // -------------------------------------------------------------------------
@@ -83,7 +82,10 @@ mod tests {
         assert_eq!(bit_permute_identity_64(0, 0), 0);
         assert_eq!(bit_permute_identity_64(u64::MAX, 0), u64::MAX);
         assert_eq!(bit_permute_identity_64(42, 0), 42);
-        assert_eq!(bit_permute_identity_64(0xDEAD_BEEF_CAFE_BABE, 0), 0xDEAD_BEEF_CAFE_BABE);
+        assert_eq!(
+            bit_permute_identity_64(0xDEAD_BEEF_CAFE_BABE, 0),
+            0xDEAD_BEEF_CAFE_BABE
+        );
     }
 
     #[test]
@@ -96,13 +98,22 @@ mod tests {
             "equivalence oracle failed"
         );
         // --- boundaries ---
-        assert_eq!(bit_permute_identity_64(0, 0), bit_permute_identity_64_reference(0, 0));
+        assert_eq!(
+            bit_permute_identity_64(0, 0),
+            bit_permute_identity_64_reference(0, 0)
+        );
         assert_eq!(
             bit_permute_identity_64(u64::MAX, u64::MAX),
             bit_permute_identity_64_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(bit_permute_identity_64(u64::MAX, 0), bit_permute_identity_64_reference(u64::MAX, 0));
-        assert_eq!(bit_permute_identity_64(0, u64::MAX), bit_permute_identity_64_reference(0, u64::MAX));
+        assert_eq!(
+            bit_permute_identity_64(u64::MAX, 0),
+            bit_permute_identity_64_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            bit_permute_identity_64(0, u64::MAX),
+            bit_permute_identity_64_reference(0, u64::MAX)
+        );
         // --- mutant divergence ---
         let baseline = bit_permute_identity_64_reference(42, 1337);
         assert_ne!(

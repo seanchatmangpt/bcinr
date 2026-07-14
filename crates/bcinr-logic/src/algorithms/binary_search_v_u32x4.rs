@@ -67,7 +67,6 @@ mod tests {
         binary_search_v_u32x4_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -82,13 +81,22 @@ mod tests {
             "equivalence oracle failed"
         );
         // --- boundaries ---
-        assert_eq!(binary_search_v_u32x4(0, 0), binary_search_v_u32x4_reference(0, 0));
+        assert_eq!(
+            binary_search_v_u32x4(0, 0),
+            binary_search_v_u32x4_reference(0, 0)
+        );
         assert_eq!(
             binary_search_v_u32x4(u64::MAX, u64::MAX),
             binary_search_v_u32x4_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(binary_search_v_u32x4(u64::MAX, 0), binary_search_v_u32x4_reference(u64::MAX, 0));
-        assert_eq!(binary_search_v_u32x4(0, u64::MAX), binary_search_v_u32x4_reference(0, u64::MAX));
+        assert_eq!(
+            binary_search_v_u32x4(u64::MAX, 0),
+            binary_search_v_u32x4_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            binary_search_v_u32x4(0, u64::MAX),
+            binary_search_v_u32x4_reference(0, u64::MAX)
+        );
         // --- mutant divergence ---
         let baseline = binary_search_v_u32x4_reference(42, 1337);
         assert_ne!(

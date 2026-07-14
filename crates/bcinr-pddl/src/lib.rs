@@ -18,40 +18,80 @@
 //! Canonical types live in `wasm4pm_compat::pddl` so any crate can import
 //! `Pddl8Tape`, `Pddl8GroundAction`, etc. without pulling in the parser.
 
+pub mod alloc_counter;
+pub mod capability_router;
+pub mod dfcm_crown;
 pub mod error;
-pub mod ground;
 pub mod execute;
+pub mod ground;
+pub mod llm_bridge;
 pub mod parse;
 pub mod powl_bridge;
 pub mod schedule_analysis;
-pub mod dfcm_crown;
-pub mod alloc_counter;
-pub mod llm_bridge;
-pub mod capability_router;
-pub use llm_bridge::{AdmittedDomain, AdmittedProblem, WorldManufactureReceipt, admit_candidate_domain, admit_candidate_problem, manufacture_world};
-pub use capability_router::{route_capability_plan, CapabilityTask, DesiredEffect, CostVector, CapabilityRouteReceipt};
-pub use schedule_analysis::{analyze_schedule, analyze_schedule_instrumented, AnalysisSubstageNs, CapacityDelta, ScheduleAnalysis64};
+pub use capability_router::{
+    route_capability_plan, CapabilityRouteReceipt, CapabilityTask, CostVector, DesiredEffect,
+};
 pub use dfcm_crown::{run_dfcm_crown_suite, DfcmBenchReceipt};
+pub use llm_bridge::{
+    admit_candidate_domain, admit_candidate_problem, manufacture_world, AdmittedDomain,
+    AdmittedProblem, WorldManufactureReceipt,
+};
+pub use schedule_analysis::{
+    analyze_schedule, analyze_schedule_instrumented, AnalysisSubstageNs, CapacityDelta,
+    ScheduleAnalysis64,
+};
 
 // Re-export canonical types from wasm4pm-compat so callers only need one import.
+pub use wasm4pm_compat::ocel::{OCELEvent, OCEL};
 pub use wasm4pm_compat::pddl::{
-    Pddl8ActionSchema, Pddl8Atom, Pddl8Domain, Pddl8ExecutionLog, Pddl8ExecutionReceipt,
-    Pddl8GroundAction, Pddl8GroundAtom, Pddl8Problem, Pddl8StepResult, Pddl8Tape, Pddl8TapeOp,
-    PDDL8_MAX_ARITY, PDDL8_MAX_CONJUNCTS, PDDL8_MAX_GROUND, PDDL8_MAX_PARAMS,
-    PDDL8_MAX_PLAN_DEPTH,
+    DerivedPredicate,
+    DurationConstraint,
+    DurativeAction,
+    Metric,
+    MetricDir,
+    MetricExpr,
+    NumericEffect,
+    NumericExpr,
+    NumericOp,
+    Pddl31Action,
+    Pddl31Domain,
+    Pddl31Problem,
+    Pddl8ActionSchema,
+    Pddl8Atom,
+    Pddl8Domain,
+    Pddl8ExecutionLog,
+    Pddl8ExecutionReceipt,
+    Pddl8GroundAction,
+    Pddl8GroundAtom,
+    Pddl8Problem,
+    Pddl8StepResult,
+    Pddl8Tape,
+    Pddl8TapeOp,
+    PddlCondition,
+    PddlConstraint,
+    PddlEffect,
+    PddlEvent,
+    PddlFunction,
+    PddlPreference,
+    PddlProcess,
     // New PDDL 3.1 types:
-    PddlType, PddlCondition, PddlEffect,
-    NumericExpr, NumericOp, NumericEffect, PddlFunction,
-    TimeSpecifier, DurationConstraint, DurativeAction,
-    TimedLiteral, Metric, MetricDir, MetricExpr,
-    TrajectoryConstraint, PddlConstraint, PddlPreference,
-    DerivedPredicate, PddlProcess, PddlEvent,
-    Pddl31Domain, Pddl31Problem, Pddl31Action,
-    TemporalPlanStep, TemporalPlan, TemporalExecutionReceipt,
+    PddlType,
+    TemporalExecutionReceipt,
+    TemporalPlan,
+    TemporalPlanStep,
+    TimeSpecifier,
+    TimedLiteral,
+    TrajectoryConstraint,
+    PDDL8_MAX_ARITY,
+    PDDL8_MAX_CONJUNCTS,
+    PDDL8_MAX_GROUND,
+    PDDL8_MAX_PARAMS,
+    PDDL8_MAX_PLAN_DEPTH,
 };
-pub use wasm4pm_compat::ocel::{OCEL, OCELEvent};
 
-pub use error::Pddl8Error;
-pub use execute::{execute_tape, compute_plan_chain, execute_temporal_plan_instrumented, SubstageNs};
-pub use ground::{GroundProblem, GroundTemporalProblem, GroundDurativeAction};
-pub use parse::{domain_from_pddl, problem_from_pddl, domain31_from_pddl, problem31_from_pddl};
+pub use error::{Pddl8Error, PlannerOutcome};
+pub use execute::{
+    compute_plan_chain, execute_tape, execute_temporal_plan_instrumented, SubstageNs,
+};
+pub use ground::{GroundDurativeAction, GroundProblem, GroundTemporalProblem};
+pub use parse::{domain31_from_pddl, domain_from_pddl, problem31_from_pddl, problem_from_pddl};

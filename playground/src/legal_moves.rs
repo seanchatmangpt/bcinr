@@ -1,5 +1,5 @@
 //! Branchless Legal Move Generation using Kogge-Stone Parallel Prefix
-//! and compile-time bitboard masks. 
+//! and compile-time bitboard masks.
 //! CC = 1, 0 allocations, #![no_std].
 
 /// Kogge-Stone parallel prefix algorithm for North rays
@@ -91,12 +91,18 @@ pub fn so_we_attacks(mut gen: u64, mut pro: u64) -> u64 {
 
 #[inline(always)]
 pub fn rook_attacks(sq: u64, empty: u64) -> u64 {
-    north_attacks(sq, empty) | south_attacks(sq, empty) | east_attacks(sq, empty) | west_attacks(sq, empty)
+    north_attacks(sq, empty)
+        | south_attacks(sq, empty)
+        | east_attacks(sq, empty)
+        | west_attacks(sq, empty)
 }
 
 #[inline(always)]
 pub fn bishop_attacks(sq: u64, empty: u64) -> u64 {
-    no_ea_attacks(sq, empty) | so_ea_attacks(sq, empty) | no_we_attacks(sq, empty) | so_we_attacks(sq, empty)
+    no_ea_attacks(sq, empty)
+        | so_ea_attacks(sq, empty)
+        | no_we_attacks(sq, empty)
+        | so_we_attacks(sq, empty)
 }
 
 #[inline(always)]
@@ -116,10 +122,10 @@ pub const fn compute_knight_attacks() -> [u64; 64] {
         let not_gh = 0x3f3f3f3f3f3f3f3f;
         attacks |= (sq << 17) & not_a;
         attacks |= (sq << 10) & not_ab;
-        attacks |= (sq >> 6)  & not_ab;
+        attacks |= (sq >> 6) & not_ab;
         attacks |= (sq >> 15) & not_a;
         attacks |= (sq << 15) & not_h;
-        attacks |= (sq << 6)  & not_gh;
+        attacks |= (sq << 6) & not_gh;
         attacks |= (sq >> 10) & not_gh;
         attacks |= (sq >> 17) & not_h;
         table[i] = attacks;

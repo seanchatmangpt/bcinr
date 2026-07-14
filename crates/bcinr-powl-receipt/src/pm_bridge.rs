@@ -43,9 +43,9 @@ pub fn frames_to_ocel2_json(frames: &[PowlReplayFrame]) -> Value {
             .collect();
 
         for obj_id in &frame.object_ids {
-            objects.entry(obj_id.clone()).or_insert_with(|| {
-                json!({ "ocel:type": "powl-object", "ocel:ovmap": {} })
-            });
+            objects
+                .entry(obj_id.clone())
+                .or_insert_with(|| json!({ "ocel:type": "powl-object", "ocel:ovmap": {} }));
         }
 
         events.insert(

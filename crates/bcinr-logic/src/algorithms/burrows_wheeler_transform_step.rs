@@ -64,7 +64,6 @@ mod tests {
         burrows_wheeler_transform_step_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -79,13 +78,22 @@ mod tests {
             "equivalence oracle failed"
         );
         // --- boundaries ---
-        assert_eq!(burrows_wheeler_transform_step(0, 0), burrows_wheeler_transform_step_reference(0, 0));
+        assert_eq!(
+            burrows_wheeler_transform_step(0, 0),
+            burrows_wheeler_transform_step_reference(0, 0)
+        );
         assert_eq!(
             burrows_wheeler_transform_step(u64::MAX, u64::MAX),
             burrows_wheeler_transform_step_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(burrows_wheeler_transform_step(u64::MAX, 0), burrows_wheeler_transform_step_reference(u64::MAX, 0));
-        assert_eq!(burrows_wheeler_transform_step(0, u64::MAX), burrows_wheeler_transform_step_reference(0, u64::MAX));
+        assert_eq!(
+            burrows_wheeler_transform_step(u64::MAX, 0),
+            burrows_wheeler_transform_step_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            burrows_wheeler_transform_step(0, u64::MAX),
+            burrows_wheeler_transform_step_reference(0, u64::MAX)
+        );
         // --- mutant divergence ---
         let baseline = burrows_wheeler_transform_step_reference(42, 1337);
         assert_ne!(

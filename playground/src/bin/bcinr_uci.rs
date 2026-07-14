@@ -1,7 +1,10 @@
-use std::io::{self, BufRead};
-use std::time::Instant;
-use chess::{Board, ChessMove, MoveGen, BoardStatus, Color};
-use std::str::FromStr;
+use std::{
+    io::{self, BufRead},
+    str::FromStr,
+    time::Instant,
+};
+
+use chess::{Board, BoardStatus, ChessMove, Color, MoveGen};
 
 /// CPU-side NNUE accumulator: the L1 hidden activations for a board.
 struct Accumulator {
@@ -15,8 +18,12 @@ struct Accumulator {
 fn board_to_accumulator(b: &Board, nnue: &playground::nnue::BranchTorchNNUE) -> Accumulator {
     let mut hidden = nnue.l1_biases;
     let pieces = [
-        chess::Piece::Pawn, chess::Piece::Knight, chess::Piece::Bishop,
-        chess::Piece::Rook, chess::Piece::Queen, chess::Piece::King
+        chess::Piece::Pawn,
+        chess::Piece::Knight,
+        chess::Piece::Bishop,
+        chess::Piece::Rook,
+        chess::Piece::Queen,
+        chess::Piece::King,
     ];
     let mut p_idx = 0;
     for &p in &pieces {
@@ -85,7 +92,12 @@ fn evaluate_board(board: &Board, nnue: &playground::nnue::BranchTorchNNUE) -> f3
     }
 }
 
-fn quiescence(mut alpha: f32, beta: f32, board: &Board, nnue: &playground::nnue::BranchTorchNNUE) -> f32 {
+fn quiescence(
+    mut alpha: f32,
+    beta: f32,
+    board: &Board,
+    nnue: &playground::nnue::BranchTorchNNUE,
+) -> f32 {
     let stand_pat = evaluate_board(board, nnue);
     if stand_pat >= beta {
         return beta;
@@ -111,9 +123,18 @@ fn quiescence(mut alpha: f32, beta: f32, board: &Board, nnue: &playground::nnue:
     alpha
 }
 
-fn alphabeta(alpha: f32, beta: f32, depth: usize, board: &Board, nnue: &playground::nnue::BranchTorchNNUE, start_time: Instant, max_time_ms: u128, nodes: &mut u64) -> f32 {
+fn alphabeta(
+    alpha: f32,
+    beta: f32,
+    depth: usize,
+    board: &Board,
+    nnue: &playground::nnue::BranchTorchNNUE,
+    start_time: Instant,
+    max_time_ms: u128,
+    nodes: &mut u64,
+) -> f32 {
     *nodes += 1;
-    
+
     if *nodes % 2048 == 0 && start_time.elapsed().as_millis() >= max_time_ms {
         return 0.0; // Time out
     }
@@ -131,14 +152,23 @@ fn alphabeta(alpha: f32, beta: f32, depth: usize, board: &Board, nnue: &playgrou
 
     let mut moves: Vec<ChessMove> = MoveGen::new_legal(board).collect();
     order_moves(board, &mut moves);
-    
+
     let mut best_val = -1000000.0;
     let mut local_alpha = alpha;
 
     for m in moves {
         let child = board.make_move_new(m);
-        let val = -alphabeta(-beta, -local_alpha, depth - 1, &child, nnue, start_time, max_time_ms, nodes);
-        
+        let val = -alphabeta(
+            -beta,
+            -local_alpha,
+            depth - 1,
+            &child,
+            nnue,
+            start_time,
+            max_time_ms,
+            nodes,
+        );
+
         if start_time.elapsed().as_millis() >= max_time_ms {
             return 0.0;
         }
@@ -225,7 +255,7 @@ fn search_best_move(board: &Board, max_time_ms: u128) -> Option<ChessMove> {
     for depth in 1..=MAX_DEPTH {
         let mut moves: Vec<ChessMove> = MoveGen::new_legal(board).collect();
         order_moves(board, &mut moves);
-        
+
         let mut best_val = -1000000.0;
         let mut best_move = None;
         let mut alpha = -1000000.0;
@@ -233,8 +263,17 @@ fn search_best_move(board: &Board, max_time_ms: u128) -> Option<ChessMove> {
 
         for m in &moves {
             let child = board.make_move_new(*m);
-            let val = -alphabeta(-beta, -alpha, depth - 1, &child, &nnue_inst, start_time, max_time_ms, &mut nodes);
-            
+            let val = -alphabeta(
+                -beta,
+                -alpha,
+                depth - 1,
+                &child,
+                &nnue_inst,
+                start_time,
+                max_time_ms,
+                &mut nodes,
+            );
+
             if start_time.elapsed().as_millis() >= max_time_ms {
                 break;
             }
@@ -251,15 +290,21 @@ fn search_best_move(board: &Board, max_time_ms: u128) -> Option<ChessMove> {
         if start_time.elapsed().as_millis() >= max_time_ms {
             break; // Keep best_move_overall from previous completed depth
         }
-        
+
         if let Some(m) = best_move {
             best_move_overall = Some(m);
         }
-        
+
         let elapsed = start_time.elapsed().as_millis();
-        println!("info depth {} nodes {} time {} nps {}", depth, nodes, elapsed, (nodes as u128 * 1000) / elapsed.max(1));
+        println!(
+            "info depth {} nodes {} time {} nps {}",
+            depth,
+            nodes,
+            elapsed,
+            (nodes as u128 * 1000) / elapsed.max(1)
+        );
     }
-    
+
     best_move_overall
 }
 
@@ -276,7 +321,9 @@ fn main() {
     for line_result in stdin.lock().lines() {
         let line = line_result.unwrap();
         let tokens: Vec<&str> = line.split_whitespace().collect();
-        if tokens.is_empty() { continue; }
+        if tokens.is_empty() {
+            continue;
+        }
 
         match tokens[0] {
             "uci" => {
@@ -322,10 +369,10 @@ fn main() {
                 let mut fixed_depth: Option<usize> = None;
                 for i in 1..tokens.len() {
                     if tokens[i] == "movetime" && i + 1 < tokens.len() {
-                        max_time_ms = tokens[i+1].parse::<u128>().unwrap_or(1000);
+                        max_time_ms = tokens[i + 1].parse::<u128>().unwrap_or(1000);
                     }
                     if tokens[i] == "depth" && i + 1 < tokens.len() {
-                        fixed_depth = tokens[i+1].parse::<usize>().ok();
+                        fixed_depth = tokens[i + 1].parse::<usize>().ok();
                     }
                 }
 

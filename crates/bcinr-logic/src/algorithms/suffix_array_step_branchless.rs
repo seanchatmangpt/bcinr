@@ -65,7 +65,6 @@ mod tests {
         suffix_array_step_branchless_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -95,9 +94,21 @@ mod tests {
         );
         // mutants
         let base = suffix_array_step_branchless_reference(42, 1337);
-        assert_ne!(mutant_suffix_array_step_branchless_1(42, 1337), base, "mutant 1");
-        assert_ne!(mutant_suffix_array_step_branchless_2(42, 1337), base, "mutant 2");
-        assert_ne!(mutant_suffix_array_step_branchless_3(42, 1337), base, "mutant 3");
+        assert_ne!(
+            mutant_suffix_array_step_branchless_1(42, 1337),
+            base,
+            "mutant 1"
+        );
+        assert_ne!(
+            mutant_suffix_array_step_branchless_2(42, 1337),
+            base,
+            "mutant 2"
+        );
+        assert_ne!(
+            mutant_suffix_array_step_branchless_3(42, 1337),
+            base,
+            "mutant 3"
+        );
     }
 
     // -------------------------------------------------------------------------

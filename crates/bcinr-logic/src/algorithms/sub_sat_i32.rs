@@ -76,18 +76,15 @@ mod tests {
     #[test]
     fn test_sub_sat_i32_all() {
         // oracle
-        assert_eq!(
-            sub_sat_i32(42, 1337),
-            sub_sat_i32_reference(42, 1337)
-        );
+        assert_eq!(sub_sat_i32(42, 1337), sub_sat_i32_reference(42, 1337));
         // boundaries
-            assert_eq!(sub_sat_i32(0, 0), sub_sat_i32_reference(0, 0));
-            assert_eq!(
-                sub_sat_i32(u64::MAX, u64::MAX),
-                sub_sat_i32_reference(u64::MAX, u64::MAX)
-            );
-            assert_eq!(sub_sat_i32(u64::MAX, 0), sub_sat_i32_reference(u64::MAX, 0));
-            assert_eq!(sub_sat_i32(0, u64::MAX), sub_sat_i32_reference(0, u64::MAX));
+        assert_eq!(sub_sat_i32(0, 0), sub_sat_i32_reference(0, 0));
+        assert_eq!(
+            sub_sat_i32(u64::MAX, u64::MAX),
+            sub_sat_i32_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(sub_sat_i32(u64::MAX, 0), sub_sat_i32_reference(u64::MAX, 0));
+        assert_eq!(sub_sat_i32(0, u64::MAX), sub_sat_i32_reference(0, u64::MAX));
         // mutants
         let base = sub_sat_i32_reference(42, 1337);
         assert_ne!(mutant_sub_sat_i32_1(42, 1337), base, "mutant 1");

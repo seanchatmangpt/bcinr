@@ -186,7 +186,10 @@ mod tests {
         for &v in PEARSON_TABLE.iter() {
             seen[v as usize] = true;
         }
-        assert!(seen.iter().all(|&s| s), "PEARSON_TABLE is not a permutation");
+        assert!(
+            seen.iter().all(|&s| s),
+            "PEARSON_TABLE is not a permutation"
+        );
     }
 
     // -------------------------------------------------------------------------

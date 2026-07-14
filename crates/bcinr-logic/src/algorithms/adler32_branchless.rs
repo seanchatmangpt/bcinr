@@ -94,7 +94,6 @@ mod tests {
         adler32_branchless_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -114,8 +113,14 @@ mod tests {
             adler32_branchless(u64::MAX, u64::MAX),
             adler32_branchless_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(adler32_branchless(u64::MAX, 0), adler32_branchless_reference(u64::MAX, 0));
-        assert_eq!(adler32_branchless(0, u64::MAX), adler32_branchless_reference(0, u64::MAX));
+        assert_eq!(
+            adler32_branchless(u64::MAX, 0),
+            adler32_branchless_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            adler32_branchless(0, u64::MAX),
+            adler32_branchless_reference(0, u64::MAX)
+        );
         // --- mutant divergence ---
         let baseline = adler32_branchless_reference(42, 1337);
         assert_ne!(

@@ -5,7 +5,13 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn bench_mask(c: &mut Criterion) {
     c.bench_function("mask::select_u32", |b| {
-        b.iter(|| black_box(select_u32(black_box(0xFFFFFFFF), black_box(10), black_box(20))))
+        b.iter(|| {
+            black_box(select_u32(
+                black_box(0xFFFFFFFF),
+                black_box(10),
+                black_box(20),
+            ))
+        })
     });
 }
 

@@ -71,17 +71,13 @@ mod tests {
         smoothstep_u32_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
     #[test]
     fn test_smoothstep_u32_all() {
         // oracle
-        assert_eq!(
-            smoothstep_u32(42, 1337),
-            smoothstep_u32_reference(42, 1337)
-        );
+        assert_eq!(smoothstep_u32(42, 1337), smoothstep_u32_reference(42, 1337));
         // boundaries
         assert_eq!(smoothstep_u32(0, 0), smoothstep_u32_reference(0, 0));
         assert_eq!(

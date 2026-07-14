@@ -61,20 +61,25 @@ impl PowlReplayVerifier {
     pub fn replay_frame(&mut self, frame: &PowlReplayFrame) -> Result<(), ReplayViolation> {
         // Guard 1: node_bit must be exactly one bit set (power of two, non-zero).
         if frame.node_bit == 0 || (frame.node_bit & frame.node_bit.wrapping_sub(1)) != 0 {
-            return Err(ReplayViolation::UnknownNode { node_id: frame.node_id });
+            return Err(ReplayViolation::UnknownNode {
+                node_id: frame.node_id,
+            });
         }
 
         // Guard 2: all required tokens must be present — branchless XOR check.
         let missing = (self.enabled_tokens & frame.required_tokens) ^ frame.required_tokens;
         if missing != 0 {
-            return Err(ReplayViolation::TokenNotEnabled { node_id: frame.node_id });
+            return Err(ReplayViolation::TokenNotEnabled {
+                node_id: frame.node_id,
+            });
         }
 
         // Accumulate enabled-not-taken before consuming tokens.
         self.enabled_not_taken |= self.enabled_tokens & !frame.required_tokens & !frame.node_bit;
 
         // Consume required tokens; produce successor tokens.
-        self.enabled_tokens = (self.enabled_tokens & !frame.required_tokens) | frame.produces_tokens;
+        self.enabled_tokens =
+            (self.enabled_tokens & !frame.required_tokens) | frame.produces_tokens;
 
         self.replayed |= frame.node_bit;
         self.fitted |= frame.node_bit;
@@ -104,7 +109,11 @@ fn fixed_div(numerator: u64, denominator: u64) -> u32 {
         return 0x0001_0000;
     }
     let shifted = (numerator << 16) / denominator;
-    if shifted > u32::MAX as u64 { u32::MAX } else { shifted as u32 }
+    if shifted > u32::MAX as u64 {
+        u32::MAX
+    } else {
+        shifted as u32
+    }
 }
 
 #[cfg(test)]
@@ -113,7 +122,8 @@ mod tests {
 
     fn f(node_id: u32, node_bit: u64, required: u64, produces: u64) -> PowlReplayFrame {
         PowlReplayFrame {
-            node_id, node_bit,
+            node_id,
+            node_bit,
             required_tokens: required,
             produces_tokens: produces,
             activity: format!("op-{node_id}"),
@@ -133,10 +143,17 @@ mod tests {
     fn zero_node_bit_is_unknown_node() {
         let mut v = PowlReplayVerifier::new(0x1);
         let bad = PowlReplayFrame {
-            node_id: 99, node_bit: 0,
-            required_tokens: 0, produces_tokens: 0,
-            activity: "X".into(), ts_ns: 0, object_ids: vec![],
+            node_id: 99,
+            node_bit: 0,
+            required_tokens: 0,
+            produces_tokens: 0,
+            activity: "X".into(),
+            ts_ns: 0,
+            object_ids: vec![],
         };
-        assert_eq!(v.replay_frame(&bad), Err(ReplayViolation::UnknownNode { node_id: 99 }));
+        assert_eq!(
+            v.replay_frame(&bad),
+            Err(ReplayViolation::UnknownNode { node_id: 99 })
+        );
     }
 }

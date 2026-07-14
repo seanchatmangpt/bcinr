@@ -1,11 +1,12 @@
 #![feature(min_adt_const_params)]
 #![allow(unsafe_code)]
 
+use playground::{
+    petri::{petri_fire_invisible, petri_fire_transition},
+    powl::{powl64_execute_step, Powl64Op, Powl64OpKind, PowlState},
+    yawl::{BYawlEngine, BYawlTask, JoinType, SplitType},
+};
 use proptest::prelude::*;
-
-use playground::petri::{petri_fire_transition, petri_fire_invisible};
-use playground::powl::{powl64_execute_step, PowlState, Powl64Op, Powl64OpKind};
-use playground::yawl::{BYawlEngine, BYawlTask, JoinType, SplitType};
 
 // --- Hoare Oracle: Formal Verification using Invariants ---
 
@@ -41,7 +42,7 @@ proptest! {
         // [POST-CONDITION]
         // 1. The output marking MUST contain all bits of out_mask
         assert_eq!(marking_mut & out_mask, out_mask, "Oracle Fault: Produced tokens not present in marking");
-        
+
         // 2. The bits of the marking that are NOT in in_mask and NOT in out_mask MUST be unchanged
         let unaffected_mask = !(in_mask | out_mask);
         assert_eq!(marking_mut & unaffected_mask, marking & unaffected_mask, "Oracle Fault: Unrelated bits modified");
@@ -70,11 +71,11 @@ proptest! {
 
         petri_fire_invisible(&mut marking_mut, &inv_in_masks, &inv_out_masks);
 
-        // [INVARIANT] For every transition i, if marking had all in_masks[i] bits, 
+        // [INVARIANT] For every transition i, if marking had all in_masks[i] bits,
         // it must end up with out_masks[i] bits OR the state is non-terminal.
-        // Due to fixed 16 iterations, we can at least assert that any newly set bits 
+        // Due to fixed 16 iterations, we can at least assert that any newly set bits
         // must come from the union of inv_out_masks.
-        
+
         let union_out = inv_out_masks.iter().fold(0, |acc, &x| acc | x);
         let union_in = inv_in_masks.iter().fold(0, |acc, &x| acc | x);
 
@@ -97,7 +98,7 @@ proptest! {
         fired_joins_mask in any::<u64>(),
         active_locks in any::<u64>(),
         active_instances_vec in prop::collection::vec(any::<u8>(), 64),
-        
+
         task_id in any::<u16>(),
         join_type_idx in 0..5u8,
         split_type_idx in 0..10u8,
@@ -161,7 +162,7 @@ proptest! {
         };
 
         let engine_pre = engine.clone();
-        
+
         // Execute task
         let fired_mask = engine.execute_task_branchless(&task);
 
@@ -173,11 +174,11 @@ proptest! {
             let is_release_mask = if (task.flags & 4) != 0 { !0u64 } else { 0u64 };
             let conflict_mask = if (engine_pre.active_locks & task.interleaved_lock_mask) != 0 { !0u64 } else { 0u64 };
             let allowed_by_lock_mask = (!conflict_mask) | is_release_mask;
-            
+
             let has_reset = (engine_pre.state_mask & task.reset_mask) != 0;
             let has_reset_tokens_mask = if has_reset { !0u64 } else { 0u64 } & allowed_by_lock_mask;
             let reset_bit = 1u64.wrapping_shl(task.join_state_bit as u32 & 63);
-            
+
             let expected_state = engine_pre.state_mask & !(task.reset_mask & has_reset_tokens_mask);
             let expected_fired_joins = engine_pre.fired_joins_mask & !(reset_bit & has_reset_tokens_mask);
 
@@ -189,11 +190,11 @@ proptest! {
             // [INVARIANT] If task fired, deterministic state transitions occurred
             // Consumed tokens must be cleared
             assert_eq!(engine.state_mask & task.consume_mask, 0, "Oracle Fault: Tokens not consumed");
-            
+
             // Active triggers might be reset
             let expected_triggers = engine_pre.active_triggers & !task.reset_mask;
             assert_eq!(engine.active_triggers, expected_triggers, "Oracle Fault: Triggers not reset properly");
-            
+
             // Fired joins mask must have the join bit set
             assert_ne!(engine.fired_joins_mask & (1u64 << task.join_state_bit), 0, "Oracle Fault: Join bit not set");
         }
@@ -210,7 +211,7 @@ proptest! {
         scope_stack in prop::array::uniform16(any::<u16>()),
         stack_depth in 1..16u32,
         completed_loops in any::<u64>(),
-        
+
         op_kind_idx in 0..9u8,
         lane in any::<u8>(),
         activity in any::<u16>(),
@@ -221,7 +222,7 @@ proptest! {
         succ_mask in any::<u64>(),
         ctrl_mask in any::<u64>(),
         intensity in any::<u8>(),
-        
+
         input_choice in any::<u64>(),
         loop_repeat in any::<u64>(),
     ) {
@@ -236,7 +237,7 @@ proptest! {
             7 => Powl64OpKind::Demote,
             _ => Powl64OpKind::Watchdog,
         };
-        
+
         let op = Powl64Op {
             kind,
             lane,
@@ -250,7 +251,7 @@ proptest! {
             intensity,
             _pad: [0; 7],
         };
-        
+
         let mut state = PowlState {
             completed_ops,
             completed_branches,
@@ -270,7 +271,7 @@ proptest! {
 
         // [INVARIANT] Monotonic progression in completed ops unless it's a loop exit repeat
         let is_loop_repeat = kind as u32 == Powl64OpKind::LoopGate as u32 && ctrl_mask == 0 && ((loop_repeat >> (loop_id & 63)) & 1) != 0;
-        
+
         if is_loop_repeat {
             // Pred mask bits could be cleared
             let cleared_bits = state_pre.completed_ops & !state.completed_ops;

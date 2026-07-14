@@ -90,19 +90,19 @@ mod tests {
             weighted_avg_u32_reference(42, 1337)
         );
         // boundaries
-            assert_eq!(weighted_avg_u32(0, 0), weighted_avg_u32_reference(0, 0));
-            assert_eq!(
-                weighted_avg_u32(u64::MAX, u64::MAX),
-                weighted_avg_u32_reference(u64::MAX, u64::MAX)
-            );
-            assert_eq!(
-                weighted_avg_u32(u64::MAX, 0),
-                weighted_avg_u32_reference(u64::MAX, 0)
-            );
-            assert_eq!(
-                weighted_avg_u32(0, u64::MAX),
-                weighted_avg_u32_reference(0, u64::MAX)
-            );
+        assert_eq!(weighted_avg_u32(0, 0), weighted_avg_u32_reference(0, 0));
+        assert_eq!(
+            weighted_avg_u32(u64::MAX, u64::MAX),
+            weighted_avg_u32_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            weighted_avg_u32(u64::MAX, 0),
+            weighted_avg_u32_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            weighted_avg_u32(0, u64::MAX),
+            weighted_avg_u32_reference(0, u64::MAX)
+        );
         // mutants
         let base = weighted_avg_u32_reference(42, 1337);
         assert_ne!(mutant_weighted_avg_u32_1(42, 1337), base, "mutant 1");

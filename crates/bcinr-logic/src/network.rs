@@ -156,7 +156,11 @@ mod tests {
         assert_eq!(network_reference(0, 0), 0);
         let cases: &[fn(u64, u64) -> u64] = &[mutant_network_1, mutant_network_2, mutant_network_3];
         for (i, m) in cases.iter().enumerate() {
-            assert!(network_reference(1, 1) != m(1, 1), "mutant {} not rejected", i + 1);
+            assert!(
+                network_reference(1, 1) != m(1, 1),
+                "mutant {} not rejected",
+                i + 1
+            );
         }
     }
 

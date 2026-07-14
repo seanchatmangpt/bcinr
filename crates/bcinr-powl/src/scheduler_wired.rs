@@ -46,15 +46,13 @@
 //!   PowlTapeLarge (>64 ops). One call to `union_u64_slices` folds 8 successor words.
 
 use bcinr_logic::{
-    patterns::{
-        swar_petri::PriorityPetriEngine,
-        time_wheel::TimeWheel,
-        deterministic_mpmc::LockFreeMpmcRing,
-        wcet_fiber::WcetFiber,
-    },
-    models::petri::KBitSet,
-    scan::prefix_xor_u64x8,
     bitset::union_u64_slices,
+    models::petri::KBitSet,
+    patterns::{
+        deterministic_mpmc::LockFreeMpmcRing, swar_petri::PriorityPetriEngine,
+        time_wheel::TimeWheel, wcet_fiber::WcetFiber,
+    },
+    scan::prefix_xor_u64x8,
 };
 
 use crate::tape::{OpKind, Powl64Op};
@@ -144,7 +142,9 @@ impl PowlPetriState {
     pub fn new(entry_mask: u64) -> Self {
         Self {
             done: KBitSet { words: [0u64] },
-            check: KBitSet { words: [entry_mask] },
+            check: KBitSet {
+                words: [entry_mask],
+            },
             choice_taken: 0,
             sla_wheel: TimeWheel::new(),
             loop_iters: [0u8; 64],
@@ -208,7 +208,7 @@ fn build_transition_arrays(
     candidates: u64,
     choice_taken: u64,
 ) -> ([KBitSet<1>; 64], [KBitSet<1>; 64], [u32; 64]) {
-    let mut inputs  = [KBitSet::<1> { words: [!0u64] }; 64];
+    let mut inputs = [KBitSet::<1> { words: [!0u64] }; 64];
     let mut outputs = [KBitSet::<1> { words: [0] }; 64];
     let mut op_indices = [u32::MAX; 64];
     let mut t = 0usize;
@@ -231,8 +231,12 @@ fn build_transition_arrays(
 
         // POWL done-set is monotone: tokens never leave.
         // output = effective_pred | op_bit so net effect is: state gains op_bit.
-        inputs[t]  = KBitSet { words: [effective_pred] };
-        outputs[t] = KBitSet { words: [effective_pred | op_bit] };
+        inputs[t] = KBitSet {
+            words: [effective_pred],
+        };
+        outputs[t] = KBitSet {
+            words: [effective_pred | op_bit],
+        };
         op_indices[t] = i as u32;
         t += 1;
     }
@@ -253,7 +257,10 @@ fn dispatch_successors(
         while succ_bits != 0 {
             let s = succ_bits.trailing_zeros() as usize;
             succ_bits &= succ_bits - 1;
-            r.push_t1(WorkItem { op_idx: s as u32, succ_mask: tape[s].succ_mask });
+            r.push_t1(WorkItem {
+                op_idx: s as u32,
+                succ_mask: tape[s].succ_mask,
+            });
         }
     }
 }
@@ -295,7 +302,10 @@ pub fn petri_tick(
     let candidates = state.check.words[0] & !done;
 
     if candidates == 0 {
-        return PetriTickResult { fired_ops: 0, event_overflow_count: 0 };
+        return PetriTickResult {
+            fired_ops: 0,
+            event_overflow_count: 0,
+        };
     }
 
     // Build per-transition arrays for PriorityPetriEngine (stack-allocated, no heap).
@@ -306,13 +316,14 @@ pub fn petri_tick(
     // priority order (index 0 first) and accumulates the firing_mask.
     // SAFETY-note: new_checked validates TRANSITIONS <= 64.
     let initial = KBitSet { words: [done] };
-    let mut engine = match PriorityPetriEngine::<1, 64>::new_checked(
-        initial,
-        inputs,
-        outputs,
-    ) {
+    let mut engine = match PriorityPetriEngine::<1, 64>::new_checked(initial, inputs, outputs) {
         Ok(e) => e,
-        Err(_) => return PetriTickResult { fired_ops: 0, event_overflow_count: 0 },
+        Err(_) => {
+            return PetriTickResult {
+                fired_ops: 0,
+                event_overflow_count: 0,
+            }
+        }
     };
 
     let firing_mask_64 = engine.step();
@@ -331,13 +342,15 @@ pub fn petri_tick(
 
         // Skip sentinel slots (unused transitions with input=!0 that never fire,
         // but guard defensively).
-        if op_indices[t_idx] == u32::MAX { continue; }
+        if op_indices[t_idx] == u32::MAX {
+            continue;
+        }
         let i = op_indices[t_idx] as usize;
         let op = &tape[i];
         let op_bit = 1u64 << i;
 
         fired_ops_accumulator |= op_bit;
-        new_done  |= op_bit;
+        new_done |= op_bit;
         new_check |= op.succ_mask;
 
         // Off hot-path: push fire event to event_ring for ReceiptWorker to drain.
@@ -369,7 +382,10 @@ pub fn petri_tick(
     state.done.words[0] = new_done;
     state.check.words[0] = new_check & !new_done;
 
-    PetriTickResult { fired_ops: fired_ops_accumulator, event_overflow_count: overflow_count }
+    PetriTickResult {
+        fired_ops: fired_ops_accumulator,
+        event_overflow_count: overflow_count,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -383,8 +399,8 @@ pub fn petri_tick(
 /// With: `union_u64_slices(check, &succ_fold)` — one SIMD call.
 #[inline(always)]
 pub fn propagate_check_mask_large(
-    fired_words: [u64; 8],     // bitmask of fired ops (512-op space)
-    succ_table: &[[u64; 8]],   // succ_mask_words[op_idx]
+    fired_words: [u64; 8],   // bitmask of fired ops (512-op space)
+    succ_table: &[[u64; 8]], // succ_mask_words[op_idx]
     check_mask: &mut [u64; 8],
     done_mask: &[u64; 8],
 ) {
@@ -445,7 +461,9 @@ impl<const SLOTS: usize, const TICKS: usize> FiberPool<SLOTS, TICKS> {
     #[inline(always)]
     pub fn claim(&mut self, op_idx: u32) -> Option<usize> {
         let free_slots = !self.active_mask & ((1u64 << SLOTS) - 1);
-        if free_slots == 0 { return None; }
+        if free_slots == 0 {
+            return None;
+        }
         let slot = free_slots.trailing_zeros() as usize;
         self.op_indices[slot] = op_idx;
         self.active_mask |= 1u64 << slot;
@@ -489,7 +507,10 @@ impl<const SLOTS: usize, const TICKS: usize> FiberPool<SLOTS, TICKS> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{compiler::{compile_powl, PowlAstNode}, tape::PowlTape};
+    use crate::{
+        compiler::{compile_powl, PowlAstNode},
+        tape::PowlTape,
+    };
 
     fn tape_ops(tape: &PowlTape) -> Vec<Powl64Op> {
         tape.ops[..tape.len as usize].to_vec()
@@ -501,13 +522,18 @@ mod tests {
             PowlAstNode::Atom("a"),
             PowlAstNode::Atom("b"),
             PowlAstNode::Atom("c"),
-        ])).unwrap();
+        ]))
+        .unwrap();
         let ops = tape_ops(&tape);
         let mut state = PowlPetriState::new(tape.entry_mask);
         let mut total_fired = 0u64;
         for _ in 0..10 {
-            if state.check.words[0] == 0 { break; }
-            total_fired += petri_tick(&ops, &mut state, None, None, 0).fired_ops.count_ones() as u64;
+            if state.check.words[0] == 0 {
+                break;
+            }
+            total_fired += petri_tick(&ops, &mut state, None, None, 0)
+                .fired_ops
+                .count_ones() as u64;
         }
         assert_eq!(total_fired, 3, "all 3 ops must fire");
         assert_eq!(state.done.words[0], 0b111, "all done");
@@ -523,13 +549,16 @@ mod tests {
                 PowlAstNode::Atom("p3"),
             ],
             edges: vec![],
-        }).unwrap();
+        })
+        .unwrap();
         let ops = tape_ops(&tape);
         let mut state = PowlPetriState::new(tape.entry_mask);
         let mut ticks = 0u32;
         let mut total = 0u64;
         while state.check.words[0] != 0 && ticks < 10 {
-            total += petri_tick(&ops, &mut state, None, None, 0).fired_ops.count_ones() as u64;
+            total += petri_tick(&ops, &mut state, None, None, 0)
+                .fired_ops
+                .count_ones() as u64;
             ticks += 1;
         }
         // 4 parallel + 1 join = 5 ops total
@@ -548,7 +577,11 @@ mod tests {
             petri_tick(&ops, &mut state, None, None, 0);
         }
         // sla_breached should have bit 0 set after tick 3.
-        assert_ne!(state.sla_breached & 1, 0, "op 0 SLA breach should be recorded");
+        assert_ne!(
+            state.sla_breached & 1,
+            0,
+            "op 0 SLA breach should be recorded"
+        );
     }
 
     #[test]
@@ -559,7 +592,11 @@ mod tests {
         let events = [1u32; 8];
         let completed = pool.advance_all(&events);
         // All 8 ticks fired → all bits set in result → slot completed.
-        assert_ne!(completed & (1 << slot), 0, "fiber completes after full budget");
+        assert_ne!(
+            completed & (1 << slot),
+            0,
+            "fiber completes after full budget"
+        );
         let op_idx = pool.release(slot);
         assert_eq!(op_idx, 7);
         assert_eq!(pool.active_mask & (1 << slot), 0);
@@ -583,8 +620,11 @@ mod tests {
 
     #[test]
     fn ring_capacity_is_power_of_two() {
-        assert!(RING_CAPACITY.is_power_of_two(),
-            "RING_CAPACITY={} must be a power of two", RING_CAPACITY);
+        assert!(
+            RING_CAPACITY.is_power_of_two(),
+            "RING_CAPACITY={} must be a power of two",
+            RING_CAPACITY
+        );
         let mask = RING_CAPACITY - 1;
         assert_eq!(RING_CAPACITY & mask, 0, "power-of-two: N & (N-1) must be 0");
     }
@@ -594,11 +634,18 @@ mod tests {
         let tape = compile_powl(&PowlAstNode::Sequence(vec![
             PowlAstNode::Atom("a"),
             PowlAstNode::Atom("b"),
-        ])).unwrap();
+        ]))
+        .unwrap();
         let ops = tape_ops(&tape);
         let mut state = PowlPetriState::new(tape.entry_mask);
         let result = petri_tick(&ops, &mut state, None, None, 0);
-        assert_ne!(result.fired_ops, 0, "at least one op must fire on first tick");
-        assert_eq!(result.event_overflow_count, 0, "no event ring present, no overflow");
+        assert_ne!(
+            result.fired_ops, 0,
+            "at least one op must fire on first tick"
+        );
+        assert_eq!(
+            result.event_overflow_count, 0,
+            "no event ring present, no overflow"
+        );
     }
 }

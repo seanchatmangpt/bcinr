@@ -25,18 +25,10 @@ pub struct Transition {
 
 impl Transition {
     pub fn new(id: &str, label: &str) -> Self {
-        Transition {
-            id: id.to_owned(),
-            label: label.to_owned(),
-            is_invisible: Some(false),
-        }
+        Transition { id: id.to_owned(), label: label.to_owned(), is_invisible: Some(false) }
     }
     pub fn silent(id: &str) -> Self {
-        Transition {
-            id: id.to_owned(),
-            label: String::new(),
-            is_invisible: Some(true),
-        }
+        Transition { id: id.to_owned(), label: String::new(), is_invisible: Some(true) }
     }
     pub fn id(&self) -> &str {
         &self.id
@@ -90,9 +82,7 @@ pub struct Marking {
 
 impl Marking {
     pub fn new(tokens: impl IntoIterator<Item = (String, usize)>) -> Self {
-        Marking {
-            tokens: tokens.into_iter().collect(),
-        }
+        Marking { tokens: tokens.into_iter().collect() }
     }
     pub fn empty() -> Self {
         Marking::default()
@@ -104,11 +94,7 @@ impl Marking {
         &self.tokens
     }
     pub fn tokens_on(&self, place_id: &str) -> usize {
-        self.tokens
-            .iter()
-            .find(|(id, _)| id == place_id)
-            .map(|(_, n)| *n)
-            .unwrap_or(0)
+        self.tokens.iter().find(|(id, _)| id == place_id).map(|(_, n)| *n).unwrap_or(0)
     }
 }
 
@@ -163,19 +149,13 @@ impl WfNetConst<SOUNDNESS_UNKNOWN> {
         Self { net, final_marking }
     }
     pub fn claim_sound(self) -> WfNetConst<SOUNDNESS_CLAIMED> {
-        WfNetConst {
-            net: self.net,
-            final_marking: self.final_marking,
-        }
+        WfNetConst { net: self.net, final_marking: self.final_marking }
     }
 }
 
 impl WfNetConst<SOUNDNESS_CLAIMED> {
     pub fn witness_soundness(self) -> WfNetConst<SOUNDNESS_WITNESSED> {
-        WfNetConst {
-            net: self.net,
-            final_marking: self.final_marking,
-        }
+        WfNetConst { net: self.net, final_marking: self.final_marking }
     }
 }
 
@@ -203,10 +183,7 @@ pub struct ObjectCentricPetriNet {
 
 impl ObjectCentricPetriNet {
     pub fn new(net: PetriNet, object_types: impl IntoIterator<Item = String>) -> Self {
-        Self {
-            net,
-            object_types: object_types.into_iter().collect(),
-        }
+        Self { net, object_types: object_types.into_iter().collect() }
     }
     pub fn validate(&self) -> Result<(), PetriRefusal> {
         let type_set: std::collections::HashSet<&str> =
@@ -243,12 +220,7 @@ impl MultipleInstanceSpec {
         threshold: Option<u32>,
         creation: InstanceCreationKind,
     ) -> Self {
-        MultipleInstanceSpec {
-            min,
-            max,
-            threshold,
-            creation,
-        }
+        MultipleInstanceSpec { min, max, threshold, creation }
     }
     pub fn validate(&self) -> Result<(), PetriRefusal> {
         if self.min == 0 {
@@ -392,14 +364,7 @@ impl NetBitmask64 {
             .map(|(i, _)| i)
             .collect();
 
-        Self {
-            initial_mask,
-            final_mask,
-            n_places,
-            transitions,
-            label_index,
-            invisible_indices,
-        }
+        Self { initial_mask, final_mask, n_places, transitions, label_index, invisible_indices }
     }
 }
 
@@ -460,24 +425,17 @@ pub fn replay_trace(net: &NetBitmask64, trace: &Trace) -> ReplayResult {
     fire_invisible(net, &mut marking);
 
     for event in &trace.events {
-        let activity = event
-            .attributes
-            .iter()
-            .find(|a| a.key == "concept:name")
-            .and_then(|a| {
-                if let AttributeValue::String(s) = &a.value {
-                    Some(s.as_str())
-                } else {
-                    None
-                }
-            });
+        let activity = event.attributes.iter().find(|a| a.key == "concept:name").and_then(|a| {
+            if let AttributeValue::String(s) = &a.value {
+                Some(s.as_str())
+            } else {
+                None
+            }
+        });
 
         let Some(activity) = activity else { continue };
 
-        let t_indices = match net
-            .label_index
-            .binary_search_by(|(k, _)| k.as_str().cmp(activity))
-        {
+        let t_indices = match net.label_index.binary_search_by(|(k, _)| k.as_str().cmp(activity)) {
             Ok(pos) => &net.label_index[pos].1,
             Err(_) => continue,
         };
@@ -513,12 +471,7 @@ pub fn replay_trace(net: &NetBitmask64, trace: &Trace) -> ReplayResult {
     marking &= !net.final_mask;
     let remaining = marking.count_ones();
 
-    ReplayResult {
-        missing,
-        remaining,
-        produced,
-        consumed,
-    }
+    ReplayResult { missing, remaining, produced, consumed }
 }
 
 pub fn replay_log(net: &NetBitmask64, log: &EventLog) -> Vec<ReplayResult> {
@@ -537,10 +490,7 @@ impl MarkingSet {
         Self { inline, len: 1 }
     }
     fn new_empty() -> Self {
-        Self {
-            inline: [0u64; 64],
-            len: 0,
-        }
+        Self { inline: [0u64; 64], len: 0 }
     }
     fn contains(&self, m: u64) -> bool {
         self.inline[..self.len].contains(&m)
@@ -588,23 +538,16 @@ pub fn in_language(net: &NetBitmask64, trace: &Trace) -> bool {
     let mut markings = epsilon_close(net, net.initial_mask);
 
     for event in &trace.events {
-        let activity = event
-            .attributes
-            .iter()
-            .find(|a| a.key == "concept:name")
-            .and_then(|a| {
-                if let AttributeValue::String(s) = &a.value {
-                    Some(s.as_str())
-                } else {
-                    None
-                }
-            });
+        let activity = event.attributes.iter().find(|a| a.key == "concept:name").and_then(|a| {
+            if let AttributeValue::String(s) = &a.value {
+                Some(s.as_str())
+            } else {
+                None
+            }
+        });
         let Some(activity) = activity else { continue };
 
-        let t_indices = match net
-            .label_index
-            .binary_search_by(|(k, _)| k.as_str().cmp(activity))
-        {
+        let t_indices = match net.label_index.binary_search_by(|(k, _)| k.as_str().cmp(activity)) {
             Ok(pos) => &net.label_index[pos].1,
             Err(_) => continue,
         };
@@ -631,10 +574,7 @@ pub fn in_language(net: &NetBitmask64, trace: &Trace) -> bool {
         markings = next;
     }
 
-    markings
-        .iter_slice()
-        .iter()
-        .any(|&m| (m & net.final_mask) == net.final_mask)
+    markings.iter_slice().iter().any(|&m| (m & net.final_mask) == net.final_mask)
 }
 
 pub fn count_in_language(net: &NetBitmask64, log: &EventLog) -> usize {
@@ -664,14 +604,10 @@ pub fn classify_exact(net: &NetBitmask64, log: &EventLog, n_target: usize) -> Ve
         .collect();
 
     accepted.sort_by(|a, b| {
-        b.1.partial_cmp(&a.1)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then(a.0.cmp(&b.0))
+        b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal).then(a.0.cmp(&b.0))
     });
     rejected.sort_by(|a, b| {
-        b.1.partial_cmp(&a.1)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then(a.0.cmp(&b.0))
+        b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal).then(a.0.cmp(&b.0))
     });
 
     let mut out = vec![false; log.traces.len()];
@@ -699,9 +635,7 @@ pub fn classify(results: &[ReplayResult], n_target: usize) -> Vec<bool> {
     }
 
     imperfect.sort_by(|a, b| {
-        b.1.partial_cmp(&a.1)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then(a.0.cmp(&b.0))
+        b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal).then(a.0.cmp(&b.0))
     });
 
     let mut out = vec![false; results.len()];

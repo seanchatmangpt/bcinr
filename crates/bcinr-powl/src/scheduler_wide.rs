@@ -27,14 +27,8 @@
 //! Steps 1–4 are 3–5 ns total on M-series hardware (measured in
 //! `scheduler_wired` at 512 ops: `union_u64_slices` ≈ 5 ns).
 
-use bcinr_logic::{
-    models::petri::KBitSet,
-    patterns::time_wheel::TimeWheel,
-};
-use crate::{
-    scheduler_wired::propagate_check_mask_large,
-    tape::v2::PowlTapeLarge,
-};
+use crate::{scheduler_wired::propagate_check_mask_large, tape::v2::PowlTapeLarge};
+use bcinr_logic::{models::petri::KBitSet, patterns::time_wheel::TimeWheel};
 
 // ---------------------------------------------------------------------------
 // WidePowlState — hot state for 512-op tapes
@@ -45,7 +39,7 @@ use crate::{
 /// All bitmasks are `KBitSet<8>` (8 × u64 = 512 bits).  No heap allocation.
 pub struct WidePowlState {
     /// Ops that have fired in this workflow instance.
-    pub done:  KBitSet<8>,
+    pub done: KBitSet<8>,
     /// Ops scheduled for checking on the next tick.
     pub check: KBitSet<8>,
     /// SLA deadline wheel (256 slots; each tick = 1 logical time unit).
@@ -64,11 +58,11 @@ impl WidePowlState {
     #[must_use]
     pub fn new(entry_words: [u64; 8]) -> Self {
         Self {
-            done:         KBitSet { words: [0u64; 8] },
-            check:        KBitSet { words: entry_words },
-            sla_wheel:    TimeWheel::new(),
+            done: KBitSet { words: [0u64; 8] },
+            check: KBitSet { words: entry_words },
+            sla_wheel: TimeWheel::new(),
             sla_breached: [0u64; 8],
-            last_done:    [0u64; 8],
+            last_done: [0u64; 8],
         }
     }
 
@@ -228,7 +222,10 @@ mod tests {
         for tick in 0..4 {
             let f = wide_tick(&tape, &mut state);
             let expected_bit = 1u64 << tick;
-            assert_eq!(f[0], expected_bit, "tick {tick}: expected op {tick} to fire");
+            assert_eq!(
+                f[0], expected_bit,
+                "tick {tick}: expected op {tick} to fire"
+            );
             for i in 0..8 {
                 all_fired[i] |= f[i];
             }

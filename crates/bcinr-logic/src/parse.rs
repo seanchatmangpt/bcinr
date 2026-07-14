@@ -105,15 +105,19 @@ mod tests {
         assert_eq!(parse_reference(0, 0), 0);
         let cases: &[fn(u64, u64) -> u64] = &[mutant_parse_1, mutant_parse_2, mutant_parse_3];
         for (i, m) in cases.iter().enumerate() {
-            assert!(parse_reference(1, 1) != m(1, 1), "mutant {} not rejected", i + 1);
+            assert!(
+                parse_reference(1, 1) != m(1, 1),
+                "mutant {} not rejected",
+                i + 1
+            );
         }
         // (input, expected_skip_count)
         let cases: &[(&[u8], usize)] = &[
-            (b"",           0), // empty
-            (b"hello",      0), // no leading whitespace
-            (b" x",         1), // single space
+            (b"", 0),           // empty
+            (b"hello", 0),      // no leading whitespace
+            (b" x", 1),         // single space
             (b"\t\n\rword", 3), // tab, newline, carriage-return
-            (b"   ",        3), // all spaces
+            (b"   ", 3),        // all spaces
         ];
         for &(input, expected) in cases {
             assert_eq!(skip_whitespace(input), expected, "input={:?}", input);
@@ -125,18 +129,18 @@ mod tests {
     fn test_parse_hex_u32() {
         // (input, expected result)
         let cases: &[(&[u8], Result<u32, ()>)] = &[
-            (b"",           Err(())),           // empty
-            (b"0",          Ok(0x0)),
-            (b"F",          Ok(15)),
-            (b"f",          Ok(15)),
-            (b"FF",         Ok(0xFF)),
-            (b"FFFFFFFF",   Ok(u32::MAX)),      // max 8 hex digits
-            (b"deadbeef",   Ok(0xDEADBEEF)),    // lowercase
-            (b"DEADBEEF",   Ok(0xDEADBEEF)),    // uppercase
-            (b"DeAdBeEf",   Ok(0xDEADBEEF)),    // mixed case
-            (b"123456789",  Err(())),           // > 8 chars
-            (b"XY",         Err(())),           // invalid chars
-            (b"0G",         Err(())),           // partially invalid
+            (b"", Err(())), // empty
+            (b"0", Ok(0x0)),
+            (b"F", Ok(15)),
+            (b"f", Ok(15)),
+            (b"FF", Ok(0xFF)),
+            (b"FFFFFFFF", Ok(u32::MAX)),   // max 8 hex digits
+            (b"deadbeef", Ok(0xDEADBEEF)), // lowercase
+            (b"DEADBEEF", Ok(0xDEADBEEF)), // uppercase
+            (b"DeAdBeEf", Ok(0xDEADBEEF)), // mixed case
+            (b"123456789", Err(())),       // > 8 chars
+            (b"XY", Err(())),              // invalid chars
+            (b"0G", Err(())),              // partially invalid
         ];
         for &(input, expected) in cases {
             assert_eq!(parse_hex_u32(input), expected, "input={:?}", input);

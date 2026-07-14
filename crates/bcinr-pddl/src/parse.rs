@@ -3,23 +3,20 @@
 
 use crate::error::Pddl8Error;
 use pddl::{
-    ConditionalEffect, GoalDefinition, InitElement, Parser, PreferenceGoalDefinition,
-    PredicateAtomicFormula, PreconditionGoalDefinition, PrimitiveEffect, StructureDef,
-    parsers::Span,
-    DurativeActionGoalDefinition, PreferenceTimedGoalDefinition, TimedGoalDefinition,
-    DurativeActionEffect, TimedEffect, ConstraintGoalDefinition, ConstraintGoalDefinitionInner,
-    DurationConstraint as PddlDurationConstraint, SimpleDurationConstraint,
-    DurationOperator, DurationValue, FluentExpression, BinaryOp, MultiOp,
-    FunctionHead, AssignOp, Optimization, MetricFluentExpression,
+    parsers::Span, AssignOp, BinaryOp, ConditionalEffect, ConstraintGoalDefinition,
+    ConstraintGoalDefinitionInner, DurationConstraint as PddlDurationConstraint, DurationOperator,
+    DurationValue, DurativeActionEffect, DurativeActionGoalDefinition, FluentExpression,
+    FunctionHead, GoalDefinition, InitElement, MetricFluentExpression, MultiOp, Optimization,
+    Parser, PreconditionGoalDefinition, PredicateAtomicFormula, PreferenceGoalDefinition,
+    PreferenceTimedGoalDefinition, PrimitiveEffect, SimpleDurationConstraint, StructureDef,
+    TimedEffect, TimedGoalDefinition,
 };
 use wasm4pm_compat::pddl::{
-    Pddl8ActionSchema, Pddl8Atom, Pddl8Domain, Pddl8Problem,
-    PDDL8_MAX_ARITY, PDDL8_MAX_CONJUNCTS, PDDL8_MAX_PARAMS,
-    PddlType, PddlCondition, CompareOp, PddlEffect, NumericExpr, NumericOp, NumericEffect,
-    PddlFunction, TimeSpecifier, DurationConstraint, DurativeAction, TimedLiteral,
-    Metric, MetricDir, MetricExpr, TrajectoryConstraint, PddlConstraint,
-    DerivedPredicate, PddlPreference, PddlProcess, PddlEvent,
-    Pddl31Domain, Pddl31Problem, Pddl31Action,
+    CompareOp, DerivedPredicate, DurationConstraint, DurativeAction, Metric, MetricDir, MetricExpr,
+    NumericEffect, NumericExpr, NumericOp, Pddl31Action, Pddl31Domain, Pddl31Problem,
+    Pddl8ActionSchema, Pddl8Atom, Pddl8Domain, Pddl8Problem, PddlCondition, PddlConstraint,
+    PddlEffect, PddlEvent, PddlFunction, PddlPreference, PddlProcess, PddlType, TimeSpecifier,
+    TimedLiteral, TrajectoryConstraint, PDDL8_MAX_ARITY, PDDL8_MAX_CONJUNCTS, PDDL8_MAX_PARAMS,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -32,41 +29,98 @@ pub fn domain_from_pddl(text: &str) -> Result<Pddl8Domain, Pddl8Error> {
 
     let name = dom.name().to_string();
 
-    let predicates = dom.predicates().values().iter().map(|p| {
-        let arity = p.variables().value().len();
-        if arity > PDDL8_MAX_ARITY {
-            Err(Pddl8Error::BoundExceeded { what: "predicate arity", limit: PDDL8_MAX_ARITY as u8, got: arity })
-        } else {
-            Ok((p.name().to_string(), arity as u8))
-        }
-    }).collect::<Result<Vec<_>, _>>()?;
+    let predicates = dom
+        .predicates()
+        .values()
+        .iter()
+        .map(|p| {
+            let arity = p.variables().value().len();
+            if arity > PDDL8_MAX_ARITY {
+                Err(Pddl8Error::BoundExceeded {
+                    what: "predicate arity",
+                    limit: PDDL8_MAX_ARITY as u8,
+                    got: arity,
+                })
+            } else {
+                Ok((p.name().to_string(), arity as u8))
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
-    let actions = dom.structure().values().iter().filter_map(|sd| {
-        if let StructureDef::Action(a) = sd { Some(a) } else { None }
-    }).map(lower_action).collect::<Result<Vec<_>, _>>()?;
+    let actions = dom
+        .structure()
+        .values()
+        .iter()
+        .filter_map(|sd| {
+            if let StructureDef::Action(a) = sd {
+                Some(a)
+            } else {
+                None
+            }
+        })
+        .map(lower_action)
+        .collect::<Result<Vec<_>, _>>()?;
 
     // PDDL 3.1 extended fields
     let types = lower_types(dom.types());
     let functions = lower_functions(dom.functions());
-    let durative_actions = dom.structure().values().iter().filter_map(|sd| {
-        if let StructureDef::DurativeAction(da) = sd { Some(da.as_ref()) } else { None }
-    }).map(lower_durative_action).collect();
-    let derived = dom.structure().values().iter().filter_map(|sd| {
-        if let StructureDef::Derived(dp) = sd { Some(dp) } else { None }
-    }).map(lower_derived_predicate).collect();
+    let durative_actions = dom
+        .structure()
+        .values()
+        .iter()
+        .filter_map(|sd| {
+            if let StructureDef::DurativeAction(da) = sd {
+                Some(da.as_ref())
+            } else {
+                None
+            }
+        })
+        .map(lower_durative_action)
+        .collect();
+    let derived = dom
+        .structure()
+        .values()
+        .iter()
+        .filter_map(|sd| {
+            if let StructureDef::Derived(dp) = sd {
+                Some(dp)
+            } else {
+                None
+            }
+        })
+        .map(lower_derived_predicate)
+        .collect();
 
-    Ok(Pddl8Domain { name, predicates, actions, types, functions, durative_actions, derived,
-        constraints: vec![], processes: vec![], events: vec![] })
+    Ok(Pddl8Domain {
+        name,
+        predicates,
+        actions,
+        types,
+        functions,
+        durative_actions,
+        derived,
+        constraints: vec![],
+        processes: vec![],
+        events: vec![],
+    })
 }
 
 pub fn problem_from_pddl(text: &str) -> Result<Pddl8Problem, Pddl8Error> {
     let (_, prob) = pddl::Problem::parse(Span::new(text))
         .map_err(|e| Pddl8Error::ParseError(format!("{e:?}")))?;
 
-    let objects: Vec<String> = prob.objects().values().value().iter()
+    let objects: Vec<String> = prob
+        .objects()
+        .values()
+        .value()
+        .iter()
         .map(|t| t.value().to_string())
         .collect();
-    let object_types: Vec<(String, String)> = prob.objects().values().value().iter()
+    let object_types: Vec<(String, String)> = prob
+        .objects()
+        .values()
+        .value()
+        .iter()
         .map(|t| (t.value().to_string(), type_to_string(t.type_())))
         .collect();
 
@@ -99,17 +153,24 @@ pub fn domain31_from_pddl(text: &str) -> Result<Pddl31Domain, Pddl8Error> {
 
     let name = dom.name().to_string();
 
-    let requirements = dom.requirements().iter()
+    let requirements = dom
+        .requirements()
+        .iter()
         .map(|r| format!("{r:?}"))
         .collect();
 
     let types = lower_types(dom.types());
     let functions = lower_functions(dom.functions());
 
-    let predicates = dom.predicates().values().iter().map(|p| {
-        let typed_params = lower_typed_variables(p.variables());
-        (p.name().to_string(), typed_params)
-    }).collect();
+    let predicates = dom
+        .predicates()
+        .values()
+        .iter()
+        .map(|p| {
+            let typed_params = lower_typed_variables(p.variables());
+            (p.name().to_string(), typed_params)
+        })
+        .collect();
 
     let mut actions = Vec::new();
     let mut durative_actions = Vec::new();
@@ -150,7 +211,11 @@ pub fn problem31_from_pddl(text: &str) -> Result<Pddl31Problem, Pddl8Error> {
     let (_, prob) = pddl::Problem::parse(Span::new(text))
         .map_err(|e| Pddl8Error::ParseError(format!("{e:?}")))?;
 
-    let objects = prob.objects().values().value().iter()
+    let objects = prob
+        .objects()
+        .values()
+        .value()
+        .iter()
         .map(|t| {
             let type_name = type_to_string(t.type_());
             (t.value().to_string(), type_name)
@@ -248,16 +313,27 @@ fn num_f64(n: pddl::Number) -> f64 {
 // ─────────────────────────────────────────────────────────────────────────────
 
 fn lower_action(a: &pddl::ActionDefinition) -> Result<Pddl8ActionSchema, Pddl8Error> {
-    let params: Vec<String> = a.parameters().value().iter()
+    let params: Vec<String> = a
+        .parameters()
+        .value()
+        .iter()
         .map(|t| format!("?{}", t.value()))
         .collect();
     if params.len() > PDDL8_MAX_PARAMS {
-        return Err(Pddl8Error::BoundExceeded { what: "action parameters", limit: PDDL8_MAX_PARAMS as u8, got: params.len() });
+        return Err(Pddl8Error::BoundExceeded {
+            what: "action parameters",
+            limit: PDDL8_MAX_PARAMS as u8,
+            got: params.len(),
+        });
     }
 
     let preconditions = lower_precond_defs(a.precondition())?;
     if preconditions.len() > PDDL8_MAX_CONJUNCTS {
-        return Err(Pddl8Error::BoundExceeded { what: "precondition atoms", limit: PDDL8_MAX_CONJUNCTS as u8, got: preconditions.len() });
+        return Err(Pddl8Error::BoundExceeded {
+            what: "precondition atoms",
+            limit: PDDL8_MAX_CONJUNCTS as u8,
+            got: preconditions.len(),
+        });
     }
 
     let (add_effects, del_effects) = lower_effects(a.effect())?;
@@ -287,7 +363,9 @@ fn lower_action(a: &pddl::ActionDefinition) -> Result<Pddl8ActionSchema, Pddl8Er
     })
 }
 
-fn lower_precond_defs(defs: &pddl::PreconditionGoalDefinitions) -> Result<Vec<Pddl8Atom>, Pddl8Error> {
+fn lower_precond_defs(
+    defs: &pddl::PreconditionGoalDefinitions,
+) -> Result<Vec<Pddl8Atom>, Pddl8Error> {
     let mut out = Vec::new();
     for def in defs.iter() {
         collect_precond_def(def, &mut out);
@@ -299,7 +377,9 @@ fn collect_precond_def(def: &PreconditionGoalDefinition, out: &mut Vec<Pddl8Atom
     match def {
         PreconditionGoalDefinition::Preference(pref) => collect_pref_gd(pref, out),
         PreconditionGoalDefinition::Forall(_, inner) => {
-            for d in inner.iter() { collect_precond_def(d, out); }
+            for d in inner.iter() {
+                collect_precond_def(d, out);
+            }
         }
     }
 }
@@ -314,15 +394,21 @@ fn collect_pref_gd(pref: &PreferenceGoalDefinition, out: &mut Vec<Pddl8Atom>) {
 fn collect_gd(gd: &GoalDefinition, out: &mut Vec<Pddl8Atom>) {
     match gd {
         GoalDefinition::AtomicFormula(af) => {
-            if let Some(atom) = lower_af_term(af) { out.push(atom); }
+            if let Some(atom) = lower_af_term(af) {
+                out.push(atom);
+            }
         }
         GoalDefinition::And(cs) => {
-            for c in cs { collect_gd(c, out); }
+            for c in cs {
+                collect_gd(c, out);
+            }
         }
         GoalDefinition::Literal(lit) => {
             use pddl::Literal;
             if let Literal::AtomicFormula(af) = lit {
-                if let Some(atom) = lower_af_term(af) { out.push(atom); }
+                if let Some(atom) = lower_af_term(af) {
+                    out.push(atom);
+                }
             }
         }
         GoalDefinition::Not(inner) => {
@@ -332,7 +418,9 @@ fn collect_gd(gd: &GoalDefinition, out: &mut Vec<Pddl8Atom>) {
         }
         GoalDefinition::Or(cs) => {
             // STRIPS8: flatten OR into atoms (lossy). Full condition in extended field.
-            for c in cs { collect_gd(c, out); }
+            for c in cs {
+                collect_gd(c, out);
+            }
         }
         GoalDefinition::Imply(a, b) => {
             collect_gd(a, out);
@@ -352,8 +440,12 @@ fn collect_gd(gd: &GoalDefinition, out: &mut Vec<Pddl8Atom>) {
     }
 }
 
-fn lower_effects(eff: &Option<pddl::Effects>) -> Result<(Vec<Pddl8Atom>, Vec<Pddl8Atom>), Pddl8Error> {
-    let Some(effects) = eff else { return Ok((vec![], vec![])); };
+fn lower_effects(
+    eff: &Option<pddl::Effects>,
+) -> Result<(Vec<Pddl8Atom>, Vec<Pddl8Atom>), Pddl8Error> {
+    let Some(effects) = eff else {
+        return Ok((vec![], vec![]));
+    };
     let mut adds = Vec::new();
     let mut dels = Vec::new();
     for ce in effects.iter() {
@@ -362,7 +454,11 @@ fn lower_effects(eff: &Option<pddl::Effects>) -> Result<(Vec<Pddl8Atom>, Vec<Pdd
     Ok((adds, dels))
 }
 
-fn collect_conditional_effect(ce: &ConditionalEffect, adds: &mut Vec<Pddl8Atom>, dels: &mut Vec<Pddl8Atom>) {
+fn collect_conditional_effect(
+    ce: &ConditionalEffect,
+    adds: &mut Vec<Pddl8Atom>,
+    dels: &mut Vec<Pddl8Atom>,
+) {
     match ce {
         ConditionalEffect::Effect(pe) => collect_primitive_effect(pe, adds, dels),
         ConditionalEffect::Forall(f) => {
@@ -378,13 +474,21 @@ fn collect_conditional_effect(ce: &ConditionalEffect, adds: &mut Vec<Pddl8Atom>,
     }
 }
 
-fn collect_primitive_effect(pe: &PrimitiveEffect, adds: &mut Vec<Pddl8Atom>, dels: &mut Vec<Pddl8Atom>) {
+fn collect_primitive_effect(
+    pe: &PrimitiveEffect,
+    adds: &mut Vec<Pddl8Atom>,
+    dels: &mut Vec<Pddl8Atom>,
+) {
     match pe {
         PrimitiveEffect::AtomicFormula(af) => {
-            if let Some(atom) = lower_af_term(af) { adds.push(atom); }
+            if let Some(atom) = lower_af_term(af) {
+                adds.push(atom);
+            }
         }
         PrimitiveEffect::NotAtomicFormula(af) => {
-            if let Some(atom) = lower_af_term(af) { dels.push(atom); }
+            if let Some(atom) = lower_af_term(af) {
+                dels.push(atom);
+            }
         }
         PrimitiveEffect::AssignNumericFluent(_, _, _) => {
             // Numeric effect — available via PddlEffect algebra in extended fields.
@@ -406,16 +510,22 @@ fn lower_af_term(af: &pddl::AtomicFormula<pddl::Term>) -> Option<Pddl8Atom> {
 fn lower_pred_af(p: &PredicateAtomicFormula<pddl::Term>) -> Pddl8Atom {
     Pddl8Atom {
         pred: p.predicate().to_string(),
-        args: p.values().iter().map(|t| match t {
-            pddl::Term::Name(n) => n.to_string(),
-            pddl::Term::Variable(v) => format!("?{v}"),
-            pddl::Term::Function(_) => "_".to_string(),
-        }).collect(),
+        args: p
+            .values()
+            .iter()
+            .map(|t| match t {
+                pddl::Term::Name(n) => n.to_string(),
+                pddl::Term::Variable(v) => format!("?{v}"),
+                pddl::Term::Function(_) => "_".to_string(),
+            })
+            .collect(),
     }
 }
 
 /// Returns (init_atoms, timed_inits, fn_values) from an InitElements.
-fn lower_init_full(init: &pddl::InitElements) -> Result<(Vec<Pddl8Atom>, Vec<TimedLiteral>, Vec<(PddlFunction, f64)>), Pddl8Error> {
+fn lower_init_full(
+    init: &pddl::InitElements,
+) -> Result<(Vec<Pddl8Atom>, Vec<TimedLiteral>, Vec<(PddlFunction, f64)>), Pddl8Error> {
     let mut atoms = Vec::new();
     let mut timed = Vec::new();
     let mut fn_vals = Vec::new();
@@ -479,42 +589,67 @@ fn lower_init_full(init: &pddl::InitElements) -> Result<(Vec<Pddl8Atom>, Vec<Tim
 // ─────────────────────────────────────────────────────────────────────────────
 
 fn lower_types(types: &pddl::Types) -> Vec<PddlType> {
-    types.values().value().iter().map(|t| {
-        let parent = match t.type_() {
-            pddl::Type::Exactly(pt) => {
-                let s = pt.to_string();
-                if s == "object" { None } else { Some(s) }
+    types
+        .values()
+        .value()
+        .iter()
+        .map(|t| {
+            let parent = match t.type_() {
+                pddl::Type::Exactly(pt) => {
+                    let s = pt.to_string();
+                    if s == "object" {
+                        None
+                    } else {
+                        Some(s)
+                    }
+                }
+                pddl::Type::EitherOf(pts) => pts.first().map(|pt| pt.to_string()),
+            };
+            PddlType {
+                name: t.value().to_string(),
+                parent,
             }
-            pddl::Type::EitherOf(pts) => pts.first().map(|pt| pt.to_string()),
-        };
-        PddlType { name: t.value().to_string(), parent }
-    }).collect()
+        })
+        .collect()
 }
 
 fn lower_functions(functions: &pddl::Functions) -> Vec<PddlFunction> {
-    functions.values().values().iter().map(|ft| {
-        let skel = ft.value_ref();
-        PddlFunction {
-            name: skel.symbol().to_string(),
-            params: skel.variables().value().iter()
-                .map(|v| format!("?{}", v.value()))
-                .collect(),
-        }
-    }).collect()
+    functions
+        .values()
+        .values()
+        .iter()
+        .map(|ft| {
+            let skel = ft.value_ref();
+            PddlFunction {
+                name: skel.symbol().to_string(),
+                params: skel
+                    .variables()
+                    .value()
+                    .iter()
+                    .map(|v| format!("?{}", v.value()))
+                    .collect(),
+            }
+        })
+        .collect()
 }
 
 fn lower_typed_variables(params: &pddl::TypedVariables) -> Vec<(String, String)> {
-    params.value().iter().map(|t| {
-        let var = format!("?{}", t.value());
-        let ty = type_to_string(t.type_());
-        (var, ty)
-    }).collect()
+    params
+        .value()
+        .iter()
+        .map(|t| {
+            let var = format!("?{}", t.value());
+            let ty = type_to_string(t.type_());
+            (var, ty)
+        })
+        .collect()
 }
 
 fn type_to_string(t: &pddl::Type) -> String {
     match t {
         pddl::Type::Exactly(pt) => pt.to_string(),
-        pddl::Type::EitherOf(pts) => pts.first()
+        pddl::Type::EitherOf(pts) => pts
+            .first()
             .map(|pt| pt.to_string())
             .unwrap_or_else(|| "object".to_string()),
     }
@@ -533,9 +668,7 @@ fn lower_action31(a: &pddl::ActionDefinition) -> Pddl31Action {
 }
 
 fn lower_precond_defs_full(defs: &pddl::PreconditionGoalDefinitions) -> PddlCondition {
-    let conjuncts: Vec<PddlCondition> = defs.iter()
-        .map(lower_precond_def_full)
-        .collect();
+    let conjuncts: Vec<PddlCondition> = defs.iter().map(lower_precond_def_full).collect();
     match conjuncts.len() {
         0 => PddlCondition::And(vec![]),
         1 => conjuncts.into_iter().next().unwrap(),
@@ -554,7 +687,10 @@ fn lower_precond_def_full(def: &PreconditionGoalDefinition) -> PddlCondition {
                 1 => body_parts.into_iter().next().unwrap(),
                 _ => PddlCondition::And(body_parts),
             };
-            PddlCondition::Forall { vars: typed_vars, body: Box::new(body_cond) }
+            PddlCondition::Forall {
+                vars: typed_vars,
+                body: Box::new(body_cond),
+            }
         }
     }
 }
@@ -579,51 +715,36 @@ fn lower_condition(gd: &GoalDefinition) -> PddlCondition {
                 PddlCondition::And(vec![])
             }
         }
-        GoalDefinition::Literal(lit) => {
-            match lit {
-                pddl::Literal::AtomicFormula(af) => {
-                    if let Some(atom) = lower_af_term(af) {
-                        PddlCondition::Atom(atom)
-                    } else {
-                        PddlCondition::And(vec![])
-                    }
-                }
-                pddl::Literal::NotAtomicFormula(af) => {
-                    if let Some(atom) = lower_af_term(af) {
-                        PddlCondition::Not(Box::new(PddlCondition::Atom(atom)))
-                    } else {
-                        PddlCondition::And(vec![])
-                    }
+        GoalDefinition::Literal(lit) => match lit {
+            pddl::Literal::AtomicFormula(af) => {
+                if let Some(atom) = lower_af_term(af) {
+                    PddlCondition::Atom(atom)
+                } else {
+                    PddlCondition::And(vec![])
                 }
             }
-        }
-        GoalDefinition::And(cs) => {
-            PddlCondition::And(cs.iter().map(lower_condition).collect())
-        }
-        GoalDefinition::Or(cs) => {
-            PddlCondition::Or(cs.iter().map(lower_condition).collect())
-        }
-        GoalDefinition::Not(inner) => {
-            PddlCondition::Not(Box::new(lower_condition(inner)))
-        }
+            pddl::Literal::NotAtomicFormula(af) => {
+                if let Some(atom) = lower_af_term(af) {
+                    PddlCondition::Not(Box::new(PddlCondition::Atom(atom)))
+                } else {
+                    PddlCondition::And(vec![])
+                }
+            }
+        },
+        GoalDefinition::And(cs) => PddlCondition::And(cs.iter().map(lower_condition).collect()),
+        GoalDefinition::Or(cs) => PddlCondition::Or(cs.iter().map(lower_condition).collect()),
+        GoalDefinition::Not(inner) => PddlCondition::Not(Box::new(lower_condition(inner))),
         GoalDefinition::Imply(a, b) => {
-            PddlCondition::Imply(
-                Box::new(lower_condition(a)),
-                Box::new(lower_condition(b)),
-            )
+            PddlCondition::Imply(Box::new(lower_condition(a)), Box::new(lower_condition(b)))
         }
-        GoalDefinition::Exists(vars, body) => {
-            PddlCondition::Exists {
-                vars: lower_typed_variables(vars),
-                body: Box::new(lower_condition(body)),
-            }
-        }
-        GoalDefinition::ForAll(vars, body) => {
-            PddlCondition::Forall {
-                vars: lower_typed_variables(vars),
-                body: Box::new(lower_condition(body)),
-            }
-        }
+        GoalDefinition::Exists(vars, body) => PddlCondition::Exists {
+            vars: lower_typed_variables(vars),
+            body: Box::new(lower_condition(body)),
+        },
+        GoalDefinition::ForAll(vars, body) => PddlCondition::Forall {
+            vars: lower_typed_variables(vars),
+            body: Box::new(lower_condition(body)),
+        },
         GoalDefinition::FluentComparison(fc) => {
             use pddl::BinaryComparison;
             let op = match fc.comparison() {
@@ -647,7 +768,9 @@ fn lower_goal_full(defs: &pddl::PreconditionGoalDefinitions) -> PddlCondition {
 }
 
 fn lower_effect_list(eff: &Option<pddl::Effects>) -> Vec<PddlEffect> {
-    let Some(effects) = eff else { return vec![]; };
+    let Some(effects) = eff else {
+        return vec![];
+    };
     effects.iter().map(lower_conditional_effect_full).collect()
 }
 
@@ -656,12 +779,19 @@ fn lower_conditional_effect_full(ce: &ConditionalEffect) -> PddlEffect {
         ConditionalEffect::Effect(pe) => lower_primitive_effect_full(pe),
         ConditionalEffect::Forall(f) => {
             let vars = lower_typed_variables(&f.variables);
-            let effects = f.effects.iter().map(lower_conditional_effect_full).collect();
+            let effects = f
+                .effects
+                .iter()
+                .map(lower_conditional_effect_full)
+                .collect();
             PddlEffect::Forall { vars, effects }
         }
         ConditionalEffect::When(w) => {
             let condition = lower_condition(&w.condition);
-            let effects = w.effect.clone().into_iter()
+            let effects = w
+                .effect
+                .clone()
+                .into_iter()
                 .map(|pe| lower_primitive_effect_full(&pe))
                 .collect();
             PddlEffect::When { condition, effects }
@@ -675,14 +805,20 @@ fn lower_primitive_effect_full(pe: &PrimitiveEffect) -> PddlEffect {
             if let Some(atom) = lower_af_term(af) {
                 PddlEffect::Add(atom)
             } else {
-                PddlEffect::Add(Pddl8Atom { pred: "_".to_string(), args: vec![] })
+                PddlEffect::Add(Pddl8Atom {
+                    pred: "_".to_string(),
+                    args: vec![],
+                })
             }
         }
         PrimitiveEffect::NotAtomicFormula(af) => {
             if let Some(atom) = lower_af_term(af) {
                 PddlEffect::Del(atom)
             } else {
-                PddlEffect::Del(Pddl8Atom { pred: "_".to_string(), args: vec![] })
+                PddlEffect::Del(Pddl8Atom {
+                    pred: "_".to_string(),
+                    args: vec![],
+                })
             }
         }
         PrimitiveEffect::AssignNumericFluent(op, head, exp) => {
@@ -692,7 +828,10 @@ fn lower_primitive_effect_full(pe: &PrimitiveEffect) -> PddlEffect {
         }
         PrimitiveEffect::AssignObjectFluent(_, _) => {
             // TODO: Object fluent effects
-            PddlEffect::Add(Pddl8Atom { pred: "_object_fluent".to_string(), args: vec![] })
+            PddlEffect::Add(Pddl8Atom {
+                pred: "_object_fluent".to_string(),
+                args: vec![],
+            })
         }
     }
 }
@@ -709,14 +848,20 @@ fn lower_assign_op_numeric(op: &AssignOp, func: PddlFunction, expr: NumericExpr)
 
 fn lower_function_head(head: &FunctionHead) -> PddlFunction {
     match head {
-        FunctionHead::Simple(sym) => PddlFunction { name: sym.to_string(), params: vec![] },
+        FunctionHead::Simple(sym) => PddlFunction {
+            name: sym.to_string(),
+            params: vec![],
+        },
         FunctionHead::WithTerms(sym, terms) => PddlFunction {
             name: sym.to_string(),
-            params: terms.iter().map(|t| match t {
-                pddl::Term::Name(n) => n.to_string(),
-                pddl::Term::Variable(v) => format!("?{v}"),
-                pddl::Term::Function(_) => "_".to_string(),
-            }).collect(),
+            params: terms
+                .iter()
+                .map(|t| match t {
+                    pddl::Term::Name(n) => n.to_string(),
+                    pddl::Term::Variable(v) => format!("?{v}"),
+                    pddl::Term::Function(_) => "_".to_string(),
+                })
+                .collect(),
         },
     }
 }
@@ -731,22 +876,19 @@ fn lower_fluent_expression(fe: &FluentExpression) -> NumericExpr {
         FluentExpression::Negative(inner) => {
             NumericExpr::Neg(Box::new(lower_fluent_expression(inner)))
         }
-        FluentExpression::BinaryOp(op, lhs, rhs) => {
-            NumericExpr::BinOp {
-                op: lower_binary_op(op),
-                lhs: Box::new(lower_fluent_expression(lhs)),
-                rhs: Box::new(lower_fluent_expression(rhs)),
-            }
-        }
+        FluentExpression::BinaryOp(op, lhs, rhs) => NumericExpr::BinOp {
+            op: lower_binary_op(op),
+            lhs: Box::new(lower_fluent_expression(lhs)),
+            rhs: Box::new(lower_fluent_expression(rhs)),
+        },
         FluentExpression::MultiOp(op, lhs, rhs) => {
             let nop = lower_multi_op(op);
-            rhs.iter().fold(lower_fluent_expression(lhs), |acc, r| {
-                NumericExpr::BinOp {
+            rhs.iter()
+                .fold(lower_fluent_expression(lhs), |acc, r| NumericExpr::BinOp {
                     op: nop,
                     lhs: Box::new(acc),
                     rhs: Box::new(lower_fluent_expression(r)),
-                }
-            })
+                })
         }
     }
 }
@@ -770,7 +912,11 @@ fn lower_da_fluent_expression(fe: &pddl::DurativeActionFluentExpression) -> Nume
         DurativeActionFluentExpression::MultiOp(op, lhs, rhs) => {
             let nop = lower_multi_op(op);
             rhs.iter().fold(lower_da_fluent_expression(lhs), |acc, r| {
-                NumericExpr::BinOp { op: nop, lhs: Box::new(acc), rhs: Box::new(lower_da_fluent_expression(r)) }
+                NumericExpr::BinOp {
+                    op: nop,
+                    lhs: Box::new(acc),
+                    rhs: Box::new(lower_da_fluent_expression(r)),
+                }
             })
         }
         DurativeActionFluentExpression::Negative(inner) => {
@@ -806,19 +952,31 @@ fn lower_durative_action(da: &pddl::DurativeActionDefinition) -> DurativeAction 
     let name = da.symbol().to_string();
     let params = lower_typed_variables(da.parameters());
 
-    let duration = da.duration().as_ref()
+    let duration = da
+        .duration()
+        .as_ref()
         .map(lower_duration_constraint)
         .unwrap_or(DurationConstraint::Eq(NumericExpr::Number(0.0)));
 
-    let conditions = da.condition().as_ref()
+    let conditions = da
+        .condition()
+        .as_ref()
         .map(|c| lower_da_gd(c))
         .unwrap_or_default();
 
-    let effects = da.effect().as_ref()
+    let effects = da
+        .effect()
+        .as_ref()
         .map(lower_da_effect)
         .unwrap_or_default();
 
-    DurativeAction { name, params, duration, conditions, effects }
+    DurativeAction {
+        name,
+        params,
+        duration,
+        conditions,
+        effects,
+    }
 }
 
 fn lower_duration_constraint(dc: &PddlDurationConstraint) -> DurationConstraint {
@@ -859,9 +1017,7 @@ fn lower_da_gd(gd: &DurativeActionGoalDefinition) -> Vec<PddlCondition> {
         DurativeActionGoalDefinition::Timed(pref_timed) => {
             vec![lower_pref_timed_gd(pref_timed)]
         }
-        DurativeActionGoalDefinition::And(cs) => {
-            cs.iter().flat_map(lower_da_gd).collect()
-        }
+        DurativeActionGoalDefinition::And(cs) => cs.iter().flat_map(lower_da_gd).collect(),
         DurativeActionGoalDefinition::Forall(vars, inner) => {
             let typed_vars = lower_typed_variables(vars);
             let body_parts = lower_da_gd(inner);
@@ -870,7 +1026,10 @@ fn lower_da_gd(gd: &DurativeActionGoalDefinition) -> Vec<PddlCondition> {
                 1 => body_parts.into_iter().next().unwrap(),
                 _ => PddlCondition::And(body_parts),
             };
-            vec![PddlCondition::Forall { vars: typed_vars, body: Box::new(body) }]
+            vec![PddlCondition::Forall {
+                vars: typed_vars,
+                body: Box::new(body),
+            }]
         }
     }
 }
@@ -905,13 +1064,14 @@ fn lower_time_specifier(ts: &pddl::TimeSpecifier) -> TimeSpecifier {
 fn lower_da_effect(effect: &DurativeActionEffect) -> Vec<PddlEffect> {
     match effect {
         DurativeActionEffect::Timed(te) => vec![lower_timed_effect(te)],
-        DurativeActionEffect::All(effects) => {
-            effects.iter().flat_map(lower_da_effect).collect()
-        }
+        DurativeActionEffect::All(effects) => effects.iter().flat_map(lower_da_effect).collect(),
         DurativeActionEffect::Forall(vars, inner) => {
             let typed_vars = lower_typed_variables(vars);
             let inner_effects = lower_da_effect(inner);
-            vec![PddlEffect::Forall { vars: typed_vars, effects: inner_effects }]
+            vec![PddlEffect::Forall {
+                vars: typed_vars,
+                effects: inner_effects,
+            }]
         }
         DurativeActionEffect::When(gd, te) => {
             let condition = lower_da_gd_condition(gd);
@@ -946,7 +1106,10 @@ fn lower_timed_effect(te: &TimedEffect) -> PddlEffect {
         }
         TimedEffect::ContinuousEffect(_, _, _) => {
             // TODO: lower continuous effects
-            PddlEffect::Add(Pddl8Atom { pred: "_continuous_effect".to_string(), args: vec![] })
+            PddlEffect::Add(Pddl8Atom {
+                pred: "_continuous_effect".to_string(),
+                args: vec![],
+            })
         }
     }
 }
@@ -964,7 +1127,10 @@ fn lower_effect_condition_ec(ec: &pddl::EffectCondition) -> PddlEffect {
     let mut effects: Vec<PddlEffect> = adds.into_iter().map(PddlEffect::Add).collect();
     effects.extend(dels.into_iter().map(PddlEffect::Del));
     match effects.len() {
-        0 => PddlEffect::Add(Pddl8Atom { pred: "_empty".to_string(), args: vec![] }),
+        0 => PddlEffect::Add(Pddl8Atom {
+            pred: "_empty".to_string(),
+            args: vec![],
+        }),
         1 => effects.remove(0),
         _ => PddlEffect::When {
             condition: PddlCondition::And(vec![]),
@@ -977,7 +1143,10 @@ fn lower_derived_predicate(dp: &pddl::DerivedPredicate) -> DerivedPredicate {
     let skel = dp.predicate();
     let head = Pddl8Atom {
         pred: skel.name().to_string(),
-        args: skel.variables().value().iter()
+        args: skel
+            .variables()
+            .value()
+            .iter()
             .map(|v| format!("?{}", v.value()))
             .collect(),
     };
@@ -987,16 +1156,17 @@ fn lower_derived_predicate(dp: &pddl::DerivedPredicate) -> DerivedPredicate {
 
 fn lower_constraint_gd(cgd: &ConstraintGoalDefinition) -> Vec<PddlConstraint> {
     match cgd {
-        ConstraintGoalDefinition::And(cs) => {
-            cs.iter().flat_map(lower_constraint_gd).collect()
-        }
+        ConstraintGoalDefinition::And(cs) => cs.iter().flat_map(lower_constraint_gd).collect(),
         ConstraintGoalDefinition::Forall(_, inner) => {
             // TODO: quantified domain constraints — lower inner for now
             lower_constraint_gd(inner)
         }
         other => {
             let tc = lower_trajectory_constraint(other);
-            vec![PddlConstraint { name: None, constraint: tc }]
+            vec![PddlConstraint {
+                name: None,
+                constraint: tc,
+            }]
         }
     }
 }
@@ -1021,45 +1191,31 @@ fn lower_trajectory_constraint(cgd: &ConstraintGoalDefinition) -> TrajectoryCons
             TrajectoryConstraint::Sometime(Box::new(lower_con2gd_condition(inner)))
         }
         ConstraintGoalDefinition::Within(n, inner) => {
-            TrajectoryConstraint::Within(
-                num_f64(*n),
-                Box::new(lower_con2gd_condition(inner)),
-            )
+            TrajectoryConstraint::Within(num_f64(*n), Box::new(lower_con2gd_condition(inner)))
         }
         ConstraintGoalDefinition::AtMostOnce(inner) => {
             TrajectoryConstraint::AtMostOnce(Box::new(lower_con2gd_condition(inner)))
         }
-        ConstraintGoalDefinition::SometimeAfter(a, b) => {
-            TrajectoryConstraint::SometimeAfter(
-                Box::new(lower_con2gd_condition(a)),
-                Box::new(lower_con2gd_condition(b)),
-            )
-        }
-        ConstraintGoalDefinition::SometimeBefore(a, b) => {
-            TrajectoryConstraint::SometimeBefore(
-                Box::new(lower_con2gd_condition(a)),
-                Box::new(lower_con2gd_condition(b)),
-            )
-        }
-        ConstraintGoalDefinition::AlwaysWithin(n, a, b) => {
-            TrajectoryConstraint::AlwaysWithin(
-                num_f64(*n),
-                Box::new(lower_con2gd_condition(a)),
-                Box::new(lower_con2gd_condition(b)),
-            )
-        }
-        ConstraintGoalDefinition::HoldDuring(n1, n2, inner) => {
-            TrajectoryConstraint::HoldDuring(
-                num_f64(*n1),
-                num_f64(*n2),
-                Box::new(lower_con2gd_condition(inner)),
-            )
-        }
+        ConstraintGoalDefinition::SometimeAfter(a, b) => TrajectoryConstraint::SometimeAfter(
+            Box::new(lower_con2gd_condition(a)),
+            Box::new(lower_con2gd_condition(b)),
+        ),
+        ConstraintGoalDefinition::SometimeBefore(a, b) => TrajectoryConstraint::SometimeBefore(
+            Box::new(lower_con2gd_condition(a)),
+            Box::new(lower_con2gd_condition(b)),
+        ),
+        ConstraintGoalDefinition::AlwaysWithin(n, a, b) => TrajectoryConstraint::AlwaysWithin(
+            num_f64(*n),
+            Box::new(lower_con2gd_condition(a)),
+            Box::new(lower_con2gd_condition(b)),
+        ),
+        ConstraintGoalDefinition::HoldDuring(n1, n2, inner) => TrajectoryConstraint::HoldDuring(
+            num_f64(*n1),
+            num_f64(*n2),
+            Box::new(lower_con2gd_condition(inner)),
+        ),
         ConstraintGoalDefinition::HoldAfter(n, inner) => {
-            TrajectoryConstraint::HoldAfter(
-                num_f64(*n),
-                Box::new(lower_con2gd_condition(inner)),
-            )
+            TrajectoryConstraint::HoldAfter(num_f64(*n), Box::new(lower_con2gd_condition(inner)))
         }
     }
 }
@@ -1090,35 +1246,28 @@ fn lower_metric_expr(expr: &MetricFluentExpression) -> MetricExpr {
         MetricFluentExpression::Number(n) => MetricExpr::Number(num_f64(*n)),
         MetricFluentExpression::TotalTime => MetricExpr::TotalTime,
         MetricFluentExpression::IsViolated(pref) => MetricExpr::IsViolated(pref.to_string()),
-        MetricFluentExpression::Function(sym, names) => {
-            MetricExpr::FunctionTerm(
-                sym.to_string(),
-                names.iter().map(|n| n.to_string()).collect(),
-            )
-        }
-        MetricFluentExpression::Negative(inner) => {
-            MetricExpr::BinOp {
-                op: NumericOp::Sub,
-                lhs: Box::new(MetricExpr::Number(0.0)),
-                rhs: Box::new(lower_metric_expr(inner)),
-            }
-        }
-        MetricFluentExpression::BinaryOp(op, lhs, rhs) => {
-            MetricExpr::BinOp {
-                op: lower_binary_op(op),
-                lhs: Box::new(lower_metric_expr(lhs)),
-                rhs: Box::new(lower_metric_expr(rhs)),
-            }
-        }
+        MetricFluentExpression::Function(sym, names) => MetricExpr::FunctionTerm(
+            sym.to_string(),
+            names.iter().map(|n| n.to_string()).collect(),
+        ),
+        MetricFluentExpression::Negative(inner) => MetricExpr::BinOp {
+            op: NumericOp::Sub,
+            lhs: Box::new(MetricExpr::Number(0.0)),
+            rhs: Box::new(lower_metric_expr(inner)),
+        },
+        MetricFluentExpression::BinaryOp(op, lhs, rhs) => MetricExpr::BinOp {
+            op: lower_binary_op(op),
+            lhs: Box::new(lower_metric_expr(lhs)),
+            rhs: Box::new(lower_metric_expr(rhs)),
+        },
         MetricFluentExpression::MultiOp(op, lhs, rhs) => {
             let nop = lower_multi_op(op);
-            rhs.iter().fold(lower_metric_expr(lhs), |acc, r| {
-                MetricExpr::BinOp {
+            rhs.iter()
+                .fold(lower_metric_expr(lhs), |acc, r| MetricExpr::BinOp {
                     op: nop,
                     lhs: Box::new(acc),
                     rhs: Box::new(lower_metric_expr(r)),
-                }
-            })
+                })
         }
     }
 }

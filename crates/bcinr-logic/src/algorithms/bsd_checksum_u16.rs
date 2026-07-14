@@ -71,7 +71,6 @@ mod tests {
         bsd_checksum_u16_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -91,8 +90,14 @@ mod tests {
             bsd_checksum_u16(u64::MAX, u64::MAX),
             bsd_checksum_u16_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(bsd_checksum_u16(u64::MAX, 0), bsd_checksum_u16_reference(u64::MAX, 0));
-        assert_eq!(bsd_checksum_u16(0, u64::MAX), bsd_checksum_u16_reference(0, u64::MAX));
+        assert_eq!(
+            bsd_checksum_u16(u64::MAX, 0),
+            bsd_checksum_u16_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            bsd_checksum_u16(0, u64::MAX),
+            bsd_checksum_u16_reference(0, u64::MAX)
+        );
         // --- mutant divergence ---
         let baseline = bsd_checksum_u16_reference(42, 1337);
         assert_ne!(

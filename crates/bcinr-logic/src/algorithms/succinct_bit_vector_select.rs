@@ -133,7 +133,6 @@ mod tests {
         succinct_bit_vector_select_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -163,9 +162,21 @@ mod tests {
         );
         // mutants
         let base = succinct_bit_vector_select_reference(42, 1337);
-        assert_ne!(mutant_succinct_bit_vector_select_1(42, 1337), base, "mutant 1");
-        assert_ne!(mutant_succinct_bit_vector_select_2(42, 1337), base, "mutant 2");
-        assert_ne!(mutant_succinct_bit_vector_select_3(42, 1337), base, "mutant 3");
+        assert_ne!(
+            mutant_succinct_bit_vector_select_1(42, 1337),
+            base,
+            "mutant 1"
+        );
+        assert_ne!(
+            mutant_succinct_bit_vector_select_2(42, 1337),
+            base,
+            "mutant 2"
+        );
+        assert_ne!(
+            mutant_succinct_bit_vector_select_3(42, 1337),
+            base,
+            "mutant 3"
+        );
     }
 
     // -------------------------------------------------------------------------

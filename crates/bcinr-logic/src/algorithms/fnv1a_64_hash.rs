@@ -169,8 +169,10 @@ mod tests {
 
     #[test]
     fn test_fnv1a_64_sixteen_bytes() {
-        let data = [0xDEu8, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE,
-                    0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF];
+        let data = [
+            0xDEu8, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB,
+            0xCD, 0xEF,
+        ];
         assert_eq!(fnv1a_64_hash(&data), fnv1a_64_reference(&data));
     }
 
@@ -190,7 +192,11 @@ mod tests {
         let h2 = fnv1a_64_hash(&data2);
         let diff_bits = (h1 ^ h2).count_ones();
         // At least 16 bits should differ (out of 64) — loose bound for spot check
-        assert!(diff_bits >= 16, "Avalanche too weak: only {} bits changed", diff_bits);
+        assert!(
+            diff_bits >= 16,
+            "Avalanche too weak: only {} bits changed",
+            diff_bits
+        );
     }
 
     // -------------------------------------------------------------------------
@@ -224,13 +230,13 @@ pub mod bench {
     pub fn bench_fnv1a_64_hash(c: &mut Criterion) {
         #[cfg(feature = "alloc")]
         {
-        let data: Vec<u8> = (0u8..=63).collect();
-        c.bench_function("fnv1a_64_hash/64B", |b| {
-            b.iter(|| {
-                let res = fnv1a_64_hash(black_box(&data));
-                black_box(res)
-            })
-        });
+            let data: Vec<u8> = (0u8..=63).collect();
+            c.bench_function("fnv1a_64_hash/64B", |b| {
+                b.iter(|| {
+                    let res = fnv1a_64_hash(black_box(&data));
+                    black_box(res)
+                })
+            });
         }
     }
 }

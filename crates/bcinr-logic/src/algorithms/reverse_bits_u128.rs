@@ -86,7 +86,6 @@ mod tests {
         }
     }
 
-
     #[test]
     fn test_reverse_bits_u128_boundaries() {
         // (0, 0): no bits set → reversal = 0; low word = 0

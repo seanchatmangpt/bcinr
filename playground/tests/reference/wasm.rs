@@ -1,16 +1,16 @@
 #![allow(unsafe_code)]
 //! WASM API C-Interface Wrappers Reference Implementation
 
+use std::{ffi::CStr, os::raw::c_char};
 
-use super::petri::{
-    PetriNet, Place, Transition, Arc, Event, Attribute, AttributeValue, Trace,
-    NetBitmask64, replay_trace, in_language
+use super::{
+    petri::{
+        in_language, replay_trace, Arc, Attribute, AttributeValue, Event, NetBitmask64, PetriNet,
+        Place, Trace, Transition,
+    },
+    powl::{Dispatcher, Powl64Executor, Powl64Program, Watchdog},
+    yawl::{BYawlEngine, BYawlTask, JoinType, SplitType},
 };
-use super::yawl::{BYawlEngine, BYawlTask, JoinType, SplitType};
-use super::powl::{Powl64Program, Powl64Executor, Watchdog, Dispatcher};
-
-use std::os::raw::c_char;
-use std::ffi::CStr;
 
 // ── Petri Net FFI ───────────────────────────────────────────────────────────
 
@@ -34,14 +34,23 @@ pub unsafe extern "C" fn ref_petri_free(net: *mut PetriNet) {
 
 #[no_mangle]
 pub unsafe extern "C" fn ref_petri_add_place(net: *mut PetriNet, id: *const c_char) {
-    if net.is_null() || id.is_null() { return; }
+    if net.is_null() || id.is_null() {
+        return;
+    }
     let id_str = CStr::from_ptr(id).to_string_lossy().into_owned();
     (*net).places.push(Place { id: id_str });
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ref_petri_add_transition(net: *mut PetriNet, id: *const c_char, label: *const c_char, is_invisible: bool) {
-    if net.is_null() || id.is_null() || label.is_null() { return; }
+pub unsafe extern "C" fn ref_petri_add_transition(
+    net: *mut PetriNet,
+    id: *const c_char,
+    label: *const c_char,
+    is_invisible: bool,
+) {
+    if net.is_null() || id.is_null() || label.is_null() {
+        return;
+    }
     let id_str = CStr::from_ptr(id).to_string_lossy().into_owned();
     let label_str = CStr::from_ptr(label).to_string_lossy().into_owned();
     (*net).transitions.push(Transition {
@@ -52,28 +61,41 @@ pub unsafe extern "C" fn ref_petri_add_transition(net: *mut PetriNet, id: *const
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ref_petri_add_arc(net: *mut PetriNet, from: *const c_char, to: *const c_char) {
-    if net.is_null() || from.is_null() || to.is_null() { return; }
+pub unsafe extern "C" fn ref_petri_add_arc(
+    net: *mut PetriNet,
+    from: *const c_char,
+    to: *const c_char,
+) {
+    if net.is_null() || from.is_null() || to.is_null() {
+        return;
+    }
     let from_str = CStr::from_ptr(from).to_string_lossy().into_owned();
     let to_str = CStr::from_ptr(to).to_string_lossy().into_owned();
-    (*net).arcs.push(Arc {
-        from: from_str,
-        to: to_str,
-        weight: None,
-        object_type: None,
-    });
+    (*net).arcs.push(Arc { from: from_str, to: to_str, weight: None, object_type: None });
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ref_petri_set_initial_marking(net: *mut PetriNet, place_id: *const c_char, count: usize) {
-    if net.is_null() || place_id.is_null() { return; }
+pub unsafe extern "C" fn ref_petri_set_initial_marking(
+    net: *mut PetriNet,
+    place_id: *const c_char,
+    count: usize,
+) {
+    if net.is_null() || place_id.is_null() {
+        return;
+    }
     let p_str = CStr::from_ptr(place_id).to_string_lossy().into_owned();
     (*net).initial_marking.push((p_str, count));
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ref_petri_set_final_marking(net: *mut PetriNet, place_id: *const c_char, count: usize) {
-    if net.is_null() || place_id.is_null() { return; }
+pub unsafe extern "C" fn ref_petri_set_final_marking(
+    net: *mut PetriNet,
+    place_id: *const c_char,
+    count: usize,
+) {
+    if net.is_null() || place_id.is_null() {
+        return;
+    }
     let p_str = CStr::from_ptr(place_id).to_string_lossy().into_owned();
     (*net).final_marking.push((p_str, count));
 }
@@ -88,11 +110,15 @@ pub unsafe extern "C" fn ref_petri_replay_trace(
     out_produced: *mut u32,
     out_consumed: *mut u32,
 ) -> bool {
-    if net.is_null() || activities.is_null() { return false; }
+    if net.is_null() || activities.is_null() {
+        return false;
+    }
     let mut trace_events = Vec::new();
     for i in 0..len {
         let act_ptr = *activities.add(i);
-        if act_ptr.is_null() { continue; }
+        if act_ptr.is_null() {
+            continue;
+        }
         let act_str = CStr::from_ptr(act_ptr).to_string_lossy().into_owned();
         trace_events.push(Event {
             attributes: vec![Attribute {
@@ -101,17 +127,21 @@ pub unsafe extern "C" fn ref_petri_replay_trace(
             }],
         });
     }
-    let trace = Trace {
-        id: "ffi_trace".to_string(),
-        attributes: Vec::new(),
-        events: trace_events,
-    };
+    let trace = Trace { id: "ffi_trace".to_string(), attributes: Vec::new(), events: trace_events };
     let bm = NetBitmask64::from_petri_net(&*net);
     let res = replay_trace(&bm, &trace);
-    if !out_missing.is_null() { *out_missing = res.missing; }
-    if !out_remaining.is_null() { *out_remaining = res.remaining; }
-    if !out_produced.is_null() { *out_produced = res.produced; }
-    if !out_consumed.is_null() { *out_consumed = res.consumed; }
+    if !out_missing.is_null() {
+        *out_missing = res.missing;
+    }
+    if !out_remaining.is_null() {
+        *out_remaining = res.remaining;
+    }
+    if !out_produced.is_null() {
+        *out_produced = res.produced;
+    }
+    if !out_consumed.is_null() {
+        *out_consumed = res.consumed;
+    }
     res.is_perfect()
 }
 
@@ -121,11 +151,15 @@ pub unsafe extern "C" fn ref_petri_in_language(
     activities: *const *const c_char,
     len: usize,
 ) -> bool {
-    if net.is_null() || activities.is_null() { return false; }
+    if net.is_null() || activities.is_null() {
+        return false;
+    }
     let mut trace_events = Vec::new();
     for i in 0..len {
         let act_ptr = *activities.add(i);
-        if act_ptr.is_null() { continue; }
+        if act_ptr.is_null() {
+            continue;
+        }
         let act_str = CStr::from_ptr(act_ptr).to_string_lossy().into_owned();
         trace_events.push(Event {
             attributes: vec![Attribute {
@@ -134,11 +168,7 @@ pub unsafe extern "C" fn ref_petri_in_language(
             }],
         });
     }
-    let trace = Trace {
-        id: "ffi_trace".to_string(),
-        attributes: Vec::new(),
-        events: trace_events,
-    };
+    let trace = Trace { id: "ffi_trace".to_string(), attributes: Vec::new(), events: trace_events };
     let bm = NetBitmask64::from_petri_net(&*net);
     in_language(&bm, &trace)
 }
@@ -176,7 +206,9 @@ pub unsafe extern "C" fn ref_yawl_execute_task(
     join_state_bit: u8,
     flags: u8,
 ) -> bool {
-    if engine.is_null() { return false; }
+    if engine.is_null() {
+        return false;
+    }
     let join_t = match join_type {
         0 => JoinType::XOR,
         1 => JoinType::AND,
@@ -239,13 +271,19 @@ pub unsafe extern "C" fn ref_powl_execute(
     out_concur_claims: *mut u32,
     out_scopes_entered: *mut u32,
 ) -> bool {
-    if prog.is_null() { return false; }
+    if prog.is_null() {
+        return false;
+    }
     let watchdog = Watchdog::with_deadline(watchdog_deadline);
     let dispatcher = Dispatcher::new();
     let executor = Powl64Executor::new(&*prog);
     if let Ok(report) = executor.run(&watchdog, &dispatcher) {
-        if !out_concur_claims.is_null() { *out_concur_claims = report.concur_slot_claims; }
-        if !out_scopes_entered.is_null() { *out_scopes_entered = report.scopes_entered; }
+        if !out_concur_claims.is_null() {
+            *out_concur_claims = report.concur_slot_claims;
+        }
+        if !out_scopes_entered.is_null() {
+            *out_scopes_entered = report.scopes_entered;
+        }
         true
     } else {
         false
@@ -254,8 +292,9 @@ pub unsafe extern "C" fn ref_powl_execute(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::ptr;
+
+    use super::*;
 
     #[test]
     fn test_ffi_petri_lifecycle() {
@@ -292,7 +331,7 @@ mod tests {
                 &mut missing,
                 &mut remaining,
                 &mut produced,
-                &mut consumed
+                &mut consumed,
             );
 
             assert!(ok);

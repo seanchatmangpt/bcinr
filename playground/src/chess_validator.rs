@@ -3,10 +3,12 @@
 //! Validates OCEL v2 Object-Centric execution transitions for the Chess engine
 //! using strict POWL v2 (Partially Ordered Workflow Language) bounds.
 
-use crate::powl::{Powl64Op, Powl64OpKind, powl64_execute_step, PowlState};
-use crate::hoeg::Hoeg64Node;
+use crate::{
+    hoeg::Hoeg64Node,
+    powl::{powl64_execute_step, Powl64Op, Powl64OpKind, PowlState},
+};
 
-/// Validates whether a generated Object-Centric chess transition conforms to 
+/// Validates whether a generated Object-Centric chess transition conforms to
 /// strict causal physics without branching.
 ///
 /// Under POWL v2 constraints (Kourani & van der Aalst), a valid move requires:
@@ -19,18 +21,15 @@ use crate::hoeg::Hoeg64Node;
 /// use playground::hoeg::Hoeg64Node;
 ///
 /// // Create a dummy chess state transition representation
-/// let state = Hoeg64Node { 
-///     feature_mask: 0x01, adjacency_mask: 0x01, node_id: 1, node_type_hash: 1, _pad: [0; 44] 
+/// let state = Hoeg64Node {
+///     feature_mask: 0x01, adjacency_mask: 0x01, node_id: 1, node_type_hash: 1, _pad: [0; 44]
 /// };
 ///
 /// let is_valid = validate_chess_move_powl(&state).unwrap();
 /// assert_eq!(is_valid, true);
 /// ```
 #[inline(always)]
-pub fn validate_chess_move_powl(
-    transition: &Hoeg64Node,
-) -> Result<bool, &'static str> {
-    
+pub fn validate_chess_move_powl(transition: &Hoeg64Node) -> Result<bool, &'static str> {
     // We map the chess rule validation to a POWL v2 state machine execution constraint.
     let mut powl_state = PowlState::new();
     powl_state.completed_ops = transition.adjacency_mask;

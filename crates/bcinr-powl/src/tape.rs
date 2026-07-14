@@ -175,14 +175,14 @@ pub mod v2 {
         #[inline(always)]
         pub const fn silent() -> Self {
             Self {
-                pred_mask:    0,
-                succ_mask:    0,
-                ctrl:         0,
-                op_kind:      OpKind::Silent,
+                pred_mask: 0,
+                succ_mask: 0,
+                ctrl: 0,
+                op_kind: OpKind::Silent,
                 choice_group: 0,
-                depth:        0,
-                fan_out:      0,
-                _pad:         [0u8; 36],
+                depth: 0,
+                fan_out: 0,
+                _pad: [0u8; 36],
             }
         }
 
@@ -242,7 +242,7 @@ pub mod v2 {
         pub const fn new() -> Self {
             Self {
                 data: [0u8; 1024],
-                len:  0,
+                len: 0,
             }
         }
 
@@ -258,18 +258,14 @@ pub mod v2 {
             // Linear scan for an existing entry.
             let mut cursor: usize = 0;
             while cursor + 2 <= self.len as usize {
-                let entry_len = u16::from_le_bytes([
-                    self.data[cursor],
-                    self.data[cursor + 1],
-                ]) as usize;
+                let entry_len =
+                    u16::from_le_bytes([self.data[cursor], self.data[cursor + 1]]) as usize;
                 let entry_start = cursor + 2;
-                let entry_end   = entry_start + entry_len;
+                let entry_end = entry_start + entry_len;
                 if entry_end > self.len as usize {
                     break; // truncated — stop scan
                 }
-                if entry_len == label_len
-                    && &self.data[entry_start..entry_end] == bytes
-                {
+                if entry_len == label_len && &self.data[entry_start..entry_end] == bytes {
                     return cursor as u16;
                 }
                 cursor = entry_end;
@@ -277,14 +273,14 @@ pub mod v2 {
 
             // Append new entry.
             let needed = 2 + label_len;
-            let used   = self.len as usize;
+            let used = self.len as usize;
             if used + needed > 1024 {
                 debug_assert!(false, "LabelSlab out of space");
                 return u16::MAX;
             }
 
             let offset = used as u16;
-            self.data[used]     = (label_len & 0xFF) as u8;
+            self.data[used] = (label_len & 0xFF) as u8;
             self.data[used + 1] = ((label_len >> 8) & 0xFF) as u8;
             self.data[used + 2..used + 2 + label_len].copy_from_slice(bytes);
             self.len = (used + needed) as u16;
@@ -300,12 +296,9 @@ pub mod v2 {
         /// UTF-8.
         pub fn get(&self, offset: u16) -> &str {
             let off = offset as usize;
-            let entry_len = u16::from_le_bytes([
-                self.data[off],
-                self.data[off + 1],
-            ]) as usize;
+            let entry_len = u16::from_le_bytes([self.data[off], self.data[off + 1]]) as usize;
             let start = off + 2;
-            let end   = start + entry_len;
+            let end = start + entry_len;
             str::from_utf8(&self.data[start..end])
                 .expect("LabelSlab: stored bytes are not valid UTF-8")
         }
@@ -342,10 +335,10 @@ pub mod v2 {
         /// Construct an empty tape.
         pub fn new() -> Self {
             Self {
-                ops:        [Powl64Op::silent(); 64],
-                len:        0,
-                entry_op:   0,
-                exit_op:    0,
+                ops: [Powl64Op::silent(); 64],
+                len: 0,
+                entry_op: 0,
+                exit_op: 0,
                 label_slab: LabelSlab::new(),
             }
         }
@@ -416,13 +409,13 @@ pub mod v2 {
         /// Construct an empty large tape.
         pub fn new() -> Self {
             Self {
-                pred_mask:    [[0u64; 8]; 512],
-                succ_mask:    [[0u64; 8]; 512],
-                ctrl:         [0u64; 512],
-                op_kind:      [OpKind::Silent; 512],
+                pred_mask: [[0u64; 8]; 512],
+                succ_mask: [[0u64; 8]; 512],
+                ctrl: [0u64; 512],
+                op_kind: [OpKind::Silent; 512],
                 choice_group: [0u8; 512],
-                len:          0,
-                label_slab:   LabelSlab::new(),
+                len: 0,
+                label_slab: LabelSlab::new(),
             }
         }
 
@@ -451,10 +444,16 @@ pub mod v2 {
 
         #[test]
         fn powl64op_is_one_cache_line() {
-            assert_eq!(mem::size_of::<Powl64Op>(), 64,
-                "Powl64Op must be exactly 64 bytes");
-            assert_eq!(mem::align_of::<Powl64Op>(), 64,
-                "Powl64Op must be 64-byte aligned");
+            assert_eq!(
+                mem::size_of::<Powl64Op>(),
+                64,
+                "Powl64Op must be exactly 64 bytes"
+            );
+            assert_eq!(
+                mem::align_of::<Powl64Op>(),
+                64,
+                "Powl64Op must be 64-byte aligned"
+            );
         }
 
         #[test]
@@ -466,15 +465,15 @@ pub mod v2 {
 
         #[test]
         fn eq_mask_equal_values() {
-            assert_eq!(eq_mask_u64(0, 0),              u64::MAX);
-            assert_eq!(eq_mask_u64(42, 42),             u64::MAX);
+            assert_eq!(eq_mask_u64(0, 0), u64::MAX);
+            assert_eq!(eq_mask_u64(42, 42), u64::MAX);
             assert_eq!(eq_mask_u64(u64::MAX, u64::MAX), u64::MAX);
         }
 
         #[test]
         fn eq_mask_unequal_values() {
-            assert_eq!(eq_mask_u64(0, 1),        0);
-            assert_eq!(eq_mask_u64(1, 0),        0);
+            assert_eq!(eq_mask_u64(0, 1), 0);
+            assert_eq!(eq_mask_u64(1, 0), 0);
             assert_eq!(eq_mask_u64(u64::MAX, 0), 0);
             assert_eq!(eq_mask_u64(0, u64::MAX), 0);
         }
@@ -539,7 +538,7 @@ pub mod v2 {
             assert_eq!(tape.push(op1).unwrap(), 1);
 
             tape.entry_op = 0;
-            tape.exit_op  = 1;
+            tape.exit_op = 1;
 
             let ready = tape.ready_mask();
             assert_ne!(ready & (1 << 0), 0, "op 0 should be ready");
@@ -560,7 +559,7 @@ pub mod v2 {
         #[test]
         fn powl64op_is_concur_when_ctrl_max() {
             let mut op = Powl64Op::silent();
-            op.ctrl    = u64::MAX;
+            op.ctrl = u64::MAX;
             op.op_kind = OpKind::Concur;
             assert!(op.is_concur());
         }
@@ -576,7 +575,7 @@ pub mod v2 {
         fn powl_tape_large_new_is_empty() {
             let tape = PowlTapeLarge::new();
             assert_eq!(tape.len, 0);
-            assert_eq!(tape.pred_mask[0],   [0u64; 8]);
+            assert_eq!(tape.pred_mask[0], [0u64; 8]);
             assert_eq!(tape.succ_mask[511], [0u64; 8]);
         }
 
@@ -623,9 +622,9 @@ mod tests {
     #[test]
     fn legacy_op_fields() {
         let mut op = Powl64Op::new(OpKind::XorDispatch, 0);
-        op.branch_mask  = 0b110;
+        op.branch_mask = 0b110;
         op.branch_count = 2;
-        assert_eq!(op.branch_mask,  0b110);
+        assert_eq!(op.branch_mask, 0b110);
         assert_eq!(op.branch_count, 2);
         assert_eq!(op.kind, OpKind::XorDispatch);
     }

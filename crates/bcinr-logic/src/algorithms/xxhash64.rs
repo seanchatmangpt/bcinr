@@ -103,17 +103,13 @@ mod tests {
         xxhash64_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
     #[test]
     fn test_xxhash64_all() {
         // oracle
-        assert_eq!(
-            xxhash64(42, 1337),
-            xxhash64_reference(42, 1337)
-        );
+        assert_eq!(xxhash64(42, 1337), xxhash64_reference(42, 1337));
         // boundaries
         assert_eq!(xxhash64(0, 0), xxhash64_reference(0, 0));
         assert_eq!(

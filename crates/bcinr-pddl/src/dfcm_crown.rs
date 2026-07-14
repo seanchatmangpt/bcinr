@@ -166,10 +166,14 @@ pub fn run_dfcm_crown_suite() -> Result<DfcmBenchReceipt, Pddl8Error> {
             let alloc_before = crate::alloc_counter::counting_alloc::snapshot();
 
             let t0 = Instant::now();
-            let plan = gtp.find_temporal_plan()?;
+            let plan = gtp.find_temporal_plan().into_result()?;
             planning_ns += t0.elapsed().as_nanos();
             #[cfg(feature = "dhat-heap")]
-            record_stage_alloc(&mut alloc_count.planning, &mut alloc_bytes.planning, alloc_before);
+            record_stage_alloc(
+                &mut alloc_count.planning,
+                &mut alloc_bytes.planning,
+                alloc_before,
+            );
             #[cfg(feature = "dhat-heap")]
             let alloc_before = crate::alloc_counter::counting_alloc::snapshot();
 
@@ -178,7 +182,11 @@ pub fn run_dfcm_crown_suite() -> Result<DfcmBenchReceipt, Pddl8Error> {
             topology_ns += t1.elapsed().as_nanos();
             max_ops_seen = max_ops_seen.max(ops.len().min(u8::MAX as usize) as u8);
             #[cfg(feature = "dhat-heap")]
-            record_stage_alloc(&mut alloc_count.topology, &mut alloc_bytes.topology, alloc_before);
+            record_stage_alloc(
+                &mut alloc_count.topology,
+                &mut alloc_bytes.topology,
+                alloc_before,
+            );
 
             #[cfg(feature = "dhat-heap")]
             let analysis_alloc_before = crate::alloc_counter::counting_alloc::snapshot();
@@ -189,7 +197,11 @@ pub fn run_dfcm_crown_suite() -> Result<DfcmBenchReceipt, Pddl8Error> {
             max_parallelism_seen = max_parallelism_seen.max(analysis.max_parallelism);
             add_analysis_substage(&mut analysis_substage, &analysis_stage_ns);
             #[cfg(feature = "dhat-heap")]
-            record_stage_alloc(&mut alloc_count.analysis, &mut alloc_bytes.analysis, analysis_alloc_before);
+            record_stage_alloc(
+                &mut alloc_count.analysis,
+                &mut alloc_bytes.analysis,
+                analysis_alloc_before,
+            );
             #[cfg(feature = "dhat-heap")]
             let alloc_before = crate::alloc_counter::counting_alloc::snapshot();
 
@@ -207,7 +219,11 @@ pub fn run_dfcm_crown_suite() -> Result<DfcmBenchReceipt, Pddl8Error> {
             admission_ns += t3.elapsed().as_nanos();
             add_substage(&mut admission_substage, &admission_stage_ns);
             #[cfg(feature = "dhat-heap")]
-            record_stage_alloc(&mut alloc_count.admission, &mut alloc_bytes.admission, alloc_before);
+            record_stage_alloc(
+                &mut alloc_count.admission,
+                &mut alloc_bytes.admission,
+                alloc_before,
+            );
             #[cfg(feature = "dhat-heap")]
             let alloc_before = crate::alloc_counter::counting_alloc::snapshot();
 
@@ -217,7 +233,11 @@ pub fn run_dfcm_crown_suite() -> Result<DfcmBenchReceipt, Pddl8Error> {
             let _chain = compute_plan_chain(&plan.steps);
             receipt_ns += t4.elapsed().as_nanos();
             #[cfg(feature = "dhat-heap")]
-            record_stage_alloc(&mut alloc_count.receipt, &mut alloc_bytes.receipt, alloc_before);
+            record_stage_alloc(
+                &mut alloc_count.receipt,
+                &mut alloc_bytes.receipt,
+                alloc_before,
+            );
             #[cfg(feature = "dhat-heap")]
             let alloc_before = crate::alloc_counter::counting_alloc::snapshot();
 
@@ -231,7 +251,11 @@ pub fn run_dfcm_crown_suite() -> Result<DfcmBenchReceipt, Pddl8Error> {
             debug_assert_eq!(receipt.chain_hash, replay_receipt.chain_hash);
             add_substage(&mut replay_substage, &replay_stage_ns);
             #[cfg(feature = "dhat-heap")]
-            record_stage_alloc(&mut alloc_count.replay, &mut alloc_bytes.replay, alloc_before);
+            record_stage_alloc(
+                &mut alloc_count.replay,
+                &mut alloc_bytes.replay,
+                alloc_before,
+            );
 
             // warm_replay_existing_receipt_ns: a DIFFERENT, cheaper replay —
             // chain-only validation with no Prolog8 queries at all, proving

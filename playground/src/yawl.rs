@@ -1,8 +1,9 @@
 //! Branchless YAWL routing semantics engine.
 
-use bcinr::mask::select_u64;
-use bcinr::int::popcount_u64;
-use bcinr_logic::simd_dispatch::{splat_u8x16, compare_eq_u8x16, add_saturating_u8x16, blend_u8x16, and_u8x16};
+use bcinr::{int::popcount_u64, mask::select_u64};
+use bcinr_logic::simd_dispatch::{
+    add_saturating_u8x16, and_u8x16, blend_u8x16, compare_eq_u8x16, splat_u8x16,
+};
 
 #[inline(always)]
 fn unpack_u64_mask_to_u8x16(mask: u64, offset: u32) -> [u8; 16] {
@@ -163,10 +164,10 @@ impl BYawlEngine {
         let place_v = splat_u8x16(place_bit);
         let in_bounds_v = splat_u8x16((in_bounds_mask as u8).wrapping_neg());
 
-        let idx0 = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
-        let idx1 = [16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31];
-        let idx2 = [32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47];
-        let idx3 = [48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63];
+        let idx0 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+        let idx1 = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31];
+        let idx2 = [32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47];
+        let idx3 = [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63];
 
         let eq0 = and_u8x16(compare_eq_u8x16(place_v, idx0), in_bounds_v);
         let eq1 = and_u8x16(compare_eq_u8x16(place_v, idx1), in_bounds_v);
@@ -174,10 +175,10 @@ impl BYawlEngine {
         let eq3 = and_u8x16(compare_eq_u8x16(place_v, idx3), in_bounds_v);
 
         let process_chunk = |active_instances: &mut [u8; 64], start: usize, eq_mask: [u8; 16]| {
-            let cur: [u8; 16] = active_instances[start..start+16].try_into().unwrap();
+            let cur: [u8; 16] = active_instances[start..start + 16].try_into().unwrap();
             let added = add_saturating_u8x16(cur, count_v);
             let next = blend_u8x16(eq_mask, cur, added);
-            active_instances[start..start+16].copy_from_slice(&next);
+            active_instances[start..start + 16].copy_from_slice(&next);
         };
 
         process_chunk(&mut self.active_instances, 0, eq0);
@@ -199,15 +200,16 @@ impl BYawlEngine {
         let allowed_by_cond_mask = z_mask_u64(cond_diff);
 
         // --- 2. Reset Complex Joins ---
-        let has_reset_tokens_mask = nz_mask_u64(self.state_mask & task.reset_mask) & allowed_by_lock_mask;
+        let has_reset_tokens_mask =
+            nz_mask_u64(self.state_mask & task.reset_mask) & allowed_by_lock_mask;
         let reset_bit = 1u64.wrapping_shl(task.join_state_bit as u32 & 63);
-        
+
         self.fired_joins_mask &= !(reset_bit & has_reset_tokens_mask);
         self.state_mask &= !(task.reset_mask & has_reset_tokens_mask);
 
         // --- 3. Join Predicate Evaluations ---
         let count_ones = popcount_u64(self.state_mask & task.consume_mask);
-        
+
         let c = self.state_mask & task.consume_mask;
         let join_xor_mask = nz_mask_u64(c) & z_mask_u64(c & c.wrapping_sub(1));
 
@@ -230,7 +232,8 @@ impl BYawlEngine {
         let is_and = z_mask_u64((task.join_type as u64).wrapping_sub(JoinType::AND as u64));
         let is_or = z_mask_u64((task.join_type as u64).wrapping_sub(JoinType::OR as u64));
         let is_complex = z_mask_u64((task.join_type as u64).wrapping_sub(JoinType::Complex as u64));
-        let is_thread_merge = z_mask_u64((task.join_type as u64).wrapping_sub(JoinType::ThreadMerge as u64));
+        let is_thread_merge =
+            z_mask_u64((task.join_type as u64).wrapping_sub(JoinType::ThreadMerge as u64));
 
         let can_join_mask = (join_xor_mask & is_xor)
             | (join_and_mask & is_and)
@@ -240,14 +243,16 @@ impl BYawlEngine {
 
         // Transient trigger check (WCP-23)
         let is_transient_mask = nz_mask_u64((task.flags & 1) as u64);
-        let has_transient_trigger_mask = is_transient_mask & nz_mask_u64(self.active_triggers & task.consume_mask);
+        let has_transient_trigger_mask =
+            is_transient_mask & nz_mask_u64(self.active_triggers & task.consume_mask);
 
         let fire_condition_mask = can_join_mask | has_transient_trigger_mask;
         let fired_mask = allowed_by_lock_mask & allowed_by_cond_mask & fire_condition_mask;
 
         // Complex Join: token consumption on bypass (vacuuming)
         let complex_fired_condition = is_complex & complex_has_fired_mask;
-        let consume_on_blocked_mask = (!fired_mask) & complex_fired_condition & allowed_by_lock_mask & allowed_by_cond_mask;
+        let consume_on_blocked_mask =
+            (!fired_mask) & complex_fired_condition & allowed_by_lock_mask & allowed_by_cond_mask;
         let do_consume_mask = fired_mask | consume_on_blocked_mask;
 
         // --- 4. State Updates ---
@@ -272,9 +277,9 @@ impl BYawlEngine {
         let zero_v = splat_u8x16(0);
         let process_cancel = |active_instances: &mut [u8; 64], start: usize, mask: u64| {
             let m = unpack_u64_mask_to_u8x16(mask, start as u32);
-            let cur: [u8; 16] = active_instances[start..start+16].try_into().unwrap();
+            let cur: [u8; 16] = active_instances[start..start + 16].try_into().unwrap();
             let next = blend_u8x16(m, cur, zero_v);
-            active_instances[start..start+16].copy_from_slice(&next);
+            active_instances[start..start + 16].copy_from_slice(&next);
         };
         process_cancel(&mut self.active_instances, 0, cancel_mask);
         process_cancel(&mut self.active_instances, 16, cancel_mask);
@@ -288,9 +293,9 @@ impl BYawlEngine {
         let zero_v = splat_u8x16(0);
         let process_cancel = |active_instances: &mut [u8; 64], start: usize, mask: u64| {
             let m = unpack_u64_mask_to_u8x16(mask, start as u32);
-            let cur: [u8; 16] = active_instances[start..start+16].try_into().unwrap();
+            let cur: [u8; 16] = active_instances[start..start + 16].try_into().unwrap();
             let next = blend_u8x16(m, cur, zero_v);
-            active_instances[start..start+16].copy_from_slice(&next);
+            active_instances[start..start + 16].copy_from_slice(&next);
         };
         process_cancel(&mut self.active_instances, 0, mi_cancel);
         process_cancel(&mut self.active_instances, 16, mi_cancel);
@@ -298,9 +303,14 @@ impl BYawlEngine {
         process_cancel(&mut self.active_instances, 48, mi_cancel);
 
         // --- 5. Splits & Produces ---
-        let split_it_mask = z_mask_u64((task.split_type as u64).wrapping_sub(SplitType::ImplicitTermination as u64));
-        let split_et_mask = z_mask_u64((task.split_type as u64).wrapping_sub(SplitType::ExplicitTermination as u64));
-        let split_mi_mask = z_mask_u64((task.split_type as u64).wrapping_sub(SplitType::MultiInstance as u64));
+        let split_it_mask = z_mask_u64(
+            (task.split_type as u64).wrapping_sub(SplitType::ImplicitTermination as u64),
+        );
+        let split_et_mask = z_mask_u64(
+            (task.split_type as u64).wrapping_sub(SplitType::ExplicitTermination as u64),
+        );
+        let split_mi_mask =
+            z_mask_u64((task.split_type as u64).wrapping_sub(SplitType::MultiInstance as u64));
 
         let should_produce_mask = fired_mask & !split_it_mask & !split_et_mask;
         self.state_mask |= task.produce_mask & should_produce_mask;
@@ -312,9 +322,9 @@ impl BYawlEngine {
         self.active_locks &= et_mask;
         let et_v = splat_u8x16(et_mask as u8);
         let process_et = |active_instances: &mut [u8; 64], start: usize| {
-            let cur: [u8; 16] = active_instances[start..start+16].try_into().unwrap();
+            let cur: [u8; 16] = active_instances[start..start + 16].try_into().unwrap();
             let next = and_u8x16(cur, et_v);
-            active_instances[start..start+16].copy_from_slice(&next);
+            active_instances[start..start + 16].copy_from_slice(&next);
         };
         process_et(&mut self.active_instances, 0);
         process_et(&mut self.active_instances, 16);
@@ -327,19 +337,20 @@ impl BYawlEngine {
         let mi_v = splat_u8x16((is_mi_mask as u8).wrapping_neg());
         let max_inst_v = splat_u8x16(task.max_instances);
         let target_idx_v = splat_u8x16(target_idx as u8);
-        let target_valid_v = splat_u8x16((nz_mask_u64((target_idx < 64) as u64) as u8).wrapping_neg());
-        
-        let idx0 = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
-        let idx1 = [16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31];
-        let idx2 = [32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47];
-        let idx3 = [48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63];
+        let target_valid_v =
+            splat_u8x16((nz_mask_u64((target_idx < 64) as u64) as u8).wrapping_neg());
+
+        let idx0 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+        let idx1 = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31];
+        let idx2 = [32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47];
+        let idx3 = [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63];
 
         let process_mi = |active_instances: &mut [u8; 64], start: usize, idx_v: [u8; 16]| {
-            let cur: [u8; 16] = active_instances[start..start+16].try_into().unwrap();
+            let cur: [u8; 16] = active_instances[start..start + 16].try_into().unwrap();
             let eq_mask = compare_eq_u8x16(idx_v, target_idx_v);
             let target_mask = and_u8x16(and_u8x16(eq_mask, target_valid_v), mi_v);
             let next = blend_u8x16(target_mask, cur, max_inst_v);
-            active_instances[start..start+16].copy_from_slice(&next);
+            active_instances[start..start + 16].copy_from_slice(&next);
         };
         process_mi(&mut self.active_instances, 0, idx0);
         process_mi(&mut self.active_instances, 16, idx1);
@@ -358,7 +369,7 @@ mod tests {
         let mut fake_engine = engine.clone();
         let has_reset_tokens_mask = nz_mask_u64(fake_engine.state_mask & task.reset_mask);
         let reset_bit = 1u64.wrapping_shl(task.join_state_bit as u32 & 63);
-        
+
         fake_engine.fired_joins_mask &= !(reset_bit & has_reset_tokens_mask);
         fake_engine.state_mask &= !(task.reset_mask & has_reset_tokens_mask);
 
@@ -370,11 +381,12 @@ mod tests {
         let allowed_by_cond_mask = z_mask_u64(cond_diff);
 
         let count_ones = popcount_u64(fake_engine.state_mask & task.consume_mask);
-        
+
         let c = fake_engine.state_mask & task.consume_mask;
         let join_xor_mask = nz_mask_u64(c) & z_mask_u64(c & c.wrapping_sub(1));
 
-        let join_and_mask = z_mask_u64((fake_engine.state_mask & task.consume_mask) ^ task.consume_mask);
+        let join_and_mask =
+            z_mask_u64((fake_engine.state_mask & task.consume_mask) ^ task.consume_mask);
 
         let val = fake_engine.state_mask & task.consume_mask;
         let aux = fake_engine.state_mask & task.reachability_mask;
@@ -392,7 +404,8 @@ mod tests {
         let is_and = z_mask_u64((task.join_type as u64).wrapping_sub(JoinType::AND as u64));
         let is_or = z_mask_u64((task.join_type as u64).wrapping_sub(JoinType::OR as u64));
         let is_complex = z_mask_u64((task.join_type as u64).wrapping_sub(JoinType::Complex as u64));
-        let is_thread_merge = z_mask_u64((task.join_type as u64).wrapping_sub(JoinType::ThreadMerge as u64));
+        let is_thread_merge =
+            z_mask_u64((task.join_type as u64).wrapping_sub(JoinType::ThreadMerge as u64));
 
         let can_join_mask = (join_xor_mask & is_xor)
             | (join_and_mask & is_and)
@@ -401,7 +414,8 @@ mod tests {
             | (join_thread_merge_mask & is_thread_merge);
 
         let is_transient_mask = nz_mask_u64((task.flags & 1) as u64);
-        let has_transient_trigger_mask = is_transient_mask & nz_mask_u64(fake_engine.active_triggers & task.consume_mask);
+        let has_transient_trigger_mask =
+            is_transient_mask & nz_mask_u64(fake_engine.active_triggers & task.consume_mask);
 
         let fire_condition_mask = can_join_mask | has_transient_trigger_mask;
         let fired_mask = allowed_by_lock_mask & allowed_by_cond_mask & fire_condition_mask;
@@ -428,18 +442,23 @@ mod tests {
         let zero_v = splat_u8x16(0);
         let process_cancel = |active_instances: &mut [u8; 64], start: usize, mask: u64| {
             let m = unpack_u64_mask_to_u8x16(mask, start as u32);
-            let cur: [u8; 16] = active_instances[start..start+16].try_into().unwrap();
+            let cur: [u8; 16] = active_instances[start..start + 16].try_into().unwrap();
             let next = blend_u8x16(m, cur, zero_v);
-            active_instances[start..start+16].copy_from_slice(&next);
+            active_instances[start..start + 16].copy_from_slice(&next);
         };
         process_cancel(&mut fake_engine.active_instances, 0, mi_cancel);
         process_cancel(&mut fake_engine.active_instances, 16, mi_cancel);
         process_cancel(&mut fake_engine.active_instances, 32, mi_cancel);
         process_cancel(&mut fake_engine.active_instances, 48, mi_cancel);
 
-        let split_it_mask = z_mask_u64((task.split_type as u64).wrapping_sub(SplitType::ImplicitTermination as u64));
-        let split_et_mask = z_mask_u64((task.split_type as u64).wrapping_sub(SplitType::ExplicitTermination as u64));
-        let split_mi_mask = z_mask_u64((task.split_type as u64).wrapping_sub(SplitType::MultiInstance as u64));
+        let split_it_mask = z_mask_u64(
+            (task.split_type as u64).wrapping_sub(SplitType::ImplicitTermination as u64),
+        );
+        let split_et_mask = z_mask_u64(
+            (task.split_type as u64).wrapping_sub(SplitType::ExplicitTermination as u64),
+        );
+        let split_mi_mask =
+            z_mask_u64((task.split_type as u64).wrapping_sub(SplitType::MultiInstance as u64));
 
         let should_produce_mask = fired_mask & !split_it_mask & !split_et_mask;
         fake_engine.state_mask |= task.produce_mask & should_produce_mask;
@@ -450,9 +469,9 @@ mod tests {
         fake_engine.active_locks &= et_mask;
         let et_v = splat_u8x16(et_mask as u8);
         let process_et = |active_instances: &mut [u8; 64], start: usize| {
-            let cur: [u8; 16] = active_instances[start..start+16].try_into().unwrap();
+            let cur: [u8; 16] = active_instances[start..start + 16].try_into().unwrap();
             let next = and_u8x16(cur, et_v);
-            active_instances[start..start+16].copy_from_slice(&next);
+            active_instances[start..start + 16].copy_from_slice(&next);
         };
         process_et(&mut fake_engine.active_instances, 0);
         process_et(&mut fake_engine.active_instances, 16);
@@ -464,19 +483,20 @@ mod tests {
         let mi_v = splat_u8x16((is_mi_mask as u8).wrapping_neg());
         let max_inst_v = splat_u8x16(task.max_instances);
         let target_idx_v = splat_u8x16(target_idx as u8);
-        let target_valid_v = splat_u8x16((nz_mask_u64((target_idx < 64) as u64) as u8).wrapping_neg());
-        
-        let idx0 = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
-        let idx1 = [16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31];
-        let idx2 = [32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47];
-        let idx3 = [48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63];
+        let target_valid_v =
+            splat_u8x16((nz_mask_u64((target_idx < 64) as u64) as u8).wrapping_neg());
+
+        let idx0 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+        let idx1 = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31];
+        let idx2 = [32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47];
+        let idx3 = [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63];
 
         let process_mi = |active_instances: &mut [u8; 64], start: usize, idx_v: [u8; 16]| {
-            let cur: [u8; 16] = active_instances[start..start+16].try_into().unwrap();
+            let cur: [u8; 16] = active_instances[start..start + 16].try_into().unwrap();
             let eq_mask = compare_eq_u8x16(idx_v, target_idx_v);
             let target_mask = and_u8x16(and_u8x16(eq_mask, target_valid_v), mi_v);
             let next = blend_u8x16(target_mask, cur, max_inst_v);
-            active_instances[start..start+16].copy_from_slice(&next);
+            active_instances[start..start + 16].copy_from_slice(&next);
         };
         process_mi(&mut fake_engine.active_instances, 0, idx0);
         process_mi(&mut fake_engine.active_instances, 16, idx1);
@@ -491,7 +511,7 @@ mod tests {
         let mut fake_engine = engine.clone();
         let has_reset_tokens_mask = nz_mask_u64(fake_engine.state_mask & task.reset_mask);
         let reset_bit = 1u64.wrapping_shl(task.join_state_bit as u32 & 63);
-        
+
         fake_engine.fired_joins_mask &= !(reset_bit & has_reset_tokens_mask);
         fake_engine.state_mask &= !(task.reset_mask & has_reset_tokens_mask);
 
@@ -503,11 +523,12 @@ mod tests {
         let allowed_by_cond_mask = z_mask_u64(cond_diff);
 
         let count_ones = popcount_u64(fake_engine.state_mask & task.consume_mask);
-        
+
         let c = fake_engine.state_mask & task.consume_mask;
         let join_xor_mask = nz_mask_u64(c) & z_mask_u64(c & c.wrapping_sub(1));
 
-        let join_and_mask = z_mask_u64((fake_engine.state_mask & task.consume_mask) ^ task.consume_mask);
+        let join_and_mask =
+            z_mask_u64((fake_engine.state_mask & task.consume_mask) ^ task.consume_mask);
 
         let val = fake_engine.state_mask & task.consume_mask;
         // MUTATED: ignores reachability (this makes it mutant 2)
@@ -525,7 +546,8 @@ mod tests {
         let is_and = z_mask_u64((task.join_type as u64).wrapping_sub(JoinType::AND as u64));
         let is_or = z_mask_u64((task.join_type as u64).wrapping_sub(JoinType::OR as u64));
         let is_complex = z_mask_u64((task.join_type as u64).wrapping_sub(JoinType::Complex as u64));
-        let is_thread_merge = z_mask_u64((task.join_type as u64).wrapping_sub(JoinType::ThreadMerge as u64));
+        let is_thread_merge =
+            z_mask_u64((task.join_type as u64).wrapping_sub(JoinType::ThreadMerge as u64));
 
         let can_join_mask = (join_xor_mask & is_xor)
             | (join_and_mask & is_and)
@@ -534,7 +556,8 @@ mod tests {
             | (join_thread_merge_mask & is_thread_merge);
 
         let is_transient_mask = nz_mask_u64((task.flags & 1) as u64);
-        let has_transient_trigger_mask = is_transient_mask & nz_mask_u64(fake_engine.active_triggers & task.consume_mask);
+        let has_transient_trigger_mask =
+            is_transient_mask & nz_mask_u64(fake_engine.active_triggers & task.consume_mask);
 
         let fire_condition_mask = can_join_mask | has_transient_trigger_mask;
         let fired_mask = allowed_by_lock_mask & allowed_by_cond_mask & fire_condition_mask;
@@ -558,9 +581,9 @@ mod tests {
         let zero_v = splat_u8x16(0);
         let process_cancel = |active_instances: &mut [u8; 64], start: usize, mask: u64| {
             let m = unpack_u64_mask_to_u8x16(mask, start as u32);
-            let cur: [u8; 16] = active_instances[start..start+16].try_into().unwrap();
+            let cur: [u8; 16] = active_instances[start..start + 16].try_into().unwrap();
             let next = blend_u8x16(m, cur, zero_v);
-            active_instances[start..start+16].copy_from_slice(&next);
+            active_instances[start..start + 16].copy_from_slice(&next);
         };
         process_cancel(&mut fake_engine.active_instances, 0, cancel_mask);
         process_cancel(&mut fake_engine.active_instances, 16, cancel_mask);
@@ -573,18 +596,23 @@ mod tests {
         let zero_v = splat_u8x16(0);
         let process_cancel = |active_instances: &mut [u8; 64], start: usize, mask: u64| {
             let m = unpack_u64_mask_to_u8x16(mask, start as u32);
-            let cur: [u8; 16] = active_instances[start..start+16].try_into().unwrap();
+            let cur: [u8; 16] = active_instances[start..start + 16].try_into().unwrap();
             let next = blend_u8x16(m, cur, zero_v);
-            active_instances[start..start+16].copy_from_slice(&next);
+            active_instances[start..start + 16].copy_from_slice(&next);
         };
         process_cancel(&mut fake_engine.active_instances, 0, mi_cancel);
         process_cancel(&mut fake_engine.active_instances, 16, mi_cancel);
         process_cancel(&mut fake_engine.active_instances, 32, mi_cancel);
         process_cancel(&mut fake_engine.active_instances, 48, mi_cancel);
 
-        let split_it_mask = z_mask_u64((task.split_type as u64).wrapping_sub(SplitType::ImplicitTermination as u64));
-        let split_et_mask = z_mask_u64((task.split_type as u64).wrapping_sub(SplitType::ExplicitTermination as u64));
-        let split_mi_mask = z_mask_u64((task.split_type as u64).wrapping_sub(SplitType::MultiInstance as u64));
+        let split_it_mask = z_mask_u64(
+            (task.split_type as u64).wrapping_sub(SplitType::ImplicitTermination as u64),
+        );
+        let split_et_mask = z_mask_u64(
+            (task.split_type as u64).wrapping_sub(SplitType::ExplicitTermination as u64),
+        );
+        let split_mi_mask =
+            z_mask_u64((task.split_type as u64).wrapping_sub(SplitType::MultiInstance as u64));
 
         let should_produce_mask = fired_mask & !split_it_mask & !split_et_mask;
         fake_engine.state_mask |= task.produce_mask & should_produce_mask;
@@ -595,9 +623,9 @@ mod tests {
         fake_engine.active_locks &= et_mask;
         let et_v = splat_u8x16(et_mask as u8);
         let process_et = |active_instances: &mut [u8; 64], start: usize| {
-            let cur: [u8; 16] = active_instances[start..start+16].try_into().unwrap();
+            let cur: [u8; 16] = active_instances[start..start + 16].try_into().unwrap();
             let next = and_u8x16(cur, et_v);
-            active_instances[start..start+16].copy_from_slice(&next);
+            active_instances[start..start + 16].copy_from_slice(&next);
         };
         process_et(&mut fake_engine.active_instances, 0);
         process_et(&mut fake_engine.active_instances, 16);
@@ -609,19 +637,20 @@ mod tests {
         let mi_v = splat_u8x16((is_mi_mask as u8).wrapping_neg());
         let max_inst_v = splat_u8x16(task.max_instances);
         let target_idx_v = splat_u8x16(target_idx as u8);
-        let target_valid_v = splat_u8x16((nz_mask_u64((target_idx < 64) as u64) as u8).wrapping_neg());
-        
-        let idx0 = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
-        let idx1 = [16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31];
-        let idx2 = [32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47];
-        let idx3 = [48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63];
+        let target_valid_v =
+            splat_u8x16((nz_mask_u64((target_idx < 64) as u64) as u8).wrapping_neg());
+
+        let idx0 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+        let idx1 = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31];
+        let idx2 = [32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47];
+        let idx3 = [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63];
 
         let process_mi = |active_instances: &mut [u8; 64], start: usize, idx_v: [u8; 16]| {
-            let cur: [u8; 16] = active_instances[start..start+16].try_into().unwrap();
+            let cur: [u8; 16] = active_instances[start..start + 16].try_into().unwrap();
             let eq_mask = compare_eq_u8x16(idx_v, target_idx_v);
             let target_mask = and_u8x16(and_u8x16(eq_mask, target_valid_v), mi_v);
             let next = blend_u8x16(target_mask, cur, max_inst_v);
-            active_instances[start..start+16].copy_from_slice(&next);
+            active_instances[start..start + 16].copy_from_slice(&next);
         };
         process_mi(&mut fake_engine.active_instances, 0, idx0);
         process_mi(&mut fake_engine.active_instances, 16, idx1);
@@ -636,7 +665,7 @@ mod tests {
         let mut fake_engine = engine.clone();
         let has_reset_tokens_mask = nz_mask_u64(fake_engine.state_mask & task.reset_mask);
         let reset_bit = 1u64.wrapping_shl(task.join_state_bit as u32 & 63);
-        
+
         fake_engine.fired_joins_mask &= !(reset_bit & has_reset_tokens_mask);
         fake_engine.state_mask &= !(task.reset_mask & has_reset_tokens_mask);
 
@@ -648,11 +677,12 @@ mod tests {
         let allowed_by_cond_mask = z_mask_u64(cond_diff);
 
         let count_ones = popcount_u64(fake_engine.state_mask & task.consume_mask);
-        
+
         let c = fake_engine.state_mask & task.consume_mask;
         let join_xor_mask = nz_mask_u64(c) & z_mask_u64(c & c.wrapping_sub(1));
 
-        let join_and_mask = z_mask_u64((fake_engine.state_mask & task.consume_mask) ^ task.consume_mask);
+        let join_and_mask =
+            z_mask_u64((fake_engine.state_mask & task.consume_mask) ^ task.consume_mask);
 
         let val = fake_engine.state_mask & task.consume_mask;
         let aux = fake_engine.state_mask & task.reachability_mask;
@@ -670,7 +700,8 @@ mod tests {
         let is_and = z_mask_u64((task.join_type as u64).wrapping_sub(JoinType::AND as u64));
         let is_or = z_mask_u64((task.join_type as u64).wrapping_sub(JoinType::OR as u64));
         let is_complex = z_mask_u64((task.join_type as u64).wrapping_sub(JoinType::Complex as u64));
-        let is_thread_merge = z_mask_u64((task.join_type as u64).wrapping_sub(JoinType::ThreadMerge as u64));
+        let is_thread_merge =
+            z_mask_u64((task.join_type as u64).wrapping_sub(JoinType::ThreadMerge as u64));
 
         let can_join_mask = (join_xor_mask & is_xor)
             | (join_and_mask & is_and)
@@ -679,7 +710,8 @@ mod tests {
             | (join_thread_merge_mask & is_thread_merge);
 
         let is_transient_mask = nz_mask_u64((task.flags & 1) as u64);
-        let has_transient_trigger_mask = is_transient_mask & nz_mask_u64(fake_engine.active_triggers & task.consume_mask);
+        let has_transient_trigger_mask =
+            is_transient_mask & nz_mask_u64(fake_engine.active_triggers & task.consume_mask);
 
         let fire_condition_mask = can_join_mask | has_transient_trigger_mask;
         let fired_mask = allowed_by_lock_mask & allowed_by_cond_mask & fire_condition_mask;
@@ -703,9 +735,9 @@ mod tests {
         let zero_v = splat_u8x16(0);
         let process_cancel = |active_instances: &mut [u8; 64], start: usize, mask: u64| {
             let m = unpack_u64_mask_to_u8x16(mask, start as u32);
-            let cur: [u8; 16] = active_instances[start..start+16].try_into().unwrap();
+            let cur: [u8; 16] = active_instances[start..start + 16].try_into().unwrap();
             let next = blend_u8x16(m, cur, zero_v);
-            active_instances[start..start+16].copy_from_slice(&next);
+            active_instances[start..start + 16].copy_from_slice(&next);
         };
         process_cancel(&mut fake_engine.active_instances, 0, cancel_mask);
         process_cancel(&mut fake_engine.active_instances, 16, cancel_mask);
@@ -718,18 +750,23 @@ mod tests {
         let zero_v = splat_u8x16(0);
         let process_cancel = |active_instances: &mut [u8; 64], start: usize, mask: u64| {
             let m = unpack_u64_mask_to_u8x16(mask, start as u32);
-            let cur: [u8; 16] = active_instances[start..start+16].try_into().unwrap();
+            let cur: [u8; 16] = active_instances[start..start + 16].try_into().unwrap();
             let next = blend_u8x16(m, cur, zero_v);
-            active_instances[start..start+16].copy_from_slice(&next);
+            active_instances[start..start + 16].copy_from_slice(&next);
         };
         process_cancel(&mut fake_engine.active_instances, 0, mi_cancel);
         process_cancel(&mut fake_engine.active_instances, 16, mi_cancel);
         process_cancel(&mut fake_engine.active_instances, 32, mi_cancel);
         process_cancel(&mut fake_engine.active_instances, 48, mi_cancel);
 
-        let split_it_mask = z_mask_u64((task.split_type as u64).wrapping_sub(SplitType::ImplicitTermination as u64));
-        let split_et_mask = z_mask_u64((task.split_type as u64).wrapping_sub(SplitType::ExplicitTermination as u64));
-        let split_mi_mask = z_mask_u64((task.split_type as u64).wrapping_sub(SplitType::MultiInstance as u64));
+        let split_it_mask = z_mask_u64(
+            (task.split_type as u64).wrapping_sub(SplitType::ImplicitTermination as u64),
+        );
+        let split_et_mask = z_mask_u64(
+            (task.split_type as u64).wrapping_sub(SplitType::ExplicitTermination as u64),
+        );
+        let split_mi_mask =
+            z_mask_u64((task.split_type as u64).wrapping_sub(SplitType::MultiInstance as u64));
 
         let should_produce_mask = fired_mask & !split_it_mask & !split_et_mask;
         fake_engine.state_mask |= task.produce_mask & should_produce_mask;
@@ -745,19 +782,20 @@ mod tests {
         let mi_v = splat_u8x16((is_mi_mask as u8).wrapping_neg());
         let max_inst_v = splat_u8x16(task.max_instances);
         let target_idx_v = splat_u8x16(target_idx as u8);
-        let target_valid_v = splat_u8x16((nz_mask_u64((target_idx < 64) as u64) as u8).wrapping_neg());
-        
-        let idx0 = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
-        let idx1 = [16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31];
-        let idx2 = [32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47];
-        let idx3 = [48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63];
+        let target_valid_v =
+            splat_u8x16((nz_mask_u64((target_idx < 64) as u64) as u8).wrapping_neg());
+
+        let idx0 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+        let idx1 = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31];
+        let idx2 = [32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47];
+        let idx3 = [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63];
 
         let process_mi = |active_instances: &mut [u8; 64], start: usize, idx_v: [u8; 16]| {
-            let cur: [u8; 16] = active_instances[start..start+16].try_into().unwrap();
+            let cur: [u8; 16] = active_instances[start..start + 16].try_into().unwrap();
             let eq_mask = compare_eq_u8x16(idx_v, target_idx_v);
             let target_mask = and_u8x16(and_u8x16(eq_mask, target_valid_v), mi_v);
             let next = blend_u8x16(target_mask, cur, max_inst_v);
-            active_instances[start..start+16].copy_from_slice(&next);
+            active_instances[start..start + 16].copy_from_slice(&next);
         };
         process_mi(&mut fake_engine.active_instances, 0, idx0);
         process_mi(&mut fake_engine.active_instances, 16, idx1);

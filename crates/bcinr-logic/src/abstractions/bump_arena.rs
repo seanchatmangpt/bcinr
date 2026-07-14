@@ -19,7 +19,10 @@ impl BumpArenaState {
     /// Creates a new zero-initialized arena state.
     #[must_use]
     pub const fn new() -> Self {
-        Self { offset: 0, capacity: 0 }
+        Self {
+            offset: 0,
+            capacity: 0,
+        }
     }
 
     /// Attempts to allocate `size` bytes branchlessly.

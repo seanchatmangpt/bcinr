@@ -87,9 +87,9 @@ mod tests {
     fn test_matrix_lru_phd_oracle() {
         // PHD Gate: LRU evicts least recently used; table-driven access sequences
         let cases: &[(&[usize], usize)] = &[
-            (&[0, 1], 2),     // 2 and 3 never accessed; 2 is found first
-            (&[0, 1, 2], 3),  // 3 never accessed
-            (&[1, 2, 3], 0),  // 0 never accessed
+            (&[0, 1], 2),    // 2 and 3 never accessed; 2 is found first
+            (&[0, 1, 2], 3), // 3 never accessed
+            (&[1, 2, 3], 0), // 0 never accessed
         ];
         for &(accesses, expected_lru) in cases {
             let mut lru = MatrixLru::<4>::new();

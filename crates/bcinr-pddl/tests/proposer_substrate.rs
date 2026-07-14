@@ -95,7 +95,11 @@ fn three_independent_proposals_yield_one_coherent_capacity_respecting_receipted_
         .emit(diag(
             run_id,
             "propose",
-            format!("{} independent proposals received: {:?}", proposers.len(), proposers),
+            format!(
+                "{} independent proposals received: {:?}",
+                proposers.len(),
+                proposers
+            ),
             0,
         ))
         .expect("emit propose diagnostic");
@@ -108,9 +112,22 @@ fn three_independent_proposals_yield_one_coherent_capacity_respecting_receipted_
     // Stage 1: the substrate reconciles all three proposals into one
     // feasible schedule — no proposer did this reasoning itself.
     let plan = gtp.find_temporal_plan().expect("temporal plan found");
-    assert_eq!(plan.steps.len(), 3, "all three proposals must be admitted into the schedule");
+    assert_eq!(
+        plan.steps.len(),
+        3,
+        "all three proposals must be admitted into the schedule"
+    );
     collector
-        .emit(diag(run_id, "schedule", format!("plan found, {} steps, makespan {}", plan.steps.len(), plan.makespan), 1))
+        .emit(diag(
+            run_id,
+            "schedule",
+            format!(
+                "plan found, {} steps, makespan {}",
+                plan.steps.len(),
+                plan.makespan
+            ),
+            1,
+        ))
         .expect("emit schedule diagnostic");
     diagnostics_emitted += 1;
 
@@ -132,7 +149,10 @@ fn three_independent_proposals_yield_one_coherent_capacity_respecting_receipted_
         .emit(diag(
             run_id,
             "analyze",
-            format!("max_parallelism={}, binding_resource_mask={:#x}", analysis.max_parallelism, analysis.binding_resource_mask),
+            format!(
+                "max_parallelism={}, binding_resource_mask={:#x}",
+                analysis.max_parallelism, analysis.binding_resource_mask
+            ),
             2,
         ))
         .expect("emit analyze diagnostic");
@@ -143,9 +163,20 @@ fn three_independent_proposals_yield_one_coherent_capacity_respecting_receipted_
     let (receipt, _ocel) = execute_temporal_plan(&plan, &domain, &problem, "case-proposer-1", &[])
         .expect("temporal plan execution");
     assert_eq!(receipt.step_count, 3);
-    assert!(receipt.goal_reached, "all three assign-worker goals must be reached");
+    assert!(
+        receipt.goal_reached,
+        "all three assign-worker goals must be reached"
+    );
     collector
-        .emit(diag(run_id, "admit", format!("{} steps admitted, goal_reached={}", receipt.step_count, receipt.goal_reached), 3))
+        .emit(diag(
+            run_id,
+            "admit",
+            format!(
+                "{} steps admitted, goal_reached={}",
+                receipt.step_count, receipt.goal_reached
+            ),
+            3,
+        ))
         .expect("emit admit diagnostic");
     diagnostics_emitted += 1;
 
@@ -165,18 +196,30 @@ fn three_independent_proposals_yield_one_coherent_capacity_respecting_receipted_
     );
     assert_eq!(receipt.goal_reached, replay_receipt.goal_reached);
     collector
-        .emit(diag(run_id, "receipt", format!("chain_hash={} replay verified", receipt.chain_hash), 4))
+        .emit(diag(
+            run_id,
+            "receipt",
+            format!("chain_hash={} replay verified", receipt.chain_hash),
+            4,
+        ))
         .expect("emit receipt diagnostic");
     diagnostics_emitted += 1;
 
     // Seal the OCEL trace: propose -> schedule -> analyze -> admit -> receipt
     // is now a real, replayable object-centric event log, not just prose.
     collector
-        .close(RunSummary { run_id: run_id.to_string(), total_diagnostics: diagnostics_emitted, ..Default::default() })
+        .close(RunSummary {
+            run_id: run_id.to_string(),
+            total_diagnostics: diagnostics_emitted,
+            ..Default::default()
+        })
         .expect("close OCEL collector");
 
     assert!(output_path.exists(), "OCEL trace file must be written");
     let contents = std::fs::read_to_string(&output_path).expect("read OCEL trace file");
     assert!(!contents.is_empty(), "OCEL trace file must be non-empty");
-    assert!(contents.contains(run_id), "OCEL trace must reference the run id");
+    assert!(
+        contents.contains(run_id),
+        "OCEL trace must reference the run id"
+    );
 }

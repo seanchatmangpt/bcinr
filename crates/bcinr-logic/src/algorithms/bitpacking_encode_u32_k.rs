@@ -64,7 +64,6 @@ mod tests {
         bitpacking_encode_u32_k_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -79,13 +78,22 @@ mod tests {
             "equivalence oracle failed"
         );
         // --- boundaries ---
-        assert_eq!(bitpacking_encode_u32_k(0, 0), bitpacking_encode_u32_k_reference(0, 0));
+        assert_eq!(
+            bitpacking_encode_u32_k(0, 0),
+            bitpacking_encode_u32_k_reference(0, 0)
+        );
         assert_eq!(
             bitpacking_encode_u32_k(u64::MAX, u64::MAX),
             bitpacking_encode_u32_k_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(bitpacking_encode_u32_k(u64::MAX, 0), bitpacking_encode_u32_k_reference(u64::MAX, 0));
-        assert_eq!(bitpacking_encode_u32_k(0, u64::MAX), bitpacking_encode_u32_k_reference(0, u64::MAX));
+        assert_eq!(
+            bitpacking_encode_u32_k(u64::MAX, 0),
+            bitpacking_encode_u32_k_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            bitpacking_encode_u32_k(0, u64::MAX),
+            bitpacking_encode_u32_k_reference(0, u64::MAX)
+        );
         // --- mutant divergence ---
         let baseline = bitpacking_encode_u32_k_reference(42, 1337);
         assert_ne!(

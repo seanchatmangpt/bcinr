@@ -1,11 +1,16 @@
-//! PDDL8 grounding and forward-search plan finding.
+mod dict;
+mod facts;
+mod xorf;
+pub mod lazy;
+
+/// PDDL8 grounding and forward-search plan finding.
 
 use crate::error::Pddl8Error;
 use std::collections::{BTreeSet, HashMap};
 use wasm4pm_compat::pddl::{
     CompareOp, DurationConstraint, DurativeAction, NumericExpr, Pddl8ActionSchema, Pddl8Atom,
     Pddl8Domain, Pddl8GroundAction, Pddl8GroundAtom, Pddl8Problem, Pddl8Tape, PddlCondition,
-    PddlEffect, PddlFunction, TemporalPlan, TemporalPlanStep, TimedLiteral, PDDL8_MAX_GROUND,
+    PddlEffect, PddlFunction, TemporalPlan, TemporalPlanStep, TimedLiteral, DerivedPredicate, PDDL8_MAX_GROUND,
     PDDL8_MAX_PLAN_DEPTH,
 };
 
@@ -19,6 +24,14 @@ pub struct GroundProblem {
     action_index: HashMap<Pddl8GroundAtom, Vec<usize>>,
     /// Indices of actions with no preconditions — always candidates.
     always_applicable: Vec<usize>,
+    pub constraints: Vec<PddlCondition>,
+    pub derived_predicates: Vec<GroundDerivedPredicate>,
+}
+
+#[derive(Clone)]
+pub struct GroundDerivedPredicate {
+    pub head: Pddl8GroundAtom,
+    pub condition: PddlCondition,
 }
 
 /// Object/type lookup used to restrict grounding to type-compatible bindings.
@@ -43,7 +56,10 @@ impl TypeIndex {
             .iter()
             .filter_map(|t| t.parent.clone().map(|p| (t.name.clone(), p)))
             .collect();
-        Self { object_type, parent }
+        Self {
+            object_type,
+            parent,
+        }
     }
 
     /// Does `obj`'s actual (or inherited) type satisfy `required`?
@@ -51,7 +67,11 @@ impl TypeIndex {
         if required == "object" {
             return true;
         }
-        let mut cur: &str = self.object_type.get(obj).map(String::as_str).unwrap_or("object");
+        let mut cur: &str = self
+            .object_type
+            .get(obj)
+            .map(String::as_str)
+            .unwrap_or("object");
         loop {
             if cur == required {
                 return true;
@@ -75,13 +95,19 @@ impl GroundProblem {
         let initial_state: BTreeSet<Pddl8GroundAtom> = problem
             .init
             .iter()
-            .map(|a| Pddl8GroundAtom { pred: a.pred.clone(), args: a.args.clone() })
+            .map(|a| Pddl8GroundAtom {
+                pred: a.pred.clone(),
+                args: a.args.clone(),
+            })
             .collect();
 
         let goal: Vec<Pddl8GroundAtom> = problem
             .goal
             .iter()
-            .map(|a| Pddl8GroundAtom { pred: a.pred.clone(), args: a.args.clone() })
+            .map(|a| Pddl8GroundAtom {
+                pred: a.pred.clone(),
+                args: a.args.clone(),
+            })
             .collect();
 
         let objects = &problem.objects;
@@ -95,7 +121,7 @@ impl GroundProblem {
                     what: "ground actions",
                     limit: limit as u8,
                     got: actions.len(),
-                });
+                })
             }
         }
 
@@ -114,11 +140,36 @@ impl GroundProblem {
             }
         }
 
-        Ok(Self { initial_state, goal, actions, action_index, always_applicable })
+                let mut constraints = Vec::new();
+        for pref in &problem.preferences {
+            if let wasm4pm_compat::pddl::TrajectoryConstraint::Always(c) = &pref.constraint {
+                constraints.push(*c.clone());
+            } else if let wasm4pm_compat::pddl::TrajectoryConstraint::And(parts) = &pref.constraint {
+                for p in parts {
+                    if let wasm4pm_compat::pddl::TrajectoryConstraint::Always(c) = p {
+                        constraints.push(*c.clone());
+                    }
+                }
+            }
+        }
+        let mut derived_predicates = Vec::new();
+        for dp in &domain.derived {
+            ground_derived_schema(dp, &problem.object_types, &type_index, &mut derived_predicates)?;
+        }
+
+        Ok(Self {
+            initial_state,
+            goal,
+            actions,
+            action_index,
+            always_applicable,
+            constraints,
+            derived_predicates,
+        })
     }
 
     /// BFS forward search — returns a `Pddl8Tape` ready for execution.
-    pub fn find_plan(&self) -> Result<Pddl8Tape, Pddl8Error> {
+    pub fn find_plan(&self) -> PlannerOutcome<Pddl8Tape> {
         use std::collections::VecDeque;
 
         let goal_set: BTreeSet<Pddl8GroundAtom> = self.goal.iter().cloned().collect();
@@ -129,14 +180,16 @@ impl GroundProblem {
         visited.insert(init_sorted);
         queue.push_back((self.initial_state.clone(), vec![]));
 
-        while let Some((state, path)) = queue.pop_front() {
+        while let Some((mut state, path)) = queue.pop_front() {
+            compute_derived_closure(&mut state, &self.derived_predicates, &HashMap::new());
             if path.len() > PDDL8_MAX_PLAN_DEPTH {
                 continue;
             }
+            if self.constraints.iter().any(|c| !eval_condition(c, &state, &HashMap::new())) { continue; }
             if goal_set.iter().all(|g| state.contains(g)) {
                 let plan: Vec<Pddl8GroundAction> =
                     path.into_iter().map(|i| self.actions[i].clone()).collect();
-                return Ok(Pddl8Tape::from_plan(plan));
+                return PlannerOutcome::Found(Pddl8Tape::from_plan(plan));
             }
             // Only consider actions that could possibly apply: always-applicable
             // (no preconditions) plus those keyed by an atom currently true.
@@ -152,8 +205,12 @@ impl GroundProblem {
                 let action = &self.actions[i];
                 if action.preconditions.iter().all(|p| state.contains(p)) {
                     let mut next = state.clone();
-                    for d in &action.del_effects { next.remove(d); }
-                    for a in &action.add_effects { next.insert(a.clone()); }
+                    for d in &action.del_effects {
+                        next.remove(d);
+                    }
+                    for a in &action.add_effects {
+                        next.insert(a.clone());
+                    }
                     let sorted: Vec<Pddl8GroundAtom> = next.iter().cloned().collect();
                     if !visited.contains(&sorted) {
                         visited.insert(sorted);
@@ -165,7 +222,7 @@ impl GroundProblem {
             }
         }
 
-        Err(Pddl8Error::NoAdmittedPlan)
+        PlannerOutcome::Exhausted
     }
 }
 
@@ -195,6 +252,8 @@ pub struct GroundTemporalProblem {
     pub goal: PddlCondition,
     pub actions: Vec<Pddl8GroundAction>,
     pub durative_actions: Vec<GroundDurativeAction>,
+    pub constraints: Vec<PddlCondition>,
+    pub derived_predicates: Vec<GroundDerivedPredicate>,
 }
 
 impl GroundTemporalProblem {
@@ -203,7 +262,10 @@ impl GroundTemporalProblem {
         let initial_atoms: BTreeSet<Pddl8GroundAtom> = problem
             .init
             .iter()
-            .map(|a| Pddl8GroundAtom { pred: a.pred.clone(), args: a.args.clone() })
+            .map(|a| Pddl8GroundAtom {
+                pred: a.pred.clone(),
+                args: a.args.clone(),
+            })
             .collect();
 
         let initial_fn_values: HashMap<String, f64> = problem
@@ -215,7 +277,11 @@ impl GroundTemporalProblem {
         let timed_inits = problem.timed_inits.clone();
 
         let goal = PddlCondition::And(
-            problem.goal.iter().map(|a| PddlCondition::Atom(a.clone())).collect(),
+            problem
+                .goal
+                .iter()
+                .map(|a| PddlCondition::Atom(a.clone()))
+                .collect(),
         );
 
         // Ground classical actions
@@ -228,7 +294,7 @@ impl GroundTemporalProblem {
                     what: "ground actions",
                     limit: PDDL8_MAX_GROUND as u8,
                     got: actions.len(),
-                });
+                })
             }
         }
 
@@ -244,11 +310,37 @@ impl GroundTemporalProblem {
                     what: "ground durative actions",
                     limit: PDDL8_MAX_GROUND as u8,
                     got: durative_actions.len(),
-                });
+                })
             }
         }
 
-        Ok(Self { initial_atoms, initial_fn_values, timed_inits, goal, actions, durative_actions })
+                let mut constraints = Vec::new();
+        for pref in &problem.preferences {
+            if let wasm4pm_compat::pddl::TrajectoryConstraint::Always(c) = &pref.constraint {
+                constraints.push(*c.clone());
+            } else if let wasm4pm_compat::pddl::TrajectoryConstraint::And(parts) = &pref.constraint {
+                for p in parts {
+                    if let wasm4pm_compat::pddl::TrajectoryConstraint::Always(c) = p {
+                        constraints.push(*c.clone());
+                    }
+                }
+            }
+        }
+        let mut derived_predicates = Vec::new();
+        for dp in &domain.derived {
+            ground_derived_schema(dp, &problem.object_types, &type_index, &mut derived_predicates)?;
+        }
+
+        Ok(Self {
+            initial_atoms,
+            initial_fn_values,
+            timed_inits,
+            goal,
+            actions,
+            durative_actions,
+            constraints,
+            derived_predicates,
+        })
     }
 
     /// Forward-chaining temporal planner using a priority queue ordered by time.
@@ -259,7 +351,7 @@ impl GroundTemporalProblem {
     /// - Applies at-end effects on completion
     /// - Checks goal (PddlCondition) after each completion
     /// - Limits to PDDL8_MAX_PLAN_DEPTH iterations
-    pub fn find_temporal_plan(&self) -> Result<TemporalPlan, Pddl8Error> {
+    pub fn find_temporal_plan(&self) -> PlannerOutcome<TemporalPlan> {
         self.find_temporal_plan_with_fn_overrides(&HashMap::new())
     }
 
@@ -272,7 +364,7 @@ impl GroundTemporalProblem {
     pub fn find_temporal_plan_with_fn_overrides(
         &self,
         overrides: &HashMap<String, f64>,
-    ) -> Result<TemporalPlan, Pddl8Error> {
+    ) -> PlannerOutcome<TemporalPlan> {
         let mut state = self.initial_atoms.clone();
         let mut fn_vals = self.initial_fn_values.clone();
         for (k, v) in overrides {
@@ -284,8 +376,15 @@ impl GroundTemporalProblem {
         // Apply t=0 timed initial literals
         for til in &self.timed_inits {
             if til.time == 0.0 {
-                let ga = Pddl8GroundAtom { pred: til.atom.pred.clone(), args: til.atom.args.clone() };
-                if til.negated { state.remove(&ga); } else { state.insert(ga); }
+                let ga = Pddl8GroundAtom {
+                    pred: til.atom.pred.clone(),
+                    args: til.atom.args.clone(),
+                };
+                if til.negated {
+                    state.remove(&ga);
+                } else {
+                    state.insert(ga);
+                }
             }
         }
 
@@ -293,21 +392,21 @@ impl GroundTemporalProblem {
         let mut pending: Vec<(f64, usize)> = Vec::new();
 
         for _iteration in 0..PDDL8_MAX_PLAN_DEPTH {
-            // Apply timed inits that have triggered
-            for til in &self.timed_inits {
-                if til.time > 0.0 && til.time <= current_time {
-                    let ga = Pddl8GroundAtom { pred: til.atom.pred.clone(), args: til.atom.args.clone() };
-                    if til.negated { state.remove(&ga); } else { state.insert(ga); }
-                }
-            }
+            // (TILs are now applied when time advances, not on every iteration)
 
+            compute_derived_closure(&mut state, &self.derived_predicates, &fn_vals);
+            if self.constraints.iter().any(|c| !eval_condition(c, &state, &fn_vals)) { break; }
             // Check goal
             if eval_condition(&self.goal, &state, &fn_vals) {
                 let makespan = steps
                     .iter()
                     .map(|s| s.start_time + s.duration)
                     .fold(0.0_f64, f64::max);
-                return Ok(TemporalPlan { steps, makespan, metric_value: None });
+                return PlannerOutcome::Found(TemporalPlan {
+                    steps,
+                    makespan,
+                    metric_value: None,
+                })
             }
 
             // Try to schedule every applicable durative action at this tick.
@@ -321,7 +420,9 @@ impl GroundTemporalProblem {
             for _pass in 0..self.durative_actions.len().max(1) {
                 let mut started_this_pass = false;
                 for (i, da) in self.durative_actions.iter().enumerate() {
-                    if started_this_tick.contains(&i) { continue; }
+                    if started_this_tick.contains(&i) {
+                        continue;
+                    }
                     // An action already in flight (started but not yet
                     // completed) must not be started again against itself —
                     // its own "already running" state isn't otherwise
@@ -330,11 +431,16 @@ impl GroundTemporalProblem {
                     // numeric fluent): only its *finished* effect blocks a
                     // restart, so without this guard the same grounded
                     // instance can be scheduled concurrently with itself.
-                    if pending.iter().any(|(_, idx)| *idx == i) { continue; }
-                    let applicable = da.conditions.iter().all(|c| {
-                        eval_condition(c, &state, &fn_vals)
-                    });
-                    if !applicable { continue; }
+                    if pending.iter().any(|(_, idx)| *idx == i) {
+                        continue;
+                    }
+                    let applicable = da
+                        .conditions
+                        .iter()
+                        .all(|c| eval_condition(c, &state, &fn_vals));
+                    if !applicable {
+                        continue;
+                    }
 
                     let dur = da.duration_min;
                     let end = current_time + dur;
@@ -355,21 +461,67 @@ impl GroundTemporalProblem {
                     started_this_pass = true;
                     started_this_tick.insert(i);
                 }
-                if !started_this_pass { break; }
+                if !started_this_pass {
+                    break;
+                }
             }
 
-            // Advance to the next pending completion
-            if let Some(min_pos) = pending
+            // Advance to the next event (completion or TIL)
+            let next_completion = pending
                 .iter()
                 .enumerate()
                 .min_by(|(_, a), (_, b)| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
-                .map(|(p, _)| p)
-            {
-                let (end, idx) = pending.remove(min_pos);
-                current_time = end;
-                let da = &self.durative_actions[idx];
-                for eff in &da.effects {
-                    apply_effect_at_end(eff, &mut state, &mut fn_vals);
+                .map(|(p, (t, _))| (p, *t));
+
+            let next_til_time = self.timed_inits
+                .iter()
+                .map(|til| til.time)
+                .filter(|&t| t > current_time)
+                .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+            let next_time = match (next_completion, next_til_time) {
+                (Some((_, c_t)), Some(t_t)) => Some(c_t.min(t_t)),
+                (Some((_, c_t)), None) => Some(c_t),
+                (None, Some(t_t)) => Some(t_t),
+                (None, None) => None,
+            };
+
+            if let Some(t_next) = next_time {
+                let old_time = current_time;
+                current_time = t_next;
+
+                // Apply TILs that occur in (old_time, current_time]
+                if current_time > old_time {
+                    for til in &self.timed_inits {
+                        if til.time > old_time && til.time <= current_time {
+                            let ga = Pddl8GroundAtom {
+                                pred: til.atom.pred.clone(),
+                                args: til.atom.args.clone(),
+                            };
+                            if til.negated {
+                                state.remove(&ga);
+                            } else {
+                                state.insert(ga);
+                            }
+                        }
+                    }
+                }
+
+                // If the next event is a completion at `current_time`, process ONE completion.
+                // Note: there could be multiple completions at `current_time`.
+                // We pick the first one and remove it.
+                if let Some(min_pos) = pending
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, (t, _))| *t == current_time)
+                    .map(|(p, _)| p)
+                    .next()
+                {
+                    let (_, idx) = pending.remove(min_pos);
+                    let da = &self.durative_actions[idx];
+                    for eff in &da.effects {
+                        apply_effect_at_end(eff, &mut state, &mut fn_vals);
+                    }
                 }
             } else if !scheduled {
                 break;
@@ -382,10 +534,14 @@ impl GroundTemporalProblem {
                 .iter()
                 .map(|s| s.start_time + s.duration)
                 .fold(0.0_f64, f64::max);
-            return Ok(TemporalPlan { steps, makespan, metric_value: None });
+            return PlannerOutcome::Found(TemporalPlan {
+                steps,
+                makespan,
+                metric_value: None,
+            })
         }
 
-        Err(Pddl8Error::NoAdmittedPlan)
+        PlannerOutcome::Exhausted
     }
 }
 
@@ -396,9 +552,10 @@ pub fn eval_condition(
     fn_vals: &HashMap<String, f64>,
 ) -> bool {
     match cond {
-        PddlCondition::Atom(a) => {
-            state.contains(&Pddl8GroundAtom { pred: a.pred.clone(), args: a.args.clone() })
-        }
+        PddlCondition::Atom(a) => state.contains(&Pddl8GroundAtom {
+            pred: a.pred.clone(),
+            args: a.args.clone(),
+        }),
         PddlCondition::Not(inner) => !eval_condition(inner, state, fn_vals),
         PddlCondition::And(subs) => subs.iter().all(|s| eval_condition(s, state, fn_vals)),
         PddlCondition::Or(subs) => subs.iter().any(|s| eval_condition(s, state, fn_vals)),
@@ -429,7 +586,9 @@ fn apply_effect_at_start(
 ) {
     use wasm4pm_compat::pddl::TimeSpecifier;
     match eff {
-        PddlEffect::Timed(TimeSpecifier::AtStart, inner) => apply_effect_ground(inner, state, fn_vals),
+        PddlEffect::Timed(TimeSpecifier::AtStart, inner) => {
+            apply_effect_ground(inner, state, fn_vals)
+        }
         PddlEffect::Timed(_, _) => {}
         other => apply_effect_ground(other, state, fn_vals),
     }
@@ -453,17 +612,27 @@ fn apply_effect_ground(
 ) {
     match eff {
         PddlEffect::Add(a) => {
-            state.insert(Pddl8GroundAtom { pred: a.pred.clone(), args: a.args.clone() });
+            state.insert(Pddl8GroundAtom {
+                pred: a.pred.clone(),
+                args: a.args.clone(),
+            });
         }
         PddlEffect::Del(a) => {
-            state.remove(&Pddl8GroundAtom { pred: a.pred.clone(), args: a.args.clone() });
+            state.remove(&Pddl8GroundAtom {
+                pred: a.pred.clone(),
+                args: a.args.clone(),
+            });
         }
         PddlEffect::Numeric(ne) => apply_numeric_effect(ne, fn_vals),
         PddlEffect::When { effects, .. } => {
-            for e in effects { apply_effect_ground(e, state, fn_vals); }
+            for e in effects {
+                apply_effect_ground(e, state, fn_vals);
+            }
         }
         PddlEffect::Forall { effects, .. } => {
-            for e in effects { apply_effect_ground(e, state, fn_vals); }
+            for e in effects {
+                apply_effect_ground(e, state, fn_vals);
+            }
         }
         PddlEffect::Timed(_, inner) => apply_effect_ground(inner, state, fn_vals),
     }
@@ -494,7 +663,9 @@ fn apply_numeric_effect(
         NumericEffect::ScaleDown(f, expr) => {
             let v = eval_numeric(expr, fn_vals);
             let entry = fn_vals.entry(fn_key(f)).or_insert(1.0);
-            if v != 0.0 { *entry /= v; }
+            if v != 0.0 {
+                *entry /= v;
+            }
         }
     }
 }
@@ -518,7 +689,13 @@ fn eval_numeric(expr: &NumericExpr, fn_vals: &HashMap<String, f64>) -> f64 {
                 NumericOp::Add => l + r,
                 NumericOp::Sub => l - r,
                 NumericOp::Mul => l * r,
-                NumericOp::Div => if r != 0.0 { l / r } else { 0.0 },
+                NumericOp::Div => {
+                    if r != 0.0 {
+                        l / r
+                    } else {
+                        0.0
+                    }
+                }
             }
         }
         NumericExpr::Neg(inner) => -eval_numeric(inner, fn_vals),
@@ -590,7 +767,10 @@ fn ground_schema(
         .params
         .iter()
         .map(|p| match typed.get(p.as_str()) {
-            Some(required) => objects.iter().filter(|o| type_index.satisfies(o, required)).collect(),
+            Some(required) => objects
+                .iter()
+                .filter(|o| type_index.satisfies(o, required))
+                .collect(),
             None => objects.iter().collect(),
         })
         .collect();
@@ -612,10 +792,14 @@ fn ground_schema(
         // odometer increment, now bounded per-slot by candidates[i].len()
         let mut pos = n;
         loop {
-            if pos == 0 { return Ok(()); }
+            if pos == 0 {
+                return Ok(());
+            }
             pos -= 1;
             indices[pos] += 1;
-            if indices[pos] < candidates[pos].len() { break; }
+            if indices[pos] < candidates[pos].len() {
+                break;
+            }
             indices[pos] = 0;
         }
     }
@@ -653,7 +837,10 @@ fn ground_durative_schema(
         .params
         .iter()
         .map(|(_, required_type)| {
-            objects.iter().filter(|o| type_index.satisfies(o, required_type)).collect()
+            objects
+                .iter()
+                .filter(|o| type_index.satisfies(o, required_type))
+                .collect()
         })
         .collect();
     if candidates.iter().any(|c| c.is_empty()) {
@@ -669,8 +856,12 @@ fn ground_durative_schema(
             .map(|(i, (p, _))| (p.clone(), candidates[i][indices[i]].clone()))
             .collect();
 
-        let args: Vec<String> =
-            da.params.iter().filter_map(|(p, _)| binding.get(p)).cloned().collect();
+        let args: Vec<String> = da
+            .params
+            .iter()
+            .filter_map(|(p, _)| binding.get(p))
+            .cloned()
+            .collect();
         let label = format!("{}({})", da.name, args.join(","));
 
         out.push(GroundDurativeAction {
@@ -679,17 +870,29 @@ fn ground_durative_schema(
             args,
             duration_min: dur_min,
             duration_max: dur_max,
-            conditions: da.conditions.iter().map(|c| subst_condition(c, &binding)).collect(),
-            effects: da.effects.iter().map(|e| subst_effect(e, &binding)).collect(),
+            conditions: da
+                .conditions
+                .iter()
+                .map(|c| subst_condition(c, &binding))
+                .collect(),
+            effects: da
+                .effects
+                .iter()
+                .map(|e| subst_effect(e, &binding))
+                .collect(),
         });
 
         // odometer increment, bounded per-slot by candidates[i].len()
         let mut pos = n;
         loop {
-            if pos == 0 { return Ok(()); }
+            if pos == 0 {
+                return Ok(());
+            }
             pos -= 1;
             indices[pos] += 1;
-            if indices[pos] < candidates[pos].len() { break; }
+            if indices[pos] < candidates[pos].len() {
+                break;
+            }
             indices[pos] = 0;
         }
     }
@@ -781,9 +984,11 @@ fn subst_condition(cond: &PddlCondition, binding: &HashMap<String, String>) -> P
         PddlCondition::Timed(spec, inner) => {
             PddlCondition::Timed(*spec, Box::new(subst_condition(inner, binding)))
         }
-        PddlCondition::Compare(lhs, op, rhs) => {
-            PddlCondition::Compare(subst_numeric(lhs, binding), *op, subst_numeric(rhs, binding))
-        }
+        PddlCondition::Compare(lhs, op, rhs) => PddlCondition::Compare(
+            subst_numeric(lhs, binding),
+            *op,
+            subst_numeric(rhs, binding),
+        ),
     }
 }
 
@@ -830,20 +1035,50 @@ fn subst_effect(eff: &PddlEffect, binding: &HashMap<String, String>) -> PddlEffe
     }
 }
 
-fn instantiate(schema: &Pddl8ActionSchema, binding: &HashMap<String, String>) -> Option<Pddl8GroundAction> {
+fn instantiate(
+    schema: &Pddl8ActionSchema,
+    binding: &HashMap<String, String>,
+) -> Option<Pddl8GroundAction> {
     fn ground_atom(a: &Pddl8Atom, binding: &HashMap<String, String>) -> Option<Pddl8GroundAtom> {
-        let args: Option<Vec<String>> = a.args.iter().map(|arg| {
-            if Pddl8Atom::is_variable(arg) { binding.get(arg).cloned() }
-            else { Some(arg.clone()) }
-        }).collect();
-        args.map(|args| Pddl8GroundAtom { pred: a.pred.clone(), args })
+        let args: Option<Vec<String>> = a
+            .args
+            .iter()
+            .map(|arg| {
+                if Pddl8Atom::is_variable(arg) {
+                    binding.get(arg).cloned()
+                } else {
+                    Some(arg.clone())
+                }
+            })
+            .collect();
+        args.map(|args| Pddl8GroundAtom {
+            pred: a.pred.clone(),
+            args,
+        })
     }
 
-    let preconditions: Option<Vec<_>> = schema.preconditions.iter().map(|a| ground_atom(a, binding)).collect();
-    let add_effects: Option<Vec<_>> = schema.add_effects.iter().map(|a| ground_atom(a, binding)).collect();
-    let del_effects: Option<Vec<_>> = schema.del_effects.iter().map(|a| ground_atom(a, binding)).collect();
+    let preconditions: Option<Vec<_>> = schema
+        .preconditions
+        .iter()
+        .map(|a| ground_atom(a, binding))
+        .collect();
+    let add_effects: Option<Vec<_>> = schema
+        .add_effects
+        .iter()
+        .map(|a| ground_atom(a, binding))
+        .collect();
+    let del_effects: Option<Vec<_>> = schema
+        .del_effects
+        .iter()
+        .map(|a| ground_atom(a, binding))
+        .collect();
 
-    let bound_args: Vec<String> = schema.params.iter().filter_map(|p| binding.get(p)).cloned().collect();
+    let bound_args: Vec<String> = schema
+        .params
+        .iter()
+        .filter_map(|p| binding.get(p))
+        .cloned()
+        .collect();
     let label = if bound_args.is_empty() {
         schema.name.clone()
     } else {
@@ -857,4 +1092,130 @@ fn instantiate(schema: &Pddl8ActionSchema, binding: &HashMap<String, String>) ->
         add_effects: add_effects?,
         del_effects: del_effects?,
     })
+}
+
+use crate::error::PlannerOutcome;
+use wasm4pm_compat::pddl::{Pddl31Domain, Pddl31Problem};
+
+
+
+fn ground_derived_schema(
+    dp: &DerivedPredicate,
+    objects: &[(String, String)],
+    type_index: &TypeIndex,
+    out: &mut Vec<GroundDerivedPredicate>,
+) -> Result<(), crate::error::Pddl8Error> {
+    let mut vars = Vec::new();
+    for arg in &dp.head.args {
+        if arg.starts_with('?') && !vars.iter().any(|(v, _)| v == arg) {
+            vars.push((arg.clone(), "object".to_string()));
+        }
+    }
+    
+    fn ground_atom(a: &Pddl8Atom, binding: &HashMap<String, String>) -> Option<Pddl8GroundAtom> {
+        let mut args = Vec::with_capacity(a.args.len());
+        for arg in &a.args {
+            if arg.starts_with('?') {
+                args.push(binding.get(arg)?.clone());
+            } else {
+                args.push(arg.clone());
+            }
+        }
+        Some(Pddl8GroundAtom {
+            pred: a.pred.clone(),
+            args,
+        })
+    }
+
+    fn ground_condition(c: &PddlCondition, binding: &HashMap<String, String>) -> Option<PddlCondition> {
+        match c {
+            PddlCondition::Atom(a) => Some(PddlCondition::Atom(ground_atom(a, binding)?)),
+            PddlCondition::And(parts) => {
+                let mut ground_parts = Vec::new();
+                for p in parts {
+                    ground_parts.push(ground_condition(p, binding)?);
+                }
+                Some(PddlCondition::And(ground_parts))
+            }
+            PddlCondition::Not(inner) => Some(PddlCondition::Not(Box::new(ground_condition(inner, binding)?))),
+            PddlCondition::Or(parts) => {
+                let mut ground_parts = Vec::new();
+                for p in parts {
+                    ground_parts.push(ground_condition(p, binding)?);
+                }
+                Some(PddlCondition::Or(ground_parts))
+            }
+            PddlCondition::Imply(a, b) => Some(PddlCondition::Imply(
+                Box::new(ground_condition(a, binding)?),
+                Box::new(ground_condition(b, binding)?),
+            )),
+            PddlCondition::Numeric(cmp, lhs, rhs) => {
+                Some(PddlCondition::Numeric(cmp.clone(), lhs.clone(), rhs.clone()))
+            }
+            PddlCondition::AtStart(c) => Some(PddlCondition::AtStart(Box::new(ground_condition(c, binding)?))),
+            PddlCondition::AtEnd(c) => Some(PddlCondition::AtEnd(Box::new(ground_condition(c, binding)?))),
+            PddlCondition::OverAll(c) => Some(PddlCondition::OverAll(Box::new(ground_condition(c, binding)?))),
+            _ => None,
+        }
+    }
+
+    fn recurse(
+        param_idx: usize,
+        bindings: &mut HashMap<String, String>,
+        dp: &DerivedPredicate,
+        objects: &[(String, String)],
+        type_index: &TypeIndex,
+        out: &mut Vec<GroundDerivedPredicate>,
+        vars: &[(String, String)],
+    ) -> Result<(), crate::error::Pddl8Error> {
+        if param_idx == vars.len() {
+            if let Some(ground_head) = ground_atom(&dp.head, bindings) {
+                if let Some(ground_cond) = ground_condition(&dp.body, bindings) {
+                    out.push(GroundDerivedPredicate {
+                        head: ground_head,
+                        condition: ground_cond,
+                    });
+                }
+            }
+            return Ok(());
+        }
+        let (var_name, req_type) = &vars[param_idx];
+        for (obj_name, _obj_type) in objects {
+            if type_index.satisfies(obj_name, req_type) {
+                bindings.insert(var_name.clone(), obj_name.clone());
+                recurse(param_idx + 1, bindings, dp, objects, type_index, out, vars)?;
+                bindings.remove(var_name);
+            }
+        }
+        Ok(())
+    }
+    
+    recurse(0, &mut HashMap::new(), dp, objects, type_index, out, &vars)
+}
+pub fn compute_derived_closure(
+    state: &mut BTreeSet<Pddl8GroundAtom>,
+    derived: &[GroundDerivedPredicate],
+    fn_vals: &HashMap<String, f64>,
+) {
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for dp in derived {
+            if !state.contains(&dp.head) {
+                if eval_condition(&dp.condition, state, fn_vals) {
+                    state.insert(dp.head.clone());
+                    changed = true;
+                }
+            }
+        }
+    }
+}
+
+pub fn check_capabilities(domain: &Pddl31Domain, _problem: &Pddl31Problem) -> Result<(), PlannerOutcome<()>> {
+    // If the domain defines object fluents or other unsupported capabilities, we reject them here.
+    if domain.requirements.contains(&":object-fluents".to_string()) {
+        return Err(PlannerOutcome::Unsupported("object fluents".to_string()));
+    }
+    // E.g. Check other requirements if necessary.
+    Ok(())
 }

@@ -106,9 +106,15 @@ mod tests {
         let m1 = mutant_delta_encode_simd_u32_1(42, 1337);
         let m2 = mutant_delta_encode_simd_u32_2(42, 1337);
         let m3 = mutant_delta_encode_simd_u32_3(42, 1337);
-        if m1 != baseline { assert_ne!(m1, baseline, "mutant 1"); }
-        if m2 != baseline { assert_ne!(m2, baseline, "mutant 2"); }
-        if m3 != baseline { assert_ne!(m3, baseline, "mutant 3"); }
+        if m1 != baseline {
+            assert_ne!(m1, baseline, "mutant 1");
+        }
+        if m2 != baseline {
+            assert_ne!(m2, baseline, "mutant 2");
+        }
+        if m3 != baseline {
+            assert_ne!(m3, baseline, "mutant 3");
+        }
     }
     // -------------------------------------------------------------------------
     // LANE SEMANTICS: Verify independent per-lane operation
@@ -116,30 +122,29 @@ mod tests {
     #[test]
     fn test_delta_encode_simd_u32_lane_independence() {
         // Lane 0: 10 - 3 = 7, Lane 1: 20 - 5 = 15
-        let val  = (10u64) | (20u64 << 32);
-        let prev = ( 3u64) | ( 5u64 << 32);
-        let enc  = delta_encode_simd_u32(val, prev);
+        let val = (10u64) | (20u64 << 32);
+        let prev = (3u64) | (5u64 << 32);
+        let enc = delta_encode_simd_u32(val, prev);
         assert_eq!(enc as u32, 7);
         assert_eq!((enc >> 32) as u32, 15);
 
         // Lane 0 wraps: 0 - 1 = u32::MAX
-        let val2  = 0u64 | (0u64 << 32);
+        let val2 = 0u64 | (0u64 << 32);
         let prev2 = 1u64 | (0u64 << 32);
-        let enc2  = delta_encode_simd_u32(val2, prev2);
+        let enc2 = delta_encode_simd_u32(val2, prev2);
         assert_eq!(enc2 as u32, u32::MAX);
         assert_eq!((enc2 >> 32) as u32, 0);
 
         // High lane wraps, low lane unchanged
-        let val3  = (5u64) | (0u64 << 32);
+        let val3 = (5u64) | (0u64 << 32);
         let prev3 = (5u64) | (1u64 << 32);
-        let enc3  = delta_encode_simd_u32(val3, prev3);
+        let enc3 = delta_encode_simd_u32(val3, prev3);
         assert_eq!(enc3 as u32, 0);
         assert_eq!((enc3 >> 32) as u32, u32::MAX);
     }
 
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
-
 }
 
 #[cfg(feature = "bench")]

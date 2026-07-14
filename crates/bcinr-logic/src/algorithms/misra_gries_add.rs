@@ -66,8 +66,6 @@ mod tests {
         misra_gries_add_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
-
     #[test]
     fn test_misra_gries_add_all() {
         // equivalence oracle
@@ -76,10 +74,7 @@ mod tests {
         assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
         // boundaries
 
-        assert_eq!(
-            misra_gries_add(0, 0),
-            misra_gries_add_reference(0, 0)
-        );
+        assert_eq!(misra_gries_add(0, 0), misra_gries_add_reference(0, 0));
         assert_eq!(
             misra_gries_add(u64::MAX, u64::MAX),
             misra_gries_add_reference(u64::MAX, u64::MAX)
@@ -97,9 +92,15 @@ mod tests {
         let m1 = mutant_misra_gries_add_1(42, 1337);
         let m2 = mutant_misra_gries_add_2(42, 1337);
         let m3 = mutant_misra_gries_add_3(42, 1337);
-        if m1 != baseline { assert_ne!(m1, baseline, "mutant 1"); }
-        if m2 != baseline { assert_ne!(m2, baseline, "mutant 2"); }
-        if m3 != baseline { assert_ne!(m3, baseline, "mutant 3"); }
+        if m1 != baseline {
+            assert_ne!(m1, baseline, "mutant 1");
+        }
+        if m2 != baseline {
+            assert_ne!(m2, baseline, "mutant 2");
+        }
+        if m3 != baseline {
+            assert_ne!(m3, baseline, "mutant 3");
+        }
     }
 
     // -------------------------------------------------------------------------

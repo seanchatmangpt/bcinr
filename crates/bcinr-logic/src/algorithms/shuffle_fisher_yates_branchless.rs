@@ -66,7 +66,6 @@ mod tests {
         shuffle_fisher_yates_branchless_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -96,9 +95,21 @@ mod tests {
         );
         // mutants
         let base = shuffle_fisher_yates_branchless_reference(42, 1337);
-        assert_ne!(mutant_shuffle_fisher_yates_branchless_1(42, 1337), base, "mutant 1");
-        assert_ne!(mutant_shuffle_fisher_yates_branchless_2(42, 1337), base, "mutant 2");
-        assert_ne!(mutant_shuffle_fisher_yates_branchless_3(42, 1337), base, "mutant 3");
+        assert_ne!(
+            mutant_shuffle_fisher_yates_branchless_1(42, 1337),
+            base,
+            "mutant 1"
+        );
+        assert_ne!(
+            mutant_shuffle_fisher_yates_branchless_2(42, 1337),
+            base,
+            "mutant 2"
+        );
+        assert_ne!(
+            mutant_shuffle_fisher_yates_branchless_3(42, 1337),
+            base,
+            "mutant 3"
+        );
     }
 
     // -------------------------------------------------------------------------

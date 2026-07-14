@@ -216,7 +216,11 @@ mod tests {
         for _ in 0..5 {
             heavy_hitter_update(&mut table, 7);
         }
-        let count = table.iter().find(|&&(k, _)| k == 7).map(|&(_, c)| c).unwrap_or(0);
+        let count = table
+            .iter()
+            .find(|&&(k, _)| k == 7)
+            .map(|&(_, c)| c)
+            .unwrap_or(0);
         assert_eq!(count, 5, "Repeated inserts must accumulate count");
     }
 

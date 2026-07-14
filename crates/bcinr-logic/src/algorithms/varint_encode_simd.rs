@@ -98,19 +98,19 @@ mod tests {
             varint_encode_simd_reference(42, 1337)
         );
         // boundaries
-            assert_eq!(varint_encode_simd(0, 0), varint_encode_simd_reference(0, 0));
-            assert_eq!(
-                varint_encode_simd(u64::MAX, u64::MAX),
-                varint_encode_simd_reference(u64::MAX, u64::MAX)
-            );
-            assert_eq!(
-                varint_encode_simd(u64::MAX, 0),
-                varint_encode_simd_reference(u64::MAX, 0)
-            );
-            assert_eq!(
-                varint_encode_simd(0, u64::MAX),
-                varint_encode_simd_reference(0, u64::MAX)
-            );
+        assert_eq!(varint_encode_simd(0, 0), varint_encode_simd_reference(0, 0));
+        assert_eq!(
+            varint_encode_simd(u64::MAX, u64::MAX),
+            varint_encode_simd_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            varint_encode_simd(u64::MAX, 0),
+            varint_encode_simd_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            varint_encode_simd(0, u64::MAX),
+            varint_encode_simd_reference(0, u64::MAX)
+        );
         // mutants
         let base = varint_encode_simd_reference(42, 1337);
         assert_ne!(mutant_varint_encode_simd_1(42, 1337), base, "mutant 1");

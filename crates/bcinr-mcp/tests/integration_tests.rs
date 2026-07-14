@@ -66,9 +66,7 @@ mod tests {
                     if let Some(paren) = after_fn.find('(') {
                         let name = after_fn[..paren].trim().to_string();
                         if name != "main" {
-                            groups
-                                .get_mut(&current_group)
-                                .map(|v| v.push(name));
+                            groups.get_mut(&current_group).map(|v| v.push(name));
                         }
                     }
                 }
@@ -95,9 +93,11 @@ mod tests {
         let tools = extract_tool_names();
         let definitions = count_tool_definitions();
         assert_eq!(
-            tools.len(), definitions,
+            tools.len(),
+            definitions,
             "Tool function count ({}) != #[tool(...)] count ({})",
-            tools.len(), definitions
+            tools.len(),
+            definitions
         );
     }
 
@@ -111,9 +111,11 @@ mod tests {
             sorted.len()
         };
         assert_eq!(
-            tools.len(), unique_count,
+            tools.len(),
+            unique_count,
             "Found duplicate tool names: {} unique out of {} total",
-            unique_count, tools.len()
+            unique_count,
+            tools.len()
         );
     }
 
@@ -176,10 +178,10 @@ mod tests {
 
         // Expected groups and minimum tool counts
         let expectations = [
-            ("PDDL", 1),                    // At least 1 PDDL tool
-            ("POWL", 1),                    // At least 1 POWL tool
-            ("bcinr-logic", 1),             // At least 1 algorithm tool
-            ("Cross-crate", 0),             // May not be explicitly grouped
+            ("PDDL", 1),        // At least 1 PDDL tool
+            ("POWL", 1),        // At least 1 POWL tool
+            ("bcinr-logic", 1), // At least 1 algorithm tool
+            ("Cross-crate", 0), // May not be explicitly grouped
         ];
 
         for (expected_group, min_count) in &expectations {
@@ -192,7 +194,9 @@ mod tests {
             assert!(
                 found >= *min_count,
                 "Group containing '{}' has {} tools, expected at least {}",
-                expected_group, found, min_count
+                expected_group,
+                found,
+                min_count
             );
         }
     }
@@ -202,10 +206,7 @@ mod tests {
     #[test]
     fn test_pddl_tools_exist() {
         let tools = extract_tool_names();
-        let pddl_tools: Vec<_> = tools
-            .iter()
-            .filter(|t| t.starts_with("pddl_"))
-            .collect();
+        let pddl_tools: Vec<_> = tools.iter().filter(|t| t.starts_with("pddl_")).collect();
         assert!(
             !pddl_tools.is_empty(),
             "No PDDL tools found. Tools: {:?}",
@@ -216,10 +217,7 @@ mod tests {
     #[test]
     fn test_powl_tools_exist() {
         let tools = extract_tool_names();
-        let powl_tools: Vec<_> = tools
-            .iter()
-            .filter(|t| t.starts_with("powl_"))
-            .collect();
+        let powl_tools: Vec<_> = tools.iter().filter(|t| t.starts_with("powl_")).collect();
         assert!(
             !powl_tools.is_empty(),
             "No POWL tools found. Tools: {:?}",
@@ -230,12 +228,18 @@ mod tests {
     #[test]
     fn test_algorithm_tools_exist() {
         let tools = extract_tool_names();
-        let expected = ["utf8_validate", "bitset_operations", "dfa_info", "scan_patterns"];
+        let expected = [
+            "utf8_validate",
+            "bitset_operations",
+            "dfa_info",
+            "scan_patterns",
+        ];
         for expected_tool in &expected {
             assert!(
                 tools.iter().any(|t| t == expected_tool),
                 "Expected algorithm tool '{}' not found. Tools: {:?}",
-                expected_tool, tools
+                expected_tool,
+                tools
             );
         }
     }
@@ -267,11 +271,7 @@ mod tests {
         let tools = extract_tool_names();
 
         // Expected PDDL tools in pipeline order
-        let expected_sequence = [
-            "pddl_parse_domain",
-            "pddl_plan",
-            "manufacture_world",
-        ];
+        let expected_sequence = ["pddl_parse_domain", "pddl_plan", "manufacture_world"];
 
         for tool in &expected_sequence {
             assert!(
@@ -286,7 +286,11 @@ mod tests {
     fn test_powl_orchestration_pipeline() {
         let tools = extract_tool_names();
 
-        let expected = ["powl_compile_sequence", "powl_admit_context", "powl_capability_check"];
+        let expected = [
+            "powl_compile_sequence",
+            "powl_admit_context",
+            "powl_capability_check",
+        ];
 
         for tool in &expected {
             assert!(
@@ -369,7 +373,14 @@ mod tests {
         println!("\nTool Inventory Report:");
         println!("  Extracted tool functions: {}", tools.len());
         println!("  #[tool(...)] definitions: {}", definitions);
-        println!("  Status: {}", if tools.len() == definitions { "CONSISTENT" } else { "MISMATCH" });
+        println!(
+            "  Status: {}",
+            if tools.len() == definitions {
+                "CONSISTENT"
+            } else {
+                "MISMATCH"
+            }
+        );
 
         // At minimum, should find tools
         assert!(tools.len() > 0, "Extraction logic failed to find any tools");
@@ -472,14 +483,24 @@ mod brce_conformance {
         recompute_chain_full(domain_w, problem_w, plan_chain, false, 0)
     }
 
-    fn recompute_chain_full(domain_w: &str, problem_w: &str, plan_chain: &str, goal_reached: bool, step_count: u64) -> String {
+    fn recompute_chain_full(
+        domain_w: &str,
+        problem_w: &str,
+        plan_chain: &str,
+        goal_reached: bool,
+        step_count: u64,
+    ) -> String {
         let mut h = blake3::Hasher::new();
         h.update(domain_w.as_bytes());
         h.update(problem_w.as_bytes());
         h.update(plan_chain.as_bytes());
         h.update(if goal_reached { b"1" } else { b"0" });
         h.update(&step_count.to_le_bytes());
-        h.finalize().as_bytes().iter().map(|x| format!("{x:02x}")).collect()
+        h.finalize()
+            .as_bytes()
+            .iter()
+            .map(|x| format!("{x:02x}"))
+            .collect()
     }
 
     /// A1 — BFS finds optimal 3-step plan: deploy → run-smoke → mark-healthy.
@@ -487,18 +508,44 @@ mod brce_conformance {
     fn a1_bfs_soundness_three_step_plan() {
         let r = manufacture_world(DEPLOY_DOMAIN, APPROVED_PROBLEM, "a1", &[]);
 
-        assert!(r.admitted, "admitted should be true for approved service; refusal: {:?}", r.refusal_reason);
-        assert_eq!(r.plan_receipt.step_count, 3,
-            "BFS must find exactly 3 steps (deploy+smoke+healthy), got {}", r.plan_receipt.step_count);
+        assert!(
+            r.admitted,
+            "admitted should be true for approved service; refusal: {:?}",
+            r.refusal_reason
+        );
+        assert_eq!(
+            r.plan_receipt.step_count, 3,
+            "BFS must find exactly 3 steps (deploy+smoke+healthy), got {}",
+            r.plan_receipt.step_count
+        );
         assert!(r.plan_receipt.goal_reached, "goal must be reached");
-        assert!(!r.domain_witness.is_empty(), "domain_witness must be non-empty");
-        assert!(!r.manufacture_chain.is_empty(), "manufacture_chain must be non-empty");
+        assert!(
+            !r.domain_witness.is_empty(),
+            "domain_witness must be non-empty"
+        );
+        assert!(
+            !r.manufacture_chain.is_empty(),
+            "manufacture_chain must be non-empty"
+        );
 
         // Verify manufacture_chain = BLAKE3(domain_w || problem_w || plan_chain || goal_reached || step_count)
-        let expected = recompute_chain_full(&r.domain_witness, &r.problem_witness, &r.plan_receipt.chain_hash, r.plan_receipt.goal_reached, r.plan_receipt.step_count as u64);
-        assert_eq!(r.manufacture_chain, expected, "manufacture_chain must match BLAKE3 recomputation");
+        let expected = recompute_chain_full(
+            &r.domain_witness,
+            &r.problem_witness,
+            &r.plan_receipt.chain_hash,
+            r.plan_receipt.goal_reached,
+            r.plan_receipt.step_count as u64,
+        );
+        assert_eq!(
+            r.manufacture_chain, expected,
+            "manufacture_chain must match BLAKE3 recomputation"
+        );
 
-        println!("A1 PASS: {} steps, chain={}", r.plan_receipt.step_count, &r.manufacture_chain[..16]);
+        println!(
+            "A1 PASS: {} steps, chain={}",
+            r.plan_receipt.step_count,
+            &r.manufacture_chain[..16]
+        );
     }
 
     /// A2 — Prolog8 gate enforced at EXECUTION time: plan exists, policy denies it.
@@ -510,16 +557,27 @@ mod brce_conformance {
     #[test]
     fn a2_prolog8_gate_denies_execution_time() {
         // Permit only a label that matches nothing real → every step is denied.
-        let r = manufacture_world(DEPLOY_DOMAIN, APPROVED_PROBLEM, "a2", &[("__noadmit__", vec![])]);
+        let r = manufacture_world(
+            DEPLOY_DOMAIN,
+            APPROVED_PROBLEM,
+            "a2",
+            &[("__noadmit__", vec![])],
+        );
 
-        assert!(!r.admitted, "Prolog8 gate must deny execution even when the plan exists");
+        assert!(
+            !r.admitted,
+            "Prolog8 gate must deny execution even when the plan exists"
+        );
         let reason = r.refusal_reason.as_deref().unwrap_or("");
         assert!(
             reason.contains("denied") || reason.contains("Denied"),
             "refusal_reason must indicate Prolog8 gate denial at execution time, got: '{reason}'"
         );
 
-        println!("A2 PASS: Prolog8 gate stopped execution at step 0 — {}", &reason[..reason.len().min(80)]);
+        println!(
+            "A2 PASS: Prolog8 gate stopped execution at step 0 — {}",
+            &reason[..reason.len().min(80)]
+        );
     }
 
     /// A3 — BLAKE3 tamper evidence: valid chain verifies; mutated chain fails.
@@ -529,8 +587,17 @@ mod brce_conformance {
         assert!(r.admitted);
 
         // Valid: recomputed chain must match stored chain.
-        let recomputed = recompute_chain_full(&r.domain_witness, &r.problem_witness, &r.plan_receipt.chain_hash, r.plan_receipt.goal_reached, r.plan_receipt.step_count as u64);
-        assert_eq!(recomputed, r.manufacture_chain, "valid receipt: chain must verify");
+        let recomputed = recompute_chain_full(
+            &r.domain_witness,
+            &r.problem_witness,
+            &r.plan_receipt.chain_hash,
+            r.plan_receipt.goal_reached,
+            r.plan_receipt.step_count as u64,
+        );
+        assert_eq!(
+            recomputed, r.manufacture_chain,
+            "valid receipt: chain must verify"
+        );
 
         // Tampered: flip the last hex digit of manufacture_chain.
         let mut tampered = r.manufacture_chain.clone();
@@ -539,7 +606,10 @@ mod brce_conformance {
         tampered.push(flipped);
 
         // Tampered chain must NOT equal the recomputed one.
-        assert_ne!(recomputed, tampered, "tampered manufacture_chain must fail BLAKE3 verification");
+        assert_ne!(
+            recomputed, tampered,
+            "tampered manufacture_chain must fail BLAKE3 verification"
+        );
 
         println!("A3 PASS: valid chain verifies; tampered chain correctly detected");
     }
@@ -549,7 +619,10 @@ mod brce_conformance {
     fn a4_pddl8_bounds_enforced_at_parse_time() {
         let r = manufacture_world(OVERBOUND_DOMAIN, OVERBOUND_PROBLEM, "a4", &[]);
 
-        assert!(!r.admitted, "domain violating PDDL8_MAX_ARITY must be denied");
+        assert!(
+            !r.admitted,
+            "domain violating PDDL8_MAX_ARITY must be denied"
+        );
         let reason = r.refusal_reason.as_deref().unwrap_or("");
         assert!(
             reason.contains("bound exceeded") || reason.contains("PDDL8 bound"),
@@ -566,22 +639,36 @@ mod brce_conformance {
         let r2 = manufacture_world(DEPLOY_DOMAIN, APPROVED_PROBLEM, "a5-run2", &[]);
 
         // Both must admit
-        assert!(r1.admitted && r2.admitted, "both runs must admit the same valid domain+problem");
+        assert!(
+            r1.admitted && r2.admitted,
+            "both runs must admit the same valid domain+problem"
+        );
 
         // Witnesses are deterministic (BLAKE3 over structural identity, not timestamps)
-        assert_eq!(r1.domain_witness, r2.domain_witness,
-            "domain_witness must be identical across runs (deterministic BLAKE3)");
-        assert_eq!(r1.problem_witness, r2.problem_witness,
-            "problem_witness must be identical across runs");
+        assert_eq!(
+            r1.domain_witness, r2.domain_witness,
+            "domain_witness must be identical across runs (deterministic BLAKE3)"
+        );
+        assert_eq!(
+            r1.problem_witness, r2.problem_witness,
+            "problem_witness must be identical across runs"
+        );
 
         // manufacture_chain depends on plan_receipt.chain_hash which may differ if case_id affects it
         // Assert equality of the plan structure instead
-        assert_eq!(r1.plan_receipt.step_count, r2.plan_receipt.step_count,
-            "step_count must be identical across runs");
-        assert_eq!(r1.plan_receipt.goal_reached, r2.plan_receipt.goal_reached,
-            "goal_reached must be identical across runs");
+        assert_eq!(
+            r1.plan_receipt.step_count, r2.plan_receipt.step_count,
+            "step_count must be identical across runs"
+        );
+        assert_eq!(
+            r1.plan_receipt.goal_reached, r2.plan_receipt.goal_reached,
+            "goal_reached must be identical across runs"
+        );
 
-        println!("A5 PASS: domain_witness={}, problem_witness={} (stable across runs)",
-            &r1.domain_witness[..16], &r1.problem_witness[..16]);
+        println!(
+            "A5 PASS: domain_witness={}, problem_witness={} (stable across runs)",
+            &r1.domain_witness[..16],
+            &r1.problem_witness[..16]
+        );
     }
 }

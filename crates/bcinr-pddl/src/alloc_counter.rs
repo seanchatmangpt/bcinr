@@ -49,6 +49,9 @@ pub mod counting_alloc {
     /// Current cumulative (allocation count, bytes allocated) since process start.
     /// Intended usage: snapshot before and after a stage, subtract.
     pub fn snapshot() -> (u64, u64) {
-        (ALLOC_COUNT.load(Ordering::Relaxed), ALLOC_BYTES.load(Ordering::Relaxed))
+        (
+            ALLOC_COUNT.load(Ordering::Relaxed),
+            ALLOC_BYTES.load(Ordering::Relaxed),
+        )
     }
 }

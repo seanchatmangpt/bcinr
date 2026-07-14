@@ -31,13 +31,7 @@
 /// count_min_sketch_update(&mut sketch, d, w, 42, 1);
 /// assert!(sketch.iter().any(|&c| c > 0));
 /// ```
-pub fn count_min_sketch_update(
-    sketch: &mut [u32],
-    d: usize,
-    w: usize,
-    key: u64,
-    delta: u32,
-) {
+pub fn count_min_sketch_update(sketch: &mut [u32], d: usize, w: usize, key: u64, delta: u32) {
     (0..d).for_each(|i| {
         let h = cm_hash(key, i as u64) as usize % w;
         let idx = i * w + h;

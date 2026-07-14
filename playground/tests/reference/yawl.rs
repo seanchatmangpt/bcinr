@@ -106,7 +106,10 @@ impl BYawlEngine {
     pub fn execute_task(&mut self, task: &BYawlTask) -> bool {
         // Mutex check for Interleaved Routing (WCP-17)
         let is_release = (task.flags & 4) != 0;
-        if !is_release && task.interleaved_lock_mask != 0 && (self.active_locks & task.interleaved_lock_mask) != 0 {
+        if !is_release
+            && task.interleaved_lock_mask != 0
+            && (self.active_locks & task.interleaved_lock_mask) != 0
+        {
             return false;
         }
 
@@ -117,7 +120,9 @@ impl BYawlEngine {
         }
 
         // Evaluate Pre-conditions
-        if task.condition_mask != 0 && (self.state_mask & task.condition_mask) != task.condition_mask {
+        if task.condition_mask != 0
+            && (self.state_mask & task.condition_mask) != task.condition_mask
+        {
             return false;
         }
 
@@ -136,9 +141,7 @@ impl BYawlEngine {
                 let has_fired = (self.fired_joins_mask & (1 << task.join_state_bit)) != 0;
                 !has_fired && (present_tokens >= task.threshold_instances)
             }
-            JoinType::ThreadMerge => {
-                (self.state_mask & task.consume_mask) != 0
-            }
+            JoinType::ThreadMerge => (self.state_mask & task.consume_mask) != 0,
         };
 
         if !can_join {

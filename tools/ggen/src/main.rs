@@ -19,7 +19,10 @@ fn main() {
     let mut by_category = std::collections::BTreeMap::new();
     for algo in &algorithms {
         let category = categorize_algorithm(&algo.name);
-        by_category.entry(category).or_insert_with(Vec::new).push(algo.name.clone());
+        by_category
+            .entry(category)
+            .or_insert_with(Vec::new)
+            .push(algo.name.clone());
     }
 
     for (category, names) in &by_category {
@@ -61,12 +64,19 @@ fn main() {
 
     println!("\n=== SUMMARY ===");
     if total_failures == 0 {
-        println!("✅ All {} invariant tests PASSED (no falsifications found)",
-                 algorithms.len() + 50);
-        println!("✅ All {} algorithms are candidates for further validation",
-                 algorithms.len());
+        println!(
+            "✅ All {} invariant tests PASSED (no falsifications found)",
+            algorithms.len() + 50
+        );
+        println!(
+            "✅ All {} algorithms are candidates for further validation",
+            algorithms.len()
+        );
     } else {
-        println!("❌ {} FAILURES DETECTED — invariants violated", total_failures);
+        println!(
+            "❌ {} FAILURES DETECTED — invariants violated",
+            total_failures
+        );
         std::process::exit(1);
     }
 }
@@ -111,14 +121,55 @@ fn discover_algorithms(root: &str) -> Vec<Algorithm> {
 
 fn categorize_algorithm(name: &str) -> &'static str {
     match name {
-        n if n.contains("hash") || n.contains("xxhash") || n.contains("farmhash") || n.contains("adler") => "Hash",
+        n if n.contains("hash")
+            || n.contains("xxhash")
+            || n.contains("farmhash")
+            || n.contains("adler") =>
+        {
+            "Hash"
+        }
         n if n.contains("select") || n.contains("mask") || n.contains("blend") => "Mask/Select",
-        n if n.contains("abs") || n.contains("min") || n.contains("max") || n.contains("sat") || n.contains("signum") => "Arithmetic",
-        n if n.contains("sin") || n.contains("cos") || n.contains("tan") || n.contains("exp") || n.contains("log") => "Math/Approx",
-        n if n.contains("reverse") || n.contains("popcount") || n.contains("rotate") || n.contains("permute") || n.contains("bit") => "Bit Ops",
-        n if n.contains("scan") || n.contains("prefix") || n.contains("suffix") || n.contains("reduce") => "Scan/Reduce",
-        n if n.contains("compare") || n.contains("equal") || n.contains("search") => "Search/Compare",
-        n if n.contains("encode") || n.contains("decode") || n.contains("delta") || n.contains("compress") => "Codec",
+        n if n.contains("abs")
+            || n.contains("min")
+            || n.contains("max")
+            || n.contains("sat")
+            || n.contains("signum") =>
+        {
+            "Arithmetic"
+        }
+        n if n.contains("sin")
+            || n.contains("cos")
+            || n.contains("tan")
+            || n.contains("exp")
+            || n.contains("log") =>
+        {
+            "Math/Approx"
+        }
+        n if n.contains("reverse")
+            || n.contains("popcount")
+            || n.contains("rotate")
+            || n.contains("permute")
+            || n.contains("bit") =>
+        {
+            "Bit Ops"
+        }
+        n if n.contains("scan")
+            || n.contains("prefix")
+            || n.contains("suffix")
+            || n.contains("reduce") =>
+        {
+            "Scan/Reduce"
+        }
+        n if n.contains("compare") || n.contains("equal") || n.contains("search") => {
+            "Search/Compare"
+        }
+        n if n.contains("encode")
+            || n.contains("decode")
+            || n.contains("delta")
+            || n.contains("compress") =>
+        {
+            "Codec"
+        }
         n if n.contains("sketch") || n.contains("hll") || n.contains("bloom") => "Sketch",
         n if n.contains("utf") || n.contains("parse") || n.contains("validate") => "Parse/UTF-8",
         n if n.contains("sort") || n.contains("order") => "Sort",
@@ -134,7 +185,9 @@ fn categorize_algorithm(name: &str) -> &'static str {
 // PHASE 6: Algorithm-Specific Falsification
 // ============================================================================
 
-fn test_algorithm_category_invariants(by_category: &std::collections::BTreeMap<&'static str, Vec<String>>) -> u32 {
+fn test_algorithm_category_invariants(
+    by_category: &std::collections::BTreeMap<&'static str, Vec<String>>,
+) -> u32 {
     let mut failures = 0;
 
     println!("   Testing {} algorithm categories", by_category.len());
@@ -143,24 +196,39 @@ fn test_algorithm_category_invariants(by_category: &std::collections::BTreeMap<&
     for (category, algos) in by_category {
         match *category {
             "Hash" => {
-                println!("   ✓ Hash algorithms ({}): Testing avalanche effect", algos.len());
+                println!(
+                    "   ✓ Hash algorithms ({}): Testing avalanche effect",
+                    algos.len()
+                );
                 // Property: Single-bit flip in input should affect ~50% of output bits
                 failures += test_hash_avalanche();
             }
             "Arithmetic" => {
-                println!("   ✓ Arithmetic ({}): Testing saturation boundaries", algos.len());
+                println!(
+                    "   ✓ Arithmetic ({}): Testing saturation boundaries",
+                    algos.len()
+                );
                 failures += test_arithmetic_boundaries();
             }
             "Bit Ops" => {
-                println!("   ✓ Bit operations ({}): Testing closure properties", algos.len());
+                println!(
+                    "   ✓ Bit operations ({}): Testing closure properties",
+                    algos.len()
+                );
                 failures += test_bitop_closure();
             }
             "Scan/Reduce" => {
-                println!("   ✓ Scan/Reduce ({}): Testing commutativity/associativity", algos.len());
+                println!(
+                    "   ✓ Scan/Reduce ({}): Testing commutativity/associativity",
+                    algos.len()
+                );
                 failures += test_scan_associativity();
             }
             "Search/Compare" => {
-                println!("   ✓ Comparison ({}): Testing total order properties", algos.len());
+                println!(
+                    "   ✓ Comparison ({}): Testing total order properties",
+                    algos.len()
+                );
                 failures += test_comparison_total_order();
             }
             "Math/Approx" => {
@@ -168,7 +236,11 @@ fn test_algorithm_category_invariants(by_category: &std::collections::BTreeMap<&
                 failures += test_math_monotonicity();
             }
             _ => {
-                println!("   ✓ {} ({}): Generic invariants only", category, algos.len());
+                println!(
+                    "   ✓ {} ({}): Generic invariants only",
+                    category,
+                    algos.len()
+                );
             }
         }
     }
@@ -193,7 +265,10 @@ fn test_hash_avalanche() -> u32 {
 
         // Sanity check: bit should be different in exactly one position
         if _xor_result.count_ones() != 1 {
-            println!("FAIL [HASH_FLIP]: Single-bit flip affected {} bits", _xor_result.count_ones());
+            println!(
+                "FAIL [HASH_FLIP]: Single-bit flip affected {} bits",
+                _xor_result.count_ones()
+            );
             failures += 1;
         }
     }
@@ -434,7 +509,7 @@ fn test_saturation_boundary_cases() -> u32 {
         (0, 0, 0),
         (1, u32::MAX - 1, u32::MAX),
         (0x7FFFFFFF, 0x7FFFFFFF, 0xFFFFFFFE), // 2147483647 + 2147483647 = 4294967294 (no overflow)
-        (0x80000000, 0x80000000, u32::MAX), // 2147483648 + 2147483648 overflows
+        (0x80000000, 0x80000000, u32::MAX),   // 2147483648 + 2147483648 overflows
     ];
 
     for (a, b, expected) in test_cases {
@@ -541,7 +616,10 @@ fn test_comparison_antisymmetry() -> u32 {
             let a_eq_b = a == b;
 
             if a_ge_b && b_ge_a && !a_eq_b {
-                println!("FAIL [ANTISYM]: {} >= {} and {} >= {} but {} != {}", a, b, b, a, a, b);
+                println!(
+                    "FAIL [ANTISYM]: {} >= {} and {} >= {} but {} != {}",
+                    a, b, b, a, a, b
+                );
                 failures += 1;
             }
         }

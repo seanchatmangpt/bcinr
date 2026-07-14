@@ -15,7 +15,13 @@ use bcinr_powl_receipt::replay::{PowlReplayFrame, PowlReplayVerifier, ReplayViol
 
 // ── Helper ─────────────────────────────────────────────────────────────────────
 
-fn pframe(node_id: u32, node_bit: u64, required: u64, produces: u64, activity: &str) -> PowlReplayFrame {
+fn pframe(
+    node_id: u32,
+    node_bit: u64,
+    required: u64,
+    produces: u64,
+    activity: &str,
+) -> PowlReplayFrame {
     PowlReplayFrame {
         node_id,
         node_bit,
@@ -43,7 +49,8 @@ fn valid_trace_achieves_perfect_fitness() {
     for f in &frames {
         assert!(
             v.replay_frame(f).is_ok(),
-            "law violated: valid frame {} must replay without error", f.node_id
+            "law violated: valid frame {} must replay without error",
+            f.node_id
         );
     }
     let m = v.finalize();
@@ -75,7 +82,10 @@ fn out_of_order_skipping_to_third_node_is_rejected() {
     let mut v = PowlReplayVerifier::new(0x1);
     let c = pframe(2, 0x4, 0x4, 0x0, "C");
     assert!(
-        matches!(v.replay_frame(&c), Err(ReplayViolation::TokenNotEnabled { .. })),
+        matches!(
+            v.replay_frame(&c),
+            Err(ReplayViolation::TokenNotEnabled { .. })
+        ),
         "law violated: firing the third node without the first two is illegal"
     );
 }
@@ -84,31 +94,40 @@ fn out_of_order_skipping_to_third_node_is_rejected() {
 
 #[test]
 fn strict_predicate_fails_on_low_precision() {
-    // STRICT demands min_precision = 0xFFFF_0000 (≈ 1.0).
-    // Supplying precision = 0x7000_0000 (≈ 0.44) must produce a Precision violation.
+    // STRICT demands min_precision = 0x0001_0000 (≈ 1.0).
+    // Supplying precision = 0x0000_7000 (≈ 0.44) must produce a Precision violation.
     let m = ConformanceMetrics {
-        fitness: 0xFFFF_0000,
-        precision: 0x7000_0000,
-        generalization: 0x8000_0000,
-        simplicity: 0x8000_0000,
+        fitness: 0x0001_0000,
+        precision: 0x0000_7000,
+        generalization: 0x0000_8000,
+        simplicity: 0x0000_8000,
     };
     let result = ConformancePredicate::STRICT.check(&m);
-    assert!(result.is_err(), "law violated: STRICT must reject low precision");
+    assert!(
+        result.is_err(),
+        "law violated: STRICT must reject low precision"
+    );
     let violation = result.unwrap_err();
-    assert_eq!(violation.dim, ConformanceDimension::Precision,
-        "law violated: the failing dimension must be Precision, not {:?}", violation.dim);
+    assert_eq!(
+        violation.dim,
+        ConformanceDimension::Precision,
+        "law violated: the failing dimension must be Precision, not {:?}",
+        violation.dim
+    );
 }
 
 #[test]
 fn strict_predicate_passes_at_exact_threshold() {
     let m = ConformanceMetrics {
-        fitness: 0xFFFF_0000,
-        precision: 0xFFFF_0000,
-        generalization: 0x8000_0000,
-        simplicity: 0x8000_0000,
+        fitness: 0x0001_0000,
+        precision: 0x0001_0000,
+        generalization: 0x0000_8000,
+        simplicity: 0x0000_8000,
     };
-    assert!(ConformancePredicate::STRICT.check(&m).is_ok(),
-        "law violated: metrics at STRICT threshold must pass");
+    assert!(
+        ConformancePredicate::STRICT.check(&m).is_ok(),
+        "law violated: metrics at STRICT threshold must pass"
+    );
 }
 
 // ── denied_frames_produce_distinct_fired_mask ────────────────────────────────
@@ -128,40 +147,64 @@ fn denied_frames_produce_distinct_fired_mask() {
     );
 
     // Verify exact bit positions (lane 2 → bit 2, lane 3 → bit 3).
-    assert_eq!(sla_mask,  1 << 2, "SLA_BREACH must scatter to bit 2");
-    assert_eq!(auth_mask, 1 << 3, "AUTHORIZATION_DENIED must scatter to bit 3");
+    assert_eq!(sla_mask, 1 << 2, "SLA_BREACH must scatter to bit 2");
+    assert_eq!(
+        auth_mask,
+        1 << 3,
+        "AUTHORIZATION_DENIED must scatter to bit 3"
+    );
 
     // Composed denial must set BOTH bits — two distinct trace variants visible.
     let composed = DenialPolarity::SLA_BREACH
         .compose(DenialPolarity::AUTHORIZATION_DENIED)
         .to_fired_mask();
-    assert_eq!(composed, (1 << 2) | (1 << 3),
-        "composed denial must set both bits; distinct variants in DFG");
+    assert_eq!(
+        composed,
+        (1 << 2) | (1 << 3),
+        "composed denial must set both bits; distinct variants in DFG"
+    );
 }
 
 #[test]
 fn admitted_denial_produces_zero_fired_mask() {
-    assert_eq!(DenialPolarity::ADMITTED.to_fired_mask(), 0,
-        "ADMITTED must not activate any fired_mask bit");
+    assert_eq!(
+        DenialPolarity::ADMITTED.to_fired_mask(),
+        0,
+        "ADMITTED must not activate any fired_mask bit"
+    );
 }
 
 #[test]
 fn all_denial_constants_have_distinct_fired_mask_bits() {
     let constants = [
-        ("PRECONDITION_FAILED",        DenialPolarity::PRECONDITION_FAILED),
-        ("SLA_BREACH",                 DenialPolarity::SLA_BREACH),
-        ("AUTHORIZATION_DENIED",       DenialPolarity::AUTHORIZATION_DENIED),
-        ("RESOURCE_EXHAUSTED",         DenialPolarity::RESOURCE_EXHAUSTED),
-        ("OBJECT_LIFECYCLE_VIOLATION", DenialPolarity::OBJECT_LIFECYCLE_VIOLATION),
-        ("CONFORMANCE_GATE_FAILED",    DenialPolarity::CONFORMANCE_GATE_FAILED),
-        ("WATCHDOG_DRAINED",           DenialPolarity::WATCHDOG_DRAINED),
+        ("PRECONDITION_FAILED", DenialPolarity::PRECONDITION_FAILED),
+        ("SLA_BREACH", DenialPolarity::SLA_BREACH),
+        ("AUTHORIZATION_DENIED", DenialPolarity::AUTHORIZATION_DENIED),
+        ("RESOURCE_EXHAUSTED", DenialPolarity::RESOURCE_EXHAUSTED),
+        (
+            "OBJECT_LIFECYCLE_VIOLATION",
+            DenialPolarity::OBJECT_LIFECYCLE_VIOLATION,
+        ),
+        (
+            "CONFORMANCE_GATE_FAILED",
+            DenialPolarity::CONFORMANCE_GATE_FAILED,
+        ),
+        ("WATCHDOG_DRAINED", DenialPolarity::WATCHDOG_DRAINED),
     ];
     let mut seen: u64 = 0;
     for (name, dp) in &constants {
         let bit = dp.to_fired_mask();
         assert_ne!(bit, 0, "{name} must produce a non-zero fired_mask");
-        assert_eq!(bit.count_ones(), 1, "{name} must scatter to exactly one bit");
-        assert_eq!(seen & bit, 0, "{name} bit collides with a previously seen constant");
+        assert_eq!(
+            bit.count_ones(),
+            1,
+            "{name} must scatter to exactly one bit"
+        );
+        assert_eq!(
+            seen & bit,
+            0,
+            "{name} bit collides with a previously seen constant"
+        );
         seen |= bit;
     }
 }
@@ -179,30 +222,44 @@ fn pm_bridge_produces_ocel_2_0_json() {
     let json = frames_to_ocel2_json(&frames);
 
     // Top-level OCEL 2.0 required keys.
-    assert_eq!(json["ocel:type"], "powl-causal-trace",
-        "ocel:type must identify the trace type");
-    assert!(json.get("ocel:attribute-names").is_some(),
-        "OCEL 2.0 JSON must include ocel:attribute-names");
+    assert_eq!(
+        json["ocel:type"], "powl-causal-trace",
+        "ocel:type must identify the trace type"
+    );
+    assert!(
+        json.get("ocel:attribute-names").is_some(),
+        "OCEL 2.0 JSON must include ocel:attribute-names"
+    );
 
-    let events = json["ocel:events"].as_object()
+    let events = json["ocel:events"]
+        .as_object()
         .expect("ocel:events must be a JSON object");
-    assert_eq!(events.len(), 3,
-        "event count must match frame count");
+    assert_eq!(events.len(), 3, "event count must match frame count");
 
     for (event_id, event) in events {
-        assert!(event.get("ocel:type").is_some(),
-            "event {event_id} missing ocel:type activity label");
-        assert!(event.get("ocel:timestamp").is_some(),
-            "event {event_id} missing ocel:timestamp");
-        assert!(event.get("ocel:omap").is_some(),
-            "event {event_id} missing ocel:omap (E2O links)");
+        assert!(
+            event.get("ocel:type").is_some(),
+            "event {event_id} missing ocel:type activity label"
+        );
+        assert!(
+            event.get("ocel:timestamp").is_some(),
+            "event {event_id} missing ocel:timestamp"
+        );
+        assert!(
+            event.get("ocel:omap").is_some(),
+            "event {event_id} missing ocel:omap (E2O links)"
+        );
     }
 
-    let objects = json["ocel:objects"].as_object()
+    let objects = json["ocel:objects"]
+        .as_object()
         .expect("ocel:objects must be a JSON object");
     // Three distinct object ids (one per frame: "obj-0", "obj-1", "obj-2").
-    assert_eq!(objects.len(), 3,
-        "ocel:objects must list all distinct objects");
+    assert_eq!(
+        objects.len(),
+        3,
+        "ocel:objects must list all distinct objects"
+    );
 }
 
 #[test]
@@ -214,8 +271,11 @@ fn pm_bridge_deduplicates_objects_across_frames() {
 
     let json = frames_to_ocel2_json(&[f0, f1]);
     let objects = json["ocel:objects"].as_object().unwrap();
-    assert_eq!(objects.len(), 2,
-        "duplicate object ids must be deduplicated in ocel:objects");
+    assert_eq!(
+        objects.len(),
+        2,
+        "duplicate object ids must be deduplicated in ocel:objects"
+    );
     assert!(objects.contains_key("case-1"));
     assert!(objects.contains_key("item-42"));
 }

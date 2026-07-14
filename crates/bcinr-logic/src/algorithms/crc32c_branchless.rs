@@ -226,10 +226,10 @@ pub mod bench {
     pub fn bench_crc32c_branchless(c: &mut Criterion) {
         #[cfg(feature = "alloc")]
         {
-        let data: Vec<u8> = (0u8..=63).collect();
-        c.bench_function("crc32c_branchless/64B", |b| {
-            b.iter(|| black_box(crc32c_branchless(black_box(&data), black_box(!0))))
-        });
+            let data: Vec<u8> = (0u8..=63).collect();
+            c.bench_function("crc32c_branchless/64B", |b| {
+                b.iter(|| black_box(crc32c_branchless(black_box(&data), black_box(!0))))
+            });
         }
     }
 }

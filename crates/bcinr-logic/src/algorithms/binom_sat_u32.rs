@@ -78,7 +78,6 @@ mod tests {
         binom_sat_u32_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -98,8 +97,14 @@ mod tests {
             binom_sat_u32(u64::MAX, u64::MAX),
             binom_sat_u32_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(binom_sat_u32(u64::MAX, 0), binom_sat_u32_reference(u64::MAX, 0));
-        assert_eq!(binom_sat_u32(0, u64::MAX), binom_sat_u32_reference(0, u64::MAX));
+        assert_eq!(
+            binom_sat_u32(u64::MAX, 0),
+            binom_sat_u32_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            binom_sat_u32(0, u64::MAX),
+            binom_sat_u32_reference(0, u64::MAX)
+        );
         // --- mutant divergence ---
         let baseline = binom_sat_u32_reference(42, 1337);
         assert_ne!(

@@ -76,22 +76,22 @@ mod tests {
             search_eytzinger_u32_reference(42, 1337)
         );
         // boundaries
-            assert_eq!(
-                search_eytzinger_u32(0, 0),
-                search_eytzinger_u32_reference(0, 0)
-            );
-            assert_eq!(
-                search_eytzinger_u32(u64::MAX, u64::MAX),
-                search_eytzinger_u32_reference(u64::MAX, u64::MAX)
-            );
-            assert_eq!(
-                search_eytzinger_u32(u64::MAX, 0),
-                search_eytzinger_u32_reference(u64::MAX, 0)
-            );
-            assert_eq!(
-                search_eytzinger_u32(0, u64::MAX),
-                search_eytzinger_u32_reference(0, u64::MAX)
-            );
+        assert_eq!(
+            search_eytzinger_u32(0, 0),
+            search_eytzinger_u32_reference(0, 0)
+        );
+        assert_eq!(
+            search_eytzinger_u32(u64::MAX, u64::MAX),
+            search_eytzinger_u32_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            search_eytzinger_u32(u64::MAX, 0),
+            search_eytzinger_u32_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            search_eytzinger_u32(0, u64::MAX),
+            search_eytzinger_u32_reference(0, u64::MAX)
+        );
         // mutants
         let base = search_eytzinger_u32_reference(42, 1337);
         assert_ne!(mutant_search_eytzinger_u32_1(42, 1337), base, "mutant 1");

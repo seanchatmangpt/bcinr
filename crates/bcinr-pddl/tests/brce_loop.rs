@@ -57,11 +57,21 @@ fn blocksworld_brce_full_loop() {
     // Blocks world to stack a on b: pick-up(a), stack(a,b) — 2 steps
     assert!(tape.len() >= 2, "need at least 2 steps");
 
-    let init: BTreeSet<Pddl8GroundAtom> = problem.init.iter()
-        .map(|a| Pddl8GroundAtom { pred: a.pred.clone(), args: a.args.clone() })
+    let init: BTreeSet<Pddl8GroundAtom> = problem
+        .init
+        .iter()
+        .map(|a| Pddl8GroundAtom {
+            pred: a.pred.clone(),
+            args: a.args.clone(),
+        })
         .collect();
-    let goal: Vec<Pddl8GroundAtom> = problem.goal.iter()
-        .map(|a| Pddl8GroundAtom { pred: a.pred.clone(), args: a.args.clone() })
+    let goal: Vec<Pddl8GroundAtom> = problem
+        .goal
+        .iter()
+        .map(|a| Pddl8GroundAtom {
+            pred: a.pred.clone(),
+            args: a.args.clone(),
+        })
         .collect();
 
     let (log, receipt, ocel) = execute_tape(&tape, &init, &goal, "brce-bw-001", &[]).unwrap();
@@ -89,7 +99,10 @@ fn empty_tape_goal_not_reached() {
 
     let tape = Pddl8Tape { ops: vec![] };
     let init: BTreeSet<Pddl8GroundAtom> = BTreeSet::new();
-    let goal = vec![Pddl8GroundAtom { pred: "on".to_string(), args: vec!["a".into(), "b".into()] }];
+    let goal = vec![Pddl8GroundAtom {
+        pred: "on".to_string(),
+        args: vec!["a".into(), "b".into()],
+    }];
 
     let (log, receipt, _) = execute_tape(&tape, &init, &goal, "empty", &[]).unwrap();
     assert!(!log.goal_reached);
@@ -108,18 +121,32 @@ fn prolog8_horn_denies_unadmitted_action() {
     let problem = problem_from_pddl(BLOCKSWORLD_PROBLEM).unwrap();
     let gp = GroundProblem::build(&domain, &problem, None).unwrap();
     let tape = gp.find_plan().unwrap();
-    assert!(tape.len() >= 2, "blocksworld plan must have at least 2 steps");
+    assert!(
+        tape.len() >= 2,
+        "blocksworld plan must have at least 2 steps"
+    );
 
-    let init: BTreeSet<Pddl8GroundAtom> = problem.init.iter()
-        .map(|a| Pddl8GroundAtom { pred: a.pred.clone(), args: a.args.clone() })
+    let init: BTreeSet<Pddl8GroundAtom> = problem
+        .init
+        .iter()
+        .map(|a| Pddl8GroundAtom {
+            pred: a.pred.clone(),
+            args: a.args.clone(),
+        })
         .collect();
-    let goal: Vec<Pddl8GroundAtom> = problem.goal.iter()
-        .map(|a| Pddl8GroundAtom { pred: a.pred.clone(), args: a.args.clone() })
+    let goal: Vec<Pddl8GroundAtom> = problem
+        .goal
+        .iter()
+        .map(|a| Pddl8GroundAtom {
+            pred: a.pred.clone(),
+            args: a.args.clone(),
+        })
         .collect();
 
     // Admit all ops EXCEPT the first one. Step 0 has no matching rule → StepDenied.
     let permitted: Vec<String> = tape.ops[1..].iter().map(|op| op.label.clone()).collect();
-    let rules: Vec<(&str, Vec<&str>)> = permitted.iter()
+    let rules: Vec<(&str, Vec<&str>)> = permitted
+        .iter()
         .map(|label| (label.as_str(), vec![]))
         .collect();
 
@@ -127,7 +154,8 @@ fn prolog8_horn_denies_unadmitted_action() {
     assert!(
         matches!(result, Err(Pddl8Error::StepDenied { op_index: 0, .. })),
         "expected StepDenied at step 0 ({:?}), got: {:?}",
-        tape.ops[0].label, result
+        tape.ops[0].label,
+        result
     );
 }
 
@@ -138,11 +166,21 @@ fn receipt_differs_by_case_id() {
     let problem = problem_from_pddl(BLOCKSWORLD_PROBLEM).unwrap();
     let gp = GroundProblem::build(&domain, &problem, None).unwrap();
     let tape = gp.find_plan().unwrap();
-    let init: BTreeSet<Pddl8GroundAtom> = problem.init.iter()
-        .map(|a| Pddl8GroundAtom { pred: a.pred.clone(), args: a.args.clone() })
+    let init: BTreeSet<Pddl8GroundAtom> = problem
+        .init
+        .iter()
+        .map(|a| Pddl8GroundAtom {
+            pred: a.pred.clone(),
+            args: a.args.clone(),
+        })
         .collect();
-    let goal: Vec<Pddl8GroundAtom> = problem.goal.iter()
-        .map(|a| Pddl8GroundAtom { pred: a.pred.clone(), args: a.args.clone() })
+    let goal: Vec<Pddl8GroundAtom> = problem
+        .goal
+        .iter()
+        .map(|a| Pddl8GroundAtom {
+            pred: a.pred.clone(),
+            args: a.args.clone(),
+        })
         .collect();
 
     let (_, r1, _) = execute_tape(&tape, &init, &goal, "case-001", &[]).unwrap();

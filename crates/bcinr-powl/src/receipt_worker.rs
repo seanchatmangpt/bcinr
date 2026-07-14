@@ -28,9 +28,9 @@
 
 #![forbid(unsafe_code)]
 
-use bcinr_logic::patterns::deterministic_mpmc::LockFreeMpmcRing;
-use crate::scheduler_wired::EventWorkItem;
 use crate::ocel::OcelLog;
+use crate::scheduler_wired::EventWorkItem;
+use bcinr_logic::patterns::deterministic_mpmc::LockFreeMpmcRing;
 
 const RING_CAPACITY: usize = 64;
 
@@ -75,7 +75,11 @@ impl ReceiptLog {
 
     /// Returns the raw bytes of entry `idx`, or `None` if out of range.
     pub fn entry(&self, idx: usize) -> Option<&[u8; ENTRY_BYTES]> {
-        if idx < self.count { Some(&self.buf[idx]) } else { None }
+        if idx < self.count {
+            Some(&self.buf[idx])
+        } else {
+            None
+        }
     }
 
     /// Append a pre-serialised entry. Returns the byte offset of the appended entry.
@@ -90,7 +94,9 @@ impl ReceiptLog {
 }
 
 impl Default for ReceiptLog {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -107,7 +113,13 @@ struct Pending {
 
 impl Pending {
     const fn empty() -> Self {
-        Self { run_id: 0, op_trace: 0, topo_tag: 0, active: false, had_overflow: false }
+        Self {
+            run_id: 0,
+            op_trace: 0,
+            topo_tag: 0,
+            active: false,
+            had_overflow: false,
+        }
     }
 }
 
@@ -174,7 +186,9 @@ impl ReceiptWorker {
             };
 
             self.pending[slot].op_trace |= item.op_trace_so_far;
-            let _ = self.ocel.record_op_fired(item.run_id, item.op_idx, item.kind_tag);
+            let _ = self
+                .ocel
+                .record_op_fired(item.run_id, item.op_idx, item.kind_tag);
 
             // If all ops have fired, finalise the receipt.
             if self.pending[slot].op_trace & full_mask == full_mask {
@@ -183,7 +197,11 @@ impl ReceiptWorker {
                     self.pending[slot].op_trace,
                     self.pending[slot].topo_tag,
                 );
-                let overflow_bit: u8 = if self.pending[slot].had_overflow { 0x80 } else { 0x00 };
+                let overflow_bit: u8 = if self.pending[slot].had_overflow {
+                    0x80
+                } else {
+                    0x00
+                };
                 let entry = self.build_entry(run_id, op_trace, topo_tag | overflow_bit);
                 // Update running chain head before appending.
                 let mut chain_hash = [0u8; 32];
@@ -249,7 +267,9 @@ impl ReceiptWorker {
 }
 
 impl Default for ReceiptWorker {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -266,33 +286,43 @@ mod tests {
 
     #[test]
     fn content_hash_nonzero_for_two_op_tape() {
-            use crate::typestate::HasPowlTape;
         use crate::compiler::{compile_powl, PowlAstNode};
+        use crate::typestate::HasPowlTape;
 
         let tape = compile_powl(&PowlAstNode::Sequence(vec![
             PowlAstNode::Atom("a"),
             PowlAstNode::Atom("b"),
-        ])).unwrap();
+        ]))
+        .unwrap();
 
         let hash = tape.content_hash();
-        assert_ne!(hash, [0u8; 32], "content_hash must be non-zero for a real tape");
+        assert_ne!(
+            hash, [0u8; 32],
+            "content_hash must be non-zero for a real tape"
+        );
     }
 
     #[test]
     fn content_hash_differs_for_different_pred_masks() {
-        use crate::typestate::HasPowlTape;
         use crate::compiler::{compile_powl, PowlAstNode};
+        use crate::typestate::HasPowlTape;
 
         let seq = compile_powl(&PowlAstNode::Sequence(vec![
-            PowlAstNode::Atom("a"), PowlAstNode::Atom("b"),
-        ])).unwrap();
+            PowlAstNode::Atom("a"),
+            PowlAstNode::Atom("b"),
+        ]))
+        .unwrap();
         let par = compile_powl(&PowlAstNode::PartialOrder {
             children: vec![PowlAstNode::Atom("a"), PowlAstNode::Atom("b")],
             edges: vec![],
-        }).unwrap();
+        })
+        .unwrap();
 
-        assert_ne!(seq.content_hash(), par.content_hash(),
-            "sequential and parallel tapes must have different content hashes");
+        assert_ne!(
+            seq.content_hash(),
+            par.content_hash(),
+            "sequential and parallel tapes must have different content hashes"
+        );
     }
 
     #[test]
@@ -301,8 +331,18 @@ mod tests {
         let run_id = 42u64;
         let full_mask = 0b11u64; // two ops
 
-        ring.push_t1(EventWorkItem { op_idx: 0, run_id, op_trace_so_far: 0b01, kind_tag: 0 });
-        ring.push_t1(EventWorkItem { op_idx: 1, run_id, op_trace_so_far: 0b11, kind_tag: 0 });
+        ring.push_t1(EventWorkItem {
+            op_idx: 0,
+            run_id,
+            op_trace_so_far: 0b01,
+            kind_tag: 0,
+        });
+        ring.push_t1(EventWorkItem {
+            op_idx: 1,
+            run_id,
+            op_trace_so_far: 0b11,
+            kind_tag: 0,
+        });
 
         let mut worker = ReceiptWorker::new();
         let sealed = worker.drain(&ring, full_mask, 10, 0);
@@ -316,8 +356,18 @@ mod tests {
         let ring = make_ring();
         let full_mask = 0b1u64; // single-op runs
 
-        ring.push_t1(EventWorkItem { op_idx: 0, run_id: 1, op_trace_so_far: 0b1, kind_tag: 0 });
-        ring.push_t1(EventWorkItem { op_idx: 0, run_id: 2, op_trace_so_far: 0b1, kind_tag: 0 });
+        ring.push_t1(EventWorkItem {
+            op_idx: 0,
+            run_id: 1,
+            op_trace_so_far: 0b1,
+            kind_tag: 0,
+        });
+        ring.push_t1(EventWorkItem {
+            op_idx: 0,
+            run_id: 2,
+            op_trace_so_far: 0b1,
+            kind_tag: 0,
+        });
 
         let mut worker = ReceiptWorker::new();
         let sealed = worker.drain(&ring, full_mask, 10, 0);
@@ -329,7 +379,11 @@ mod tests {
         let e1 = worker.log.entry(1).unwrap();
 
         // Chain hashes must differ.
-        assert_ne!(&e0[17..49], &e1[17..49], "chain hashes must differ across runs");
+        assert_ne!(
+            &e0[17..49],
+            &e1[17..49],
+            "chain hashes must differ across runs"
+        );
 
         // entry[1]'s chain_hash must include entry[0]'s chain_hash as input.
         // Recompute: BLAKE3(e0_chain_hash ‖ run_id=2 ‖ op_trace=1 ‖ topo_tag=0)
@@ -351,8 +405,18 @@ mod tests {
         let ring = make_ring();
         let full_mask = 0b1u64;
 
-        ring.push_t1(EventWorkItem { op_idx: 0, run_id: 10, op_trace_so_far: 0b1, kind_tag: 0 });
-        ring.push_t1(EventWorkItem { op_idx: 0, run_id: 20, op_trace_so_far: 0b1, kind_tag: 0 });
+        ring.push_t1(EventWorkItem {
+            op_idx: 0,
+            run_id: 10,
+            op_trace_so_far: 0b1,
+            kind_tag: 0,
+        });
+        ring.push_t1(EventWorkItem {
+            op_idx: 0,
+            run_id: 20,
+            op_trace_so_far: 0b1,
+            kind_tag: 0,
+        });
 
         let mut worker = ReceiptWorker::new();
         worker.drain(&ring, full_mask, 10, 0);
@@ -365,7 +429,10 @@ mod tests {
         // Second entry: replay_ptr at offset ENTRY_BYTES.
         let e1 = worker.log.entry(1).unwrap();
         let ptr1 = u64::from_le_bytes(e1[49..57].try_into().unwrap());
-        assert_eq!(ptr1, ENTRY_BYTES as u64, "second entry replay_ptr must be 57");
+        assert_eq!(
+            ptr1, ENTRY_BYTES as u64,
+            "second entry replay_ptr must be 57"
+        );
     }
 
     // ---------------------------------------------------------------------------
@@ -399,9 +466,24 @@ mod tests {
         let ring = make_ring();
         let full_mask = 0b1u64;
 
-        ring.push_t1(EventWorkItem { op_idx: 0, run_id: 100, op_trace_so_far: 0b1, kind_tag: 0 });
-        ring.push_t1(EventWorkItem { op_idx: 0, run_id: 200, op_trace_so_far: 0b1, kind_tag: 1 });
-        ring.push_t1(EventWorkItem { op_idx: 0, run_id: 300, op_trace_so_far: 0b1, kind_tag: 2 });
+        ring.push_t1(EventWorkItem {
+            op_idx: 0,
+            run_id: 100,
+            op_trace_so_far: 0b1,
+            kind_tag: 0,
+        });
+        ring.push_t1(EventWorkItem {
+            op_idx: 0,
+            run_id: 200,
+            op_trace_so_far: 0b1,
+            kind_tag: 1,
+        });
+        ring.push_t1(EventWorkItem {
+            op_idx: 0,
+            run_id: 300,
+            op_trace_so_far: 0b1,
+            kind_tag: 2,
+        });
 
         let mut worker = ReceiptWorker::new();
         let sealed = worker.drain(&ring, full_mask, 10, 0);
@@ -422,7 +504,11 @@ mod tests {
             h.update(&100u64.to_le_bytes());
             h.update(&1u64.to_le_bytes());
             h.update(&[0u8]);
-            assert_eq!(hash0, *h.finalize().as_bytes(), "entry[0] chain_hash mismatch");
+            assert_eq!(
+                hash0,
+                *h.finalize().as_bytes(),
+                "entry[0] chain_hash mismatch"
+            );
         }
 
         // Verify entry[1] depends on entry[0]'s hash.
@@ -432,7 +518,11 @@ mod tests {
             h.update(&200u64.to_le_bytes());
             h.update(&1u64.to_le_bytes());
             h.update(&[1u8]);
-            assert_eq!(hash1, *h.finalize().as_bytes(), "entry[1] must chain from entry[0]");
+            assert_eq!(
+                hash1,
+                *h.finalize().as_bytes(),
+                "entry[1] must chain from entry[0]"
+            );
         }
 
         // Verify entry[2] depends on entry[1]'s hash.
@@ -442,7 +532,11 @@ mod tests {
             h.update(&300u64.to_le_bytes());
             h.update(&1u64.to_le_bytes());
             h.update(&[2u8]);
-            assert_eq!(hash2, *h.finalize().as_bytes(), "entry[2] must chain from entry[1]");
+            assert_eq!(
+                hash2,
+                *h.finalize().as_bytes(),
+                "entry[2] must chain from entry[1]"
+            );
         }
     }
 
@@ -450,12 +544,25 @@ mod tests {
     fn ring_overflow_at_65_items_drops_without_corruption() {
         let ring = make_ring();
         for i in 0u64..65 {
-            ring.push_t1(EventWorkItem { op_idx: 0, run_id: i, op_trace_so_far: 0b1, kind_tag: 0 });
+            ring.push_t1(EventWorkItem {
+                op_idx: 0,
+                run_id: i,
+                op_trace_so_far: 0b1,
+                kind_tag: 0,
+            });
         }
         let mut worker = ReceiptWorker::new();
         let sealed = worker.drain(&ring, 0b1, 200, 0);
-        assert!(sealed <= 64, "must not seal more than ring capacity: sealed={}", sealed);
-        assert_eq!(worker.log.len() as u32, sealed, "log len must equal sealed count");
+        assert!(
+            sealed <= 64,
+            "must not seal more than ring capacity: sealed={}",
+            sealed
+        );
+        assert_eq!(
+            worker.log.len() as u32,
+            sealed,
+            "log len must equal sealed count"
+        );
     }
 
     #[test]
@@ -464,17 +571,42 @@ mod tests {
         let run_id = 99u64;
         let full_mask = 0b111u64;
         // Push in reverse order
-        ring.push_t1(EventWorkItem { op_idx: 2, run_id, op_trace_so_far: 0b100, kind_tag: 0 });
-        ring.push_t1(EventWorkItem { op_idx: 1, run_id, op_trace_so_far: 0b110, kind_tag: 0 });
-        ring.push_t1(EventWorkItem { op_idx: 0, run_id, op_trace_so_far: 0b111, kind_tag: 0 });
+        ring.push_t1(EventWorkItem {
+            op_idx: 2,
+            run_id,
+            op_trace_so_far: 0b100,
+            kind_tag: 0,
+        });
+        ring.push_t1(EventWorkItem {
+            op_idx: 1,
+            run_id,
+            op_trace_so_far: 0b110,
+            kind_tag: 0,
+        });
+        ring.push_t1(EventWorkItem {
+            op_idx: 0,
+            run_id,
+            op_trace_so_far: 0b111,
+            kind_tag: 0,
+        });
         let mut worker = ReceiptWorker::new();
         let sealed = worker.drain(&ring, full_mask, 10, 0);
         assert_eq!(sealed, 1, "must seal after all three ops arrive");
 
         // Verify partial trace does not seal early
         let ring2 = make_ring();
-        ring2.push_t1(EventWorkItem { op_idx: 2, run_id: 200, op_trace_so_far: 0b100, kind_tag: 0 });
-        ring2.push_t1(EventWorkItem { op_idx: 1, run_id: 200, op_trace_so_far: 0b110, kind_tag: 0 });
+        ring2.push_t1(EventWorkItem {
+            op_idx: 2,
+            run_id: 200,
+            op_trace_so_far: 0b100,
+            kind_tag: 0,
+        });
+        ring2.push_t1(EventWorkItem {
+            op_idx: 1,
+            run_id: 200,
+            op_trace_so_far: 0b110,
+            kind_tag: 0,
+        });
         let mut worker2 = ReceiptWorker::new();
         let sealed2 = worker2.drain(&ring2, full_mask, 10, 0);
         assert_eq!(sealed2, 0, "incomplete trace must not seal");
@@ -484,7 +616,12 @@ mod tests {
     fn overflow_count_zero_when_ring_never_full() {
         let ring = make_ring();
         let full_mask = 0b1u64;
-        ring.push_t1(EventWorkItem { op_idx: 0, run_id: 1, op_trace_so_far: 0b1, kind_tag: 0 });
+        ring.push_t1(EventWorkItem {
+            op_idx: 0,
+            run_id: 1,
+            op_trace_so_far: 0b1,
+            kind_tag: 0,
+        });
         let mut worker = ReceiptWorker::new();
         worker.drain(&ring, full_mask, 10, 0);
         assert_eq!(worker.overflow(), 0);

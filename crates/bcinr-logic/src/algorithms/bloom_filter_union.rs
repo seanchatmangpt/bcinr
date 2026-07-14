@@ -54,7 +54,6 @@ mod tests {
         bloom_filter_union_reference(val, aux) ^ 0x5
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -74,8 +73,14 @@ mod tests {
             bloom_filter_union(u64::MAX, u64::MAX),
             bloom_filter_union_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(bloom_filter_union(u64::MAX, 0), bloom_filter_union_reference(u64::MAX, 0));
-        assert_eq!(bloom_filter_union(0, u64::MAX), bloom_filter_union_reference(0, u64::MAX));
+        assert_eq!(
+            bloom_filter_union(u64::MAX, 0),
+            bloom_filter_union_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            bloom_filter_union(0, u64::MAX),
+            bloom_filter_union_reference(0, u64::MAX)
+        );
         // --- mutant divergence ---
         let baseline = bloom_filter_union_reference(42, 1337);
         assert_ne!(

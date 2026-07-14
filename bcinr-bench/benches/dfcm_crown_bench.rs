@@ -15,7 +15,10 @@ use std::time::Instant;
 #[divan::bench(sample_count = 3, sample_size = 1)]
 fn dfcm_crown_suite_bench() {
     let receipt = divan::black_box(run_dfcm_crown_suite().expect("dfcm crown suite"));
-    assert!(receipt.suite_passed_5s_gate, "DfCM crown suite exceeded the 5s gate");
+    assert!(
+        receipt.suite_passed_5s_gate,
+        "DfCM crown suite exceeded the 5s gate"
+    );
 }
 
 fn main() {

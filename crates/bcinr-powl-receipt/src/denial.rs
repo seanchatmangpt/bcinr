@@ -110,7 +110,7 @@ impl DenialPolarity {
         | (lane(32) << 4)  // bit 4
         | (lane(40) << 5)  // bit 5
         | (lane(48) << 6)  // bit 6
-        | (lane(56) << 7)  // bit 7
+        | (lane(56) << 7) // bit 7
     }
 }
 
@@ -137,8 +137,7 @@ mod tests {
 
     #[test]
     fn compose_is_or() {
-        let combined = DenialPolarity::PRECONDITION_FAILED
-            .compose(DenialPolarity::SLA_BREACH);
+        let combined = DenialPolarity::PRECONDITION_FAILED.compose(DenialPolarity::SLA_BREACH);
         assert_eq!(
             combined.0,
             DenialPolarity::PRECONDITION_FAILED.0 | DenialPolarity::SLA_BREACH.0
@@ -162,13 +161,13 @@ mod tests {
     fn to_fired_mask_each_lane_distinct_bit() {
         // Each constant maps to exactly one distinct bit.
         let cases: &[(DenialPolarity, u64)] = &[
-            (DenialPolarity::PRECONDITION_FAILED,        1 << 1),
-            (DenialPolarity::SLA_BREACH,                 1 << 2),
-            (DenialPolarity::AUTHORIZATION_DENIED,       1 << 3),
-            (DenialPolarity::RESOURCE_EXHAUSTED,         1 << 4),
+            (DenialPolarity::PRECONDITION_FAILED, 1 << 1),
+            (DenialPolarity::SLA_BREACH, 1 << 2),
+            (DenialPolarity::AUTHORIZATION_DENIED, 1 << 3),
+            (DenialPolarity::RESOURCE_EXHAUSTED, 1 << 4),
             (DenialPolarity::OBJECT_LIFECYCLE_VIOLATION, 1 << 5),
-            (DenialPolarity::CONFORMANCE_GATE_FAILED,    1 << 6),
-            (DenialPolarity::WATCHDOG_DRAINED,           1 << 7),
+            (DenialPolarity::CONFORMANCE_GATE_FAILED, 1 << 6),
+            (DenialPolarity::WATCHDOG_DRAINED, 1 << 7),
         ];
         for (polarity, expected_bit) in cases {
             let mask = polarity.to_fired_mask();
@@ -182,8 +181,8 @@ mod tests {
 
     #[test]
     fn to_fired_mask_combined_sets_multiple_bits() {
-        let combined = DenialPolarity::PRECONDITION_FAILED
-            .compose(DenialPolarity::WATCHDOG_DRAINED);
+        let combined =
+            DenialPolarity::PRECONDITION_FAILED.compose(DenialPolarity::WATCHDOG_DRAINED);
         let mask = combined.to_fired_mask();
         // Both bits 1 and 7 must be set, nothing else.
         assert_eq!(mask, (1 << 1) | (1 << 7));

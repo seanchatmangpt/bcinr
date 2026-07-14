@@ -1,8 +1,10 @@
 //! Branchless Petri net token replay engine implementation.
 //! Adheres strictly to bcinr's Radon Law (CC=1), zero-alloc, and no_std constraints.
 
-use bcinr_logic::int::popcount_u64;
-use bcinr_logic::mask::{is_zero_mask_u32, select_u32, select_u64, lt_mask_u32, min_u32};
+use bcinr_logic::{
+    int::popcount_u64,
+    mask::{is_zero_mask_u32, lt_mask_u32, min_u32, select_u32, select_u64},
+};
 
 /// Results of the token replay operation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -20,12 +22,7 @@ pub struct ReplayResult {
 impl ReplayResult {
     /// Creates a new `ReplayResult`.
     pub const fn new(missing: u32, remaining: u32, produced: u32, consumed: u32) -> Self {
-        Self {
-            missing,
-            remaining,
-            produced,
-            consumed,
-        }
+        Self { missing, remaining, produced, consumed }
     }
 
     /// Calculates the fitness score branchlessly.
@@ -37,10 +34,10 @@ impl ReplayResult {
         let denom_u32 = self.consumed.wrapping_add(self.missing).wrapping_add(self.produced);
         let is_zero = is_zero_mask_u32(denom_u32);
         let safe_denom = select_u32(is_zero, 1, denom_u32);
-        
+
         let sum_num = self.missing.wrapping_add(self.remaining);
         let raw_fitness = 1.0 - (f64::from(sum_num) / f64::from(safe_denom));
-        
+
         let is_zero_64 = (u64::from(is_zero)) | (u64::from(is_zero) << 32);
         let fit_bits = select_u64(is_zero_64, (1.0f64).to_bits(), raw_fitness.to_bits());
         f64::from_bits(fit_bits)
@@ -78,11 +75,7 @@ pub fn petri_fire_transition(
 ///
 /// Bounded to a fixed count (16x16 iterations) to comply with CC = 1.
 #[inline(always)]
-pub fn petri_fire_invisible(
-    marking: &mut u64,
-    inv_in_masks: &[u64],
-    inv_out_masks: &[u64],
-) {
+pub fn petri_fire_invisible(marking: &mut u64, inv_in_masks: &[u64], inv_out_masks: &[u64]) {
     let len_in = inv_in_masks.len();
     let len_out = inv_out_masks.len();
     let len = min_u32(len_in as u32, len_out as u32) as usize;

@@ -14,14 +14,16 @@
 //! `go [movetime ms | nodes N]`, `setoption`, `quit`.
 //! Plus a non-UCI `bench` command that reports GPU eval throughput (boards/sec).
 
-use chess::{Board, BoardStatus, ChessMove, Color, MoveGen, Piece};
-use pollster::FutureExt;
-use std::io::{self, BufRead, Write};
-use std::str::FromStr;
-use std::time::Instant;
-use wgpu::util::DeviceExt;
+use std::{
+    io::{self, BufRead, Write},
+    str::FromStr,
+    time::Instant,
+};
 
+use chess::{Board, BoardStatus, ChessMove, Color, MoveGen, Piece};
 use playground::nnue::BranchTorchNNUE;
+use pollster::FutureExt;
+use wgpu::util::DeviceExt;
 
 const C_PUCT: f32 = 1.5;
 
@@ -91,13 +93,7 @@ impl GpuEval {
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 
-        GpuEval {
-            device,
-            queue,
-            pipeline,
-            nnue_buffer,
-            boards_evaluated: 0,
-        }
+        GpuEval { device, queue, pipeline, nnue_buffer, boards_evaluated: 0 }
     }
 
     /// Evaluate a batch of accumulators, returning the i32 value head per board
@@ -112,13 +108,11 @@ impl GpuEval {
         let mut input = boards.to_vec();
         input.resize(padded, Accumulator { hidden: [0; 16] });
 
-        let input_buffer = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Input"),
-                contents: bytemuck::cast_slice(&input),
-                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            });
+        let input_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Input"),
+            contents: bytemuck::cast_slice(&input),
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        });
         let value_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Value"),
             size: (padded * 4) as u64,
@@ -137,28 +131,15 @@ impl GpuEval {
             label: None,
             layout: &layout,
             entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: self.nnue_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: input_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: value_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: policy_buffer.as_entire_binding(),
-                },
+                wgpu::BindGroupEntry { binding: 0, resource: self.nnue_buffer.as_entire_binding() },
+                wgpu::BindGroupEntry { binding: 1, resource: input_buffer.as_entire_binding() },
+                wgpu::BindGroupEntry { binding: 2, resource: value_buffer.as_entire_binding() },
+                wgpu::BindGroupEntry { binding: 3, resource: policy_buffer.as_entire_binding() },
             ],
         });
 
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+        let mut encoder =
+            self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
         {
             let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: None,
@@ -199,14 +180,8 @@ impl GpuEval {
 /// Incremental L1 accumulator on the CPU (same content the shader consumes).
 fn board_to_acc(b: &Board, nnue: &BranchTorchNNUE) -> Accumulator {
     let mut hidden = nnue.l1_biases;
-    let pieces = [
-        Piece::Pawn,
-        Piece::Knight,
-        Piece::Bishop,
-        Piece::Rook,
-        Piece::Queen,
-        Piece::King,
-    ];
+    let pieces =
+        [Piece::Pawn, Piece::Knight, Piece::Bishop, Piece::Rook, Piece::Queen, Piece::King];
     for (p_idx, &p) in pieces.iter().enumerate() {
         let w_bb = *b.color_combined(Color::White) & *b.pieces(p);
         for sq in w_bb {
@@ -228,11 +203,7 @@ fn board_to_acc(b: &Board, nnue: &BranchTorchNNUE) -> Accumulator {
 
 /// Map a White-relative centipawn score to a side-to-move value in (-1, 1).
 fn stm_value(white_cp: i32, stm: Color) -> f32 {
-    let cp = if stm == Color::White {
-        white_cp as f32
-    } else {
-        -(white_cp as f32)
-    };
+    let cp = if stm == Color::White { white_cp as f32 } else { -(white_cp as f32) };
     // tanh squashing; branch-free.
     let x = cp / 400.0;
     let e = (2.0 * x).exp();
@@ -266,12 +237,7 @@ struct Mcts<'a> {
 
 impl<'a> Mcts<'a> {
     fn new(root: Board, gpu: &'a mut GpuEval, nnue: &'a BranchTorchNNUE, hybrid: bool) -> Self {
-        let mut m = Mcts {
-            nodes: Vec::with_capacity(1 << 16),
-            gpu,
-            nnue,
-            hybrid,
-        };
+        let mut m = Mcts { nodes: Vec::with_capacity(1 << 16), gpu, nnue, hybrid };
         m.nodes.push(Node {
             board: root,
             mv: None,
@@ -393,11 +359,8 @@ impl<'a> Mcts<'a> {
         for (leaf, start, moves, boards) in plan {
             let n = moves.len();
             let cps = &white_cps[start..start + n];
-            let mut child_vals: Vec<f32> = boards
-                .iter()
-                .zip(cps)
-                .map(|(b, &cp)| stm_value(cp, b.side_to_move()))
-                .collect();
+            let mut child_vals: Vec<f32> =
+                boards.iter().zip(cps).map(|(b, &cp)| stm_value(cp, b.side_to_move())).collect();
             if self.hybrid {
                 for (i, cb) in boards.iter().enumerate() {
                     if let Some(adj) = self.tactical_guard(cb) {
@@ -432,9 +395,7 @@ impl<'a> Mcts<'a> {
         // --- 4. Back-propagate every path, removing the virtual loss.
         for path in &paths {
             let leaf = *path.last().unwrap();
-            let v = self.nodes[leaf]
-                .terminal
-                .unwrap_or(self.nodes[leaf].pending_value);
+            let v = self.nodes[leaf].terminal.unwrap_or(self.nodes[leaf].pending_value);
             let mut x = v;
             for &node in path.iter().rev() {
                 self.nodes[node].vloss = self.nodes[node].vloss.saturating_sub(1);
@@ -494,7 +455,14 @@ fn softmax(xs: &[f32]) -> Vec<f32> {
 // Driver
 // ---------------------------------------------------------------------------
 
-fn search(board: &Board, gpu: &mut GpuEval, nnue: &BranchTorchNNUE, hybrid: bool, max_ms: u128, max_nodes: u64) -> Option<ChessMove> {
+fn search(
+    board: &Board,
+    gpu: &mut GpuEval,
+    nnue: &BranchTorchNNUE,
+    hybrid: bool,
+    max_ms: u128,
+    max_nodes: u64,
+) -> Option<ChessMove> {
     let start = Instant::now();
     let before = gpu.boards_evaluated;
     let mut tree = Mcts::new(*board, gpu, nnue, hybrid);
@@ -594,7 +562,8 @@ fn main() {
                             i += 1;
                         }
                         "nodes" => {
-                            max_nodes = t.get(i + 1).and_then(|s| s.parse().ok()).unwrap_or(u64::MAX);
+                            max_nodes =
+                                t.get(i + 1).and_then(|s| s.parse().ok()).unwrap_or(u64::MAX);
                             i += 1;
                         }
                         _ => {}
@@ -612,11 +581,20 @@ fn main() {
                 // Debug: GPU value of the current board and of each legal move.
                 let acc = board_to_acc(&board, &nnue);
                 let wcp = gpu.values(&[acc])[0];
-                writeln!(out, "white_cp={} stm_value={:.3} cpu_hidden0={}", wcp, stm_value(wcp, board.side_to_move()), acc.hidden[0]).unwrap();
+                writeln!(
+                    out,
+                    "white_cp={} stm_value={:.3} cpu_hidden0={}",
+                    wcp,
+                    stm_value(wcp, board.side_to_move()),
+                    acc.hidden[0]
+                )
+                .unwrap();
                 let moves: Vec<ChessMove> = MoveGen::new_legal(&board).collect();
-                let accs: Vec<Accumulator> = moves.iter().map(|m| board_to_acc(&board.make_move_new(*m), &nnue)).collect();
+                let accs: Vec<Accumulator> =
+                    moves.iter().map(|m| board_to_acc(&board.make_move_new(*m), &nnue)).collect();
                 let cps = gpu.values(&accs);
-                let mut scored: Vec<(ChessMove, i32)> = moves.iter().cloned().zip(cps.iter().cloned()).collect();
+                let mut scored: Vec<(ChessMove, i32)> =
+                    moves.iter().cloned().zip(cps.iter().cloned()).collect();
                 // best for side-to-move: lowest white_cp if black to move, highest if white
                 let stm = board.side_to_move();
                 scored.sort_by_key(|(_, cp)| if stm == Color::White { -*cp } else { *cp });

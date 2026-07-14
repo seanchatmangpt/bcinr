@@ -1,11 +1,11 @@
-use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 use bcinr_powl_receipt::{
-    causal_receipt::{OcelCausalReceipt},
+    causal_receipt::OcelCausalReceipt,
     conformance::{ConformanceMetrics, ConformancePredicate},
     denial::DenialPolarity,
     ocel_emit::OcelEmitArena,
     replay::{PowlReplayFrame, PowlReplayVerifier},
 };
+use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 
 // ---------------------------------------------------------------------------
 // Bench 1: OcelEmitArena::emit — target < 10 ns
@@ -21,7 +21,9 @@ fn bench_ocel_emit(c: &mut Criterion) {
             let start = std::time::Instant::now();
             for i in 0..iters {
                 let _ = arena.emit(i, 0, &[], DenialPolarity::ADMITTED, 0);
-                if arena.len() >= 4090 { arena = OcelEmitArena::new(); }
+                if arena.len() >= 4090 {
+                    arena = OcelEmitArena::new();
+                }
             }
             start.elapsed()
         })
@@ -34,7 +36,9 @@ fn bench_ocel_emit(c: &mut Criterion) {
             let start = std::time::Instant::now();
             for i in 0..iters {
                 let _ = arena.emit(i, 1, &obj_refs, DenialPolarity::ADMITTED, 2);
-                if arena.len() >= 4090 { arena = OcelEmitArena::new(); }
+                if arena.len() >= 4090 {
+                    arena = OcelEmitArena::new();
+                }
             }
             start.elapsed()
         })
@@ -46,7 +50,9 @@ fn bench_ocel_emit(c: &mut Criterion) {
             let start = std::time::Instant::now();
             for i in 0..iters {
                 let _ = arena.emit(i, 2, &[], DenialPolarity::SLA_BREACH, 0);
-                if arena.len() >= 4090 { arena = OcelEmitArena::new(); }
+                if arena.len() >= 4090 {
+                    arena = OcelEmitArena::new();
+                }
             }
             start.elapsed()
         })
@@ -65,7 +71,9 @@ fn bench_causal_chain(c: &mut Criterion) {
 
     // Build a frame via the arena (only public constructor)
     let mut seed_arena = OcelEmitArena::new();
-    let frame = seed_arena.emit(42, 7, &[], DenialPolarity::ADMITTED, 0).clone(); // Clone now derived
+    let frame = seed_arena
+        .emit(42, 7, &[], DenialPolarity::ADMITTED, 0)
+        .clone(); // Clone now derived
 
     g.bench_function("chain_1_frame_blake3", |b| {
         b.iter(|| {
@@ -96,16 +104,16 @@ fn bench_causal_chain(c: &mut Criterion) {
 fn bench_conformance_check(c: &mut Criterion) {
     let pred = ConformancePredicate::STRICT;
     let passing = ConformanceMetrics {
-        fitness:        0xFFFF_0000,
-        precision:      0xFFFF_0000,
+        fitness: 0xFFFF_0000,
+        precision: 0xFFFF_0000,
         generalization: 0xFFFF_0000,
-        simplicity:     0xFFFF_0000,
+        simplicity: 0xFFFF_0000,
     };
     let failing = ConformanceMetrics {
-        fitness:        0x7FFF_0000,
-        precision:      0xFFFF_0000,
+        fitness: 0x7FFF_0000,
+        precision: 0xFFFF_0000,
         generalization: 0xFFFF_0000,
-        simplicity:     0xFFFF_0000,
+        simplicity: 0xFFFF_0000,
     };
 
     c.bench_function("conformance_check_pass", |b| {
@@ -121,15 +129,17 @@ fn bench_conformance_check(c: &mut Criterion) {
 // ---------------------------------------------------------------------------
 
 fn sequential_frames(n: u32) -> Vec<PowlReplayFrame> {
-    (0..n).map(|i| PowlReplayFrame {
-        node_id:            i,
-        node_bit:           1u64 << i,
-        required_tokens:    if i == 0 { 1u64 } else { 1u64 << (i - 1) },
-        produces_tokens:    if i < n - 1 { 1u64 << i } else { 0 },
-        activity:           format!("op{i}"),
-        ts_ns:              i as u64 * 1000,
-        object_ids:         vec![],
-    }).collect()
+    (0..n)
+        .map(|i| PowlReplayFrame {
+            node_id: i,
+            node_bit: 1u64 << i,
+            required_tokens: if i == 0 { 1u64 } else { 1u64 << (i - 1) },
+            produces_tokens: if i < n - 1 { 1u64 << i } else { 0 },
+            activity: format!("op{i}"),
+            ts_ns: i as u64 * 1000,
+            object_ids: vec![],
+        })
+        .collect()
 }
 
 fn bench_replay_verifier(c: &mut Criterion) {
@@ -140,7 +150,9 @@ fn bench_replay_verifier(c: &mut Criterion) {
     g.bench_function("replay_10_frames", |b| {
         b.iter(|| {
             let mut v = PowlReplayVerifier::new(1u64);
-            for f in &frames10 { let _ = v.replay_frame(f); }
+            for f in &frames10 {
+                let _ = v.replay_frame(f);
+            }
             criterion::black_box(v.finalize())
         })
     });
@@ -151,7 +163,9 @@ fn bench_replay_verifier(c: &mut Criterion) {
     g.bench_function("replay_64_frames_max", |b| {
         b.iter(|| {
             let mut v = PowlReplayVerifier::new(1u64);
-            for f in &frames64 { let _ = v.replay_frame(f); }
+            for f in &frames64 {
+                let _ = v.replay_frame(f);
+            }
             criterion::black_box(v.finalize())
         })
     });
@@ -175,7 +189,9 @@ fn bench_denial_polarity(c: &mut Criterion) {
     c.bench_function("denial_to_fired_mask", |b| {
         b.iter(|| {
             let mut acc = 0u64;
-            for &p in &polarities { acc ^= p.to_fired_mask(); }
+            for &p in &polarities {
+                acc ^= p.to_fired_mask();
+            }
             criterion::black_box(acc)
         })
     });

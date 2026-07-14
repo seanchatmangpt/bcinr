@@ -9,8 +9,8 @@ use wasm4pm_compat::pddl::TemporalPlan;
 pub struct PowlOpSpec {
     pub kind: PowlOpKind,
     pub label: String,
-    pub pred_mask: u64,   // bitmask of preceding ops that must complete
-    pub succ_mask: u64,   // bitmask of this op (1 << index)
+    pub pred_mask: u64, // bitmask of preceding ops that must complete
+    pub succ_mask: u64, // bitmask of this op (1 << index)
     pub start_time: Option<f64>,
     pub duration: Option<f64>,
 }
@@ -41,7 +41,9 @@ pub fn temporal_plan_to_powl_tape(plan: &TemporalPlan) -> Vec<PowlOpSpec> {
         //   AND they are not concurrent (no time overlap)
         let mut pred_mask: u64 = 0;
         for (j, prev) in steps.iter().enumerate() {
-            if j >= i { continue; }
+            if j >= i {
+                continue;
+            }
             let prev_end = prev.start_time + prev.duration;
             // prev must finish before step i starts (strict sequential dependency)
             if prev_end <= step.start_time + 1e-9 {

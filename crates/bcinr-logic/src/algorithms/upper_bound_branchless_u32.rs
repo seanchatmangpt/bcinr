@@ -81,7 +81,6 @@ mod tests {
         upper_bound_branchless_u32_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -111,9 +110,21 @@ mod tests {
         );
         // mutants
         let base = upper_bound_branchless_u32_reference(42, 1337);
-        assert_ne!(mutant_upper_bound_branchless_u32_1(42, 1337), base, "mutant 1");
-        assert_ne!(mutant_upper_bound_branchless_u32_2(42, 1337), base, "mutant 2");
-        assert_ne!(mutant_upper_bound_branchless_u32_3(42, 1337), base, "mutant 3");
+        assert_ne!(
+            mutant_upper_bound_branchless_u32_1(42, 1337),
+            base,
+            "mutant 1"
+        );
+        assert_ne!(
+            mutant_upper_bound_branchless_u32_2(42, 1337),
+            base,
+            "mutant 2"
+        );
+        assert_ne!(
+            mutant_upper_bound_branchless_u32_3(42, 1337),
+            base,
+            "mutant 3"
+        );
     }
 
     // -------------------------------------------------------------------------

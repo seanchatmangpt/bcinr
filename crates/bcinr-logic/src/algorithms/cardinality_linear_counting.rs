@@ -151,7 +151,10 @@ mod tests {
             prev_est = est;
         }
         // After 50 distinct elements, estimate should reflect growth.
-        assert!(prev_est >= 5, "Estimate should be at least 5 after 50 elements: {prev_est}");
+        assert!(
+            prev_est >= 5,
+            "Estimate should be at least 5 after 50 elements: {prev_est}"
+        );
     }
 
     #[test]

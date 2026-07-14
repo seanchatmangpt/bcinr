@@ -7,9 +7,9 @@ extern crate std;
 
 pub mod abstractions;
 pub mod algorithms;
-pub mod ct;
 pub mod autonomic;
 pub mod bitset;
+pub mod ct;
 pub mod dfa;
 pub mod exec;
 pub mod fix;

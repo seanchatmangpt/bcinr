@@ -432,7 +432,7 @@ pub fn q16_log2(x: i32) -> i32 {
     // log2(x / 65536) = log2(x) - 16.
     // Find the position of the highest set bit.
     let high_bit = 31 - xu.leading_zeros(); // position in [0, 31]
-    // Integer part of log2(x/65536): (high_bit as i32) - 16.
+                                            // Integer part of log2(x/65536): (high_bit as i32) - 16.
     let int_part = (high_bit as i32) - 16;
 
     // Fractional part: normalize x so the leading 1 is at bit 15,
@@ -507,7 +507,11 @@ mod tests {
             (u32::MAX, 0, u32::MAX, u32::MAX),
         ];
         for &(val, lo, hi, expected) in clamp_cases {
-            assert_eq!(clamp_u32(val, lo, hi), expected, "clamp_u32({val}, {lo}, {hi})");
+            assert_eq!(
+                clamp_u32(val, lo, hi),
+                expected,
+                "clamp_u32({val}, {lo}, {hi})"
+            );
         }
 
         // bucketize_u32: (val, step, expected)
@@ -523,7 +527,11 @@ mod tests {
             (0, 0, 0),
         ];
         for &(val, step, expected) in bucket_cases {
-            assert_eq!(bucketize_u32(val, step), expected, "bucketize_u32({val}, {step})");
+            assert_eq!(
+                bucketize_u32(val, step),
+                expected,
+                "bucketize_u32({val}, {step})"
+            );
         }
         let v = bucketize_u32(u32::MAX, 100);
         assert!(v <= u32::MAX);
@@ -539,8 +547,12 @@ mod tests {
         let b = f32_to_q16(3.0);
         let result = q16_mul(a, b);
         let expected = f32_to_q16(7.5);
-        assert!((result - expected).abs() <= 1,
-            "q16_mul(2.5, 3.0) = {}, expected approx {}", result, expected);
+        assert!(
+            (result - expected).abs() <= 1,
+            "q16_mul(2.5, 3.0) = {}, expected approx {}",
+            result,
+            expected
+        );
     }
 
     #[test]
@@ -557,8 +569,12 @@ mod tests {
         let b = f32_to_q16(4.0);
         let result = q16_div(a, b);
         let expected = f32_to_q16(2.5);
-        assert!((result - expected).abs() <= 2,
-            "q16_div(10.0, 4.0) = {}, expected approx {}", result, expected);
+        assert!(
+            (result - expected).abs() <= 2,
+            "q16_div(10.0, 4.0) = {}, expected approx {}",
+            result,
+            expected
+        );
     }
 
     #[test]
@@ -573,8 +589,12 @@ mod tests {
         for &v in &vals {
             let encoded = f32_to_q16(v);
             let decoded = q16_to_f32(encoded);
-            assert!((decoded - v).abs() < 0.0001,
-                "roundtrip failed for {}: got {}", v, decoded);
+            assert!(
+                (decoded - v).abs() < 0.0001,
+                "roundtrip failed for {}: got {}",
+                v,
+                decoded
+            );
         }
     }
 
@@ -609,13 +629,20 @@ mod tests {
     #[test]
     fn test_isqrt_u32_floor_property() {
         // floor(sqrt(n))^2 <= n < (floor(sqrt(n)) + 1)^2
-        let cases = [2u32, 3, 5, 7, 10, 99, 100, 101, 999, 65535, 65536, 1_000_000];
+        let cases = [
+            2u32, 3, 5, 7, 10, 99, 100, 101, 999, 65535, 65536, 1_000_000,
+        ];
         for n in cases {
             let s = isqrt_u32(n);
-            assert!(s * s <= n,
-                "isqrt({}) = {}: {}^2 > {}", n, s, s, n);
-            assert!((s + 1).saturating_mul(s + 1) > n,
-                "isqrt({}) = {}: ({}+1)^2 <= {}", n, s, s, n);
+            assert!(s * s <= n, "isqrt({}) = {}: {}^2 > {}", n, s, s, n);
+            assert!(
+                (s + 1).saturating_mul(s + 1) > n,
+                "isqrt({}) = {}: ({}+1)^2 <= {}",
+                n,
+                s,
+                s,
+                n
+            );
         }
     }
 
@@ -675,7 +702,11 @@ mod tests {
         // sqrt(4.0) = 2.0
         let four = f32_to_q16(4.0);
         let result = q16_to_f32(q16_sqrt(four));
-        assert!((result - 2.0).abs() < 0.01, "q16_sqrt(4.0) approx {}", result);
+        assert!(
+            (result - 2.0).abs() < 0.01,
+            "q16_sqrt(4.0) approx {}",
+            result
+        );
     }
 
     #[test]
@@ -683,7 +714,11 @@ mod tests {
         // sqrt(1.0) = 1.0
         let one = f32_to_q16(1.0);
         let result = q16_to_f32(q16_sqrt(one));
-        assert!((result - 1.0).abs() < 0.01, "q16_sqrt(1.0) approx {}", result);
+        assert!(
+            (result - 1.0).abs() < 0.01,
+            "q16_sqrt(1.0) approx {}",
+            result
+        );
     }
 
     #[test]
@@ -699,7 +734,11 @@ mod tests {
         let four = f32_to_q16(4.0);
         let r = q16_recip(four);
         let result = q16_to_f32(r);
-        assert!((result - 0.25).abs() < 0.01, "q16_recip(4.0) approx {}", result);
+        assert!(
+            (result - 0.25).abs() < 0.01,
+            "q16_recip(4.0) approx {}",
+            result
+        );
     }
 
     #[test]
@@ -708,7 +747,11 @@ mod tests {
         let one = f32_to_q16(1.0);
         let r = q16_recip(one);
         let result = q16_to_f32(r);
-        assert!((result - 1.0).abs() < 0.01, "q16_recip(1.0) approx {}", result);
+        assert!(
+            (result - 1.0).abs() < 0.01,
+            "q16_recip(1.0) approx {}",
+            result
+        );
     }
 
     #[test]
@@ -732,7 +775,11 @@ mod tests {
         // log2(4.0) = 2.0
         let four = f32_to_q16(4.0);
         let result = q16_to_f32(q16_log2(four));
-        assert!((result - 2.0).abs() < 0.05, "q16_log2(4.0) approx {}", result);
+        assert!(
+            (result - 2.0).abs() < 0.05,
+            "q16_log2(4.0) approx {}",
+            result
+        );
     }
 
     #[test]
@@ -740,7 +787,11 @@ mod tests {
         // log2(2.0) = 1.0
         let two = f32_to_q16(2.0);
         let result = q16_to_f32(q16_log2(two));
-        assert!((result - 1.0).abs() < 0.05, "q16_log2(2.0) approx {}", result);
+        assert!(
+            (result - 1.0).abs() < 0.05,
+            "q16_log2(2.0) approx {}",
+            result
+        );
     }
 }
 

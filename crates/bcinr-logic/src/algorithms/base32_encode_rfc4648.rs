@@ -63,7 +63,6 @@ mod tests {
         base32_encode_rfc4648_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -78,13 +77,22 @@ mod tests {
             "equivalence oracle failed"
         );
         // --- boundaries ---
-        assert_eq!(base32_encode_rfc4648(0, 0), base32_encode_rfc4648_reference(0, 0));
+        assert_eq!(
+            base32_encode_rfc4648(0, 0),
+            base32_encode_rfc4648_reference(0, 0)
+        );
         assert_eq!(
             base32_encode_rfc4648(u64::MAX, u64::MAX),
             base32_encode_rfc4648_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(base32_encode_rfc4648(u64::MAX, 0), base32_encode_rfc4648_reference(u64::MAX, 0));
-        assert_eq!(base32_encode_rfc4648(0, u64::MAX), base32_encode_rfc4648_reference(0, u64::MAX));
+        assert_eq!(
+            base32_encode_rfc4648(u64::MAX, 0),
+            base32_encode_rfc4648_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            base32_encode_rfc4648(0, u64::MAX),
+            base32_encode_rfc4648_reference(0, u64::MAX)
+        );
         // --- mutant divergence ---
         let baseline = base32_encode_rfc4648_reference(42, 1337);
         assert_ne!(

@@ -99,7 +99,11 @@ mod tests {
     fn test_single_feature_all_ones() {
         // Single feature = u64::MAX: every bit gets vote +1 → all bits set.
         let sig = simhash_cosine_u64(&[u64::MAX]);
-        assert_eq!(sig, u64::MAX, "All-ones feature must produce all-ones signature");
+        assert_eq!(
+            sig,
+            u64::MAX,
+            "All-ones feature must produce all-ones signature"
+        );
     }
 
     #[test]
@@ -142,7 +146,10 @@ mod tests {
         // With 49 shared features and 1 differing, distance should be small.
         // The changed feature flips votes for each bit it differs in; with 50
         // features the impact is bounded but can affect multiple bits.
-        assert!(dist <= 16, "Near-duplicate sets should have distance <= 16, got {dist}");
+        assert!(
+            dist <= 16,
+            "Near-duplicate sets should have distance <= 16, got {dist}"
+        );
     }
 
     proptest! {
@@ -241,8 +248,10 @@ pub mod bench {
     pub fn bench_simhash_hamming_distance(c: &mut Criterion) {
         c.bench_function("simhash_hamming_distance", |b| {
             b.iter(|| {
-                let res =
-                    simhash_hamming_distance(black_box(0xDEAD_BEEF_u64), black_box(0xCAFE_BABE_u64));
+                let res = simhash_hamming_distance(
+                    black_box(0xDEAD_BEEF_u64),
+                    black_box(0xCAFE_BABE_u64),
+                );
                 black_box(res)
             })
         });

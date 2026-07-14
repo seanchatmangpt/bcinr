@@ -116,7 +116,7 @@ mod tests {
         let nblocks = len / 4;
         for i in 0..nblocks {
             let i4 = i * 4;
-            let mut k1 = u32::from_le_bytes([data[i4], data[i4+1], data[i4+2], data[i4+3]]);
+            let mut k1 = u32::from_le_bytes([data[i4], data[i4 + 1], data[i4 + 2], data[i4 + 3]]);
             k1 = k1.wrapping_mul(0xcc9e2d51);
             k1 = k1.rotate_left(15);
             k1 = k1.wrapping_mul(0x1b873593);
@@ -126,8 +126,12 @@ mod tests {
         }
         let tail = &data[nblocks * 4..];
         let mut k1: u32 = 0;
-        if tail.len() >= 3 { k1 ^= (tail[2] as u32) << 16; }
-        if tail.len() >= 2 { k1 ^= (tail[1] as u32) << 8; }
+        if tail.len() >= 3 {
+            k1 ^= (tail[2] as u32) << 16;
+        }
+        if tail.len() >= 2 {
+            k1 ^= (tail[1] as u32) << 8;
+        }
         if tail.len() >= 1 {
             k1 ^= tail[0] as u32;
             k1 = k1.wrapping_mul(0xcc9e2d51);
@@ -276,10 +280,10 @@ pub mod bench {
     pub fn bench_murmur3_32_hash(c: &mut Criterion) {
         #[cfg(feature = "alloc")]
         {
-        let data: Vec<u8> = (0u8..=63).collect();
-        c.bench_function("murmur3_32_hash/64B", |b| {
-            b.iter(|| black_box(murmur3_32_hash(black_box(&data), black_box(0))))
-        });
+            let data: Vec<u8> = (0u8..=63).collect();
+            c.bench_function("murmur3_32_hash/64B", |b| {
+                b.iter(|| black_box(murmur3_32_hash(black_box(&data), black_box(0))))
+            });
         }
     }
 }

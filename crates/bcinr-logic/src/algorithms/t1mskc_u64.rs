@@ -53,17 +53,13 @@ mod tests {
         t1mskc_u64_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
     #[test]
     fn test_t1mskc_u64_all() {
         // oracle
-        assert_eq!(
-            t1mskc_u64(42, 1337),
-            t1mskc_u64_reference(42, 1337)
-        );
+        assert_eq!(t1mskc_u64(42, 1337), t1mskc_u64_reference(42, 1337));
         // boundaries
         assert_eq!(t1mskc_u64(0, 0), t1mskc_u64_reference(0, 0));
         assert_eq!(

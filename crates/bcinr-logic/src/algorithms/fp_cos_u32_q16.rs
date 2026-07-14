@@ -76,10 +76,7 @@ mod tests {
         // 90 degrees: cos(90) = 0
         assert_eq!(fp_cos_u32_q16(90 * 65536, 0), 0u64);
         // 180 degrees: cos(180) = -1.0, Q16 signed = -65536
-        assert_eq!(
-            fp_cos_u32_q16(180 * 65536, 0),
-            (-65536i64) as u64
-        );
+        assert_eq!(fp_cos_u32_q16(180 * 65536, 0), (-65536i64) as u64);
         // 270 degrees: cos(270) = 0
         assert_eq!(fp_cos_u32_q16(270 * 65536, 0), 0u64);
     }
@@ -153,7 +150,6 @@ mod tests {
     }
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
-
 }
 
 #[cfg(feature = "bench")]

@@ -92,7 +92,6 @@ mod tests {
         base64_decode_chunk4_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -107,13 +106,22 @@ mod tests {
             "equivalence oracle failed"
         );
         // --- boundaries ---
-        assert_eq!(base64_decode_chunk4(0, 0), base64_decode_chunk4_reference(0, 0));
+        assert_eq!(
+            base64_decode_chunk4(0, 0),
+            base64_decode_chunk4_reference(0, 0)
+        );
         assert_eq!(
             base64_decode_chunk4(u64::MAX, u64::MAX),
             base64_decode_chunk4_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(base64_decode_chunk4(u64::MAX, 0), base64_decode_chunk4_reference(u64::MAX, 0));
-        assert_eq!(base64_decode_chunk4(0, u64::MAX), base64_decode_chunk4_reference(0, u64::MAX));
+        assert_eq!(
+            base64_decode_chunk4(u64::MAX, 0),
+            base64_decode_chunk4_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            base64_decode_chunk4(0, u64::MAX),
+            base64_decode_chunk4_reference(0, u64::MAX)
+        );
         // --- mutant divergence ---
         let baseline = base64_decode_chunk4_reference(42, 1337);
         assert_ne!(

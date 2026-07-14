@@ -63,18 +63,15 @@ mod tests {
     #[test]
     fn test_select_u128_all() {
         // oracle
-        assert_eq!(
-            select_u128(42, 1337),
-            select_u128_reference(42, 1337)
-        );
+        assert_eq!(select_u128(42, 1337), select_u128_reference(42, 1337));
         // boundaries
-            assert_eq!(select_u128(0, 0), select_u128_reference(0, 0));
-            assert_eq!(
-                select_u128(u64::MAX, u64::MAX),
-                select_u128_reference(u64::MAX, u64::MAX)
-            );
-            assert_eq!(select_u128(u64::MAX, 0), select_u128_reference(u64::MAX, 0));
-            assert_eq!(select_u128(0, u64::MAX), select_u128_reference(0, u64::MAX));
+        assert_eq!(select_u128(0, 0), select_u128_reference(0, 0));
+        assert_eq!(
+            select_u128(u64::MAX, u64::MAX),
+            select_u128_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(select_u128(u64::MAX, 0), select_u128_reference(u64::MAX, 0));
+        assert_eq!(select_u128(0, u64::MAX), select_u128_reference(0, u64::MAX));
         // mutants
         let base = select_u128_reference(42, 1337);
         assert_ne!(mutant_select_u128_1(42, 1337), base, "mutant 1");

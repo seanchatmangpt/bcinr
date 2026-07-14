@@ -140,7 +140,6 @@ mod tests {
         compress_bits_u64_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -160,8 +159,14 @@ mod tests {
             compress_bits_u64(u64::MAX, u64::MAX),
             compress_bits_u64_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(compress_bits_u64(u64::MAX, 0), compress_bits_u64_reference(u64::MAX, 0));
-        assert_eq!(compress_bits_u64(0, u64::MAX), compress_bits_u64_reference(0, u64::MAX));
+        assert_eq!(
+            compress_bits_u64(u64::MAX, 0),
+            compress_bits_u64_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            compress_bits_u64(0, u64::MAX),
+            compress_bits_u64_reference(0, u64::MAX)
+        );
         // --- mutant divergence ---
         let baseline = compress_bits_u64_reference(42, 1337);
         assert_ne!(

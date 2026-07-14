@@ -64,7 +64,6 @@ mod tests {
         bit_swap_u64_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -84,8 +83,14 @@ mod tests {
             bit_swap_u64(u64::MAX, u64::MAX),
             bit_swap_u64_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(bit_swap_u64(u64::MAX, 0), bit_swap_u64_reference(u64::MAX, 0));
-        assert_eq!(bit_swap_u64(0, u64::MAX), bit_swap_u64_reference(0, u64::MAX));
+        assert_eq!(
+            bit_swap_u64(u64::MAX, 0),
+            bit_swap_u64_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            bit_swap_u64(0, u64::MAX),
+            bit_swap_u64_reference(0, u64::MAX)
+        );
         // --- mutant divergence ---
         let baseline = bit_swap_u64_reference(42, 1337);
         assert_ne!(

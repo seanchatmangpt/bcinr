@@ -1,7 +1,7 @@
-use bcinr_logic::algorithms::sigmoid_sat_u32::sigmoid_sat_u32;
 use bcinr_logic::algorithms::exp2_u64_fixed::exp2_u64_fixed;
-use std::time::Instant;
+use bcinr_logic::algorithms::sigmoid_sat_u32::sigmoid_sat_u32;
 use std::hint::black_box;
+use std::time::Instant;
 
 fn main() {
     const ITERATIONS: u64 = 10_000_000;
@@ -13,9 +13,15 @@ fn main() {
     println!("sigmoid_sat_u32:");
     benchmark("avg", 42u64, 1337u64, sigmoid_sat_u32, ITERATIONS);
     benchmark("min", 0u64, 0u64, sigmoid_sat_u32, ITERATIONS);
-    benchmark("max", u32::MAX as u64, u32::MAX as u64, sigmoid_sat_u32, ITERATIONS);
+    benchmark(
+        "max",
+        u32::MAX as u64,
+        u32::MAX as u64,
+        sigmoid_sat_u32,
+        ITERATIONS,
+    );
 
-    // exp2_u64_fixed tests  
+    // exp2_u64_fixed tests
     println!("\nexp2_u64_fixed:");
     benchmark("avg", 42u64, 1337u64, exp2_u64_fixed, ITERATIONS);
     benchmark("min", 0u64, 0u64, exp2_u64_fixed, ITERATIONS);

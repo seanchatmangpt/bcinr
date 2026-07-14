@@ -14,7 +14,7 @@ pub struct Hoeg64Node {
     pub adjacency_mask: u64,
     /// Local identity
     pub node_id: u16,
-    /// Identifier hash representing the node type ($NT$). 
+    /// Identifier hash representing the node type ($NT$).
     pub node_type_hash: u16,
     /// Padding to ensure 64-byte alignment
     pub _pad: [u8; 44],
@@ -35,15 +35,15 @@ const _: () = assert!(core::mem::size_of::<Hoeg64Node>() == 64);
 /// use playground::hoeg::{compile_hoeg_matrix, Hoeg64Node};
 ///
 /// // Prepare a zeroed output buffer for the nodes.
-/// let mut out = [Hoeg64Node { 
-///     feature_mask: 0, adjacency_mask: 0, node_id: 0, node_type_hash: 0, _pad: [0; 44] 
+/// let mut out = [Hoeg64Node {
+///     feature_mask: 0, adjacency_mask: 0, node_id: 0, node_type_hash: 0, _pad: [0; 44]
 /// }; 3];
 ///
 /// // Synthetic node types, features, and connections
 /// let types = [1, 1, 2];
 /// let features = [0b101, 0b010, 0b111];
 /// let connections = [0b010, 0b100, 0b001];
-/// 
+///
 /// let nodes_emitted = compile_hoeg_matrix(&types, &features, &connections, &mut out).unwrap();
 ///
 /// assert_eq!(nodes_emitted, 3);

@@ -266,6 +266,7 @@ dependencies = [
  "blake3",
  "chicago-tdd-tools",
  "chrono",
+ "divan",
  "pddl",
  "prolog8",
  "serde",
@@ -3828,6 +3829,14 @@ dependencies = [
  "serde",
  "serde_json",
  "uuid",
+ "wasm4pm-core",
+]
+
+[[package]]
+name = "wasm4pm-core"
+version = "26.6.29"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

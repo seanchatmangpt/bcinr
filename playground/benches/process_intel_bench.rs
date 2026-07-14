@@ -1,10 +1,12 @@
 #![allow(unsafe_code)]
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use playground::petri::petri_fire_transition;
-use playground::yawl::{BYawlEngine, BYawlTask, JoinType, SplitType};
-use playground::powl::{powl64_execute_step, PowlState, Powl64Op, Powl64OpKind};
-use playground::wasm::{wasm_powl_execute_step, wasm_yawl_execute_task, WasmBYawlState, WasmPowlState};
-use playground::tekg::{compile_snapshot_chain, Tekg64Node, TekgLabel};
+use playground::{
+    petri::petri_fire_transition,
+    powl::{powl64_execute_step, Powl64Op, Powl64OpKind, PowlState},
+    tekg::{compile_snapshot_chain, Tekg64Node, TekgLabel},
+    wasm::{wasm_powl_execute_step, wasm_yawl_execute_task, WasmBYawlState, WasmPowlState},
+    yawl::{BYawlEngine, BYawlTask, JoinType, SplitType},
+};
 
 fn bench_granular_yawl(c: &mut Criterion) {
     let mut group = c.benchmark_group("YAWL Granular Micro-Benchmarks");
@@ -72,12 +74,7 @@ fn bench_granular_powl(c: &mut Criterion) {
 
     group.bench_function("execute_step_swar", |b| {
         b.iter(|| {
-            powl64_execute_step(
-                black_box(&mut state),
-                black_box(&op),
-                black_box(0),
-                black_box(0),
-            );
+            powl64_execute_step(black_box(&mut state), black_box(&op), black_box(0), black_box(0));
         })
     });
 
@@ -164,26 +161,34 @@ fn bench_wasm_ffi_boundaries(c: &mut Criterion) {
 fn bench_tekg_compiler(c: &mut Criterion) {
     let mut group = c.benchmark_group("TEKG Ontology Compiler");
 
-    let mut out = [Tekg64Node { 
-        timestamp_ns: 0, rel_mask: 0, node_id: 0, parent_id: 0, 
-        prev_snapshot_id: 0, label: TekgLabel::Log, _pad: [0; 41] 
+    let mut out = [Tekg64Node {
+        timestamp_ns: 0,
+        rel_mask: 0,
+        node_id: 0,
+        parent_id: 0,
+        prev_snapshot_id: 0,
+        label: TekgLabel::Log,
+        _pad: [0; 41],
     }; 100];
-    
+
     // A synthetic update vector of 99 timestamps
     let timestamps = [100; 99];
 
     group.bench_function("compile_snapshot_chain_100_nodes", |b| {
         b.iter(|| {
-            compile_snapshot_chain(
-                black_box(1), 
-                black_box(&timestamps), 
-                black_box(&mut out)
-            ).unwrap();
+            compile_snapshot_chain(black_box(1), black_box(&timestamps), black_box(&mut out))
+                .unwrap();
         })
     });
 
     group.finish();
 }
 
-criterion_group!(benches, bench_granular_yawl, bench_granular_powl, bench_wasm_ffi_boundaries, bench_tekg_compiler);
+criterion_group!(
+    benches,
+    bench_granular_yawl,
+    bench_granular_powl,
+    bench_wasm_ffi_boundaries,
+    bench_tekg_compiler
+);
 criterion_main!(benches);

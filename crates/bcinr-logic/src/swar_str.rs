@@ -369,7 +369,7 @@ pub fn swar_classify_bytes(word: u64) -> u64 {
     let is_digit = swar_is_in_range(word, b'0', b'9'); // 0x80 → bit 0: >> 7
     let is_upper = swar_is_in_range(word, b'A', b'Z'); // 0x80 → bit 3: >> 4
     let is_lower = swar_is_in_range(word, b'a', b'z'); // 0x80 → bit 4: >> 3
-    // Whitespace: TAB(09)..CR(0D) plus SP(20). Handle as two ranges OR'd.
+                                                       // Whitespace: TAB(09)..CR(0D) plus SP(20). Handle as two ranges OR'd.
     let is_ctrl_ws = swar_is_in_range(word, b'\t', b'\r'); // 0x09..0x0D
     let is_space = swar_is_in_range(word, b' ', b' ');
     let is_ws = is_ctrl_ws | is_space;
@@ -750,8 +750,16 @@ mod tests {
         let word = u64::from_le_bytes(*b"5       ");
         let cls = swar_classify_bytes(word);
         // byte 0 = '5': digit (bit 0 = 0x01), no alpha/ws/upper/lower.
-        assert_eq!(cls.to_le_bytes()[0] & 0x01, 0x01, "bit 0 (digit) should be set");
-        assert_eq!(cls.to_le_bytes()[0] & 0x02, 0x00, "bit 1 (alpha) should be clear");
+        assert_eq!(
+            cls.to_le_bytes()[0] & 0x01,
+            0x01,
+            "bit 0 (digit) should be set"
+        );
+        assert_eq!(
+            cls.to_le_bytes()[0] & 0x02,
+            0x00,
+            "bit 1 (alpha) should be clear"
+        );
     }
 
     #[test]
@@ -778,8 +786,16 @@ mod tests {
     fn test_classify_whitespace() {
         let word = u64::from_le_bytes(*b" \t      ");
         let cls = swar_classify_bytes(word);
-        assert_eq!(cls.to_le_bytes()[0] & 0x04, 0x04, "bit 2 (ws) should be set for space");
-        assert_eq!(cls.to_le_bytes()[1] & 0x04, 0x04, "bit 2 (ws) should be set for tab");
+        assert_eq!(
+            cls.to_le_bytes()[0] & 0x04,
+            0x04,
+            "bit 2 (ws) should be set for space"
+        );
+        assert_eq!(
+            cls.to_le_bytes()[1] & 0x04,
+            0x04,
+            "bit 2 (ws) should be set for tab"
+        );
     }
 
     // ── parse_4_hex_digits ───────────────────────────────────────────────────
@@ -814,6 +830,9 @@ mod tests {
     fn test_phd_gate_identity() {
         assert_eq!(swar_str_phd_gate(0), 0);
         assert_eq!(swar_str_phd_gate(u64::MAX), u64::MAX);
-        assert_eq!(swar_str_phd_gate(0xDEAD_BEEF_CAFE_1234), 0xDEAD_BEEF_CAFE_1234);
+        assert_eq!(
+            swar_str_phd_gate(0xDEAD_BEEF_CAFE_1234),
+            0xDEAD_BEEF_CAFE_1234
+        );
     }
 }

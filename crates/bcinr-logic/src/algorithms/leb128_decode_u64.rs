@@ -117,7 +117,6 @@ mod tests {
     // PROPERTY TESTS: 1000+ random cases of equivalence
     // -------------------------------------------------------------------------
 
-
     #[test]
     fn test_leb128_decode_u64_all() {
         // equivalence oracle
@@ -126,10 +125,7 @@ mod tests {
         assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
         // boundaries
 
-        assert_eq!(
-            leb128_decode_u64(0, 0),
-            leb128_decode_u64_reference(0, 0)
-        );
+        assert_eq!(leb128_decode_u64(0, 0), leb128_decode_u64_reference(0, 0));
         assert_eq!(
             leb128_decode_u64(u64::MAX, u64::MAX),
             leb128_decode_u64_reference(u64::MAX, u64::MAX)

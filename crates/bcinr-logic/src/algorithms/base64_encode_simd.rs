@@ -70,7 +70,6 @@ mod tests {
         base64_encode_simd_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -90,8 +89,14 @@ mod tests {
             base64_encode_simd(u64::MAX, u64::MAX),
             base64_encode_simd_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(base64_encode_simd(u64::MAX, 0), base64_encode_simd_reference(u64::MAX, 0));
-        assert_eq!(base64_encode_simd(0, u64::MAX), base64_encode_simd_reference(0, u64::MAX));
+        assert_eq!(
+            base64_encode_simd(u64::MAX, 0),
+            base64_encode_simd_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            base64_encode_simd(0, u64::MAX),
+            base64_encode_simd_reference(0, u64::MAX)
+        );
         // --- mutant divergence ---
         let baseline = base64_encode_simd_reference(42, 1337);
         assert_ne!(

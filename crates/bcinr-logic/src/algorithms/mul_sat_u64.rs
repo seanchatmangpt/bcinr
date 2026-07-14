@@ -71,7 +71,6 @@ mod tests {
     // PROPERTY TEST: 1000+ random cases of equivalence
     // -------------------------------------------------------------------------
 
-
     #[test]
     fn test_mul_sat_u64_all() {
         // equivalence oracle

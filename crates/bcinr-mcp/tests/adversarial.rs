@@ -11,8 +11,8 @@
 //! - Receipt tampering detection
 //! - Tool list stability (24 tools, catches regressions)
 
-use chicago_tdd_mcp::{McpServerHarnessBuilder, McpSession};
 use chicago_tdd_mcp::assert::error_scenarios;
+use chicago_tdd_mcp::{McpServerHarnessBuilder, McpSession};
 use rmcp::model::ContentBlock;
 use tokio::process::Command;
 
@@ -21,9 +21,16 @@ fn bcinr_mcp_cmd() -> Command {
 }
 
 fn text_from_content(blocks: &[ContentBlock]) -> &str {
-    blocks.iter().find_map(|b| {
-        if let ContentBlock::Text(t) = b { Some(t.text.as_str()) } else { None }
-    }).unwrap_or("")
+    blocks
+        .iter()
+        .find_map(|b| {
+            if let ContentBlock::Text(t) = b {
+                Some(t.text.as_str())
+            } else {
+                None
+            }
+        })
+        .unwrap_or("")
 }
 
 // ── Structural / JSON-RPC error paths ────────────────────────────────────────
@@ -37,8 +44,11 @@ async fn malformed_json_rejected() {
         .get("error")
         .and_then(|e| e.get("code"))
         .and_then(|c| c.as_i64());
-    assert_eq!(code, Some(error_scenarios::codes::PARSE_ERROR as i64),
-        "server must return -32700 parse error for non-JSON input, got: {response}");
+    assert_eq!(
+        code,
+        Some(error_scenarios::codes::PARSE_ERROR as i64),
+        "server must return -32700 parse error for non-JSON input, got: {response}"
+    );
 }
 
 #[tokio::test]
@@ -69,9 +79,14 @@ async fn unknown_tool_rejected() {
     let _ = harness.shutdown().await;
 
     let has_error_code = response.get("error").and_then(|e| e.get("code")).is_some();
-    let is_error = response.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
-    assert!(has_error_code || is_error,
-        "unknown tool must produce an error response, got: {response}");
+    let is_error = response
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    assert!(
+        has_error_code || is_error,
+        "unknown tool must produce an error response, got: {response}"
+    );
 }
 
 #[tokio::test]
@@ -86,9 +101,14 @@ async fn manufacture_world_invalid_params() {
     let _ = harness.shutdown().await;
 
     let has_error_code = response.get("error").and_then(|e| e.get("code")).is_some();
-    let is_error = response.get("isError").and_then(|v| v.as_bool()).unwrap_or(false);
-    assert!(has_error_code || is_error,
-        "invalid params must produce an error, not a panic, got: {response}");
+    let is_error = response
+        .get("isError")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    assert!(
+        has_error_code || is_error,
+        "invalid params must produce an error, not a panic, got: {response}"
+    );
 }
 
 // ── Injection in PDDL text fields ────────────────────────────────────────────
@@ -130,9 +150,14 @@ async fn injection_in_domain_text() {
 
         let content_text = text_from_content(&result.content);
         let parsed: serde_json::Value = serde_json::from_str(content_text).unwrap_or_default();
-        let admitted = parsed.get("admitted").and_then(|v| v.as_bool()).unwrap_or(false);
-        assert!(!admitted,
-            "injection in domain_text must be refused (admitted=false), got: {content_text}");
+        let admitted = parsed
+            .get("admitted")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        assert!(
+            !admitted,
+            "injection in domain_text must be refused (admitted=false), got: {content_text}"
+        );
     }
 
     session.shutdown().await;
@@ -201,8 +226,11 @@ async fn adversarial_case_id_rejected() {
         let content_text = text_from_content(&result.content);
         let parsed: serde_json::Value = serde_json::from_str(content_text).unwrap_or_default();
         let ok = parsed.get("ok").and_then(|v| v.as_bool()).unwrap_or(true);
-        assert!(!ok,
-            "bad case_id {:?} must be rejected (ok=false), got: {content_text}", bad_id);
+        assert!(
+            !ok,
+            "bad case_id {:?} must be rejected (ok=false), got: {content_text}",
+            bad_id
+        );
     }
 
     session.shutdown().await;
@@ -236,23 +264,41 @@ async fn receipt_inspect_detects_tampering() {
         .expect("manufacture_world must not crash");
 
     let content_text = text_from_content(&manufacture_result.content).to_owned();
-    let receipt: serde_json::Value = serde_json::from_str(&content_text).expect("must be valid JSON");
-    assert!(receipt.get("admitted").and_then(|v| v.as_bool()).unwrap_or(false),
-        "manufacture must be admitted for tamper test; got: {content_text}");
+    let receipt: serde_json::Value =
+        serde_json::from_str(&content_text).expect("must be valid JSON");
+    assert!(
+        receipt
+            .get("admitted")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        "manufacture must be admitted for tamper test; got: {content_text}"
+    );
 
     // Untampered receipt must pass.
     let inspect = session
-        .call_tool("receipt_inspect", serde_json::json!({ "receipt_data": &content_text }))
+        .call_tool(
+            "receipt_inspect",
+            serde_json::json!({ "receipt_data": &content_text }),
+        )
         .await
         .expect("receipt_inspect must not crash");
     let inspect_text = text_from_content(&inspect.content);
-    let inspect_val: serde_json::Value = serde_json::from_str(inspect_text).expect("must be valid JSON");
-    assert!(inspect_val.get("chain_valid").and_then(|v| v.as_bool()).unwrap_or(false),
-        "untampered receipt must have chain_valid=true, got: {inspect_text}");
+    let inspect_val: serde_json::Value =
+        serde_json::from_str(inspect_text).expect("must be valid JSON");
+    assert!(
+        inspect_val
+            .get("chain_valid")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        "untampered receipt must have chain_valid=true, got: {inspect_text}"
+    );
 
     // Tamper manufacture_chain: flip first hex char.
     let mut tampered = receipt.clone();
-    let orig_chain = tampered["manufacture_chain"].as_str().unwrap_or("").to_owned();
+    let orig_chain = tampered["manufacture_chain"]
+        .as_str()
+        .unwrap_or("")
+        .to_owned();
     let flipped = if orig_chain.starts_with('a') {
         format!("b{}", &orig_chain[1..])
     } else {
@@ -261,13 +307,22 @@ async fn receipt_inspect_detects_tampering() {
     tampered["manufacture_chain"] = serde_json::Value::String(flipped);
 
     let tampered_inspect = session
-        .call_tool("receipt_inspect", serde_json::json!({ "receipt_data": tampered.to_string() }))
+        .call_tool(
+            "receipt_inspect",
+            serde_json::json!({ "receipt_data": tampered.to_string() }),
+        )
         .await
         .expect("receipt_inspect must handle tampered receipt without crashing");
     let tampered_text = text_from_content(&tampered_inspect.content);
-    let tampered_val: serde_json::Value = serde_json::from_str(tampered_text).expect("must be valid JSON");
-    assert!(!tampered_val.get("chain_valid").and_then(|v| v.as_bool()).unwrap_or(true),
-        "tampered receipt must have chain_valid=false, got: {tampered_text}");
+    let tampered_val: serde_json::Value =
+        serde_json::from_str(tampered_text).expect("must be valid JSON");
+    assert!(
+        !tampered_val
+            .get("chain_valid")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true),
+        "tampered receipt must have chain_valid=false, got: {tampered_text}"
+    );
 
     session.shutdown().await;
 }
@@ -284,26 +339,48 @@ async fn tool_list_has_expected_tools() {
     let _ = harness.shutdown().await;
 
     let expected = [
-        "manufacture_world", "pddl_plan", "pddl_parse_domain", "pddl_parse_problem",
-        "pddl_admit_domain", "pddl_domain_info", "pddl_temporal_plan_info",
-        "powl_compile_sequence", "powl_compile_choice", "powl_admit_context",
-        "powl_capability_check", "powl_plan_to_tape",
-        "bcinr_library_info", "bcinr_mask_ops", "bcinr_powl_info",
-        "utf8_validate", "bitset_operations", "dfa_info", "scan_patterns",
-        "reduce_sequence", "simd_string_info",
-        "receipt_inspect", "system_capabilities",
-        "analyze_schedule64", "route_capability_plan",
+        "manufacture_world",
+        "pddl_plan",
+        "pddl_parse_domain",
+        "pddl_parse_problem",
+        "pddl_admit_domain",
+        "pddl_domain_info",
+        "pddl_temporal_plan_info",
+        "powl_compile_sequence",
+        "powl_compile_choice",
+        "powl_admit_context",
+        "powl_capability_check",
+        "powl_plan_to_tape",
+        "bcinr_library_info",
+        "bcinr_mask_ops",
+        "bcinr_powl_info",
+        "utf8_validate",
+        "bitset_operations",
+        "dfa_info",
+        "scan_patterns",
+        "reduce_sequence",
+        "simd_string_info",
+        "receipt_inspect",
+        "system_capabilities",
+        "analyze_schedule64",
+        "route_capability_plan",
     ];
 
     let tool_names: Vec<String> = tools.iter().map(|t| t.name.to_string()).collect();
     let name_refs: Vec<&str> = tool_names.iter().map(|s| s.as_str()).collect();
     for name in &expected {
-        assert!(name_refs.contains(name),
-            "tool {name:?} missing from tool list; present: {name_refs:?}");
+        assert!(
+            name_refs.contains(name),
+            "tool {name:?} missing from tool list; present: {name_refs:?}"
+        );
     }
-    assert_eq!(tools.len(), expected.len(),
+    assert_eq!(
+        tools.len(),
+        expected.len(),
         "tool count changed: expected {}, got {}; list: {name_refs:?}",
-        expected.len(), tools.len());
+        expected.len(),
+        tools.len()
+    );
 }
 
 // ── route_capability_plan determinism ─────────────────────────────────────────
@@ -331,10 +408,20 @@ async fn route_capability_plan_is_deterministic() {
         .expect("route_capability_plan must not crash");
     let first_val: serde_json::Value =
         serde_json::from_str(text_from_content(&first.content)).expect("must be valid JSON");
-    assert!(first_val.get("ok").and_then(|v| v.as_bool()).unwrap_or(false),
-        "expected ok=true, got: {first_val}");
-    assert!(first_val.get("admitted").and_then(|v| v.as_bool()).unwrap_or(false),
-        "expected admitted=true, got: {first_val}");
+    assert!(
+        first_val
+            .get("ok")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        "expected ok=true, got: {first_val}"
+    );
+    assert!(
+        first_val
+            .get("admitted")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        "expected admitted=true, got: {first_val}"
+    );
 
     let second = session
         .call_tool("route_capability_plan", input)
@@ -344,7 +431,8 @@ async fn route_capability_plan_is_deterministic() {
         serde_json::from_str(text_from_content(&second.content)).expect("must be valid JSON");
 
     assert_eq!(
-        first_val.get("route_chain"), second_val.get("route_chain"),
+        first_val.get("route_chain"),
+        second_val.get("route_chain"),
         "same task + same fixed capability set must produce an identical route_chain"
     );
 
@@ -376,8 +464,12 @@ async fn route_capability_plan_refuses_infeasible_task_without_crashing() {
     let val: serde_json::Value =
         serde_json::from_str(text_from_content(&result.content)).expect("must be valid JSON");
     assert!(val.get("ok").and_then(|v| v.as_bool()).unwrap_or(false));
-    assert!(!val.get("admitted").and_then(|v| v.as_bool()).unwrap_or(true),
-        "zero attention capacity must refuse, not admit: {val}");
+    assert!(
+        !val.get("admitted")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true),
+        "zero attention capacity must refuse, not admit: {val}"
+    );
     assert!(val.get("refusal_reason").and_then(|v| v.as_str()).is_some());
 
     session.shutdown().await;
@@ -428,7 +520,9 @@ async fn rice_quarantine_adversarial_battery_never_hangs_or_panics() {
         // inside the "lawful core"), not just a slow response.
         let result = tokio::time::timeout(std::time::Duration::from_secs(10), call)
             .await
-            .unwrap_or_else(|_| panic!("manufacture_world hung (>10s) on malformed input: {bad_domain:.80}"))
+            .unwrap_or_else(|_| {
+                panic!("manufacture_world hung (>10s) on malformed input: {bad_domain:.80}")
+            })
             .expect("server must not crash (transport-level) on malformed PDDL");
 
         let content_text = text_from_content(&result.content);
@@ -468,14 +562,15 @@ async fn rice_quarantine_adversarial_battery_never_hangs_or_panics() {
         );
         let result = tokio::time::timeout(std::time::Duration::from_secs(10), call)
             .await
-            .unwrap_or_else(|_| panic!("pddl_plan hung (>10s) on malformed input: {bad_domain:.80}"))
+            .unwrap_or_else(|_| {
+                panic!("pddl_plan hung (>10s) on malformed input: {bad_domain:.80}")
+            })
             .expect("server must not crash (transport-level) on malformed PDDL");
 
         let content_text = text_from_content(&result.content);
-        let parsed: serde_json::Value = serde_json::from_str(content_text)
-            .unwrap_or_else(|_| panic!(
-                "response must be structured JSON for input {bad_domain:.80}: {content_text}"
-            ));
+        let parsed: serde_json::Value = serde_json::from_str(content_text).unwrap_or_else(|_| {
+            panic!("response must be structured JSON for input {bad_domain:.80}: {content_text}")
+        });
         assert!(
             parsed.get("ok").is_some(),
             "pddl_plan response must carry an ok verdict field, got: {content_text}"

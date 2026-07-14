@@ -158,10 +158,10 @@ fn swar_byte_min(a: u64, b: u64) -> u64 {
 #[must_use = "horizontal_max_u8x8 result — ignoring discards the maximum lane value"]
 pub fn horizontal_max_u8x8(v: u64) -> u64 {
     // 3-step pairwise SWAR tournament reduction.
-    let v1 = swar_byte_max(v, v >> 8);     // compare bytes (0,1),(2,3),(4,5),(6,7)
-    let v1 = swar_byte_max(v1, v1 >> 16);  // compare pairs
-    let v1 = swar_byte_max(v1, v1 >> 32);  // final reduction
-    // Broadcast the max byte (now in byte 0) to all 8 lanes.
+    let v1 = swar_byte_max(v, v >> 8); // compare bytes (0,1),(2,3),(4,5),(6,7)
+    let v1 = swar_byte_max(v1, v1 >> 16); // compare pairs
+    let v1 = swar_byte_max(v1, v1 >> 32); // final reduction
+                                          // Broadcast the max byte (now in byte 0) to all 8 lanes.
     let max_byte = v1 & 0xFF;
     max_byte.wrapping_mul(0x0101_0101_0101_0101)
 }
@@ -185,10 +185,10 @@ pub fn horizontal_max_u8x8(v: u64) -> u64 {
 #[must_use = "horizontal_min_u8x8 result — ignoring discards the minimum lane value"]
 pub fn horizontal_min_u8x8(v: u64) -> u64 {
     // 3-step pairwise SWAR tournament reduction.
-    let v1 = swar_byte_min(v, v >> 8);     // compare bytes (0,1),(2,3),(4,5),(6,7)
-    let v1 = swar_byte_min(v1, v1 >> 16);  // compare pairs
-    let v1 = swar_byte_min(v1, v1 >> 32);  // final reduction
-    // Broadcast the min byte (now in byte 0) to all 8 lanes.
+    let v1 = swar_byte_min(v, v >> 8); // compare bytes (0,1),(2,3),(4,5),(6,7)
+    let v1 = swar_byte_min(v1, v1 >> 16); // compare pairs
+    let v1 = swar_byte_min(v1, v1 >> 32); // final reduction
+                                          // Broadcast the min byte (now in byte 0) to all 8 lanes.
     let min_byte = v1 & 0xFF;
     min_byte.wrapping_mul(0x0101_0101_0101_0101)
 }
@@ -213,12 +213,12 @@ pub fn swar_horizontal_sum(word: u64) -> u32 {
     // Step 1: add pairs of adjacent bytes into u16 lanes.
     let lo = word & 0x00FF_00FF_00FF_00FFu64;
     let hi = (word >> 8) & 0x00FF_00FF_00FF_00FFu64;
-    let s2 = lo + hi;                               // 4 × u16 in even byte lanes
+    let s2 = lo + hi; // 4 × u16 in even byte lanes
 
     // Step 2: add pairs of u16s into u32 lanes.
     let lo4 = s2 & 0x0000_FFFF_0000_FFFFu64;
     let hi4 = (s2 >> 16) & 0x0000_FFFF_0000_FFFFu64;
-    let s4  = lo4 + hi4;                            // 2 × u32 in low halves
+    let s4 = lo4 + hi4; // 2 × u32 in low halves
 
     // Step 3: add the two u32 halves.
     let sum = (s4 & 0x0000_0000_FFFF_FFFFu64) + (s4 >> 32);
@@ -240,14 +240,14 @@ pub fn swar_horizontal_sum(word: u64) -> u32 {
 pub fn swar_horizontal_max_u8(word: u64) -> u8 {
     // Extract each byte lane explicitly — avoids inter-lane interference.
     let b = [
-        (word       ) as u8,
-        (word >>  8 ) as u8,
-        (word >> 16 ) as u8,
-        (word >> 24 ) as u8,
-        (word >> 32 ) as u8,
-        (word >> 40 ) as u8,
-        (word >> 48 ) as u8,
-        (word >> 56 ) as u8,
+        (word) as u8,
+        (word >> 8) as u8,
+        (word >> 16) as u8,
+        (word >> 24) as u8,
+        (word >> 32) as u8,
+        (word >> 40) as u8,
+        (word >> 48) as u8,
+        (word >> 56) as u8,
     ];
     // 7 branchless max comparisons (linear reduction).
     let mut m = b[0];
@@ -285,10 +285,8 @@ pub fn swar_count_eq_u8(word: u64, target: u8) -> u32 {
     let xored = word ^ broadcast;
 
     // SWAR zero-byte test: set the high bit of each zero byte lane.
-    let zero_bytes = xored
-        .wrapping_sub(0x0101_0101_0101_0101u64)
-        & !xored
-        & 0x8080_8080_8080_8080u64;
+    let zero_bytes =
+        xored.wrapping_sub(0x0101_0101_0101_0101u64) & !xored & 0x8080_8080_8080_8080u64;
 
     // Each matching lane contributes exactly one set bit (the 0x80 sentinel bit).
     // count_ones() of zero_bytes directly equals the number of matching byte lanes.
@@ -320,7 +318,7 @@ pub fn reduce_min_u32(slice: &[u32]) -> u32 {
         let a = acc;
         let b = slice[i];
         // Unsigned borrow: bit 32 of (a as u64 - b as u64) is 1 iff a < b.
-        let borrow     = ((a as u64).wrapping_sub(b as u64) >> 32) as u32 & 1;
+        let borrow = ((a as u64).wrapping_sub(b as u64) >> 32) as u32 & 1;
         // neg_borrow: 0xFFFF_FFFF when a < b (keep a), 0 when a >= b (keep b).
         let neg_borrow = borrow.wrapping_neg();
         //   a <  b (neg_borrow = 0xFFFF_FFFF): b + (a-b) = a  ✓
@@ -347,11 +345,11 @@ pub fn reduce_max_u32(slice: &[u32]) -> u32 {
         let a = acc;
         let b = slice[i];
         // Unsigned borrow for (b - a): bit 32 is 1 iff b < a.
-        let borrow     = ((b as u64).wrapping_sub(a as u64) >> 32) as u32 & 1;
-        let not_borrow = 1u32.wrapping_sub(borrow);       // 1 when b >= a
-        let neg_nb     = not_borrow.wrapping_neg();        // 0xFFFF_FFFF when b >= a
-        //   b >= a (neg_nb = 0xFFFF_FFFF): a + (b-a) = b  ✓
-        //   b <  a (neg_nb = 0):           a + 0     = a  ✓
+        let borrow = ((b as u64).wrapping_sub(a as u64) >> 32) as u32 & 1;
+        let not_borrow = 1u32.wrapping_sub(borrow); // 1 when b >= a
+        let neg_nb = not_borrow.wrapping_neg(); // 0xFFFF_FFFF when b >= a
+                                                //   b >= a (neg_nb = 0xFFFF_FFFF): a + (b-a) = b  ✓
+                                                //   b <  a (neg_nb = 0):           a + 0     = a  ✓
         acc = a.wrapping_add(b.wrapping_sub(a) & neg_nb);
     });
     acc
@@ -400,7 +398,11 @@ mod tests_phd_reduce {
         assert_eq!(reduce_reference(1, 0), 1);
         let cases: &[fn(u64, u64) -> u64] = &[mutant_reduce_1, mutant_reduce_2, mutant_reduce_3];
         for (i, m) in cases.iter().enumerate() {
-            assert!(reduce_reference(1, 1) != m(1, 1), "mutant {} not rejected", i + 1);
+            assert!(
+                reduce_reference(1, 1) != m(1, 1),
+                "mutant {} not rejected",
+                i + 1
+            );
         }
     }
 
@@ -672,13 +674,30 @@ mod tests_phd_reduce {
         };
         for _ in 0..200_000 {
             let v = next();
-            assert_eq!(horizontal_max_u8x8(v), ref_max_u8x8(v), "max mismatch at {v:#018x}");
-            assert_eq!(horizontal_min_u8x8(v), ref_min_u8x8(v), "min mismatch at {v:#018x}");
+            assert_eq!(
+                horizontal_max_u8x8(v),
+                ref_max_u8x8(v),
+                "max mismatch at {v:#018x}"
+            );
+            assert_eq!(
+                horizontal_min_u8x8(v),
+                ref_min_u8x8(v),
+                "min mismatch at {v:#018x}"
+            );
         }
         // Explicit high-bit edge cases.
-        assert_eq!(horizontal_max_u8x8(0x80_7F_00_00_00_00_00_00), ref_max_u8x8(0x80_7F_00_00_00_00_00_00));
-        assert_eq!(horizontal_max_u8x8(0xFF_01_02_03_04_05_06_07), 0xFFFF_FFFF_FFFF_FFFF);
-        assert_eq!(horizontal_min_u8x8(0xFF_80_81_82_83_84_85_86), 0x8080_8080_8080_8080);
+        assert_eq!(
+            horizontal_max_u8x8(0x80_7F_00_00_00_00_00_00),
+            ref_max_u8x8(0x80_7F_00_00_00_00_00_00)
+        );
+        assert_eq!(
+            horizontal_max_u8x8(0xFF_01_02_03_04_05_06_07),
+            0xFFFF_FFFF_FFFF_FFFF
+        );
+        assert_eq!(
+            horizontal_min_u8x8(0xFF_80_81_82_83_84_85_86),
+            0x8080_8080_8080_8080
+        );
     }
 }
 

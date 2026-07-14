@@ -55,7 +55,6 @@ mod tests {
         branchless_priority_queue_pop_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -70,13 +69,22 @@ mod tests {
             "equivalence oracle failed"
         );
         // --- boundaries ---
-        assert_eq!(branchless_priority_queue_pop(0, 0), branchless_priority_queue_pop_reference(0, 0));
+        assert_eq!(
+            branchless_priority_queue_pop(0, 0),
+            branchless_priority_queue_pop_reference(0, 0)
+        );
         assert_eq!(
             branchless_priority_queue_pop(u64::MAX, u64::MAX),
             branchless_priority_queue_pop_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(branchless_priority_queue_pop(u64::MAX, 0), branchless_priority_queue_pop_reference(u64::MAX, 0));
-        assert_eq!(branchless_priority_queue_pop(0, u64::MAX), branchless_priority_queue_pop_reference(0, u64::MAX));
+        assert_eq!(
+            branchless_priority_queue_pop(u64::MAX, 0),
+            branchless_priority_queue_pop_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            branchless_priority_queue_pop(0, u64::MAX),
+            branchless_priority_queue_pop_reference(0, u64::MAX)
+        );
         // --- mutant divergence ---
         let baseline = branchless_priority_queue_pop_reference(42, 1337);
         assert_ne!(

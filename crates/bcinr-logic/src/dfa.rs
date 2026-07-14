@@ -147,7 +147,11 @@ mod tests {
         assert_eq!(dfa_reference(0, 0), 0);
         let cases: &[fn(u64, u64) -> u64] = &[mutant_dfa_1, mutant_dfa_2, mutant_dfa_3];
         for (i, m) in cases.iter().enumerate() {
-            assert!(dfa_reference(1, 1) != m(1, 1), "mutant {} not rejected", i + 1);
+            assert!(
+                dfa_reference(1, 1) != m(1, 1),
+                "mutant {} not rejected",
+                i + 1
+            );
         }
         // Two-state DFA over alphabet {0,1} (size 2):
         // table layout: [t(0,0), t(0,1), t(1,0), t(1,1)]
@@ -166,7 +170,7 @@ mod tests {
         assert_eq!(dfa_advance(1, 0, &table, 2), 0);
 
         // is_accepting: membership and boundary cases
-        assert!( dfa_is_accepting(2, &[1, 2, 3]));
+        assert!(dfa_is_accepting(2, &[1, 2, 3]));
         assert!(!dfa_is_accepting(5, &[1, 2, 3]));
         assert!(!dfa_is_accepting(0, &[]));
         // dfa_run end-to-end

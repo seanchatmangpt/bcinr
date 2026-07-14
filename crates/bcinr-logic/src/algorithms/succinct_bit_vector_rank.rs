@@ -79,27 +79,39 @@ mod tests {
             succinct_bit_vector_rank_reference(42, 1337)
         );
         // boundaries
-            assert_eq!(
-                succinct_bit_vector_rank(0, 0),
-                succinct_bit_vector_rank_reference(0, 0)
-            );
-            assert_eq!(
-                succinct_bit_vector_rank(u64::MAX, u64::MAX),
-                succinct_bit_vector_rank_reference(u64::MAX, u64::MAX)
-            );
-            assert_eq!(
-                succinct_bit_vector_rank(u64::MAX, 0),
-                succinct_bit_vector_rank_reference(u64::MAX, 0)
-            );
-            assert_eq!(
-                succinct_bit_vector_rank(0, u64::MAX),
-                succinct_bit_vector_rank_reference(0, u64::MAX)
-            );
+        assert_eq!(
+            succinct_bit_vector_rank(0, 0),
+            succinct_bit_vector_rank_reference(0, 0)
+        );
+        assert_eq!(
+            succinct_bit_vector_rank(u64::MAX, u64::MAX),
+            succinct_bit_vector_rank_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(
+            succinct_bit_vector_rank(u64::MAX, 0),
+            succinct_bit_vector_rank_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            succinct_bit_vector_rank(0, u64::MAX),
+            succinct_bit_vector_rank_reference(0, u64::MAX)
+        );
         // mutants
         let base = succinct_bit_vector_rank_reference(42, 1337);
-        assert_ne!(mutant_succinct_bit_vector_rank_1(42, 1337), base, "mutant 1");
-        assert_ne!(mutant_succinct_bit_vector_rank_2(42, 1337), base, "mutant 2");
-        assert_ne!(mutant_succinct_bit_vector_rank_3(42, 1337), base, "mutant 3");
+        assert_ne!(
+            mutant_succinct_bit_vector_rank_1(42, 1337),
+            base,
+            "mutant 1"
+        );
+        assert_ne!(
+            mutant_succinct_bit_vector_rank_2(42, 1337),
+            base,
+            "mutant 2"
+        );
+        assert_ne!(
+            mutant_succinct_bit_vector_rank_3(42, 1337),
+            base,
+            "mutant 3"
+        );
     }
 
     // -------------------------------------------------------------------------

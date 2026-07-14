@@ -82,10 +82,7 @@ mod tests {
     fn test_radix_trie_phd_oracle() {
         // PHD Gate: bitmap-based lookup returns correct child index; table-driven bytes
         // 'a'=97 (bitmap[1] bit 33), 'z'=122 (bitmap[1] bit 58)
-        let cases: &[(u8, u32, u32)] = &[
-            (b'a', 97 - 64, 100),
-            (b'z', 122 - 64, 200),
-        ];
+        let cases: &[(u8, u32, u32)] = &[(b'a', 97 - 64, 100), (b'z', 122 - 64, 200)];
         let mut node = RadixTrieNode::<16>::new();
         for &(_, bit, _child) in cases {
             node.bitmap[1] |= 1u64 << bit;

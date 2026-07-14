@@ -91,7 +91,7 @@ pub fn analyze_schedule_instrumented(
     let mut substage = AnalysisSubstageNs::default();
 
     let t_base = Instant::now();
-    let plan = gtp.find_temporal_plan()?;
+    let plan = gtp.find_temporal_plan().into_result()?;
     let ops = temporal_plan_to_powl_tape(&plan);
     let n = ops.len().min(64);
 
@@ -232,5 +232,8 @@ fn replan_with_perturbed_capacity(
     let base = *gtp.initial_fn_values.get(resource_key).unwrap_or(&0.0);
     let mut overrides = std::collections::HashMap::with_capacity(1);
     overrides.insert(resource_key.to_string(), (base + delta).max(0.0));
-    gtp.find_temporal_plan_with_fn_overrides(&overrides).ok().map(|p| p.makespan)
+    gtp.find_temporal_plan_with_fn_overrides(&overrides)
+        .into_result()
+        .ok()
+        .map(|p| p.makespan)
 }

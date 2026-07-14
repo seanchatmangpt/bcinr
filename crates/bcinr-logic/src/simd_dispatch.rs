@@ -358,12 +358,14 @@ unsafe fn horizontal_sum_u8x16_neon(a: [u8; 16]) -> u32 {
 // Scalar fallbacks (always correct, used when no SIMD target feature active)
 // ---------------------------------------------------------------------------
 
-#[allow(dead_code)] #[inline(always)]
+#[allow(dead_code)]
+#[inline(always)]
 fn splat_u8x16_scalar(value: u8) -> [u8; 16] {
     [value; 16]
 }
 
-#[allow(dead_code)] #[inline(always)]
+#[allow(dead_code)]
+#[inline(always)]
 fn movemask_u8x16_scalar(a: [u8; 16]) -> u16 {
     let mut result = 0u16;
     let mut i = 0usize;
@@ -374,7 +376,8 @@ fn movemask_u8x16_scalar(a: [u8; 16]) -> u16 {
     result
 }
 
-#[allow(dead_code)] #[inline(always)]
+#[allow(dead_code)]
+#[inline(always)]
 fn compare_eq_u8x16_scalar(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     let mut out = [0u8; 16];
     let mut i = 0usize;
@@ -386,7 +389,8 @@ fn compare_eq_u8x16_scalar(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     out
 }
 
-#[allow(dead_code)] #[inline(always)]
+#[allow(dead_code)]
+#[inline(always)]
 fn add_saturating_u8x16_scalar(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     let mut out = [0u8; 16];
     let mut i = 0usize;
@@ -397,7 +401,8 @@ fn add_saturating_u8x16_scalar(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     out
 }
 
-#[allow(dead_code)] #[inline(always)]
+#[allow(dead_code)]
+#[inline(always)]
 fn and_u8x16_scalar(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     let mut out = [0u8; 16];
     let mut i = 0usize;
@@ -408,7 +413,8 @@ fn and_u8x16_scalar(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     out
 }
 
-#[allow(dead_code)] #[inline(always)]
+#[allow(dead_code)]
+#[inline(always)]
 fn or_u8x16_scalar(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     let mut out = [0u8; 16];
     let mut i = 0usize;
@@ -419,41 +425,44 @@ fn or_u8x16_scalar(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     out
 }
 
-#[allow(dead_code)] #[inline(always)]
+#[allow(dead_code)]
+#[inline(always)]
 fn max_u8x16_scalar(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     let mut out = [0u8; 16];
     let mut i = 0usize;
     while i < 16 {
         // Branchless select(a[i] > b[i], a[i], b[i]) using XOR-mask pattern.
         let gt = (a[i] > b[i]) as u8; // 1 if a > b, else 0
-        let mask = gt.wrapping_neg();  // 0xFF if a > b, else 0x00
-        // select(cond, a, b) = b ^ ((a ^ b) & mask)
-        // Proof: if a > b → mask = 0xFF → out = b ^ (a ^ b) = a  ✓
-        //        if a ≤ b → mask = 0x00 → out = b ^ 0       = b  ✓
+        let mask = gt.wrapping_neg(); // 0xFF if a > b, else 0x00
+                                      // select(cond, a, b) = b ^ ((a ^ b) & mask)
+                                      // Proof: if a > b → mask = 0xFF → out = b ^ (a ^ b) = a  ✓
+                                      //        if a ≤ b → mask = 0x00 → out = b ^ 0       = b  ✓
         out[i] = b[i] ^ ((a[i] ^ b[i]) & mask);
         i += 1;
     }
     out
 }
 
-#[allow(dead_code)] #[inline(always)]
+#[allow(dead_code)]
+#[inline(always)]
 fn min_u8x16_scalar(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     let mut out = [0u8; 16];
     let mut i = 0usize;
     while i < 16 {
         // Branchless select(a[i] < b[i], a[i], b[i]) using XOR-mask pattern.
         let lt = (a[i] < b[i]) as u8; // 1 if a < b, else 0
-        let mask = lt.wrapping_neg();  // 0xFF if a < b, else 0x00
-        // select(cond, a, b) = b ^ ((a ^ b) & mask)
-        // Proof: if a < b → mask = 0xFF → out = b ^ (a ^ b) = a  ✓
-        //        if a ≥ b → mask = 0x00 → out = b ^ 0       = b  ✓
+        let mask = lt.wrapping_neg(); // 0xFF if a < b, else 0x00
+                                      // select(cond, a, b) = b ^ ((a ^ b) & mask)
+                                      // Proof: if a < b → mask = 0xFF → out = b ^ (a ^ b) = a  ✓
+                                      //        if a ≥ b → mask = 0x00 → out = b ^ 0       = b  ✓
         out[i] = b[i] ^ ((a[i] ^ b[i]) & mask);
         i += 1;
     }
     out
 }
 
-#[allow(dead_code)] #[inline(always)]
+#[allow(dead_code)]
+#[inline(always)]
 fn shuffle_u8x16_branchless_scalar(a: [u8; 16], mask: [u8; 16]) -> [u8; 16] {
     let mut out = [0u8; 16];
     let mut i = 0usize;
@@ -468,7 +477,8 @@ fn shuffle_u8x16_branchless_scalar(a: [u8; 16], mask: [u8; 16]) -> [u8; 16] {
     out
 }
 
-#[allow(dead_code)] #[inline(always)]
+#[allow(dead_code)]
+#[inline(always)]
 fn horizontal_sum_u8x16_scalar(a: [u8; 16]) -> u32 {
     let mut sum = 0u32;
     let mut i = 0usize;
@@ -849,7 +859,6 @@ pub fn simd_dispatch_phd_gate(val: u64) -> u64 {
 // Tests
 // ---------------------------------------------------------------------------
 
-
 // ---------------------------------------------------------------------------
 // SIMDe Philosophy Extensions: Blend, Shift, PDEP/PEXT
 // ---------------------------------------------------------------------------
@@ -886,7 +895,8 @@ unsafe fn blend_u8x16_neon(mask: [u8; 16], a: [u8; 16], b: [u8; 16]) -> [u8; 16]
     out
 }
 
-#[allow(dead_code)] #[inline(always)]
+#[allow(dead_code)]
+#[inline(always)]
 fn blend_u8x16_scalar(mask: [u8; 16], a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     let mut out = [0u8; 16];
     let mut i = 0usize;
@@ -902,14 +912,20 @@ fn blend_u8x16_scalar(mask: [u8; 16], a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
 #[inline(always)]
 pub fn blend_u8x16(mask: [u8; 16], a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     #[cfg(all(target_arch = "x86_64", target_feature = "ssse3"))]
-    { unsafe { blend_u8x16_sse(mask, a, b) } }
+    {
+        unsafe { blend_u8x16_sse(mask, a, b) }
+    }
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-    { unsafe { blend_u8x16_neon(mask, a, b) } }
+    {
+        unsafe { blend_u8x16_neon(mask, a, b) }
+    }
     #[cfg(not(any(
         all(target_arch = "x86_64", target_feature = "ssse3"),
         all(target_arch = "aarch64", target_feature = "neon"),
     )))]
-    { blend_u8x16_scalar(mask, a, b) }
+    {
+        blend_u8x16_scalar(mask, a, b)
+    }
 }
 
 #[inline(always)]
@@ -958,8 +974,12 @@ mod tests {
         let mut a = [0u8; 16];
         let mut b = [0u8; 16];
         let mut mask = [0u8; 16];
-        a[0] = 1; a[1] = 2; a[2] = 3;
-        b[0] = 10; b[1] = 20; b[2] = 30;
+        a[0] = 1;
+        a[1] = 2;
+        a[2] = 3;
+        b[0] = 10;
+        b[1] = 20;
+        b[2] = 30;
         mask[1] = 0x80; // select b for index 1
         mask[2] = 0x7F; // select a for index 2 (MSB=0)
         let r = blend_u8x16(mask, a, b);
@@ -1008,25 +1028,33 @@ mod tests {
 
     fn ref_and(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
         let mut out = [0u8; 16];
-        for i in 0..16 { out[i] = a[i] & b[i]; }
+        for i in 0..16 {
+            out[i] = a[i] & b[i];
+        }
         out
     }
 
     fn ref_or(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
         let mut out = [0u8; 16];
-        for i in 0..16 { out[i] = a[i] | b[i]; }
+        for i in 0..16 {
+            out[i] = a[i] | b[i];
+        }
         out
     }
 
     fn ref_max(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
         let mut out = [0u8; 16];
-        for i in 0..16 { out[i] = a[i].max(b[i]); }
+        for i in 0..16 {
+            out[i] = a[i].max(b[i]);
+        }
         out
     }
 
     fn ref_min(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
         let mut out = [0u8; 16];
-        for i in 0..16 { out[i] = a[i].min(b[i]); }
+        for i in 0..16 {
+            out[i] = a[i].min(b[i]);
+        }
         out
     }
 
@@ -1098,7 +1126,9 @@ mod tests {
     #[test]
     fn test_movemask_alternating() {
         let mut a = [0u8; 16];
-        for i in (0..16).step_by(2) { a[i] = 0x80; }
+        for i in (0..16).step_by(2) {
+            a[i] = 0x80;
+        }
         assert_eq!(movemask_u8x16(a), ref_movemask(a));
     }
 
@@ -1127,7 +1157,7 @@ mod tests {
     #[test]
     fn test_cmp_eq_mixed() {
         let a: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-        let b: [u8; 16] = [0, 0, 2, 0, 4, 0, 6, 0, 8, 0, 10,  0, 12,  0, 14,  0];
+        let b: [u8; 16] = [0, 0, 2, 0, 4, 0, 6, 0, 8, 0, 10, 0, 12, 0, 14, 0];
         let got = compare_eq_u8x16(a, b);
         let exp = ref_compare_eq(a, b);
         assert_eq!(got, exp);
@@ -1158,7 +1188,9 @@ mod tests {
 
     #[test]
     fn test_add_sat_alternating() {
-        let a: [u8; 16] = [0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255];
+        let a: [u8; 16] = [
+            0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255,
+        ];
         let b: [u8; 16] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
         assert_eq!(add_saturating_u8x16(a, b), ref_add_sat(a, b));
     }
@@ -1295,7 +1327,9 @@ mod tests {
     #[test]
     fn test_shuffle_oracle() {
         let a: [u8; 16] = core::array::from_fn(|i| (i * 3 + 7) as u8);
-        let mask: [u8; 16] = [3, 7, 0xF, 0x80, 1, 2, 0xA, 0x80, 0, 5, 0xE, 4, 8, 0x9, 6, 0x80];
+        let mask: [u8; 16] = [
+            3, 7, 0xF, 0x80, 1, 2, 0xA, 0x80, 0, 5, 0xE, 4, 8, 0x9, 6, 0x80,
+        ];
         assert_eq!(shuffle_u8x16_branchless(a, mask), ref_shuffle(a, mask));
     }
 
@@ -1338,6 +1372,9 @@ mod tests {
     fn test_phd_gate_identity() {
         assert_eq!(simd_dispatch_phd_gate(0), 0);
         assert_eq!(simd_dispatch_phd_gate(u64::MAX), u64::MAX);
-        assert_eq!(simd_dispatch_phd_gate(0xDEAD_BEEF_CAFE_1234), 0xDEAD_BEEF_CAFE_1234);
+        assert_eq!(
+            simd_dispatch_phd_gate(0xDEAD_BEEF_CAFE_1234),
+            0xDEAD_BEEF_CAFE_1234
+        );
     }
 }

@@ -81,7 +81,13 @@ pub fn wyhash_64(data: &[u8], seed: u64) -> u64 {
             a = (read_u32_le(data, 0) << 32) | read_u32_le(data, tail_offset);
             let mid_offset = (len >> 3) << 2;
             b = (read_u32_le(data, mid_offset) << 32)
-                | read_u32_le(data, tail_offset.saturating_sub(mid_offset).wrapping_add(tail_offset).min(len - 4));
+                | read_u32_le(
+                    data,
+                    tail_offset
+                        .saturating_sub(mid_offset)
+                        .wrapping_add(tail_offset)
+                        .min(len - 4),
+                );
             // Simpler formulation: just use 4-byte chunks
             let head = read_u32_le(data, 0);
             let tail = read_u32_le(data, len - 4);

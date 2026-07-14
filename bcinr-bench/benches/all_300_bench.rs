@@ -269,7 +269,12 @@ fn bench_next_lexicographic_permutation_u64(c: &mut Criterion) {
         b.iter(|| next_lexicographic_permutation_u64(black_box(0), black_box(0)))
     });
     c.bench_function("next_lexicographic_permutation_u64_max", |b| {
-        b.iter(|| next_lexicographic_permutation_u64(black_box(0xFFFFFFFFFFFFFFFEu64), black_box(0xFFFFFFFFFFFFFFFEu64)))
+        b.iter(|| {
+            next_lexicographic_permutation_u64(
+                black_box(0xFFFFFFFFFFFFFFFEu64),
+                black_box(0xFFFFFFFFFFFFFFFEu64),
+            )
+        })
     });
 }
 
@@ -997,7 +1002,12 @@ fn bench_gcd_u64_branchless(c: &mut Criterion) {
         b.iter(|| gcd_u64_branchless(black_box(2u64), black_box(3u64)))
     });
     c.bench_function("gcd_u64_branchless_max", |b| {
-        b.iter(|| gcd_u64_branchless(black_box(18_446_744_073_709_551_557u64), black_box(9_007_199_254_740_881u64)))
+        b.iter(|| {
+            gcd_u64_branchless(
+                black_box(18_446_744_073_709_551_557u64),
+                black_box(9_007_199_254_740_881u64),
+            )
+        })
     });
 }
 

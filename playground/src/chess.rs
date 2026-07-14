@@ -2,8 +2,10 @@
 //!
 //! Enforces CC=1 by resolving piece movements as 64-bit integer physics.
 
-use crate::hoeg::Hoeg64Node;
-use crate::gnn::{BinarizedGnnLayer, hoeg_gnn_forward};
+use crate::{
+    gnn::{hoeg_gnn_forward, BinarizedGnnLayer},
+    hoeg::Hoeg64Node,
+};
 
 /// Represents the physical state of a chess board squeezed into a 64-byte boundary.
 /// 64 squares = 64 bits = 1 `u64`.
@@ -54,7 +56,7 @@ impl ChessBitboard {
 /// let neural_layer = BinarizedGnnLayer { weights: [0xFFFF_0000_0000_FFFF; 64], bias: 0 };
 ///
 /// let advantage = evaluate_board_branchless(&board, &neural_layer).unwrap();
-/// 
+///
 /// // The board was mathematically evaluated in O(1) time
 /// assert_eq!(advantage > 0, true);
 /// ```
@@ -63,10 +65,9 @@ pub fn evaluate_board_branchless(
     board: &ChessBitboard,
     neural_layer: &BinarizedGnnLayer,
 ) -> Result<u64, &'static str> {
-    
     // Map the chess state dynamically into the HOEG node framework
     let node_representation = Hoeg64Node {
-        feature_mask: board.white_pieces, 
+        feature_mask: board.white_pieces,
         adjacency_mask: board.black_pieces, // Opponent acts as the structural adversary
         node_id: board.turn,
         node_type_hash: 0, // "BoardState" identifier

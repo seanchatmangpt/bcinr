@@ -66,18 +66,15 @@ mod tests {
     #[test]
     fn test_weight_u64_all() {
         // oracle
-        assert_eq!(
-            weight_u64(42, 1337),
-            weight_u64_reference(42, 1337)
-        );
+        assert_eq!(weight_u64(42, 1337), weight_u64_reference(42, 1337));
         // boundaries
-            assert_eq!(weight_u64(0, 0), weight_u64_reference(0, 0));
-            assert_eq!(
-                weight_u64(u64::MAX, u64::MAX),
-                weight_u64_reference(u64::MAX, u64::MAX)
-            );
-            assert_eq!(weight_u64(u64::MAX, 0), weight_u64_reference(u64::MAX, 0));
-            assert_eq!(weight_u64(0, u64::MAX), weight_u64_reference(0, u64::MAX));
+        assert_eq!(weight_u64(0, 0), weight_u64_reference(0, 0));
+        assert_eq!(
+            weight_u64(u64::MAX, u64::MAX),
+            weight_u64_reference(u64::MAX, u64::MAX)
+        );
+        assert_eq!(weight_u64(u64::MAX, 0), weight_u64_reference(u64::MAX, 0));
+        assert_eq!(weight_u64(0, u64::MAX), weight_u64_reference(0, u64::MAX));
         // mutants
         let base = weight_u64_reference(42, 1337);
         assert_ne!(mutant_weight_u64_1(42, 1337), base, "mutant 1");

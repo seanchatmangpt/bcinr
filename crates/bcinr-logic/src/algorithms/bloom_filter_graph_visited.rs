@@ -51,7 +51,6 @@ mod tests {
         bloom_filter_graph_visited_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -66,13 +65,22 @@ mod tests {
             "equivalence oracle failed"
         );
         // --- boundaries ---
-        assert_eq!(bloom_filter_graph_visited(0, 0), bloom_filter_graph_visited_reference(0, 0));
+        assert_eq!(
+            bloom_filter_graph_visited(0, 0),
+            bloom_filter_graph_visited_reference(0, 0)
+        );
         assert_eq!(
             bloom_filter_graph_visited(u64::MAX, u64::MAX),
             bloom_filter_graph_visited_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(bloom_filter_graph_visited(u64::MAX, 0), bloom_filter_graph_visited_reference(u64::MAX, 0));
-        assert_eq!(bloom_filter_graph_visited(0, u64::MAX), bloom_filter_graph_visited_reference(0, u64::MAX));
+        assert_eq!(
+            bloom_filter_graph_visited(u64::MAX, 0),
+            bloom_filter_graph_visited_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            bloom_filter_graph_visited(0, u64::MAX),
+            bloom_filter_graph_visited_reference(0, u64::MAX)
+        );
         // --- mutant divergence ---
         let baseline = bloom_filter_graph_visited_reference(42, 1337);
         assert_ne!(

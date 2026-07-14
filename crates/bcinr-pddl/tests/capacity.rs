@@ -68,7 +68,12 @@ fn capacity_one_forces_sequential() {
     let plan = gtp.find_temporal_plan().expect("temporal plan found");
 
     let intervals = assign_worker_intervals(&plan);
-    assert_eq!(intervals.len(), 2, "expected two assign-worker steps, got {:?}", intervals);
+    assert_eq!(
+        intervals.len(),
+        2,
+        "expected two assign-worker steps, got {:?}",
+        intervals
+    );
 
     assert!(
         !intervals_overlap(intervals[0], intervals[1]),
@@ -86,7 +91,12 @@ fn capacity_two_allows_concurrent() {
     let plan = gtp.find_temporal_plan().expect("temporal plan found");
 
     let intervals = assign_worker_intervals(&plan);
-    assert_eq!(intervals.len(), 2, "expected two assign-worker steps, got {:?}", intervals);
+    assert_eq!(
+        intervals.len(),
+        2,
+        "expected two assign-worker steps, got {:?}",
+        intervals
+    );
 
     assert!(
         intervals_overlap(intervals[0], intervals[1]),
@@ -119,7 +129,9 @@ fn schedule_analysis_capacity_one_is_binding_and_sequential() {
         1,
         "available-workers must be flagged as binding at capacity 1"
     );
-    let delta = analysis.capacity_delta.expect("capacity_delta for resource 0");
+    let delta = analysis
+        .capacity_delta
+        .expect("capacity_delta for resource 0");
     assert_eq!(delta.baseline_makespan, analysis.makespan);
     assert!(
         delta.plus_one_makespan.unwrap_or(f64::INFINITY) < delta.baseline_makespan,
@@ -142,7 +154,9 @@ fn schedule_analysis_capacity_two_allows_full_parallelism() {
         analysis.max_parallelism, 2,
         "capacity 2 allows both assign-worker steps to run concurrently"
     );
-    let delta = analysis.capacity_delta.expect("capacity_delta for resource 0");
+    let delta = analysis
+        .capacity_delta
+        .expect("capacity_delta for resource 0");
     assert!(
         delta.plus_one_makespan.unwrap_or(f64::INFINITY) >= delta.baseline_makespan - 1e-9,
         "capacity 3 has no further benefit once both workers already run concurrently: {:?}",
@@ -169,7 +183,11 @@ fn duplicate_action_labels_admit_identically_to_a_single_label() {
 
     // Sanity: this plan really does have multiple steps sharing one label —
     // otherwise this test wouldn't be exercising the dedup path at all.
-    let assign_worker_steps = plan.steps.iter().filter(|s| s.action_name == "assign-worker").count();
+    let assign_worker_steps = plan
+        .steps
+        .iter()
+        .filter(|s| s.action_name == "assign-worker")
+        .count();
     assert!(
         assign_worker_steps >= 2,
         "expected multiple assign-worker steps sharing one label, got {}",
@@ -179,7 +197,10 @@ fn duplicate_action_labels_admit_identically_to_a_single_label() {
     let (receipt, _ocel) = execute_temporal_plan(&plan, &domain, &problem, "dedup-regression", &[])
         .expect("execute_temporal_plan admits every duplicate-labeled step");
     assert_eq!(receipt.step_count, plan.steps.len());
-    assert!(receipt.goal_reached, "all workers must be admitted and reach done despite sharing one action label");
+    assert!(
+        receipt.goal_reached,
+        "all workers must be admitted and reach done despite sharing one action label"
+    );
 }
 
 /// Regression test for a same-instance double-scheduling bug found while
@@ -248,7 +269,8 @@ fn same_instance_is_never_scheduled_twice_while_in_flight() {
                 assert!(
                     !intervals_overlap(intervals[i], intervals[j]),
                     "{name}(w1) was scheduled twice while in flight: {:?} and {:?}",
-                    intervals[i], intervals[j]
+                    intervals[i],
+                    intervals[j]
                 );
             }
         }

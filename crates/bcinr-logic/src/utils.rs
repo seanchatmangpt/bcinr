@@ -101,10 +101,18 @@ mod tests_utils {
 
     use super::*;
 
-    fn utils_reference(val: u64, _aux: u64) -> u64 { val }
-    fn mutant_utils_1(val: u64, aux: u64) -> u64 { !utils_reference(val, aux) }
-    fn mutant_utils_2(val: u64, aux: u64) -> u64 { utils_reference(val, aux).wrapping_add(1) }
-    fn mutant_utils_3(val: u64, aux: u64) -> u64 { utils_reference(val, aux) ^ 0xFF }
+    fn utils_reference(val: u64, _aux: u64) -> u64 {
+        val
+    }
+    fn mutant_utils_1(val: u64, aux: u64) -> u64 {
+        !utils_reference(val, aux)
+    }
+    fn mutant_utils_2(val: u64, aux: u64) -> u64 {
+        utils_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_utils_3(val: u64, aux: u64) -> u64 {
+        utils_reference(val, aux) ^ 0xFF
+    }
 
     #[test]
     fn test_utils_equivalence_and_boundaries() {

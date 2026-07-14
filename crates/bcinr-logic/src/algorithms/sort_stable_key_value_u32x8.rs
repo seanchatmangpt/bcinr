@@ -81,7 +81,16 @@ mod tests {
 
     #[test]
     fn test_distinct_keys() {
-        let pairs = [(5, 50), (3, 30), (7, 70), (1, 10), (6, 60), (2, 20), (4, 40), (8, 80)];
+        let pairs = [
+            (5, 50),
+            (3, 30),
+            (7, 70),
+            (1, 10),
+            (6, 60),
+            (2, 20),
+            (4, 40),
+            (8, 80),
+        ];
         let result = sort_stable_key_value_u32x8(pairs);
         let expected = reference_stable_sort(pairs);
         assert_eq!(result, expected);
@@ -89,14 +98,32 @@ mod tests {
 
     #[test]
     fn test_already_sorted() {
-        let pairs = [(1, 10), (2, 20), (3, 30), (4, 40), (5, 50), (6, 60), (7, 70), (8, 80)];
+        let pairs = [
+            (1, 10),
+            (2, 20),
+            (3, 30),
+            (4, 40),
+            (5, 50),
+            (6, 60),
+            (7, 70),
+            (8, 80),
+        ];
         let result = sort_stable_key_value_u32x8(pairs);
         assert_eq!(result, pairs);
     }
 
     #[test]
     fn test_reverse_sorted() {
-        let pairs = [(8, 80), (7, 70), (6, 60), (5, 50), (4, 40), (3, 30), (2, 20), (1, 10)];
+        let pairs = [
+            (8, 80),
+            (7, 70),
+            (6, 60),
+            (5, 50),
+            (4, 40),
+            (3, 30),
+            (2, 20),
+            (1, 10),
+        ];
         let result = sort_stable_key_value_u32x8(pairs);
         let expected = reference_stable_sort(pairs);
         assert_eq!(result, expected);
@@ -105,7 +132,16 @@ mod tests {
     #[test]
     fn test_all_equal_keys() {
         // All keys equal: values must remain in original order (stability)
-        let pairs = [(1, 0), (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7)];
+        let pairs = [
+            (1, 0),
+            (1, 1),
+            (1, 2),
+            (1, 3),
+            (1, 4),
+            (1, 5),
+            (1, 6),
+            (1, 7),
+        ];
         let result = sort_stable_key_value_u32x8(pairs);
         // With equal keys, stable sort preserves original order
         assert_eq!(result, pairs);
@@ -114,7 +150,14 @@ mod tests {
     #[test]
     fn test_stability_with_duplicates() {
         let pairs = [
-            (3u32, 30u32), (1, 10), (2, 20), (1, 11), (2, 21), (0, 0), (1, 12), (3, 31),
+            (3u32, 30u32),
+            (1, 10),
+            (2, 20),
+            (1, 11),
+            (2, 21),
+            (0, 0),
+            (1, 12),
+            (3, 31),
         ];
         let result = sort_stable_key_value_u32x8(pairs);
         let expected = reference_stable_sort(pairs);
@@ -127,7 +170,16 @@ mod tests {
 
     #[test]
     fn test_output_keys_sorted() {
-        let pairs = [(5, 0), (3, 1), (8, 2), (1, 3), (6, 4), (2, 5), (4, 6), (7, 7)];
+        let pairs = [
+            (5, 0),
+            (3, 1),
+            (8, 2),
+            (1, 3),
+            (6, 4),
+            (2, 5),
+            (4, 6),
+            (7, 7),
+        ];
         let result = sort_stable_key_value_u32x8(pairs);
         assert!(keys_sorted(&result));
     }
@@ -135,8 +187,14 @@ mod tests {
     #[test]
     fn test_boundaries() {
         let pairs = [
-            (u32::MAX, 0), (0, 1), (u32::MAX, 2), (0, 3),
-            (u32::MAX / 2, 4), (1, 5), (u32::MAX - 1, 6), (2, 7),
+            (u32::MAX, 0),
+            (0, 1),
+            (u32::MAX, 2),
+            (0, 3),
+            (u32::MAX / 2, 4),
+            (1, 5),
+            (u32::MAX - 1, 6),
+            (2, 7),
         ];
         let result = sort_stable_key_value_u32x8(pairs);
         let expected = reference_stable_sort(pairs);
@@ -170,8 +228,14 @@ pub mod bench {
 
     pub fn bench_sort_stable_key_value_u32x8(c: &mut Criterion) {
         let pairs = [
-            (5u32, 50u32), (3, 30), (7, 70), (1, 10),
-            (6, 60), (2, 20), (4, 40), (8, 80),
+            (5u32, 50u32),
+            (3, 30),
+            (7, 70),
+            (1, 10),
+            (6, 60),
+            (2, 20),
+            (4, 40),
+            (8, 80),
         ];
         c.bench_function("sort_stable_key_value_u32x8", |b| {
             b.iter(|| sort_stable_key_value_u32x8(black_box(pairs)))

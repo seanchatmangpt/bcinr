@@ -1,7 +1,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules
 #[no_mangle]
 pub fn quotient_filter_add_u64(val: u64, aux: u64) -> u64 {
-    let nonzero = (((val | 0x8080_8080_8080_8080).wrapping_sub(0x0101_0101_0101_0101)) | val) & 0x8080_8080_8080_8080;
+    let nonzero = (((val | 0x8080_8080_8080_8080).wrapping_sub(0x0101_0101_0101_0101)) | val)
+        & 0x8080_8080_8080_8080;
     let zero_bytes = !nonzero & 0x8080_8080_8080_8080;
     let tz = zero_bytes.trailing_zeros();
     let shift = tz & 0x38; // nearest byte boundary

@@ -84,7 +84,6 @@ mod tests {
     // PROPERTY TESTS: 1000+ random cases of equivalence
     // -------------------------------------------------------------------------
 
-
     #[test]
     fn test_pearson_hash_u8_all() {
         // equivalence oracle
@@ -93,10 +92,7 @@ mod tests {
         assert_eq!(expected, actual, "Adversarial failure: branchless mismatch");
         // boundaries
 
-        assert_eq!(
-            pearson_hash_u8(0, 0),
-            pearson_hash_u8_reference(0, 0)
-        );
+        assert_eq!(pearson_hash_u8(0, 0), pearson_hash_u8_reference(0, 0));
         assert_eq!(
             pearson_hash_u8(u64::MAX, u64::MAX),
             pearson_hash_u8_reference(u64::MAX, u64::MAX)

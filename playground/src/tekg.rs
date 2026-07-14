@@ -47,7 +47,7 @@ const _: () = assert!(core::mem::size_of::<Tekg64Node>() == 64);
 ///
 /// # Example: The Assignment Update (Fig 2)
 ///
-/// The paper details an assignment `a1` whose points are updated from 2 to 3 
+/// The paper details an assignment `a1` whose points are updated from 2 to 3
 /// at times `t1` and `t4`. This requires capturing the entity and mapping
 /// the two chronological snapshots sequentially.
 ///
@@ -55,9 +55,9 @@ const _: () = assert!(core::mem::size_of::<Tekg64Node>() == 64);
 /// use playground::tekg::{compile_snapshot_chain, Tekg64Node, TekgLabel};
 ///
 /// // Prepare a zeroed output buffer for the nodes.
-/// let mut out = [Tekg64Node { 
-///     timestamp_ns: 0, rel_mask: 0, node_id: 0, parent_id: 0, 
-///     prev_snapshot_id: 0, label: TekgLabel::Log, _pad: [0; 41] 
+/// let mut out = [Tekg64Node {
+///     timestamp_ns: 0, rel_mask: 0, node_id: 0, parent_id: 0,
+///     prev_snapshot_id: 0, label: TekgLabel::Log, _pad: [0; 41]
 /// }; 3];
 ///
 /// // Algorithm 1: Entity `a1` (ID 1) updated at `t1` (100) and `t4` (400).
@@ -110,7 +110,7 @@ pub fn compile_snapshot_chain(
     // CC=1 unrolling loop for snapshot matrix emission
     for &ts in update_timestamps {
         let snap_id = entity_id.wrapping_add(current_idx as u16 * 100);
-        
+
         out[current_idx] = Tekg64Node {
             timestamp_ns: ts,
             rel_mask: 1 << (entity_id & 63),

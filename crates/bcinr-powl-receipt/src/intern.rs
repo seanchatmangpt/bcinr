@@ -39,7 +39,10 @@ impl ActivityTable {
         }
         // Insert new entry.
         let idx = self.len as usize;
-        assert!(idx < 256, "ActivityTable: too many distinct labels (max 256)");
+        assert!(
+            idx < 256,
+            "ActivityTable: too many distinct labels (max 256)"
+        );
         // Find write position: for idx 0 write at 0; otherwise after previous entry.
         let write_pos: usize = if idx == 0 {
             0
@@ -50,10 +53,7 @@ impl ActivityTable {
             prev_off + 1 + prev_len
         };
         let needed = 1 + bytes.len();
-        assert!(
-            write_pos + needed <= 4096,
-            "ActivityTable: arena exhausted"
-        );
+        assert!(write_pos + needed <= 4096, "ActivityTable: arena exhausted");
         self.offsets[idx] = write_pos as u16;
         self.data[write_pos] = bytes.len() as u8;
         self.data[write_pos + 1..write_pos + 1 + bytes.len()].copy_from_slice(bytes);
@@ -73,7 +73,10 @@ impl ActivityTable {
     }
 
     fn get_raw(&self, idx: u16) -> &[u8] {
-        assert!((idx as usize) < self.len as usize, "ActivityTable: index out of bounds");
+        assert!(
+            (idx as usize) < self.len as usize,
+            "ActivityTable: index out of bounds"
+        );
         let off = self.offsets[idx as usize] as usize;
         let len = self.data[off] as usize;
         &self.data[off + 1..off + 1 + len]
@@ -142,7 +145,10 @@ impl ObjTypeTable {
     }
 
     fn get_raw(&self, idx: u16) -> &[u8] {
-        assert!((idx as usize) < self.len as usize, "ObjTypeTable: index out of bounds");
+        assert!(
+            (idx as usize) < self.len as usize,
+            "ObjTypeTable: index out of bounds"
+        );
         let off = self.offsets[idx as usize] as usize;
         let len = self.data[off] as usize;
         &self.data[off + 1..off + 1 + len]

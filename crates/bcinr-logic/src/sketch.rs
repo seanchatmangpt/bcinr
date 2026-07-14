@@ -103,10 +103,18 @@ pub fn count_min_sketch_query(table: &[u32], hash: u64, depth: usize, width: usi
 mod tests {
     use super::*;
 
-    fn sketch_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    fn mutant_sketch_1(val: u64, aux: u64) -> u64 { !sketch_reference(val, aux) }
-    fn mutant_sketch_2(val: u64, aux: u64) -> u64 { sketch_reference(val, aux).wrapping_add(1) }
-    fn mutant_sketch_3(val: u64, aux: u64) -> u64 { sketch_reference(val, aux) ^ 0xFF }
+    fn sketch_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
+    fn mutant_sketch_1(val: u64, aux: u64) -> u64 {
+        !sketch_reference(val, aux)
+    }
+    fn mutant_sketch_2(val: u64, aux: u64) -> u64 {
+        sketch_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_sketch_3(val: u64, aux: u64) -> u64 {
+        sketch_reference(val, aux) ^ 0xFF
+    }
 
     const DEPTH: usize = 4;
     const WIDTH: usize = 256;
@@ -134,7 +142,10 @@ mod tests {
             count_min_sketch_update(&mut table, 0xCAFE_BABE, DEPTH, WIDTH);
         }
         let estimate = count_min_sketch_query(&table, 0xCAFE_BABE, DEPTH, WIDTH);
-        assert!(estimate >= n, "estimate {estimate} must be >= true count {n}");
+        assert!(
+            estimate >= n,
+            "estimate {estimate} must be >= true count {n}"
+        );
         assert!(
             estimate <= n + (n / 20).max(5),
             "estimate {estimate} exceeded 5% overcount threshold for true count {n}"

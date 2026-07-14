@@ -65,10 +65,7 @@ mod tests_petri_engine {
     #[test]
     fn test_swar_petri_phd_oracle() {
         // PHD Gate: step transitions state from input to output mask
-        let cases: &[(u64, u64, u64)] = &[
-            (0b01, 0b01, 0b10),
-            (0b10, 0b10, 0b01),
-        ];
+        let cases: &[(u64, u64, u64)] = &[(0b01, 0b01, 0b10), (0b10, 0b10, 0b01)];
         for &(init, inp, out) in cases {
             let initial = KBitSet { words: [init] };
             let inputs = [KBitSet { words: [inp] }];

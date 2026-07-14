@@ -61,17 +61,13 @@ mod tests {
         softmax_u32x4_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
     #[test]
     fn test_softmax_u32x4_all() {
         // oracle
-        assert_eq!(
-            softmax_u32x4(42, 1337),
-            softmax_u32x4_reference(42, 1337)
-        );
+        assert_eq!(softmax_u32x4(42, 1337), softmax_u32x4_reference(42, 1337));
         // boundaries
         assert_eq!(softmax_u32x4(0, 0), softmax_u32x4_reference(0, 0));
         assert_eq!(

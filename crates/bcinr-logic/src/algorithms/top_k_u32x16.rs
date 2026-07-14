@@ -76,17 +76,13 @@ mod tests {
         top_k_u32x16_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
     #[test]
     fn test_top_k_u32x16_all() {
         // oracle
-        assert_eq!(
-            top_k_u32x16(42, 1337),
-            top_k_u32x16_reference(42, 1337)
-        );
+        assert_eq!(top_k_u32x16(42, 1337), top_k_u32x16_reference(42, 1337));
         // boundaries
         assert_eq!(top_k_u32x16(0, 0), top_k_u32x16_reference(0, 0));
         assert_eq!(

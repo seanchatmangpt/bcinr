@@ -68,8 +68,6 @@ mod tests {
         is_sorted_branchless_u32_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
-
     // -------------------------------------------------------------------------
     // BRANCHLESS CONTRACT: is_sorted_branchless_u32
     // -------------------------------------------------------------------------
@@ -133,11 +131,16 @@ mod tests {
         let m1 = mutant_is_sorted_branchless_u32_1(42, 1337);
         let m2 = mutant_is_sorted_branchless_u32_2(42, 1337);
         let m3 = mutant_is_sorted_branchless_u32_3(42, 1337);
-        if m1 != baseline { assert_ne!(m1, baseline, "mutant 1"); }
-        if m2 != baseline { assert_ne!(m2, baseline, "mutant 2"); }
-        if m3 != baseline { assert_ne!(m3, baseline, "mutant 3"); }
+        if m1 != baseline {
+            assert_ne!(m1, baseline, "mutant 1");
+        }
+        if m2 != baseline {
+            assert_ne!(m2, baseline, "mutant 2");
+        }
+        if m3 != baseline {
+            assert_ne!(m3, baseline, "mutant 3");
+        }
     }
-
 }
 
 #[cfg(feature = "bench")]

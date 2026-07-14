@@ -59,20 +59,28 @@ fn logistics_plan_found_and_executed() {
     let initial_state: BTreeSet<Pddl8GroundAtom> = problem
         .init
         .iter()
-        .map(|a| Pddl8GroundAtom { pred: a.pred.clone(), args: a.args.clone() })
+        .map(|a| Pddl8GroundAtom {
+            pred: a.pred.clone(),
+            args: a.args.clone(),
+        })
         .collect();
     let goal: Vec<Pddl8GroundAtom> = problem
         .goal
         .iter()
-        .map(|a| Pddl8GroundAtom { pred: a.pred.clone(), args: a.args.clone() })
+        .map(|a| Pddl8GroundAtom {
+            pred: a.pred.clone(),
+            args: a.args.clone(),
+        })
         .collect();
 
     let (log, receipt, ocel) =
-        execute_tape(&tape, &initial_state, &goal, "test-logistics-001", &[])
-            .expect("execution");
+        execute_tape(&tape, &initial_state, &goal, "test-logistics-001", &[]).expect("execution");
 
     // All steps admitted
-    assert!(log.steps.iter().all(|s| s.admitted), "all steps must be admitted");
+    assert!(
+        log.steps.iter().all(|s| s.admitted),
+        "all steps must be admitted"
+    );
     assert_eq!(log.steps.len(), tape.len());
 
     // Goal reached
@@ -92,8 +100,14 @@ fn logistics_plan_found_and_executed() {
 
     // OCEL output
     assert_eq!(ocel.events.len(), tape.len());
-    assert!(ocel.events[0].attributes.iter().any(|a| a.name == "activity"));
-    assert!(ocel.events[0].attributes.iter().any(|a| a.name == "receipt"));
+    assert!(ocel.events[0]
+        .attributes
+        .iter()
+        .any(|a| a.name == "activity"));
+    assert!(ocel.events[0]
+        .attributes
+        .iter()
+        .any(|a| a.name == "receipt"));
     assert_eq!(ocel.objects.len(), 1);
     assert_eq!(ocel.objects[0].id, "test-logistics-001");
 }
@@ -105,11 +119,21 @@ fn logistics_step_receipt_chain_is_deterministic() {
     let gp = GroundProblem::build(&domain, &problem, None).unwrap();
     let tape = gp.find_plan().unwrap();
 
-    let init: BTreeSet<Pddl8GroundAtom> = problem.init.iter()
-        .map(|a| Pddl8GroundAtom { pred: a.pred.clone(), args: a.args.clone() })
+    let init: BTreeSet<Pddl8GroundAtom> = problem
+        .init
+        .iter()
+        .map(|a| Pddl8GroundAtom {
+            pred: a.pred.clone(),
+            args: a.args.clone(),
+        })
         .collect();
-    let goal: Vec<Pddl8GroundAtom> = problem.goal.iter()
-        .map(|a| Pddl8GroundAtom { pred: a.pred.clone(), args: a.args.clone() })
+    let goal: Vec<Pddl8GroundAtom> = problem
+        .goal
+        .iter()
+        .map(|a| Pddl8GroundAtom {
+            pred: a.pred.clone(),
+            args: a.args.clone(),
+        })
         .collect();
 
     let (log1, receipt1, _) = execute_tape(&tape, &init, &goal, "run1", &[]).unwrap();
@@ -127,14 +151,17 @@ fn logistics_step_receipt_chain_is_deterministic() {
 fn logistics_plan_fails_without_truck_at_pickup() {
     let domain = domain_from_pddl(DOMAIN).unwrap();
     // Problem where truck is at loc_b, not loc_a — cannot load at loc_a
-    let problem_no_truck = problem_from_pddl(r#"
+    let problem_no_truck = problem_from_pddl(
+        r#"
         (define (problem impossible)
           (:domain logistics)
           (:objects pkg1 truck1 loc_a loc_b)
           (:init (at pkg1 loc_a) (at truck1 loc_b))
           (:goal (at pkg1 loc_b))
         )
-    "#).unwrap();
+    "#,
+    )
+    .unwrap();
     let gp = GroundProblem::build(&domain, &problem_no_truck, None).unwrap();
     // Plan might exist via driving truck first then loading — so we just verify
     // the planner does something sensible (either finds a longer plan or fails)

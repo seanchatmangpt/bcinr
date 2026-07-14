@@ -58,7 +58,6 @@ mod tests {
         abs_diff_i64_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -78,8 +77,14 @@ mod tests {
             abs_diff_i64(u64::MAX, u64::MAX),
             abs_diff_i64_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(abs_diff_i64(u64::MAX, 0), abs_diff_i64_reference(u64::MAX, 0));
-        assert_eq!(abs_diff_i64(0, u64::MAX), abs_diff_i64_reference(0, u64::MAX));
+        assert_eq!(
+            abs_diff_i64(u64::MAX, 0),
+            abs_diff_i64_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            abs_diff_i64(0, u64::MAX),
+            abs_diff_i64_reference(0, u64::MAX)
+        );
         // --- mutant divergence ---
         let baseline = abs_diff_i64_reference(42, 1337);
         assert_ne!(

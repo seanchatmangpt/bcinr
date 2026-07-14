@@ -154,7 +154,10 @@ mod tests {
             }
         }
         // With 8-bit fingerprints, ~1/256 keys have fp=0, so we expect to find one quickly.
-        assert!(found, "Should find a key with fingerprint 0 within 10000 trials");
+        assert!(
+            found,
+            "Should find a key with fingerprint 0 within 10000 trials"
+        );
     }
 
     proptest! {

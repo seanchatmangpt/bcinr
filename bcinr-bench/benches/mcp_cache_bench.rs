@@ -46,8 +46,11 @@ fn problem_with_n_packages(n: usize) -> String {
         "{} - package\n    truck1 - truck\n    loc_a loc_b - location",
         pkgs.join(" ")
     );
-    let init: Vec<String> = pkgs.iter().map(|p| format!("(at {p} loc_a)"))
-        .chain(std::iter::once("(at truck1 loc_a)".to_string())).collect();
+    let init: Vec<String> = pkgs
+        .iter()
+        .map(|p| format!("(at {p} loc_a)"))
+        .chain(std::iter::once("(at truck1 loc_a)".to_string()))
+        .collect();
     let goal: Vec<String> = pkgs.iter().map(|p| format!("(at {p} loc_b)")).collect();
     format!(
         "(define (problem get-pkgs-to-loc_b)\n  (:domain logistics)\n  (:objects {objects})\n  (:init {})\n  (:goal (and {})))",
@@ -57,10 +60,24 @@ fn problem_with_n_packages(n: usize) -> String {
 
 /// Same shape as `manufacture_world`'s MCP handler's cache wrap: check cache
 /// by (tool, blake3(input)), compute on miss, insert before returning.
-async fn cached_manufacture_world(cache: &CapabilityCache, domain: &str, problem: &str, case_id: &str) -> String {
+async fn cached_manufacture_world(
+    cache: &CapabilityCache,
+    domain: &str,
+    problem: &str,
+    case_id: &str,
+) -> String {
     #[derive(serde::Serialize)]
-    struct Input<'a> { domain_text: &'a str, problem_text: &'a str, case_id: &'a str }
-    let canonical = serde_json::to_vec(&Input { domain_text: domain, problem_text: problem, case_id }).unwrap_or_default();
+    struct Input<'a> {
+        domain_text: &'a str,
+        problem_text: &'a str,
+        case_id: &'a str,
+    }
+    let canonical = serde_json::to_vec(&Input {
+        domain_text: domain,
+        problem_text: problem,
+        case_id,
+    })
+    .unwrap_or_default();
     let key = CapabilityCache::key("manufacture_world", &canonical);
     if let Some(cached) = cache.get(&key).await {
         return cached;
@@ -70,15 +87,23 @@ async fn cached_manufacture_world(cache: &CapabilityCache, domain: &str, problem
         "admitted": receipt.admitted,
         "makespan": receipt.plan.makespan,
         "step_count": receipt.plan.steps.len(),
-    }).to_string();
+    })
+    .to_string();
     cache.insert(key, result.clone()).await;
     result
 }
 
 async fn cached_pddl_plan(cache: &CapabilityCache, domain: &str, problem: &str) -> String {
     #[derive(serde::Serialize)]
-    struct Input<'a> { domain_text: &'a str, problem_text: &'a str }
-    let canonical = serde_json::to_vec(&Input { domain_text: domain, problem_text: problem }).unwrap_or_default();
+    struct Input<'a> {
+        domain_text: &'a str,
+        problem_text: &'a str,
+    }
+    let canonical = serde_json::to_vec(&Input {
+        domain_text: domain,
+        problem_text: problem,
+    })
+    .unwrap_or_default();
     let key = CapabilityCache::key("pddl_plan", &canonical);
     if let Some(cached) = cache.get(&key).await {
         return cached;
@@ -89,7 +114,8 @@ async fn cached_pddl_plan(cache: &CapabilityCache, domain: &str, problem: &str) 
         let ground = GroundProblem::build(&d, &p, None)?;
         let tape = ground.find_plan()?;
         Ok(serde_json::json!({"ok": true, "step_count": tape.ops.len()}).to_string())
-    })().unwrap_or_else(|e| serde_json::json!({"ok": false, "error": e.to_string()}).to_string());
+    })()
+    .unwrap_or_else(|e| serde_json::json!({"ok": false, "error": e.to_string()}).to_string());
     cache.insert(key, result.clone()).await;
     result
 }
@@ -103,15 +129,21 @@ fn cold_vs_warm_manufacture_world(bencher: divan::Bencher) {
             let problem = problem_with_n_packages(3);
 
             let t_cold = Instant::now();
-            let _ = divan::black_box(cached_manufacture_world(&cache, DOMAIN, &problem, "bench-cold").await);
+            let _ = divan::black_box(
+                cached_manufacture_world(&cache, DOMAIN, &problem, "bench-cold").await,
+            );
             let cold_ns = t_cold.elapsed().as_nanos();
 
             let t_warm = Instant::now();
-            let _ = divan::black_box(cached_manufacture_world(&cache, DOMAIN, &problem, "bench-cold").await);
+            let _ = divan::black_box(
+                cached_manufacture_world(&cache, DOMAIN, &problem, "bench-cold").await,
+            );
             let warm_ns = t_warm.elapsed().as_nanos();
 
-            eprintln!("manufacture_world cold_ns={cold_ns} warm_ns={warm_ns} speedup={:.1}x",
-                cold_ns as f64 / warm_ns.max(1) as f64);
+            eprintln!(
+                "manufacture_world cold_ns={cold_ns} warm_ns={warm_ns} speedup={:.1}x",
+                cold_ns as f64 / warm_ns.max(1) as f64
+            );
         });
     });
 }
@@ -132,8 +164,10 @@ fn cold_vs_warm_pddl_plan(bencher: divan::Bencher) {
             let _ = divan::black_box(cached_pddl_plan(&cache, DOMAIN, &problem).await);
             let warm_ns = t_warm.elapsed().as_nanos();
 
-            eprintln!("pddl_plan cold_ns={cold_ns} warm_ns={warm_ns} speedup={:.1}x",
-                cold_ns as f64 / warm_ns.max(1) as f64);
+            eprintln!(
+                "pddl_plan cold_ns={cold_ns} warm_ns={warm_ns} speedup={:.1}x",
+                cold_ns as f64 / warm_ns.max(1) as f64
+            );
         });
     });
 }
@@ -159,8 +193,17 @@ fn concurrent_throughput(n: usize) {
             handles.push(tokio::spawn(async move {
                 let problem = problem_with_n_packages(n_packages);
                 #[derive(serde::Serialize)]
-                struct Input<'a> { domain_text: &'a str, problem_text: &'a str, case_id: &'a str }
-                let canonical = serde_json::to_vec(&Input { domain_text: DOMAIN, problem_text: &problem, case_id: "throughput" }).unwrap_or_default();
+                struct Input<'a> {
+                    domain_text: &'a str,
+                    problem_text: &'a str,
+                    case_id: &'a str,
+                }
+                let canonical = serde_json::to_vec(&Input {
+                    domain_text: DOMAIN,
+                    problem_text: &problem,
+                    case_id: "throughput",
+                })
+                .unwrap_or_default();
                 let key = CapabilityCache::key("manufacture_world", &canonical);
                 if cache.get(&key).await.is_some() {
                     hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -168,7 +211,9 @@ fn concurrent_throughput(n: usize) {
                 let _ = cached_manufacture_world(&cache, DOMAIN, &problem, "throughput").await;
             }));
         }
-        for h in handles { let _ = h.await; }
+        for h in handles {
+            let _ = h.await;
+        }
 
         let elapsed = start.elapsed();
         let req_per_sec = n as f64 / elapsed.as_secs_f64();

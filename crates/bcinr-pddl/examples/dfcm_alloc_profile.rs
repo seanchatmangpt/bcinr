@@ -13,5 +13,8 @@ fn main() {
     let receipt = bcinr_pddl::run_dfcm_crown_suite().expect("dfcm crown suite");
     println!("wall_clock_ms = {}", receipt.wall_clock_ms);
     println!("alloc_count_by_stage = {:#?}", receipt.alloc_count_by_stage);
-    println!("bytes_allocated_by_stage = {:#?}", receipt.bytes_allocated_by_stage);
+    println!(
+        "bytes_allocated_by_stage = {:#?}",
+        receipt.bytes_allocated_by_stage
+    );
 }

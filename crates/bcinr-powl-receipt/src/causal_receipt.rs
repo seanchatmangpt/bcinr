@@ -302,10 +302,7 @@ mod tests {
         assert_eq!(canonical.len(), 71);
         // All hex digits must be lowercase ASCII hex.
         for &b in &canonical[7..] {
-            assert!(
-                b.is_ascii_hexdigit(),
-                "expected hex digit, got {b:#04x}"
-            );
+            assert!(b.is_ascii_hexdigit(), "expected hex digit, got {b:#04x}");
         }
     }
 
@@ -318,7 +315,10 @@ mod tests {
         let mut r2 = OcelCausalReceipt::genesis(run_id);
         r1.chain(&frame);
         r2.chain(&frame);
-        assert_eq!(r1.chain_hash, r2.chain_hash, "chaining must be deterministic");
+        assert_eq!(
+            r1.chain_hash, r2.chain_hash,
+            "chaining must be deterministic"
+        );
     }
 
     #[test]

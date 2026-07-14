@@ -24,15 +24,14 @@
 //! it. bcinr itself never computes fitness or conformance scores.
 
 use crate::error::Pddl8Error;
-use crate::parse::{domain31_from_pddl, problem31_from_pddl, domain_from_pddl, problem_from_pddl};
-use crate::ground::{GroundProblem, GroundTemporalProblem};
 use crate::execute::execute_temporal_plan;
-use wasm4pm_compat::pddl::{
-    Pddl31Domain, Pddl31Problem, Pddl8Domain, Pddl8Problem,
-    TemporalPlan, TemporalExecutionReceipt,
-};
+use crate::ground::{GroundProblem, GroundTemporalProblem};
+use crate::parse::{domain31_from_pddl, domain_from_pddl, problem31_from_pddl, problem_from_pddl};
 use blake3::Hasher;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
+use wasm4pm_compat::pddl::{
+    Pddl31Domain, Pddl31Problem, Pddl8Domain, Pddl8Problem, TemporalExecutionReceipt, TemporalPlan,
+};
 
 // ─── Admitted wrapper types ──────────────────────────────────────────────────
 
@@ -91,18 +90,30 @@ pub fn admit_candidate_domain(text: &str) -> Result<AdmittedDomain, Pddl8Error> 
     if domain31.name.is_empty() {
         return Err(Pddl8Error::ParseError("domain name is empty".to_string()));
     }
-    if domain31.predicates.is_empty() && domain31.actions.is_empty() && domain31.durative_actions.is_empty() {
-        return Err(Pddl8Error::ParseError("domain has no predicates and no actions".to_string()));
+    if domain31.predicates.is_empty()
+        && domain31.actions.is_empty()
+        && domain31.durative_actions.is_empty()
+    {
+        return Err(Pddl8Error::ParseError(
+            "domain has no predicates and no actions".to_string(),
+        ));
     }
 
     // Compute domain witness: BLAKE3 over structural identity
     let witness = compute_domain_witness(&domain31);
 
-    Ok(AdmittedDomain { domain31, domain8, witness })
+    Ok(AdmittedDomain {
+        domain31,
+        domain8,
+        witness,
+    })
 }
 
 /// Validate and admit an LLM-generated PDDL 3.1 problem text against an admitted domain.
-pub fn admit_candidate_problem(text: &str, domain: &AdmittedDomain) -> Result<AdmittedProblem, Pddl8Error> {
+pub fn admit_candidate_problem(
+    text: &str,
+    domain: &AdmittedDomain,
+) -> Result<AdmittedProblem, Pddl8Error> {
     let problem31 = problem31_from_pddl(text)?;
     let problem8 = problem_from_pddl(text)?;
 
@@ -120,7 +131,11 @@ pub fn admit_candidate_problem(text: &str, domain: &AdmittedDomain) -> Result<Ad
 
     let witness = compute_problem_witness(&problem31);
 
-    Ok(AdmittedProblem { problem31, problem8, witness })
+    Ok(AdmittedProblem {
+        problem31,
+        problem8,
+        witness,
+    })
 }
 
 /// Full pipeline: LLM text → admitted domain + problem → temporal plan → receipt.
@@ -137,35 +152,39 @@ pub fn manufacture_world(
     // Admit domain
     let admitted_domain = match admit_candidate_domain(domain_text) {
         Ok(d) => d,
-        Err(e) => return WorldManufactureReceipt {
-            domain_name: "<parse-failed>".to_string(),
-            problem_name: "<parse-failed>".to_string(),
-            domain_witness: String::new(),
-            problem_witness: String::new(),
-            plan: TemporalPlan::default(),
-            plan_receipt: refused_receipt(),
-            manufacture_chain: String::new(),
-            admitted: false,
-            refusal_reason: Some(format!("domain admission failed: {e}")),
-            ocel_export: build_ocel_export(&TemporalPlan::default(), case_id),
-        },
+        Err(e) => {
+            return WorldManufactureReceipt {
+                domain_name: "<parse-failed>".to_string(),
+                problem_name: "<parse-failed>".to_string(),
+                domain_witness: String::new(),
+                problem_witness: String::new(),
+                plan: TemporalPlan::default(),
+                plan_receipt: refused_receipt(),
+                manufacture_chain: String::new(),
+                admitted: false,
+                refusal_reason: Some(format!("domain admission failed: {e}")),
+                ocel_export: build_ocel_export(&TemporalPlan::default(), case_id),
+            }
+        }
     };
 
     // Admit problem
     let admitted_problem = match admit_candidate_problem(problem_text, &admitted_domain) {
         Ok(p) => p,
-        Err(e) => return WorldManufactureReceipt {
-            domain_name: admitted_domain.domain31.name.clone(),
-            problem_name: "<parse-failed>".to_string(),
-            domain_witness: admitted_domain.witness.clone(),
-            problem_witness: String::new(),
-            plan: TemporalPlan::default(),
-            plan_receipt: refused_receipt(),
-            manufacture_chain: String::new(),
-            admitted: false,
-            refusal_reason: Some(format!("problem admission failed: {e}")),
-            ocel_export: build_ocel_export(&TemporalPlan::default(), case_id),
-        },
+        Err(e) => {
+            return WorldManufactureReceipt {
+                domain_name: admitted_domain.domain31.name.clone(),
+                problem_name: "<parse-failed>".to_string(),
+                domain_witness: admitted_domain.witness.clone(),
+                problem_witness: String::new(),
+                plan: TemporalPlan::default(),
+                plan_receipt: refused_receipt(),
+                manufacture_chain: String::new(),
+                admitted: false,
+                refusal_reason: Some(format!("problem admission failed: {e}")),
+                ocel_export: build_ocel_export(&TemporalPlan::default(), case_id),
+            }
+        }
     };
 
     let domain_name = admitted_domain.domain31.name.clone();
@@ -174,27 +193,34 @@ pub fn manufacture_world(
     let problem_witness = admitted_problem.witness.clone();
 
     // Ground and plan — try temporal first, fall back to STRIPS
-    let (plan, plan_receipt) = match ground_and_plan(&admitted_domain, &admitted_problem, case_id, policy_rules) {
-        Ok(result) => result,
-        Err(e) => {
-            let receipt = refused_receipt();
-            let chain = chain_witnesses(&domain_witness, &problem_witness, &receipt.chain_hash);
-            return WorldManufactureReceipt {
-                domain_name,
-                problem_name,
-                domain_witness,
-                problem_witness,
-                plan: TemporalPlan::default(),
-                plan_receipt: receipt,
-                manufacture_chain: chain,
-                admitted: false,
-                refusal_reason: Some(format!("planning failed: {e}")),
-                ocel_export: build_ocel_export(&TemporalPlan::default(), case_id),
-            };
-        }
-    };
+    let (plan, plan_receipt) =
+        match ground_and_plan(&admitted_domain, &admitted_problem, case_id, policy_rules) {
+            Ok(result) => result,
+            Err(e) => {
+                let receipt = refused_receipt();
+                let chain = chain_witnesses(&domain_witness, &problem_witness, &receipt.chain_hash);
+                return WorldManufactureReceipt {
+                    domain_name,
+                    problem_name,
+                    domain_witness,
+                    problem_witness,
+                    plan: TemporalPlan::default(),
+                    plan_receipt: receipt,
+                    manufacture_chain: chain,
+                    admitted: false,
+                    refusal_reason: Some(format!("planning failed: {e}")),
+                    ocel_export: build_ocel_export(&TemporalPlan::default(), case_id),
+                };
+            }
+        };
 
-    let manufacture_chain = chain_witnesses_full(&domain_witness, &problem_witness, &plan_receipt.chain_hash, plan_receipt.goal_reached, plan_receipt.step_count as u64);
+    let manufacture_chain = chain_witnesses_full(
+        &domain_witness,
+        &problem_witness,
+        &plan_receipt.chain_hash,
+        plan_receipt.goal_reached,
+        plan_receipt.step_count as u64,
+    );
     let ocel_export = build_ocel_export(&plan, case_id);
 
     WorldManufactureReceipt {
@@ -233,7 +259,10 @@ pub fn build_ocel_export(plan: &TemporalPlan, case_id: &str) -> Value {
             step.args.clone()
         };
 
-        let omap: Vec<Value> = object_ids.iter().map(|id| Value::String(id.clone())).collect();
+        let omap: Vec<Value> = object_ids
+            .iter()
+            .map(|id| Value::String(id.clone()))
+            .collect();
 
         ocel_events.insert(
             event_id,
@@ -275,42 +304,72 @@ fn ground_and_plan(
     // Try temporal planning if there are durative actions
     if !domain.domain31.durative_actions.is_empty() {
         let ground = GroundTemporalProblem::build(&domain.domain8, &problem.problem8)?;
-        let plan = ground.find_temporal_plan()?;
-        let (receipt, _ocel) = execute_temporal_plan(&plan, &domain.domain8, &problem.problem8, case_id, policy_rules)?;
+        let plan = ground.find_temporal_plan().into_result()?;
+        let (receipt, _ocel) = execute_temporal_plan(
+            &plan,
+            &domain.domain8,
+            &problem.problem8,
+            case_id,
+            policy_rules,
+        )?;
         return Ok((plan, receipt));
     }
 
     // Fall back to classical STRIPS planning
     let ground = GroundProblem::build(&domain.domain8, &problem.problem8, None)?;
-    let tape = ground.find_plan()?;
+    let tape = ground.find_plan().into_result()?;
 
     // Convert classical tape to a TemporalPlan (each step at sequential integer times)
-    let steps = tape.ops.iter().enumerate().map(|(i, op)| {
-        wasm4pm_compat::pddl::TemporalPlanStep {
+    let steps = tape
+        .ops
+        .iter()
+        .enumerate()
+        .map(|(i, op)| wasm4pm_compat::pddl::TemporalPlanStep {
             start_time: i as f64,
             duration: 1.0,
             action_name: op.label.clone(),
-            args: op.action.preconditions.iter()
+            args: op
+                .action
+                .preconditions
+                .iter()
                 .flat_map(|a| a.args.clone())
                 .collect::<std::collections::HashSet<_>>()
                 .into_iter()
                 .collect(),
-        }
-    }).collect::<Vec<_>>();
+        })
+        .collect::<Vec<_>>();
 
     let makespan = steps.len() as f64;
-    let plan = TemporalPlan { steps, makespan, metric_value: None };
-    let (receipt, _ocel) = execute_temporal_plan(&plan, &domain.domain8, &problem.problem8, case_id, policy_rules)?;
+    let plan = TemporalPlan {
+        steps,
+        makespan,
+        metric_value: None,
+    };
+    let (receipt, _ocel) = execute_temporal_plan(
+        &plan,
+        &domain.domain8,
+        &problem.problem8,
+        case_id,
+        policy_rules,
+    )?;
     Ok((plan, receipt))
 }
 
 fn compute_domain_witness(domain: &Pddl31Domain) -> String {
     let mut h = Hasher::new();
     h.update(domain.name.as_bytes());
-    for req in &domain.requirements { h.update(req.as_bytes()); }
-    for (name, _) in &domain.predicates { h.update(name.as_bytes()); }
-    for action in &domain.actions { h.update(action.name.as_bytes()); }
-    for da in &domain.durative_actions { h.update(da.name.as_bytes()); }
+    for req in &domain.requirements {
+        h.update(req.as_bytes());
+    }
+    for (name, _) in &domain.predicates {
+        h.update(name.as_bytes());
+    }
+    for action in &domain.actions {
+        h.update(action.name.as_bytes());
+    }
+    for da in &domain.durative_actions {
+        h.update(da.name.as_bytes());
+    }
     hex(h.finalize().as_bytes())
 }
 
@@ -318,7 +377,10 @@ fn compute_problem_witness(problem: &Pddl31Problem) -> String {
     let mut h = Hasher::new();
     h.update(problem.name.as_bytes());
     h.update(problem.domain.as_bytes());
-    for (obj, typ) in &problem.objects { h.update(obj.as_bytes()); h.update(typ.as_bytes()); }
+    for (obj, typ) in &problem.objects {
+        h.update(obj.as_bytes());
+        h.update(typ.as_bytes());
+    }
     hex(h.finalize().as_bytes())
 }
 
@@ -326,11 +388,22 @@ fn chain_witnesses(domain_w: &str, problem_w: &str, plan_chain: &str) -> String 
     chain_witnesses_with_goal(domain_w, problem_w, plan_chain, false)
 }
 
-pub fn chain_witnesses_with_goal(domain_w: &str, problem_w: &str, plan_chain: &str, goal_reached: bool) -> String {
+pub fn chain_witnesses_with_goal(
+    domain_w: &str,
+    problem_w: &str,
+    plan_chain: &str,
+    goal_reached: bool,
+) -> String {
     chain_witnesses_full(domain_w, problem_w, plan_chain, goal_reached, 0)
 }
 
-pub fn chain_witnesses_full(domain_w: &str, problem_w: &str, plan_chain: &str, goal_reached: bool, step_count: u64) -> String {
+pub fn chain_witnesses_full(
+    domain_w: &str,
+    problem_w: &str,
+    plan_chain: &str,
+    goal_reached: bool,
+    step_count: u64,
+) -> String {
     let mut h = Hasher::new();
     h.update(domain_w.as_bytes());
     h.update(problem_w.as_bytes());
@@ -387,7 +460,10 @@ mod ocel_export_tests {
     #[test]
     fn ocel_case_id_matches_caller_supplied_case_id() {
         let receipt = manufacture_world(DOMAIN, PROBLEM, "unit-3", &[]);
-        assert_eq!(receipt.ocel_export["ocel:global-log"]["ocel:case-id"], "unit-3");
+        assert_eq!(
+            receipt.ocel_export["ocel:global-log"]["ocel:case-id"],
+            "unit-3"
+        );
     }
 
     #[test]
@@ -395,6 +471,9 @@ mod ocel_export_tests {
         let receipt = manufacture_world("not valid pddl", PROBLEM, "unit-4", &[]);
         assert!(!receipt.admitted);
         assert_eq!(receipt.ocel_export["ocel:type"], "pddl-temporal-trace");
-        assert!(receipt.ocel_export["ocel:events"].as_object().unwrap().is_empty());
+        assert!(receipt.ocel_export["ocel:events"]
+            .as_object()
+            .unwrap()
+            .is_empty());
     }
 }

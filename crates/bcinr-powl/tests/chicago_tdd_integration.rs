@@ -9,9 +9,9 @@
 
 #![cfg(feature = "std")]
 
-use bcinr_powl::compiler::{PowlAstNode, compile_powl};
+use bcinr_powl::compiler::{compile_powl, PowlAstNode};
 use bcinr_powl::ocel::{ConformanceResult, OcelLog};
-use bcinr_powl::scheduler::{PowlRunState, scheduler_tick};
+use bcinr_powl::scheduler::{scheduler_tick, PowlRunState};
 use chicago_tdd_tools::core::governance::{
     Diagnostic, DiagnosticCategory, DiagnosticCode, DiagnosticSink, RunSummary, Severity,
 };
@@ -77,7 +77,8 @@ fn powl_linear_chain_conformance_receipted() {
     let tape = compile_powl(&ast).expect("linear chain must compile");
     let _full_mask = tape.entry_mask | {
         let ops = &tape.ops[..tape.len as usize];
-        ops.iter().fold(0u64, |acc, op| acc | op.pred_mask | op.succ_mask)
+        ops.iter()
+            .fold(0u64, |acc, op| acc | op.pred_mask | op.succ_mask)
     };
 
     let mut state = PowlRunState::new(&tape);
@@ -103,27 +104,43 @@ fn powl_linear_chain_conformance_receipted() {
 
     // Conformance check: all predecessor constraints satisfied.
     let result = ocel_log.validate_against_tape(&tape);
-    assert_eq!(result, ConformanceResult::Conforms, "linear chain must conform");
+    assert_eq!(
+        result,
+        ConformanceResult::Conforms,
+        "linear chain must conform"
+    );
 
     // Route result through chicago-tdd-tools OcelCollector.
     std::fs::create_dir_all("target").ok();
     let path = PathBuf::from("target/bcinr-powl-chicago-tdd-linear-chain.ocel.json");
     let collector = OcelCollector::new(Some(path));
-    emit_conformance(&collector, "powl-linear-001", Severity::Info,
-        "POWL linear chain conforms — all predecessor constraints satisfied", 1000);
+    emit_conformance(
+        &collector,
+        "powl-linear-001",
+        Severity::Info,
+        "POWL linear chain conforms — all predecessor constraints satisfied",
+        1000,
+    );
 
     // Seal: produces receipted Evidence + 64-char hex digest.
-    let (receipted, digest) = seal_run(&collector, "powl-linear-001".to_string())
-        .expect("seal_run must succeed");
+    let (receipted, digest) =
+        seal_run(&collector, "powl-linear-001".to_string()).expect("seal_run must succeed");
     assert_eq!(digest.len(), 64, "digest must be 64 hex chars");
-    assert!(digest.chars().all(|c| c.is_ascii_hexdigit()), "digest must be hex");
+    assert!(
+        digest.chars().all(|c| c.is_ascii_hexdigit()),
+        "digest must be hex"
+    );
 
     // The receipted log must contain our conformance event.
     let log = receipted.inner();
-    assert!(!log.events.is_empty(), "receipted log must contain at least one event");
+    assert!(
+        !log.events.is_empty(),
+        "receipted log must contain at least one event"
+    );
 
     // Close writes the OCEL JSON to disk.
-    collector.close(make_run_summary("powl-linear-001"))
+    collector
+        .close(make_run_summary("powl-linear-001"))
         .expect("close must succeed");
 }
 
@@ -156,8 +173,13 @@ fn powl_predecessor_violation_detected_and_receipted() {
 
     // Route violation through chicago-tdd-tools as Andon.
     let collector = OcelCollector::new(None);
-    emit_conformance(&collector, "powl-violation-001", Severity::Andon,
-        "POWL predecessor violation: op 1 fired without op 0 — ANDON", 2000);
+    emit_conformance(
+        &collector,
+        "powl-violation-001",
+        Severity::Andon,
+        "POWL predecessor violation: op 1 fired without op 0 — ANDON",
+        2000,
+    );
 
     let (receipted_v1, digest_v1) = seal_run(&collector, "powl-violation-001".to_string())
         .expect("seal must succeed for violation log");
@@ -166,15 +188,27 @@ fn powl_predecessor_violation_detected_and_receipted() {
 
     // Now emit a second (different) event and reseal — digest must change.
     let collector2 = OcelCollector::new(None);
-    emit_conformance(&collector2, "powl-violation-002", Severity::Andon,
-        "POWL predecessor violation (mutated log)", 3000);
-    emit_conformance(&collector2, "powl-violation-002", Severity::Warning,
-        "Additional conformance note", 4000);
+    emit_conformance(
+        &collector2,
+        "powl-violation-002",
+        Severity::Andon,
+        "POWL predecessor violation (mutated log)",
+        3000,
+    );
+    emit_conformance(
+        &collector2,
+        "powl-violation-002",
+        Severity::Warning,
+        "Additional conformance note",
+        4000,
+    );
 
-    let (_receipted_v2, digest_v2) = seal_run(&collector2, "powl-violation-002".to_string())
-        .expect("reseal must succeed");
-    assert_ne!(digest_v1, digest_v2,
-        "digest must change when log content changes — tamper evidence");
+    let (_receipted_v2, digest_v2) =
+        seal_run(&collector2, "powl-violation-002".to_string()).expect("reseal must succeed");
+    assert_ne!(
+        digest_v1, digest_v2,
+        "digest must change when log content changes — tamper evidence"
+    );
 }
 
 // ─── test 3 ──────────────────────────────────────────────────────────────────
@@ -213,7 +247,9 @@ fn powl_xor_workflow_ocel_export() {
     ocel_log.record_run_sealed(run_id, op_trace).unwrap();
 
     // Export OCEL 2.0 JSON.
-    let json = ocel_log.to_ocel_json().expect("to_ocel_json must succeed with std feature");
+    let json = ocel_log
+        .to_ocel_json()
+        .expect("to_ocel_json must succeed with std feature");
     assert!(!json.is_empty(), "OCEL JSON must be non-empty");
 
     // Structural assertions on the JSON — strict OCEL 2.0 per-key checks.
@@ -242,25 +278,42 @@ fn powl_xor_workflow_ocel_export() {
     );
 
     // eventTypes must include op_fired and run_sealed.
-    let event_types = parsed["eventTypes"].as_array()
+    let event_types = parsed["eventTypes"]
+        .as_array()
         .expect("'eventTypes' must be an array");
-    let et_names: Vec<&str> = event_types.iter()
+    let et_names: Vec<&str> = event_types
+        .iter()
         .filter_map(|t| t.get("name").and_then(|n| n.as_str()))
         .collect();
-    assert!(et_names.contains(&"op_fired"), "eventTypes must contain 'op_fired'");
-    assert!(et_names.contains(&"run_sealed"), "eventTypes must contain 'run_sealed'");
+    assert!(
+        et_names.contains(&"op_fired"),
+        "eventTypes must contain 'op_fired'"
+    );
+    assert!(
+        et_names.contains(&"run_sealed"),
+        "eventTypes must contain 'run_sealed'"
+    );
 
     // objectTypes must include PowlRun and PowlOp.
-    let object_types = parsed["objectTypes"].as_array()
+    let object_types = parsed["objectTypes"]
+        .as_array()
         .expect("'objectTypes' must be an array");
-    let ot_names: Vec<&str> = object_types.iter()
+    let ot_names: Vec<&str> = object_types
+        .iter()
         .filter_map(|t| t.get("name").and_then(|n| n.as_str()))
         .collect();
-    assert!(ot_names.contains(&"PowlRun"), "objectTypes must contain 'PowlRun'");
-    assert!(ot_names.contains(&"PowlOp"), "objectTypes must contain 'PowlOp'");
+    assert!(
+        ot_names.contains(&"PowlRun"),
+        "objectTypes must contain 'PowlRun'"
+    );
+    assert!(
+        ot_names.contains(&"PowlOp"),
+        "objectTypes must contain 'PowlOp'"
+    );
 
     // Every event must carry a time field (OCEL 2.0 uses "time").
-    let events_arr = parsed["events"].as_array()
+    let events_arr = parsed["events"]
+        .as_array()
         .expect("'events' must be an array");
     for (i, evt) in events_arr.iter().enumerate() {
         assert!(
@@ -270,9 +323,11 @@ fn powl_xor_workflow_ocel_export() {
     }
 
     // Every event relationship must reference an object declared in the objects array.
-    let objects_arr = parsed["objects"].as_array()
+    let objects_arr = parsed["objects"]
+        .as_array()
         .expect("'objects' must be an array");
-    let declared_ids: std::collections::HashSet<&str> = objects_arr.iter()
+    let declared_ids: std::collections::HashSet<&str> = objects_arr
+        .iter()
         .filter_map(|o| o.get("id").and_then(|id| id.as_str()))
         .collect();
     for (i, evt) in events_arr.iter().enumerate() {
@@ -291,22 +346,32 @@ fn powl_xor_workflow_ocel_export() {
 
     // Write to disk for external tooling.
     std::fs::create_dir_all("target").ok();
-    std::fs::write("target/bcinr-powl-chicago-tdd-xor-workflow.ocel.json", &json)
-        .expect("must write OCEL JSON to target/");
+    std::fs::write(
+        "target/bcinr-powl-chicago-tdd-xor-workflow.ocel.json",
+        &json,
+    )
+    .expect("must write OCEL JSON to target/");
 
     // Route through chicago-tdd-tools.
-    let collector = OcelCollector::new(
-        Some(PathBuf::from("target/bcinr-powl-chicago-tdd-xor-collector.ocel.json"))
+    let collector = OcelCollector::new(Some(PathBuf::from(
+        "target/bcinr-powl-chicago-tdd-xor-collector.ocel.json",
+    )));
+    emit_conformance(
+        &collector,
+        "powl-xor-001",
+        Severity::Info,
+        "XOR workflow OCEL 2.0 export: structurally valid",
+        5000,
     );
-    emit_conformance(&collector, "powl-xor-001", Severity::Info,
-        "XOR workflow OCEL 2.0 export: structurally valid", 5000);
 
-    let (receipted, digest) = seal_run(&collector, "powl-xor-001".to_string())
-        .expect("seal must succeed");
+    let (receipted, digest) =
+        seal_run(&collector, "powl-xor-001".to_string()).expect("seal must succeed");
     assert_eq!(digest.len(), 64);
     assert!(!receipted.inner().events.is_empty());
 
-    collector.close(make_run_summary("powl-xor-001")).expect("close must succeed");
+    collector
+        .close(make_run_summary("powl-xor-001"))
+        .expect("close must succeed");
 }
 
 // ─── test 4 ──────────────────────────────────────────────────────────────────
@@ -319,46 +384,74 @@ fn powl_xor_workflow_ocel_export() {
 fn sealed_receipt_digest_changes_on_event_mutation() {
     // Collector A: one Info event.
     let c_a = OcelCollector::new(None);
-    emit_conformance(&c_a, "digest-run-a", Severity::Info,
-        "original conformance event", 10_000);
-    let (_, digest_a) = seal_run(&c_a, "digest-run-a".to_string())
-        .expect("seal A");
+    emit_conformance(
+        &c_a,
+        "digest-run-a",
+        Severity::Info,
+        "original conformance event",
+        10_000,
+    );
+    let (_, digest_a) = seal_run(&c_a, "digest-run-a".to_string()).expect("seal A");
 
     // Collector B: same run_id, same message — should match A's content.
     let c_b = OcelCollector::new(None);
-    emit_conformance(&c_b, "digest-run-a", Severity::Info,
-        "original conformance event", 10_000);
-    let (_, digest_b) = seal_run(&c_b, "digest-run-a".to_string())
-        .expect("seal B");
+    emit_conformance(
+        &c_b,
+        "digest-run-a",
+        Severity::Info,
+        "original conformance event",
+        10_000,
+    );
+    let (_, digest_b) = seal_run(&c_b, "digest-run-a".to_string()).expect("seal B");
     // Deterministic: same events → same digest.
     // Note: uuid in event_id is random, so digests may differ.
     // Instead we verify that changing the message changes the digest.
 
     // Collector C: different message → different digest.
     let c_c = OcelCollector::new(None);
-    emit_conformance(&c_c, "digest-run-c", Severity::Andon,
-        "MUTATED — different message than A", 10_001);
-    let (_, digest_c) = seal_run(&c_c, "digest-run-c".to_string())
-        .expect("seal C");
-    assert_ne!(digest_a, digest_c,
-        "digest must differ when event message differs — tamper evidence");
+    emit_conformance(
+        &c_c,
+        "digest-run-c",
+        Severity::Andon,
+        "MUTATED — different message than A",
+        10_001,
+    );
+    let (_, digest_c) = seal_run(&c_c, "digest-run-c".to_string()).expect("seal C");
+    assert_ne!(
+        digest_a, digest_c,
+        "digest must differ when event message differs — tamper evidence"
+    );
 
     // Collector D: two events vs one → different digest.
     let c_d = OcelCollector::new(None);
-    emit_conformance(&c_d, "digest-run-d", Severity::Info,
-        "original conformance event", 10_000);
-    emit_conformance(&c_d, "digest-run-d", Severity::Warning,
-        "additional event changes the log", 11_000);
-    let (_, digest_d) = seal_run(&c_d, "digest-run-d".to_string())
-        .expect("seal D");
+    emit_conformance(
+        &c_d,
+        "digest-run-d",
+        Severity::Info,
+        "original conformance event",
+        10_000,
+    );
+    emit_conformance(
+        &c_d,
+        "digest-run-d",
+        Severity::Warning,
+        "additional event changes the log",
+        11_000,
+    );
+    let (_, digest_d) = seal_run(&c_d, "digest-run-d".to_string()).expect("seal D");
     // Two events in D vs one in B (same run_id prefix doesn't matter since IDs differ).
     let _ = digest_b; // used above
-    assert_ne!(digest_a, digest_d,
-        "digest must differ when event count differs — tamper evidence");
+    assert_ne!(
+        digest_a, digest_d,
+        "digest must differ when event count differs — tamper evidence"
+    );
 
     // All digests are well-formed.
     for d in &[&digest_a, &digest_c, &digest_d] {
         assert_eq!(d.len(), 64, "digest must be 64 hex chars");
-        assert!(d.chars().all(|c| c.is_ascii_hexdigit()), "digest must be hex");
+        assert!(
+            d.chars().all(|c| c.is_ascii_hexdigit()),
+            "digest must be hex"
+        );
     }
 }

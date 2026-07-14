@@ -26,12 +26,7 @@
 /// let sample = reservoir_sample_step(0, 42, 1, 0xDEAD_BEEF);
 /// assert_eq!(sample, 42, "First element must always be accepted");
 /// ```
-pub fn reservoir_sample_step(
-    current: u64,
-    candidate: u64,
-    item_index: u64,
-    rand_val: u64,
-) -> u64 {
+pub fn reservoir_sample_step(current: u64, candidate: u64, item_index: u64, rand_val: u64) -> u64 {
     // item_index must be >= 1; use max(item_index, 1) to avoid division by zero.
     let idx = item_index.max(1);
     // Accept candidate iff rand_val % idx == 0.
@@ -126,7 +121,10 @@ mod tests {
     fn test_zero_index_treated_as_one() {
         // item_index = 0 is treated as 1 (max(0,1)=1 → always accept).
         let result = reservoir_sample_step(99, 7, 0, 12345);
-        assert_eq!(result, 7, "index=0 should be clamped to 1 and always accept");
+        assert_eq!(
+            result, 7,
+            "index=0 should be clamped to 1 and always accept"
+        );
     }
 
     #[test]

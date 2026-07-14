@@ -21,9 +21,16 @@ fn bcinr_mcp_cmd() -> Command {
 }
 
 fn text_of(blocks: &[ContentBlock]) -> &str {
-    blocks.iter().find_map(|b| {
-        if let ContentBlock::Text(t) = b { Some(t.text.as_str()) } else { None }
-    }).unwrap_or("")
+    blocks
+        .iter()
+        .find_map(|b| {
+            if let ContentBlock::Text(t) = b {
+                Some(t.text.as_str())
+            } else {
+                None
+            }
+        })
+        .unwrap_or("")
 }
 
 fn parse_result(blocks: &[ContentBlock]) -> serde_json::Value {
@@ -127,27 +134,47 @@ const SIX_STEP_PROBLEM: &str = "\
 #[tokio::test]
 async fn financial_best_execution_compliant_workflow() {
     let session = McpSession::new(
-        McpServerHarnessBuilder::new(bcinr_mcp_cmd()).spawn().await.expect("server must start"),
-    ).initialize().await.expect("init");
+        McpServerHarnessBuilder::new(bcinr_mcp_cmd())
+            .spawn()
+            .await
+            .expect("server must start"),
+    )
+    .initialize()
+    .await
+    .expect("init");
 
-    let result = session.call_tool("manufacture_world", serde_json::json!({
-        "domain_text": FINANCIAL_DOMAIN,
-        "problem_text": FINANCIAL_PROBLEM,
-        "case_id": "trade-2026-06-30-compliant",
-        // No restrictive policy — standard may_fire allows all admitted steps
-    })).await.expect("manufacture_world");
+    let result = session
+        .call_tool(
+            "manufacture_world",
+            serde_json::json!({
+                "domain_text": FINANCIAL_DOMAIN,
+                "problem_text": FINANCIAL_PROBLEM,
+                "case_id": "trade-2026-06-30-compliant",
+                // No restrictive policy — standard may_fire allows all admitted steps
+            }),
+        )
+        .await
+        .expect("manufacture_world");
 
     let r = parse_result(&result.content);
-    assert!(r["admitted"].as_bool().unwrap_or(false),
-        "compliant financial workflow must be admitted; got: {r}");
-    assert!(r["goal_reached"].as_bool().unwrap_or(false),
-        "order-submitted goal must be reached; got: {r}");
+    assert!(
+        r["admitted"].as_bool().unwrap_or(false),
+        "compliant financial workflow must be admitted; got: {r}"
+    );
+    assert!(
+        r["goal_reached"].as_bool().unwrap_or(false),
+        "order-submitted goal must be reached; got: {r}"
+    );
     assert_eq!(r["step_count"].as_u64().unwrap_or(0), 4,
         "financial workflow is exactly 4 steps: check-price, check-venue, execute-trade, submit-order");
 
     // The receipt hash is the compliance artifact.
     let chain = r["manufacture_chain"].as_str().unwrap_or("");
-    assert_eq!(chain.len(), 64, "manufacture_chain must be a 64-char BLAKE3 hex string");
+    assert_eq!(
+        chain.len(),
+        64,
+        "manufacture_chain must be a 64-char BLAKE3 hex string"
+    );
 
     session.shutdown().await;
 }
@@ -164,27 +191,41 @@ async fn financial_best_execution_compliant_workflow() {
 #[tokio::test]
 async fn financial_policy_gate_blocks_premature_trade() {
     let session = McpSession::new(
-        McpServerHarnessBuilder::new(bcinr_mcp_cmd()).spawn().await.expect("server must start"),
-    ).initialize().await.expect("init");
+        McpServerHarnessBuilder::new(bcinr_mcp_cmd())
+            .spawn()
+            .await
+            .expect("server must start"),
+    )
+    .initialize()
+    .await
+    .expect("init");
 
-    let result = session.call_tool("manufacture_world", serde_json::json!({
-        "domain_text": FINANCIAL_DOMAIN,
-        "problem_text": FINANCIAL_PROBLEM,
-        "case_id": "trade-2026-06-30-blocked",
-        "policy_rules": [
-            // Explicitly deny execute-trade — simulates: no pre-trade checks, trade blocked
-            "may_fire(X) :- not(blocked(X)).",
-            "blocked(execute-trade).",
-        ]
-    })).await.expect("manufacture_world");
+    let result = session
+        .call_tool(
+            "manufacture_world",
+            serde_json::json!({
+                "domain_text": FINANCIAL_DOMAIN,
+                "problem_text": FINANCIAL_PROBLEM,
+                "case_id": "trade-2026-06-30-blocked",
+                "policy_rules": [
+                    // Explicitly deny execute-trade — simulates: no pre-trade checks, trade blocked
+                    "may_fire(X) :- not(blocked(X)).",
+                    "blocked(execute-trade).",
+                ]
+            }),
+        )
+        .await
+        .expect("manufacture_world");
 
     let r = parse_result(&result.content);
     // The workflow is either refused outright (admitted=false) or a step is denied.
     // Either way: the claim is that the Prolog8 gate prevents execution.
     let admitted = r["admitted"].as_bool().unwrap_or(false);
     let refusal = r["refusal_reason"].as_str().unwrap_or("");
-    assert!(!admitted || !refusal.is_empty() || !r["goal_reached"].as_bool().unwrap_or(true),
-        "execute-trade must be blocked by policy gate; got: {r}");
+    assert!(
+        !admitted || !refusal.is_empty() || !r["goal_reached"].as_bool().unwrap_or(true),
+        "execute-trade must be blocked by policy gate; got: {r}"
+    );
 
     session.shutdown().await;
 }
@@ -196,33 +237,58 @@ async fn financial_policy_gate_blocks_premature_trade() {
 #[tokio::test]
 async fn healthcare_phi_gated_by_consent_verification() {
     let session = McpSession::new(
-        McpServerHarnessBuilder::new(bcinr_mcp_cmd()).spawn().await.expect("server must start"),
-    ).initialize().await.expect("init");
+        McpServerHarnessBuilder::new(bcinr_mcp_cmd())
+            .spawn()
+            .await
+            .expect("server must start"),
+    )
+    .initialize()
+    .await
+    .expect("init");
 
-    let result = session.call_tool("manufacture_world", serde_json::json!({
-        "domain_text": HEALTHCARE_DOMAIN,
-        "problem_text": HEALTHCARE_PROBLEM,
-        "case_id": "phi-case-2026-06-30",
-    })).await.expect("manufacture_world");
+    let result = session
+        .call_tool(
+            "manufacture_world",
+            serde_json::json!({
+                "domain_text": HEALTHCARE_DOMAIN,
+                "problem_text": HEALTHCARE_PROBLEM,
+                "case_id": "phi-case-2026-06-30",
+            }),
+        )
+        .await
+        .expect("manufacture_world");
 
     let r = parse_result(&result.content);
-    assert!(r["admitted"].as_bool().unwrap_or(false), "care coordination must be admitted; got: {r}");
-    assert!(r["goal_reached"].as_bool().unwrap_or(false), "care-plan goal must be reached; got: {r}");
+    assert!(
+        r["admitted"].as_bool().unwrap_or(false),
+        "care coordination must be admitted; got: {r}"
+    );
+    assert!(
+        r["goal_reached"].as_bool().unwrap_or(false),
+        "care-plan goal must be reached; got: {r}"
+    );
 
     // Verify the plan steps are in the required causal order:
     // identify-patient → verify-consent → access-phi → create-care-plan
     // The step ordering in the receipt is the cryptographic proof of causal compliance.
     if let Some(steps) = r["plan_steps"].as_array() {
-        let names: Vec<&str> = steps.iter()
+        let names: Vec<&str> = steps
+            .iter()
             .filter_map(|s| s["action_name"].as_str())
             .collect();
-        assert_eq!(names.len(), 4, "care plan requires exactly 4 steps; got: {names:?}");
+        assert_eq!(
+            names.len(),
+            4,
+            "care plan requires exactly 4 steps; got: {names:?}"
+        );
         // consent must precede phi access in the receipt
         let consent_pos = names.iter().position(|n| n.contains("consent"));
         let phi_pos = names.iter().position(|n| n.contains("phi"));
         if let (Some(c), Some(p)) = (consent_pos, phi_pos) {
-            assert!(c < p,
-                "verify-consent (pos {c}) must precede access-phi (pos {p}) in the causal receipt");
+            assert!(
+                c < p,
+                "verify-consent (pos {c}) must precede access-phi (pos {p}) in the causal receipt"
+            );
         }
     }
 
@@ -234,25 +300,39 @@ async fn healthcare_phi_gated_by_consent_verification() {
 #[tokio::test]
 async fn healthcare_phi_blocked_without_consent_policy() {
     let session = McpSession::new(
-        McpServerHarnessBuilder::new(bcinr_mcp_cmd()).spawn().await.expect("server must start"),
-    ).initialize().await.expect("init");
+        McpServerHarnessBuilder::new(bcinr_mcp_cmd())
+            .spawn()
+            .await
+            .expect("server must start"),
+    )
+    .initialize()
+    .await
+    .expect("init");
 
-    let result = session.call_tool("manufacture_world", serde_json::json!({
-        "domain_text": HEALTHCARE_DOMAIN,
-        "problem_text": HEALTHCARE_PROBLEM,
-        "case_id": "phi-blocked-2026-06-30",
-        "policy_rules": [
-            // Deny PHI access unconditionally — simulates a system where consent
-            // hasn't been obtained at policy-load time
-            "may_fire(X) :- not(blocked(X)).",
-            "blocked(access-phi).",
-        ]
-    })).await.expect("manufacture_world");
+    let result = session
+        .call_tool(
+            "manufacture_world",
+            serde_json::json!({
+                "domain_text": HEALTHCARE_DOMAIN,
+                "problem_text": HEALTHCARE_PROBLEM,
+                "case_id": "phi-blocked-2026-06-30",
+                "policy_rules": [
+                    // Deny PHI access unconditionally — simulates a system where consent
+                    // hasn't been obtained at policy-load time
+                    "may_fire(X) :- not(blocked(X)).",
+                    "blocked(access-phi).",
+                ]
+            }),
+        )
+        .await
+        .expect("manufacture_world");
 
     let r = parse_result(&result.content);
     let admitted = r["admitted"].as_bool().unwrap_or(false);
-    assert!(!admitted || !r["goal_reached"].as_bool().unwrap_or(true),
-        "PHI access without consent policy must be blocked or goal must not be reached; got: {r}");
+    assert!(
+        !admitted || !r["goal_reached"].as_bool().unwrap_or(true),
+        "PHI access without consent policy must be blocked or goal must not be reached; got: {r}"
+    );
 
     session.shutdown().await;
 }
@@ -276,19 +356,34 @@ async fn hijacking_injection_in_domain_text_is_parser_rejected() {
     ];
 
     let session = McpSession::new(
-        McpServerHarnessBuilder::new(bcinr_mcp_cmd()).spawn().await.expect("server must start"),
-    ).initialize().await.expect("init");
+        McpServerHarnessBuilder::new(bcinr_mcp_cmd())
+            .spawn()
+            .await
+            .expect("server must start"),
+    )
+    .initialize()
+    .await
+    .expect("init");
 
     for injection in &injections {
-        let result = session.call_tool("manufacture_world", serde_json::json!({
-            "domain_text": injection,
-            "problem_text": CICD_PROBLEM,
-            "case_id": "hijack-test",
-        })).await.expect("server must not crash on injection");
+        let result = session
+            .call_tool(
+                "manufacture_world",
+                serde_json::json!({
+                    "domain_text": injection,
+                    "problem_text": CICD_PROBLEM,
+                    "case_id": "hijack-test",
+                }),
+            )
+            .await
+            .expect("server must not crash on injection");
 
         let r = parse_result(&result.content);
-        assert!(!r["admitted"].as_bool().unwrap_or(false),
-            "injected domain_text {:?} must be parser-rejected (admitted=false); got: {r}", injection);
+        assert!(
+            !r["admitted"].as_bool().unwrap_or(false),
+            "injected domain_text {:?} must be parser-rejected (admitted=false); got: {r}",
+            injection
+        );
     }
 
     session.shutdown().await;
@@ -302,23 +397,35 @@ async fn hijacking_injection_in_domain_text_is_parser_rejected() {
 #[tokio::test]
 async fn hijacking_prolog8_gate_blocks_unauthorized_production_deploy() {
     let session = McpSession::new(
-        McpServerHarnessBuilder::new(bcinr_mcp_cmd()).spawn().await.expect("server must start"),
-    ).initialize().await.expect("init");
+        McpServerHarnessBuilder::new(bcinr_mcp_cmd())
+            .spawn()
+            .await
+            .expect("server must start"),
+    )
+    .initialize()
+    .await
+    .expect("init");
 
     // Attempt: valid PDDL, valid plan, but policy blocks deploy-production.
-    let result = session.call_tool("manufacture_world", serde_json::json!({
-        "domain_text": CICD_DOMAIN,
-        "problem_text": CICD_PROBLEM,
-        "case_id": "hijack-prolog8-test",
-        "policy_rules": [
-            // Staging gate: production deploy only if human-approved.
-            // Without a human_approved fact, the gate blocks it.
-            "may_fire(X) :- not(requires_approval(X)).",
-            "requires_approval(deploy-production).",
-            // Note: no may_fire(deploy-production) fact is provided —
-            // so the gate returns false for deploy-production.
-        ]
-    })).await.expect("server must not crash");
+    let result = session
+        .call_tool(
+            "manufacture_world",
+            serde_json::json!({
+                "domain_text": CICD_DOMAIN,
+                "problem_text": CICD_PROBLEM,
+                "case_id": "hijack-prolog8-test",
+                "policy_rules": [
+                    // Staging gate: production deploy only if human-approved.
+                    // Without a human_approved fact, the gate blocks it.
+                    "may_fire(X) :- not(requires_approval(X)).",
+                    "requires_approval(deploy-production).",
+                    // Note: no may_fire(deploy-production) fact is provided —
+                    // so the gate returns false for deploy-production.
+                ]
+            }),
+        )
+        .await
+        .expect("server must not crash");
 
     let r = parse_result(&result.content);
     // The plan will find deploy-production as a valid action,
@@ -340,47 +447,81 @@ async fn hijacking_prolog8_gate_blocks_unauthorized_production_deploy() {
 #[tokio::test]
 async fn compliance_receipt_is_tamper_evident_under_eu_ai_act() {
     let session = McpSession::new(
-        McpServerHarnessBuilder::new(bcinr_mcp_cmd()).spawn().await.expect("server must start"),
-    ).initialize().await.expect("init");
+        McpServerHarnessBuilder::new(bcinr_mcp_cmd())
+            .spawn()
+            .await
+            .expect("server must start"),
+    )
+    .initialize()
+    .await
+    .expect("init");
 
     // Generate a valid receipt for the financial workflow.
-    let original = session.call_tool("manufacture_world", serde_json::json!({
-        "domain_text": FINANCIAL_DOMAIN,
-        "problem_text": FINANCIAL_PROBLEM,
-        "case_id": "eu-ai-act-audit-2026",
-    })).await.expect("manufacture_world");
+    let original = session
+        .call_tool(
+            "manufacture_world",
+            serde_json::json!({
+                "domain_text": FINANCIAL_DOMAIN,
+                "problem_text": FINANCIAL_PROBLEM,
+                "case_id": "eu-ai-act-audit-2026",
+            }),
+        )
+        .await
+        .expect("manufacture_world");
 
     let receipt_text = text_of(&original.content).to_owned();
     let receipt: serde_json::Value = serde_json::from_str(&receipt_text).expect("valid JSON");
-    assert!(receipt["admitted"].as_bool().unwrap_or(false), "must be admitted for tamper test");
+    assert!(
+        receipt["admitted"].as_bool().unwrap_or(false),
+        "must be admitted for tamper test"
+    );
 
     // Verify the original passes receipt_inspect.
-    let inspect = session.call_tool("receipt_inspect",
-        serde_json::json!({ "receipt_data": &receipt_text }))
-        .await.expect("receipt_inspect");
+    let inspect = session
+        .call_tool(
+            "receipt_inspect",
+            serde_json::json!({ "receipt_data": &receipt_text }),
+        )
+        .await
+        .expect("receipt_inspect");
     let i = parse_result(&inspect.content);
-    assert!(i["chain_valid"].as_bool().unwrap_or(false),
-        "original receipt must pass chain verification (EU AI Act auditability); got: {i}");
+    assert!(
+        i["chain_valid"].as_bool().unwrap_or(false),
+        "original receipt must pass chain verification (EU AI Act auditability); got: {i}"
+    );
 
     // Tamper: change goal_reached to true (fraud attempt — claiming success when plan failed).
     let mut tampered = receipt.clone();
-    tampered["goal_reached"] = serde_json::Value::Bool(!receipt["goal_reached"].as_bool().unwrap_or(true));
-    let tampered_inspect = session.call_tool("receipt_inspect",
-        serde_json::json!({ "receipt_data": tampered.to_string() }))
-        .await.expect("receipt_inspect must not crash");
+    tampered["goal_reached"] =
+        serde_json::Value::Bool(!receipt["goal_reached"].as_bool().unwrap_or(true));
+    let tampered_inspect = session
+        .call_tool(
+            "receipt_inspect",
+            serde_json::json!({ "receipt_data": tampered.to_string() }),
+        )
+        .await
+        .expect("receipt_inspect must not crash");
     let ti = parse_result(&tampered_inspect.content);
-    assert!(!ti["chain_valid"].as_bool().unwrap_or(true),
-        "tampered receipt (goal_reached flipped) must fail chain verification; got: {ti}");
+    assert!(
+        !ti["chain_valid"].as_bool().unwrap_or(true),
+        "tampered receipt (goal_reached flipped) must fail chain verification; got: {ti}"
+    );
 
     // Tamper: change step_count (fraud — claiming fewer steps were taken).
     let mut tampered2 = receipt.clone();
     tampered2["step_count"] = serde_json::Value::Number(serde_json::Number::from(1u64));
-    let tampered_inspect2 = session.call_tool("receipt_inspect",
-        serde_json::json!({ "receipt_data": tampered2.to_string() }))
-        .await.expect("receipt_inspect must not crash");
+    let tampered_inspect2 = session
+        .call_tool(
+            "receipt_inspect",
+            serde_json::json!({ "receipt_data": tampered2.to_string() }),
+        )
+        .await
+        .expect("receipt_inspect must not crash");
     let ti2 = parse_result(&tampered_inspect2.content);
-    assert!(!ti2["chain_valid"].as_bool().unwrap_or(true),
-        "tampered receipt (step_count changed) must fail chain verification; got: {ti2}");
+    assert!(
+        !ti2["chain_valid"].as_bool().unwrap_or(true),
+        "tampered receipt (step_count changed) must fail chain verification; got: {ti2}"
+    );
 
     session.shutdown().await;
 }
@@ -415,8 +556,14 @@ async fn causal_ordering_different_paths_produce_different_receipts() {
     let problem2 = "(define (problem p) (:domain order-ba-c) (:init) (:goal (c-done)))";
 
     let session = McpSession::new(
-        McpServerHarnessBuilder::new(bcinr_mcp_cmd()).spawn().await.expect("server must start"),
-    ).initialize().await.expect("init");
+        McpServerHarnessBuilder::new(bcinr_mcp_cmd())
+            .spawn()
+            .await
+            .expect("server must start"),
+    )
+    .initialize()
+    .await
+    .expect("init");
 
     let r1 = session.call_tool("manufacture_world", serde_json::json!({
         "domain_text": domain_ab_then_c, "problem_text": problem, "case_id": "causal-order-ab",
@@ -432,11 +579,19 @@ async fn causal_ordering_different_paths_produce_different_receipts() {
     let chain1 = v1["manufacture_chain"].as_str().unwrap_or("");
     let chain2 = v2["manufacture_chain"].as_str().unwrap_or("");
 
-    assert!(v1["admitted"].as_bool().unwrap_or(false), "first ordering must be admitted");
-    assert!(v2["admitted"].as_bool().unwrap_or(false), "second ordering must be admitted");
-    assert_ne!(chain1, chain2,
+    assert!(
+        v1["admitted"].as_bool().unwrap_or(false),
+        "first ordering must be admitted"
+    );
+    assert!(
+        v2["admitted"].as_bool().unwrap_or(false),
+        "second ordering must be admitted"
+    );
+    assert_ne!(
+        chain1, chain2,
         "different causal orderings must produce different BLAKE3 chains; \
-         both got: {chain1} — this would mean causal ordering is not captured");
+         both got: {chain1} — this would mean causal ordering is not captured"
+    );
 
     session.shutdown().await;
 }
@@ -449,24 +604,42 @@ async fn causal_ordering_different_paths_produce_different_receipts() {
 #[tokio::test]
 async fn deterministic_replay_same_inputs_same_receipt() {
     let session = McpSession::new(
-        McpServerHarnessBuilder::new(bcinr_mcp_cmd()).spawn().await.expect("server must start"),
-    ).initialize().await.expect("init");
+        McpServerHarnessBuilder::new(bcinr_mcp_cmd())
+            .spawn()
+            .await
+            .expect("server must start"),
+    )
+    .initialize()
+    .await
+    .expect("init");
 
     let mut chains = Vec::new();
     for _ in 0..3 {
-        let r = session.call_tool("manufacture_world", serde_json::json!({
-            "domain_text": FINANCIAL_DOMAIN,
-            "problem_text": FINANCIAL_PROBLEM,
-            "case_id": "determinism-proof",
-        })).await.expect("manufacture_world");
+        let r = session
+            .call_tool(
+                "manufacture_world",
+                serde_json::json!({
+                    "domain_text": FINANCIAL_DOMAIN,
+                    "problem_text": FINANCIAL_PROBLEM,
+                    "case_id": "determinism-proof",
+                }),
+            )
+            .await
+            .expect("manufacture_world");
         let v = parse_result(&r.content);
         let chain = v["manufacture_chain"].as_str().unwrap_or("").to_owned();
         assert!(!chain.is_empty(), "chain must be non-empty");
         chains.push(chain);
     }
 
-    assert_eq!(chains[0], chains[1], "run 1 and run 2 must produce identical chains");
-    assert_eq!(chains[1], chains[2], "run 2 and run 3 must produce identical chains");
+    assert_eq!(
+        chains[0], chains[1],
+        "run 1 and run 2 must produce identical chains"
+    );
+    assert_eq!(
+        chains[1], chains[2],
+        "run 2 and run 3 must produce identical chains"
+    );
 
     session.shutdown().await;
 }
@@ -483,36 +656,74 @@ async fn deterministic_replay_same_inputs_same_receipt() {
 #[tokio::test]
 async fn token_flat_three_step_and_six_step_same_mcp_call_structure() {
     let session = McpSession::new(
-        McpServerHarnessBuilder::new(bcinr_mcp_cmd()).spawn().await.expect("server must start"),
-    ).initialize().await.expect("init");
+        McpServerHarnessBuilder::new(bcinr_mcp_cmd())
+            .spawn()
+            .await
+            .expect("server must start"),
+    )
+    .initialize()
+    .await
+    .expect("init");
 
-    let r3 = session.call_tool("manufacture_world", serde_json::json!({
-        "domain_text": THREE_STEP_DOMAIN,
-        "problem_text": THREE_STEP_PROBLEM,
-        "case_id": "token-flat-3step",
-    })).await.expect("manufacture_world: 3-step");
+    let r3 = session
+        .call_tool(
+            "manufacture_world",
+            serde_json::json!({
+                "domain_text": THREE_STEP_DOMAIN,
+                "problem_text": THREE_STEP_PROBLEM,
+                "case_id": "token-flat-3step",
+            }),
+        )
+        .await
+        .expect("manufacture_world: 3-step");
 
-    let r6 = session.call_tool("manufacture_world", serde_json::json!({
-        "domain_text": SIX_STEP_DOMAIN,
-        "problem_text": SIX_STEP_PROBLEM,
-        "case_id": "token-flat-6step",
-    })).await.expect("manufacture_world: 6-step");
+    let r6 = session
+        .call_tool(
+            "manufacture_world",
+            serde_json::json!({
+                "domain_text": SIX_STEP_DOMAIN,
+                "problem_text": SIX_STEP_PROBLEM,
+                "case_id": "token-flat-6step",
+            }),
+        )
+        .await
+        .expect("manufacture_world: 6-step");
 
     let v3 = parse_result(&r3.content);
     let v6 = parse_result(&r6.content);
 
     // Both admitted via a single MCP call — the call structure is flat regardless of plan length.
-    assert!(v3["admitted"].as_bool().unwrap_or(false), "3-step plan must be admitted");
-    assert!(v6["admitted"].as_bool().unwrap_or(false), "6-step plan must be admitted");
-    assert_eq!(v3["step_count"].as_u64(), Some(3), "3-step receipt must record 3 steps");
-    assert_eq!(v6["step_count"].as_u64(), Some(6), "6-step receipt must record 6 steps");
+    assert!(
+        v3["admitted"].as_bool().unwrap_or(false),
+        "3-step plan must be admitted"
+    );
+    assert!(
+        v6["admitted"].as_bool().unwrap_or(false),
+        "6-step plan must be admitted"
+    );
+    assert_eq!(
+        v3["step_count"].as_u64(),
+        Some(3),
+        "3-step receipt must record 3 steps"
+    );
+    assert_eq!(
+        v6["step_count"].as_u64(),
+        Some(6),
+        "6-step receipt must record 6 steps"
+    );
 
     // Both receipts are 64-char BLAKE3 hashes — the chain is O(1) in structure
     // (rolling hash, not a growing log of tokens re-processed at each step).
-    assert_eq!(v3["manufacture_chain"].as_str().unwrap_or("").len(), 64,
-        "3-step chain must be 64-char BLAKE3");
-    assert_eq!(v6["manufacture_chain"].as_str().unwrap_or("").len(), 64,
-        "6-step chain must be 64-char BLAKE3 (same size, not 2x the 3-step chain)");
+    assert_eq!(
+        v3["manufacture_chain"].as_str().unwrap_or("").len(),
+        64,
+        "3-step chain must be 64-char BLAKE3"
+    );
+    assert_eq!(
+        v6["manufacture_chain"].as_str().unwrap_or("").len(),
+        64,
+        "6-step chain must be 64-char BLAKE3 (same size, not 2x the 3-step chain)"
+    );
 
     session.shutdown().await;
 }
@@ -528,8 +739,14 @@ async fn token_flat_three_step_and_six_step_same_mcp_call_structure() {
 #[tokio::test]
 async fn refusal_is_structured_not_silent() {
     let session = McpSession::new(
-        McpServerHarnessBuilder::new(bcinr_mcp_cmd()).spawn().await.expect("server must start"),
-    ).initialize().await.expect("init");
+        McpServerHarnessBuilder::new(bcinr_mcp_cmd())
+            .spawn()
+            .await
+            .expect("server must start"),
+    )
+    .initialize()
+    .await
+    .expect("init");
 
     // Unsatisfiable problem: goal requires a predicate that no action can make true
     // when all actions are blocked by their preconditions from the initial state.
@@ -547,28 +764,41 @@ async fn refusal_is_structured_not_silent() {
     let impossible_problem = "(define (problem impossible) (:domain impossible-domain) \
         (:init (unlocked)) (:goal (done)))";
 
-    let result = session.call_tool("manufacture_world", serde_json::json!({
-        "domain_text": impossible_domain,
-        "problem_text": impossible_problem,
-        "case_id": "refusal-receipt-test",
-    })).await.expect("server must not crash on impossible problem");
+    let result = session
+        .call_tool(
+            "manufacture_world",
+            serde_json::json!({
+                "domain_text": impossible_domain,
+                "problem_text": impossible_problem,
+                "case_id": "refusal-receipt-test",
+            }),
+        )
+        .await
+        .expect("server must not crash on impossible problem");
 
     let r = parse_result(&result.content);
     // Either admitted=false (plan not found) or goal_reached=false (plan found but goal not satisfied).
     let admitted = r["admitted"].as_bool().unwrap_or(false);
     let goal = r["goal_reached"].as_bool().unwrap_or(false);
-    assert!(!admitted || !goal,
-        "impossible problem must produce a structured refusal; got: {r}");
+    assert!(
+        !admitted || !goal,
+        "impossible problem must produce a structured refusal; got: {r}"
+    );
 
     // The refusal must have a reason — not just admitted=false with no explanation.
-    let has_reason = r["refusal_reason"].as_str().map(|s| !s.is_empty()).unwrap_or(false)
+    let has_reason = r["refusal_reason"]
+        .as_str()
+        .map(|s| !s.is_empty())
+        .unwrap_or(false)
         || r["refusal_code"].as_str().is_some();
     // Note: if admitted=false, refusal_reason should be populated.
     // If admitted=true but goal_reached=false, that's also a valid structured response.
     if !admitted {
         // A structured refusal must explain itself.
-        assert!(has_reason || r.get("ok").and_then(|v| v.as_bool()) == Some(false),
-            "refusal must include refusal_reason or ok=false; got: {r}");
+        assert!(
+            has_reason || r.get("ok").and_then(|v| v.as_bool()) == Some(false),
+            "refusal must include refusal_reason or ok=false; got: {r}"
+        );
     }
 
     session.shutdown().await;
@@ -583,25 +813,43 @@ async fn refusal_is_structured_not_silent() {
 #[tokio::test]
 async fn process_mining_causal_ordering_is_cryptographically_bound() {
     let session = McpSession::new(
-        McpServerHarnessBuilder::new(bcinr_mcp_cmd()).spawn().await.expect("server must start"),
-    ).initialize().await.expect("init");
+        McpServerHarnessBuilder::new(bcinr_mcp_cmd())
+            .spawn()
+            .await
+            .expect("server must start"),
+    )
+    .initialize()
+    .await
+    .expect("init");
 
-    let original = session.call_tool("manufacture_world", serde_json::json!({
-        "domain_text": HEALTHCARE_DOMAIN,
-        "problem_text": HEALTHCARE_PROBLEM,
-        "case_id": "pm-causal-binding",
-    })).await.expect("manufacture_world");
+    let original = session
+        .call_tool(
+            "manufacture_world",
+            serde_json::json!({
+                "domain_text": HEALTHCARE_DOMAIN,
+                "problem_text": HEALTHCARE_PROBLEM,
+                "case_id": "pm-causal-binding",
+            }),
+        )
+        .await
+        .expect("manufacture_world");
 
     let receipt_text = text_of(&original.content).to_owned();
     let receipt: serde_json::Value = serde_json::from_str(&receipt_text).expect("valid JSON");
 
     // Verify the untampered receipt passes.
-    let inspect = session.call_tool("receipt_inspect",
-        serde_json::json!({ "receipt_data": &receipt_text }))
-        .await.expect("receipt_inspect");
+    let inspect = session
+        .call_tool(
+            "receipt_inspect",
+            serde_json::json!({ "receipt_data": &receipt_text }),
+        )
+        .await
+        .expect("receipt_inspect");
     let i = parse_result(&inspect.content);
-    assert!(i["chain_valid"].as_bool().unwrap_or(false),
-        "original causal receipt must be valid; got: {i}");
+    assert!(
+        i["chain_valid"].as_bool().unwrap_or(false),
+        "original causal receipt must be valid; got: {i}"
+    );
 
     // Tamper: if plan_steps present, swap two steps to simulate reordering.
     if let Some(steps) = receipt["plan_steps"].as_array() {
@@ -613,12 +861,16 @@ async fn process_mining_causal_ordering_is_cryptographically_bound() {
             }
             let swapped_steps = tampered["plan_steps"].clone();
 
-            let tampered_inspect = session.call_tool("receipt_inspect",
-                serde_json::json!({
-                    "receipt_data": tampered.to_string(),
-                    "plan_steps": swapped_steps,
-                }))
-                .await.expect("receipt_inspect must not crash");
+            let tampered_inspect = session
+                .call_tool(
+                    "receipt_inspect",
+                    serde_json::json!({
+                        "receipt_data": tampered.to_string(),
+                        "plan_steps": swapped_steps,
+                    }),
+                )
+                .await
+                .expect("receipt_inspect must not crash");
             let ti = parse_result(&tampered_inspect.content);
             // A reordered plan_steps should either fail chain_valid or
             // report a different plan_chain_recomputed value.

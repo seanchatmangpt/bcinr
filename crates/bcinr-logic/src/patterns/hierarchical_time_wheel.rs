@@ -54,17 +54,26 @@ pub struct HierarchicalTimeWheel<const A: usize, const B: usize, const C: usize>
     level1: [u64; B],
     level2: [u64; C],
     /// Current index in level-0 (advances each tick).
-    tick0:  usize,
+    tick0: usize,
     /// Current index in level-1 (advances when level-0 wraps).
-    tick1:  usize,
+    tick1: usize,
     /// Current index in level-2 (advances when level-1 wraps).
-    tick2:  usize,
+    tick2: usize,
 }
 
 impl<const A: usize, const B: usize, const C: usize> HierarchicalTimeWheel<A, B, C> {
-    const _A_POW2: () = assert!(A >= 2 && A.is_power_of_two(), "A must be a power of two ≥ 2");
-    const _B_POW2: () = assert!(B >= 2 && B.is_power_of_two(), "B must be a power of two ≥ 2");
-    const _C_POW2: () = assert!(C >= 2 && C.is_power_of_two(), "C must be a power of two ≥ 2");
+    const _A_POW2: () = assert!(
+        A >= 2 && A.is_power_of_two(),
+        "A must be a power of two ≥ 2"
+    );
+    const _B_POW2: () = assert!(
+        B >= 2 && B.is_power_of_two(),
+        "B must be a power of two ≥ 2"
+    );
+    const _C_POW2: () = assert!(
+        C >= 2 && C.is_power_of_two(),
+        "C must be a power of two ≥ 2"
+    );
 
     /// Construct a new empty wheel.
     #[must_use]
@@ -76,9 +85,9 @@ impl<const A: usize, const B: usize, const C: usize> HierarchicalTimeWheel<A, B,
             level0: [0u64; A],
             level1: [0u64; B],
             level2: [0u64; C],
-            tick0:  0,
-            tick1:  0,
-            tick2:  0,
+            tick0: 0,
+            tick1: 0,
+            tick2: 0,
         }
     }
 
@@ -164,9 +173,7 @@ impl<const A: usize, const B: usize, const C: usize> HierarchicalTimeWheel<A, B,
     }
 }
 
-impl<const A: usize, const B: usize, const C: usize> Default
-    for HierarchicalTimeWheel<A, B, C>
-{
+impl<const A: usize, const B: usize, const C: usize> Default for HierarchicalTimeWheel<A, B, C> {
     fn default() -> Self {
         Self::new()
     }
@@ -210,7 +217,10 @@ mod tests {
         // L1 bucket 0 cascade: fires at the (A+1)th tick() call = index 16 (0-indexed).
         assert!(fired_at.is_some(), "event must fire");
         let t = fired_at.unwrap();
-        assert!(t == 16, "L1 bucket 0 fires at call index 16 (0-indexed), got {t}");
+        assert!(
+            t == 16,
+            "L1 bucket 0 fires at call index 16 (0-indexed), got {t}"
+        );
     }
 
     #[test]

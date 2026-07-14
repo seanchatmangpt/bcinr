@@ -57,9 +57,7 @@ impl Default for BinaryRelation {
 
 impl BinaryRelation {
     pub const fn new() -> Self {
-        Self {
-            words: [0u64; MAX_NODES],
-        }
+        Self { words: [0u64; MAX_NODES] }
     }
     pub const fn add_edge(&mut self, src: usize, tgt: usize) {
         if src < MAX_NODES && tgt < MAX_NODES {
@@ -416,15 +414,21 @@ impl Powl64Program {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct UDelta;
 
-pub fn causal_mix(r: UCausalReceipt, val: u64, scope: u16, denial: u64, _delta: &UDelta) -> UCausalReceipt {
+pub fn causal_mix(
+    r: UCausalReceipt,
+    val: u64,
+    scope: u16,
+    denial: u64,
+    _delta: &UDelta,
+) -> UCausalReceipt {
     let mut bytes = r.0;
     let mix_val = val ^ (u64::from(scope) << 16) ^ (denial << 32) ^ 0x9e3779b97f4a7c15;
     let mix_bytes = mix_val.to_ne_bytes();
     for i in 0..8 {
         bytes[i] = bytes[i].wrapping_add(mix_bytes[i]);
-        bytes[i+8] = bytes[i+8] ^ mix_bytes[i];
-        bytes[i+16] = bytes[i+16].wrapping_sub(mix_bytes[i]);
-        bytes[i+24] = bytes[i+24] ^ mix_bytes[7-i];
+        bytes[i + 8] = bytes[i + 8] ^ mix_bytes[i];
+        bytes[i + 16] = bytes[i + 16].wrapping_sub(mix_bytes[i]);
+        bytes[i + 24] = bytes[i + 24] ^ mix_bytes[7 - i];
     }
     UCausalReceipt(bytes)
 }
@@ -764,9 +768,7 @@ pub struct ResidenceMap<const N: usize> {
 
 impl<const N: usize> ResidenceMap<N> {
     pub fn from_program(_prog: &Powl64Program) -> Self {
-        Self {
-            tiers: [ResidenceTier::Reg; N],
-        }
+        Self { tiers: [ResidenceTier::Reg; N] }
     }
     pub fn tier(&self, scope: u16) -> ResidenceTier {
         self.tiers[scope as usize]
@@ -784,10 +786,7 @@ pub struct Watchdog {
 
 impl Watchdog {
     pub fn with_deadline(deadline: u64) -> Self {
-        Self {
-            deadline,
-            tripped: std::cell::Cell::new(false),
-        }
+        Self { deadline, tripped: std::cell::Cell::new(false) }
     }
     pub fn cycle(&self) -> bool {
         self.tripped.set(true);
@@ -823,12 +822,8 @@ pub struct Dispatcher {
 
 impl Dispatcher {
     pub fn new() -> Self {
-        const INIT: Slot = Slot {
-            active: std::cell::Cell::new(false),
-        };
-        Self {
-            slots: [INIT; 64],
-        }
+        const INIT: Slot = Slot { active: std::cell::Cell::new(false) };
+        Self { slots: [INIT; 64] }
     }
 }
 
@@ -840,10 +835,7 @@ pub struct WindowedProjection {
 
 impl WindowedProjection {
     pub fn root() -> Self {
-        Self {
-            start_bit: 0,
-            end_bit: ScopeDesc::ROOT_END_BIT,
-        }
+        Self { start_bit: 0, end_bit: ScopeDesc::ROOT_END_BIT }
     }
     pub fn start_bit(&self) -> u32 {
         self.start_bit
@@ -853,14 +845,14 @@ impl WindowedProjection {
     }
 }
 
-pub fn enter_scope(parent: &WindowedProjection, child: &ScopeDesc) -> Result<WindowedProjection, &'static str> {
+pub fn enter_scope(
+    parent: &WindowedProjection,
+    child: &ScopeDesc,
+) -> Result<WindowedProjection, &'static str> {
     if child.start_bit < parent.start_bit || child.end_bit > parent.end_bit {
         return Err("Child window is not a subset of parent window");
     }
-    Ok(WindowedProjection {
-        start_bit: child.start_bit,
-        end_bit: child.end_bit,
-    })
+    Ok(WindowedProjection { start_bit: child.start_bit, end_bit: child.end_bit })
 }
 
 pub enum WatchdogOutcome {
@@ -873,7 +865,12 @@ pub struct DrainFragment {
     pub denial: u64,
 }
 
-pub fn drive_watchdog(_op: &Powl64Op, op_index: u32, scope_remaining: &[Powl64Op], watchdog: &Watchdog) -> WatchdogOutcome {
+pub fn drive_watchdog(
+    _op: &Powl64Op,
+    op_index: u32,
+    scope_remaining: &[Powl64Op],
+    watchdog: &Watchdog,
+) -> WatchdogOutcome {
     if watchdog.is_tripped() {
         let mut frags = Vec::new();
         for (idx, drained_op) in scope_remaining.iter().enumerate() {
@@ -893,10 +890,13 @@ pub enum ConcurOutcome {
     Sequential,
 }
 
-pub fn schedule_concur(_left: u32, _right: u32, _dispatcher: &Dispatcher, _tier: u8) -> ConcurOutcome {
-    ConcurOutcome::Parallel {
-        slots: [SlotId(0), SlotId(1)],
-    }
+pub fn schedule_concur(
+    _left: u32,
+    _right: u32,
+    _dispatcher: &Dispatcher,
+    _tier: u8,
+) -> ConcurOutcome {
+    ConcurOutcome::Parallel { slots: [SlotId(0), SlotId(1)] }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -950,11 +950,18 @@ impl<'p> Powl64Executor<'p> {
         Self { program }
     }
 
-    pub fn run(&self, watchdog: &Watchdog, dispatcher: &Dispatcher) -> Result<ExecutionReport, ExecutorError> {
+    pub fn run(
+        &self,
+        watchdog: &Watchdog,
+        dispatcher: &Dispatcher,
+    ) -> Result<ExecutionReport, ExecutorError> {
         let ops = &self.program.ops;
         let scopes = &self.program.scopes;
 
-        let root_desc = scopes.iter().find(|s| s.scope_id == 0).ok_or(ExecutorError::UnknownScope { scope_id: 0 })?;
+        let root_desc = scopes
+            .iter()
+            .find(|s| s.scope_id == 0)
+            .ok_or(ExecutorError::UnknownScope { scope_id: 0 })?;
         let root_proj = WindowedProjection::root();
 
         let mut scope_stack = Vec::with_capacity(MAX_SCOPE_DEPTH);
@@ -981,10 +988,16 @@ impl<'p> Powl64Executor<'p> {
                     if op.scope as usize >= MAX_SCOPES {
                         return Err(ExecutorError::ScopeOverflow { scope_id: op.scope });
                     }
-                    let child_desc = scopes.iter().find(|s| s.scope_id == op.scope)
+                    let child_desc = scopes
+                        .iter()
+                        .find(|s| s.scope_id == op.scope)
                         .ok_or(ExecutorError::UnknownScope { scope_id: op.scope })?;
-                    let parent = &scope_stack.last().ok_or(ExecutorError::UnbalancedExit { op_index: i as u32 })?.1;
-                    let child_proj = enter_scope(parent, child_desc).map_err(ExecutorError::ScopeWindow)?;
+                    let parent = &scope_stack
+                        .last()
+                        .ok_or(ExecutorError::UnbalancedExit { op_index: i as u32 })?
+                        .1;
+                    let child_proj =
+                        enter_scope(parent, child_desc).map_err(ExecutorError::ScopeWindow)?;
                     scope_stack.push((op.scope, child_proj));
                     scopes_entered = scopes_entered.saturating_add(1);
                     push_admit(&mut events, op, i);
@@ -1044,7 +1057,12 @@ impl<'p> Powl64Executor<'p> {
                     }
                     let left_idx = i.saturating_sub(2) as u32;
                     let right_idx = i.saturating_sub(1) as u32;
-                    let outcome = schedule_concur(left_idx, right_idx, dispatcher, residence.tier(op.scope) as u8);
+                    let outcome = schedule_concur(
+                        left_idx,
+                        right_idx,
+                        dispatcher,
+                        residence.tier(op.scope) as u8,
+                    );
                     let slot_pair = match outcome {
                         ConcurOutcome::Parallel { slots } => {
                             concur_slot_claims = concur_slot_claims.saturating_add(2);
@@ -1070,12 +1088,7 @@ impl<'p> Powl64Executor<'p> {
             }
         }
 
-        Ok(ExecutionReport {
-            events,
-            residence,
-            scopes_entered,
-            concur_slot_claims,
-        })
+        Ok(ExecutionReport { events, residence, scopes_entered, concur_slot_claims })
     }
 }
 

@@ -49,8 +49,8 @@ pub fn delta_decode_simd_u32(val: u64, aux: u64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::delta_encode_simd_u32::delta_encode_simd_u32;
+    use super::*;
     use proptest::prelude::*;
 
     // -------------------------------------------------------------------------
@@ -158,9 +158,15 @@ mod tests {
         let m1 = mutant_delta_decode_simd_u32_1(42, 1337);
         let m2 = mutant_delta_decode_simd_u32_2(42, 1337);
         let m3 = mutant_delta_decode_simd_u32_3(42, 1337);
-        if m1 != baseline { assert_ne!(m1, baseline, "mutant 1"); }
-        if m2 != baseline { assert_ne!(m2, baseline, "mutant 2"); }
-        if m3 != baseline { assert_ne!(m3, baseline, "mutant 3"); }
+        if m1 != baseline {
+            assert_ne!(m1, baseline, "mutant 1");
+        }
+        if m2 != baseline {
+            assert_ne!(m2, baseline, "mutant 2");
+        }
+        if m3 != baseline {
+            assert_ne!(m3, baseline, "mutant 3");
+        }
     }
     // -------------------------------------------------------------------------
     // LANE SEMANTICS: Verify independent per-lane operation and round-trip
@@ -168,22 +174,22 @@ mod tests {
     #[test]
     fn test_delta_decode_simd_u32_lane_independence() {
         // Lane 0: delta=7, prev=3 → 10; Lane 1: delta=15, prev=5 → 20
-        let enc  = ( 7u64) | (15u64 << 32);
-        let prev = ( 3u64) | ( 5u64 << 32);
-        let dec  = delta_decode_simd_u32(enc, prev);
+        let enc = (7u64) | (15u64 << 32);
+        let prev = (3u64) | (5u64 << 32);
+        let dec = delta_decode_simd_u32(enc, prev);
         assert_eq!(dec as u32, 10);
         assert_eq!((dec >> 32) as u32, 20);
 
         // Wrapping: delta=u32::MAX, prev=1 → 0
-        let enc2  = (u32::MAX as u64) | (0u64 << 32);
-        let prev2 = (1u64)            | (0u64 << 32);
-        let dec2  = delta_decode_simd_u32(enc2, prev2);
+        let enc2 = (u32::MAX as u64) | (0u64 << 32);
+        let prev2 = (1u64) | (0u64 << 32);
+        let dec2 = delta_decode_simd_u32(enc2, prev2);
         assert_eq!(dec2 as u32, 0);
 
         // High lane wrapping
-        let enc3  = (0u64) | ((u32::MAX as u64) << 32);
+        let enc3 = (0u64) | ((u32::MAX as u64) << 32);
         let prev3 = (0u64) | (1u64 << 32);
-        let dec3  = delta_decode_simd_u32(enc3, prev3);
+        let dec3 = delta_decode_simd_u32(enc3, prev3);
         assert_eq!((dec3 >> 32) as u32, 0);
     }
 
@@ -201,13 +207,16 @@ mod tests {
         for &(val, prev) in cases {
             let encoded = delta_encode_simd_u32(val, prev);
             let decoded = delta_decode_simd_u32(encoded, prev);
-            assert_eq!(decoded, val, "Round-trip failed for val={:#018x} prev={:#018x}", val, prev);
+            assert_eq!(
+                decoded, val,
+                "Round-trip failed for val={:#018x} prev={:#018x}",
+                val, prev
+            );
         }
     }
 
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
-
 }
 
 #[cfg(feature = "bench")]

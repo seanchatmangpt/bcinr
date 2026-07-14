@@ -86,7 +86,9 @@ impl DesiredEffect {
 
     fn file(&self) -> &str {
         match self {
-            DesiredEffect::Edited(f) | DesiredEffect::FormFilled(f) | DesiredEffect::Drafted(f) => f,
+            DesiredEffect::Edited(f) | DesiredEffect::FormFilled(f) | DesiredEffect::Drafted(f) => {
+                f
+            }
         }
     }
 }
@@ -161,7 +163,10 @@ impl Ord for CostVector {
         other
             .admitted
             .cmp(&self.admitted)
-            .then_with(|| self.unreceipted_mutation_risk.cmp(&other.unreceipted_mutation_risk))
+            .then_with(|| {
+                self.unreceipted_mutation_risk
+                    .cmp(&other.unreceipted_mutation_risk)
+            })
             .then_with(|| {
                 self.human_attention_seconds
                     .partial_cmp(&other.human_attention_seconds)
@@ -237,11 +242,14 @@ pub fn route_capability_plan(task: &CapabilityTask) -> Result<CapabilityRouteRec
     let gtp = GroundTemporalProblem::build(&domain, &problem)?;
 
     let plan = match gtp.find_temporal_plan() {
-        Ok(plan) => plan,
-        Err(e) => {
+        crate::error::PlannerOutcome::Found(plan) => plan,
+        _ => {
             return Ok(CapabilityRouteReceipt {
                 admitted: false,
-                refusal_reason: Some(format!("routing infeasible under attention capacity {}: {e}", task.attention_capacity)),
+                refusal_reason: Some(format!(
+                    "routing infeasible under attention capacity {}",
+                    task.attention_capacity
+                )),
                 plan: TemporalPlan::default(),
                 analysis: None,
                 cost: CostVector::refused(),
@@ -282,9 +290,16 @@ mod tests {
             attention_capacity: 2,
         };
         let receipt = route_capability_plan(&task).expect("routing should succeed");
-        assert!(receipt.admitted, "refusal_reason={:?}", receipt.refusal_reason);
+        assert!(
+            receipt.admitted,
+            "refusal_reason={:?}",
+            receipt.refusal_reason
+        );
         let analysis = receipt.analysis.expect("analysis present when admitted");
-        assert_eq!(analysis.max_parallelism, 2, "disjoint-file capabilities under capacity 2 should run concurrently");
+        assert_eq!(
+            analysis.max_parallelism, 2,
+            "disjoint-file capabilities under capacity 2 should run concurrently"
+        );
     }
 
     /// Note: `find_temporal_plan` greedily starts every applicable durative
@@ -305,7 +320,11 @@ mod tests {
             attention_capacity: 2,
         };
         let receipt = route_capability_plan(&task).expect("routing should succeed");
-        assert!(receipt.admitted, "refusal_reason={:?}", receipt.refusal_reason);
+        assert!(
+            receipt.admitted,
+            "refusal_reason={:?}",
+            receipt.refusal_reason
+        );
         assert!(receipt.analysis.is_some());
 
         let interval = |name: &str| -> (f64, f64) {
@@ -320,7 +339,10 @@ mod tests {
         let edit = interval("claude-code-edit-file");
         let draft = interval("claude-desktop-draft");
         let overlaps = edit.0 < draft.1 && draft.0 < edit.1;
-        assert!(!overlaps, "edit and draft on the same file must be sequenced: edit={edit:?} draft={draft:?}");
+        assert!(
+            !overlaps,
+            "edit and draft on the same file must be sequenced: edit={edit:?} draft={draft:?}"
+        );
     }
 
     #[test]
@@ -329,8 +351,12 @@ mod tests {
             desired_effects: vec![DesiredEffect::Edited("f1".to_string())],
             attention_capacity: 0,
         };
-        let receipt = route_capability_plan(&task).expect("route_capability_plan itself should not error");
-        assert!(!receipt.admitted, "zero attention capacity must refuse, not silently default a route");
+        let receipt =
+            route_capability_plan(&task).expect("route_capability_plan itself should not error");
+        assert!(
+            !receipt.admitted,
+            "zero attention capacity must refuse, not silently default a route"
+        );
         assert!(receipt.refusal_reason.is_some());
         assert!(receipt.analysis.is_none());
         assert!(!receipt.cost.admitted);
@@ -347,7 +373,10 @@ mod tests {
         };
         let r1 = route_capability_plan(&task).expect("first route");
         let r2 = route_capability_plan(&task).expect("second route");
-        assert_eq!(r1.route_chain, r2.route_chain, "same task must produce identical route chain");
+        assert_eq!(
+            r1.route_chain, r2.route_chain,
+            "same task must produce identical route chain"
+        );
     }
 
     #[test]
@@ -361,6 +390,9 @@ mod tests {
             context_switches: 3,
         };
         let refused = CostVector::refused();
-        assert!(admitted < refused, "an admitted route must always sort before a refused one");
+        assert!(
+            admitted < refused,
+            "an admitted route must always sort before a refused one"
+        );
     }
 }

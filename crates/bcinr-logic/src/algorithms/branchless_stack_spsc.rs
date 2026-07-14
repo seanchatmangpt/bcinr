@@ -51,7 +51,6 @@ mod tests {
         branchless_stack_spsc_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -66,13 +65,22 @@ mod tests {
             "equivalence oracle failed"
         );
         // --- boundaries ---
-        assert_eq!(branchless_stack_spsc(0, 0), branchless_stack_spsc_reference(0, 0));
+        assert_eq!(
+            branchless_stack_spsc(0, 0),
+            branchless_stack_spsc_reference(0, 0)
+        );
         assert_eq!(
             branchless_stack_spsc(u64::MAX, u64::MAX),
             branchless_stack_spsc_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(branchless_stack_spsc(u64::MAX, 0), branchless_stack_spsc_reference(u64::MAX, 0));
-        assert_eq!(branchless_stack_spsc(0, u64::MAX), branchless_stack_spsc_reference(0, u64::MAX));
+        assert_eq!(
+            branchless_stack_spsc(u64::MAX, 0),
+            branchless_stack_spsc_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            branchless_stack_spsc(0, u64::MAX),
+            branchless_stack_spsc_reference(0, u64::MAX)
+        );
         // --- mutant divergence ---
         let baseline = branchless_stack_spsc_reference(42, 1337);
         assert_ne!(

@@ -70,17 +70,13 @@ mod tests {
         splitmix64_u64_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
     #[test]
     fn test_splitmix64_u64_all() {
         // oracle
-        assert_eq!(
-            splitmix64_u64(42, 1337),
-            splitmix64_u64_reference(42, 1337)
-        );
+        assert_eq!(splitmix64_u64(42, 1337), splitmix64_u64_reference(42, 1337));
         // boundaries
         assert_eq!(splitmix64_u64(0, 0), splitmix64_u64_reference(0, 0));
         assert_eq!(

@@ -87,10 +87,7 @@ mod tests {
         // 180 degrees: sin(180) = 0
         assert_eq!(fp_sin_u32_q16(180 * 65536, 0), 0u64);
         // 270 degrees: sin(270) = -1.0, Q16 signed = -65536 = 0xFFFF0000 in u64 two's complement
-        assert_eq!(
-            fp_sin_u32_q16(270 * 65536, 0),
-            (-65536i64) as u64
-        );
+        assert_eq!(fp_sin_u32_q16(270 * 65536, 0), (-65536i64) as u64);
     }
 
     proptest! {
@@ -162,7 +159,6 @@ mod tests {
     }
     // -------------------------------------------------------------------------
     // AXIOMATIC PROOF: Hoare-logic Analysis of Failure Modes
-
 }
 
 #[cfg(feature = "bench")]

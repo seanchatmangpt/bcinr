@@ -108,7 +108,8 @@ fn apply_xor_dispatch(op: &Powl64Op, fire_mask: u64, choice_taken: &mut u64) -> 
     debug_assert!(
         (*choice_taken & chosen & active) == 0,
         "XOR branch re-chosen: choice_taken={:#018x} chosen={:#018x}",
-        *choice_taken, chosen
+        *choice_taken,
+        chosen
     );
     *choice_taken |= chosen & active;
     suppressed & active // done_delta (suppressed slots marked done, not fired)
@@ -264,12 +265,20 @@ mod tests {
             }
             let fs = scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
             if fs.0 != 0 {
-                assert_eq!(fs.0.count_ones(), 1, "expected one slot per tick in linear chain");
+                assert_eq!(
+                    fs.0.count_ones(),
+                    1,
+                    "expected one slot per tick in linear chain"
+                );
                 order.push(fs.0.trailing_zeros());
             }
         }
 
-        assert_eq!(order, vec![0, 1, 2, 3, 4], "slots must fire in slot-index order");
+        assert_eq!(
+            order,
+            vec![0, 1, 2, 3, 4],
+            "slots must fire in slot-index order"
+        );
     }
 
     #[test]
@@ -285,15 +294,16 @@ mod tests {
         assert_eq!(fs1.0 & 0b11, 0b11, "both parallel ops must fire on tick 1");
 
         let fs2 = scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
-        assert!(fs2.0 & 0b100 != 0, "join must fire after both parallel ops complete");
+        assert!(
+            fs2.0 & 0b100 != 0,
+            "join must fire after both parallel ops complete"
+        );
     }
 
     #[test]
     fn xor_choice_only_taken_branch_fires() {
-        let ast = PowlAstNode::XorChoice(vec![
-            PowlAstNode::Atom("left"),
-            PowlAstNode::Atom("right"),
-        ]);
+        let ast =
+            PowlAstNode::XorChoice(vec![PowlAstNode::Atom("left"), PowlAstNode::Atom("right")]);
         let tape = compile_powl(&ast).unwrap();
         assert_eq!(tape.len, 4);
 
@@ -311,7 +321,10 @@ mod tests {
         assert!(all_fired & (1 << 0) != 0, "dispatch must fire");
         assert!(all_fired & (1 << 1) != 0, "join must fire");
         assert!(all_fired & (1 << 2) != 0, "chosen (left) branch must fire");
-        assert!(all_fired & (1 << 3) == 0, "unchosen (right) branch must not appear in FiredSet");
+        assert!(
+            all_fired & (1 << 3) == 0,
+            "unchosen (right) branch must not appear in FiredSet"
+        );
     }
 
     // New: exercises run_to_completion and validates LoopRedo counter increment.
@@ -367,14 +380,21 @@ mod tests {
         // Body slot = 0, Redo slot = 1, LoopRedo slot = 2.
         // With max_iters=2, redo fires at most 2 times.
         let redo_fires = fired_sets.iter().filter(|&&fs| fs & (1 << 1) != 0).count();
-        assert!(redo_fires <= 2, "redo must fire at most max_iters times, got {}", redo_fires);
+        assert!(
+            redo_fires <= 2,
+            "redo must fire at most max_iters times, got {}",
+            redo_fires
+        );
     }
 
     // New: kind_mask is the identity for equal kinds, zero for different kinds.
     #[test]
     fn kind_mask_correctness() {
         assert_eq!(kind_mask(OpKind::Join, OpKind::Join), u64::MAX);
-        assert_eq!(kind_mask(OpKind::XorDispatch, OpKind::XorDispatch), u64::MAX);
+        assert_eq!(
+            kind_mask(OpKind::XorDispatch, OpKind::XorDispatch),
+            u64::MAX
+        );
         assert_eq!(kind_mask(OpKind::LoopRedo, OpKind::LoopRedo), u64::MAX);
         assert_eq!(kind_mask(OpKind::Join, OpKind::XorDispatch), 0);
         assert_eq!(kind_mask(OpKind::XorDispatch, OpKind::LoopRedo), 0);
@@ -441,7 +461,9 @@ mod tests {
         let tape = compile_powl(&ast).unwrap();
         // Find dispatch slot
         let dispatch_slot = tape.ops[..tape.len as usize]
-            .iter().position(|op| op.kind == OpKind::XorDispatch).unwrap();
+            .iter()
+            .position(|op| op.kind == OpKind::XorDispatch)
+            .unwrap();
         let branch_mask = tape.ops[dispatch_slot].branch_mask;
         let chosen_bit = branch_mask & branch_mask.wrapping_neg();
         let suppressed_mask = branch_mask & !chosen_bit;
@@ -449,15 +471,28 @@ mod tests {
         let mut state = PowlRunState::new(&tape);
         let mut all_fired = 0u64;
         for _ in 0..20 {
-            if state.check_mask == 0 { break; }
+            if state.check_mask == 0 {
+                break;
+            }
             let fs = scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
             all_fired |= fs.0;
         }
-        assert_ne!(all_fired & chosen_bit, 0, "chosen (lowest) branch must fire");
-        assert_eq!(all_fired & suppressed_mask, 0, "suppressed branches must not fire");
+        assert_ne!(
+            all_fired & chosen_bit,
+            0,
+            "chosen (lowest) branch must fire"
+        );
+        assert_eq!(
+            all_fired & suppressed_mask,
+            0,
+            "suppressed branches must not fire"
+        );
         // Verify it's the lowest-indexed: trailing_zeros of chosen == min trailing_zeros of branch_mask
-        assert_eq!(chosen_bit.trailing_zeros(), branch_mask.trailing_zeros(),
-            "chosen bit must be the lowest-indexed branch");
+        assert_eq!(
+            chosen_bit.trailing_zeros(),
+            branch_mask.trailing_zeros(),
+            "chosen bit must be the lowest-indexed branch"
+        );
     }
 
     #[test]
@@ -468,7 +503,9 @@ mod tests {
         ]);
         let tape = compile_powl(&ast).unwrap();
         let dispatch_slot = tape.ops[..tape.len as usize]
-            .iter().position(|op| op.kind == OpKind::XorDispatch).unwrap();
+            .iter()
+            .position(|op| op.kind == OpKind::XorDispatch)
+            .unwrap();
         let branch_mask = tape.ops[dispatch_slot].branch_mask;
         let chosen_bit = branch_mask & branch_mask.wrapping_neg();
         let suppressed_mask = branch_mask & !chosen_bit;
@@ -476,13 +513,19 @@ mod tests {
         let mut state = PowlRunState::new(&tape);
         let mut all_fired = 0u64;
         for _ in 0..20 {
-            if state.check_mask == 0 { break; }
+            if state.check_mask == 0 {
+                break;
+            }
             let fs = scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
             all_fired |= fs.0;
         }
-        assert_eq!(all_fired & suppressed_mask, 0,
+        assert_eq!(
+            all_fired & suppressed_mask,
+            0,
             "suppressed XOR branch must never fire: suppressed={:#018x}, all_fired={:#018x}",
-            suppressed_mask, all_fired);
+            suppressed_mask,
+            all_fired
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -505,7 +548,10 @@ mod tests {
                 body_fired_count += 1;
             }
         }
-        assert!(body_fired_count >= 1, "loop body must execute at least once");
+        assert!(
+            body_fired_count >= 1,
+            "loop body must execute at least once"
+        );
     }
 
     #[test]
@@ -524,16 +570,15 @@ mod tests {
         for _ in 0..4 {
             scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
         }
-        assert!(state.loop_iters[redo_slot] >= 1,
-            "loop_iters must increment each time LoopRedo fires");
+        assert!(
+            state.loop_iters[redo_slot] >= 1,
+            "loop_iters must increment each time LoopRedo fires"
+        );
     }
 
     #[test]
     fn scheduler_tick_no_progress_returns_zero_does_not_spin() {
-        let ast = PowlAstNode::Sequence(vec![
-            PowlAstNode::Atom("a"),
-            PowlAstNode::Atom("b"),
-        ]);
+        let ast = PowlAstNode::Sequence(vec![PowlAstNode::Atom("a"), PowlAstNode::Atom("b")]);
         let tape = compile_powl(&ast).unwrap();
         let mut state = PowlRunState::new(&tape);
         // Manually force check_mask to op1 without having fired op0.
@@ -554,10 +599,15 @@ mod tests {
         let max_ticks = (tape.len as u32) * 2;
         let mut state = PowlRunState::new(&tape);
         for _ in 0..max_ticks {
-            if state.check_mask == 0 { break; }
+            if state.check_mask == 0 {
+                break;
+            }
             scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
         }
-        assert_eq!(state.check_mask, 0, "scheduler must terminate within 2*len ticks");
+        assert_eq!(
+            state.check_mask, 0,
+            "scheduler must terminate within 2*len ticks"
+        );
     }
 
     #[test]
@@ -567,7 +617,11 @@ mod tests {
         assert_eq!(tape.ops[0].pred_mask, 0, "entry op must have pred_mask=0");
         let mut state = PowlRunState::new(&tape);
         let fs = scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
-        assert_ne!(fs.0 & 1, 0, "op with pred_mask=0 must fire on the very first tick");
+        assert_ne!(
+            fs.0 & 1,
+            0,
+            "op with pred_mask=0 must fire on the very first tick"
+        );
     }
 
     // ---------------------------------------------------------------------------

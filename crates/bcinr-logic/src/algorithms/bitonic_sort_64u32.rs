@@ -119,7 +119,6 @@ mod tests {
         bitonic_sort_64u32_reference(val, aux) ^ 0xFFFFFFFF
     } // Operator-swap bluff
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------
@@ -139,8 +138,14 @@ mod tests {
             bitonic_sort_64u32(u64::MAX, u64::MAX),
             bitonic_sort_64u32_reference(u64::MAX, u64::MAX)
         );
-        assert_eq!(bitonic_sort_64u32(u64::MAX, 0), bitonic_sort_64u32_reference(u64::MAX, 0));
-        assert_eq!(bitonic_sort_64u32(0, u64::MAX), bitonic_sort_64u32_reference(0, u64::MAX));
+        assert_eq!(
+            bitonic_sort_64u32(u64::MAX, 0),
+            bitonic_sort_64u32_reference(u64::MAX, 0)
+        );
+        assert_eq!(
+            bitonic_sort_64u32(0, u64::MAX),
+            bitonic_sort_64u32_reference(0, u64::MAX)
+        );
         // --- mutant divergence ---
         let baseline = bitonic_sort_64u32_reference(42, 1337);
         assert_ne!(

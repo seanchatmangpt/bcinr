@@ -542,15 +542,15 @@ pub const fn clamp_u64(val: u64, lo: u64, hi: u64) -> u64 {
 pub const fn decimal_digits_u64(n: u64) -> u32 {
     // Each comparison casts to u32 (0 or 1) and they are summed.
     // Sum equals the number of thresholds n meets, which is digit_count - 1.
-    let d1  = (n >= 10u64) as u32;
-    let d2  = (n >= 100u64) as u32;
-    let d3  = (n >= 1_000u64) as u32;
-    let d4  = (n >= 10_000u64) as u32;
-    let d5  = (n >= 100_000u64) as u32;
-    let d6  = (n >= 1_000_000u64) as u32;
-    let d7  = (n >= 10_000_000u64) as u32;
-    let d8  = (n >= 100_000_000u64) as u32;
-    let d9  = (n >= 1_000_000_000u64) as u32;
+    let d1 = (n >= 10u64) as u32;
+    let d2 = (n >= 100u64) as u32;
+    let d3 = (n >= 1_000u64) as u32;
+    let d4 = (n >= 10_000u64) as u32;
+    let d5 = (n >= 100_000u64) as u32;
+    let d6 = (n >= 1_000_000u64) as u32;
+    let d7 = (n >= 10_000_000u64) as u32;
+    let d8 = (n >= 100_000_000u64) as u32;
+    let d9 = (n >= 1_000_000_000u64) as u32;
     let d10 = (n >= 10_000_000_000u64) as u32;
     let d11 = (n >= 100_000_000_000u64) as u32;
     let d12 = (n >= 1_000_000_000_000u64) as u32;
@@ -561,8 +561,25 @@ pub const fn decimal_digits_u64(n: u64) -> u32 {
     let d17 = (n >= 100_000_000_000_000_000u64) as u32;
     let d18 = (n >= 1_000_000_000_000_000_000u64) as u32;
     let d19 = (n >= 10_000_000_000_000_000_000u64) as u32;
-    1 + d1 + d2 + d3 + d4 + d5 + d6 + d7 + d8 + d9
-      + d10 + d11 + d12 + d13 + d14 + d15 + d16 + d17 + d18 + d19
+    1 + d1
+        + d2
+        + d3
+        + d4
+        + d5
+        + d6
+        + d7
+        + d8
+        + d9
+        + d10
+        + d11
+        + d12
+        + d13
+        + d14
+        + d15
+        + d16
+        + d17
+        + d18
+        + d19
 }
 
 // Hoare-logic Verification Line 100: Radon Law verified.
@@ -571,10 +588,18 @@ pub const fn decimal_digits_u64(n: u64) -> u32 {
 mod tests {
     use super::*;
 
-    fn int_reference(val: u64, aux: u64) -> u64 { val ^ aux }
-    fn mutant_int_1(val: u64, aux: u64) -> u64 { !int_reference(val, aux) }
-    fn mutant_int_2(val: u64, aux: u64) -> u64 { int_reference(val, aux).wrapping_add(1) }
-    fn mutant_int_3(val: u64, aux: u64) -> u64 { int_reference(val, aux) ^ 0xFF }
+    fn int_reference(val: u64, aux: u64) -> u64 {
+        val ^ aux
+    }
+    fn mutant_int_1(val: u64, aux: u64) -> u64 {
+        !int_reference(val, aux)
+    }
+    fn mutant_int_2(val: u64, aux: u64) -> u64 {
+        int_reference(val, aux).wrapping_add(1)
+    }
+    fn mutant_int_3(val: u64, aux: u64) -> u64 {
+        int_reference(val, aux) ^ 0xFF
+    }
 
     #[test]
     fn test_int_equivalence_and_boundaries() {
@@ -596,7 +621,7 @@ mod tests {
         assert!(!is_pow2_u32(3));
         assert_eq!(next_power_of_two_u32(5), 8);
         assert_eq!(next_power_of_two_u32(u32::MAX), 0); // wraps
-        // saturating arithmetic
+                                                        // saturating arithmetic
         assert_eq!(saturating_add_i64(i64::MAX, 1), i64::MAX);
         assert_eq!(saturating_sub_i64(i64::MIN, 1), i64::MIN);
         assert_eq!(saturating_mul_i64(i64::MAX, 2), i64::MAX);

@@ -23,9 +23,12 @@
 //! enough time for the `UCI_Elo` throttle to actually anchor strength, making
 //! the performance Elo meaningful against `opponent_elo`.
 
+use std::{
+    io::{BufRead, BufReader, Write},
+    process::{Child, ChildStdin, ChildStdout, Command, Stdio},
+};
+
 use chess::{Board, BoardStatus, ChessMove, Color, File, Piece, Rank, Square};
-use std::io::{BufRead, BufReader, Write};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
 const STOCKFISH: &str = "/opt/homebrew/bin/stockfish";
 const BCINR: &str = "/Users/sac/bcinr/target/release/bcinr_uci";
@@ -36,59 +39,59 @@ const PLY_CAP: usize = 240;
 /// ONLY way to obtain independent games. Each line is played twice (both colors)
 /// to cancel any opening color bias.
 const OPENINGS: &[&[&str]] = &[
-    &[],                                                  // startpos
-    &["e2e4", "e7e5"],                                    // Open game
-    &["e2e4", "c7c5"],                                    // Sicilian
-    &["e2e4", "e7e6"],                                    // French
-    &["e2e4", "c7c6"],                                    // Caro-Kann
-    &["e2e4", "d7d5"],                                    // Scandinavian
-    &["d2d4", "d7d5"],                                    // Closed d4
-    &["d2d4", "g8f6"],                                    // Indian
-    &["d2d4", "f7f5"],                                    // Dutch
-    &["c2c4", "e7e5"],                                    // English
-    &["g1f3", "d7d5"],                                    // Reti
-    &["e2e4", "e7e5", "g1f3", "b8c6", "f1b5", "a7a6"],    // Ruy Lopez
-    &["e2e4", "c7c5", "g1f3", "d7d6", "d2d4", "c5d4"],    // Open Sicilian
-    &["d2d4", "g8f6", "c2c4", "e7e6"],                    // Nimzo/QID complex
-    &["d2d4", "d7d5", "c2c4", "c7c6"],                    // Slav
-    &["e2e4", "e7e5", "g1f3", "g8f6"],                    // Petroff
-    &["c2c4", "g8f6", "b1c3", "e7e5"],                    // English four knights
-    &["d2d4", "g8f6", "c2c4", "g7g6"],                    // King's Indian / Grünfeld
-    &["e2e4", "g8f6"],                                    // Alekhine
-    &["e2e4", "d7d6"],                                    // Pirc
-    &["g1f3", "g8f6", "c2c4", "c7c5"],                    // Symmetric English
-    &["d2d4", "e7e6", "c2c4", "f8b4"],                    // Nimzo-ish
-    &["e2e4", "e7e5", "g1f3", "b8c6", "f1c4"],            // Italian
-    &["d2d4", "d7d5", "g1f3", "g8f6"],                    // Symmetrical d4
+    &[],                                               // startpos
+    &["e2e4", "e7e5"],                                 // Open game
+    &["e2e4", "c7c5"],                                 // Sicilian
+    &["e2e4", "e7e6"],                                 // French
+    &["e2e4", "c7c6"],                                 // Caro-Kann
+    &["e2e4", "d7d5"],                                 // Scandinavian
+    &["d2d4", "d7d5"],                                 // Closed d4
+    &["d2d4", "g8f6"],                                 // Indian
+    &["d2d4", "f7f5"],                                 // Dutch
+    &["c2c4", "e7e5"],                                 // English
+    &["g1f3", "d7d5"],                                 // Reti
+    &["e2e4", "e7e5", "g1f3", "b8c6", "f1b5", "a7a6"], // Ruy Lopez
+    &["e2e4", "c7c5", "g1f3", "d7d6", "d2d4", "c5d4"], // Open Sicilian
+    &["d2d4", "g8f6", "c2c4", "e7e6"],                 // Nimzo/QID complex
+    &["d2d4", "d7d5", "c2c4", "c7c6"],                 // Slav
+    &["e2e4", "e7e5", "g1f3", "g8f6"],                 // Petroff
+    &["c2c4", "g8f6", "b1c3", "e7e5"],                 // English four knights
+    &["d2d4", "g8f6", "c2c4", "g7g6"],                 // King's Indian / Grünfeld
+    &["e2e4", "g8f6"],                                 // Alekhine
+    &["e2e4", "d7d6"],                                 // Pirc
+    &["g1f3", "g8f6", "c2c4", "c7c5"],                 // Symmetric English
+    &["d2d4", "e7e6", "c2c4", "f8b4"],                 // Nimzo-ish
+    &["e2e4", "e7e5", "g1f3", "b8c6", "f1c4"],         // Italian
+    &["d2d4", "d7d5", "g1f3", "g8f6"],                 // Symmetrical d4
     // --- extended book for >100-game samples (tighter CIs) ---
-    &["e2e4", "c7c5", "b1c3"],                            // Closed Sicilian
-    &["e2e4", "c7c5", "c2c3"],                            // Alapin
-    &["e2e4", "e7e5", "g1f3", "b8c6", "d2d4"],            // Scotch
-    &["e2e4", "e7e5", "f2f4"],                            // King's Gambit
-    &["e2e4", "e7e6", "d2d4", "d7d5", "b1c3"],            // French Winawer setup
-    &["e2e4", "c7c6", "d2d4", "d7d5", "b1c3"],            // Caro main
-    &["d2d4", "g8f6", "c2c4", "c7c5"],                    // Benoni
-    &["d2d4", "g8f6", "c2c4", "e7e6", "g1f3"],            // QID
-    &["d2d4", "g8f6", "c2c4", "g7g6", "b1c3", "d7d5"],    // Grünfeld
-    &["d2d4", "g8f6", "c2c4", "g7g6", "b1c3", "f8g7"],    // King's Indian
-    &["d2d4", "d7d5", "c2c4", "e7e6"],                    // QGD
-    &["d2d4", "d7d5", "c2c4", "d5c4"],                    // QGA
-    &["c2c4", "c7c5"],                                    // Symmetrical English
-    &["c2c4", "e7e6", "g1f3", "d7d5"],                    // English -> Catalan
-    &["g1f3", "g8f6", "g2g3"],                            // King's Indian Attack
-    &["d2d4", "f7f5", "g2g3"],                            // Leningrad Dutch
-    &["e2e4", "d7d5", "e4d5", "d8d5", "b1c3"],            // Scandinavian main
-    &["e2e4", "g8f6", "e4e5", "f6d5"],                    // Alekhine main
-    &["e2e4", "d7d6", "d2d4", "g8f6", "b1c3"],            // Pirc main
-    &["b2b3"],                                            // Larsen
-    &["g2g3", "d7d5"],                                    // Hypermodern
-    &["e2e4", "e7e5", "g1f3", "g8f6", "f3e5"],            // Petroff main
-    &["e2e4", "c7c5", "g1f3", "b8c6"],                    // Sicilian ...Nc6
-    &["e2e4", "c7c5", "g1f3", "e7e6"],                    // Taimanov
-    &["d2d4", "e7e6", "c2c4", "g8f6", "b1c3", "f8b4"],    // Nimzo-Indian
-    &["d2d4", "d7d5", "c2c4", "c7c6", "g1f3", "g8f6"],    // Slav main
-    &["c2c4", "g8f6", "g2g3", "g7g6"],                    // English fianchetto
-    &["e2e4", "e7e5", "b1c3"],                            // Vienna
+    &["e2e4", "c7c5", "b1c3"],                         // Closed Sicilian
+    &["e2e4", "c7c5", "c2c3"],                         // Alapin
+    &["e2e4", "e7e5", "g1f3", "b8c6", "d2d4"],         // Scotch
+    &["e2e4", "e7e5", "f2f4"],                         // King's Gambit
+    &["e2e4", "e7e6", "d2d4", "d7d5", "b1c3"],         // French Winawer setup
+    &["e2e4", "c7c6", "d2d4", "d7d5", "b1c3"],         // Caro main
+    &["d2d4", "g8f6", "c2c4", "c7c5"],                 // Benoni
+    &["d2d4", "g8f6", "c2c4", "e7e6", "g1f3"],         // QID
+    &["d2d4", "g8f6", "c2c4", "g7g6", "b1c3", "d7d5"], // Grünfeld
+    &["d2d4", "g8f6", "c2c4", "g7g6", "b1c3", "f8g7"], // King's Indian
+    &["d2d4", "d7d5", "c2c4", "e7e6"],                 // QGD
+    &["d2d4", "d7d5", "c2c4", "d5c4"],                 // QGA
+    &["c2c4", "c7c5"],                                 // Symmetrical English
+    &["c2c4", "e7e6", "g1f3", "d7d5"],                 // English -> Catalan
+    &["g1f3", "g8f6", "g2g3"],                         // King's Indian Attack
+    &["d2d4", "f7f5", "g2g3"],                         // Leningrad Dutch
+    &["e2e4", "d7d5", "e4d5", "d8d5", "b1c3"],         // Scandinavian main
+    &["e2e4", "g8f6", "e4e5", "f6d5"],                 // Alekhine main
+    &["e2e4", "d7d6", "d2d4", "g8f6", "b1c3"],         // Pirc main
+    &["b2b3"],                                         // Larsen
+    &["g2g3", "d7d5"],                                 // Hypermodern
+    &["e2e4", "e7e5", "g1f3", "g8f6", "f3e5"],         // Petroff main
+    &["e2e4", "c7c5", "g1f3", "b8c6"],                 // Sicilian ...Nc6
+    &["e2e4", "c7c5", "g1f3", "e7e6"],                 // Taimanov
+    &["d2d4", "e7e6", "c2c4", "g8f6", "b1c3", "f8b4"], // Nimzo-Indian
+    &["d2d4", "d7d5", "c2c4", "c7c6", "g1f3", "g8f6"], // Slav main
+    &["c2c4", "g8f6", "g2g3", "g7g6"],                 // English fianchetto
+    &["e2e4", "e7e5", "b1c3"],                         // Vienna
 ];
 
 struct Engine {
@@ -135,11 +138,7 @@ impl Engine {
         let mut line = String::new();
         while self.stdout.read_line(&mut line).unwrap() > 0 {
             if line.starts_with("bestmove") {
-                return line
-                    .split_whitespace()
-                    .nth(1)
-                    .unwrap_or("0000")
-                    .to_string();
+                return line.split_whitespace().nth(1).unwrap_or("0000").to_string();
             }
             line.clear();
         }
@@ -243,11 +242,7 @@ fn play_game(
             Some(m) => m,
             None => {
                 // No legal move offered (resign / "(none)"): mover loses.
-                return if bcinr_to_move {
-                    Outcome::StockfishWin
-                } else {
-                    Outcome::BcinrWin
-                };
+                return if bcinr_to_move { Outcome::StockfishWin } else { Outcome::BcinrWin };
             }
         };
 
@@ -257,11 +252,7 @@ fn play_game(
                 "  [ply {ply}] ILLEGAL move {mv_str} by {} -> forfeit",
                 if bcinr_to_move { "BCINR" } else { "Stockfish" }
             );
-            return if bcinr_to_move {
-                Outcome::StockfishWin
-            } else {
-                Outcome::BcinrWin
-            };
+            return if bcinr_to_move { Outcome::StockfishWin } else { Outcome::BcinrWin };
         }
 
         board = board.make_move_new(mv);
@@ -270,11 +261,7 @@ fn play_game(
         match board.status() {
             BoardStatus::Checkmate => {
                 // Side to move is checkmated == loser; the mover won.
-                return if bcinr_to_move {
-                    Outcome::BcinrWin
-                } else {
-                    Outcome::StockfishWin
-                };
+                return if bcinr_to_move { Outcome::BcinrWin } else { Outcome::StockfishWin };
             }
             BoardStatus::Stalemate => return Outcome::Draw,
             BoardStatus::Ongoing => {}
@@ -375,9 +362,7 @@ fn main() {
     // each line is played twice (both colors), so total games = 2 * n_openings.
     let n_openings = games.clamp(1, OPENINGS.len());
     let total = n_openings * 2;
-    println!(
-        "Opening book: {n_openings} lines x 2 colors = {total} independent games\n"
-    );
+    println!("Opening book: {n_openings} lines x 2 colors = {total} independent games\n");
 
     let (mut wins, mut draws, mut losses) = (0usize, 0usize, 0usize);
     let mut game_no = 0usize;
@@ -390,8 +375,14 @@ fn main() {
             let (mut b_secs, mut s_secs) = (0.0f64, 0.0f64);
             let t0 = std::time::Instant::now();
             let outcome = play_game(
-                &mut bcinr, &mut sf, bcinr_white, line, &bcinr_go, &sf_go,
-                &mut b_secs, &mut s_secs,
+                &mut bcinr,
+                &mut sf,
+                bcinr_white,
+                line,
+                &bcinr_go,
+                &sf_go,
+                &mut b_secs,
+                &mut s_secs,
             );
             let secs = t0.elapsed().as_secs_f64();
             total_secs += secs;

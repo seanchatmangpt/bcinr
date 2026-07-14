@@ -55,7 +55,6 @@ mod tests {
         content_defined_chunking_branchless_reference(val, aux) ^ 0xFFFFFFFF
     }
 
-
     // -------------------------------------------------------------------------
     // BOUNDARY EXAMPLES: Hardcoded edge cases
     // -------------------------------------------------------------------------

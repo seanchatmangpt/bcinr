@@ -270,8 +270,10 @@ pub struct SparseEnabledIndex<const OPS: usize> {
 impl<const OPS: usize> SparseEnabledIndex<OPS> {
     /// Compile-time bound: OPS must be ≤ 512 (8 × 64 bits).
     /// Evaluated once per monomorphisation; compatible with `generic_const_exprs`.
-    const _OPS_BOUND: () =
-        assert!(OPS <= 512, "SparseEnabledIndex: OPS must be <= 512 (8 * 64 bits)");
+    const _OPS_BOUND: () = assert!(
+        OPS <= 512,
+        "SparseEnabledIndex: OPS must be <= 512 (8 * 64 bits)"
+    );
 
     /// Construct an index where every op starts with `initial_counts`
     /// as its pending predecessor count and no dependents are
@@ -397,7 +399,9 @@ mod tests {
     #[test]
     fn try_submit_claim_release_roundtrip() {
         let d = InlineDispatcher::new();
-        let slot = d.try_submit(42).expect("fresh dispatcher must accept submission");
+        let slot = d
+            .try_submit(42)
+            .expect("fresh dispatcher must accept submission");
         let op = d.try_claim(slot).expect("submitted op must be claimable");
         assert_eq!(op, 42);
         d.release(slot);
@@ -420,8 +424,13 @@ mod tests {
     #[test]
     fn fanout_pair_claims_two_distinct_slots() {
         let d = InlineDispatcher::new();
-        let pair = d.fanout_pair(10, 20).expect("empty dispatcher must allow fanout_pair");
-        assert_ne!(pair[0], pair[1], "fanout_pair must return distinct slot ids");
+        let pair = d
+            .fanout_pair(10, 20)
+            .expect("empty dispatcher must allow fanout_pair");
+        assert_ne!(
+            pair[0], pair[1],
+            "fanout_pair must return distinct slot ids"
+        );
         assert_eq!(d.occupied(), 2);
 
         // Verify correct op indices are visible.
