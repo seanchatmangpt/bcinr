@@ -23,6 +23,11 @@ pub fn time_wheel_phd_gate(val: u64) -> u64 {
     val
 }
 
+/// `Clone` is a plain field-wise copy of plain-old-data (`[u64; N]` +
+/// two `usize`s) — cloning a wheel does not consume or reset any pending
+/// deadline; the clone fires on the exact same future ticks as the
+/// original until one of the two is advanced independently via `tick()`.
+#[derive(Clone)]
 pub struct TimeWheel<const N: usize> {
     /// Each u64 bitmask represents firing events at a specific tick.
     pub slots: [u64; N],

@@ -44,6 +44,27 @@
 //!
 //! - **`prefix_xor_u64x8` / `union_u64_slices`** — bulk check_mask propagation for
 //!   PowlTapeLarge (>64 ops). One call to `union_u64_slices` folds 8 successor words.
+//!
+//! # Concurrency-aware scheduling (additive)
+//!
+//! [`petri_tick`] itself is untouched by this section — every existing caller
+//! keeps firing every op in `PriorityPetriEngine`'s computed firing mask every
+//! tick, exactly as before, with zero code-path change. [`petri_tick_guarded`]
+//! is a new, separate entry point mirroring [`crate::scheduler::scheduler_tick_guarded`]:
+//! it inserts a [`crate::scheduler::ConcurrencySelector`]-gated selection step
+//! between "compute the ready set" and "actually fire," so a fired set
+//! reported by this hot path is checked against a
+//! [`crate::tape::v2::ConcurrencyGuardTable`] (an
+//! [`bcinr_mfw_ir::ExecutableConcurrencyComplex`] compiled to per-tick guard
+//! form) before it is ever reported as fired, closing the gap that made this
+//! module's hot path the one wired scheduler entry point with no
+//! `ConcurrencySelector`/`ConcurrencyGuardTable`/`EventSet` anywhere in it.
+//! With [`crate::tape::v2::ConcurrencyGuardTable::empty`] and
+//! [`crate::scheduler::StableMaximalSelector`], selection always chooses the
+//! entire ready set, so `petri_tick_guarded` provably degenerates to calling
+//! `petri_tick` — see `tests::concurrency_gated::empty_guards_matches_plain_tick_*`
+//! below, checked tick-by-tick across two tape shapes, plus a nonempty-guard
+//! test proving the gate has a real deferring effect, not just plumbing.
 
 use bcinr_logic::{
     bitset::union_u64_slices,
@@ -55,7 +76,10 @@ use bcinr_logic::{
     scan::prefix_xor_u64x8,
 };
 
+use crate::scheduler::{pred_satisfied, ConcurrencySelector};
+use crate::tape::v2::ConcurrencyGuardTable;
 use crate::tape::{OpKind, Powl64Op};
+use bcinr_mfw_ir::EventSet;
 
 // ---------------------------------------------------------------------------
 // Branchless helpers (duplicated from scheduler.rs — private, proven)
@@ -122,6 +146,12 @@ fn apply_loop_redo(op: &Powl64Op, fire_mask: u64, loop_iter: &mut u8) -> (u64, u
 ///
 /// Replaces `PowlRunState` for the ≤64-op fast path. Layout is 5×u64 = 40 bytes,
 /// fitting in less than one cache line.
+///
+/// `Clone` is required by [`petri_tick_guarded`]'s preview step (it clones
+/// `state`, runs an unguarded [`petri_tick`] on the clone to discover the
+/// tick's ready set, then discards the clone) — cloning does not consume or
+/// otherwise mutate the original.
+#[derive(Clone)]
 #[repr(C, align(64))]
 pub struct PowlPetriState {
     /// Tokens currently placed (ops that have fired and completed).
@@ -378,6 +408,190 @@ pub fn petri_tick(
         // Parallel dispatch: push enabled successors to the ring.
         dispatch_successors(tape, i, new_done, ring);
     }
+
+    state.done.words[0] = new_done;
+    state.check.words[0] = new_check & !new_done;
+
+    PetriTickResult {
+        fired_ops: fired_ops_accumulator,
+        event_overflow_count: overflow_count,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// petri_tick_guarded — concurrency-complex-checked hot path (additive)
+// ---------------------------------------------------------------------------
+
+/// Convert a `u64` tape-slot bitmask (as used throughout `petri_tick`) into
+/// an `EventSet` (as used by `ConcurrencySelector`/`ConcurrencyGuardTable`).
+///
+/// Duplicated from `crate::scheduler` (private there) — same convention as
+/// this module's other duplicated branchless helpers (see module docs).
+fn mask_to_event_set(mask: u64) -> EventSet {
+    let mut set = EventSet::empty();
+    let mut bits = mask;
+    while bits != 0 {
+        let i = bits.trailing_zeros() as usize;
+        bits &= bits - 1;
+        set.insert(i);
+    }
+    set
+}
+
+/// Convert an `EventSet` back into a `u64` tape-slot bitmask.
+fn event_set_to_mask(set: &EventSet) -> u64 {
+    let mut mask = 0u64;
+    for id in set.iter_stable() {
+        mask |= 1u64 << id;
+    }
+    mask
+}
+
+/// Drives one scheduler tick, gating which of the ready ops actually fire
+/// through a [`ConcurrencySelector`] and [`ConcurrencyGuardTable`] — the
+/// `petri_tick` counterpart to
+/// [`crate::scheduler::scheduler_tick_guarded`].
+///
+/// # Why this exists
+///
+/// [`petri_tick`] fires every op `PriorityPetriEngine::step` computes as
+/// enabled, every tick, unconditionally — it never consults an
+/// `ExecutableConcurrencyComplex`. A `FireSet` this hot path reports is not
+/// thereby known to be a member of the concurrency complex; it is only known
+/// to satisfy each fired op's own `pred_mask`. `petri_tick_guarded` closes
+/// that gap for this crate's wired hot path exactly the way
+/// `scheduler_tick_guarded` already closes it for the plain hot path.
+///
+/// # Protocol
+///
+/// 1. **Preview** (no mutation of `state`): clone `state` and run
+///    [`petri_tick`] on the clone with `ring`/`event_ring` both `None` (so
+///    the preview cannot double-dispatch to the real ring or double-push a
+///    receipt event) to discover exactly which ops would fire absent any
+///    gating — this tick's ready set. The clone's `sla_wheel` absorbs the
+///    one-tick advance during preview and is then discarded; the real
+///    `state.sla_wheel` is untouched by this step.
+/// 2. **Select**: `selector.select_checked(ready, guards)` chooses the
+///    admissible subset that may actually fire.
+/// 3. **Fast path**: if selection changed nothing (`selected == ready` —
+///    always true for an empty guard table with `StableMaximalSelector`),
+///    delegate to the real, unguarded [`petri_tick`] on `state` directly, so
+///    the observable state transition (including the real `ring`/
+///    `event_ring`/`sla_wheel` side effects) is provably identical to the
+///    unguarded path.
+/// 4. **Divergent path**: otherwise, advance `state.sla_wheel` for real
+///    exactly once, then recompute per-candidate enablement directly with
+///    [`pred_satisfied`] (the same formula `SwarMarking::try_fire` uses
+///    internally — see that function's doc comment), gated on
+///    `selected_bit`, so a candidate excluded from `selected` neither
+///    contributes its `op_bit` to this tick's `done` set nor unblocks a
+///    later-priority candidate in the same tick that depended on it. Ready-
+///    but-unselected ops are carried forward into next tick's `check` set
+///    (deferred, never dropped).
+///
+/// # Complexity
+///
+/// O(`candidates.count_ones()`) for the divergent path's own loop, plus
+/// whatever `selector.select_checked` costs (see
+/// `StableMaximalSelector::select`'s own `# Complexity` note) and one full
+/// (discarded) `petri_tick` call for the preview step — data-dependent on
+/// how many ops are ready this tick, not O(1), unlike the individual
+/// branchless primitives it is built from.
+pub fn petri_tick_guarded<S: ConcurrencySelector>(
+    tape: &[Powl64Op],
+    state: &mut PowlPetriState,
+    selector: &mut S,
+    guards: &ConcurrencyGuardTable,
+    ring: Option<&LockFreeMpmcRing<WorkItem, RING_CAPACITY>>,
+    event_ring: Option<&LockFreeMpmcRing<EventWorkItem, RING_CAPACITY>>,
+    run_id: u64,
+) -> PetriTickResult {
+    // Step 1: dry-run preview on a clone — does not touch the real state,
+    // the real ring, or the real event ring.
+    let mut preview = state.clone();
+    let would_fire = petri_tick(tape, &mut preview, None, None, run_id);
+    let ready_mask = would_fire.fired_ops;
+    let ready = mask_to_event_set(ready_mask);
+
+    // Step 2: select which of the ready ops may actually fire.
+    let selected = selector.select_checked(&ready, guards);
+    let selected_mask = event_set_to_mask(&selected);
+
+    // Step 3: fast path — nothing was gated away (also covers ready_mask==0,
+    // since a subset of the empty set is always the empty set).
+    if selected_mask == ready_mask {
+        return petri_tick(tape, state, ring, event_ring, run_id);
+    }
+
+    // Step 4: divergent path. Advance the real SLA wheel exactly once (the
+    // preview above only advanced the discarded clone's wheel).
+    let mut overflow_count: u32 = 0;
+    let sla_due = state.sla_wheel.tick();
+    state.sla_breached |= sla_due;
+
+    let done = state.done.words[0];
+    let mut new_done = done;
+    let mut new_check = 0u64;
+    let mut fired_ops_accumulator = 0u64;
+
+    let mut bits = state.check.words[0] & !done;
+    while bits != 0 {
+        let i = bits.trailing_zeros() as usize;
+        bits &= bits - 1;
+
+        let op = &tape[i];
+        let op_bit = 1u64 << i;
+
+        let is_join = kind_mask(op.kind, OpKind::Join);
+        let join_effective = op.pred_mask & state.choice_taken;
+        let effective_pred = (join_effective & is_join) | (op.pred_mask & !is_join);
+
+        // Same enablement formula PriorityPetriEngine's SwarMarking::try_fire
+        // uses internally (`current.satisfies(input)`), recomputed here
+        // against `new_done` as it accumulates across this loop so a
+        // deferred (unselected) predecessor correctly fails to unblock a
+        // later same-tick successor — matching engine's sequential,
+        // priority-ordered firing semantics exactly.
+        let sat = pred_satisfied(new_done, effective_pred);
+        let sat_bit = sat & 1;
+        let selected_bit = (selected_mask >> i) & 1;
+        let fire_mask = u64::wrapping_sub(0, sat_bit & selected_bit) & op_bit;
+
+        fired_ops_accumulator |= fire_mask;
+        new_done |= fire_mask;
+
+        let fired_this = fire_mask >> i;
+        new_check |= op.succ_mask & u64::wrapping_sub(0, fired_this);
+
+        new_done |= apply_xor_dispatch(op, fire_mask, &mut state.choice_taken);
+
+        let (redo_clear, redo_check) = apply_loop_redo(op, fire_mask, &mut state.loop_iters[i]);
+        new_done &= !redo_clear;
+        new_check |= redo_check;
+
+        // Cold path (per module docs): only an op that actually fired this
+        // tick emits a receipt event or releases successors to the parallel
+        // ring — a deferred (ready-but-unselected) candidate must not be
+        // reported as fired or have its successors dispatched.
+        if fired_this == 1 {
+            if let Some(er) = event_ring {
+                let pushed = er.push_t1(EventWorkItem {
+                    op_idx: i as u32,
+                    run_id,
+                    op_trace_so_far: fired_ops_accumulator,
+                    kind_tag: op.kind as u8,
+                });
+                if pushed == 0 {
+                    overflow_count += 1;
+                }
+            }
+            dispatch_successors(tape, i, new_done, ring);
+        }
+    }
+
+    // Carry forward ready-but-unselected ops so they are reconsidered next
+    // tick instead of being lost.
+    new_check |= ready_mask & !selected_mask;
 
     state.done.words[0] = new_done;
     state.check.words[0] = new_check & !new_done;
@@ -647,5 +861,169 @@ mod tests {
             result.event_overflow_count, 0,
             "no event ring present, no overflow"
         );
+    }
+
+    // -------------------------------------------------------------------------
+    // petri_tick_guarded — concurrency-complex-checked hot path (additive)
+    // -------------------------------------------------------------------------
+
+    mod concurrency_gated {
+        use super::*;
+        use crate::scheduler::StableMaximalSelector;
+        use crate::tape::v2::CompiledNonFace;
+        use bcinr_mfw_ir::Digest;
+
+        /// Runs both `petri_tick` and `petri_tick_guarded` (with
+        /// `StableMaximalSelector` + an empty guard table) from identical
+        /// starting states, tick by tick, and asserts every observable
+        /// piece of state stays in lockstep — the required proof that
+        /// gating this hot path is additive, not a silent behavior change.
+        fn assert_guarded_matches_plain(tape: &PowlTape) {
+            let ops = tape_ops(tape);
+            let mut plain_state = PowlPetriState::new(tape.entry_mask);
+            let mut guarded_state = PowlPetriState::new(tape.entry_mask);
+            let mut selector = StableMaximalSelector;
+            let guards = ConcurrencyGuardTable::empty();
+
+            for tick in 0..20 {
+                let plain_done = plain_state.check.words[0] == 0;
+                let guarded_done = guarded_state.check.words[0] == 0;
+                assert_eq!(
+                    plain_done, guarded_done,
+                    "tick {tick}: plain/guarded disagree on termination"
+                );
+                if plain_done {
+                    break;
+                }
+
+                let plain_fired = petri_tick(&ops, &mut plain_state, None, None, 0);
+                let guarded_fired = petri_tick_guarded(
+                    &ops,
+                    &mut guarded_state,
+                    &mut selector,
+                    &guards,
+                    None,
+                    None,
+                    0,
+                );
+
+                assert_eq!(
+                    plain_fired.fired_ops, guarded_fired.fired_ops,
+                    "tick {tick}: fired sets diverged (plain={:#018x}, guarded={:#018x})",
+                    plain_fired.fired_ops, guarded_fired.fired_ops
+                );
+                assert_eq!(
+                    plain_state.done.words[0], guarded_state.done.words[0],
+                    "tick {tick}: done diverged"
+                );
+                assert_eq!(
+                    plain_state.check.words[0], guarded_state.check.words[0],
+                    "tick {tick}: check diverged"
+                );
+                assert_eq!(
+                    plain_state.choice_taken, guarded_state.choice_taken,
+                    "tick {tick}: choice_taken diverged"
+                );
+                assert_eq!(
+                    plain_state.loop_iters, guarded_state.loop_iters,
+                    "tick {tick}: loop_iters diverged"
+                );
+            }
+        }
+
+        #[test]
+        fn empty_guards_matches_plain_tick_for_linear_chain() {
+            let ast = PowlAstNode::Sequence(vec![
+                PowlAstNode::Atom("a"),
+                PowlAstNode::Atom("b"),
+                PowlAstNode::Atom("c"),
+                PowlAstNode::Atom("d"),
+                PowlAstNode::Atom("e"),
+            ]);
+            let tape = compile_powl(&ast).unwrap();
+            assert_guarded_matches_plain(&tape);
+        }
+
+        #[test]
+        fn empty_guards_matches_plain_tick_for_parallel_ops() {
+            // The multi-bit-ready-set case: two ops become ready on the
+            // same tick, forcing a real ready set of size > 1 through the
+            // gating logic.
+            let ast = PowlAstNode::PartialOrder {
+                children: vec![PowlAstNode::Atom("a"), PowlAstNode::Atom("b")],
+                edges: vec![],
+            };
+            let tape = compile_powl(&ast).unwrap();
+            assert_guarded_matches_plain(&tape);
+        }
+
+        /// The concurrency guard must have a real effect: a nonface
+        /// covering both parallel ops forbids them from firing on the same
+        /// tick, deferring one to a later tick — but both must eventually
+        /// fire (the guard defers, it never permanently starves), and the
+        /// deferred op must never be reported in `fired_ops` on the tick
+        /// it was excluded.
+        #[test]
+        fn nonempty_guard_defers_a_forbidden_pair_but_both_eventually_fire() {
+            let ast = PowlAstNode::PartialOrder {
+                children: vec![PowlAstNode::Atom("a"), PowlAstNode::Atom("b")],
+                edges: vec![],
+            };
+            let tape = compile_powl(&ast).unwrap();
+            let ops = tape_ops(&tape);
+
+            let guards = ConcurrencyGuardTable {
+                nonfaces: vec![CompiledNonFace {
+                    members: EventSet::empty().with(0).with(1),
+                    witness_digest: Digest::hash(b"a-b-conflict"),
+                }],
+            };
+            let mut state = PowlPetriState::new(tape.entry_mask);
+            let mut selector = StableMaximalSelector;
+
+            let fs1 = petri_tick_guarded(&ops, &mut state, &mut selector, &guards, None, None, 0);
+            assert_eq!(
+                fs1.fired_ops.count_ones(),
+                1,
+                "guard must defer one of the two conflicting ops on tick 1, got fired={:#018x}",
+                fs1.fired_ops
+            );
+            assert!(
+                fs1.fired_ops == 0b01 || fs1.fired_ops == 0b10,
+                "exactly one of a (bit0) or b (bit1) must fire, got {:#018x}",
+                fs1.fired_ops
+            );
+
+            let mut total_fired = fs1.fired_ops;
+            for _ in 0..10 {
+                if state.check.words[0] == 0 {
+                    break;
+                }
+                let fs =
+                    petri_tick_guarded(&ops, &mut state, &mut selector, &guards, None, None, 0);
+                total_fired |= fs.fired_ops;
+            }
+            assert_eq!(
+                total_fired & 0b11,
+                0b11,
+                "both conflicting ops must eventually fire (deferred, not dropped)"
+            );
+            assert_eq!(
+                state.check.words[0], 0,
+                "run must terminate (join must eventually fire once both preds are done)"
+            );
+        }
+
+        #[test]
+        fn mask_event_set_round_trip() {
+            for mask in [0u64, 1, 0b1010, 0xFFFF_FFFF_FFFF_FFFF] {
+                let set = mask_to_event_set(mask);
+                assert_eq!(
+                    event_set_to_mask(&set),
+                    mask,
+                    "round trip failed for {mask:#018x}"
+                );
+            }
+        }
     }
 }

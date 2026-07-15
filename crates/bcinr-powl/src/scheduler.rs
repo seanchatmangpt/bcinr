@@ -89,8 +89,13 @@ pub struct FiredSet(pub u64);
 ///
 /// Proof: `unmet = required & !done` is zero iff every required bit is done.
 /// `(unmet == 0) as u64` ∈ {0, 1}; `wrapping_neg` maps 1 → !0, 0 → 0.
+///
+/// `pub(crate)`: also used by [`crate::scheduler_wired::petri_tick_guarded`],
+/// whose divergent (gated) path recomputes per-candidate enablement with the
+/// identical formula `SwarMarking::try_fire` uses internally, rather than
+/// duplicating this arithmetic a third time.
 #[inline(always)]
-fn pred_satisfied(done: u64, required: u64) -> u64 {
+pub(crate) fn pred_satisfied(done: u64, required: u64) -> u64 {
     let unmet = required & !done;
     0u64.wrapping_sub((unmet == 0) as u64)
 }
