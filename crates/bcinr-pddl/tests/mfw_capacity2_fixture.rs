@@ -78,6 +78,7 @@ use bcinr_powl::scheduler::{
 use bcinr_powl::tape::v2::{CompiledNonFace, ConcurrencyGuardTable};
 use bcinr_powl_receipt::execution::{
     digest_legacy_tape, seal_execution_receipt, tick_and_seal_execution_receipt,
+    verify_execution_receipt, ExecutionIntegrityError, ExecutionReceipt,
 };
 
 // ---------------------------------------------------------------------------
@@ -566,7 +567,8 @@ fn link7_execution_receipt_fired_pair_differs_from_the_genuinely_ready_triple() 
         Digest::ZERO,
         Digest::hash(b"capacity2-powl-model"),
         compiled_digest,
-    );
+    )
+    .expect("the real scheduler's own firing decision must be admissible under the same guards");
 
     assert_eq!(
         receipt.fired.len(),
@@ -593,7 +595,10 @@ fn link7_execution_receipt_fired_pair_differs_from_the_genuinely_ready_triple() 
 
 // ---------------------------------------------------------------------------
 // Link 8 — the sharpest test: does anything reject a hand-fabricated
-// receipt claiming the triple fired?
+// receipt claiming the triple fired? ALIVE as of this session:
+// `seal_execution_receipt`/`verify_execution_receipt` in
+// `bcinr-powl-receipt/src/execution.rs` now both check `fired` against a
+// `ConcurrencyGuardTable`; link8b exercises both.
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -613,44 +618,37 @@ fn link8a_a_real_receipt_for_the_legal_pair_is_well_formed() {
         Digest::ZERO,
         Digest::hash(b"capacity2-powl-model"),
         compiled_digest,
-    );
+    )
+    .expect("the real scheduler's own firing decision must be admissible under the same guards");
     assert_eq!(real_receipt.fired.len(), 2);
     assert!(guards.admits(&real_receipt.fired));
 }
 
 #[test]
-fn link8b_blocked_no_replay_or_verify_function_rejects_a_hand_fabricated_triple_receipt() {
-    // BLOCKED. Evidence gathered this session:
+fn link8b_seal_and_verify_execution_receipt_reject_a_hand_fabricated_triple_receipt() {
+    // ALIVE (fixed this session; was BLOCKED in a prior round). Evidence
+    // this test now checks directly, replacing the prior round's evidence
+    // trail:
     //
-    // 1. `grep -rn "\.admits(" crates --include="*.rs"` (non-test call
-    //    sites) shows `ConcurrencyGuardTable::admits`/
-    //    `ExecutableConcurrencyComplex::admits` are called from exactly two
-    //    places in non-test code: `ConcurrencySelector::select`/
-    //    `select_checked` (bcinr-powl/src/scheduler.rs, live gating of what
-    //    is allowed to fire *before* it fires) and `StableMaximalSelector::
-    //    select`'s own greedy loop. Zero call sites exist inside any
-    //    receipt-sealing, receipt-verification, or replay function.
+    // `bcinr_powl_receipt::execution::seal_execution_receipt` now takes a
+    // `guards: &ConcurrencyGuardTable` parameter and returns
+    // `Result<ExecutionReceipt, ExecutionIntegrityError>`, refusing to seal
+    // a receipt whose `fired` is inadmissible; a companion
+    // `verify_execution_receipt(receipt, guards) -> Result<(), _>` now
+    // exists to catch the same problem in an already-sealed (or hand
+    // struct-literal-assembled, since the fields are still `pub`) receipt.
+    // `bcinr_powl_receipt::replay::PowlReplayVerifier` remains a separate,
+    // unrelated token-passing model (untouched by this fix, out of this
+    // gap's scope) — this fix closes the sealing/verification gap, not
+    // that one.
     //
-    // 2. `bcinr_powl_receipt::execution::seal_execution_receipt` takes
-    //    `fired: EventSet` as a plain, trusted argument (lines 102-131 of
-    //    execution.rs) -- it hashes whatever `fired` it is given; it has no
-    //    `ConcurrencyGuardTable`/`ExecutableConcurrencyComplex` parameter to
-    //    cross-check against at all.
-    //
-    // 3. `bcinr_powl_receipt::replay::PowlReplayVerifier` (replay.rs) is a
-    //    *different* token-passing model entirely (`PowlReplayFrame`/
-    //    `required_tokens`/`node_bit`, one frame at a time) -- it never
-    //    references `EventSet`, `ConcurrencyGuardTable`, or
-    //    `ExecutableConcurrencyComplex` (grep-confirmed zero occurrences in
-    //    that file), so it has no way to notice that a single frame's
-    //    "concurrent firing" violates a capacity constraint even in
-    //    principle.
-    //
-    // So: fabricate a receipt claiming all three fired, by hand, bypassing
-    // the real scheduler entirely -- and show it is accepted as well-formed
-    // by the one function that exists to seal receipts.
+    // Fabricate a receipt claiming all three fired, by hand, bypassing the
+    // real scheduler entirely — and confirm it is now refused at both the
+    // sealing boundary and the verification boundary.
+    let guards = capacity2_guard_table_for_slots_0_1_2();
     let fabricated_fired = EventSet::empty().with(0).with(1).with(2);
-    let fabricated = seal_execution_receipt(
+
+    let seal_result = seal_execution_receipt(
         Digest::ZERO,
         Digest::hash(b"capacity2-powl-model"),
         Digest::hash(b"capacity2-compiled-tape"),
@@ -658,27 +656,38 @@ fn link8b_blocked_no_replay_or_verify_function_rejects_a_hand_fabricated_triple_
         Digest::hash(b"fabricated-decision"),
         fabricated_fired,
         fabricated_fired,
+        &guards,
     );
-    // The fabrication is accepted: a perfectly well-formed, non-zero,
-    // internally-consistent hash chain entry -- nothing in
-    // `seal_execution_receipt` refuses it.
-    assert_ne!(fabricated.hash, Digest::ZERO);
-    assert_eq!(fabricated.fired.len(), 3);
+    assert_eq!(
+        seal_result,
+        Err(ExecutionIntegrityError::InadmissibleFiredSet {
+            fired: fabricated_fired
+        }),
+        "seal_execution_receipt must refuse to produce a receipt for the \
+         inadmissible triple, not silently accept it"
+    );
 
-    // The one piece of logic that *could* have caught this, applied here
-    // manually (not by any replay/verify code path -- none exists):
-    let guards = capacity2_guard_table_for_slots_0_1_2();
-    assert!(
-        !guards.admits(&fabricated.fired),
-        "the raw building block (ConcurrencyGuardTable::admits) correctly \
-         identifies the fabricated triple as inadmissible when applied by \
-         hand -- proving the primitive exists and is sufficient in \
-         principle -- but no replay/verification function in the repository \
-         calls it against a receipt's `fired` field, so an \
-         `ExecutionReceipt` claiming the triple fired is never rejected by \
-         any code that actually runs today. This is the missing piece: a \
-         `verify_execution_receipt(receipt, guards) -> Result<(), _>` (or \
-         equivalent) that does not exist anywhere in \
-         crates/bcinr-powl-receipt/src/execution.rs or replay.rs."
+    // Even bypassing `seal_execution_receipt` entirely via struct-literal
+    // construction (still possible: the fields remain `pub`, matching this
+    // crate's existing style for the rest of its receipt types),
+    // `verify_execution_receipt` independently catches the same
+    // inadmissible `fired` set.
+    let hand_built = ExecutionReceipt {
+        powl_model_digest: Digest::hash(b"capacity2-powl-model"),
+        compiled_digest: Digest::hash(b"capacity2-compiled-tape"),
+        tick: 1,
+        scheduler_decision_digest: Digest::hash(b"fabricated-decision"),
+        fired: fabricated_fired,
+        completed_after: fabricated_fired,
+        prior_hash: Digest::ZERO,
+        hash: Digest::hash(b"whatever"),
+    };
+    assert_eq!(
+        verify_execution_receipt(&hand_built, &guards),
+        Err(ExecutionIntegrityError::InadmissibleFiredSet {
+            fired: fabricated_fired
+        }),
+        "verify_execution_receipt must reject a hand-assembled receipt \
+         claiming the inadmissible triple fired"
     );
 }
