@@ -18,9 +18,15 @@
 //!   only passes because `(at start (not (locked ?f)))` really gates
 //!   scheduling.
 //! - [`PddlFeature::Disjunction`] — `Exact`. `eval_condition`'s `Or` arm
-//!   (`.any(...)`) is equally straightforward and reachable through the same
-//!   durative-condition / derived-predicate pipeline already proven live for
-//!   `Not`/`Compare`/`Timed`.
+//!   (`.any(...)`) is reachable through the same durative-condition pipeline
+//!   already proven live for `Not`/`Compare`/`Timed`, and is now itself
+//!   proven end-to-end by `tests/durative_disjunction.rs`: a
+//!   `:durative-action`'s `(at start (or ...))` condition genuinely gates
+//!   scheduling, including the adversarial case (only one of two disjuncts
+//!   true still fires; neither true correctly blocks). Like
+//!   `UniversalPreconditions`, this is only proven through the one
+//!   parser-reachable path that exists — `:action`/`:goal` preconditions
+//!   still can't carry a `PddlCondition::Or` at all in this crate.
 //! - [`PddlFeature::Equality`] — `Unsupported`. Nothing in this crate
 //!   special-cases the built-in `=` predicate (no equality facts are
 //!   synthesized, no identity check exists anywhere in `ground/mod.rs`) — a
