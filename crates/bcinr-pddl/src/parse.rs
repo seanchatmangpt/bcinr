@@ -124,7 +124,7 @@ pub fn problem_from_pddl(text: &str) -> Result<Pddl8Problem, Pddl8Error> {
         .map(|t| (t.value().to_string(), type_to_string(t.type_())))
         .collect();
 
-    let (init, timed_inits, fn_values) = lower_init_full(prob.init())?;
+    let (init, timed_inits, fn_values) = lower_init_full(prob.init());
     let goal = lower_precond_defs(prob.goals())?;
 
     let metric = prob.metric_spec().as_ref().map(lower_metric);
@@ -553,7 +553,17 @@ fn lower_pred_af(p: &PredicateAtomicFormula<pddl::Term>) -> Pddl8Atom {
 type LoweredInit = (Vec<Pddl8Atom>, Vec<TimedLiteral>, Vec<(PddlFunction, f64)>);
 
 /// Returns (init_atoms, timed_inits, fn_values) from an InitElements.
-fn lower_init_full(init: &pddl::InitElements) -> Result<LoweredInit, Pddl8Error> {
+///
+/// Infallible by construction: every `InitElement` variant this function
+/// matches on is handled (including `IsObject`, whose object-fluent
+/// initial-value assignments are intentionally, disclosedly dropped rather
+/// than refused — see `capability::admit_planning_task`'s doc comment on
+/// the `declares_object_fluents`/`uses_object_fluent_construct` check for
+/// the full rationale). There is genuinely no error path here; this used
+/// to return `Result<LoweredInit, Pddl8Error>` with every arm wrapped in
+/// `Ok(..)` and no `Err(..)` anywhere in the body (clippy::unnecessary_wraps)
+/// — a decorative fallible signature implying a check that doesn't exist.
+fn lower_init_full(init: &pddl::InitElements) -> LoweredInit {
     let mut atoms = Vec::new();
     let mut timed = Vec::new();
     let mut fn_vals = Vec::new();
@@ -607,7 +617,7 @@ fn lower_init_full(init: &pddl::InitElements) -> Result<LoweredInit, Pddl8Error>
             InitElement::IsObject(_, _) => {}
         }
     }
-    Ok((atoms, timed, fn_vals))
+    (atoms, timed, fn_vals)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
