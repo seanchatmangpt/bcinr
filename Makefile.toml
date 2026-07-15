@@ -10,6 +10,21 @@ RUSTFLAGS = "-D warnings"
 [tasks.check]
 category = "Build"
 description = "Verify workspace compiles"
+# `workspace = false`: this task's own `args` already say `--workspace`, so
+# a single invocation from the root already covers every member in one
+# `cargo` process. Without this flag, cargo-make's `default_to_workspace =
+# true` (see [config]) makes it re-invoke a task named "check" once per
+# member directory instead -- and per cargo-make's own member-descent
+# semantics, that re-invocation does NOT reuse this task's `args`; members
+# with no local Makefile.toml (every MFW retrofit crate: bcinr-mfw-ir,
+# bcinr-pddl, bcinr-powl, bcinr-powl-receipt, bcinr-mcp, plus bcinr,
+# bcinr-core, bcinr-api, bcinr-logic, and every tool under tools/) instead
+# silently fall back to a bare `cargo check` with none of
+# `--workspace`/`--all-targets`/`--all-features` -- confirmed live via
+# `cargo make check`'s own per-member log lines
+# (`Execute Command: "cargo" "check"`, no flags). Same fix pattern already
+# established by the `fmt` task below for the identical reason.
+workspace = false
 command = "cargo"
 args = ["check", "--workspace", "--all-targets", "--all-features"]
 
@@ -22,16 +37,21 @@ args = ["build", "--workspace", "--release", "--all-features"]
 [tasks.test]
 category = "Test"
 description = "Run all workspace tests"
+# workspace = false: see [tasks.check]'s comment for why -- this task's
+# `--no-fail-fast` (added in commit a04a6264 specifically "so make test
+# reaches every crate") never actually took effect without this flag either:
+# cargo-make's per-member descent invoked a bare `cargo test --all-features`
+# per member directory (no --no-fail-fast, no --all-targets), so `bcinr`'s
+# own pre-existing tests/e2e.rs failures aborted the whole `cargo-make`
+# task immediately after the first member ("Project: bcinr") and every
+# later member -- including every MFW retrofit crate -- was never reached,
+# regardless of --no-fail-fast being present in this task's own (unused)
+# `args`. `workspace = false` makes this one real `cargo test --workspace
+# --all-features --all-targets --no-fail-fast` invocation from the root,
+# which both reaches every member AND keeps running past bcinr's own
+# unrelated e2e.rs failures.
+workspace = false
 command = "cargo"
-# --no-fail-fast: `cargo test`'s default is to stop running further test
-# binaries the moment one fails. `bcinr` (the root package) is the first
-# workspace member and its own tests/e2e.rs has pre-existing, unrelated
-# failures (dev-tooling scenario tests) -- without --no-fail-fast, that
-# single failing binary silently prevents every later member (including
-# crates/bcinr-pddl, bcinr-powl, bcinr-powl-receipt, bcinr-mfw-ir) from
-# ever being test-run at all in this invocation, giving zero signal on
-# them even though this task's exit code still (correctly) reports
-# failure overall.
 args = ["test", "--workspace", "--all-features", "--all-targets", "--no-fail-fast"]
 
 [tasks.bench]
@@ -103,6 +123,17 @@ args = ["run", "--manifest-path", "/Users/sac/anti-llm-cheat-lsp/Cargo.toml", "-
 [tasks.clippy]
 category = "Lint"
 description = "Run clippy with strict pedantic lints (+ anti-LLM stub scan)"
+# workspace = false: see [tasks.check]'s comment for why -- without this,
+# cargo-make's per-member descent ran a bare `cargo clippy` (RUSTFLAGS
+# still carries -D warnings via [env], since that propagates as process
+# env rather than a per-task arg, but --workspace/--all-targets/
+# --all-features did not) once per member directory, so it never actually
+# ran against the pedantic/full-target surface this task's own `args`
+# request, and halted at the very first member with pre-existing lint debt
+# (bcinr-logic, pulled in as a dependency of every MFW crate) -- meaning
+# clippy was never actually run against bcinr-mfw-ir, bcinr-pddl,
+# bcinr-powl, bcinr-powl-receipt, or bcinr-mcp in this invocation either.
+workspace = false
 dependencies = ["lint-anti-llm"]
 command = "cargo"
 args = ["clippy", "--workspace", "--all-targets", "--all-features", "--", "-D", "warnings"]
