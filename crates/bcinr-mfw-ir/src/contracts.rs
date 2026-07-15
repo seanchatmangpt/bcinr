@@ -104,13 +104,21 @@ impl std::error::Error for ContractError {}
 ///
 /// This is the enforcement point, not documentation: `new` refuses
 /// (`Err(ContractError::LawNotProven)`) rather than merely warning when
-/// `law.standing != FormalStanding::Proven`.
+/// `law.standing != FormalStanding::Proven`. The fields are deliberately
+/// **not** `pub`: `#[derive(Clone)]` plus public fields would let any
+/// caller (in this crate or downstream, since Rust field privacy is
+/// per-crate, not per-module) construct a full `SemanticOptimizationContract`
+/// via struct-literal syntax carrying a non-`Proven` law, bypassing `new`'s
+/// refusal entirely and making the doc comment above false as written. Use
+/// the accessor methods below for read access — nothing outside this
+/// module needs write access, and `new` is the only place that should ever
+/// need it.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SemanticOptimizationContract {
-    pub law: FormalLawRef,
-    pub consequence_horizon: ConsequenceHorizonId,
-    pub transformation: TransformationProfileId,
-    pub assumptions: Vec<String>,
+    law: FormalLawRef,
+    consequence_horizon: ConsequenceHorizonId,
+    transformation: TransformationProfileId,
+    assumptions: Vec<String>,
 }
 
 impl SemanticOptimizationContract {
@@ -130,6 +138,31 @@ impl SemanticOptimizationContract {
             transformation,
             assumptions,
         })
+    }
+
+    /// The formal law this contract cites as its license. Always `Proven`
+    /// (`new` refuses otherwise) — a caller can rely on
+    /// `.law().standing == FormalStanding::Proven` without re-checking it.
+    pub fn law(&self) -> FormalLawRef {
+        self.law
+    }
+
+    /// The consequence horizon this contract licenses skipping re-search
+    /// within.
+    pub fn consequence_horizon(&self) -> ConsequenceHorizonId {
+        self.consequence_horizon
+    }
+
+    /// The transformation profile this contract licenses.
+    pub fn transformation(&self) -> TransformationProfileId {
+        self.transformation
+    }
+
+    /// Caller-supplied assumptions this contract's validity additionally
+    /// depends on (e.g. "fiber is constant over horizon") — `new` does not
+    /// verify these; they are recorded, not checked.
+    pub fn assumptions(&self) -> &[String] {
+        &self.assumptions
     }
 }
 
