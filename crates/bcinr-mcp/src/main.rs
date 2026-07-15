@@ -313,7 +313,7 @@ impl BcinrServer {
                     .to_string()
             }
         };
-        match ground.find_plan() {
+        match ground.find_plan().into_result() {
             Ok(tape) => {
                 let steps: Vec<String> = tape
                     .ops
@@ -637,7 +637,7 @@ impl BcinrServer {
                 }
                 Ok(g) => g,
             };
-            match ground.find_temporal_plan() {
+            match ground.find_temporal_plan().into_result() {
                 Err(e) => {
                     return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string()
                 }
@@ -651,7 +651,7 @@ impl BcinrServer {
                 }
                 Ok(g) => g,
             };
-            let tape = match ground.find_plan() {
+            let tape = match ground.find_plan().into_result() {
                 Err(e) => {
                     return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string()
                 }

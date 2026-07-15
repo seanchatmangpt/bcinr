@@ -330,11 +330,14 @@ mod tests {
     fn test_tools_have_descriptions() {
         let src = fs::read_to_string("src/main.rs").expect("Failed to read main.rs");
 
-        // Count #[tool(description = "...")]
-        let tool_defs = src
-            .lines()
-            .filter(|line| line.contains("#[tool(description"))
-            .count();
+        // Count `#[tool(` attributes. Every tool's `description = "..."` is
+        // on the line(s) after `#[tool(` (macro-formatted as a multi-line
+        // attribute), so matching the combined single-line substring
+        // `"#[tool(description"` here always undercounts to zero once the
+        // attribute is reformatted across multiple lines — match the
+        // attribute's opening line instead, which is stable across
+        // single-line/multi-line formatting.
+        let tool_defs = src.lines().filter(|line| line.contains("#[tool(")).count();
 
         let async_fns = extract_tool_names().len();
 
