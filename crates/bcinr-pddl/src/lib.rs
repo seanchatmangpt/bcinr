@@ -10,10 +10,18 @@
 //! ```
 //!
 //! # Isolation guarantee
-//! Zero path deps on bcinr-powl or wasm4pm-cognition — the `pddl` parser crate
-//! is **only** compiled when this crate is in the dependency graph. PDDL does
-//! not bleed into bcinr-powl, wasm4pm, or lsp-max unless they explicitly add
-//! bcinr-pddl as a dep.
+//! Zero *unconditional* path deps on bcinr-powl or wasm4pm-cognition — the
+//! `pddl` parser crate is **only** compiled when this crate is in the
+//! dependency graph. PDDL does not bleed into bcinr-powl, wasm4pm, or
+//! lsp-max unless they explicitly add bcinr-pddl as a dep.
+//!
+//! `bcinr-powl` and `bcinr-powl-receipt` *are* optional path deps of this
+//! crate (see `Cargo.toml`), enabled only by the `mfw-planner` feature (off
+//! by default) for the `MfwPlanner` orchestrator in [`mfw::planner`]. A
+//! default build of this crate — and every existing consumer that does not
+//! opt into `mfw-planner`, including praxis's own path dependency on this
+//! crate — pulls in neither. This is the one genuine, intentional exception
+//! to the isolation guarantee above, and it is opt-in, not automatic.
 //!
 //! Canonical types live in `wasm4pm_compat::pddl` so any crate can import
 //! `Pddl8Tape`, `Pddl8GroundAction`, etc. without pulling in the parser.
