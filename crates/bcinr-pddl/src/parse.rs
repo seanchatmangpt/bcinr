@@ -1084,6 +1084,20 @@ fn lower_da_gd_condition(gd: &DurativeActionGoalDefinition) -> PddlCondition {
     }
 }
 
+/// The fabricated predicate name [`lower_timed_effect`]'s
+/// `TimedEffect::ContinuousEffect` arm substitutes for a real continuous
+/// numeric effect (e.g. `(increase fuel #t)` inside a `:durative-action`'s
+/// `:effect`) — this crate has no representation for a continuous
+/// (rate-based, over-duration) numeric change at all. The name is `pub(crate)`
+/// rather than a private literal so
+/// `capability::admit_planning_task`'s content scan
+/// (`effect_uses_continuous_effect_sentinel`) can detect real usage of this
+/// unsupported construct without re-deriving or duplicating the string —
+/// see that function's doc comment for why a fingerprint scan, not a
+/// declared-`:continuous-effects`-requirement check, is the right admission
+/// gate here.
+pub(crate) const CONTINUOUS_EFFECT_SENTINEL_PRED: &str = "_continuous_effect";
+
 fn lower_timed_effect(te: &TimedEffect) -> PddlEffect {
     match te {
         TimedEffect::Conditional(ts, ec) => {
@@ -1099,9 +1113,21 @@ fn lower_timed_effect(te: &TimedEffect) -> PddlEffect {
             PddlEffect::Timed(ts_out, Box::new(PddlEffect::Numeric(numeric)))
         }
         TimedEffect::ContinuousEffect(_, _, _) => {
-            // TODO: lower continuous effects
+            // This crate does not implement continuous effects (see
+            // capability.rs's module doc comment). The fabricated atom
+            // below is a *detectable sentinel*, not a real fact — it exists
+            // so `capability::admit_planning_task` can refuse a domain that
+            // actually uses this construct (see
+            // `CONTINUOUS_EFFECT_SENTINEL_PRED`'s doc comment), closing the
+            // "parsed but silently wrong" gap a bare drop would leave open.
+            // It still reaches `GroundTemporalProblem`'s ground state as a
+            // meaningless fact if a caller bypasses admission entirely
+            // (calls `GroundTemporalProblem::build` directly on a domain
+            // that was never run through `admit_planning_task`) — that
+            // residual risk is the admission gate's job to close, not this
+            // lowering function's.
             PddlEffect::Add(Pddl8Atom {
-                pred: "_continuous_effect".to_string(),
+                pred: CONTINUOUS_EFFECT_SENTINEL_PRED.to_string(),
                 args: vec![],
             })
         }

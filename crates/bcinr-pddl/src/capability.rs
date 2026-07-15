@@ -250,11 +250,18 @@ impl CapabilityProfile for DefaultCapabilityProfile {
 /// `Requirement::expand()` uses. `ObjectFluents`/`DurationInequalities`/
 /// `ContinuousEffects`/`ActionCosts` never imply any [`PddlFeature`] here —
 /// `ObjectFluents` is rejected structurally by [`admit_planning_task`]
-/// instead (see that function), and the other three have no corresponding
-/// feature in this crate's admission vocabulary at all (this crate does not
-/// implement continuous effects or duration inequalities beyond the
-/// min/max bounds `resolve_duration` already resolves, and `ActionCosts`'s
-/// restricted-metric semantics fall under [`PddlFeature::Metrics`], which is
+/// instead (see that function), `ContinuousEffects` is likewise rejected
+/// structurally by [`admit_planning_task`] but via a *content* scan
+/// (`effect_list_uses_continuous_effect_sentinel`) rather than this
+/// declared-requirement mapping — declaring `:continuous-effects` without
+/// ever using the construct is harmless, so keying the refusal on the
+/// requirement string the way `ObjectFluents` does would both needlessly
+/// refuse harmless domains and miss a domain that uses the construct
+/// without declaring it — and the other two have no corresponding feature
+/// in this crate's admission vocabulary at all (this crate does not
+/// implement duration inequalities beyond the min/max bounds
+/// `resolve_duration` already resolves, and `ActionCosts`'s restricted-metric
+/// semantics fall under [`PddlFeature::Metrics`], which is
 /// already `Unsupported`).
 fn requirement_implies(req: &str, feature: PddlFeature) -> bool {
     match req {
@@ -341,6 +348,41 @@ fn effect_list_uses_conditional_or_quantified(effects: &[PddlEffect]) -> bool {
     effects.iter().any(effect_uses_conditional_or_quantified)
 }
 
+/// True iff `effect` is (or, through a `Timed`/`When`/`Forall` wrapper,
+/// contains) the sentinel `PddlEffect::Add` atom
+/// `crate::parse::CONTINUOUS_EFFECT_SENTINEL_PRED` fabricates in place of a
+/// real continuous numeric effect — see that constant's doc comment on
+/// [`crate::parse::lower_timed_effect`] for the fabrication this detects,
+/// and [`admit_planning_task`]'s continuous-effects check for why a
+/// sentinel-fingerprint scan, not a preserved AST node, is what's available
+/// here: `PddlEffect` (an external `wasm4pm_compat` type) has no dedicated
+/// continuous-effect variant, so — unlike `PddlEffect::When`/`Forall`, which
+/// survive lowering intact — the real construct is destroyed before
+/// `Pddl31Domain` is built at all, and this sentinel is the only surviving
+/// signal that it was ever there.
+///
+/// # Complexity
+/// O(n) in the number of `PddlEffect` nodes reachable from `effect`.
+fn effect_uses_continuous_effect_sentinel(effect: &PddlEffect) -> bool {
+    match effect {
+        PddlEffect::Add(a) => a.pred == crate::parse::CONTINUOUS_EFFECT_SENTINEL_PRED,
+        PddlEffect::Timed(_, inner) => effect_uses_continuous_effect_sentinel(inner),
+        PddlEffect::When { effects, .. } | PddlEffect::Forall { effects, .. } => {
+            effects.iter().any(effect_uses_continuous_effect_sentinel)
+        }
+        PddlEffect::Del(_) | PddlEffect::Numeric(_) => false,
+    }
+}
+
+/// True iff any effect in `effects` carries the continuous-effect sentinel —
+/// see [`effect_uses_continuous_effect_sentinel`].
+///
+/// # Complexity
+/// O(n) in the total number of `PddlEffect` nodes across `effects`.
+fn effect_list_uses_continuous_effect_sentinel(effects: &[PddlEffect]) -> bool {
+    effects.iter().any(effect_uses_continuous_effect_sentinel)
+}
+
 /// A domain + problem that passed [`admit_planning_task`]'s structural and
 /// capability checks. Cheap to construct further planning stages from —
 /// `theory_digest` content-addresses exactly the structural identity used
@@ -411,6 +453,37 @@ pub fn admit_planning_task(
                       is refused outright."
                 .to_string(),
         });
+    }
+
+    // Structural rejection for continuous effects (`(increase fuel #t)`-shaped
+    // constructs inside a `:durative-action`'s `:effect`): like
+    // `ObjectFluents` above, no `PddlFeature` variant represents this
+    // because this crate has no representation for a continuous, rate-based
+    // numeric change at all. Unlike `ObjectFluents`, this is *not* keyed on
+    // the declared `:continuous-effects` requirement string — declaring the
+    // requirement without ever using the construct is harmless, so a
+    // declaration-only check would both needlessly refuse harmless domains
+    // and (symmetrically with the `ConditionalEffects` content scan above)
+    // miss a domain that uses the construct without declaring it. Instead
+    // this scans for `parse::CONTINUOUS_EFFECT_SENTINEL_PRED`, the
+    // detectable fingerprint `parse::lower_timed_effect` fabricates in place
+    // of every real continuous effect — see that constant's doc comment for
+    // why a sentinel scan, not a preserved AST node, is what's available to
+    // scan here (`PddlEffect` has no dedicated continuous-effect variant).
+    for da in &domain.durative_actions {
+        if effect_list_uses_continuous_effect_sentinel(&da.effects) {
+            return PlannerOutcome::Unsupported(UnsupportedFeature {
+                feature_name: "ContinuousEffects".to_string(),
+                context: format!(
+                    "durative action {:?} uses a continuous numeric effect (e.g. `(increase ... \
+                     #t)`), which this crate has no representation for — \
+                     parse::lower_timed_effect fabricates a meaningless sentinel fact atom in \
+                     its place, so admitting this domain would let GroundTemporalProblem \
+                     silently add a fake fact instead of applying the real numeric change",
+                    da.name
+                ),
+            });
+        }
     }
 
     for req in &domain.requirements {
@@ -639,6 +712,72 @@ mod tests {
             PlannerOutcome::Unsupported(u) => assert_eq!(u.feature_name, "object-fluents"),
             other => panic!("expected Unsupported(object-fluents), got {other:?}"),
         }
+    }
+
+    #[test]
+    fn continuous_effect_is_refused_as_unsupported_whether_or_not_declared() {
+        // CONFIRMED LIVE gap (see this module's doc comment on
+        // `effect_uses_continuous_effect_sentinel`): before this fix, a
+        // durative action's `(increase (fuel) #t)` continuous effect was
+        // silently lowered into a meaningless `_continuous_effect` sentinel
+        // fact by `parse::lower_timed_effect`, and nothing in
+        // `admit_planning_task` ever looked at durative-action effect
+        // bodies at all, so this domain sailed through admission
+        // regardless of whether `:continuous-effects` was declared.
+        // Both variants below (declared and undeclared) must now be refused
+        // — the content scan does not depend on the requirement string.
+        let declared = domain31_from_pddl(
+            "(define (domain d) \
+             (:requirements :durative-actions :numeric-fluents :continuous-effects) \
+             (:predicates (p)) (:functions (fuel)) \
+             (:durative-action a :parameters () :duration (= ?duration 1) \
+              :condition (at start (p)) :effect (increase (fuel) #t)))",
+        )
+        .unwrap();
+        let undeclared = domain31_from_pddl(
+            "(define (domain d) (:requirements :durative-actions :numeric-fluents) \
+             (:predicates (p)) (:functions (fuel)) \
+             (:durative-action a :parameters () :duration (= ?duration 1) \
+              :condition (at start (p)) :effect (increase (fuel) #t)))",
+        )
+        .unwrap();
+        let problem =
+            problem31_from_pddl("(define (problem pr) (:domain d) (:init (p)) (:goal (p)))")
+                .unwrap();
+
+        for domain in [declared, undeclared] {
+            let outcome = admit_planning_task(&domain, &problem, &DefaultCapabilityProfile);
+            match outcome {
+                PlannerOutcome::Unsupported(u) => {
+                    assert_eq!(u.feature_name, "ContinuousEffects")
+                }
+                other => panic!(
+                    "expected Unsupported(ContinuousEffects) for a domain using a continuous \
+                     effect, got {other:?}"
+                ),
+            }
+        }
+    }
+
+    #[test]
+    fn a_durative_action_with_no_continuous_effect_is_admitted_normally() {
+        // The content scan must not over-trigger: an ordinary numeric
+        // (non-continuous) durative effect is unaffected.
+        let domain = domain31_from_pddl(
+            "(define (domain d) (:requirements :durative-actions :numeric-fluents) \
+             (:predicates (p)) (:functions (fuel)) \
+             (:durative-action a :parameters () :duration (= ?duration 1) \
+              :condition (at start (p)) :effect (at end (increase (fuel) 1))))",
+        )
+        .unwrap();
+        let problem =
+            problem31_from_pddl("(define (problem pr) (:domain d) (:init (p)) (:goal (p)))")
+                .unwrap();
+        let outcome = admit_planning_task(&domain, &problem, &DefaultCapabilityProfile);
+        assert!(
+            outcome.is_found(),
+            "an ordinary at-end numeric effect must not be mistaken for a continuous effect"
+        );
     }
 
     #[test]
