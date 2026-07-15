@@ -230,6 +230,21 @@ impl GroundProblem {
     }
 
     /// BFS forward search — returns a `Pddl8Tape` ready for execution.
+    ///
+    /// # Bounded vs. Exhausted
+    ///
+    /// `PDDL8_MAX_PLAN_DEPTH` caps how deep any single BFS branch may be
+    /// expanded. If the queue empties out *without* ever discarding a
+    /// branch solely for exceeding that depth cap, every reachable state
+    /// really was visited and `Exhausted` is a genuine proof of
+    /// unreachability. But if at least one branch was cut off only because
+    /// it hit the depth cap, the state space below that cutoff was never
+    /// explored — the goal could still be reachable via a longer plan, so
+    /// claiming `Exhausted` would be a false proof. This mirrors the fix
+    /// already applied to the sibling `find_temporal_plan_with_fn_overrides`
+    /// (same file): see `crates/bcinr-pddl/tests/depth_bound_exhaustion_conflation.rs`
+    /// for an adversarial regression fixture (a 70-step chain domain whose
+    /// only plan exceeds the 64-step depth cap) that pins this down.
     pub fn find_plan(&self) -> PlannerOutcome<Pddl8Tape> {
         use std::collections::VecDeque;
 
@@ -241,6 +256,13 @@ impl GroundProblem {
         visited.insert(init_sorted);
         queue.push_back((self.initial_state.clone(), vec![]));
 
+        // Set the moment any branch is discarded purely for exceeding
+        // `PDDL8_MAX_PLAN_DEPTH` (never for constraint violation or
+        // already-visited dedup). Once true, an empty queue no longer
+        // proves unreachability — see the doc comment above.
+        let mut depth_bound_hit = false;
+        let mut max_depth_observed: u64 = 0;
+
         while let Some((mut state, path)) = queue.pop_front() {
             compute_derived_closure(
                 &mut state,
@@ -248,7 +270,9 @@ impl GroundProblem {
                 &HashMap::new(),
                 &self.quant_domain,
             );
+            max_depth_observed = max_depth_observed.max(path.len() as u64);
             if path.len() > PDDL8_MAX_PLAN_DEPTH {
+                depth_bound_hit = true;
                 continue;
             }
             if self
@@ -292,6 +316,17 @@ impl GroundProblem {
                     }
                 }
             }
+        }
+
+        if depth_bound_hit {
+            // At least one branch was cut off solely by the depth cap, not
+            // by the frontier genuinely running dry — a structural bound
+            // was hit, not a proof of unreachability.
+            return PlannerOutcome::Bounded(BoundHit {
+                kind: BoundKind::PlanDepth,
+                limit: PDDL8_MAX_PLAN_DEPTH as u64,
+                observed: max_depth_observed,
+            });
         }
 
         let goal_labels: Vec<String> = self.goal.iter().map(Pddl8GroundAtom::label).collect();
