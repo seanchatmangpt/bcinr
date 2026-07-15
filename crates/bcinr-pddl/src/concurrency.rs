@@ -44,8 +44,8 @@
 use std::collections::BTreeMap;
 
 use bcinr_mfw_ir::{
-    CausalPlan, ConcurrencyAnalyzer, ConcurrencyConflictWitness, Digest, EventSet,
-    ExecutableConcurrencyComplex, MinimalNonFace, MAX_EPOCH_EVENTS,
+    ActionOccurrenceId, CausalPlan, ConcurrencyAnalyzer, ConcurrencyConflictWitness, Digest,
+    EventSet, ExecutableConcurrencyComplex, MinimalNonFace, MAX_EPOCH_EVENTS,
 };
 
 use crate::capability::GroundedPlanningEpoch;
@@ -62,6 +62,30 @@ pub enum ConcurrencyAnalysisError {
     /// More occurrences than `EventSet`'s fixed 512-slot capacity — this
     /// construction cannot represent them.
     TooManyOccurrences(usize),
+    /// `causal.independence.dependent` names a pair whose `ActionOccurrenceId`
+    /// is not present in `causal.occurrences` — the `CausalPlan` is
+    /// internally inconsistent (its independence relation and its
+    /// occurrence list disagree about what occurrences exist).
+    ///
+    /// This is a hard refusal, not a silent skip: a recorded-`Dependent`
+    /// pair that this analyzer cannot resolve to `EventSet` slots must
+    /// never be treated as concurrency-admissible by omission. Before this
+    /// variant existed, `analyze` `continue`d past such a pair, so no
+    /// [`MinimalNonFace`] was ever emitted for it and
+    /// [`ExecutableConcurrencyComplex::admits`] silently allowed it to fire
+    /// concurrently — the exact "unknown defaults to no-conflict" pattern
+    /// the independence relation's own default (`Dependent` unless proven
+    /// `Independent`) exists to rule out. The current single production
+    /// call site (`crate::mfw::planner`, which always derives `causal` and
+    /// the epoch from the same `PddlCausalAnalyzer::analyze` call) never
+    /// triggers this, since that path's occurrences and independence
+    /// relation are always mutually consistent by construction — this
+    /// guards `analyze`'s public contract against any other `CausalPlan`
+    /// (a different `CausalAnalyzer` impl, or a hand-assembled one).
+    UnresolvedDependentPair {
+        left: ActionOccurrenceId,
+        right: ActionOccurrenceId,
+    },
 }
 
 impl std::fmt::Display for ConcurrencyAnalysisError {
@@ -70,6 +94,12 @@ impl std::fmt::Display for ConcurrencyAnalysisError {
             Self::TooManyOccurrences(n) => write!(
                 f,
                 "{n} occurrences exceeds EventSet's {MAX_EPOCH_EVENTS}-slot capacity"
+            ),
+            Self::UnresolvedDependentPair { left, right } => write!(
+                f,
+                "independence.dependent names occurrence pair ({left:?}, {right:?}) not present \
+                 in causal.occurrences -- refusing to silently admit an unresolvable Dependent \
+                 pair as concurrency-eligible"
             ),
         }
     }
@@ -118,7 +148,16 @@ impl ConcurrencyAnalyzer for PddlConcurrencyAnalyzer {
 
         for (pair, dep_witness) in &causal.independence.dependent {
             let (Some(&i), Some(&j)) = (slot_of.get(&pair.left), slot_of.get(&pair.right)) else {
-                continue;
+                // Refuse, don't silently skip: a `Dependent` pair this
+                // analyzer cannot resolve to `EventSet` slots must never be
+                // treated as concurrency-admissible by omission (no
+                // `MinimalNonFace` emitted == `admits` allows it). See
+                // `ConcurrencyAnalysisError::UnresolvedDependentPair`'s doc
+                // comment.
+                return Err(ConcurrencyAnalysisError::UnresolvedDependentPair {
+                    left: pair.left,
+                    right: pair.right,
+                });
             };
             let members = EventSet::empty().with(i).with(j);
 
@@ -248,5 +287,62 @@ mod tests {
         assert!(complex.minimal_nonfaces.is_empty());
         let both = EventSet::empty().with(0).with(1);
         assert!(complex.admits(&both));
+    }
+
+    #[test]
+    fn a_dependent_pair_unresolvable_to_occurrence_slots_is_refused_not_silently_admitted() {
+        // A hand-assembled, internally-inconsistent `CausalPlan`: its
+        // `independence.dependent` names an `ActionPair` whose occurrence
+        // IDs are not in `occurrences` at all (e.g. produced by a
+        // different `CausalAnalyzer` impl, or built by hand). Before this
+        // fix, `analyze`'s `slot_of.get(..)` lookup failure was silently
+        // `continue`d past: no `MinimalNonFace` was emitted for the pair,
+        // so `ExecutableConcurrencyComplex::admits` treated it as
+        // concurrency-admissible by omission -- a genuinely `Dependent`
+        // pair silently defaulting to "no conflict". `analyze` must now
+        // refuse instead.
+        use bcinr_mfw_ir::{
+            ActionPair, CausalPlan, DependenceReason, DependenceWitness, IndependenceRelation,
+            StrictPartialOrder,
+        };
+        use std::collections::{BTreeMap, BTreeSet};
+
+        let domain = "(define (domain d) (:predicates (p) (q)) \
+                       (:action a1 :parameters () :precondition () :effect (p)) \
+                       (:action a2 :parameters () :precondition (p) :effect (q)))";
+        let problem = "(define (problem pr) (:domain d) (:init) (:goal (and (p) (q))))";
+        let epoch = epoch_from(domain, problem);
+
+        // `occurrences` only knows about id 0; the dependent pair below
+        // references id 7, which has no slot.
+        let unresolvable_pair = ActionPair::new(ActionOccurrenceId(0), ActionOccurrenceId(7));
+        let mut dependent = BTreeMap::new();
+        dependent.insert(
+            unresolvable_pair,
+            DependenceWitness {
+                reasons: BTreeSet::from([DependenceReason::CausalSupport]),
+            },
+        );
+        let malformed = CausalPlan {
+            epoch: bcinr_mfw_ir::PlanningEpochId(1),
+            occurrences: vec![occ(0, 0)],
+            precedes: StrictPartialOrder::default(),
+            independence: IndependenceRelation {
+                independent: BTreeMap::new(),
+                dependent,
+            },
+            support_edges: BTreeSet::new(),
+            digest: Digest::hash(b"malformed"),
+        };
+
+        let result = PddlConcurrencyAnalyzer.analyze(&epoch, &malformed);
+        assert_eq!(
+            result,
+            Err(ConcurrencyAnalysisError::UnresolvedDependentPair {
+                left: ActionOccurrenceId(0),
+                right: ActionOccurrenceId(7),
+            }),
+            "an unresolvable Dependent pair must be refused, never silently admitted"
+        );
     }
 }
