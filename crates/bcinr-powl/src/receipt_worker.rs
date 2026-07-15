@@ -343,6 +343,16 @@ impl ReceiptWorker {
                 p.topo_tag = kind_tag;
                 p.active = true;
                 p.had_overflow = false;
+                // A freed slot may have been marked `had_inadmissible_tick`
+                // by a previous, unrelated run_id (set at the `guards.admits`
+                // check in `drain`). That flag is per-run execution-integrity
+                // state, not per-slot bookkeeping like `op_trace`/`topo_tag`
+                // above -- leaving it set would let a brand-new run inherit
+                // a stale refusal from whichever run last occupied this slot,
+                // contaminating the very gate this module's doc comment
+                // describes ("digest equality != semantic equivalence").
+                // Must reset on every (re)allocation, not just at `Pending::empty()`.
+                p.had_inadmissible_tick = false;
                 return Ok(i);
             }
         }
@@ -440,6 +450,72 @@ mod tests {
             par.content_hash(),
             "sequential and parallel tapes must have different content hashes"
         );
+    }
+
+    #[test]
+    fn adversarial_stale_had_inadmissible_tick_leaks_across_slot_reuse() {
+        use crate::tape::v2::{CompiledNonFace, ConcurrencyGuardTable};
+        use bcinr_mfw_ir::{Digest, EventSet};
+
+        // Guard table forbids ops {0,1} firing together.
+        let mut forbidden = EventSet::empty();
+        forbidden.insert(0);
+        forbidden.insert(1);
+        let guards = ConcurrencyGuardTable {
+            nonfaces: vec![CompiledNonFace {
+                members: forbidden,
+                witness_digest: Digest([0u8; 32]),
+            }],
+        };
+
+        let ring = make_ring();
+        let full_mask = 0b11u64; // two-op runs
+
+        let mut worker = ReceiptWorker::new();
+
+        // Run A: a single tick fires {0,1} together -- forbidden, refused.
+        // This frees slot 0 (the first slot any run lands in on a fresh
+        // worker) while leaving `had_inadmissible_tick` still set to true
+        // on that slot (find_or_alloc's free-slot branch never resets it).
+        ring.push_t1(EventWorkItem {
+            op_idx: 0,
+            run_id: 1001,
+            op_trace_so_far: 0b11,
+            tick_fired_mask: 0b11,
+            kind_tag: 0,
+        });
+        let r1 = worker.drain(&ring, full_mask, 10, 0, &guards);
+        assert_eq!(r1.refused, 1, "run A must be refused (forbidden pair)");
+        assert_eq!(r1.sealed, 0);
+
+        // Run B: two ticks, {2} then {3} -- neither individually contains
+        // the forbidden {0,1} pair, so both ticks are independently
+        // admissible under `guards`. Run B reuses the now-free slot 0
+        // (find_or_alloc's free-slot scan starts at index 0).
+        ring.push_t1(EventWorkItem {
+            op_idx: 2,
+            run_id: 2002,
+            op_trace_so_far: 0b01,
+            tick_fired_mask: 0b0100, // {2} alone
+            kind_tag: 0,
+        });
+        ring.push_t1(EventWorkItem {
+            op_idx: 3,
+            run_id: 2002,
+            op_trace_so_far: 0b11,
+            tick_fired_mask: 0b1000, // {3} alone
+            kind_tag: 0,
+        });
+
+        let r2 = worker.drain(&ring, full_mask, 10, 0, &guards);
+        assert_eq!(
+            r2.sealed, 1,
+            "run B (never touching forbidden {{0,1}}) must be sealed, not \
+             refused -- got sealed={} refused={} (stale had_inadmissible_tick \
+             leaked from a reused slot)",
+            r2.sealed, r2.refused
+        );
+        assert_eq!(r2.refused, 0);
     }
 
     #[test]
