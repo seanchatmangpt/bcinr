@@ -477,6 +477,52 @@ mod tests {
             .contains(&DependenceReason::DeleteInterference));
     }
 
+    /// Covers `analyze_pair`'s conservative fallback (the
+    /// `if !commute && reasons.is_empty()` branch): an add/delete conflict
+    /// on the *same atom* between two actions with **disjoint, empty
+    /// preconditions**, so neither of the two direct checks
+    /// (`CausalSupport`, `DeleteInterference`) can see a reason — a1 has no
+    /// preconditions and no del_effects, a2 has no preconditions and its
+    /// only del_effect (`p`) is never a precondition of a1's — yet AB and BA
+    /// orderings genuinely produce different final states (`{}` vs `{p}`,
+    /// since `p` starts absent), so `commute` is real and false. Before this
+    /// test, no test in the suite exercised this branch at all: deleting the
+    /// `if !commute && reasons.is_empty() { reasons.insert(...) }` line, or
+    /// inverting its condition, would silently flip this pair to
+    /// `Independent` — violating the load-bearing invariant that
+    /// independence defaults to `Dependent`, never `Independent`, when
+    /// unknown — and nothing would have caught it.
+    #[test]
+    fn add_delete_conflict_without_shared_precondition_falls_back_to_conservative_dependent() {
+        let domain = "(define (domain d) (:predicates (p)) \
+                       (:action a1 :parameters () :precondition () :effect (p)) \
+                       (:action a2 :parameters () :precondition () :effect (not (p))))";
+        let problem = "(define (problem pr) (:domain d) (:init) (:goal (p)))";
+        let epoch = epoch_from(domain, problem);
+        // a1 (adds p) then a2 (deletes p): both preconditions are trivially
+        // satisfied (empty), so replay succeeds regardless of order.
+        let occurrences = vec![occ(0, 0), occ(1, 1)];
+        let analyzer = PddlCausalAnalyzer;
+        let plan = analyzer.analyze(&epoch, &occurrences).unwrap();
+
+        assert!(
+            plan.independence.independent.is_empty(),
+            "must never be marked Independent: neither commute-check nor a \
+             direct reason actually verified independence for this pair"
+        );
+        assert_eq!(plan.independence.dependent.len(), 1);
+        let (_, witness) = plan.independence.dependent.iter().next().unwrap();
+        assert!(
+            !witness.reasons.is_empty(),
+            "the conservative fallback must record a reason, not leave \
+             `reasons` empty — an empty-but-Dependent witness is exactly \
+             the shape a future regression on this branch would produce"
+        );
+        assert!(witness
+            .reasons
+            .contains(&DependenceReason::DeleteInterference));
+    }
+
     #[test]
     fn out_of_range_action_index_is_a_real_error_not_a_panic() {
         let epoch = epoch_from(
