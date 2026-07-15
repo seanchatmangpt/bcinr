@@ -38,6 +38,9 @@ pub use capability::{
     admit_planning_task, AdmittedPlanningTask, CapabilityProfile, DefaultCapabilityProfile,
     GroundedPlanningEpoch, PddlFeature, SemanticSupport, ALL_PDDL_FEATURES,
 };
+pub use capability_router::{
+    route_capability_plan, CapabilityRouteReceipt, CapabilityTask, CostVector, DesiredEffect,
+};
 pub use causal::{CausalAnalysisError, PddlCausalAnalyzer};
 pub use concurrency::{ConcurrencyAnalysisError, PddlConcurrencyAnalyzer};
 pub use consequence::{
@@ -45,25 +48,22 @@ pub use consequence::{
     MakespanObservation, MinimumMakespanHorizon, PlanningResult, ResidualDecision,
     ResidualObligation, Residualizer, StandingConsequenceCache,
 };
-pub use mfw::{
-    q_lens, FrontierBoxes, FrontierMeasure, MassVector, PositiveDistribution, PositiveMass,
-    QLensError, QValue, WeightedDistribution,
-};
-pub use search::{
-    ExactBfsRail, ExactSearchRail, ExactStepOutcome, ExploitSearchRail, ExploitStepOutcome,
-    FairRailScheduler, MfwPortfolio, PortfolioOutcome, QLensRail, RailSelection,
-};
-pub use capability_router::{
-    route_capability_plan, CapabilityRouteReceipt, CapabilityTask, CostVector, DesiredEffect,
-};
 pub use dfcm_crown::{run_dfcm_crown_suite, DfcmBenchReceipt};
 pub use llm_bridge::{
     admit_candidate_domain, admit_candidate_problem, manufacture_world, AdmittedDomain,
     AdmittedProblem, WorldManufactureReceipt,
 };
+pub use mfw::{
+    q_lens, FrontierBoxes, FrontierMeasure, MassVector, PositiveDistribution, PositiveMass,
+    QLensError, QValue, WeightedDistribution,
+};
 pub use schedule_analysis::{
     analyze_schedule, analyze_schedule_instrumented, AnalysisSubstageNs, CapacityDelta,
     ScheduleAnalysis64,
+};
+pub use search::{
+    ExactBfsRail, ExactSearchRail, ExactStepOutcome, ExploitSearchRail, ExploitStepOutcome,
+    FairRailScheduler, MfwPortfolio, PortfolioOutcome, QLensRail, RailSelection,
 };
 
 // Re-export canonical types from wasm4pm-compat so callers only need one import.

@@ -68,14 +68,17 @@ use bcinr_mfw_ir::{
 };
 use bcinr_pddl::capability::GroundedPlanningEpoch;
 use bcinr_pddl::{
-    domain_from_pddl, problem_from_pddl, GroundProblem, PddlCausalAnalyzer,
-    PddlConcurrencyAnalyzer,
+    domain_from_pddl, problem_from_pddl, GroundProblem, PddlCausalAnalyzer, PddlConcurrencyAnalyzer,
 };
 use bcinr_powl::compiler::v2::compile_powl_v2;
 use bcinr_powl::compiler::{compile_powl, PowlAstNode};
-use bcinr_powl::scheduler::{scheduler_tick, scheduler_tick_guarded, PowlRunState, StableMaximalSelector};
+use bcinr_powl::scheduler::{
+    scheduler_tick, scheduler_tick_guarded, PowlRunState, StableMaximalSelector,
+};
 use bcinr_powl::tape::v2::{CompiledNonFace, ConcurrencyGuardTable};
-use bcinr_powl_receipt::execution::{digest_legacy_tape, seal_execution_receipt, tick_and_seal_execution_receipt};
+use bcinr_powl_receipt::execution::{
+    digest_legacy_tape, seal_execution_receipt, tick_and_seal_execution_receipt,
+};
 
 // ---------------------------------------------------------------------------
 // Shared fixture helpers
@@ -94,8 +97,11 @@ fn epoch_from(domain_pddl: &str, problem_pddl: &str) -> GroundedPlanningEpoch {
     let domain = domain_from_pddl(domain_pddl).unwrap();
     let problem = problem_from_pddl(problem_pddl).unwrap();
     let gp = GroundProblem::build(&domain, &problem, None).unwrap();
-    let mut epoch =
-        GroundedPlanningEpoch::from_ground_problem(&gp, Digest::hash(b"capacity2-fixture"), bounds());
+    let mut epoch = GroundedPlanningEpoch::from_ground_problem(
+        &gp,
+        Digest::hash(b"capacity2-fixture"),
+        bounds(),
+    );
     epoch.id = PlanningEpochId(7);
     epoch
 }
@@ -254,7 +260,8 @@ fn link2_precedes_is_the_full_input_vector_order_even_though_every_pair_is_indep
 // ---------------------------------------------------------------------------
 
 #[test]
-fn link3a_real_pddl_pipeline_cannot_produce_a_three_way_nonface_from_pairwise_independent_actions() {
+fn link3a_real_pddl_pipeline_cannot_produce_a_three_way_nonface_from_pairwise_independent_actions()
+{
     // BLOCKED (empirically confirmed, not just asserted from the doc
     // comment): PddlConcurrencyAnalyzer only ever emits one 2-element
     // MinimalNonFace per Dependent pair (bcinr-pddl/src/concurrency.rs,
@@ -264,7 +271,9 @@ fn link3a_real_pddl_pipeline_cannot_produce_a_three_way_nonface_from_pairwise_in
     // Pddl8GroundAction does not carry.
     let epoch = epoch_from(DISJOINT_DOMAIN, DISJOINT_PROBLEM);
     let causal_plan = real_causal_plan_for_abc();
-    let complex = PddlConcurrencyAnalyzer.analyze(&epoch, &causal_plan).unwrap();
+    let complex = PddlConcurrencyAnalyzer
+        .analyze(&epoch, &causal_plan)
+        .unwrap();
     assert!(
         complex.minimal_nonfaces.is_empty(),
         "BLOCKED: the real analyzer cannot derive a capacity-only 3-way nonface \
@@ -280,7 +289,8 @@ fn link3a_real_pddl_pipeline_cannot_produce_a_three_way_nonface_from_pairwise_in
 }
 
 #[test]
-fn link3b_hand_built_capacity2_complex_admits_every_pair_and_rejects_the_triple_by_event_membership() {
+fn link3b_hand_built_capacity2_complex_admits_every_pair_and_rejects_the_triple_by_event_membership(
+) {
     let complex = hand_built_capacity2_complex([100, 101, 102]);
 
     let a = EventSet::empty().with(0);
@@ -291,10 +301,20 @@ fn link3b_hand_built_capacity2_complex_admits_every_pair_and_rejects_the_triple_
     let bc = b.union(&c);
     let abc = ab.union(&c);
 
-    for (name, candidate) in [("A", a), ("B", b), ("C", c), ("AB", ab), ("AC", ac), ("BC", bc)] {
+    for (name, candidate) in [
+        ("A", a),
+        ("B", b),
+        ("C", c),
+        ("AB", ab),
+        ("AC", ac),
+        ("BC", bc),
+    ] {
         assert!(complex.admits(&candidate), "{name} must be admitted");
     }
-    assert!(!complex.admits(&abc), "the full triple must not be admitted");
+    assert!(
+        !complex.admits(&abc),
+        "the full triple must not be admitted"
+    );
 
     // "by event membership, not incidental digest match": walk the actual
     // MinimalNonFace's member bit-positions and confirm they are exactly
@@ -344,8 +364,10 @@ fn link4_real_projector_preserves_the_capacity2_nonface_into_the_powl_model() {
     // action_node_bijection.node_to_action) to exactly the source
     // ActionOccurrenceIds {0,1,2}, not merely "some 3-element set".
     assert_eq!(model.concurrency.minimal_nonfaces.len(), 1);
-    let projected_members: Vec<usize> =
-        model.concurrency.minimal_nonfaces[0].members.iter_stable().collect();
+    let projected_members: Vec<usize> = model.concurrency.minimal_nonfaces[0]
+        .members
+        .iter_stable()
+        .collect();
     let mapped_back: Vec<u32> = projected_members
         .iter()
         .map(|&slot| {
@@ -503,7 +525,11 @@ fn link6_real_scheduler_never_fires_the_triple_when_the_ready_set_is_the_triple(
          never all three -- got fired mask {:#05b}",
         fired.0
     );
-    assert_ne!(fired.0 & 0b111, 0b111, "the triple must never fire together");
+    assert_ne!(
+        fired.0 & 0b111,
+        0b111,
+        "the triple must never fire together"
+    );
     assert!(
         fired.0 == 0b011 || fired.0 == 0b101 || fired.0 == 0b110,
         "fired must be exactly one of the three legal pairs, got {:#05b}",

@@ -262,7 +262,10 @@ fn requirement_implies(req: &str, feature: PddlFeature) -> bool {
         ),
         "ConditionalEffects" => feature == PddlFeature::ConditionalEffects,
         "Fluents" | "NumericFluents" => {
-            matches!(feature, PddlFeature::NumericFluents | PddlFeature::NumericEffects)
+            matches!(
+                feature,
+                PddlFeature::NumericFluents | PddlFeature::NumericEffects
+            )
         }
         "Adl" => matches!(
             feature,
@@ -323,7 +326,9 @@ pub fn admit_planning_task(
             digest: Digest::ZERO,
         });
     }
-    if domain.predicates.is_empty() && domain.actions.is_empty() && domain.durative_actions.is_empty()
+    if domain.predicates.is_empty()
+        && domain.actions.is_empty()
+        && domain.durative_actions.is_empty()
     {
         return PlannerOutcome::Inconsistent(InconsistencyWitness {
             kind_name: "empty-domain-structure".to_string(),
@@ -444,7 +449,11 @@ impl GroundedPlanningEpoch {
     /// exactly the property `crate::cache::StandingConsequenceCache` needs
     /// for a cache-hit to mean "the same planning epoch, not just a
     /// coincidentally-equal state."
-    pub fn from_ground_problem(gp: &GroundProblem, theory_digest: Digest, bounds: EpochBounds) -> Self {
+    pub fn from_ground_problem(
+        gp: &GroundProblem,
+        theory_digest: Digest,
+        bounds: EpochBounds,
+    ) -> Self {
         let mut id_bytes = [0u8; 16];
         id_bytes.copy_from_slice(&theory_digest.as_bytes()[..16]);
         Self {
@@ -465,8 +474,7 @@ mod tests {
 
     const STRIPS_DOMAIN: &str = "(define (domain d) (:requirements :strips) (:predicates (p)) \
                                   (:action a :parameters () :precondition (p) :effect (not (p))))";
-    const STRIPS_PROBLEM: &str =
-        "(define (problem pr) (:domain d) (:init (p)) (:goal (not (p))))";
+    const STRIPS_PROBLEM: &str = "(define (problem pr) (:domain d) (:init (p)) (:goal (not (p))))";
 
     #[test]
     fn strips_domain_is_admitted_under_default_profile() {
@@ -501,7 +509,9 @@ mod tests {
         let problem = problem31_from_pddl(STRIPS_PROBLEM).unwrap();
         let outcome = admit_planning_task(&domain, &problem, &DefaultCapabilityProfile);
         match outcome {
-            PlannerOutcome::Unsupported(u) => assert_eq!(u.feature_name, "ExistentialPreconditions"),
+            PlannerOutcome::Unsupported(u) => {
+                assert_eq!(u.feature_name, "ExistentialPreconditions")
+            }
             other => panic!("expected Unsupported(ExistentialPreconditions), got {other:?}"),
         }
     }
@@ -567,7 +577,9 @@ mod tests {
                 match feature {
                     // Downgrade Approximate -> Unsupported for everything;
                     // otherwise defer to the default.
-                    _ if DefaultCapabilityProfile.support(feature) == SemanticSupport::Approximate => {
+                    _ if DefaultCapabilityProfile.support(feature)
+                        == SemanticSupport::Approximate =>
+                    {
                         SemanticSupport::Unsupported
                     }
                     other => DefaultCapabilityProfile.support(other),
@@ -597,7 +609,8 @@ mod tests {
             max_search_steps: 1_000,
             max_partition_boxes: 8,
         };
-        let epoch = GroundedPlanningEpoch::from_ground_problem(&gp, Digest::hash(b"theory"), bounds);
+        let epoch =
+            GroundedPlanningEpoch::from_ground_problem(&gp, Digest::hash(b"theory"), bounds);
         assert_eq!(epoch.actions.len(), gp.actions.len());
         assert_eq!(epoch.initial_state, gp.initial_state);
     }

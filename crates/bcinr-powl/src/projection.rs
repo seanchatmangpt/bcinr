@@ -106,7 +106,10 @@ impl fmt::Display for PreservationError {
                 write!(f, "order edge references unmapped action {a:?}")
             }
             PreservationError::DroppedOrderEdge(e) => {
-                write!(f, "source precedence edge {e:?} missing from projected order")
+                write!(
+                    f,
+                    "source precedence edge {e:?} missing from projected order"
+                )
             }
             PreservationError::InventedOrderEdge(e) => {
                 write!(f, "projected order contains edge {e:?} absent from source")
@@ -115,10 +118,16 @@ impl fmt::Display for PreservationError {
                 write!(f, "concurrency nonface references unmapped slot {slot}")
             }
             PreservationError::DroppedNonFace(m) => {
-                write!(f, "source minimal nonface {m:?} missing from projected concurrency")
+                write!(
+                    f,
+                    "source minimal nonface {m:?} missing from projected concurrency"
+                )
             }
             PreservationError::InventedNonFace(m) => {
-                write!(f, "projected concurrency contains nonface {m:?} absent from source")
+                write!(
+                    f,
+                    "projected concurrency contains nonface {m:?} absent from source"
+                )
             }
         }
     }
@@ -467,10 +476,7 @@ mod tests {
         assert_eq!(witness.action_node_bijection.node_to_action.len(), 3);
         for occ in &causal.occurrences {
             let node = witness.action_node_bijection.action_to_node[&occ.id];
-            assert_eq!(
-                witness.action_node_bijection.node_to_action[&node],
-                occ.id
-            );
+            assert_eq!(witness.action_node_bijection.node_to_action[&node], occ.id);
         }
     }
 
@@ -519,8 +525,7 @@ mod tests {
         // Deliberately drop the only order edge from the projected model.
         model.order.edges.clear();
 
-        let result =
-            verify_order_preservation(&causal, &model, &witness.action_node_bijection);
+        let result = verify_order_preservation(&causal, &model, &witness.action_node_bijection);
         assert_eq!(
             result,
             Err(PreservationError::DroppedOrderEdge(PrecedenceEdge {
@@ -543,8 +548,7 @@ mod tests {
         };
         model.order.edges.insert(invented);
 
-        let result =
-            verify_order_preservation(&causal, &model, &witness.action_node_bijection);
+        let result = verify_order_preservation(&causal, &model, &witness.action_node_bijection);
         assert_eq!(result, Err(PreservationError::InventedOrderEdge(invented)));
     }
 
@@ -562,7 +566,10 @@ mod tests {
             &model.concurrency,
             &witness.action_node_bijection,
         );
-        assert_eq!(result, Err(PreservationError::DroppedNonFace(vec![0, 1, 2])));
+        assert_eq!(
+            result,
+            Err(PreservationError::DroppedNonFace(vec![0, 1, 2]))
+        );
     }
 
     #[test]

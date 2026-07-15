@@ -50,7 +50,6 @@ use bcinr_mfw_ir::{Digest, ExhaustionWitness, PlannerOutcome, SearchProfileId};
 /// profile registry in `crate::search`.
 const INDEXED_BFS_SEARCH_PROFILE: SearchProfileId = SearchProfileId(1);
 
-
 /// Counters describing how much the indexed grounder saved over naive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct GroundStats {
@@ -305,7 +304,8 @@ impl IndexedGroundProblem {
                 actions.push(ga);
                 if actions.len() > limit {
                     return Err(crate::error::Pddl8Error::BoundExceeded {
-                        what: "ground actions", limit: limit as u8,
+                        what: "ground actions",
+                        limit: limit as u8,
                         got: actions.len(),
                     });
                 }

@@ -1,18 +1,20 @@
 mod dict;
 mod facts;
-mod xorf;
 pub mod lazy;
+mod xorf;
 
 // PDDL8 grounding and forward-search plan finding.
 
 use crate::error::Pddl8Error;
-use bcinr_mfw_ir::{BoundHit, BoundKind, Digest, ExhaustionWitness, PlannerOutcome, SearchProfileId};
+use bcinr_mfw_ir::{
+    BoundHit, BoundKind, Digest, ExhaustionWitness, PlannerOutcome, SearchProfileId,
+};
 use std::collections::{BTreeSet, HashMap};
 use wasm4pm_compat::pddl::{
-    CompareOp, DurationConstraint, DurativeAction, NumericExpr, Pddl8ActionSchema, Pddl8Atom,
-    Pddl8Domain, Pddl8GroundAction, Pddl8GroundAtom, Pddl8Problem, Pddl8Tape, PddlCondition,
-    PddlEffect, PddlFunction, TemporalPlan, TemporalPlanStep, TimedLiteral, DerivedPredicate, PDDL8_MAX_GROUND,
-    PDDL8_MAX_PLAN_DEPTH,
+    CompareOp, DerivedPredicate, DurationConstraint, DurativeAction, NumericExpr,
+    Pddl8ActionSchema, Pddl8Atom, Pddl8Domain, Pddl8GroundAction, Pddl8GroundAtom, Pddl8Problem,
+    Pddl8Tape, PddlCondition, PddlEffect, PddlFunction, TemporalPlan, TemporalPlanStep,
+    TimedLiteral, PDDL8_MAX_GROUND, PDDL8_MAX_PLAN_DEPTH,
 };
 
 /// `SearchProfileId` for the plain, un-portfolio'd whole-run BFS/greedy
@@ -176,7 +178,7 @@ impl GroundProblem {
                     what: "ground actions",
                     limit: limit as u8,
                     got: actions.len(),
-                })
+                });
             }
         }
 
@@ -195,11 +197,12 @@ impl GroundProblem {
             }
         }
 
-                let mut constraints = Vec::new();
+        let mut constraints = Vec::new();
         for pref in &problem.preferences {
             if let wasm4pm_compat::pddl::TrajectoryConstraint::Always(c) = &pref.constraint {
                 constraints.push(*c.clone());
-            } else if let wasm4pm_compat::pddl::TrajectoryConstraint::And(parts) = &pref.constraint {
+            } else if let wasm4pm_compat::pddl::TrajectoryConstraint::And(parts) = &pref.constraint
+            {
                 for p in parts {
                     if let wasm4pm_compat::pddl::TrajectoryConstraint::Always(c) = p {
                         constraints.push(*c.clone());
@@ -209,7 +212,12 @@ impl GroundProblem {
         }
         let mut derived_predicates = Vec::new();
         for dp in &domain.derived {
-            ground_derived_schema(dp, &problem.object_types, &type_index, &mut derived_predicates)?;
+            ground_derived_schema(
+                dp,
+                &problem.object_types,
+                &type_index,
+                &mut derived_predicates,
+            )?;
         }
 
         let quant_domain = QuantifierDomain {
@@ -410,7 +418,7 @@ impl GroundTemporalProblem {
                     what: "ground actions",
                     limit: PDDL8_MAX_GROUND as u8,
                     got: actions.len(),
-                })
+                });
             }
         }
 
@@ -426,15 +434,16 @@ impl GroundTemporalProblem {
                     what: "ground durative actions",
                     limit: PDDL8_MAX_GROUND as u8,
                     got: durative_actions.len(),
-                })
+                });
             }
         }
 
-                let mut constraints = Vec::new();
+        let mut constraints = Vec::new();
         for pref in &problem.preferences {
             if let wasm4pm_compat::pddl::TrajectoryConstraint::Always(c) = &pref.constraint {
                 constraints.push(*c.clone());
-            } else if let wasm4pm_compat::pddl::TrajectoryConstraint::And(parts) = &pref.constraint {
+            } else if let wasm4pm_compat::pddl::TrajectoryConstraint::And(parts) = &pref.constraint
+            {
                 for p in parts {
                     if let wasm4pm_compat::pddl::TrajectoryConstraint::Always(c) = p {
                         constraints.push(*c.clone());
@@ -444,7 +453,12 @@ impl GroundTemporalProblem {
         }
         let mut derived_predicates = Vec::new();
         for dp in &domain.derived {
-            ground_derived_schema(dp, &problem.object_types, &type_index, &mut derived_predicates)?;
+            ground_derived_schema(
+                dp,
+                &problem.object_types,
+                &type_index,
+                &mut derived_predicates,
+            )?;
         }
 
         let quant_domain = QuantifierDomain {
@@ -556,7 +570,7 @@ impl GroundTemporalProblem {
                     steps,
                     makespan,
                     metric_value: None,
-                })
+                });
             }
 
             // Try to schedule every applicable durative action at this tick.
@@ -623,7 +637,8 @@ impl GroundTemporalProblem {
                 .min_by(|(_, a), (_, b)| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
                 .map(|(p, (t, _))| (p, *t));
 
-            let next_til_time = self.timed_inits
+            let next_til_time = self
+                .timed_inits
                 .iter()
                 .map(|til| til.time)
                 .filter(|&t| t > current_time)
@@ -689,7 +704,7 @@ impl GroundTemporalProblem {
                 steps,
                 makespan,
                 metric_value: None,
-            })
+            });
         }
 
         let goal_labels = vec![format!("{:?}", self.goal)];
@@ -698,7 +713,10 @@ impl GroundTemporalProblem {
                 search_profile: LEGACY_WHOLE_RUN_SEARCH_PROFILE,
                 explored_states: steps.len() as u64,
                 frontier_empty: true,
-                digest: search_digest(&goal_labels, self.actions.len() + self.durative_actions.len()),
+                digest: search_digest(
+                    &goal_labels,
+                    self.actions.len() + self.durative_actions.len(),
+                ),
             })
         } else {
             // The loop ran through every iteration of the `PDDL8_MAX_PLAN_DEPTH`
@@ -1403,7 +1421,7 @@ fn ground_derived_schema(
             vars.push((arg.clone(), "object".to_string()));
         }
     }
-    
+
     fn ground_atom(a: &Pddl8Atom, binding: &HashMap<String, String>) -> Option<Pddl8GroundAtom> {
         let mut args = Vec::with_capacity(a.args.len());
         for arg in &a.args {
@@ -1419,7 +1437,10 @@ fn ground_derived_schema(
         })
     }
 
-    fn ground_condition(c: &PddlCondition, binding: &HashMap<String, String>) -> Option<PddlCondition> {
+    fn ground_condition(
+        c: &PddlCondition,
+        binding: &HashMap<String, String>,
+    ) -> Option<PddlCondition> {
         match c {
             PddlCondition::Atom(a) => {
                 let ga = ground_atom(a, binding)?;
@@ -1435,7 +1456,9 @@ fn ground_derived_schema(
                 }
                 Some(PddlCondition::And(ground_parts))
             }
-            PddlCondition::Not(inner) => Some(PddlCondition::Not(Box::new(ground_condition(inner, binding)?))),
+            PddlCondition::Not(inner) => Some(PddlCondition::Not(Box::new(ground_condition(
+                inner, binding,
+            )?))),
             PddlCondition::Or(parts) => {
                 let mut ground_parts = Vec::new();
                 for p in parts {
@@ -1450,7 +1473,10 @@ fn ground_derived_schema(
             PddlCondition::Compare(lhs, cmp, rhs) => {
                 Some(PddlCondition::Compare(lhs.clone(), *cmp, rhs.clone()))
             }
-            PddlCondition::Timed(ts, c) => Some(PddlCondition::Timed(*ts, Box::new(ground_condition(c, binding)?))),
+            PddlCondition::Timed(ts, c) => Some(PddlCondition::Timed(
+                *ts,
+                Box::new(ground_condition(c, binding)?),
+            )),
             _ => None,
         }
     }
@@ -1485,7 +1511,7 @@ fn ground_derived_schema(
         }
         Ok(())
     }
-    
+
     recurse(0, &mut HashMap::new(), dp, objects, type_index, out, &vars)
 }
 /// Compute the least fixpoint of `derived` over `state` (a derived predicate
@@ -1505,7 +1531,9 @@ pub(crate) fn compute_derived_closure(
     while changed {
         changed = false;
         for dp in derived {
-            if !state.contains(&dp.head) && eval_condition(&dp.condition, state, fn_vals, quant_domain) {
+            if !state.contains(&dp.head)
+                && eval_condition(&dp.condition, state, fn_vals, quant_domain)
+            {
                 state.insert(dp.head.clone());
                 changed = true;
             }
@@ -1668,7 +1696,12 @@ mod quantifier_tests {
             vars: vec![("?i".to_string(), "object".to_string())],
             body: Box::new(exists_j),
         };
-        assert!(eval_condition(&forall_i_exists_j, &state, &HashMap::new(), &qd));
+        assert!(eval_condition(
+            &forall_i_exists_j,
+            &state,
+            &HashMap::new(),
+            &qd
+        ));
 
         // Break the ring (only a->b, no b->a): now ?i=b has no matching ?j.
         let broken_state: BTreeSet<Pddl8GroundAtom> = [("a", "b")]

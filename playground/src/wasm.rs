@@ -254,7 +254,10 @@ pub unsafe extern "C" fn wasm_powl_execute_step(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{powl::Powl64OpKind, yawl::{JoinType, SplitType}};
+    use crate::{
+        powl::Powl64OpKind,
+        yawl::{JoinType, SplitType},
+    };
 
     #[test]
     fn test_wasm_petri_replay_success() {

@@ -60,7 +60,9 @@ use wasm4pm_compat::pddl::{Pddl8GroundAction, Pddl8Tape};
 use bcinr_powl_receipt::planning::{
     seal_planning_receipt, ComputeEvidence, PlannerOutcomeTag, PlanningReceipt,
 };
-use bcinr_powl_receipt::projection::{digest_powl_model, seal_projection_receipt, ProjectionReceipt};
+use bcinr_powl_receipt::projection::{
+    digest_powl_model, seal_projection_receipt, ProjectionReceipt,
+};
 
 use crate::capability::{
     admit_planning_task, AdmittedPlanningTask, CapabilityProfile, GroundedPlanningEpoch,
@@ -69,7 +71,7 @@ use crate::capability::{
 use crate::causal::{CausalAnalysisError, PddlCausalAnalyzer};
 use crate::concurrency::{ConcurrencyAnalysisError, PddlConcurrencyAnalyzer};
 use crate::consequence::{
-    ConsequenceHorizon, GoalReachabilityHorizon, PlanningResult, Residualizer, ResidualDecision,
+    ConsequenceHorizon, GoalReachabilityHorizon, PlanningResult, ResidualDecision, Residualizer,
     StandingConsequenceCache,
 };
 use crate::error::Pddl8Error;
@@ -127,7 +129,10 @@ impl std::fmt::Display for MfwPlanError {
             Self::Admission(w) => write!(f, "admission refused: {w}"),
             Self::Grounding(e) => write!(f, "grounding failed: {e}"),
             Self::CachedUnreachable => {
-                write!(f, "standing cache already proved this state/theory unreachable")
+                write!(
+                    f,
+                    "standing cache already proved this state/theory unreachable"
+                )
             }
             Self::PortfolioExhausted(_) => write!(f, "portfolio exhausted: no plan exists"),
             Self::PortfolioBounded(_) => write!(f, "portfolio hit a structural bound"),
@@ -265,7 +270,10 @@ impl<CA, CO, PJ> MfwPlanner<GoalReachabilityHorizon, CA, CO, PJ>
 where
     CA: CausalAnalyzer<Epoch = GroundedPlanningEpoch, Error = CausalAnalysisError>,
     CO: ConcurrencyAnalyzer<Epoch = GroundedPlanningEpoch, Error = ConcurrencyAnalysisError>,
-    PJ: PowlProjectorTrait<Model = bcinr_powl::model::PowlModel, Error = bcinr_powl::projection::ProjectionError>,
+    PJ: PowlProjectorTrait<
+        Model = bcinr_powl::model::PowlModel,
+        Error = bcinr_powl::projection::ProjectionError,
+    >,
 {
     /// Run the complete admission -> grounding -> cache -> residualize ->
     /// measure -> portfolio -> validate -> causal -> concurrency -> project
@@ -297,8 +305,10 @@ where
         let capability_digest = capability_digest(profile);
 
         // --- Grounding ---
-        let gp = GroundProblem::build(&domain8, &problem8, None).map_err(MfwPlanError::Grounding)?;
-        let mut epoch = GroundedPlanningEpoch::from_ground_problem(&gp, admitted.theory_digest, self.bounds);
+        let gp =
+            GroundProblem::build(&domain8, &problem8, None).map_err(MfwPlanError::Grounding)?;
+        let mut epoch =
+            GroundedPlanningEpoch::from_ground_problem(&gp, admitted.theory_digest, self.bounds);
         // `from_ground_problem` derives `id` from `theory_digest`'s first 16
         // bytes (see `capability.rs`'s doc comment) — already deterministic,
         // no further action needed, but bind the variable name for clarity
@@ -393,7 +403,9 @@ where
             .concat(),
         );
         let residual_evidence = residual_digest(&residual);
-        let frontier_evidence = frontier_mass.map(|m| Digest::hash(&m.get().to_le_bytes())).unwrap_or(Digest::ZERO);
+        let frontier_evidence = frontier_mass
+            .map(|m| Digest::hash(&m.get().to_le_bytes()))
+            .unwrap_or(Digest::ZERO);
         let portfolio_evidence = Digest::hash(
             &tape
                 .ops
@@ -456,7 +468,9 @@ where
 /// Deterministic digest of a ground-atom state set — same construction
 /// `crate::consequence`'s own tests use (label bytes, `0`-terminated, in
 /// `BTreeSet` iteration order, which is already deterministic).
-fn state_digest(state: &std::collections::BTreeSet<wasm4pm_compat::pddl::Pddl8GroundAtom>) -> Digest {
+fn state_digest(
+    state: &std::collections::BTreeSet<wasm4pm_compat::pddl::Pddl8GroundAtom>,
+) -> Digest {
     let mut buf = Vec::new();
     for atom in state {
         buf.extend_from_slice(atom.label().as_bytes());
@@ -552,12 +566,12 @@ fn occurrences_from_tape(
     tape.ops
         .iter()
         .filter_map(|op| {
-            index_by_label
-                .get(op.action.label.as_str())
-                .map(|&action| bcinr_mfw_ir::ActionOccurrence {
+            index_by_label.get(op.action.label.as_str()).map(|&action| {
+                bcinr_mfw_ir::ActionOccurrence {
                     id: bcinr_mfw_ir::ActionOccurrenceId(op.index as u32),
                     action,
-                })
+                }
+            })
         })
         .collect()
 }
@@ -576,8 +590,7 @@ mod tests {
                            (:predicates (p) (q) (r)) \
                            (:action a1 :parameters () :precondition (p) :effect (q)) \
                            (:action a2 :parameters () :precondition (q) :effect (r)))";
-    const PROBLEM: &str =
-        "(define (problem pr) (:domain d) (:init (p)) (:goal (r)))";
+    const PROBLEM: &str = "(define (problem pr) (:domain d) (:init (p)) (:goal (r)))";
 
     fn bounds() -> EpochBounds {
         EpochBounds {
@@ -623,7 +636,10 @@ mod tests {
         let mut planner2 = new_planner();
         let workflow2 = planner2.plan(DOMAIN, PROBLEM, &profile).unwrap();
 
-        assert_eq!(workflow1.planning_receipt.hash, workflow2.planning_receipt.hash);
+        assert_eq!(
+            workflow1.planning_receipt.hash,
+            workflow2.planning_receipt.hash
+        );
         assert_eq!(
             workflow1.projection_receipt.hash,
             workflow2.projection_receipt.hash
@@ -643,7 +659,10 @@ mod tests {
         // — only the *planning receipt's* `cache_evidence` digest differs,
         // because it genuinely folds in whether this call was a cache hit.
         assert_eq!(first.causal_plan.digest, second.causal_plan.digest);
-        assert_eq!(first.projection_receipt.hash, second.projection_receipt.hash);
+        assert_eq!(
+            first.projection_receipt.hash,
+            second.projection_receipt.hash
+        );
         assert_ne!(first.planning_receipt.hash, second.planning_receipt.hash);
     }
 }

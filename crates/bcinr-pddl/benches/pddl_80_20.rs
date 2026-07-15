@@ -1,6 +1,6 @@
 use bcinr_pddl::{
-    domain_from_pddl, problem_from_pddl, powl_bridge::temporal_plan_to_powl_tape,
-    GroundProblem, GroundTemporalProblem,
+    domain_from_pddl, powl_bridge::temporal_plan_to_powl_tape, problem_from_pddl, GroundProblem,
+    GroundTemporalProblem,
 };
 use std::time::Instant;
 
@@ -8,11 +8,7 @@ fn main() {
     divan::main();
 }
 
-fn measure_and_prove_times(
-    domain_pddl: &str,
-    problem_pddl: &str,
-    is_temporal: bool,
-) {
+fn measure_and_prove_times(domain_pddl: &str, problem_pddl: &str, is_temporal: bool) {
     let t0 = Instant::now();
     let domain = domain_from_pddl(domain_pddl).unwrap();
     let problem = problem_from_pddl(problem_pddl).unwrap();
@@ -28,7 +24,9 @@ fn measure_and_prove_times(
 
         let t2 = Instant::now();
         let plan_res = gp.find_temporal_plan().into_result();
-        if plan_res.is_err() { return; }
+        if plan_res.is_err() {
+            return;
+        }
         let plan = plan_res.unwrap();
         t_solve = t2.elapsed();
 
@@ -41,7 +39,9 @@ fn measure_and_prove_times(
 
         let t2 = Instant::now();
         let plan_res = gp.find_plan().into_result();
-        if plan_res.is_err() { return; }
+        if plan_res.is_err() {
+            return;
+        }
         let plan = plan_res.unwrap();
         t_solve = t2.elapsed();
 
@@ -58,19 +58,24 @@ fn measure_and_prove_times(
     };
 
     let t_total = t0.elapsed();
-    
+
     // Prove T_total >= T_IR + T_ground + T_solve + T_POWL
     let sum = t_ir + t_ground + t_solve + t_powl;
     assert!(t_total >= sum);
-    
-    println!("IR: {}us, Ground: {}us, Solve: {}us, POWL: {}us", 
-        t_ir.as_micros(), t_ground.as_micros(), t_solve.as_micros(), t_powl.as_micros());
+
+    println!(
+        "IR: {}us, Ground: {}us, Solve: {}us, POWL: {}us",
+        t_ir.as_micros(),
+        t_ground.as_micros(),
+        t_solve.as_micros(),
+        t_powl.as_micros()
+    );
 }
 
 pub mod ingress {
     use super::*;
     use divan::Bencher;
-    
+
     const DOMAIN: &str = "(define (domain ingress) (:requirements :strips) (:predicates (p)))";
     const PROBLEM: &str = "(define (problem p) (:domain ingress) (:init (p)) (:goal (p)))";
 
@@ -88,14 +93,17 @@ pub mod ingress {
             let domain_text = domain_from_pddl(DOMAIN).unwrap();
 
             let domain_direct = domain_text.clone();
-            
+
             let text_json = serde_json::to_vec(&domain_text).unwrap();
             let direct_json = serde_json::to_vec(&domain_direct).unwrap();
-            
+
             let digest_text = blake3::hash(&text_json);
             let digest_direct = blake3::hash(&direct_json);
-            
-            assert_eq!(digest_text, digest_direct, "digest(IR_text) == digest(IR_direct)");
+
+            assert_eq!(
+                digest_text, digest_direct,
+                "digest(IR_text) == digest(IR_direct)"
+            );
         });
     }
 }
@@ -103,7 +111,7 @@ pub mod ingress {
 pub mod classical {
     use super::*;
     use divan::Bencher;
-    
+
     const DOMAIN: &str = "(define (domain todo-dependencies) (:requirements :strips) (:predicates (todo-done ?x) (todo-ready ?x)) (:action complete :parameters (?x) :precondition (todo-ready ?x) :effect (and (todo-done ?x) (not (todo-ready ?x)))))";
     const PROBLEM: &str = "(define (problem complete-task) (:domain todo-dependencies) (:objects task1) (:init (todo-ready task1)) (:goal (todo-done task1)))";
 
@@ -118,7 +126,7 @@ pub mod classical {
 pub mod temporal {
     use super::*;
     use divan::Bencher;
-    
+
     const DOMAIN: &str = "(define (domain deploy-independent-services) (:requirements :durative-actions :typing) (:types service) (:predicates (deployed ?s - service)) (:durative-action deploy :parameters (?s - service) :duration (= ?duration 10) :condition () :effect (and (at end (deployed ?s)))))";
     const PROBLEM: &str = "(define (problem deploy-2) (:domain deploy-independent-services) (:objects s1 s2 - service) (:init) (:goal (and (deployed s1) (deployed s2))))";
 
@@ -133,7 +141,7 @@ pub mod temporal {
 pub mod numeric {
     use super::*;
     use divan::Bencher;
-    
+
     const DOMAIN: &str = "(define (domain budgeted-migration) (:requirements :numeric-fluents :typing :durative-actions) (:types db) (:predicates (migrated ?d - db)) (:functions (budget)) (:durative-action migrate :parameters (?d - db) :duration (= ?duration 5) :condition (at start (>= (budget) 10)) :effect (and (at start (decrease (budget) 10)) (at end (migrated ?d)))))";
     const PROBLEM: &str = "(define (problem m1) (:domain budgeted-migration) (:objects db1 - db) (:init (= (budget) 50)) (:goal (migrated db1)))";
 
@@ -148,11 +156,12 @@ pub mod numeric {
 pub mod derived {
     use super::*;
     use divan::Bencher;
-    
+
     // Note: derived predicates might be in PDDL 3.1 but bcinr-pddl might not plan over them natively.
     // If it fails, I'll adjust the PDDL string.
     const DOMAIN: &str = "(define (domain derived-readiness) (:requirements :derived-predicates) (:predicates (has-a) (has-b) (ready)) (:derived (ready) (and (has-a) (has-b))) (:action get-a :parameters () :precondition () :effect (has-a)) (:action get-b :parameters () :precondition () :effect (has-b)))";
-    const PROBLEM: &str = "(define (problem d1) (:domain derived-readiness) (:init) (:goal (ready)))";
+    const PROBLEM: &str =
+        "(define (problem d1) (:domain derived-readiness) (:init) (:goal (ready)))";
 
     #[divan::bench]
     fn derived_readiness(bencher: Bencher) {
@@ -166,7 +175,7 @@ pub mod derived {
 pub mod til {
     use super::*;
     use divan::Bencher;
-    
+
     const DOMAIN: &str = "(define (domain maintenance-windows) (:requirements :timed-initial-literals :durative-actions) (:predicates (window-open) (done)) (:durative-action do-work :parameters () :duration (= ?duration 5) :condition (over all (window-open)) :effect (at end (done))))";
     const PROBLEM: &str = "(define (problem t1) (:domain maintenance-windows) (:init (at 10 (window-open)) (at 20 (not (window-open)))) (:goal (done)))";
 
@@ -181,7 +190,7 @@ pub mod til {
 pub mod constraints {
     use super::*;
     use divan::Bencher;
-    
+
     const DOMAIN: &str = "(define (domain compliant-rollout) (:requirements :constraints) (:predicates (p) (q)) (:action do-p :parameters () :precondition () :effect (p)) (:action do-q :parameters () :precondition (p) :effect (q)))";
     const PROBLEM: &str = "(define (problem c1) (:domain compliant-rollout) (:init) (:goal (q)) (:constraints (and (always (not (and (p) (q)))))))";
 
@@ -196,7 +205,7 @@ pub mod constraints {
 pub mod composed {
     use super::*;
     use divan::Bencher;
-    
+
     const DOMAIN: &str = "(define (domain composed-enterprise-rollout) (:requirements :typing :numeric-fluents :durative-actions) (:types node) (:predicates (up ?n - node)) (:functions (cost)) (:durative-action boot :parameters (?n - node) :duration (= ?duration 10) :condition (at start (>= (cost) 5)) :effect (and (at start (decrease (cost) 5)) (at end (up ?n)))))";
     const PROBLEM: &str = "(define (problem e1) (:domain composed-enterprise-rollout) (:objects n1 n2 - node) (:init (= (cost) 20)) (:goal (and (up n1) (up n2))))";
 

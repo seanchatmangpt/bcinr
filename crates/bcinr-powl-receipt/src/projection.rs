@@ -266,8 +266,8 @@ mod tests {
     use super::*;
     use bcinr_mfw_ir::{
         ActionOccurrence, ActionOccurrenceId, ConcurrencyConflictWitness, EventSet, FluentId,
-        IndependenceRelation, MinimalNonFace, PowlProjector as PowlProjectorTrait,
-        PrecedenceEdge, ResourceConflictWitness, StrictPartialOrder,
+        IndependenceRelation, MinimalNonFace, PowlProjector as PowlProjectorTrait, PrecedenceEdge,
+        ResourceConflictWitness, StrictPartialOrder,
     };
     use std::collections::BTreeMap;
 
@@ -338,7 +338,8 @@ mod tests {
         let (model, witness) = projector.project(&causal, &concurrency).unwrap();
         let model_digest = digest_powl_model(&model);
 
-        let receipt = seal_projection_receipt(Digest::ZERO, &causal, &concurrency, &witness, model_digest);
+        let receipt =
+            seal_projection_receipt(Digest::ZERO, &causal, &concurrency, &witness, model_digest);
         assert_eq!(receipt.prior_hash, Digest::ZERO);
         assert_eq!(receipt.source_epoch, PlanningEpochId(42));
         assert_ne!(receipt.hash, Digest::ZERO);
@@ -394,13 +395,8 @@ mod tests {
 
         let receipt1 =
             seal_projection_receipt(Digest::ZERO, &causal, &concurrency, &witness, model_digest);
-        let receipt2 = seal_projection_receipt(
-            receipt1.hash,
-            &causal,
-            &concurrency,
-            &witness,
-            model_digest,
-        );
+        let receipt2 =
+            seal_projection_receipt(receipt1.hash, &causal, &concurrency, &witness, model_digest);
         assert_ne!(receipt1.hash, receipt2.hash);
         assert_eq!(receipt2.prior_hash, receipt1.hash);
     }

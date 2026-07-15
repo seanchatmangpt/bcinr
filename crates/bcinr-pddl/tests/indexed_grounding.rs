@@ -1,5 +1,5 @@
-use bcinr_pddl::{domain_from_pddl, problem_from_pddl, GroundProblem};
 use bcinr_pddl::ground::lazy::IndexedGroundProblem;
+use bcinr_pddl::{domain_from_pddl, problem_from_pddl, GroundProblem};
 
 #[test]
 fn test_differential_grounding() {
@@ -48,5 +48,9 @@ fn test_differential_grounding() {
         _ => panic!("Expected Found"),
     };
 
-    assert_eq!(naive_plan.ops.len(), lazy_plan.ops.len(), "Plans should have same length");
+    assert_eq!(
+        naive_plan.ops.len(),
+        lazy_plan.ops.len(),
+        "Plans should have same length"
+    );
 }

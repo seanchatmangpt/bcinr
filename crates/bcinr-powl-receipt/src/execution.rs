@@ -27,7 +27,9 @@
 //! without changing this receipt's shape.
 
 use bcinr_mfw_ir::{Digest, EventSet};
-use bcinr_powl::scheduler::{scheduler_tick, scheduler_tick_guarded, ConcurrencySelector, PowlRunState};
+use bcinr_powl::scheduler::{
+    scheduler_tick, scheduler_tick_guarded, ConcurrencySelector, PowlRunState,
+};
 use bcinr_powl::tape::v2::ConcurrencyGuardTable;
 use bcinr_powl::tape::Powl64Op as LegacyPowl64Op;
 use bcinr_powl::tape::PowlTape as LegacyPowlTape;

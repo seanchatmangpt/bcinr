@@ -1,8 +1,8 @@
 use bcinr_pddl::{
-    domain_from_pddl, problem_from_pddl, powl_bridge::temporal_plan_to_powl_tape,
+    domain_from_pddl, powl_bridge::temporal_plan_to_powl_tape, problem_from_pddl,
     GroundTemporalProblem,
 };
-use divan::{bench, Bencher, black_box};
+use divan::{bench, black_box, Bencher};
 
 fn main() {
     divan::main();
@@ -19,7 +19,8 @@ fn generate_fixture(n: usize) -> (String, String) {
         :condition ()
         :effect (and (at end (deployed ?s)))
     )
-)"#.to_string();
+)"#
+    .to_string();
 
     let mut objects = String::new();
     let mut goals = String::new();
@@ -27,13 +28,17 @@ fn generate_fixture(n: usize) -> (String, String) {
         objects.push_str(&format!("s{} ", i));
         goals.push_str(&format!("(deployed s{}) ", i));
     }
-    
-    let problem = format!(r#"(define (problem deploy-n)
+
+    let problem = format!(
+        r#"(define (problem deploy-n)
     (:domain deploy-services)
     (:objects {} - service)
     (:init)
     (:goal (and {}))
-)"#, objects.trim(), goals.trim());
+)"#,
+        objects.trim(),
+        goals.trim()
+    );
 
     (domain, problem)
 }

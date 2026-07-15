@@ -177,7 +177,9 @@ mod tests {
     use crate::causal::PddlCausalAnalyzer;
     use crate::ground::GroundProblem;
     use crate::parse::{domain_from_pddl, problem_from_pddl};
-    use bcinr_mfw_ir::{ActionOccurrence, ActionOccurrenceId, CausalAnalyzer, EpochBounds, PlanningEpochId};
+    use bcinr_mfw_ir::{
+        ActionOccurrence, ActionOccurrenceId, CausalAnalyzer, EpochBounds, PlanningEpochId,
+    };
 
     fn epoch_from(domain_pddl: &str, problem_pddl: &str) -> GroundedPlanningEpoch {
         let domain = domain_from_pddl(domain_pddl).unwrap();

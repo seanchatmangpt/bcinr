@@ -898,8 +898,7 @@ mod tests {
 
             for tick in 0..20 {
                 let plain_done = plain_state.check_mask == 0 && plain_state.active_mask == 0;
-                let guarded_done =
-                    guarded_state.check_mask == 0 && guarded_state.active_mask == 0;
+                let guarded_done = guarded_state.check_mask == 0 && guarded_state.active_mask == 0;
                 assert_eq!(
                     plain_done, guarded_done,
                     "tick {tick}: plain/guarded disagree on termination"
@@ -968,10 +967,8 @@ mod tests {
 
         #[test]
         fn empty_guards_matches_plain_tick_for_xor_choice() {
-            let ast = PowlAstNode::XorChoice(vec![
-                PowlAstNode::Atom("left"),
-                PowlAstNode::Atom("right"),
-            ]);
+            let ast =
+                PowlAstNode::XorChoice(vec![PowlAstNode::Atom("left"), PowlAstNode::Atom("right")]);
             let tape = compile_powl(&ast).unwrap();
             assert_guarded_matches_plain(&tape);
         }

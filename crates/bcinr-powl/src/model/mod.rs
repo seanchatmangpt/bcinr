@@ -63,7 +63,9 @@
 
 use std::collections::BTreeMap;
 
-use bcinr_mfw_ir::{ActionOccurrenceId, ExecutableConcurrencyComplex, PowlNodeId, StrictPartialOrder};
+use bcinr_mfw_ir::{
+    ActionOccurrenceId, ExecutableConcurrencyComplex, PowlNodeId, StrictPartialOrder,
+};
 
 /// A concrete, named activity node — the common case: one PowlNode per
 /// source `ActionOccurrence`.

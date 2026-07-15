@@ -108,13 +108,12 @@ impl CausalAnalyzer for PddlCausalAnalyzer {
         let actions: Vec<&Pddl8GroundAction> = occurrences
             .iter()
             .map(|occ| {
-                epoch
-                    .actions
-                    .get(occ.action as usize)
-                    .ok_or(CausalAnalysisError::ActionIndexOutOfRange {
+                epoch.actions.get(occ.action as usize).ok_or(
+                    CausalAnalysisError::ActionIndexOutOfRange {
                         occurrence: occ.id,
                         action_index: occ.action,
-                    })
+                    },
+                )
             })
             .collect::<Result<_, _>>()?;
 
@@ -473,7 +472,9 @@ mod tests {
         let plan = analyzer.analyze(&epoch, &occurrences).unwrap();
         assert!(plan.independence.independent.is_empty());
         let (_, witness) = plan.independence.dependent.iter().next().unwrap();
-        assert!(witness.reasons.contains(&DependenceReason::DeleteInterference));
+        assert!(witness
+            .reasons
+            .contains(&DependenceReason::DeleteInterference));
     }
 
     #[test]

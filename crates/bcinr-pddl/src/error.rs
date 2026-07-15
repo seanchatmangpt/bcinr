@@ -96,7 +96,9 @@ impl From<bcinr_mfw_ir::PlannerFailure> for Pddl8Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bcinr_mfw_ir::{BoundHit, BoundKind, Digest, ExhaustionWitness, PlannerFailure, SearchProfileId};
+    use bcinr_mfw_ir::{
+        BoundHit, BoundKind, Digest, ExhaustionWitness, PlannerFailure, SearchProfileId,
+    };
 
     #[test]
     fn planner_failure_converts_via_from_and_preserves_witness() {

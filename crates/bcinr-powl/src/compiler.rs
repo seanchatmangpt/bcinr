@@ -664,11 +664,17 @@ pub mod v2 {
             assert_eq!(compiled.tape.entry_op, 0);
             assert_eq!(compiled.tape.exit_op, 1);
             assert_eq!(
-                compiled.tape.label_slab.get(compiled.node_labels[&PowlNodeId(0)]),
+                compiled
+                    .tape
+                    .label_slab
+                    .get(compiled.node_labels[&PowlNodeId(0)]),
                 "a"
             );
             assert_eq!(
-                compiled.tape.label_slab.get(compiled.node_labels[&PowlNodeId(1)]),
+                compiled
+                    .tape
+                    .label_slab
+                    .get(compiled.node_labels[&PowlNodeId(1)]),
                 "b"
             );
             assert!(compiled.guards.nonfaces.is_empty());
@@ -799,9 +805,7 @@ pub mod v2 {
 
         #[test]
         fn more_than_64_nodes_is_tape_full() {
-            let nodes: Vec<PowlNode> = (0..65)
-                .map(|i| activity(i, "x", i as u32))
-                .collect();
+            let nodes: Vec<PowlNode> = (0..65).map(|i| activity(i, "x", i as u32)).collect();
             let model = PowlModel {
                 nodes,
                 order: StrictPartialOrder::default(),
@@ -813,7 +817,10 @@ pub mod v2 {
                 },
                 provenance: BTreeMap::new(),
             };
-            assert_eq!(compile_powl_v2(&model).unwrap_err(), CompileErrorV2::TapeFull);
+            assert_eq!(
+                compile_powl_v2(&model).unwrap_err(),
+                CompileErrorV2::TapeFull
+            );
         }
 
         /// End-to-end: project a real `CausalPlan` +

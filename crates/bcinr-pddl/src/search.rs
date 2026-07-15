@@ -206,7 +206,11 @@ impl ExploitSearchRail for QLensRail<'_> {
             .actions
             .iter()
             .enumerate()
-            .filter(|(_, a)| a.preconditions.iter().all(|p| self.current_state.contains(p)))
+            .filter(|(_, a)| {
+                a.preconditions
+                    .iter()
+                    .all(|p| self.current_state.contains(p))
+            })
             .map(|(i, _)| i)
             .collect();
         if applicable.is_empty() {
@@ -475,11 +479,9 @@ mod tests {
     fn qlens_rail_reports_idle_not_exhausted_on_a_dead_end() {
         // No action ever satisfies (r) and (p) is never re-achievable —
         // a genuine dead end for a no-backtracking greedy rail.
-        let dead_end_domain =
-            "(define (domain d) (:predicates (p) (q)) \
+        let dead_end_domain = "(define (domain d) (:predicates (p) (q)) \
              (:action a :parameters () :precondition (p) :effect (and (not (p)) (q))))";
-        let dead_end_problem =
-            "(define (problem pr) (:domain d) (:init (p)) (:goal (r)))";
+        let dead_end_problem = "(define (problem pr) (:domain d) (:init (p)) (:goal (r)))";
         let domain = domain_from_pddl(dead_end_domain).unwrap();
         // (r) is never declared reachable; GroundProblem::build only fails
         // on EmptyGrounding, not on an unreachable goal atom, so this still

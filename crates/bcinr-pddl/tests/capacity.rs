@@ -65,7 +65,10 @@ fn capacity_one_forces_sequential() {
     let problem = problem_from_pddl(&problem_with_capacity(1)).expect("problem parse");
 
     let gtp = GroundTemporalProblem::build(&domain, &problem).expect("grounding");
-    let plan = gtp.find_temporal_plan().into_result().expect("temporal plan found");
+    let plan = gtp
+        .find_temporal_plan()
+        .into_result()
+        .expect("temporal plan found");
 
     let intervals = assign_worker_intervals(&plan);
     assert_eq!(
@@ -88,7 +91,10 @@ fn capacity_two_allows_concurrent() {
     let problem = problem_from_pddl(&problem_with_capacity(2)).expect("problem parse");
 
     let gtp = GroundTemporalProblem::build(&domain, &problem).expect("grounding");
-    let plan = gtp.find_temporal_plan().into_result().expect("temporal plan found");
+    let plan = gtp
+        .find_temporal_plan()
+        .into_result()
+        .expect("temporal plan found");
 
     let intervals = assign_worker_intervals(&plan);
     assert_eq!(
@@ -179,7 +185,10 @@ fn duplicate_action_labels_admit_identically_to_a_single_label() {
     let domain = domain_from_pddl(DOMAIN).expect("domain parse");
     let problem = problem_from_pddl(&problem_with_capacity(5)).expect("problem parse");
     let gtp = GroundTemporalProblem::build(&domain, &problem).expect("grounding");
-    let plan = gtp.find_temporal_plan().into_result().expect("temporal plan found");
+    let plan = gtp
+        .find_temporal_plan()
+        .into_result()
+        .expect("temporal plan found");
 
     // Sanity: this plan really does have multiple steps sharing one label —
     // otherwise this test wouldn't be exercising the dedup path at all.
@@ -251,7 +260,10 @@ fn same_instance_is_never_scheduled_twice_while_in_flight() {
     let domain = domain_from_pddl(DOUBLE_SCHEDULE_DOMAIN).expect("domain parse");
     let problem = problem_from_pddl(DOUBLE_SCHEDULE_PROBLEM).expect("problem parse");
     let gtp = GroundTemporalProblem::build(&domain, &problem).expect("grounding");
-    let plan = gtp.find_temporal_plan().into_result().expect("temporal plan found");
+    let plan = gtp
+        .find_temporal_plan()
+        .into_result()
+        .expect("temporal plan found");
 
     // Group steps by (action_name, args) and confirm no two intervals for
     // the same instance overlap — before the fix, worker-b(w1) (or
