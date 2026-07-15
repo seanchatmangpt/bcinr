@@ -1,6 +1,6 @@
 //! Branchless YAWL routing semantics engine.
 
-use bcinr::{int::popcount_u64, mask::select_u64};
+use bcinr::int::popcount_u64;
 use bcinr_logic::simd_dispatch::{
     add_saturating_u8x16, and_u8x16, blend_u8x16, compare_eq_u8x16, splat_u8x16,
 };

@@ -13,6 +13,7 @@ pub fn south_attacks(mut gen: u64, mut pro: u64) -> u64 {
     gen >> 8
 }
 
+/// Kogge-Stone parallel prefix algorithm for North rays.
 #[inline(always)]
 pub fn north_attacks(mut gen: u64, mut pro: u64) -> u64 {
     gen |= pro & (gen << 8);
@@ -23,6 +24,7 @@ pub fn north_attacks(mut gen: u64, mut pro: u64) -> u64 {
     gen << 8
 }
 
+/// Kogge-Stone parallel prefix algorithm for East rays.
 #[inline(always)]
 pub fn east_attacks(mut gen: u64, mut pro: u64) -> u64 {
     pro &= 0xfefefefefefefefe;
@@ -34,6 +36,7 @@ pub fn east_attacks(mut gen: u64, mut pro: u64) -> u64 {
     (gen << 1) & 0xfefefefefefefefe
 }
 
+/// Kogge-Stone parallel prefix algorithm for West rays.
 #[inline(always)]
 pub fn west_attacks(mut gen: u64, mut pro: u64) -> u64 {
     pro &= 0x7f7f7f7f7f7f7f7f;
@@ -45,6 +48,7 @@ pub fn west_attacks(mut gen: u64, mut pro: u64) -> u64 {
     (gen >> 1) & 0x7f7f7f7f7f7f7f7f
 }
 
+/// Kogge-Stone parallel prefix algorithm for North-East diagonal rays.
 #[inline(always)]
 pub fn no_ea_attacks(mut gen: u64, mut pro: u64) -> u64 {
     pro &= 0xfefefefefefefefe;
@@ -56,6 +60,7 @@ pub fn no_ea_attacks(mut gen: u64, mut pro: u64) -> u64 {
     (gen << 9) & 0xfefefefefefefefe
 }
 
+/// Kogge-Stone parallel prefix algorithm for South-East diagonal rays.
 #[inline(always)]
 pub fn so_ea_attacks(mut gen: u64, mut pro: u64) -> u64 {
     pro &= 0xfefefefefefefefe;
@@ -67,6 +72,7 @@ pub fn so_ea_attacks(mut gen: u64, mut pro: u64) -> u64 {
     (gen >> 7) & 0xfefefefefefefefe
 }
 
+/// Kogge-Stone parallel prefix algorithm for North-West diagonal rays.
 #[inline(always)]
 pub fn no_we_attacks(mut gen: u64, mut pro: u64) -> u64 {
     pro &= 0x7f7f7f7f7f7f7f7f;
@@ -78,6 +84,7 @@ pub fn no_we_attacks(mut gen: u64, mut pro: u64) -> u64 {
     (gen << 7) & 0x7f7f7f7f7f7f7f7f
 }
 
+/// Kogge-Stone parallel prefix algorithm for South-West diagonal rays.
 #[inline(always)]
 pub fn so_we_attacks(mut gen: u64, mut pro: u64) -> u64 {
     pro &= 0x7f7f7f7f7f7f7f7f;
@@ -89,6 +96,8 @@ pub fn so_we_attacks(mut gen: u64, mut pro: u64) -> u64 {
     (gen >> 9) & 0x7f7f7f7f7f7f7f7f
 }
 
+/// Rook attack set from `sq` on a board where `empty` marks empty squares:
+/// the union of all four orthogonal ray directions.
 #[inline(always)]
 pub fn rook_attacks(sq: u64, empty: u64) -> u64 {
     north_attacks(sq, empty)
@@ -97,6 +106,8 @@ pub fn rook_attacks(sq: u64, empty: u64) -> u64 {
         | west_attacks(sq, empty)
 }
 
+/// Bishop attack set from `sq` on a board where `empty` marks empty
+/// squares: the union of all four diagonal ray directions.
 #[inline(always)]
 pub fn bishop_attacks(sq: u64, empty: u64) -> u64 {
     no_ea_attacks(sq, empty)
@@ -105,11 +116,15 @@ pub fn bishop_attacks(sq: u64, empty: u64) -> u64 {
         | so_we_attacks(sq, empty)
 }
 
+/// Queen attack set from `sq`: the union of [`rook_attacks`] and
+/// [`bishop_attacks`].
 #[inline(always)]
 pub fn queen_attacks(sq: u64, empty: u64) -> u64 {
     rook_attacks(sq, empty) | bishop_attacks(sq, empty)
 }
 
+/// Build the compile-time knight-attack lookup table: `table[sq]` is the
+/// bitboard of every square a knight on `sq` attacks.
 pub const fn compute_knight_attacks() -> [u64; 64] {
     let mut table = [0; 64];
     let mut i = 0;
@@ -134,6 +149,8 @@ pub const fn compute_knight_attacks() -> [u64; 64] {
     table
 }
 
+/// Build the compile-time king-attack lookup table: `table[sq]` is the
+/// bitboard of every square a king on `sq` attacks.
 pub const fn compute_king_attacks() -> [u64; 64] {
     let mut table = [0; 64];
     let mut i = 0;
@@ -142,8 +159,8 @@ pub const fn compute_king_attacks() -> [u64; 64] {
         let mut attacks = 0;
         let not_a = 0xfefefefefefefefe;
         let not_h = 0x7f7f7f7f7f7f7f7f;
-        attacks |= (sq << 8);
-        attacks |= (sq >> 8);
+        attacks |= sq << 8;
+        attacks |= sq >> 8;
         attacks |= (sq << 1) & not_a;
         attacks |= (sq >> 1) & not_h;
         attacks |= (sq << 9) & not_a;
@@ -156,5 +173,7 @@ pub const fn compute_king_attacks() -> [u64; 64] {
     table
 }
 
+/// Precomputed knight-attack bitboard per square, indexed by square number.
 pub static KNIGHT_MASKS: [u64; 64] = compute_knight_attacks();
+/// Precomputed king-attack bitboard per square, indexed by square number.
 pub static KING_MASKS: [u64; 64] = compute_king_attacks();

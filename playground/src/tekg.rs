@@ -4,16 +4,19 @@
 //! Implements Algorithm 1 from Khayatbashi et al. (2024) for Transforming
 //! OCEL to tEKG arrays.
 
-use bcinr::mask::select_u64;
-
 /// Enum identifying the TEKG Node Label in SWAR fields.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TekgLabel {
+    /// A log-level node (the OCEL log itself).
     Log = 0,
+    /// A class/event-type node.
     Class = 1,
+    /// A single recorded event occurrence.
     Event = 2,
+    /// An entity (object) node.
     Entity = 3,
+    /// A point-in-time snapshot of an entity's state.
     Snapshot = 4,
 }
 
@@ -32,7 +35,9 @@ pub struct Tekg64Node {
     pub parent_id: u16,
     /// For snapshots: the node ID of the temporally previous snapshot (if any)
     pub prev_snapshot_id: u16,
+    /// This node's kind (log/class/event/entity/snapshot).
     pub label: TekgLabel,
+    /// Padding to reach the 64-byte cache-line-aligned layout.
     pub _pad: [u8; 41],
 }
 

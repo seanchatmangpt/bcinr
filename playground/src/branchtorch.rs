@@ -11,7 +11,9 @@ use crate::gnn::BinarizedGnnLayer;
 #[repr(C, align(64))]
 #[derive(Clone, Copy, Debug)]
 pub struct BranchlessRng {
+    /// Current generator state.
     pub seed: u64,
+    /// Padding to reach the 64-byte cache-line-aligned layout.
     pub _pad: [u8; 56],
 }
 

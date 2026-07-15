@@ -1,12 +1,17 @@
-#![no_std]
-
 /// A simplified 768 -> 16 -> 1 NNUE architecture
 pub struct BranchTorchNNUE {
+    /// Layer-1 weights: `l1_weights[neuron][feature]`, one 768-wide row per
+    /// of the 16 hidden neurons (feature = piece-type * 64 + square).
     pub l1_weights: [[i32; 768]; 16],
+    /// Layer-1 bias per hidden neuron.
     pub l1_biases: [i32; 16],
+    /// Layer-2 (value head) weight per hidden neuron.
     pub l2_weights_value: [i32; 16],
+    /// Layer-2 (policy head) weights: `l2_weights_policy[neuron][square]`.
     pub l2_weights_policy: [[i32; 64]; 16],
+    /// Layer-2 (value head) bias.
     pub l2_bias_value: i32,
+    /// Padding reserved for future fields.
     pub _pad: [i32; 3],
 }
 
@@ -73,6 +78,8 @@ impl BranchTorchNNUE {
         }
     }
 
+    /// Construct a network seeded with classical material values in hidden
+    /// neuron 0 (see the body below), all other weights zeroed.
     pub const fn new() -> Self {
         let mut nnue = Self {
             l1_weights: [[0; 768]; 16],

@@ -44,11 +44,17 @@ pub struct WasmBYawlState {
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct WasmPowlState {
+    /// Bitmask of ops that have completed.
     pub completed_ops: u64,
+    /// Count of branches (XorChoice/loop iterations) completed so far.
     pub completed_branches: u64,
+    /// Bitmask of scopes currently active.
     pub active_scopes: u64,
+    /// Stack of nested scope ids, most recent last.
     pub scope_stack: [u16; 16],
+    /// Number of valid entries in `scope_stack`.
     pub stack_depth: u32,
+    /// Count of loop iterations completed so far.
     pub completed_loops: u64,
 }
 

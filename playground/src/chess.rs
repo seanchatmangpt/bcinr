@@ -12,9 +12,13 @@ use crate::{
 #[repr(C, align(64))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ChessBitboard {
+    /// Bitboard of every square occupied by a white piece.
     pub white_pieces: u64,
+    /// Bitboard of every square occupied by a black piece.
     pub black_pieces: u64,
-    pub turn: u16, // 0 = White, 1 = Black
+    /// Side to move: 0 = White, 1 = Black.
+    pub turn: u16,
+    /// Padding to reach the 64-byte cache-line-aligned layout.
     pub _pad: [u8; 46],
 }
 

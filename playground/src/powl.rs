@@ -52,6 +52,7 @@ pub struct Powl64Op {
     pub ctrl_mask: u64,
     /// Intensity for activities.
     pub intensity: u8,
+    /// Padding to reach the 64-byte cache-line-aligned layout.
     pub _pad: [u8; 7],
 }
 
