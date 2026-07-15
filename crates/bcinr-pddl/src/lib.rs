@@ -21,6 +21,7 @@
 pub mod alloc_counter;
 pub mod capability;
 pub mod capability_router;
+pub mod consequence;
 pub mod dfcm_crown;
 pub mod error;
 pub mod execute;
@@ -32,6 +33,11 @@ pub mod schedule_analysis;
 pub use capability::{
     admit_planning_task, AdmittedPlanningTask, CapabilityProfile, DefaultCapabilityProfile,
     GroundedPlanningEpoch, PddlFeature, SemanticSupport, ALL_PDDL_FEATURES,
+};
+pub use consequence::{
+    plan_with_standing_cache, ConsequenceHorizon, ExactStateKey, GoalReachabilityHorizon,
+    MakespanObservation, MinimumMakespanHorizon, PlanningResult, ResidualDecision,
+    ResidualObligation, Residualizer, StandingConsequenceCache,
 };
 pub use capability_router::{
     route_capability_plan, CapabilityRouteReceipt, CapabilityTask, CostVector, DesiredEffect,
