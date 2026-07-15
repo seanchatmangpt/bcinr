@@ -27,6 +27,7 @@ pub mod error;
 pub mod execute;
 pub mod ground;
 pub mod llm_bridge;
+pub mod mfw;
 pub mod parse;
 pub mod powl_bridge;
 pub mod schedule_analysis;
@@ -38,6 +39,10 @@ pub use consequence::{
     plan_with_standing_cache, ConsequenceHorizon, ExactStateKey, GoalReachabilityHorizon,
     MakespanObservation, MinimumMakespanHorizon, PlanningResult, ResidualDecision,
     ResidualObligation, Residualizer, StandingConsequenceCache,
+};
+pub use mfw::{
+    q_lens, FrontierBoxes, FrontierMeasure, MassVector, PositiveDistribution, PositiveMass,
+    QLensError, QValue, WeightedDistribution,
 };
 pub use capability_router::{
     route_capability_plan, CapabilityRouteReceipt, CapabilityTask, CostVector, DesiredEffect,
