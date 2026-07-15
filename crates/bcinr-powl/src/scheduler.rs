@@ -248,22 +248,41 @@ pub fn scheduler_tick(tape: &[Powl64Op], state: &mut PowlRunState) -> FiredSet {
 /// Implementors write only [`select`][Self::select] — the business logic.
 /// [`select_checked`][Self::select_checked] is a **shared, non-overridable
 /// helper**: every implementation gets the postcondition check
-/// (`selected.is_subset_of(ready) && guards.admits(&selected)`, enforced
-/// via `debug_assert!` so it costs nothing in release builds) for free,
-/// without having to write it themselves. Callers should go through
+/// (`selected.is_subset_of(ready) && guards.admits(&selected)`) enforced for
+/// free, without having to write it themselves. Callers should go through
 /// `select_checked`, not `select`, directly.
+///
+/// # Enforcement is unconditional, not debug-only
+///
+/// The postcondition is checked with `assert!`, not `debug_assert!` — it
+/// runs in every build profile, including `--release`. This is deliberate:
+/// this workspace's `[profile.release]` does not set
+/// `debug-assertions = true`, so a `debug_assert!` here would compile to
+/// nothing in release builds, silently letting a noncompliant
+/// `ConcurrencySelector` (this trait is public and generic — anything
+/// implementing it reaches [`scheduler_tick_guarded`] through
+/// `S: ConcurrencySelector`) fire a set that is not a member of the
+/// concurrency complex. `FireSet != ReadySet`: a `FireSet` must be a subset
+/// of `ReadySet` *and* a member of the concurrency complex in every build,
+/// not just the ones compiled with debug assertions on. See
+/// `crates/bcinr-powl/tests/release_mode_fireset_gap.rs` for the regression
+/// fixture that pins this down across both `cargo test` and
+/// `cargo test --release`.
 pub trait ConcurrencySelector {
     /// Choose a subset of `ready` to fire this tick, respecting `guards`.
     fn select(&mut self, ready: &EventSet, guards: &ConcurrencyGuardTable) -> EventSet;
 
-    /// Calls [`select`][Self::select] and enforces its postcondition.
+    /// Calls [`select`][Self::select] and enforces its postcondition
+    /// unconditionally (see the trait-level doc comment) — panics if a
+    /// [`ConcurrencySelector`] implementation returns a set that is not a
+    /// subset of `ready`, or that the guard table does not admit.
     fn select_checked(&mut self, ready: &EventSet, guards: &ConcurrencyGuardTable) -> EventSet {
         let selected = self.select(ready, guards);
-        debug_assert!(
+        assert!(
             selected.is_subset_of(ready),
             "ConcurrencySelector::select returned a set that is not a subset of ready"
         );
-        debug_assert!(
+        assert!(
             guards.admits(&selected),
             "ConcurrencySelector::select returned a set the guard table does not admit"
         );

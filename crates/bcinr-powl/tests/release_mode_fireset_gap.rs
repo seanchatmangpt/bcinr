@@ -1,39 +1,33 @@
-//! Adversarial verification: is `ConcurrencySelector::select_checked`'s
+//! Regression test: is `ConcurrencySelector::select_checked`'s
 //! FireSet-must-be-a-subset-of-ReadySet-AND-a-member-of-the-concurrency-
-//! complex postcondition actually enforced at runtime, or only in debug
-//! builds?
+//! complex postcondition actually enforced at runtime in *every* build
+//! profile, not only in debug builds?
 //!
-//! `crates/bcinr-powl/src/scheduler.rs`'s `select_checked` enforces both
-//! halves of that invariant purely via `debug_assert!` (its own doc comment
-//! even advertises this: "costs nothing in release builds"). This crate's
-//! workspace `[profile.release]` (top-level `Cargo.toml`) does not set
+//! `crates/bcinr-powl/src/scheduler.rs`'s `select_checked` used to enforce
+//! both halves of that invariant purely via `debug_assert!`. This
+//! workspace's `[profile.release]` (top-level `Cargo.toml`) does not set
 //! `debug-assertions = true`, so `debug_assertions` is off by Cargo's
-//! default in release builds — meaning `debug_assert!` compiles to nothing.
+//! default in release builds, meaning `debug_assert!` compiled to nothing
+//! there — a noncompliant `ConcurrencySelector` (the trait is public and
+//! generic, so any implementation reaches the real `scheduler_tick_guarded`
+//! entry point) could silently fire a set the guard table forbids in a
+//! release build, with zero enforcement.
 //!
-//! This test constructs a deliberately non-compliant `ConcurrencySelector`
-//! (`select` just returns the whole `ready` set, ignoring `guards`
-//! entirely) and drives it through the real, public
-//! `scheduler_tick_guarded` entry point against a guard table that forbids
-//! two ops from firing together. The two `#[cfg(...)]`-gated tests below
-//! show the actual, empirically-different behavior in the two build modes:
+//! `select_checked` now uses `assert!` instead of `debug_assert!`, so the
+//! postcondition is checked unconditionally. This test constructs a
+//! deliberately non-compliant `ConcurrencySelector` (`select` just returns
+//! the whole `ready` set, ignoring `guards` entirely) and drives it through
+//! the real, public `scheduler_tick_guarded` entry point against a guard
+//! table that forbids two ops from firing together, then confirms the
+//! resulting panic happens under both build profiles:
 //!
-//! - Under `cargo test` (dev profile, `debug_assertions` on): the bad
-//!   selector's output is caught and the process panics before anything
-//!   fires — the invariant *is* enforced here.
-//! - Under `cargo test --release` (release profile, `debug_assertions`
-//!   off): the same bad selector's output sails through unchecked, and
-//!   `scheduler_tick_guarded` actually fires both forbidden ops together in
-//!   the same tick — the invariant is *not* enforced here. `guards.admits`
-//!   on the actually-fired set is false, empirically confirmed below.
-//!
-//! Run both to see the divergence:
 //!   cargo test -p bcinr-powl --test release_mode_fireset_gap
 //!   cargo test -p bcinr-powl --release --test release_mode_fireset_gap
 
+use bcinr_mfw_ir::{Digest, EventSet};
 use bcinr_powl::compiler::{compile_powl, PowlAstNode};
 use bcinr_powl::scheduler::{scheduler_tick_guarded, ConcurrencySelector, PowlRunState};
 use bcinr_powl::tape::v2::{CompiledNonFace, ConcurrencyGuardTable};
-use bcinr_mfw_ir::{Digest, EventSet};
 
 /// A selector that violates its own trait contract on purpose: it ignores
 /// `guards` entirely and always hands back the full `ready` set, exactly
@@ -63,58 +57,41 @@ fn ab_tape_and_guards() -> (bcinr_powl::tape::PowlTape, ConcurrencyGuardTable) {
     (tape, guards)
 }
 
-#[cfg(debug_assertions)]
+/// Runs identically (and must panic identically) under both `cargo test`
+/// and `cargo test --release` — the postcondition is no longer
+/// debug-profile-only.
 #[test]
-fn debug_build_catches_the_noncompliant_selector_via_debug_assert() {
+fn noncompliant_selector_is_rejected_in_every_build_profile() {
     let (tape, guards) = ab_tape_and_guards();
     let mut state = PowlRunState::new(&tape);
     let mut selector = AlwaysFireEverything;
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        scheduler_tick_guarded(&tape.ops[..tape.len as usize], &mut state, &mut selector, &guards)
+        scheduler_tick_guarded(
+            &tape.ops[..tape.len as usize],
+            &mut state,
+            &mut selector,
+            &guards,
+        )
     }));
 
     assert!(
         result.is_err(),
-        "expected select_checked's debug_assert! to panic on a selector that \
-         returns a set the guard table does not admit"
+        "expected select_checked's postcondition assert! to panic on a \
+         selector that returns a set the guard table does not admit — in \
+         this build profile too (release included)"
     );
 }
 
-#[cfg(not(debug_assertions))]
+/// Companion positive check: confirm the guard table used above really
+/// does forbid `{a, b}` firing together, so the panic above is caused by a
+/// genuine violation and not a fixture mistake.
 #[test]
-fn release_build_silently_fires_the_forbidden_pair() {
-    let (tape, guards) = ab_tape_and_guards();
-    let mut state = PowlRunState::new(&tape);
-    let mut selector = AlwaysFireEverything;
-
-    // No panic here: select_checked's postcondition checks compiled to
-    // nothing (debug_assertions is off in this build).
-    let fired = scheduler_tick_guarded(&tape.ops[..tape.len as usize], &mut state, &mut selector, &guards);
-
-    let fired_set = {
-        let mut s = EventSet::empty();
-        let mut bits = fired.0;
-        while bits != 0 {
-            let i = bits.trailing_zeros() as usize;
-            bits &= bits - 1;
-            s = s.with(i);
-        }
-        s
-    };
-
-    assert_eq!(
-        fired.0.count_ones(),
-        2,
-        "CONFIRMED GAP: in a release build, the noncompliant selector's \
-         full-ready-set answer was NOT rejected — both forbidden ops fired \
-         in the same tick (fired={:#04b})",
-        fired.0
-    );
+fn fixture_guard_table_genuinely_forbids_the_ab_pair() {
+    let (_, guards) = ab_tape_and_guards();
+    let forbidden = EventSet::empty().with(0).with(1);
     assert!(
-        !guards.admits(&fired_set),
-        "the actually-fired set must be exactly the one the guard table \
-         forbids, proving select_checked's postcondition was skipped, not \
-         merely coincidentally satisfied"
+        !guards.admits(&forbidden),
+        "sanity: the {{a, b}} pair must be forbidden by this fixture's guard table"
     );
 }
