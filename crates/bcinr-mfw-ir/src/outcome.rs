@@ -11,12 +11,16 @@
 //!
 //! This version keeps a witness on every non-`Found` variant, so
 //! `into_result()` can hand back a typed failure (`PlannerFailure`) without
-//! discarding it. **Not yet wired into `bcinr-pddl`** — this is Phase 1
-//! (this crate only, zero dependency from `bcinr-pddl`); swapping
-//! `bcinr-pddl`'s `error.rs` to depend on this type is Phase 2 work. See the
-//! final report for the blast radius (`error.rs`, `lib.rs`,
-//! `capability_router.rs`, `ground/mod.rs`, `ground/lazy.rs`,
-//! `tests/indexed_grounding.rs` all currently reference the old shape).
+//! discarding it. **Phase 2 is done**: `bcinr-pddl/src/error.rs` no longer
+//! defines its own `PlannerOutcome<T>` — it re-exports this type directly
+//! (`pub use bcinr_mfw_ir::PlannerOutcome;`) and gained
+//! `Pddl8Error::PlanningFailed(PlannerFailure)` so `.into_result()?` keeps
+//! working without collapsing the witness onto `NoAdmittedPlan`. There is
+//! exactly one `PlannerOutcome<T>` in the workspace now, not two parallel
+//! types: `error.rs`, `lib.rs`, `capability_router.rs`, `ground/mod.rs`,
+//! `ground/lazy.rs`, and `tests/indexed_grounding.rs` all construct and match
+//! on *this* type (confirmed by grep — none references a separate local
+//! shape any more).
 
 use crate::digest::Digest;
 use crate::ids::SearchProfileId;
