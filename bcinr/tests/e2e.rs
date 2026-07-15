@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::{Mutex, MutexGuard, OnceLock};
 
 fn str_has_substr(s: &str, pat: &str) -> bool {
     if pat.is_empty() {
@@ -10,16 +11,49 @@ fn str_has_substr(s: &str, pat: &str) -> bool {
     s.as_bytes().windows(pat.len()).any(|w| w == pat.as_bytes())
 }
 
+/// Serializes every `TestCtx` against `crates/bcinr-logic/src/algorithms/
+/// mod.rs`, the one real, shared source file `create_temp_algo_file`
+/// read-modify-writes.
+///
+/// Without this, `cargo test`'s default thread-per-test parallelism lets
+/// two `TestCtx`s race on that file: both read the same "original" content,
+/// both append their own `pub mod temp_*;` line, and whichever writes last
+/// wins — silently dropping the other's line from the file it thinks it's
+/// about to restore. Each `TestCtx::drop` then writes back *its own*
+/// `original_files` snapshot (captured before either wrote), so whichever
+/// drops last "restores" a snapshot that already lacks the other test's
+/// entry, but the module file on disk still carries the other test's now-
+/// dangling `pub mod temp_*;` line pointing at a `.rs` file the other
+/// test's own (already-run) cleanup deleted. The net effect, confirmed live
+/// by running `cargo make test` twice in a row: `algorithms/mod.rs` is left
+/// with leftover `pub mod temp_invalid;` / `pub mod temp_unused;` /
+/// `pub mod temp_cross_clippy_gate;` declarations with no backing file,
+/// breaking `bcinr-logic`'s compilation — and therefore every crate that
+/// depends on it, including every MFW crate — for every build after the
+/// test run until someone notices and manually deletes the stray lines.
+fn mod_rs_lock() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+}
+
 struct TestCtx {
     to_cleanup: Vec<PathBuf>,
     original_files: HashMap<PathBuf, String>,
+    // Held for the entire lifetime of this `TestCtx` (released on `Drop`,
+    // after cleanup runs) — see `mod_rs_lock`'s doc comment for why this is
+    // load-bearing, not incidental.
+    _guard: MutexGuard<'static, ()>,
 }
 
 impl TestCtx {
     fn new() -> Self {
+        let guard = mod_rs_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         Self {
             to_cleanup: Vec::new(),
             original_files: HashMap::new(),
+            _guard: guard,
         }
     }
 
