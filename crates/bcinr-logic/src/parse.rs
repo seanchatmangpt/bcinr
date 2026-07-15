@@ -79,6 +79,66 @@ pub fn parse_hex_u32(bytes: &[u8]) -> Result<u32, ()> {
     [Err(()), Ok(res)][(err == 0) as usize]
 }
 
+/// Parses a decimal ASCII string of 1–20 characters into a `u64` branchlessly.
+///
+/// Accepts digit (`0`–`9`) characters only. Returns `Err(())` if:
+/// - `bytes` is empty
+/// - `bytes` has more than 20 characters (`u64::MAX` has 20 decimal digits,
+///   so no valid `u64` needs more)
+/// - any character is not an ASCII digit
+/// - the parsed value overflows `u64` (a 20-digit input can still exceed
+///   `u64::MAX`, since `u64::MAX` itself is not the largest 20-digit number)
+///
+/// The implementation accumulates into a `u128` (so no intermediate sum can
+/// wrap before the final range check) and uses branchless arithmetic (masks
+/// derived from comparisons, not data-dependent `if`/`else` control flow) to
+/// classify each digit and fold in errors, keeping cyclomatic complexity at
+/// CC=1 — mirroring [`parse_hex_u32`]'s structure exactly, generalized from
+/// a fixed 8-hex-digit/32-bit bound to a fixed 20-decimal-digit bound with
+/// an explicit overflow check (decimal digit count alone does not bound the
+/// value the way hex digit count does).
+///
+/// # Complexity
+/// O(1) — the loop always runs exactly 20 iterations regardless of
+/// `bytes.len()` (bytes beyond `len` are masked to contribute nothing), so
+/// cost does not grow with input length beyond that fixed cap.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_logic::parse::parse_decimal_u64;
+///
+/// assert_eq!(parse_decimal_u64(b"0"), Ok(0));
+/// assert_eq!(parse_decimal_u64(b"42"), Ok(42));
+/// assert_eq!(parse_decimal_u64(b"18446744073709551615"), Ok(u64::MAX));
+/// assert_eq!(parse_decimal_u64(b""), Err(()));
+/// assert_eq!(parse_decimal_u64(b"18446744073709551616"), Err(())); // u64::MAX + 1
+/// assert_eq!(parse_decimal_u64(b"123456789012345678901"), Err(())); // 21 digits
+/// assert_eq!(parse_decimal_u64(b"12x"), Err(()));
+/// ```
+#[must_use = "parse result — ignoring discards the parsed value and cursor"]
+#[inline(always)]
+pub fn parse_decimal_u64(bytes: &[u8]) -> Result<u64, ()> {
+    let len = bytes.len();
+    let mut err = (len == 0 || len > 20) as u32;
+    let mut acc: u128 = 0;
+    (0..20).for_each(|i| {
+        let in_range = (i < len) as u8;
+        let b = bytes.get(i).copied().unwrap_or(0) & 0u8.wrapping_sub(in_range);
+        let is_digit = b.is_ascii_digit() as u32;
+        err |= (!is_digit & in_range as u32) & 1;
+        let digit = b.wrapping_sub(b'0') as u128;
+        // Out-of-range iterations (`i >= len`) must leave `acc` unchanged,
+        // not multiply it by 10 with a zero digit added — that would shift
+        // every accumulated digit's decimal place left once per padding
+        // iteration. `mult` is 10 when in-range, 1 (identity) otherwise.
+        let mult: u128 = 1 + 9 * (in_range as u128);
+        acc = acc * mult + digit * (in_range as u128);
+    });
+    err |= (acc > u64::MAX as u128) as u32;
+    [Err(()), Ok(acc as u64)][(err == 0) as usize]
+}
+
 #[cfg(test)]
 mod tests {
     // _reference equivalence boundaries
@@ -144,6 +204,27 @@ mod tests {
         ];
         for &(input, expected) in cases {
             assert_eq!(parse_hex_u32(input), expected, "input={:?}", input);
+        }
+    }
+
+    // ── parse_decimal_u64 ────────────────────────────────────────────────────
+    #[test]
+    fn test_parse_decimal_u64() {
+        // (input, expected result)
+        let cases: &[(&[u8], Result<u64, ()>)] = &[
+            (b"", Err(())), // empty
+            (b"0", Ok(0)),
+            (b"42", Ok(42)),
+            (b"007", Ok(7)),                         // leading zeros
+            (b"18446744073709551615", Ok(u64::MAX)), // exactly u64::MAX, 20 digits
+            (b"18446744073709551616", Err(())),      // u64::MAX + 1, still 20 digits
+            (b"99999999999999999999", Err(())),      // 20 nines, overflows
+            (b"123456789012345678901", Err(())),     // 21 digits, always too long
+            (b"12x", Err(())),                       // invalid char
+            (b" 1", Err(())),                        // leading space is not a digit
+        ];
+        for &(input, expected) in cases {
+            assert_eq!(parse_decimal_u64(input), expected, "input={:?}", input);
         }
     }
 }
