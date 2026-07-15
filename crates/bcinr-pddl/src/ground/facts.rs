@@ -133,7 +133,7 @@ impl FactStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dict::Dict;
+    use crate::ground::dict::Dict;
 
     #[test]
     fn insert_dedup_and_contains() {

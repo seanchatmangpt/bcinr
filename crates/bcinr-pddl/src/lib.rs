@@ -19,6 +19,7 @@
 //! `Pddl8Tape`, `Pddl8GroundAction`, etc. without pulling in the parser.
 
 pub mod alloc_counter;
+pub mod capability;
 pub mod capability_router;
 pub mod dfcm_crown;
 pub mod error;
@@ -28,6 +29,10 @@ pub mod llm_bridge;
 pub mod parse;
 pub mod powl_bridge;
 pub mod schedule_analysis;
+pub use capability::{
+    admit_planning_task, AdmittedPlanningTask, CapabilityProfile, DefaultCapabilityProfile,
+    GroundedPlanningEpoch, PddlFeature, SemanticSupport, ALL_PDDL_FEATURES,
+};
 pub use capability_router::{
     route_capability_plan, CapabilityRouteReceipt, CapabilityTask, CostVector, DesiredEffect,
 };

@@ -41,7 +41,14 @@ use wasm4pm_compat::pddl::{
 /// Errors from indexed grounding / plan finding. Mirrors the meaningful subset
 /// of `crate::Pddl8Error` this path can produce, so the caller's
 /// "infeasibility is `Ok`" classification is unchanged whichever grounder ran.
-use crate::error::{Pddl8Error, PlannerOutcome};
+use bcinr_mfw_ir::{Digest, ExhaustionWitness, PlannerOutcome, SearchProfileId};
+
+/// `SearchProfileId` for this crate's indexed/lazy grounder's BFS — distinct
+/// from `super::LEGACY_WHOLE_RUN_SEARCH_PROFILE` (the naive grounder's BFS)
+/// so an `ExhaustionWitness` can, in principle, be traced back to which
+/// grounder produced it. Both are sentinels predating the portfolio/rail
+/// profile registry in `crate::search`.
+const INDEXED_BFS_SEARCH_PROFILE: SearchProfileId = SearchProfileId(1);
 
 
 /// Counters describing how much the indexed grounder saved over naive.
@@ -399,7 +406,18 @@ impl IndexedGroundProblem {
                 }
             }
         }
-        PlannerOutcome::Exhausted
+        let mut goal_digest_buf = Vec::new();
+        for g in &self.goal {
+            goal_digest_buf.extend_from_slice(g.label().as_bytes());
+            goal_digest_buf.push(0);
+        }
+        goal_digest_buf.extend_from_slice(&(self.actions.len() as u64).to_le_bytes());
+        PlannerOutcome::Exhausted(ExhaustionWitness {
+            search_profile: INDEXED_BFS_SEARCH_PROFILE,
+            explored_states: visited.len() as u64,
+            frontier_empty: true,
+            digest: Digest::hash(&goal_digest_buf),
+        })
     }
 
     /// Reachability statistics for this grounding.

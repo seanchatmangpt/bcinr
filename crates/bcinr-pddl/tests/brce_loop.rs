@@ -52,7 +52,7 @@ fn blocksworld_brce_full_loop() {
     let domain = domain_from_pddl(BLOCKSWORLD_DOMAIN).unwrap();
     let problem = problem_from_pddl(BLOCKSWORLD_PROBLEM).unwrap();
     let gp = GroundProblem::build(&domain, &problem, None).unwrap();
-    let tape = gp.find_plan().unwrap();
+    let tape = gp.find_plan().into_result().unwrap();
 
     // Blocks world to stack a on b: pick-up(a), stack(a,b) — 2 steps
     assert!(tape.len() >= 2, "need at least 2 steps");
@@ -120,7 +120,7 @@ fn prolog8_horn_denies_unadmitted_action() {
     let domain = domain_from_pddl(BLOCKSWORLD_DOMAIN).unwrap();
     let problem = problem_from_pddl(BLOCKSWORLD_PROBLEM).unwrap();
     let gp = GroundProblem::build(&domain, &problem, None).unwrap();
-    let tape = gp.find_plan().unwrap();
+    let tape = gp.find_plan().into_result().unwrap();
     assert!(
         tape.len() >= 2,
         "blocksworld plan must have at least 2 steps"
@@ -165,7 +165,7 @@ fn receipt_differs_by_case_id() {
     let domain = domain_from_pddl(BLOCKSWORLD_DOMAIN).unwrap();
     let problem = problem_from_pddl(BLOCKSWORLD_PROBLEM).unwrap();
     let gp = GroundProblem::build(&domain, &problem, None).unwrap();
-    let tape = gp.find_plan().unwrap();
+    let tape = gp.find_plan().into_result().unwrap();
     let init: BTreeSet<Pddl8GroundAtom> = problem
         .init
         .iter()

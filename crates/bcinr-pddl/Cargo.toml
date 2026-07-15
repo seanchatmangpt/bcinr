@@ -31,6 +31,11 @@ wasm4pm-compat = { path = "/Users/sac/wasm4pm-compat", version = "26.6.29" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = { version = "0.4", features = ["serde"] }
+# bcinr-mfw-ir — shared IR types/trait contracts for the multifractal
+# planner (witness algebra, formal-law contracts, causal/concurrency IR).
+# bcinr-pddl depends on it, never the reverse (see bcinr-mfw-ir's own
+# Cargo.toml comment).
+bcinr-mfw-ir = { path = "../bcinr-mfw-ir", version = "26.6.26" }
 
 [features]
 # Surface 7 (docs/DFCM_CONTRACT.md): per-stage allocation attribution for the
@@ -47,6 +52,10 @@ dhat-heap = []
 # tests/proposer_substrate.rs. Registry version, matching bcinr-powl's dep.
 chicago-tdd-tools = { version = "26.7.1", features = ["ocel-generation"] }
 divan = "0.1.21"
+# Property-based testing for q_lens's normalization/ordering invariants
+# (LAW_QLENS_RATIO) — same major version already pinned in bcinr-logic and
+# bcinr-powl.
+proptest = "1"
 
 [[test]]
 name = "logistics"

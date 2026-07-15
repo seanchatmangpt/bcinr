@@ -3,9 +3,10 @@ mod facts;
 mod xorf;
 pub mod lazy;
 
-/// PDDL8 grounding and forward-search plan finding.
+// PDDL8 grounding and forward-search plan finding.
 
 use crate::error::Pddl8Error;
+use bcinr_mfw_ir::{BoundHit, BoundKind, Digest, ExhaustionWitness, PlannerOutcome, SearchProfileId};
 use std::collections::{BTreeSet, HashMap};
 use wasm4pm_compat::pddl::{
     CompareOp, DurationConstraint, DurativeAction, NumericExpr, Pddl8ActionSchema, Pddl8Atom,
@@ -13,6 +14,28 @@ use wasm4pm_compat::pddl::{
     PddlEffect, PddlFunction, TemporalPlan, TemporalPlanStep, TimedLiteral, DerivedPredicate, PDDL8_MAX_GROUND,
     PDDL8_MAX_PLAN_DEPTH,
 };
+
+/// `SearchProfileId` for the plain, un-portfolio'd whole-run BFS/greedy
+/// search `GroundProblem`/`GroundTemporalProblem` run directly (as opposed
+/// to a rail inside `crate::search`'s `MfwPortfolio`, which assigns its own
+/// profile ids). `0` is a sentinel, not a real profile registry entry — this
+/// module predates the portfolio/rail split and has exactly one search
+/// strategy per problem type, so there is nothing to distinguish it from.
+const LEGACY_WHOLE_RUN_SEARCH_PROFILE: SearchProfileId = SearchProfileId(0);
+
+/// A cheap, deterministic digest summarizing what was searched — not a
+/// formally meaningful proof digest, just enough to let two `ExhaustionWitness`
+/// values be compared/deduplicated. Hashes the goal atom labels and the
+/// ground action count.
+fn search_digest(goal_labels: &[String], action_count: usize) -> Digest {
+    let mut buf = Vec::new();
+    for l in goal_labels {
+        buf.extend_from_slice(l.as_bytes());
+        buf.push(0);
+    }
+    buf.extend_from_slice(&(action_count as u64).to_le_bytes());
+    Digest::hash(&buf)
+}
 
 pub struct GroundProblem {
     pub initial_state: BTreeSet<Pddl8GroundAtom>,
@@ -26,6 +49,9 @@ pub struct GroundProblem {
     always_applicable: Vec<usize>,
     pub constraints: Vec<PddlCondition>,
     pub derived_predicates: Vec<GroundDerivedPredicate>,
+    /// Object universe + type index quantified `Forall`/`Exists` conditions
+    /// range over. See `eval_quantifier`.
+    quant_domain: QuantifierDomain,
 }
 
 #[derive(Clone)]
@@ -40,6 +66,7 @@ pub struct GroundDerivedPredicate {
 /// entry in `typed_params`, or a required type of `"object"` (PDDL's
 /// universal type), matches every object — this is what keeps untyped/legacy
 /// domains behaving exactly as before.
+#[derive(Clone)]
 struct TypeIndex {
     /// object name -> declared type (objects absent from `object_types` are
     /// treated as type `"object"`, matching untyped-domain semantics).
@@ -81,6 +108,34 @@ impl TypeIndex {
                 None => return false,
             }
         }
+    }
+}
+
+/// The object universe + type index that a `Forall`/`Exists`-quantified
+/// condition's variables range over. Built once per `GroundProblem`/
+/// `GroundTemporalProblem::build` (same `TypeIndex` already used to
+/// type-filter action-schema parameter candidates) and threaded through
+/// every `eval_condition` call for that problem.
+///
+/// This is what `eval_condition` needs, and previously did not have, to
+/// evaluate `Forall`/`Exists` for real instead of returning the hardcoded
+/// `true`/`false` stub — see `eval_quantifier`.
+#[derive(Clone)]
+pub(crate) struct QuantifierDomain {
+    objects: Vec<String>,
+    type_index: TypeIndex,
+}
+
+impl QuantifierDomain {
+    /// Candidate object names for one quantified variable's declared type.
+    /// `"object"` (PDDL's universal type) matches every object, identically
+    /// to `ground_schema`'s per-parameter candidate lists and
+    /// `TypeIndex::satisfies`'s own `"object"` short-circuit.
+    fn candidates(&self, required_type: &str) -> Vec<&String> {
+        self.objects
+            .iter()
+            .filter(|o| self.type_index.satisfies(o, required_type))
+            .collect()
     }
 }
 
@@ -157,6 +212,11 @@ impl GroundProblem {
             ground_derived_schema(dp, &problem.object_types, &type_index, &mut derived_predicates)?;
         }
 
+        let quant_domain = QuantifierDomain {
+            objects: problem.objects.clone(),
+            type_index,
+        };
+
         Ok(Self {
             initial_state,
             goal,
@@ -165,6 +225,7 @@ impl GroundProblem {
             always_applicable,
             constraints,
             derived_predicates,
+            quant_domain,
         })
     }
 
@@ -181,11 +242,22 @@ impl GroundProblem {
         queue.push_back((self.initial_state.clone(), vec![]));
 
         while let Some((mut state, path)) = queue.pop_front() {
-            compute_derived_closure(&mut state, &self.derived_predicates, &HashMap::new());
+            compute_derived_closure(
+                &mut state,
+                &self.derived_predicates,
+                &HashMap::new(),
+                &self.quant_domain,
+            );
             if path.len() > PDDL8_MAX_PLAN_DEPTH {
                 continue;
             }
-            if self.constraints.iter().any(|c| !eval_condition(c, &state, &HashMap::new())) { continue; }
+            if self
+                .constraints
+                .iter()
+                .any(|c| !eval_condition(c, &state, &HashMap::new(), &self.quant_domain))
+            {
+                continue;
+            }
             if goal_set.iter().all(|g| state.contains(g)) {
                 let plan: Vec<Pddl8GroundAction> =
                     path.into_iter().map(|i| self.actions[i].clone()).collect();
@@ -222,7 +294,13 @@ impl GroundProblem {
             }
         }
 
-        PlannerOutcome::Exhausted
+        let goal_labels: Vec<String> = self.goal.iter().map(Pddl8GroundAtom::label).collect();
+        PlannerOutcome::Exhausted(ExhaustionWitness {
+            search_profile: LEGACY_WHOLE_RUN_SEARCH_PROFILE,
+            explored_states: visited.len() as u64,
+            frontier_empty: true,
+            digest: search_digest(&goal_labels, self.actions.len()),
+        })
     }
 }
 
@@ -254,6 +332,9 @@ pub struct GroundTemporalProblem {
     pub durative_actions: Vec<GroundDurativeAction>,
     pub constraints: Vec<PddlCondition>,
     pub derived_predicates: Vec<GroundDerivedPredicate>,
+    /// Object universe + type index quantified `Forall`/`Exists` conditions
+    /// range over. See `eval_quantifier`.
+    quant_domain: QuantifierDomain,
 }
 
 impl GroundTemporalProblem {
@@ -331,6 +412,11 @@ impl GroundTemporalProblem {
             ground_derived_schema(dp, &problem.object_types, &type_index, &mut derived_predicates)?;
         }
 
+        let quant_domain = QuantifierDomain {
+            objects: problem.objects.clone(),
+            type_index,
+        };
+
         Ok(Self {
             initial_atoms,
             initial_fn_values,
@@ -340,6 +426,7 @@ impl GroundTemporalProblem {
             durative_actions,
             constraints,
             derived_predicates,
+            quant_domain,
         })
     }
 
@@ -391,13 +478,41 @@ impl GroundTemporalProblem {
         // Pending completions: (end_time, action_idx)
         let mut pending: Vec<(f64, usize)> = Vec::new();
 
+        // True once this planner's single greedy trajectory has died — either
+        // no durative action could be scheduled and no future TIL/completion
+        // event remains (`else if !scheduled` below), or a trajectory
+        // constraint became false. Unlike `GroundProblem::find_plan`'s real
+        // multi-path BFS frontier, this forward-chaining planner only ever
+        // explores one trajectory, so either condition means that trajectory
+        // is dead — that's what `ExhaustionWitness::frontier_empty` stands in
+        // for below. Distinguishing this from simply running out of the
+        // `PDDL8_MAX_PLAN_DEPTH` iteration budget (which returns `Bounded`,
+        // not `Exhausted`) matters: the old code conflated both into the same
+        // unit `Exhausted` variant, which silently claimed "search exhausted
+        // its frontier" even when the loop was cut off mid-progress.
+        let mut trajectory_dead = false;
+        let mut iterations_run: u64 = 0;
+
         for _iteration in 0..PDDL8_MAX_PLAN_DEPTH {
+            iterations_run += 1;
             // (TILs are now applied when time advances, not on every iteration)
 
-            compute_derived_closure(&mut state, &self.derived_predicates, &fn_vals);
-            if self.constraints.iter().any(|c| !eval_condition(c, &state, &fn_vals)) { break; }
+            compute_derived_closure(
+                &mut state,
+                &self.derived_predicates,
+                &fn_vals,
+                &self.quant_domain,
+            );
+            if self
+                .constraints
+                .iter()
+                .any(|c| !eval_condition(c, &state, &fn_vals, &self.quant_domain))
+            {
+                trajectory_dead = true;
+                break;
+            }
             // Check goal
-            if eval_condition(&self.goal, &state, &fn_vals) {
+            if eval_condition(&self.goal, &state, &fn_vals, &self.quant_domain) {
                 let makespan = steps
                     .iter()
                     .map(|s| s.start_time + s.duration)
@@ -437,7 +552,7 @@ impl GroundTemporalProblem {
                     let applicable = da
                         .conditions
                         .iter()
-                        .all(|c| eval_condition(c, &state, &fn_vals));
+                        .all(|c| eval_condition(c, &state, &fn_vals, &self.quant_domain));
                     if !applicable {
                         continue;
                     }
@@ -524,12 +639,13 @@ impl GroundTemporalProblem {
                     }
                 }
             } else if !scheduled {
+                trajectory_dead = true;
                 break;
             }
         }
 
         // Final goal check after last completion
-        if eval_condition(&self.goal, &state, &fn_vals) {
+        if eval_condition(&self.goal, &state, &fn_vals, &self.quant_domain) {
             let makespan = steps
                 .iter()
                 .map(|s| s.start_time + s.duration)
@@ -541,30 +657,65 @@ impl GroundTemporalProblem {
             })
         }
 
-        PlannerOutcome::Exhausted
+        let goal_labels = vec![format!("{:?}", self.goal)];
+        if trajectory_dead {
+            PlannerOutcome::Exhausted(ExhaustionWitness {
+                search_profile: LEGACY_WHOLE_RUN_SEARCH_PROFILE,
+                explored_states: steps.len() as u64,
+                frontier_empty: true,
+                digest: search_digest(&goal_labels, self.actions.len() + self.durative_actions.len()),
+            })
+        } else {
+            // The loop ran through every iteration of the `PDDL8_MAX_PLAN_DEPTH`
+            // budget without the trajectory dying and without reaching the
+            // goal — a structural bound was hit, not a proof the trajectory
+            // had nowhere left to go.
+            PlannerOutcome::Bounded(BoundHit {
+                kind: BoundKind::PlanDepth,
+                limit: PDDL8_MAX_PLAN_DEPTH as u64,
+                observed: iterations_run,
+            })
+        }
     }
 }
 
 /// Evaluate a `PddlCondition` against a ground state.
-pub fn eval_condition(
+///
+/// `quant_domain` supplies the object universe + type index that
+/// `Forall`/`Exists` variables range over — see [`QuantifierDomain`] and
+/// [`eval_quantifier`]. Narrowed from `pub` to `pub(crate)` in this phase:
+/// nothing outside `bcinr-pddl` referenced this function (grepped), so
+/// threading the new `quant_domain` parameter through is not a breaking
+/// change to any real caller.
+pub(crate) fn eval_condition(
     cond: &PddlCondition,
     state: &BTreeSet<Pddl8GroundAtom>,
     fn_vals: &HashMap<String, f64>,
+    quant_domain: &QuantifierDomain,
 ) -> bool {
     match cond {
         PddlCondition::Atom(a) => state.contains(&Pddl8GroundAtom {
             pred: a.pred.clone(),
             args: a.args.clone(),
         }),
-        PddlCondition::Not(inner) => !eval_condition(inner, state, fn_vals),
-        PddlCondition::And(subs) => subs.iter().all(|s| eval_condition(s, state, fn_vals)),
-        PddlCondition::Or(subs) => subs.iter().any(|s| eval_condition(s, state, fn_vals)),
+        PddlCondition::Not(inner) => !eval_condition(inner, state, fn_vals, quant_domain),
+        PddlCondition::And(subs) => subs
+            .iter()
+            .all(|s| eval_condition(s, state, fn_vals, quant_domain)),
+        PddlCondition::Or(subs) => subs
+            .iter()
+            .any(|s| eval_condition(s, state, fn_vals, quant_domain)),
         PddlCondition::Imply(lhs, rhs) => {
-            !eval_condition(lhs, state, fn_vals) || eval_condition(rhs, state, fn_vals)
+            !eval_condition(lhs, state, fn_vals, quant_domain)
+                || eval_condition(rhs, state, fn_vals, quant_domain)
         }
-        PddlCondition::Timed(_, inner) => eval_condition(inner, state, fn_vals),
-        PddlCondition::Forall { .. } => true,
-        PddlCondition::Exists { .. } => false,
+        PddlCondition::Timed(_, inner) => eval_condition(inner, state, fn_vals, quant_domain),
+        PddlCondition::Forall { vars, body } => {
+            eval_quantifier(vars, body, state, fn_vals, quant_domain, true)
+        }
+        PddlCondition::Exists { vars, body } => {
+            eval_quantifier(vars, body, state, fn_vals, quant_domain, false)
+        }
         PddlCondition::Compare(lhs, op, rhs) => {
             let l = eval_numeric(lhs, fn_vals);
             let r = eval_numeric(rhs, fn_vals);
@@ -577,6 +728,117 @@ pub fn eval_condition(
             }
         }
     }
+}
+
+/// Evaluate a `Forall`/`Exists`-quantified condition over `quant_domain`'s
+/// object universe, restricted per-variable by each `(var, type)` pair's
+/// declared type — exactly like `ground_schema`'s per-parameter candidate
+/// lists. `require_all = true` implements `Forall` (every binding's
+/// substituted body must hold; vacuously **true** over an empty candidate
+/// set, standard first-order semantics for a universally-quantified
+/// statement over an empty domain); `require_all = false` implements
+/// `Exists` (at least one binding's substituted body must hold; vacuously
+/// **false** over an empty candidate set).
+///
+/// This replaces the previous hardcoded stub (`Forall => true`, `Exists =>
+/// false`, unconditionally, regardless of the body) with real quantifier
+/// evaluation: each quantified variable is bound, in turn, to every
+/// type-compatible object via [`subst_condition`], and the substituted body
+/// is recursively evaluated by [`eval_condition`]. Cost is
+/// `O(∏ᵢ |candidates(varᵢ)|)` per call — the same combinatorial shape
+/// grounding already pays for action-schema parameters — so this is exact,
+/// not approximate, but it is re-paid on every `eval_condition` call against
+/// a quantified condition (e.g. once per BFS state if a domain constraint
+/// uses a quantifier), not memoized.
+///
+/// This function alone is not the whole capability-admission story, though:
+/// `crate::capability::DefaultCapabilityProfile` marks
+/// `PddlFeature::UniversalPreconditions` only `Approximate` (this evaluator
+/// is genuinely correct, but the only parser-reachable path carrying a
+/// `PddlCondition::Forall` into it today is a `:durative-action`'s
+/// `:condition`; plain `:action` preconditions and `:goal` can't carry a
+/// `Forall` through this crate's flat-`Pddl8Atom` representation at all) and
+/// `PddlFeature::ExistentialPreconditions` `Unsupported` (this function's
+/// `Exists` arm is just as correct — see `ground::quantifier_tests` — but no
+/// parser path in this crate reaches it: `da-GD` has no `exists` production,
+/// and derived-predicate bodies drop `Exists` in `ground_derived_schema`'s
+/// `ground_condition` helper). See `crate::capability`'s module doc comment
+/// for the full per-feature accounting.
+fn eval_quantifier(
+    vars: &[(String, String)],
+    body: &PddlCondition,
+    state: &BTreeSet<Pddl8GroundAtom>,
+    fn_vals: &HashMap<String, f64>,
+    quant_domain: &QuantifierDomain,
+    require_all: bool,
+) -> bool {
+    // 8 params: threading (idx, vars, binding) for the recursive-bind state
+    // plus (body, state, fn_vals, quant_domain, require_all) unchanged
+    // through every level. A context struct would remove one clippy warning
+    // at the cost of an extra type for a single small private helper —
+    // not worth it here.
+    #[allow(clippy::too_many_arguments)]
+    fn recurse(
+        idx: usize,
+        vars: &[(String, String)],
+        binding: &mut HashMap<String, String>,
+        body: &PddlCondition,
+        state: &BTreeSet<Pddl8GroundAtom>,
+        fn_vals: &HashMap<String, f64>,
+        quant_domain: &QuantifierDomain,
+        require_all: bool,
+    ) -> bool {
+        if idx == vars.len() {
+            let bound_body = subst_condition(body, binding);
+            return eval_condition(&bound_body, state, fn_vals, quant_domain);
+        }
+        let (var_name, required_type) = &vars[idx];
+        let candidates = quant_domain.candidates(required_type);
+        if require_all {
+            candidates.into_iter().all(|obj| {
+                binding.insert(var_name.clone(), obj.clone());
+                let r = recurse(
+                    idx + 1,
+                    vars,
+                    binding,
+                    body,
+                    state,
+                    fn_vals,
+                    quant_domain,
+                    require_all,
+                );
+                binding.remove(var_name);
+                r
+            })
+        } else {
+            candidates.into_iter().any(|obj| {
+                binding.insert(var_name.clone(), obj.clone());
+                let r = recurse(
+                    idx + 1,
+                    vars,
+                    binding,
+                    body,
+                    state,
+                    fn_vals,
+                    quant_domain,
+                    require_all,
+                );
+                binding.remove(var_name);
+                r
+            })
+        }
+    }
+    let mut binding = HashMap::new();
+    recurse(
+        0,
+        vars,
+        &mut binding,
+        body,
+        state,
+        fn_vals,
+        quant_domain,
+        require_all,
+    )
 }
 
 fn apply_effect_at_start(
@@ -1094,11 +1356,6 @@ fn instantiate(
     })
 }
 
-use crate::error::PlannerOutcome;
-use wasm4pm_compat::pddl::{Pddl31Domain, Pddl31Problem};
-
-
-
 fn ground_derived_schema(
     dp: &DerivedPredicate,
     objects: &[(String, String)],
@@ -1129,7 +1386,13 @@ fn ground_derived_schema(
 
     fn ground_condition(c: &PddlCondition, binding: &HashMap<String, String>) -> Option<PddlCondition> {
         match c {
-            PddlCondition::Atom(a) => Some(PddlCondition::Atom(ground_atom(a, binding)?)),
+            PddlCondition::Atom(a) => {
+                let ga = ground_atom(a, binding)?;
+                Some(PddlCondition::Atom(Pddl8Atom {
+                    pred: ga.pred,
+                    args: ga.args,
+                }))
+            }
             PddlCondition::And(parts) => {
                 let mut ground_parts = Vec::new();
                 for p in parts {
@@ -1149,12 +1412,10 @@ fn ground_derived_schema(
                 Box::new(ground_condition(a, binding)?),
                 Box::new(ground_condition(b, binding)?),
             )),
-            PddlCondition::Numeric(cmp, lhs, rhs) => {
-                Some(PddlCondition::Numeric(cmp.clone(), lhs.clone(), rhs.clone()))
+            PddlCondition::Compare(lhs, cmp, rhs) => {
+                Some(PddlCondition::Compare(lhs.clone(), *cmp, rhs.clone()))
             }
-            PddlCondition::AtStart(c) => Some(PddlCondition::AtStart(Box::new(ground_condition(c, binding)?))),
-            PddlCondition::AtEnd(c) => Some(PddlCondition::AtEnd(Box::new(ground_condition(c, binding)?))),
-            PddlCondition::OverAll(c) => Some(PddlCondition::OverAll(Box::new(ground_condition(c, binding)?))),
+            PddlCondition::Timed(ts, c) => Some(PddlCondition::Timed(*ts, Box::new(ground_condition(c, binding)?))),
             _ => None,
         }
     }
@@ -1192,30 +1453,201 @@ fn ground_derived_schema(
     
     recurse(0, &mut HashMap::new(), dp, objects, type_index, out, &vars)
 }
-pub fn compute_derived_closure(
+/// Compute the least fixpoint of `derived` over `state` (a derived predicate
+/// fires once its body holds; firing can make other derived predicates'
+/// bodies hold, so this iterates to a fixpoint rather than a single pass).
+///
+/// Narrowed from `pub` to `pub(crate)` in this phase alongside
+/// `eval_condition` (see that function's doc comment) — no external caller
+/// referenced it.
+pub(crate) fn compute_derived_closure(
     state: &mut BTreeSet<Pddl8GroundAtom>,
     derived: &[GroundDerivedPredicate],
     fn_vals: &HashMap<String, f64>,
+    quant_domain: &QuantifierDomain,
 ) {
     let mut changed = true;
     while changed {
         changed = false;
         for dp in derived {
-            if !state.contains(&dp.head) {
-                if eval_condition(&dp.condition, state, fn_vals) {
-                    state.insert(dp.head.clone());
-                    changed = true;
-                }
+            if !state.contains(&dp.head) && eval_condition(&dp.condition, state, fn_vals, quant_domain) {
+                state.insert(dp.head.clone());
+                changed = true;
             }
         }
     }
 }
 
-pub fn check_capabilities(domain: &Pddl31Domain, _problem: &Pddl31Problem) -> Result<(), PlannerOutcome<()>> {
-    // If the domain defines object fluents or other unsupported capabilities, we reject them here.
-    if domain.requirements.contains(&":object-fluents".to_string()) {
-        return Err(PlannerOutcome::Unsupported("object fluents".to_string()));
+// `check_capabilities` (a narrow, ad hoc `:object-fluents` rejection with no
+// callers anywhere in this workspace) has been removed and superseded by
+// `crate::capability::admit_planning_task`, which performs the same
+// `:object-fluents` structural rejection (PDDL 3.1 object-valued fluents are
+// not implemented anywhere in this grounder — only numeric fluents are) as
+// part of a much more complete admission gate over all sixteen
+// `PddlFeature`s. See `crate::capability` for the replacement.
+
+#[cfg(test)]
+mod quantifier_tests {
+    //! White-box tests for `eval_quantifier`/`eval_condition`'s `Forall`/
+    //! `Exists` handling — constructed directly against `QuantifierDomain`
+    //! and `PddlCondition`, bypassing the PDDL parser entirely. This is
+    //! deliberate: as documented in `crate::capability`, the parser has its
+    //! own pre-existing, separate gaps (durative-action conditions support
+    //! `Forall` but not `Exists` at the grammar level; plain `:action`
+    //! preconditions and `:goal` can't carry either quantifier through
+    //! `Pddl8ActionSchema.preconditions`/`Pddl8Problem.goal`'s flat
+    //! `Vec<Pddl8Atom>` representation) — those are parser/grounding-pipeline
+    //! limitations, not evaluator bugs. These tests prove the evaluator
+    //! itself — the actual fix for the `Forall => true` / `Exists => false`
+    //! stub — is correct, independent of which parser paths currently reach
+    //! it. `tests/durative_quantifiers.rs` separately proves `Forall` is
+    //! ALIVE end-to-end through the one parser path that does carry it
+    //! (durative-action `:condition`).
+    use super::*;
+
+    fn domain(objects: &[&str], ready: &[&str]) -> (QuantifierDomain, BTreeSet<Pddl8GroundAtom>) {
+        let type_index = TypeIndex {
+            object_type: HashMap::new(),
+            parent: HashMap::new(),
+        };
+        let quant_domain = QuantifierDomain {
+            objects: objects.iter().map(|s| s.to_string()).collect(),
+            type_index,
+        };
+        let state: BTreeSet<Pddl8GroundAtom> = ready
+            .iter()
+            .map(|o| Pddl8GroundAtom {
+                pred: "ready".to_string(),
+                args: vec![o.to_string()],
+            })
+            .collect();
+        (quant_domain, state)
     }
-    // E.g. Check other requirements if necessary.
-    Ok(())
+
+    fn ready_body() -> PddlCondition {
+        PddlCondition::Atom(Pddl8Atom {
+            pred: "ready".to_string(),
+            args: vec!["?i".to_string()],
+        })
+    }
+
+    #[test]
+    fn forall_is_true_when_every_object_satisfies_body() {
+        let (qd, state) = domain(&["a", "b"], &["a", "b"]);
+        let cond = PddlCondition::Forall {
+            vars: vec![("?i".to_string(), "object".to_string())],
+            body: Box::new(ready_body()),
+        };
+        assert!(eval_condition(&cond, &state, &HashMap::new(), &qd));
+    }
+
+    #[test]
+    fn forall_is_false_when_one_object_fails_body() {
+        let (qd, state) = domain(&["a", "b"], &["a"]);
+        let cond = PddlCondition::Forall {
+            vars: vec![("?i".to_string(), "object".to_string())],
+            body: Box::new(ready_body()),
+        };
+        assert!(
+            !eval_condition(&cond, &state, &HashMap::new(), &qd),
+            "b is not ready, so forall must be false — the old stub always returned true here"
+        );
+    }
+
+    #[test]
+    fn forall_is_vacuously_true_over_an_empty_object_domain() {
+        let (qd, state) = domain(&[], &[]);
+        let cond = PddlCondition::Forall {
+            vars: vec![("?i".to_string(), "object".to_string())],
+            body: Box::new(ready_body()),
+        };
+        assert!(eval_condition(&cond, &state, &HashMap::new(), &qd));
+    }
+
+    #[test]
+    fn exists_is_true_when_at_least_one_object_satisfies_body() {
+        let (qd, state) = domain(&["a", "b"], &["b"]);
+        let cond = PddlCondition::Exists {
+            vars: vec![("?i".to_string(), "object".to_string())],
+            body: Box::new(ready_body()),
+        };
+        assert!(eval_condition(&cond, &state, &HashMap::new(), &qd));
+    }
+
+    #[test]
+    fn exists_is_false_when_no_object_satisfies_body() {
+        let (qd, state) = domain(&["a", "b"], &[]);
+        let cond = PddlCondition::Exists {
+            vars: vec![("?i".to_string(), "object".to_string())],
+            body: Box::new(ready_body()),
+        };
+        assert!(
+            !eval_condition(&cond, &state, &HashMap::new(), &qd),
+            "no object is ready, so exists must be false — the old stub always returned false \
+             here too, so this specific case coincidentally matched the stub, but for the wrong \
+             reason (constant, not evaluated)"
+        );
+    }
+
+    #[test]
+    fn exists_is_vacuously_false_over_an_empty_object_domain() {
+        let (qd, state) = domain(&[], &[]);
+        let cond = PddlCondition::Exists {
+            vars: vec![("?i".to_string(), "object".to_string())],
+            body: Box::new(ready_body()),
+        };
+        assert!(!eval_condition(&cond, &state, &HashMap::new(), &qd));
+    }
+
+    #[test]
+    fn nested_forall_exists_binds_independently() {
+        // forall ?i exists ?j (paired i j) — a genuinely two-variable
+        // quantifier nesting, proving `eval_quantifier`'s recursive binding
+        // substitutes each variable independently rather than aliasing them.
+        let type_index = TypeIndex {
+            object_type: HashMap::new(),
+            parent: HashMap::new(),
+        };
+        let qd = QuantifierDomain {
+            objects: vec!["a".to_string(), "b".to_string()],
+            type_index,
+        };
+        // "a" pairs with "b" and "b" pairs with "a" (a ring), so every ?i has
+        // some ?j != ?i with (paired ?i ?j) true.
+        let state: BTreeSet<Pddl8GroundAtom> = [("a", "b"), ("b", "a")]
+            .iter()
+            .map(|(x, y)| Pddl8GroundAtom {
+                pred: "paired".to_string(),
+                args: vec![x.to_string(), y.to_string()],
+            })
+            .collect();
+        let inner_body = PddlCondition::Atom(Pddl8Atom {
+            pred: "paired".to_string(),
+            args: vec!["?i".to_string(), "?j".to_string()],
+        });
+        let exists_j = PddlCondition::Exists {
+            vars: vec![("?j".to_string(), "object".to_string())],
+            body: Box::new(inner_body),
+        };
+        let forall_i_exists_j = PddlCondition::Forall {
+            vars: vec![("?i".to_string(), "object".to_string())],
+            body: Box::new(exists_j),
+        };
+        assert!(eval_condition(&forall_i_exists_j, &state, &HashMap::new(), &qd));
+
+        // Break the ring (only a->b, no b->a): now ?i=b has no matching ?j.
+        let broken_state: BTreeSet<Pddl8GroundAtom> = [("a", "b")]
+            .iter()
+            .map(|(x, y)| Pddl8GroundAtom {
+                pred: "paired".to_string(),
+                args: vec![x.to_string(), y.to_string()],
+            })
+            .collect();
+        assert!(!eval_condition(
+            &forall_i_exists_j,
+            &broken_state,
+            &HashMap::new(),
+            &qd
+        ));
+    }
 }

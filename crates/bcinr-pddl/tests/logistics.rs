@@ -51,7 +51,7 @@ fn logistics_plan_found_and_executed() {
     assert_eq!(problem.goal.len(), 1);
 
     let gp = GroundProblem::build(&domain, &problem, None).expect("grounding");
-    let tape = gp.find_plan().expect("plan found");
+    let tape = gp.find_plan().into_result().expect("plan found");
 
     // BFS finds shortest plan (1–3 steps; without typing, drive-truck alone may suffice)
     assert!(tape.len() >= 1, "plan must have at least one step");
@@ -117,7 +117,7 @@ fn logistics_step_receipt_chain_is_deterministic() {
     let domain = domain_from_pddl(DOMAIN).unwrap();
     let problem = problem_from_pddl(PROBLEM).unwrap();
     let gp = GroundProblem::build(&domain, &problem, None).unwrap();
-    let tape = gp.find_plan().unwrap();
+    let tape = gp.find_plan().into_result().unwrap();
 
     let init: BTreeSet<Pddl8GroundAtom> = problem
         .init

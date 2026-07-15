@@ -32,7 +32,7 @@ fn test_differential_grounding() {
                 (at p1 l2)
                 (at p2 l1)
             )
-            (:goal (and (at p1 l1) (at p2 l2)))
+            (:goal (and (in p1 t2) (in p2 t1)))
         )
     "#;
 
@@ -42,7 +42,7 @@ fn test_differential_grounding() {
     let naive = GroundProblem::build(&domain, &problem, None).unwrap();
     let lazy = IndexedGroundProblem::build(&domain, &problem, None).unwrap();
 
-    let naive_plan = naive.find_plan().unwrap();
+    let naive_plan = naive.find_plan().into_result().unwrap();
     let lazy_plan = match lazy.find_plan() {
         bcinr_pddl::PlannerOutcome::Found(p) => p,
         _ => panic!("Expected Found"),

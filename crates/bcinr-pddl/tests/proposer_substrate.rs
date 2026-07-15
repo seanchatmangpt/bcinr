@@ -111,7 +111,7 @@ fn three_independent_proposals_yield_one_coherent_capacity_respecting_receipted_
 
     // Stage 1: the substrate reconciles all three proposals into one
     // feasible schedule — no proposer did this reasoning itself.
-    let plan = gtp.find_temporal_plan().expect("temporal plan found");
+    let plan = gtp.find_temporal_plan().into_result().expect("temporal plan found");
     assert_eq!(
         plan.steps.len(),
         3,

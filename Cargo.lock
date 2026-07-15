@@ -260,15 +260,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "bcinr-mfw-ir"
+version = "26.6.26"
+dependencies = [
+ "blake3",
+]
+
+[[package]]
 name = "bcinr-pddl"
 version = "26.6.26"
 dependencies = [
+ "bcinr-mfw-ir",
  "blake3",
  "chicago-tdd-tools",
  "chrono",
  "divan",
  "pddl",
  "prolog8",
+ "proptest",
  "serde",
  "serde_json",
  "wasm4pm-compat",
@@ -279,6 +288,7 @@ name = "bcinr-powl"
 version = "26.6.25"
 dependencies = [
  "bcinr-logic",
+ "bcinr-mfw-ir",
  "blake3",
  "chicago-tdd-tools",
  "divan",
