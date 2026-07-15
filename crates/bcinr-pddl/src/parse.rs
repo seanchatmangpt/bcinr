@@ -273,7 +273,35 @@ pub fn problem31_from_pddl(text: &str) -> Result<Pddl31Problem, Pddl8Error> {
                 init_fn_values.push((func, num_f64(*num)));
             }
             InitElement::IsObject(_, _) => {
-                // Object fluent initial assignment — TODO: extend if needed
+                // Object-fluent initial-value assignment (`(= (at pkg1)
+                // loc1)`-style init facts binding an object-valued fluent,
+                // not a numeric one — distinct from `IsValue` above, which
+                // only handles numeric `(= (fluent) number)` init facts).
+                // Silently dropped: no atom of any kind is added to
+                // `init_atoms`/`init_fn_values`, so the initial value is
+                // simply lost. This is more honest than the fabricated-atom
+                // pattern `parse::lower_primitive_effect_full`'s
+                // `AssignObjectFluent` arm used to have (see
+                // `OBJECT_FLUENT_SENTINEL_PRED`'s doc comment) — dropping
+                // silently is a real information loss, not a corrupted
+                // fact, but it is still undisclosed in
+                // `capability.rs`'s per-feature accounting: that module
+                // documents object-fluent *effects* being structurally
+                // refused (the `ObjectFluents` requirement check in
+                // `admit_planning_task`, keyed on both the declared
+                // requirement and, since the object-fluent-effect fix, the
+                // content scan too) but never mentions that object-fluent
+                // *initial values* are silently discarded during problem
+                // parsing regardless of whether the domain ends up admitted
+                // or refused. Since `admit_planning_task` already refuses
+                // any domain using object-fluent constructs at all (see
+                // above), a domain that reaches this arm and is later
+                // admitted is, by construction, one whose init block used an
+                // object-fluent assignment while its domain used none —
+                // an edge case with no matching effect to be inconsistent
+                // with, but still worth this comment rather than a bare
+                // TODO, since a caller inspecting `init_atoms` for
+                // completeness has no signal that anything was dropped.
             }
         }
     }

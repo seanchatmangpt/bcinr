@@ -486,6 +486,15 @@ pub fn admit_planning_task(
     // `parse::OBJECT_FLUENT_SENTINEL_PRED` sentinel atom in place of the
     // real assignment specifically so this scan can catch that case too
     // (see that arm's doc comment).
+    //
+    // This check covers object-fluent *effects* only. Object-fluent
+    // *initial values* (`(= (at pkg1) loc1)`-style `:init` facts) are a
+    // separate, lower-severity gap: `parse::problem31_from_pddl`'s
+    // `InitElement::IsObject` arm silently drops them (no atom of any kind
+    // added — a real information loss, but more honest than fabricating one)
+    // regardless of whether the domain this check runs against ends up
+    // admitted or refused, since it happens during *problem* parsing, not
+    // here. See that arm's doc comment for the full disclosure.
     let declares_object_fluents = domain.requirements.iter().any(|r| r == "ObjectFluents");
     let uses_object_fluent_construct = domain
         .actions
