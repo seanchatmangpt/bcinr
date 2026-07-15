@@ -253,6 +253,36 @@ impl GroundProblem {
     /// (same file): see `crates/bcinr-pddl/tests/depth_bound_exhaustion_conflation.rs`
     /// for an adversarial regression fixture (a 70-step chain domain whose
     /// only plan exceeds the 64-step depth cap) that pins this down.
+    ///
+    /// # Complexity
+    ///
+    /// This is uninformed forward BFS with **no heuristic** — every reached
+    /// state's *entire* fact set is inserted into a `HashSet` for dedup, and
+    /// every candidate action from that state is expanded before the queue
+    /// advances. There is no polynomial guarantee: in the worst case the
+    /// reachable-state space is exponential in the grounded-action count
+    /// (`self.actions.len()`), since each of up to `A` applicable actions
+    /// can branch at every one of up to `PDDL8_MAX_PLAN_DEPTH` levels before
+    /// the depth cap or dedup catches it — i.e. worst-case `O(A ^
+    /// PDDL8_MAX_PLAN_DEPTH)` states visited, each doing `O(A * k)` work
+    /// (candidate filtering + per-action apply, `k` = average
+    /// precondition/effect-list size) plus a `state.len()`-sized clone for
+    /// the visited-set key. The only pruning is the depth cap
+    /// (`PDDL8_MAX_PLAN_DEPTH`) and the full-state-equality dedup — neither
+    /// bounds the branching factor itself. This is the "exact" half of the
+    /// exact/exploit rail pair `crate::search::ExactBfsRail::step` wraps
+    /// verbatim (see that type's own doc comment): `FairRailScheduler`'s
+    /// fairness invariant guarantees an `ExactBfsRail::step` call — and
+    /// therefore this function — fires at least once every `max_gap`
+    /// scheduler selections, so this cost is incurred on a real, recurring
+    /// hot path, not a one-time setup cost. Contrast with the exploit rail's
+    /// [`crate::search::QLensRail`]'s `step` (via `ExploitSearchRail`), which
+    /// is `O(A * k)` per step by construction (bounded branching, no
+    /// backtracking) — this function has
+    /// no such bound. `bcinr-bench/benches/mfw_hotpath_bench.rs` benchmarks
+    /// `EventSet` ops, `concurrency_admits`, and `q_lens`, but does not
+    /// benchmark `find_plan`/`ExactBfsRail::step`, so this cost is
+    /// documented here but not yet measured anywhere in the retrofit.
     pub fn find_plan(&self) -> PlannerOutcome<Pddl8Tape> {
         use std::collections::VecDeque;
 
