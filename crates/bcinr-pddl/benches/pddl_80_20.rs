@@ -76,8 +76,23 @@ pub mod ingress {
     use super::*;
     use divan::Bencher;
 
-    const DOMAIN: &str = "(define (domain ingress) (:requirements :strips) (:predicates (p)))";
-    const PROBLEM: &str = "(define (problem p) (:domain ingress) (:init (p)) (:goal (p)))";
+    // Must declare at least one `:action`: `GroundProblem::build` legitimately
+    // returns `Pddl8Error::EmptyGrounding` for an action-less domain (there is
+    // nothing to instantiate), and `measure_and_prove_times` -- shared by
+    // every benchmark in this file, all of which use action-bearing domains
+    // -- unconditionally calls `GroundProblem::build(..).unwrap()` to measure
+    // the full IR -> ground -> solve -> POWL pipeline, not just parsing. The
+    // previous action-less domain made that `.unwrap()` panic here specifically
+    // (`cargo test -p bcinr-pddl --bench pddl_80_20`), even though every other
+    // benchmark in this module worked fine. One trivial action keeps this
+    // fixture minimal (matching "ingress" = text-to-IR overhead measurement)
+    // while making grounding genuinely succeed so the shared helper's full
+    // pipeline (and its `t_total >= t_ir + t_ground + t_solve + t_powl` proof)
+    // is actually exercised, the same as every other benchmark here.
+    const DOMAIN: &str = "(define (domain ingress) (:requirements :strips) \
+                           (:predicates (p) (q)) \
+                           (:action noop :parameters () :precondition (p) :effect (q)))";
+    const PROBLEM: &str = "(define (problem p) (:domain ingress) (:init (p)) (:goal (q)))";
 
     #[divan::bench]
     fn rdf_via_text_to_ir(bencher: Bencher) {
