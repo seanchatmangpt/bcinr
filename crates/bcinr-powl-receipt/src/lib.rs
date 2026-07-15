@@ -18,6 +18,7 @@ pub mod causal_receipt;
 pub mod chain;
 pub mod conformance;
 pub mod denial;
+pub mod execution;
 pub mod intern;
 pub mod ocel_emit;
 pub mod pm_bridge;
