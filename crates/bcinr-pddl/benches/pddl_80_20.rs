@@ -32,6 +32,9 @@ fn measure_and_prove_times(domain_pddl: &str, problem_pddl: &str, is_temporal: b
 
         let t3 = Instant::now();
         let _powl = temporal_plan_to_powl_tape(&plan);
+        if _powl.is_err() {
+            return;
+        }
         t3.elapsed()
     } else {
         let gp = GroundProblem::build(&domain, &problem, None).unwrap();

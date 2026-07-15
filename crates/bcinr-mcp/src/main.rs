@@ -677,7 +677,12 @@ impl BcinrServer {
             }
         };
 
-        let specs = temporal_plan_to_powl_tape(&temporal_plan);
+        let specs = match temporal_plan_to_powl_tape(&temporal_plan) {
+            Err(e) => {
+                return serde_json::json!({ "ok": false, "error": e.to_string() }).to_string()
+            }
+            Ok(specs) => specs,
+        };
         let ops_arr: Vec<serde_json::Value> = specs
             .iter()
             .map(|s| {

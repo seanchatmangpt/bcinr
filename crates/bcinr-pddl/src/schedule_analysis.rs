@@ -92,7 +92,11 @@ pub fn analyze_schedule_instrumented(
 
     let t_base = Instant::now();
     let plan = gtp.find_temporal_plan().into_result()?;
-    let ops = temporal_plan_to_powl_tape(&plan);
+    let ops = temporal_plan_to_powl_tape(&plan)?;
+    // `temporal_plan_to_powl_tape` now refuses (rather than silently
+    // truncating) any plan longer than `MAX_POWL_TAPE_STEPS` (64), so this
+    // `.min(64)` is a provable no-op restating this function's own
+    // documented 64-op bound, not a silent-truncation safety net.
     let n = ops.len().min(64);
 
     let (earliest_start, earliest_finish) = forward_pass(&ops, n);

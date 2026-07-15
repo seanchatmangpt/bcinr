@@ -67,7 +67,8 @@ fn test_manufacture_world_wrong_domain() {
 fn test_powl_bridge() {
     let receipt = manufacture_world(CLASSICAL_DOMAIN, CLASSICAL_PROBLEM, "test-powl-001", &[]);
     if receipt.admitted {
-        let tape = temporal_plan_to_powl_tape(&receipt.plan);
+        let tape = temporal_plan_to_powl_tape(&receipt.plan)
+            .expect("this fixture's plan is well within the 64-step tape cap");
         assert!(!tape.is_empty(), "POWL tape must not be empty");
     }
 }

@@ -178,7 +178,7 @@ pub fn run_dfcm_crown_suite() -> Result<DfcmBenchReceipt, Pddl8Error> {
             let alloc_before = crate::alloc_counter::counting_alloc::snapshot();
 
             let t1 = Instant::now();
-            let ops = temporal_plan_to_powl_tape(&plan);
+            let ops = temporal_plan_to_powl_tape(&plan)?;
             topology_ns += t1.elapsed().as_nanos();
             max_ops_seen = max_ops_seen.max(ops.len().min(u8::MAX as usize) as u8);
             #[cfg(feature = "dhat-heap")]
