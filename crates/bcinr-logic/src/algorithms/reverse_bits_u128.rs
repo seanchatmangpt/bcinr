@@ -122,6 +122,29 @@ mod tests {
         // (0, 1): bit 64 set in input. Reversed 128-bit has bit 63 set.
         // Low output word = 0x8000_0000_0000_0000
         assert_eq!(reverse_bits_u128(0, 1), 0x8000_0000_0000_0000u64);
+
+        // --- mutant divergence ---
+        // Same convention as this crate's sibling algorithm files (e.g.
+        // `bit_swap_u64.rs`): the NEGATIVE MUTANTS defined above exist to be
+        // exercised here, not merely declared — an unwired mutant is dead
+        // code (and, more importantly, proves nothing about this test
+        // suite's ability to catch the bug class it represents).
+        let baseline = reverse_bits_u128_reference(42, 1337);
+        assert_ne!(
+            mutant_reverse_bits_u128_1(42, 1337),
+            baseline,
+            "mutant 1 (identity bluff) must diverge from reference"
+        );
+        assert_ne!(
+            mutant_reverse_bits_u128_2(42, 1337),
+            baseline,
+            "mutant 2 (bit-skip bluff) must diverge from reference"
+        );
+        assert_ne!(
+            mutant_reverse_bits_u128_3(42, 1337),
+            baseline,
+            "mutant 3 (operator-swap bluff) must diverge from reference"
+        );
     }
 
     // -------------------------------------------------------------------------

@@ -158,7 +158,7 @@ mod tests {
     #[test]
     fn test_sigmoid_sat_u32_large_negative() {
         // sigmoid(-8.0) ≈ 0.0; in Q16: input=-8*65536 as u64, output≈0
-        let neg_input = ((-524288i64) as u64);
+        let neg_input = (-524288i64) as u64;
         let result = sigmoid_sat_u32(neg_input, 0);
         assert!(
             result <= 3577,

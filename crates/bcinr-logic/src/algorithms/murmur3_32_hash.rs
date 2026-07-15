@@ -85,7 +85,7 @@ pub fn murmur3_32_hash(data: &[u8], seed: u32) -> u32 {
     let m2 = ((tail_len > 2) as u32).wrapping_neg();
     k1 ^= ((tail.get(2).copied().unwrap_or(0) as u32) & m2) << 16;
     k1 ^= ((tail.get(1).copied().unwrap_or(0) as u32) & m1) << 8;
-    k1 ^= (tail.get(0).copied().unwrap_or(0) as u32) & m0;
+    k1 ^= (tail.first().copied().unwrap_or(0) as u32) & m0;
     // Only mix k1 into h1 when tail_len > 0 (branchless: mask by any-byte-present)
     let any = ((tail_len > 0) as u32).wrapping_neg();
     let k1_mixed = {

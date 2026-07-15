@@ -77,7 +77,21 @@ impl<const A: usize, const B: usize, const C: usize> HierarchicalTimeWheel<A, B,
 
     /// Construct a new empty wheel.
     #[must_use]
+    #[allow(clippy::let_unit_value)]
     pub const fn new() -> Self {
+        // `let _ = Self::_X_POW2;` intentionally binds each associated
+        // `const _X_POW2: ()` (a compile-time `assert!`) rather than merely
+        // naming it as a bare path-statement: an associated const in a
+        // generic impl is only evaluated when a specific monomorphization
+        // actually references it, so this is what forces `A`/`B`/`C`'s
+        // power-of-two assertion to run (and fail at compile time on a bad
+        // instantiation) when `new()` is monomorphized. A bare
+        // `Self::_A_POW2;` statement (clippy::let_unit_value's own
+        // suggestion) still compiles and still evaluates the const, but
+        // rustc's `path_statements` lint then flags it as having "no
+        // effect" — true from rustc's local dataflow view, false in intent
+        // — so the `let _ =` form is kept and the (correct-for-this-idiom)
+        // `let_unit_value` lint is silenced explicitly instead.
         let _ = Self::_A_POW2;
         let _ = Self::_B_POW2;
         let _ = Self::_C_POW2;

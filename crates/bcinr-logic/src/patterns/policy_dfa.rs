@@ -25,7 +25,8 @@ pub struct ConstantShapePolicyDfa {
 }
 
 impl ConstantShapePolicyDfa {
-    #[must_use]
+    // No explicit #[must_use]: `Result` is already `#[must_use]` in std, so
+    // an additional attribute here would be redundant (clippy::double_must_use).
     pub fn new_checked(
         table: &'static [usize],
         alphabet_size: usize,

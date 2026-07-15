@@ -346,7 +346,7 @@ pub fn q16_sin_approx(theta: i32) -> i32 {
     let t = {
         let raw = theta % TWO_PI;
         // Branchless: if raw < 0, add TWO_PI.
-        let neg_mask = (raw >> 31) as i32; // -1 if negative, 0 otherwise
+        let neg_mask = raw >> 31; // -1 if negative, 0 otherwise
         raw + (TWO_PI & neg_mask)
     };
     // Determine if t is in [pi, 2*pi]: second_half = 1 if t >= PI, else 0.

@@ -436,9 +436,7 @@ pub fn gcd_u64(mut a: u64, mut b: u64) -> u64 {
         b >>= b.trailing_zeros();
         // Ensure a <= b.
         if a > b {
-            let tmp = a;
-            a = b;
-            b = tmp;
+            core::mem::swap(&mut a, &mut b);
         }
         b -= a;
         if b == 0 {

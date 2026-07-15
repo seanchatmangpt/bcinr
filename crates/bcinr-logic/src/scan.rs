@@ -298,7 +298,7 @@ pub fn segmented_prefix_sum_u32x8(values: [u32; 8], flags: [bool; 8]) -> [u32; 8
     (0..8usize).for_each(|i| {
         // reset mask: 0xFFFF_FFFF on segment start, 0 otherwise.
         let reset = (flags[i] as u32).wrapping_neg();
-        acc = acc & !reset;
+        acc &= !reset;
         acc = acc.wrapping_add(values[i]);
         out[i] = acc;
     });

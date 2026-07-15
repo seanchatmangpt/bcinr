@@ -39,8 +39,9 @@ mod tests {
     // -------------------------------------------------------------------------
     fn modular_mul_u64_reference(val: u64, aux: u64) -> u64 {
         // Independent: accumulate the product via repeated modular doubling
-        // (Russian-peasant), reducing with subtraction-based loops instead of `%`.
-        const M: u128 = (1u128 << 61) - 1;
+        // (Russian-peasant), reducing with subtraction-based loops instead of
+        // `%`. The reduction modulus lives solely in `rem`'s own inner `M`
+        // (this function has no direct use for a copy of its own).
         fn rem(mut x: u128) -> u128 {
             const M: u128 = (1u128 << 61) - 1;
             while x >= M {

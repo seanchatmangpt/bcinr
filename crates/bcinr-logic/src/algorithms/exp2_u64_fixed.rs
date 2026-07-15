@@ -33,7 +33,7 @@ pub fn exp2_u64_fixed(val: u64, _aux: u64) -> u64 {
     let safe_exp = int_exp & 63;
     let result = 65536u64.wrapping_shl(safe_exp);
     // Select: if saturated return u64::MAX, else return result
-    (result & !sat_mask) | (u64::MAX & sat_mask)
+    (result & !sat_mask) | sat_mask
 }
 
 #[cfg(test)]
