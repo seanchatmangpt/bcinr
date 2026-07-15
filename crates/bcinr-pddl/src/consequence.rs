@@ -30,6 +30,14 @@
 //!   ("semantic cache" in the mission brief means "a cache keyed on planning
 //!   semantics," not "a cache with fuzzy/approximate matching"). Nothing in
 //!   this module claims otherwise.
+//! - A standing hit's soundness rides entirely on `theory_digest` actually
+//!   distinguishing theories that differ — see
+//!   [`crate::capability::domain_problem_digest`]'s doc comment for the
+//!   precise, current coverage boundary (action bodies, durations, and
+//!   `:init`/`:goal` content are covered; `:constraints`/`:preferences`/
+//!   `:metric`/PDDL+ `:process`/`:event` are not, as of this phase). This
+//!   module does not itself compute `theory_digest`; it only trusts the
+//!   caller's key.
 //! - `SemanticOptimizationContract` from `bcinr_mfw_ir::contracts` is
 //!   deliberately **not** wired in here: doing so would require citing a
 //!   `Proven` `FormalLawRef` for "a cache hit is semantically equivalent to
@@ -193,8 +201,18 @@ impl ConsequenceHorizon for MinimumMakespanHorizon {
 
 /// The (only, mandatory) cache profile: an exact `(state, theory, horizon)`
 /// triple. Two calls with the same key are, by construction, asking the same
-/// question of the same theory in the same state — a standing hit is
-/// therefore exactly as sound as re-running the search.
+/// question of the same *digest* in the same state — a standing hit is
+/// exactly as sound as re-running the search **only insofar as
+/// `theory_digest` actually distinguishes theories that differ**. This
+/// holds today for theories differing in action bodies, durations, or
+/// `:init`/`:goal` content (see
+/// [`crate::capability::domain_problem_digest`], which computes the
+/// `theory_digest` every caller of this cache is expected to supply), but
+/// not yet for theories differing only in `:constraints`/`:preferences`/
+/// `:metric`/PDDL+ `:process`/`:event` — two such theories still collide on
+/// `theory_digest` and this cache cannot tell them apart. `ExactStateKey`
+/// itself does no theory hashing; it is exactly as sound as whatever digest
+/// its caller hands it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ExactStateKey {
     pub state_digest: Digest,

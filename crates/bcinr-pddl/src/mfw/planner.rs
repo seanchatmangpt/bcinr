@@ -22,10 +22,21 @@
 //! this theory") — it does not preserve the plan that proved it. So:
 //!
 //! - A cached `false` (goal was proven unreachable from this exact
-//!   `(state, theory)` before) genuinely lets [`plan`](MfwPlanner::plan)
-//!   short-circuit the entire rest of the pipeline with zero search — this
-//!   is a real, sound use of the cache, not a stub. ALIVE, verified this
-//!   session: `plan()`'s own pipeline never actually *writes* a `false`
+//!   `(state, theory)` before) lets [`plan`](MfwPlanner::plan) short-circuit
+//!   the entire rest of the pipeline with zero search — real, not a stub,
+//!   and sound **to the extent `theory_digest` actually distinguishes
+//!   theories that differ** (see
+//!   [`crate::capability::domain_problem_digest`]'s doc comment for the
+//!   precise, current coverage boundary: action bodies, durations, and
+//!   `:init`/`:goal` are covered; `:constraints`/`:preferences`/`:metric`/
+//!   PDDL+ are not, so two domains differing only in one of those would
+//!   still share a `theory_digest` and could produce a false
+//!   `CachedUnreachable`). `self.cache` is a persistent field reused across
+//!   every `plan()` call on `self`, including calls with different
+//!   `domain_text`/`problem_text` — so this short-circuit's soundness is a
+//!   live property of every call, not a one-time construction-time check.
+//!   ALIVE, verified this session: `plan()`'s own pipeline never actually
+//!   *writes* a `false`
 //!   entry (`self.cache.admit` is called exactly once, and only after
 //!   `goal_reached` is already confirmed `true` — every non-`Found`
 //!   portfolio outcome and the `!goal_reached` case both `return Err(...)`
@@ -110,10 +121,14 @@ pub enum MfwPlanError {
     Admission(PlannerFailure),
     /// [`GroundProblem::build`] failed.
     Grounding(Pddl8Error),
-    /// The standing cache already proved this exact `(state, theory)`
-    /// unreachable — a real, sound zero-search short-circuit, not an error
-    /// in the usual sense, but terminal for `plan()` because there is
-    /// nothing further to build a `PlannedWorkflow` from.
+    /// The standing cache already proved this exact `(state, theory_digest)`
+    /// unreachable — a real, zero-search short-circuit, not an error in the
+    /// usual sense, but terminal for `plan()` because there is nothing
+    /// further to build a `PlannedWorkflow` from. Sound to the extent
+    /// `theory_digest` actually distinguishes theories that differ — see
+    /// the module doc comment's "Real gap #1" section and
+    /// [`crate::capability::domain_problem_digest`] for the current
+    /// coverage boundary.
     CachedUnreachable,
     /// The portfolio's exact rail proved no plan exists.
     PortfolioExhausted(bcinr_mfw_ir::ExhaustionWitness),
@@ -735,6 +750,88 @@ mod tests {
             matches!(outcome, Err(MfwPlanError::CachedUnreachable)),
             "expected Err(CachedUnreachable) from the standing-false-hit short-circuit, got \
              {outcome:?}"
+        );
+    }
+
+    /// The exact false-negative risk the module doc comment's "Real gap #1"
+    /// section now names: `self.cache` is a persistent field reused across
+    /// `plan()` calls with *different* `domain_text`, keyed by
+    /// `(state_digest, theory_digest)`. If two structurally-different
+    /// domains shared a `theory_digest` (true before
+    /// `capability::domain_problem_digest` was deepened to hash action
+    /// bodies, not just names) and happened to also share `state_digest`
+    /// (identical `:init` text, as here), a `false` entry cached under one
+    /// domain's key would incorrectly short-circuit `plan()` for the
+    /// *other* domain too, returning `Err(CachedUnreachable)` for a domain
+    /// that is actually solvable.
+    ///
+    /// `domain_a`/`domain_b` below share every name (domain name,
+    /// predicate names, action name) and the same `:init` text, but have
+    /// swapped precondition/effect bodies: under `domain_b`, `(goal (p))`
+    /// is genuinely unreachable (the only action produces `q`, not `p`);
+    /// under `domain_a`, it is trivially reachable in one step.
+    #[test]
+    fn a_false_cache_entry_for_one_domain_does_not_leak_into_a_same_named_different_domain() {
+        const SWAP_PROBLEM: &str = "(define (problem pr) (:domain d) (:init) (:goal (p)))";
+        const DOMAIN_A_REACHABLE: &str = "(define (domain d) (:predicates (p) (q)) \
+             (:action a1 :parameters () :precondition () :effect (p)))";
+        const DOMAIN_B_UNREACHABLE: &str = "(define (domain d) (:predicates (p) (q)) \
+             (:action a1 :parameters () :precondition () :effect (q)))";
+
+        let mut planner = new_planner();
+        let profile = DefaultCapabilityProfile;
+
+        // Hand-seed a genuine `false` entry for domain_b's real key (mirrors
+        // the preceding test: `plan()` itself never writes `false`, see
+        // "Real gap #1").
+        let domain31_b = domain31_from_pddl(DOMAIN_B_UNREACHABLE).unwrap();
+        let problem31 = problem31_from_pddl(SWAP_PROBLEM).unwrap();
+        let domain8_b = domain_from_pddl(DOMAIN_B_UNREACHABLE).unwrap();
+        let problem8 = problem_from_pddl(SWAP_PROBLEM).unwrap();
+        let admitted_b = admit_planning_task(&domain31_b, &problem31, &profile)
+            .into_result()
+            .unwrap();
+        let gp_b = GroundProblem::build(&domain8_b, &problem8, None).unwrap();
+        let state_digest_b = state_digest(&gp_b.initial_state);
+        let unreachable_result =
+            PlanningResult::new(std::collections::BTreeSet::new(), gp_b.goal.clone(), 0, 0.0);
+        planner.cache.admit(
+            state_digest_b,
+            admitted_b.theory_digest,
+            &unreachable_result,
+        );
+
+        // Sanity: domain_a's real state_digest is identical (same `:init`
+        // text between both domains), but its theory_digest must differ --
+        // otherwise this test would not actually be exercising the
+        // collision scenario it claims to.
+        let domain31_a = domain31_from_pddl(DOMAIN_A_REACHABLE).unwrap();
+        let domain8_a = domain_from_pddl(DOMAIN_A_REACHABLE).unwrap();
+        let admitted_a = admit_planning_task(&domain31_a, &problem31, &profile)
+            .into_result()
+            .unwrap();
+        let gp_a = GroundProblem::build(&domain8_a, &problem8, None).unwrap();
+        assert_eq!(
+            state_digest(&gp_a.initial_state),
+            state_digest_b,
+            "fixture must share state_digest across both domains, or this isn't the collision \
+             scenario being tested"
+        );
+        assert_ne!(
+            admitted_a.theory_digest, admitted_b.theory_digest,
+            "domain_a and domain_b must have different theory_digest despite sharing every \
+             name -- this is exactly what capability::domain_problem_digest's deepened \
+             coverage is responsible for"
+        );
+
+        // The real assertion: planning domain_a (genuinely solvable) on the
+        // same planner/cache must NOT be short-circuited by domain_b's
+        // cached `false` entry.
+        let outcome = planner.plan(DOMAIN_A_REACHABLE, SWAP_PROBLEM, &profile);
+        assert!(
+            outcome.is_ok(),
+            "domain_a is genuinely solvable and must not be rejected via a same-state, \
+             different-theory cached-unreachable entry that belongs to domain_b, got {outcome:?}"
         );
     }
 }

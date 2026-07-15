@@ -121,7 +121,9 @@ use bcinr_mfw_ir::{
     Digest, EpochBounds, InconsistencyWitness, PlannerOutcome, PlanningEpochId, UnsupportedFeature,
 };
 use wasm4pm_compat::pddl::{
-    Pddl31Domain, Pddl31Problem, Pddl8GroundAction, Pddl8GroundAtom, PddlEffect,
+    CompareOp, DurationConstraint, NumericEffect, NumericExpr, NumericOp, Pddl31Domain,
+    Pddl31Problem, Pddl8Atom, Pddl8GroundAction, Pddl8GroundAtom, PddlCondition, PddlEffect,
+    PddlFunction, TimeSpecifier,
 };
 
 use crate::ground::GroundProblem;
@@ -417,10 +419,16 @@ fn effect_list_uses_object_fluent_sentinel(effects: &[PddlEffect]) -> bool {
 
 /// A domain + problem that passed [`admit_planning_task`]'s structural and
 /// capability checks. Cheap to construct further planning stages from —
-/// `theory_digest` content-addresses exactly the structural identity used
-/// to compute it, matching `crate::llm_bridge::compute_domain_witness`/
-/// `compute_problem_witness`'s existing witnessing style but folded into one
-/// `bcinr_mfw_ir::Digest` instead of two separate hex strings.
+/// `theory_digest` (see [`domain_problem_digest`] for exactly which fields
+/// it walks) content-addresses the domain's/problem's action bodies,
+/// durations, and `:init`/`:goal` content, not just their names — it is
+/// *not* the same construction as `crate::llm_bridge::compute_domain_witness`/
+/// `compute_problem_witness` (those remain name/requirements-only, for a
+/// human-readable LLM-facing witness string, not a semantic content digest).
+/// `theory_digest` still does not cover `:constraints`/`:preferences`/
+/// `:metric`/PDDL+ `:process`/`:event` — see [`domain_problem_digest`]'s doc
+/// comment for the precise, current coverage boundary. Two domains/problems
+/// differing only in one of those uncovered fields will still collide.
 #[derive(Debug, Clone)]
 pub struct AdmittedPlanningTask {
     pub domain: Pddl31Domain,
@@ -613,24 +621,69 @@ pub fn admit_planning_task(
     })
 }
 
-/// Content-addressed digest of `domain`'s + `problem`'s structural identity —
-/// same fields `crate::llm_bridge::compute_domain_witness`/
-/// `compute_problem_witness` hash, just mixed into one `Digest` via
-/// `Digest::mix` instead of two separate hex strings.
+/// Content-addressed digest of `domain`'s + `problem`'s structural identity,
+/// deep enough to distinguish two domains/problems that differ only in
+/// action bodies, durations, or `:init`/`:goal` content — not just in names.
+///
+/// This deliberately does **not** delegate to
+/// `crate::llm_bridge::compute_domain_witness`/`compute_problem_witness`:
+/// those two remain name/requirements-only (they exist to produce a short,
+/// human-readable witness string for LLM-facing display, not a semantic
+/// content digest), and this function now hashes strictly more than they
+/// do — see each helper below for exactly which fields are walked.
+///
+/// Coverage: domain name, requirements, every predicate's full typed
+/// signature, every function's full signature, every classical action's
+/// params + precondition + effect tree, every durative action's params +
+/// duration constraint + conditions + effects; problem name, domain
+/// reference, objects, `:init` atoms, `:init` numeric-fluent values, timed
+/// initial literals, and `:goal`. Not yet covered: `:constraints`,
+/// `:preferences`, `:metric`, PDDL+ `:process`/`:event` blocks — a domain
+/// or problem differing only in one of those would still digest-collide.
+/// This is a real narrowing of (not a full close of) the "digest equality
+/// != semantic equivalence" gap: the two are no longer conflatable for the
+/// case this was reported against (a swapped precondition/effect on a
+/// same-named action), but the digest still does not cover every field
+/// `Pddl31Domain`/`Pddl31Problem` carry.
+///
+/// # Complexity
+/// O(size of `domain`'s + `problem`'s AST) — data-dependent, not O(1):
+/// every condition/effect node reachable from every action is visited
+/// exactly once.
 fn domain_problem_digest(domain: &Pddl31Domain, problem: &Pddl31Problem) -> Digest {
     let mut dbuf = Vec::new();
     dbuf.extend_from_slice(domain.name.as_bytes());
     for req in &domain.requirements {
         dbuf.extend_from_slice(req.as_bytes());
     }
-    for (name, _) in &domain.predicates {
+    for (name, params) in &domain.predicates {
         dbuf.extend_from_slice(name.as_bytes());
+        hash_typed_params(&mut dbuf, params);
+    }
+    for f in &domain.functions {
+        hash_function(&mut dbuf, f);
     }
     for a in &domain.actions {
         dbuf.extend_from_slice(a.name.as_bytes());
+        hash_typed_params(&mut dbuf, &a.params);
+        hash_condition(&mut dbuf, &a.precondition);
+        dbuf.extend_from_slice(&(a.effect.len() as u32).to_le_bytes());
+        for e in &a.effect {
+            hash_effect(&mut dbuf, e);
+        }
     }
     for da in &domain.durative_actions {
         dbuf.extend_from_slice(da.name.as_bytes());
+        hash_typed_params(&mut dbuf, &da.params);
+        hash_duration_constraint(&mut dbuf, &da.duration);
+        dbuf.extend_from_slice(&(da.conditions.len() as u32).to_le_bytes());
+        for c in &da.conditions {
+            hash_condition(&mut dbuf, c);
+        }
+        dbuf.extend_from_slice(&(da.effects.len() as u32).to_le_bytes());
+        for e in &da.effects {
+            hash_effect(&mut dbuf, e);
+        }
     }
     let domain_digest = Digest::hash(&dbuf);
 
@@ -641,9 +694,243 @@ fn domain_problem_digest(domain: &Pddl31Domain, problem: &Pddl31Problem) -> Dige
         pbuf.extend_from_slice(obj.as_bytes());
         pbuf.extend_from_slice(typ.as_bytes());
     }
+    pbuf.extend_from_slice(&(problem.init_atoms.len() as u32).to_le_bytes());
+    for a in &problem.init_atoms {
+        hash_atom(&mut pbuf, a);
+    }
+    pbuf.extend_from_slice(&(problem.init_fn_values.len() as u32).to_le_bytes());
+    for (f, v) in &problem.init_fn_values {
+        hash_function(&mut pbuf, f);
+        pbuf.extend_from_slice(&v.to_bits().to_le_bytes());
+    }
+    pbuf.extend_from_slice(&(problem.timed_inits.len() as u32).to_le_bytes());
+    for t in &problem.timed_inits {
+        pbuf.extend_from_slice(&t.time.to_bits().to_le_bytes());
+        hash_atom(&mut pbuf, &t.atom);
+        pbuf.push(t.negated as u8);
+    }
+    hash_condition(&mut pbuf, &problem.goal);
     let problem_digest = Digest::hash(&pbuf);
 
     domain_digest.mix(&problem_digest)
+}
+
+/// Hashes a `(var_name, type_name)` param/typed-signature list — shared
+/// shape used by predicate signatures, action/durative-action params, and
+/// `forall`/`exists` binder lists.
+fn hash_typed_params(buf: &mut Vec<u8>, params: &[(String, String)]) {
+    buf.extend_from_slice(&(params.len() as u32).to_le_bytes());
+    for (name, ty) in params {
+        buf.extend_from_slice(name.as_bytes());
+        buf.push(0); // separator: prevents "ab","c" colliding with "a","bc"
+        buf.extend_from_slice(ty.as_bytes());
+        buf.push(0xff);
+    }
+}
+
+fn hash_function(buf: &mut Vec<u8>, f: &PddlFunction) {
+    buf.extend_from_slice(f.name.as_bytes());
+    buf.extend_from_slice(&(f.params.len() as u32).to_le_bytes());
+    for p in &f.params {
+        buf.extend_from_slice(p.as_bytes());
+    }
+}
+
+fn hash_atom(buf: &mut Vec<u8>, atom: &Pddl8Atom) {
+    buf.extend_from_slice(atom.pred.as_bytes());
+    buf.extend_from_slice(&(atom.args.len() as u32).to_le_bytes());
+    for a in &atom.args {
+        buf.extend_from_slice(a.as_bytes());
+    }
+}
+
+fn hash_numeric_op(buf: &mut Vec<u8>, op: NumericOp) {
+    buf.push(match op {
+        NumericOp::Add => 0,
+        NumericOp::Sub => 1,
+        NumericOp::Mul => 2,
+        NumericOp::Div => 3,
+    });
+}
+
+/// # Complexity
+/// O(size of `e`'s subtree).
+fn hash_numeric_expr(buf: &mut Vec<u8>, e: &NumericExpr) {
+    match e {
+        NumericExpr::Number(n) => {
+            buf.push(0);
+            buf.extend_from_slice(&n.to_bits().to_le_bytes());
+        }
+        NumericExpr::FunctionTerm(name, args) => {
+            buf.push(1);
+            buf.extend_from_slice(name.as_bytes());
+            buf.extend_from_slice(&(args.len() as u32).to_le_bytes());
+            for a in args {
+                buf.extend_from_slice(a.as_bytes());
+            }
+        }
+        NumericExpr::BinOp { op, lhs, rhs } => {
+            buf.push(2);
+            hash_numeric_op(buf, *op);
+            hash_numeric_expr(buf, lhs);
+            hash_numeric_expr(buf, rhs);
+        }
+        NumericExpr::Neg(inner) => {
+            buf.push(3);
+            hash_numeric_expr(buf, inner);
+        }
+    }
+}
+
+fn hash_compare_op(buf: &mut Vec<u8>, op: CompareOp) {
+    buf.push(match op {
+        CompareOp::Ge => 0,
+        CompareOp::Le => 1,
+        CompareOp::Gt => 2,
+        CompareOp::Lt => 3,
+        CompareOp::Eq => 4,
+    });
+}
+
+fn hash_time_specifier(buf: &mut Vec<u8>, t: TimeSpecifier) {
+    buf.push(match t {
+        TimeSpecifier::AtStart => 0,
+        TimeSpecifier::AtEnd => 1,
+        TimeSpecifier::OverAll => 2,
+    });
+}
+
+/// # Complexity
+/// O(size of `c`'s subtree) — every `PddlCondition` node is visited once.
+fn hash_condition(buf: &mut Vec<u8>, c: &PddlCondition) {
+    match c {
+        PddlCondition::Atom(a) => {
+            buf.push(0);
+            hash_atom(buf, a);
+        }
+        PddlCondition::Not(inner) => {
+            buf.push(1);
+            hash_condition(buf, inner);
+        }
+        PddlCondition::And(cs) => {
+            buf.push(2);
+            buf.extend_from_slice(&(cs.len() as u32).to_le_bytes());
+            for c in cs {
+                hash_condition(buf, c);
+            }
+        }
+        PddlCondition::Or(cs) => {
+            buf.push(3);
+            buf.extend_from_slice(&(cs.len() as u32).to_le_bytes());
+            for c in cs {
+                hash_condition(buf, c);
+            }
+        }
+        PddlCondition::Forall { vars, body } => {
+            buf.push(4);
+            hash_typed_params(buf, vars);
+            hash_condition(buf, body);
+        }
+        PddlCondition::Exists { vars, body } => {
+            buf.push(5);
+            hash_typed_params(buf, vars);
+            hash_condition(buf, body);
+        }
+        PddlCondition::Imply(a, b) => {
+            buf.push(6);
+            hash_condition(buf, a);
+            hash_condition(buf, b);
+        }
+        PddlCondition::Timed(t, inner) => {
+            buf.push(7);
+            hash_time_specifier(buf, *t);
+            hash_condition(buf, inner);
+        }
+        PddlCondition::Compare(lhs, op, rhs) => {
+            buf.push(8);
+            hash_numeric_expr(buf, lhs);
+            hash_compare_op(buf, *op);
+            hash_numeric_expr(buf, rhs);
+        }
+    }
+}
+
+fn hash_numeric_effect(buf: &mut Vec<u8>, e: &NumericEffect) {
+    let (tag, f, ex) = match e {
+        NumericEffect::Assign(f, ex) => (0u8, f, ex),
+        NumericEffect::Increase(f, ex) => (1u8, f, ex),
+        NumericEffect::Decrease(f, ex) => (2u8, f, ex),
+        NumericEffect::ScaleUp(f, ex) => (3u8, f, ex),
+        NumericEffect::ScaleDown(f, ex) => (4u8, f, ex),
+    };
+    buf.push(tag);
+    hash_function(buf, f);
+    hash_numeric_expr(buf, ex);
+}
+
+/// # Complexity
+/// O(size of `e`'s subtree) — every `PddlEffect` node (including nested
+/// `Timed`/`Forall`/`When` wrappers) is visited once.
+fn hash_effect(buf: &mut Vec<u8>, e: &PddlEffect) {
+    match e {
+        PddlEffect::Add(a) => {
+            buf.push(0);
+            hash_atom(buf, a);
+        }
+        PddlEffect::Del(a) => {
+            buf.push(1);
+            hash_atom(buf, a);
+        }
+        PddlEffect::Numeric(ne) => {
+            buf.push(2);
+            hash_numeric_effect(buf, ne);
+        }
+        PddlEffect::Timed(t, inner) => {
+            buf.push(3);
+            hash_time_specifier(buf, *t);
+            hash_effect(buf, inner);
+        }
+        PddlEffect::Forall { vars, effects } => {
+            buf.push(4);
+            hash_typed_params(buf, vars);
+            buf.extend_from_slice(&(effects.len() as u32).to_le_bytes());
+            for e in effects {
+                hash_effect(buf, e);
+            }
+        }
+        PddlEffect::When { condition, effects } => {
+            buf.push(5);
+            hash_condition(buf, condition);
+            buf.extend_from_slice(&(effects.len() as u32).to_le_bytes());
+            for e in effects {
+                hash_effect(buf, e);
+            }
+        }
+    }
+}
+
+fn hash_duration_constraint(buf: &mut Vec<u8>, d: &DurationConstraint) {
+    match d {
+        DurationConstraint::Eq(e) => {
+            buf.push(0);
+            hash_numeric_expr(buf, e);
+        }
+        DurationConstraint::Lte(e) => {
+            buf.push(1);
+            hash_numeric_expr(buf, e);
+        }
+        DurationConstraint::Gte(e) => {
+            buf.push(2);
+            hash_numeric_expr(buf, e);
+        }
+        DurationConstraint::And(ds) => {
+            buf.push(3);
+            buf.extend_from_slice(&(ds.len() as u32).to_le_bytes());
+            for d in ds {
+                hash_duration_constraint(buf, d);
+            }
+        }
+    }
 }
 
 /// One bounded PDDL grounding + search run — the PDDL-shaped
@@ -981,5 +1268,63 @@ mod tests {
             GroundedPlanningEpoch::from_ground_problem(&gp, Digest::hash(b"theory"), bounds);
         assert_eq!(epoch.actions.len(), gp.actions.len());
         assert_eq!(epoch.initial_state, gp.initial_state);
+    }
+
+    // -- theory_digest: digest equality != semantic equivalence coverage --
+
+    #[test]
+    fn theory_digest_distinguishes_a_swapped_precondition_and_effect() {
+        // The exact adversarial scenario this gap was reported against: two
+        // domains share every *name* (domain name, predicate names, action
+        // name) but have opposite precondition/effect semantics on the same
+        // action. Before this fix, `domain_problem_digest` only hashed
+        // names, so these two domains produced a byte-identical
+        // `theory_digest`. It must not, now that the digest walks the
+        // actual precondition/effect trees.
+        let domain_a = domain31_from_pddl(
+            "(define (domain d) (:predicates (p) (q)) \
+             (:action a1 :parameters () :precondition (p) :effect (q)))",
+        )
+        .unwrap();
+        let domain_b = domain31_from_pddl(
+            "(define (domain d) (:predicates (p) (q)) \
+             (:action a1 :parameters () :precondition (q) :effect (p)))",
+        )
+        .unwrap();
+        let problem =
+            problem31_from_pddl("(define (problem pr) (:domain d) (:init (p)) (:goal (q)))")
+                .unwrap();
+
+        let digest_a = domain_problem_digest(&domain_a, &problem);
+        let digest_b = domain_problem_digest(&domain_b, &problem);
+        assert_ne!(
+            digest_a, digest_b,
+            "theory_digest must distinguish domains that differ only in a \
+             swapped precondition/effect on a same-named action"
+        );
+    }
+
+    #[test]
+    fn theory_digest_distinguishes_different_init_and_goal_content() {
+        let domain = domain31_from_pddl(STRIPS_DOMAIN).unwrap();
+        let problem_a = problem31_from_pddl(STRIPS_PROBLEM).unwrap();
+        let problem_b =
+            problem31_from_pddl("(define (problem pr) (:domain d) (:init) (:goal (p)))").unwrap();
+
+        let digest_a = domain_problem_digest(&domain, &problem_a);
+        let digest_b = domain_problem_digest(&domain, &problem_b);
+        assert_ne!(
+            digest_a, digest_b,
+            "theory_digest must distinguish problems that differ only in :init/:goal content"
+        );
+    }
+
+    #[test]
+    fn theory_digest_is_deterministic_across_repeated_calls() {
+        let domain = domain31_from_pddl(STRIPS_DOMAIN).unwrap();
+        let problem = problem31_from_pddl(STRIPS_PROBLEM).unwrap();
+        let d1 = domain_problem_digest(&domain, &problem);
+        let d2 = domain_problem_digest(&domain, &problem);
+        assert_eq!(d1, d2);
     }
 }
