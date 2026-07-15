@@ -11,6 +11,11 @@ categories = ["algorithms", "data-structures"]
 
 [dependencies]
 bcinr-logic = { version = "26.6.24", path = "../bcinr-logic" }
+# Shared IR types/trait contracts for the multifractal-workflow (MFW)
+# planner: EventSet, CausalPlan, ExecutableConcurrencyComplex, the
+# PowlProjector contract. bcinr-mfw-ir has zero path-dependency back onto
+# bcinr-powl (see its Cargo.toml) so this is a one-way edge, no cycle.
+bcinr-mfw-ir = { version = "26.6.26", path = "../bcinr-mfw-ir" }
 blake3 = "1"
 wasm4pm-compat = "26.6.26"
 serde = { version = "1", features = ["derive"], optional = true }

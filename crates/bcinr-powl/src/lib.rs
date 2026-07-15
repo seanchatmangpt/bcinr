@@ -20,6 +20,8 @@ pub mod compiler;
 pub mod const_scheduler;
 pub mod dispatcher;
 pub mod enterprise;
+pub mod model;
+pub mod projection;
 pub mod receipt_worker;
 pub mod scheduler;
 pub mod scheduler_wide;
