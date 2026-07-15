@@ -357,50 +357,53 @@ fn link4_real_projector_preserves_the_capacity2_nonface_into_the_powl_model() {
 }
 
 #[test]
-fn link4_adversarial_confirmed_bug_projector_assumes_eventset_slot_equals_raw_action_occurrence_id() {
-    // CONFIRMED BUG (found by this adversarial pass, not previously
-    // reported): `PddlConcurrencyAnalyzer::analyze` documents and
-    // implements `EventSet` slots as *position in `causal.occurrences`*,
-    // explicitly *not* the raw `ActionOccurrenceId`
+fn link4_adversarial_fixed_projector_now_agrees_eventset_slot_is_position_not_raw_id() {
+    // Regression test for a previously CONFIRMED BUG: `PddlConcurrencyAnalyzer::analyze`
+    // documents and implements `EventSet` slots as *position in
+    // `causal.occurrences`*, explicitly *not* the raw `ActionOccurrenceId`
     // (bcinr-pddl/src/concurrency.rs lines 95-98: "Stable EventSet slot per
     // occurrence: position in `causal.occurrences`, not the ...
-    // `ActionOccurrenceId` itself"). But
-    // `bcinr_powl::projection::verify_concurrency_preservation` (called by
-    // the real `PowlProjector::project`, bcinr-powl/src/projection.rs lines
-    // 219-226) does the opposite: it reinterprets every `EventSet` member
+    // `ActionOccurrenceId` itself"). `bcinr_powl::projection::verify_concurrency_preservation`
+    // used to do the opposite: it reinterpreted every `EventSet` member
     // value `event_id` directly as `ActionOccurrenceId(event_id as u32)`
-    // and looks *that* up in the action->node bijection. These two
-    // conventions only agree when `occurrences[i].id.0 == i` for every `i`
-    // -- true in every hand-built fixture in this codebase (including this
-    // file's own `link4`/`link5` above, which deliberately use ids
-    // 0,1,2) and true for `MfwPlanner`'s real `occurrences_from_tape`
-    // *only as long as no tape op is filtered out* (planner.rs lines
-    // 552-561: `tape.ops.iter().filter_map(...)` keeps each surviving op's
-    // *original* `op.index` as its `ActionOccurrenceId`, so if any earlier
-    // op is dropped by the `filter_map`, a later occurrence's position in
-    // the resulting `Vec` no longer equals its `id.0`). This test
-    // reproduces the mismatch directly: a causal plan whose 3 occurrences
-    // sit at positions 0,1,2 but carry ids 100,101,102 (a completely valid
-    // `CausalPlan` by this crate's own type -- nothing forbids
-    // caller-assigned, non-dense `ActionOccurrenceId`s) causes the real,
-    // non-test `PowlProjector::project` to refuse a concurrency complex
-    // that is, in fact, perfectly well-formed.
+    // and looked *that* up in the action->node bijection, which only
+    // agreed with the position convention when `occurrences[i].id.0 == i`
+    // for every `i`. It now resolves each member as a position through
+    // `map.node_to_action` (built from the same
+    // `causal.occurrences.iter().enumerate()` ordering
+    // `PddlConcurrencyAnalyzer` uses), matching the real analyzer's
+    // contract regardless of what `ActionOccurrenceId`s the occurrences
+    // carry. This test reproduces the exact fixture that used to trigger
+    // the mismatch: a causal plan whose 3 occurrences sit at positions
+    // 0,1,2 but carry ids 100,101,102 (a completely valid `CausalPlan` by
+    // this crate's own type -- nothing forbids caller-assigned, non-dense
+    // `ActionOccurrenceId`s) and confirms `PowlProjector::project` now
+    // accepts it and correctly maps the projected nonface's positions back
+    // to the real ActionOccurrenceIds.
     let causal = abc_causal_plan_with_empty_order([100, 101, 102]);
     let concurrency = hand_built_capacity2_complex([100, 101, 102]);
     let projector = bcinr_powl::projection::PowlProjector;
-    let err = projector.project(&causal, &concurrency).unwrap_err();
+    let (model, witness) = projector
+        .project(&causal, &concurrency)
+        .expect("a well-formed complex with sparse ActionOccurrenceIds must now project cleanly");
+
+    assert_eq!(model.concurrency.minimal_nonfaces.len(), 1);
+    let projected_members: Vec<usize> = model.concurrency.minimal_nonfaces[0]
+        .members
+        .iter_stable()
+        .collect();
+    let mapped_back: Vec<u32> = projected_members
+        .iter()
+        .map(|&slot| {
+            let node_id = bcinr_mfw_ir::PowlNodeId(slot as u64);
+            witness.action_node_bijection.node_to_action[&node_id].0
+        })
+        .collect();
     assert_eq!(
-        err,
-        bcinr_powl::projection::ProjectionError::Preservation(
-            bcinr_powl::projection::PreservationError::UnmappedActionInConcurrency(
-                bcinr_mfw_ir::ActionOccurrenceId(0)
-            )
-        ),
-        "CONFIRMED: PowlProjector::project refuses a well-formed \
-         ExecutableConcurrencyComplex whenever ActionOccurrenceIds are not \
-         exactly their position index -- EventSet-slot-as-position \
-         (PddlConcurrencyAnalyzer's contract) and EventSet-slot-as-raw-id \
-         (verify_concurrency_preservation's assumption) disagree."
+        mapped_back,
+        vec![100, 101, 102],
+        "the projected nonface's positions must resolve back to the real, \
+         sparse ActionOccurrenceIds, not be silently misinterpreted"
     );
 }
 

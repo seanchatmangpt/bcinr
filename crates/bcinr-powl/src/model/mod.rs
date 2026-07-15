@@ -20,21 +20,46 @@
 //! contributes an entry to `provenance`. This is a partial map by design,
 //! not an oversight.
 //!
-//! # Concurrency stays in `ActionOccurrenceId` space
+//! # `EventSet` members are positions, not `ActionOccurrenceId` values
 //!
 //! [`PowlModel::concurrency`] is carried through from the source
-//! `ExecutableConcurrencyComplex` **unchanged** — its `EventSet` members
-//! continue to be `ActionOccurrenceId` numeric values, exactly as in the
-//! source. It is deliberately **not** re-keyed to `PowlNodeId` here.
-//! `PowlNodeId` is purely a tape/compile-time addressing detail; the
-//! semantic identity of "which action occurrence" stays anchored to
-//! `ActionOccurrenceId` throughout this IR, recoverable at any point via
-//! `provenance` (or the `ActionNodeBijection` at projection time). The one
-//! consumer that needs a `PowlNodeId`-space (tape-slot-index-space)
-//! `EventSet` is the v2 guard-table compiler
-//! ([`crate::compiler::compile_powl_v2`]), which performs that re-keying
-//! explicitly and locally at compile time — see its doc comment for why
-//! that's the right layer to do it in, not here.
+//! `ExecutableConcurrencyComplex` **unchanged** (no field is rewritten),
+//! but its `EventSet` members were never `ActionOccurrenceId` numeric
+//! values in the first place — an earlier version of this doc comment
+//! claimed they were, which was false and caused a real bug (see below).
+//!
+//! The actual, authoritative contract (matching this workspace's only real
+//! `ConcurrencyAnalyzer` producer, `PddlConcurrencyAnalyzer::analyze` in
+//! `crates/bcinr-pddl/src/concurrency.rs`, whose own doc comment is
+//! explicit about this): an `EventSet` member value is the **position** of
+//! an occurrence within the source `CausalPlan::occurrences` list — a
+//! dense `0..occurrences.len()` index — never the occurrence's own
+//! (caller-assigned, possibly sparse) `ActionOccurrenceId`. `bcinr-mfw-ir`
+//! itself does not pin this down (neither `EventSet`'s nor
+//! `MinimalNonFace`'s doc comments say which convention is authoritative);
+//! this crate is now consistent with `bcinr-pddl`'s producer.
+//!
+//! [`crate::projection::PowlProjector::project`] builds each node's
+//! `PowlNodeId` from that exact same position (`PowlNodeId(i)` for
+//! `causal.occurrences[i]`), so for a `PowlModel` produced by the real
+//! projector, an `EventSet` member numerically coincides with the
+//! `PowlNodeId` of the node it refers to — `PowlNodeId` is not a separate
+//! addressing space concurrency needs to be re-keyed into, it already *is*
+//! the same numbering. [`crate::compiler::compile_powl_v2`] relies on
+//! exactly this coincidence (after independently re-verifying node-id
+//! density) rather than resolving through `provenance`/`ActionOccurrenceId`
+//! for concurrency members — see that function's doc comment.
+//!
+//! Treating an `EventSet` member as a raw `ActionOccurrenceId` (as both
+//! [`crate::projection::verify_concurrency_preservation`] and
+//! [`crate::compiler::compile_powl_v2`] used to) only coincidentally works
+//! when every occurrence's `ActionOccurrenceId` equals its position — true
+//! of every hand-built fixture in this codebase, and true of
+//! `MfwPlanner::occurrences_from_tape`'s real output only as long as no
+//! tape op is filtered out. See
+//! `crates/bcinr-pddl/tests/mfw_capacity2_fixture.rs`'s
+//! `link4_adversarial_confirmed_bug_...` test for the reproduction that
+//! caught this.
 
 use std::collections::BTreeMap;
 

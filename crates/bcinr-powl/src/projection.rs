@@ -1,28 +1,59 @@
 //! Real implementation of [`bcinr_mfw_ir::PowlProjector`] for
 //! [`PowlModel`](crate::model::PowlModel): projects a `CausalPlan` +
-//! `ExecutableConcurrencyComplex` into a `PowlModel`, and *actually*
-//! verifies (not stubs, not always-`Ok`) that the projection preserved
-//! source semantics before returning a witness claiming it did.
+//! `ExecutableConcurrencyComplex` into a `PowlModel`, and verifies (not a
+//! stub, not always-`Ok`) that the projection preserved source semantics
+//! *for the checks it actually runs* before returning a witness claiming
+//! it did — see the "Known limits of this verification" section below for
+//! exactly which case is not (yet) exercised by these checks; this module
+//! makes no claim of exhaustiveness beyond what's stated there.
 //!
 //! # What "mapped through the bijection" means here
 //!
-//! `bcinr-mfw-ir`'s [`StrictPartialOrder`]/[`PrecedenceEdge`] and
-//! [`ExecutableConcurrencyComplex`]/[`MinimalNonFace`] are both keyed in
-//! `ActionOccurrenceId` space on *both* the source (causal-plan) side and
-//! the target (`PowlModel`) side — there is no separate `PowlNodeId`-keyed
-//! order or concurrency type in `bcinr-mfw-ir` to project into (see
-//! [`crate::model`]'s module docs for why that's a deliberate choice, not
-//! an oversight). So "mapping an edge/nonface through the bijection" here
-//! means: validate that every `ActionOccurrenceId` the edge/nonface
+//! `bcinr-mfw-ir`'s [`StrictPartialOrder`]/[`PrecedenceEdge`] genuinely
+//! stays keyed in `ActionOccurrenceId` space on *both* the source
+//! (causal-plan) side and the target (`PowlModel`) side — there is no
+//! separate `PowlNodeId`-keyed order type in `bcinr-mfw-ir` to project
+//! into (see [`crate::model`]'s module docs for why that's a deliberate
+//! choice, not an oversight). So for order, "mapping an edge through the
+//! bijection" means: validate that every `ActionOccurrenceId` the edge
 //! references is actually covered by the bijection (i.e. has a
-//! corresponding `PowlNodeId`) — not changing the edge/nonface's own key
-//! type, which stays `ActionOccurrenceId` throughout. The *authoritative*
-//! preservation check is a direct, bidirectional set comparison of edges
-//! (respectively canonicalized nonface member-sets) between source and
-//! target — that is what actually catches a dropped or invented edge/
-//! nonface, not the digests (the digests are a derived, checkable summary
-//! of that same comparison, per `OrderPreservationWitness`'s and
+//! corresponding `PowlNodeId`) — not changing the edge's own key type,
+//! which stays `ActionOccurrenceId` throughout.
+//!
+//! [`ExecutableConcurrencyComplex`]/[`MinimalNonFace`] is different:
+//! `EventSet` members are **positions** in the causal plan's occurrence
+//! list, not `ActionOccurrenceId` values — see [`crate::model`]'s module
+//! doc comment ("`EventSet` members are positions, not `ActionOccurrenceId`
+//! values") for the authoritative contract and why an earlier version of
+//! this module got it wrong. [`verify_concurrency_preservation`] resolves
+//! each position through `map.node_to_action` (built from the same
+//! `causal.occurrences.iter().enumerate()` ordering `PddlConcurrencyAnalyzer`
+//! uses for its own position numbering) to recover the real
+//! `ActionOccurrenceId` for bijection-coverage checking — it does not cast
+//! the raw member value into an `ActionOccurrenceId` directly.
+//!
+//! The *authoritative* preservation check for both order and concurrency
+//! is a direct, bidirectional set comparison (edges, respectively
+//! canonicalized nonface member-sets) between source and target — that is
+//! what actually catches a dropped or invented edge/nonface, not the
+//! digests (the digests are a derived, checkable summary of that same
+//! comparison, per `OrderPreservationWitness`'s and
 //! `ConcurrencyPreservationWitness`'s own doc comments).
+//!
+//! # Known limits of this verification
+//!
+//! `verify_concurrency_preservation`'s coverage check
+//! (`UnmappedActionInConcurrency`) only confirms that a position resolves
+//! to *some* `ActionOccurrenceId` covered by the bijection — it does not
+//! (and structurally cannot, from this function's inputs alone) prove
+//! that position numbering is *globally* consistent with the source
+//! `CausalPlan` a caller had in mind, if that caller hand-constructs an
+//! `ExecutableConcurrencyComplex` whose positions don't correspond to any
+//! real `CausalPlan::occurrences` ordering at all. In the normal call path
+//! (`PowlProjector::project`, both `source` and `target` derived from the
+//! *same* `causal` argument) this can't arise. A caller that invokes
+//! [`verify_concurrency_preservation`] directly with mismatched
+//! `source`/`map` pairs is responsible for that consistency itself.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -53,9 +84,11 @@ pub enum PreservationError {
     /// The target's order contains a precedence edge absent from the
     /// source (over-invention).
     InventedOrderEdge(PrecedenceEdge),
-    /// A concurrency nonface referenced an `ActionOccurrenceId` the
-    /// bijection does not cover.
-    UnmappedActionInConcurrency(ActionOccurrenceId),
+    /// A concurrency nonface's `EventSet` referenced a member value (a
+    /// *position* in the causal plan's occurrence list — see the module
+    /// doc comment) that does not resolve to any node covered by the
+    /// bijection.
+    UnmappedConcurrencySlot(usize),
     /// A source minimal nonface is missing from the target's concurrency
     /// complex (under-preservation). Carries the canonicalized (sorted)
     /// member-id list.
@@ -78,8 +111,8 @@ impl fmt::Display for PreservationError {
             PreservationError::InventedOrderEdge(e) => {
                 write!(f, "projected order contains edge {e:?} absent from source")
             }
-            PreservationError::UnmappedActionInConcurrency(a) => {
-                write!(f, "concurrency nonface references unmapped action {a:?}")
+            PreservationError::UnmappedConcurrencySlot(slot) => {
+                write!(f, "concurrency nonface references unmapped slot {slot}")
             }
             PreservationError::DroppedNonFace(m) => {
                 write!(f, "source minimal nonface {m:?} missing from projected concurrency")
@@ -217,10 +250,17 @@ pub fn verify_concurrency_preservation(
     map: &ActionNodeBijection,
 ) -> Result<ConcurrencyPreservationWitness, PreservationError> {
     for nf in &source.minimal_nonfaces {
-        for event_id in nf.members.iter_stable() {
-            let action = ActionOccurrenceId(event_id as u32);
-            if !map.action_to_node.contains_key(&action) {
-                return Err(PreservationError::UnmappedActionInConcurrency(action));
+        for slot in nf.members.iter_stable() {
+            // `slot` is a position in the causal plan's occurrence list
+            // (see the module doc comment), not a raw `ActionOccurrenceId`.
+            // `PowlProjector::project` builds `PowlNodeId(i)` for
+            // `causal.occurrences[i]`, so `PowlNodeId(slot)` is the node
+            // this position refers to; resolving it through
+            // `map.node_to_action` both confirms coverage and recovers the
+            // real `ActionOccurrenceId`, rather than casting `slot`
+            // directly into one.
+            if !map.node_to_action.contains_key(&PowlNodeId(slot as u64)) {
+                return Err(PreservationError::UnmappedConcurrencySlot(slot));
             }
         }
     }
@@ -241,9 +281,10 @@ pub fn verify_concurrency_preservation(
 
     let source_complex_digest = digest_nonface_keys(&source_keys);
     let target_complex_digest = digest_nonface_keys(&target_keys);
-    // Concurrency is carried through unchanged (ActionOccurrenceId-keyed on
-    // both sides — see module docs), so "mapped" coincides with "source"
-    // once the totality + two-way set-equality checks above have passed.
+    // Concurrency is carried through unchanged (EventSet member values
+    // are position-keyed on both sides — see module docs), so "mapped"
+    // coincides with "source" once the totality + two-way set-equality
+    // checks above have passed.
     let mapped_source_digest = source_complex_digest;
 
     Ok(ConcurrencyPreservationWitness {
@@ -580,5 +621,82 @@ mod tests {
                 99
             )))
         );
+    }
+
+    /// Regression test for the position-vs-`ActionOccurrenceId` conflation
+    /// bug: a well-formed `CausalPlan` whose 3 occurrences sit at positions
+    /// 0,1,2 but carry sparse `ActionOccurrenceId`s 100,101,102 (nothing in
+    /// this crate's types forbids that) must project successfully — see
+    /// `crates/bcinr-pddl/tests/mfw_capacity2_fixture.rs`'s
+    /// `link4_adversarial_confirmed_bug_...` test, which pinned down the
+    /// previously-broken behavior from the `bcinr-pddl` side.
+    #[test]
+    fn project_succeeds_with_sparse_non_positional_action_occurrence_ids() {
+        let occurrences = vec![
+            ActionOccurrence {
+                id: ActionOccurrenceId(100),
+                action: 1,
+            },
+            ActionOccurrence {
+                id: ActionOccurrenceId(101),
+                action: 2,
+            },
+            ActionOccurrence {
+                id: ActionOccurrenceId(102),
+                action: 3,
+            },
+        ];
+        let causal = CausalPlan {
+            epoch: PlanningEpochId(7),
+            occurrences,
+            precedes: StrictPartialOrder::default(),
+            independence: IndependenceRelation::default(),
+            support_edges: BTreeSet::new(),
+            digest: Digest::hash(b"sparse-ids-causal-plan"),
+        };
+
+        // Minimal nonface built the way PddlConcurrencyAnalyzer builds
+        // one: EventSet members are *positions* {0, 1} (occurrences[0] and
+        // occurrences[1]), not the raw ActionOccurrenceIds 100/101.
+        let witness_digest = Digest::hash(b"sparse-ids-conflict");
+        let mut conflict_witnesses = BTreeMap::new();
+        conflict_witnesses.insert(
+            witness_digest,
+            ConcurrencyConflictWitness {
+                causal: None,
+                temporal: None,
+                resource: None,
+            },
+        );
+        let concurrency = ExecutableConcurrencyComplex {
+            event_count: 3,
+            minimal_nonfaces: vec![MinimalNonFace {
+                members: EventSet::empty().with(0).with(1),
+                witness_digest,
+            }],
+            conflict_witnesses,
+            digest: Digest::hash(b"sparse-ids-complex"),
+        };
+
+        let projector = PowlProjector;
+        let (model, witness) = projector
+            .project(&causal, &concurrency)
+            .expect("a well-formed plan with sparse ActionOccurrenceIds must project cleanly");
+
+        assert_eq!(
+            witness.concurrency_witness.mapped_source_digest,
+            witness.concurrency_witness.target_complex_digest
+        );
+        // The projected nonface's positions {0,1} must resolve back to the
+        // real ActionOccurrenceIds {100,101} through the bijection.
+        let projected_members: Vec<usize> = model.concurrency.minimal_nonfaces[0]
+            .members
+            .iter_stable()
+            .collect();
+        let mapped_back: Vec<u32> = projected_members
+            .iter()
+            .map(|&slot| witness.action_node_bijection.node_to_action[&PowlNodeId(slot as u64)].0)
+            .collect();
+        assert_eq!(mapped_back, vec![100, 101]);
     }
 }

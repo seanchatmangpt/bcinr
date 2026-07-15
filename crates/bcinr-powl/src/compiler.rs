@@ -461,10 +461,13 @@ pub mod v2 {
         /// from `model.provenance` — the edge cannot be wired to a tape
         /// slot.
         UnmappedActionInOrder(ActionOccurrenceId),
-        /// A concurrency nonface referenced an `ActionOccurrenceId` absent
-        /// from `model.provenance` — the nonface cannot be re-keyed into
+        /// A concurrency nonface's `EventSet` referenced a member value
+        /// (a *position* in the source causal plan's occurrence list —
+        /// see [`compile_powl_v2`]'s doc comment on the re-keying
+        /// assumption) that is not a valid tape-slot index for this model
+        /// (`>= model.nodes.len()`) — the nonface cannot be re-keyed into
         /// tape-slot space.
-        UnmappedActionInConcurrency(ActionOccurrenceId),
+        UnmappedConcurrencySlot(usize),
     }
 
     /// The result of compiling a `PowlModel`: the existing v2 `PowlTape`
@@ -484,15 +487,31 @@ pub mod v2 {
     ///
     /// # Re-keying concurrency into tape-slot space
     ///
-    /// `model.concurrency` stays `ActionOccurrenceId`-keyed all the way
-    /// through `PowlModel` (see that module's doc comments for why). The
-    /// scheduler, however, operates on tape-slot indices (`0..64`, the
-    /// same numbering as `Powl64Op` array positions). This function is the
-    /// one place that re-keying happens: `model.provenance` is inverted
-    /// into an `ActionOccurrenceId -> PowlNodeId` map, and every minimal
-    /// nonface's `EventSet` members are rewritten through it into
-    /// tape-slot-index space before being stored in the returned
-    /// `ConcurrencyGuardTable`.
+    /// `model.concurrency`'s `EventSet` members are **positions in the
+    /// source causal plan's occurrence list** — the same convention
+    /// `PddlConcurrencyAnalyzer::analyze` documents and implements
+    /// (`crates/bcinr-pddl/src/concurrency.rs`, its `slot_of` map), *not*
+    /// raw `ActionOccurrenceId` values (see `crate::model`'s corrected
+    /// module doc comment). `PowlProjector::project` builds each
+    /// `PowlNodeId` from that exact same position (`PowlNodeId(i)` for
+    /// `causal.occurrences[i]`), so once this function's own
+    /// `NodeIdNotDense` check above has passed (every `model.nodes[i]` has
+    /// `id() == PowlNodeId(i)`), an `EventSet` member value *is* directly
+    /// a valid tape-slot index / `PowlNodeId` numeric value — no
+    /// `ActionOccurrenceId` round-trip is needed or correct here. This
+    /// function bounds-checks each member against `model.nodes.len()` and
+    /// re-keys it directly into the returned `ConcurrencyGuardTable`.
+    ///
+    /// Earlier code paths in this function (order-edge wiring above) still
+    /// go through `model.provenance`'s `ActionOccurrenceId -> PowlNodeId`
+    /// inversion, because `model.order`'s `PrecedenceEdge`s genuinely stay
+    /// `ActionOccurrenceId`-keyed — concurrency and order use different
+    /// key spaces in `PowlModel`, and conflating them is exactly the bug
+    /// this function used to have (see
+    /// `crates/bcinr-pddl/tests/mfw_capacity2_fixture.rs`'s
+    /// `link4_adversarial_confirmed_bug_...`-style regression coverage,
+    /// mirrored by this crate's own `non_dense_node_ids_are_rejected` and
+    /// concurrency-re-keying tests below).
     pub fn compile_powl_v2(model: &PowlModel) -> Result<CompiledPowlV2, CompileErrorV2> {
         if model.nodes.len() > 64 {
             return Err(CompileErrorV2::TapeFull);
@@ -570,17 +589,19 @@ pub mod v2 {
             .map(|i| i as u8)
             .unwrap_or(0);
 
-        // Re-key the concurrency complex from ActionOccurrenceId space into
-        // tape-slot-index space.
+        // Re-key the concurrency complex: EventSet members are positions
+        // in the source occurrence list, which (per the density check
+        // above) coincide exactly with tape-slot indices / PowlNodeId
+        // values — see this function's doc comment for why no
+        // ActionOccurrenceId lookup belongs here.
         let mut guards = ConcurrencyGuardTable::empty();
         for nf in &model.concurrency.minimal_nonfaces {
             let mut members = EventSet::empty();
             for event_id in nf.members.iter_stable() {
-                let action = ActionOccurrenceId(event_id as u32);
-                let node = *action_to_node
-                    .get(&action)
-                    .ok_or(CompileErrorV2::UnmappedActionInConcurrency(action))?;
-                members.insert(node.0 as usize);
+                if event_id >= model.nodes.len() {
+                    return Err(CompileErrorV2::UnmappedConcurrencySlot(event_id));
+                }
+                members.insert(event_id);
             }
             guards.nonfaces.push(CompiledNonFace {
                 members,
@@ -865,6 +886,84 @@ pub mod v2 {
             assert!(!compiled.guards.admits(&abc));
             assert_eq!(compiled.tape.ops[0].succ_mask, 1 << 2);
             assert_eq!(compiled.tape.ops[2].pred_mask, 1);
+        }
+
+        /// Regression test for the position-vs-`ActionOccurrenceId`
+        /// conflation bug: a `PowlModel` built from a `CausalPlan` with
+        /// sparse `ActionOccurrenceId`s (100,101,102 at positions 0,1,2)
+        /// must still compile and re-key its concurrency guard table
+        /// correctly — previously `compile_powl_v2` reinterpreted the
+        /// `EventSet` member value `event_id` as
+        /// `ActionOccurrenceId(event_id as u32)` directly, which only
+        /// coincidentally worked when ids equaled positions. Paired with
+        /// `crate::projection::tests::project_succeeds_with_sparse_non_positional_action_occurrence_ids`.
+        #[test]
+        fn compiles_real_projector_output_with_sparse_action_occurrence_ids() {
+            use bcinr_mfw_ir::{
+                ActionOccurrence, IndependenceRelation, PlanningEpochId,
+                PowlProjector as PowlProjectorTrait,
+            };
+
+            let occurrences = vec![
+                ActionOccurrence {
+                    id: ActionOccurrenceId(100),
+                    action: 10,
+                },
+                ActionOccurrence {
+                    id: ActionOccurrenceId(101),
+                    action: 11,
+                },
+                ActionOccurrence {
+                    id: ActionOccurrenceId(102),
+                    action: 12,
+                },
+            ];
+            let causal = bcinr_mfw_ir::CausalPlan {
+                epoch: PlanningEpochId(1),
+                occurrences,
+                precedes: StrictPartialOrder::default(),
+                independence: IndependenceRelation::default(),
+                support_edges: BTreeSet::new(),
+                digest: Digest::hash(b"sparse-e2e-causal"),
+            };
+            // Positions {0, 1} (PddlConcurrencyAnalyzer-shaped), not the
+            // raw ActionOccurrenceIds 100/101.
+            let witness_digest = Digest::hash(b"sparse-e2e-conflict");
+            let mut conflict_witnesses = BTreeMap::new();
+            conflict_witnesses.insert(
+                witness_digest,
+                ConcurrencyConflictWitness {
+                    causal: None,
+                    temporal: None,
+                    resource: None,
+                },
+            );
+            let concurrency = ExecutableConcurrencyComplex {
+                event_count: 3,
+                minimal_nonfaces: vec![MinimalNonFace {
+                    members: EventSet::empty().with(0).with(1),
+                    witness_digest,
+                }],
+                conflict_witnesses,
+                digest: Digest::hash(b"sparse-e2e-complex"),
+            };
+
+            let projector = crate::projection::PowlProjector;
+            let (model, _witness) = projector.project(&causal, &concurrency).unwrap();
+            let compiled = compile_powl_v2(&model)
+                .expect("sparse ActionOccurrenceIds must not break concurrency re-keying");
+
+            assert_eq!(compiled.guards.nonfaces.len(), 1);
+            let ab = EventSet::empty().with(0).with(1);
+            let ac = EventSet::empty().with(0).with(2);
+            assert!(
+                !compiled.guards.admits(&ab),
+                "positions {{0,1}} must stay forbidden"
+            );
+            assert!(
+                compiled.guards.admits(&ac),
+                "positions {{0,2}} were never forbidden"
+            );
         }
     }
 }
