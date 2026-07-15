@@ -24,7 +24,20 @@
 //! - A cached `false` (goal was proven unreachable from this exact
 //!   `(state, theory)` before) genuinely lets [`plan`](MfwPlanner::plan)
 //!   short-circuit the entire rest of the pipeline with zero search — this
-//!   is a real, sound use of the cache, not a stub.
+//!   is a real, sound use of the cache, not a stub. ALIVE, verified this
+//!   session: `plan()`'s own pipeline never actually *writes* a `false`
+//!   entry (`self.cache.admit` is called exactly once, and only after
+//!   `goal_reached` is already confirmed `true` — every non-`Found`
+//!   portfolio outcome and the `!goal_reached` case both `return Err(...)`
+//!   first), so the read-side short-circuit
+//!   (`if cache_hit == Some(false) { return
+//!   Err(MfwPlanError::CachedUnreachable) }`) had never actually fired in
+//!   any test or real call before this session —
+//!   `tests::a_hand_seeded_false_cache_entry_makes_plan_short_circuit_with_cached_unreachable`
+//!   now hand-seeds a `false` entry (via the public `cache` field, at the
+//!   exact `(state_digest, theory_digest)` key `plan()`'s own pipeline
+//!   would derive) and confirms `plan()` genuinely returns
+//!   `Err(MfwPlanError::CachedUnreachable)` without running the portfolio.
 //! - A cached `true` cannot, by itself, produce the `Pddl8Tape` that
 //!   `causal`/`concurrency`/POWL projection all need downstream. `plan()`
 //!   documents this rather than fabricating a tape: it still has to run the
@@ -664,5 +677,64 @@ mod tests {
             second.projection_receipt.hash
         );
         assert_ne!(first.planning_receipt.hash, second.planning_receipt.hash);
+    }
+
+    /// Exercises the `cache_hit == Some(false)` short-circuit at `plan()`'s
+    /// line "if cache_hit == Some(false) { return
+    /// Err(MfwPlanError::CachedUnreachable) }" for the first time — this
+    /// module's own doc comment ("Real gap #1") called that path "a real,
+    /// sound use of the cache, not a stub," but `plan()`'s own pipeline
+    /// only ever calls `cache.admit` after `goal_reached` is already `true`
+    /// (every non-`Found` portfolio outcome and the `!goal_reached` case
+    /// return `Err` before reaching the `admit` call), so nothing in normal
+    /// use of `plan()` had ever populated the cache with a `false` entry,
+    /// and no test exercised this branch. Seed one by hand (via the `pub
+    /// cache` field, computing the same `(state_digest, theory_digest)` key
+    /// `plan()`'s own pipeline would derive for `DOMAIN`/`PROBLEM`) and
+    /// confirm the short-circuit genuinely fires.
+    #[test]
+    fn a_hand_seeded_false_cache_entry_makes_plan_short_circuit_with_cached_unreachable() {
+        let mut planner = new_planner();
+        let profile = DefaultCapabilityProfile;
+
+        // Reproduce exactly the key `plan()` itself would compute for
+        // (DOMAIN, PROBLEM) — see `plan()`'s own body, lines 296-320.
+        let domain31 = domain31_from_pddl(DOMAIN).unwrap();
+        let problem31 = problem31_from_pddl(PROBLEM).unwrap();
+        let domain8 = domain_from_pddl(DOMAIN).unwrap();
+        let problem8 = problem_from_pddl(PROBLEM).unwrap();
+        let admitted = admit_planning_task(&domain31, &problem31, &profile)
+            .into_result()
+            .unwrap();
+        let gp = GroundProblem::build(&domain8, &problem8, None).unwrap();
+        let key_state_digest = state_digest(&gp.initial_state);
+        let key_theory_digest = admitted.theory_digest;
+
+        // A `PlanningResult` whose final state does not contain the goal —
+        // `GoalReachabilityHorizon::observe` on this is `false` by
+        // construction (`result.goal.iter().all(|g|
+        // result.final_state.contains(g))` over an empty final state and a
+        // non-empty goal).
+        let unreachable_result =
+            PlanningResult::new(std::collections::BTreeSet::new(), gp.goal.clone(), 0, 0.0);
+        assert!(
+            !GoalReachabilityHorizon.observe(&unreachable_result),
+            "fixture must genuinely observe as unreachable, or this test proves nothing"
+        );
+        planner
+            .cache
+            .admit(key_state_digest, key_theory_digest, &unreachable_result);
+        assert_eq!(
+            planner.cache.lookup(key_state_digest, key_theory_digest),
+            Some(&false),
+            "the seeded entry must be a real cache hit under the same key plan() uses"
+        );
+
+        let outcome = planner.plan(DOMAIN, PROBLEM, &profile);
+        assert!(
+            matches!(outcome, Err(MfwPlanError::CachedUnreachable)),
+            "expected Err(CachedUnreachable) from the standing-false-hit short-circuit, got \
+             {outcome:?}"
+        );
     }
 }
