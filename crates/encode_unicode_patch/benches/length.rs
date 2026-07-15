@@ -60,9 +60,22 @@ fn load_wikipedia(language: &str, article: &str, english: &str, revision: usize)
         language, article_ascii, revision
     );
     println!("Downloading {} and saving to {}", url, path);
-    let response = minreq::get(&url).send().unwrap_or_else(|e| {
-        panic!("Cannot get {}: {}", url, e);
-    });
+    // Wikipedia's edge (m.wikipedia.org) returns 403 Forbidden for requests
+    // with no `User-Agent` header at all (minreq sends none by default) --
+    // confirmed via `curl -A ""` (403) vs `curl -A "<anything>"` (301 -> 200)
+    // against this exact URL. A descriptive, contactable User-Agent (per
+    // Wikimedia's User-Agent policy) is the minimal fix, not a spoofed
+    // browser string.
+    let response = minreq::get(&url)
+        .with_header(
+            "User-Agent",
+            "bcinr-encode_unicode-bench/1.0 (https://github.com/seanchatmangpt/bcinr; \
+             vendored encode_unicode benchmark fixture download)",
+        )
+        .send()
+        .unwrap_or_else(|e| {
+            panic!("Cannot get {}: {}", url, e);
+        });
     if response.status_code != 200 {
         panic!(
             "Bad URL {}: {} {}",
