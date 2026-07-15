@@ -31,6 +31,7 @@ pub mod mfw;
 pub mod parse;
 pub mod powl_bridge;
 pub mod schedule_analysis;
+pub mod search;
 pub use capability::{
     admit_planning_task, AdmittedPlanningTask, CapabilityProfile, DefaultCapabilityProfile,
     GroundedPlanningEpoch, PddlFeature, SemanticSupport, ALL_PDDL_FEATURES,
@@ -43,6 +44,10 @@ pub use consequence::{
 pub use mfw::{
     q_lens, FrontierBoxes, FrontierMeasure, MassVector, PositiveDistribution, PositiveMass,
     QLensError, QValue, WeightedDistribution,
+};
+pub use search::{
+    ExactBfsRail, ExactSearchRail, ExactStepOutcome, ExploitSearchRail, ExploitStepOutcome,
+    FairRailScheduler, MfwPortfolio, PortfolioOutcome, QLensRail, RailSelection,
 };
 pub use capability_router::{
     route_capability_plan, CapabilityRouteReceipt, CapabilityTask, CostVector, DesiredEffect,
