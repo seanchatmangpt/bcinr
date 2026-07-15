@@ -383,6 +383,38 @@ fn effect_list_uses_continuous_effect_sentinel(effects: &[PddlEffect]) -> bool {
     effects.iter().any(effect_uses_continuous_effect_sentinel)
 }
 
+/// True iff `effect` is (or, through a `Timed`/`When`/`Forall` wrapper,
+/// contains) the sentinel `PddlEffect::Add` atom
+/// `crate::parse::OBJECT_FLUENT_SENTINEL_PRED` fabricates in place of a real
+/// object-fluent assignment effect — see that constant's doc comment on
+/// [`crate::parse::lower_primitive_effect_full`]'s `AssignObjectFluent` arm.
+/// Same rationale and shape as
+/// [`effect_uses_continuous_effect_sentinel`]: `PddlEffect` has no dedicated
+/// object-fluent-assignment variant, so the sentinel fingerprint is the only
+/// surviving signal after lowering.
+///
+/// # Complexity
+/// O(n) in the number of `PddlEffect` nodes reachable from `effect`.
+fn effect_uses_object_fluent_sentinel(effect: &PddlEffect) -> bool {
+    match effect {
+        PddlEffect::Add(a) => a.pred == crate::parse::OBJECT_FLUENT_SENTINEL_PRED,
+        PddlEffect::Timed(_, inner) => effect_uses_object_fluent_sentinel(inner),
+        PddlEffect::When { effects, .. } | PddlEffect::Forall { effects, .. } => {
+            effects.iter().any(effect_uses_object_fluent_sentinel)
+        }
+        PddlEffect::Del(_) | PddlEffect::Numeric(_) => false,
+    }
+}
+
+/// True iff any effect in `effects` carries the object-fluent sentinel —
+/// see [`effect_uses_object_fluent_sentinel`].
+///
+/// # Complexity
+/// O(n) in the total number of `PddlEffect` nodes across `effects`.
+fn effect_list_uses_object_fluent_sentinel(effects: &[PddlEffect]) -> bool {
+    effects.iter().any(effect_uses_object_fluent_sentinel)
+}
+
 /// A domain + problem that passed [`admit_planning_task`]'s structural and
 /// capability checks. Cheap to construct further planning stages from —
 /// `theory_digest` content-addresses exactly the structural identity used
@@ -444,7 +476,22 @@ pub fn admit_planning_task(
     // this same requirement but against the wrong string format (`:kebab-case`
     // against a `PascalCase`-populated field, so it could never actually
     // fire) and had no callers.
-    if domain.requirements.iter().any(|r| r == "ObjectFluents") {
+    //
+    // Refuses on two independent signals, for the same reason the
+    // `ConditionalEffects`/`ContinuousEffects` checks do: the declared
+    // requirement string alone misses a domain that *uses*
+    // `(assign (fluent) obj)`-shaped object-fluent effects without ever
+    // declaring `:object-fluents` — `parse::lower_primitive_effect_full`'s
+    // `AssignObjectFluent` arm fabricates a detectable
+    // `parse::OBJECT_FLUENT_SENTINEL_PRED` sentinel atom in place of the
+    // real assignment specifically so this scan can catch that case too
+    // (see that arm's doc comment).
+    let declares_object_fluents = domain.requirements.iter().any(|r| r == "ObjectFluents");
+    let uses_object_fluent_construct = domain
+        .actions
+        .iter()
+        .any(|a| effect_list_uses_object_fluent_sentinel(&a.effect));
+    if declares_object_fluents || uses_object_fluent_construct {
         return PlannerOutcome::Unsupported(UnsupportedFeature {
             feature_name: "object-fluents".to_string(),
             context: "PDDL 3.1 object-valued fluents have no representation anywhere in this \
@@ -711,6 +758,31 @@ mod tests {
         match outcome {
             PlannerOutcome::Unsupported(u) => assert_eq!(u.feature_name, "object-fluents"),
             other => panic!("expected Unsupported(object-fluents), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn undeclared_object_fluent_assignment_effect_is_refused_as_unsupported() {
+        // Adversarial case from the gap report: a domain that *uses*
+        // `(assign fluent obj)` (an object-fluent assignment effect)
+        // without ever declaring `:object-fluents` bypassed the old
+        // declared-requirement-only check entirely. The sentinel content
+        // scan (mirroring undeclared_when_effect_is_refused_.../
+        // continuous_effect_is_refused_.../ above) must catch it too.
+        let domain = domain31_from_pddl(
+            "(define (domain d) (:requirements :strips) (:constants obj1) (:predicates (p)) \
+             (:functions (loc)) \
+             (:action a :parameters () :precondition (p) :effect (assign (loc) obj1)))",
+        )
+        .unwrap();
+        let problem = problem31_from_pddl(STRIPS_PROBLEM).unwrap();
+        let outcome = admit_planning_task(&domain, &problem, &DefaultCapabilityProfile);
+        match outcome {
+            PlannerOutcome::Unsupported(u) => assert_eq!(u.feature_name, "object-fluents"),
+            other => panic!(
+                "expected Unsupported(object-fluents) for an undeclared object-fluent \
+                 assignment effect, got {other:?}"
+            ),
         }
     }
 

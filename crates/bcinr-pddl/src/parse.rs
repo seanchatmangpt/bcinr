@@ -855,14 +855,43 @@ fn lower_primitive_effect_full(pe: &PrimitiveEffect) -> PddlEffect {
             PddlEffect::Numeric(lower_assign_op_numeric(op, func, expr))
         }
         PrimitiveEffect::AssignObjectFluent(_, _) => {
-            // TODO: Object fluent effects
+            // This crate has no representation for an object-valued fluent
+            // assignment (e.g. `(assign (at ?pkg) ?loc)`) — see
+            // `capability.rs`'s structural `ObjectFluents` refusal. The
+            // fabricated atom below is a *detectable sentinel*, not a real
+            // fact — mirrors `CONTINUOUS_EFFECT_SENTINEL_PRED`'s pattern
+            // exactly so `capability::admit_planning_task`'s content scan
+            // (`effect_list_uses_object_fluent_sentinel`) can refuse a
+            // domain that actually uses this construct even when it never
+            // declared `:object-fluents` (see that requirement's structural
+            // refusal in `admit_planning_task`, which — before this fix —
+            // was keyed only on the declared requirement string, not on
+            // whether the construct was actually used). Contrast
+            // `collect_primitive_effect` (the STRIPS8-lowering sibling of
+            // this function), which handles the identical case by silently
+            // dropping it with a plain comment rather than fabricating an
+            // atom — that function's output (`Pddl8ActionSchema.add_effects`/
+            // `del_effects`) has no way to represent "sentinel produced,
+            // check for it later" since it collects into typed `Pddl8Atom`
+            // vectors with no reserved-name convention, so a bare drop is
+            // the honest choice there; this function's output
+            // (`PddlEffect`, feeding `Pddl31Action.effect`, the *content
+            // scan's* input) is exactly where a detectable sentinel is
+            // useful and actionable.
             PddlEffect::Add(Pddl8Atom {
-                pred: "_object_fluent".to_string(),
+                pred: OBJECT_FLUENT_SENTINEL_PRED.to_string(),
                 args: vec![],
             })
         }
     }
 }
+
+/// The fabricated predicate name [`lower_primitive_effect_full`]'s
+/// `AssignObjectFluent` arm substitutes for a real object-fluent assignment
+/// effect. `pub(crate)` so `capability::admit_planning_task`'s content scan
+/// can detect real usage of this unsupported construct — see that arm's
+/// doc comment.
+pub(crate) const OBJECT_FLUENT_SENTINEL_PRED: &str = "_object_fluent";
 
 fn lower_assign_op_numeric(op: &AssignOp, func: PddlFunction, expr: NumericExpr) -> NumericEffect {
     match op {
