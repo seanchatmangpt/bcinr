@@ -209,14 +209,43 @@ pub struct WorkItem {
 /// One fired-op event, pushed to the event ring after each fire.
 /// The ring drains asynchronously via `ReceiptWorker`; BLAKE3 never called
 /// inside `petri_tick`.
+///
+/// Carries two distinct masks, deliberately not collapsed into one field:
+/// `op_trace_so_far` drives [`crate::receipt_worker::ReceiptWorker`]'s
+/// run-completion detection (which must see a strictly growing value across
+/// a multi-op tick's several events, or the *first* event of a tick that
+/// completes the run would falsely look like the whole run's last event —
+/// see `tick_fired_mask_never_collapses_progressive_completion_detection`
+/// in this module's tests for the regression this guards against);
+/// `tick_fired_mask` drives admissibility checking (which needs the whole
+/// tick's joint FireSet, constant across every event of that tick, not a
+/// partial view of it).
 #[derive(Clone, Copy, Default)]
 pub struct EventWorkItem {
     /// Op index (0..63) that fired.
     pub op_idx: u32,
     /// Run-id of the workflow instance.
     pub run_id: u64,
-    /// Cumulative op-trace bitmask (all ops fired so far this run, OR'd in).
+    /// This **tick's** fired-ops-so-far bitmask: starts partial and grows
+    /// (within one tick's several events, in firing order) until it equals
+    /// `tick_fired_mask` on the last event of that tick. Despite the name,
+    /// this is scoped to one tick, not the whole run — `petri_tick`'s
+    /// `fired_ops_accumulator` is freshly zeroed every call. Consumers that
+    /// want "has this run finished" should OR every drained event's value
+    /// together across ticks (as `ReceiptWorker::drain` does), not compare
+    /// a single event's value to a run-wide total.
     pub op_trace_so_far: u64,
+    /// The **complete** set of op bits that fired during the same tick as
+    /// `op_idx` — i.e. this tick's `PetriTickResult::fired_ops`. Every
+    /// `EventWorkItem` pushed for the same tick carries the identical value,
+    /// unlike `op_trace_so_far`.
+    ///
+    /// This is what [`crate::receipt_worker::ReceiptWorker::drain`] checks
+    /// against a `ConcurrencyGuardTable` before letting the event
+    /// contribute to a sealed receipt — admissibility is a property of a
+    /// *tick's joint FireSet*, not of any single op in isolation, so this
+    /// field has to carry the whole set, not a partial view of it.
+    pub tick_fired_mask: u64,
     /// `OpKind` discriminant for receipt classification.
     pub kind_tag: u8,
 }
@@ -365,6 +394,14 @@ pub fn petri_tick(
     let mut new_check = 0u64;
     let mut fired_ops_accumulator = 0u64;
 
+    // The complete set of ops firing this tick is already known here (before
+    // the per-op loop below applies XorDispatch/LoopRedo on top of it):
+    // engine.step() only ever adds op bits for transitions it actually fired,
+    // so this delta is exactly what fired_ops_accumulator will equal once the
+    // loop finishes. Computed upfront so every EventWorkItem pushed below can
+    // carry the tick's whole FireSet, not just the one op it names.
+    let tick_fired_mask = new_done & !done;
+
     let mut fm = firing_mask_64;
     while fm != 0 {
         let t_idx = fm.trailing_zeros() as usize;
@@ -390,6 +427,7 @@ pub fn petri_tick(
                 op_idx: i as u32,
                 run_id,
                 op_trace_so_far: fired_ops_accumulator,
+                tick_fired_mask,
                 kind_tag: op.kind as u8,
             });
             if pushed == 0 {
@@ -408,6 +446,13 @@ pub fn petri_tick(
         // Parallel dispatch: push enabled successors to the ring.
         dispatch_successors(tape, i, new_done, ring);
     }
+
+    debug_assert_eq!(
+        fired_ops_accumulator, tick_fired_mask,
+        "tick_fired_mask (computed upfront from engine.state.current) must equal \
+         fired_ops_accumulator (accumulated by the per-op loop) — every EventWorkItem \
+         pushed above assumed these stay equal"
+    );
 
     state.done.words[0] = new_done;
     state.check.words[0] = new_check & !new_done;
@@ -570,21 +615,11 @@ pub fn petri_tick_guarded<S: ConcurrencySelector>(
         new_check |= redo_check;
 
         // Cold path (per module docs): only an op that actually fired this
-        // tick emits a receipt event or releases successors to the parallel
-        // ring — a deferred (ready-but-unselected) candidate must not be
-        // reported as fired or have its successors dispatched.
+        // tick releases successors to the parallel ring — a deferred
+        // (ready-but-unselected) candidate must not have its successors
+        // dispatched. Receipt-event pushes are deferred to a post-loop pass
+        // below (see comment there for why).
         if fired_this == 1 {
-            if let Some(er) = event_ring {
-                let pushed = er.push_t1(EventWorkItem {
-                    op_idx: i as u32,
-                    run_id,
-                    op_trace_so_far: fired_ops_accumulator,
-                    kind_tag: op.kind as u8,
-                });
-                if pushed == 0 {
-                    overflow_count += 1;
-                }
-            }
             dispatch_successors(tape, i, new_done, ring);
         }
     }
@@ -595,6 +630,44 @@ pub fn petri_tick_guarded<S: ConcurrencySelector>(
 
     state.done.words[0] = new_done;
     state.check.words[0] = new_check & !new_done;
+
+    // Push receipt events only after the loop above finishes, so
+    // `tick_fired_mask` can carry this tick's *complete* FireSet
+    // (`fired_ops_accumulator`'s final value) on every event — unlike the
+    // engine-based `petri_tick` path, this divergent (gated) path cannot
+    // know the tick's final FireSet until every candidate has been
+    // considered, since a deferred candidate can prevent a later, dependent
+    // candidate from firing in the same tick.
+    //
+    // `op_trace_so_far` is reconstructed here to match what an inline push
+    // would have produced: ascending bit order is this loop's own firing
+    // order (same `trailing_zeros` bit-scan idiom used above), so
+    // re-scanning `fired_ops_accumulator` in that same order and OR-ing
+    // progressively reproduces the exact partial-then-complete sequence a
+    // caller would see from `petri_tick`'s inline push — this must stay
+    // partial-then-growing, not constant, or the *first* event of a tick
+    // that completes a run would look like the run's completion by itself,
+    // firing `ReceiptWorker`'s seal/refuse check once per fired op instead
+    // of once per tick.
+    if let Some(er) = event_ring {
+        let mut remaining = fired_ops_accumulator;
+        let mut op_trace_so_far = 0u64;
+        while remaining != 0 {
+            let i = remaining.trailing_zeros() as usize;
+            remaining &= remaining - 1;
+            op_trace_so_far |= 1u64 << i;
+            let pushed = er.push_t1(EventWorkItem {
+                op_idx: i as u32,
+                run_id,
+                op_trace_so_far,
+                tick_fired_mask: fired_ops_accumulator,
+                kind_tag: tape[i].kind as u8,
+            });
+            if pushed == 0 {
+                overflow_count += 1;
+            }
+        }
+    }
 
     PetriTickResult {
         fired_ops: fired_ops_accumulator,

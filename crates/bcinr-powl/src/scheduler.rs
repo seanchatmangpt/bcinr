@@ -337,7 +337,11 @@ impl ConcurrencySelector for StableMaximalSelector {
 
 /// Convert a `u64` tape-slot bitmask (as used throughout `scheduler_tick`)
 /// into an `EventSet` (as used by `ConcurrencySelector`/`ConcurrencyGuardTable`).
-fn mask_to_event_set(mask: u64) -> EventSet {
+///
+/// `pub(crate)`: also reused by [`crate::receipt_worker`] to check a drained
+/// tick's fired-ops mask against a `ConcurrencyGuardTable` before letting it
+/// contribute to a sealed receipt.
+pub(crate) fn mask_to_event_set(mask: u64) -> EventSet {
     let mut set = EventSet::empty();
     let mut bits = mask;
     while bits != 0 {
