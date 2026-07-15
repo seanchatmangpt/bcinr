@@ -8,6 +8,14 @@
 /// Q16.16 fixed-point conformance metrics.
 ///
 /// Value encoding: `0x0001_0000` == 1.0, `0x0000_8000` == 0.5, `0x0000_0000` == 0.0.
+///
+/// Not every producer in this crate computes all four dimensions for real:
+/// [`crate::replay::PowlReplayVerifier::finalize`] computes genuine
+/// `fitness`/`precision` from token-passing replay state but MOCKS
+/// `generalization`/`simplicity` as `0x0000_0000` (no state-space or
+/// model-complexity analysis backs them yet) — see that method's doc
+/// comment before trusting those two dimensions from a replay-derived
+/// `ConformanceMetrics`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConformanceMetrics {
     pub fitness: u32,
