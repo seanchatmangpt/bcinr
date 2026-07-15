@@ -23,7 +23,16 @@ args = ["build", "--workspace", "--release", "--all-features"]
 category = "Test"
 description = "Run all workspace tests"
 command = "cargo"
-args = ["test", "--workspace", "--all-features", "--all-targets"]
+# --no-fail-fast: `cargo test`'s default is to stop running further test
+# binaries the moment one fails. `bcinr` (the root package) is the first
+# workspace member and its own tests/e2e.rs has pre-existing, unrelated
+# failures (dev-tooling scenario tests) -- without --no-fail-fast, that
+# single failing binary silently prevents every later member (including
+# crates/bcinr-pddl, bcinr-powl, bcinr-powl-receipt, bcinr-mfw-ir) from
+# ever being test-run at all in this invocation, giving zero signal on
+# them even though this task's exit code still (correctly) reports
+# failure overall.
+args = ["test", "--workspace", "--all-features", "--all-targets", "--no-fail-fast"]
 
 [tasks.bench]
 category = "Performance"
