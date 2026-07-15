@@ -38,7 +38,7 @@ pub fn domain_from_pddl(text: &str) -> Result<Pddl8Domain, Pddl8Error> {
             if arity > PDDL8_MAX_ARITY {
                 Err(Pddl8Error::BoundExceeded {
                     what: "predicate arity",
-                    limit: PDDL8_MAX_ARITY as u8,
+                    limit: PDDL8_MAX_ARITY,
                     got: arity,
                 })
             } else {
@@ -348,7 +348,7 @@ fn lower_action(a: &pddl::ActionDefinition) -> Result<Pddl8ActionSchema, Pddl8Er
     if params.len() > PDDL8_MAX_PARAMS {
         return Err(Pddl8Error::BoundExceeded {
             what: "action parameters",
-            limit: PDDL8_MAX_PARAMS as u8,
+            limit: PDDL8_MAX_PARAMS,
             got: params.len(),
         });
     }
@@ -357,7 +357,7 @@ fn lower_action(a: &pddl::ActionDefinition) -> Result<Pddl8ActionSchema, Pddl8Er
     if preconditions.len() > PDDL8_MAX_CONJUNCTS {
         return Err(Pddl8Error::BoundExceeded {
             what: "precondition atoms",
-            limit: PDDL8_MAX_CONJUNCTS as u8,
+            limit: PDDL8_MAX_CONJUNCTS,
             got: preconditions.len(),
         });
     }

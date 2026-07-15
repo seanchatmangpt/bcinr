@@ -176,7 +176,7 @@ impl GroundProblem {
             if actions.len() > limit {
                 return Err(Pddl8Error::BoundExceeded {
                     what: "ground actions",
-                    limit: limit as u8,
+                    limit,
                     got: actions.len(),
                 });
             }
@@ -446,7 +446,7 @@ impl GroundTemporalProblem {
             if actions.len() > PDDL8_MAX_GROUND {
                 return Err(Pddl8Error::BoundExceeded {
                     what: "ground actions",
-                    limit: PDDL8_MAX_GROUND as u8,
+                    limit: PDDL8_MAX_GROUND,
                     got: actions.len(),
                 });
             }
@@ -462,7 +462,7 @@ impl GroundTemporalProblem {
             if durative_actions.len() > PDDL8_MAX_GROUND {
                 return Err(Pddl8Error::BoundExceeded {
                     what: "ground durative actions",
-                    limit: PDDL8_MAX_GROUND as u8,
+                    limit: PDDL8_MAX_GROUND,
                     got: durative_actions.len(),
                 });
             }
@@ -1747,5 +1747,105 @@ mod quantifier_tests {
             &HashMap::new(),
             &qd
         ));
+    }
+}
+
+#[cfg(test)]
+mod bound_exceeded_tests {
+    //! `Pddl8Error::BoundExceeded.limit` used to be `u8`, which silently
+    //! truncated any bound above `u8::MAX` (255) — `4096usize as u8 == 0`
+    //! for the default [`PDDL8_MAX_GROUND`], so a domain that genuinely
+    //! exceeded it reported `limit: 0` in its refusal instead of the real
+    //! bound. These tests build a domain (directly, not through the PDDL
+    //! parser — grounding count is all that matters here) whose grounding
+    //! exceeds a caller-supplied limit above `u8::MAX`, and assert the
+    //! reported `limit` is the real value, not a wrapped-around one.
+    use super::*;
+
+    /// One untyped, single-parameter action schema grounds once per object:
+    /// `n` objects in the problem produce exactly `n` ground actions.
+    fn single_param_domain() -> Pddl8Domain {
+        Pddl8Domain {
+            name: "bound-probe".to_string(),
+            predicates: vec![("p".to_string(), 1)],
+            actions: vec![Pddl8ActionSchema {
+                name: "act".to_string(),
+                params: vec!["?x".to_string()],
+                preconditions: vec![],
+                add_effects: vec![Pddl8Atom {
+                    pred: "p".to_string(),
+                    args: vec!["?x".to_string()],
+                }],
+                del_effects: vec![],
+                typed_params: vec![],
+                condition: None,
+                effects: vec![],
+                numeric_effects: vec![],
+            }],
+            types: vec![],
+            functions: vec![],
+            durative_actions: vec![],
+            derived: vec![],
+            constraints: vec![],
+            processes: vec![],
+            events: vec![],
+        }
+    }
+
+    fn problem_with_n_objects(n: usize) -> Pddl8Problem {
+        Pddl8Problem {
+            name: "bound-probe-p".to_string(),
+            domain: "bound-probe".to_string(),
+            objects: (0..n).map(|i| format!("o{i}")).collect(),
+            init: vec![],
+            goal: vec![],
+            object_types: vec![],
+            fn_values: vec![],
+            timed_inits: vec![],
+            metric: None,
+            preferences: vec![],
+        }
+    }
+
+    #[test]
+    fn ground_action_bound_report_is_not_truncated_past_u8_max() {
+        let domain = single_param_domain();
+        // 301 objects -> 301 ground actions, which exceeds a 300 limit.
+        // 300 > u8::MAX (255): a pre-fix `limit as u8` would have reported
+        // `300usize as u8 == 44`, not the real bound of 300.
+        let problem = problem_with_n_objects(301);
+        match GroundProblem::build(&domain, &problem, Some(300)) {
+            Err(Pddl8Error::BoundExceeded { limit, got, .. }) => {
+                assert_eq!(
+                    limit, 300,
+                    "limit must report the real bound, not a u8-wrapped value"
+                );
+                assert_eq!(got, 301);
+            }
+            Err(other) => panic!("expected BoundExceeded, got {other:?}"),
+            Ok(_) => panic!("301 ground actions must exceed the 300-action limit"),
+        }
+    }
+
+    #[test]
+    fn default_ground_action_bound_report_is_not_truncated() {
+        // Exercise the *default* PDDL8_MAX_GROUND path (max_ground: None),
+        // not just a caller-supplied limit: PDDL8_MAX_GROUND itself (4096)
+        // is > u8::MAX, so this is the exact scenario the original bug
+        // report cited (`4096usize as u8 == 0`).
+        let domain = single_param_domain();
+        let problem = problem_with_n_objects(PDDL8_MAX_GROUND + 1);
+        match GroundProblem::build(&domain, &problem, None) {
+            Err(Pddl8Error::BoundExceeded { limit, got, .. }) => {
+                assert_eq!(
+                    limit, PDDL8_MAX_GROUND,
+                    "limit must report the real PDDL8_MAX_GROUND bound (4096), not \
+                     4096usize as u8 == 0"
+                );
+                assert_eq!(got, PDDL8_MAX_GROUND + 1);
+            }
+            Err(other) => panic!("expected BoundExceeded, got {other:?}"),
+            Ok(_) => panic!("PDDL8_MAX_GROUND + 1 ground actions must exceed the default bound"),
+        }
     }
 }

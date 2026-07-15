@@ -307,7 +307,7 @@ impl IndexedGroundProblem {
                 if actions.len() > limit {
                     return Err(crate::error::Pddl8Error::BoundExceeded {
                         what: "ground actions",
-                        limit: limit as u8,
+                        limit,
                         got: actions.len(),
                     });
                 }

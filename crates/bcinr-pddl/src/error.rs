@@ -25,9 +25,17 @@ pub enum Pddl8Error {
     /// PDDL text could not be parsed.
     ParseError(String),
     /// A structural bound was exceeded (arity, body atoms, variables, depth).
+    ///
+    /// `limit` is `usize`, matching `got` and every bound constant that
+    /// feeds it (`PDDL8_MAX_GROUND` = 4096, plus any caller-supplied
+    /// `max_ground: Option<usize>`) — it was previously `u8`, which silently
+    /// truncated any bound above 255 (`4096usize as u8 == 0`, so a domain
+    /// that actually exceeded `PDDL8_MAX_GROUND` reported `limit: 0` instead
+    /// of the real bound). A refusal's witness must report the bound that
+    /// was actually hit.
     BoundExceeded {
         what: &'static str,
-        limit: u8,
+        limit: usize,
         got: usize,
     },
     /// An action schema references an unknown predicate or type.

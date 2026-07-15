@@ -68,7 +68,7 @@ pub fn temporal_plan_to_powl_tape(plan: &TemporalPlan) -> Result<Vec<PowlOpSpec>
     if n > MAX_POWL_TAPE_STEPS {
         return Err(Pddl8Error::BoundExceeded {
             what: "powl_bridge tape steps (pred_mask/succ_mask are u64-bit-indexed)",
-            limit: MAX_POWL_TAPE_STEPS as u8,
+            limit: MAX_POWL_TAPE_STEPS,
             got: n,
         });
     }
@@ -179,7 +179,7 @@ mod tests {
         };
         match temporal_plan_to_powl_tape(&plan) {
             Err(Pddl8Error::BoundExceeded { limit, got, .. }) => {
-                assert_eq!(limit, MAX_POWL_TAPE_STEPS as u8);
+                assert_eq!(limit, MAX_POWL_TAPE_STEPS);
                 assert_eq!(got, MAX_POWL_TAPE_STEPS + 1);
             }
             other => panic!("expected BoundExceeded, got {other:?}"),

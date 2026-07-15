@@ -281,7 +281,7 @@ pub fn check_domain_text(text: &str) -> BoundReport {
                 vec![BoundViolation {
                     kind,
                     actual: got,
-                    limit: limit as usize,
+                    limit,
                     name: format!("parsed:{what}"),
                 }],
             )
