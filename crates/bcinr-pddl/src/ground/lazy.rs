@@ -41,7 +41,9 @@ use wasm4pm_compat::pddl::{
 /// Errors from indexed grounding / plan finding. Mirrors the meaningful subset
 /// of `crate::Pddl8Error` this path can produce, so the caller's
 /// "infeasibility is `Ok`" classification is unchanged whichever grounder ran.
-use bcinr_mfw_ir::{Digest, ExhaustionWitness, PlannerOutcome, SearchProfileId};
+use bcinr_mfw_ir::{
+    BoundHit, BoundKind, Digest, ExhaustionWitness, PlannerOutcome, SearchProfileId,
+};
 
 /// `SearchProfileId` for this crate's indexed/lazy grounder's BFS — distinct
 /// from `super::LEGACY_WHOLE_RUN_SEARCH_PROFILE` (the naive grounder's BFS)
@@ -360,8 +362,25 @@ impl IndexedGroundProblem {
         })
     }
 
-    /// BFS forward search — identical strategy to
-    /// `crate::GroundProblem::find_plan`, over the pruned action set.
+    /// BFS forward search over the pruned action set.
+    ///
+    /// # Bounded vs. Exhausted
+    ///
+    /// Same "bounded != exhausted" obligation as
+    /// `crate::GroundProblem::find_plan` (see that function's doc comment):
+    /// `PDDL8_MAX_PLAN_DEPTH` caps how deep any single BFS branch may be
+    /// expanded, and this search tracks (`depth_bound_hit`) whether any
+    /// branch was cut off *solely* for exceeding that cap rather than the
+    /// frontier genuinely running dry. If so, an empty queue does not prove
+    /// unreachability — this returns `Bounded`, not `Exhausted`.
+    ///
+    /// (This doc comment used to claim "identical strategy to
+    /// `crate::GroundProblem::find_plan`" — true of the join/prune
+    /// grounding strategy, but that sibling's `find_plan` was patched in
+    /// commit f736dca5 to make exactly this Bounded/Exhausted distinction
+    /// and this function was not; both now agree, closing that gap rather
+    /// than continuing to assert an equivalence this function did not
+    /// actually have.)
     pub fn find_plan(&self) -> PlannerOutcome<Pddl8Tape> {
         let goal_set: BTreeSet<Pddl8GroundAtom> = self.goal.iter().cloned().collect();
         let mut queue: VecDeque<(BTreeSet<Pddl8GroundAtom>, Vec<usize>)> = VecDeque::new();
@@ -371,8 +390,15 @@ impl IndexedGroundProblem {
         visited.insert(init_sorted);
         queue.push_back((self.initial_state.clone(), vec![]));
 
+        // Set the moment any branch is discarded purely for exceeding
+        // `PDDL8_MAX_PLAN_DEPTH` — see the doc comment above.
+        let mut depth_bound_hit = false;
+        let mut max_depth_observed: u64 = 0;
+
         while let Some((state, path)) = queue.pop_front() {
+            max_depth_observed = max_depth_observed.max(path.len() as u64);
             if path.len() > PDDL8_MAX_PLAN_DEPTH {
+                depth_bound_hit = true;
                 continue;
             }
             if goal_set.iter().all(|g| state.contains(g)) {
@@ -406,6 +432,19 @@ impl IndexedGroundProblem {
                 }
             }
         }
+
+        if depth_bound_hit {
+            // At least one branch was cut off solely by the depth cap, not
+            // by the frontier genuinely running dry — a structural bound
+            // was hit, not a proof of unreachability. See the doc comment
+            // on this function.
+            return PlannerOutcome::Bounded(BoundHit {
+                kind: BoundKind::PlanDepth,
+                limit: PDDL8_MAX_PLAN_DEPTH as u64,
+                observed: max_depth_observed,
+            });
+        }
+
         let mut goal_digest_buf = Vec::new();
         for g in &self.goal {
             goal_digest_buf.extend_from_slice(g.label().as_bytes());
