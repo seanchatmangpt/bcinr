@@ -44,6 +44,16 @@ script = [
 [tasks.fmt]
 category = "Lint"
 description = "Check formatting"
+# `cargo fmt --all` already covers the entire workspace by itself, and this
+# task's command doesn't vary per member -- so opt out of cargo-make's
+# default_to_workspace member-descent behavior (`workspace = true` by
+# default here, per [config]). Without this, cargo-make re-invokes a task
+# named "fmt" inside each member's own directory; members with no local
+# Makefile.toml (e.g. the root `bcinr` package) fall back to cargo-make's
+# built-in core-task bundle, which has no task literally named "fmt" (its
+# equivalent core task is "format"), so the whole gate failed immediately
+# with "Task fmt not found" before ever running `cargo fmt` for real.
+workspace = false
 command = "cargo"
 args = ["fmt", "--all", "--", "--check"]
 
