@@ -117,7 +117,14 @@ category = "Lint"
 description = "Scan bcinr-mcp for LLM-generated stubs, hedge comments, and unverified claims"
 workspace = false
 command = "cargo"
-args = ["run", "--manifest-path", "/Users/sac/anti-llm-cheat-lsp/Cargo.toml", "--quiet", "--", "scan", "--dir", "crates/bcinr-mcp/src"]
+# `--bin anti-llm-cheat-lsp` is required, not optional: that crate's own
+# Cargo.toml now defines two binaries (`anti-llm-cheat-lsp` via src/main.rs,
+# `gen_receipts` via src/bin/gen_receipts.rs) with no `default-run` key set,
+# so a bare `cargo run` refuses to pick one ("could not determine which
+# binary to run") -- confirmed live before this fix. Disambiguating here,
+# in this repo's own Makefile.toml, avoids touching the external
+# anti-llm-cheat-lsp repo at all.
+args = ["run", "--manifest-path", "/Users/sac/anti-llm-cheat-lsp/Cargo.toml", "--quiet", "--bin", "anti-llm-cheat-lsp", "--", "scan", "--dir", "crates/bcinr-mcp/src"]
 
 # Wire anti-llm scan into clippy so CI always catches stub code in the MCP layer.
 [tasks.clippy]
