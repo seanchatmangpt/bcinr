@@ -417,15 +417,16 @@ pub fn compile_powl(root: &PowlAstNode<'_>) -> Result<PowlTape, CompileError> {
 // =============================================================================
 
 /// Compiles [`crate::model::PowlModel`] (the new planner-output IR) into the
-/// existing v2 tape representation, mirroring [`tape::v2`]'s pattern of
-/// living alongside the legacy AST compiler above rather than replacing it.
+/// existing v2 tape representation, mirroring [`crate::tape::v2`]'s pattern
+/// of living alongside the legacy AST compiler above rather than replacing
+/// it.
 ///
 /// `PowlModel`'s node graph is already flat (one node per `ActionOccurrence`
 /// plus precedence edges, not a nested AST), so this module does not reuse
 /// the recursive-descent machinery above (`compile_node`/`wire`/`Segment`)
 /// — there is no tree to recurse over. It *does* reuse the v2 tape's own
-/// primitives unchanged: [`tape::v2::PowlTape::push`],
-/// [`tape::v2::LabelSlab::intern`], and the established `pred_mask`/
+/// primitives unchanged: [`crate::tape::v2::PowlTape::push`],
+/// [`crate::tape::v2::LabelSlab::intern`], and the established `pred_mask`/
 /// `succ_mask` bit convention — no new op/tape encoding is invented here.
 pub mod v2 {
     use std::collections::BTreeMap;

@@ -2,7 +2,8 @@
 //!
 //! # Nightly features
 //!
-//! - `adt_const_params`: allows [`TopologyKind`] as a const generic parameter.
+//! - `adt_const_params`: allows [`crate::typestate::TopologyKind`] as a const
+//!   generic parameter.
 //! - `generic_const_exprs`: enables `[u64; N]` in const generic position,
 //!   unlocking compile-time topology encoding in [`const_scheduler`] and
 //!   512-op wide tapes in [`scheduler_wide`].

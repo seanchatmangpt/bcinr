@@ -526,8 +526,9 @@ fn event_set_to_mask(set: &EventSet) -> u64 {
 ///    unguarded path.
 /// 4. **Divergent path**: otherwise, advance `state.sla_wheel` for real
 ///    exactly once, then recompute per-candidate enablement directly with
-///    [`pred_satisfied`] (the same formula `SwarMarking::try_fire` uses
-///    internally — see that function's doc comment), gated on
+///    `pred_satisfied` (a private helper in this module, hence a plain code
+///    span rather than a doc-link — the same formula `SwarMarking::try_fire`
+///    uses internally, see that function's doc comment), gated on
 ///    `selected_bit`, so a candidate excluded from `selected` neither
 ///    contributes its `op_bit` to this tick's `done` set nor unblocks a
 ///    later-priority candidate in the same tick that depended on it. Ready-

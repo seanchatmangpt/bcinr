@@ -103,8 +103,8 @@ impl Default for PowlTape {
 ///
 /// All new types (`Powl64OpV2`, `PowlTapeV2`, `PowlTapeLarge`, `LabelSlab`)
 /// live here.  They are `no_std`-compatible (only `core` imports) — **with
-/// one exception**: [`CompiledNonFace`] and [`ConcurrencyGuardTable`] pull
-/// in `bcinr_mfw_ir::{EventSet, Digest}`, and `bcinr-mfw-ir` itself uses
+/// one exception**: [`v2::CompiledNonFace`] and [`v2::ConcurrencyGuardTable`]
+/// pull in `bcinr_mfw_ir::{EventSet, Digest}`, and `bcinr-mfw-ir` itself uses
 /// `std::collections::{BTreeMap, BTreeSet}` (see its `causal.rs`/
 /// `concurrency.rs`), so those two types are not `no_std`-compatible. They
 /// are grouped with the rest of v2 anyway because they are conceptually
@@ -499,14 +499,15 @@ pub mod v2 {
         ///
         /// # Complexity
         ///
-        /// O(`self.nonfaces.len()`) — one [`EventSet::is_subset_of`] call
-        /// per recorded nonface, each itself O(1) over `EventSet`'s fixed
-        /// 8-word bitset (same cost shape as the mirrored
+        /// O(`self.nonfaces.len()`) — one [`bcinr_mfw_ir::EventSet::is_subset_of`]
+        /// call per recorded nonface, each itself O(1) over `EventSet`'s
+        /// fixed 8-word bitset (same cost shape as the mirrored
         /// `ExecutableConcurrencyComplex::admits`, and the same reason it
         /// matters here: this is called once per ready-set candidate inside
-        /// [`crate::scheduler::StableMaximalSelector::select`]'s inner
-        /// loop, every scheduler tick — see that function's own `#
-        /// Complexity` note, and `bcinr-bench/benches/mfw_hotpath_bench.rs`,
+        /// `crate::scheduler::StableMaximalSelector`'s implementation of
+        /// [`crate::scheduler::ConcurrencySelector::select`]'s inner loop,
+        /// every scheduler tick — see that function's own `# Complexity`
+        /// note, and `bcinr-bench/benches/mfw_hotpath_bench.rs`,
         /// which benchmarks exactly this call-volume-sensitive path).
         pub fn admits(&self, candidate: &bcinr_mfw_ir::EventSet) -> bool {
             !self

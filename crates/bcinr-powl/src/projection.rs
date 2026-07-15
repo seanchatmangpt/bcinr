@@ -1,5 +1,5 @@
 //! Real implementation of [`bcinr_mfw_ir::PowlProjector`] for
-//! [`PowlModel`](crate::model::PowlModel): projects a `CausalPlan` +
+//! [`PowlModel`]: projects a `CausalPlan` +
 //! `ExecutableConcurrencyComplex` into a `PowlModel`, and verifies (not a
 //! stub, not always-`Ok`) that the projection preserved source semantics
 //! *for the checks it actually runs* before returning a witness claiming
@@ -20,7 +20,7 @@
 //! corresponding `PowlNodeId`) — not changing the edge's own key type,
 //! which stays `ActionOccurrenceId` throughout.
 //!
-//! [`ExecutableConcurrencyComplex`]/[`MinimalNonFace`] is different:
+//! [`ExecutableConcurrencyComplex`]/[`bcinr_mfw_ir::MinimalNonFace`] is different:
 //! `EventSet` members are **positions** in the causal plan's occurrence
 //! list, not `ActionOccurrenceId` values — see [`crate::model`]'s module
 //! doc comment ("`EventSet` members are positions, not `ActionOccurrenceId`
@@ -135,7 +135,8 @@ impl fmt::Display for PreservationError {
 
 impl std::error::Error for PreservationError {}
 
-/// Error returned by [`PowlProjector::project`].
+/// Error returned by `PowlProjector`'s implementation of
+/// [`bcinr_mfw_ir::PowlProjector::project`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProjectionError {
     /// One of the two real preservation checks failed.

@@ -7,7 +7,7 @@
 //! [`bcinr_mfw_ir::PowlProjector`] (see [`crate::projection`]) from a
 //! `CausalPlan` + `ExecutableConcurrencyComplex`. `PowlModel` can itself be
 //! lowered into the existing v2 tape representation via
-//! [`crate::compiler::compile_powl_v2`]. The two models are never conflated:
+//! [`crate::compiler::v2::compile_powl_v2`]. The two models are never conflated:
 //! there is no `From<PowlAstNode> for PowlModel` or vice versa in this phase.
 //!
 //! # Node identity vs. action identity
@@ -39,20 +39,21 @@
 //! `MinimalNonFace`'s doc comments say which convention is authoritative);
 //! this crate is now consistent with `bcinr-pddl`'s producer.
 //!
-//! [`crate::projection::PowlProjector::project`] builds each node's
+//! `crate::projection::PowlProjector`'s implementation of
+//! [`bcinr_mfw_ir::PowlProjector::project`] builds each node's
 //! `PowlNodeId` from that exact same position (`PowlNodeId(i)` for
 //! `causal.occurrences[i]`), so for a `PowlModel` produced by the real
 //! projector, an `EventSet` member numerically coincides with the
 //! `PowlNodeId` of the node it refers to — `PowlNodeId` is not a separate
 //! addressing space concurrency needs to be re-keyed into, it already *is*
-//! the same numbering. [`crate::compiler::compile_powl_v2`] relies on
+//! the same numbering. [`crate::compiler::v2::compile_powl_v2`] relies on
 //! exactly this coincidence (after independently re-verifying node-id
 //! density) rather than resolving through `provenance`/`ActionOccurrenceId`
 //! for concurrency members — see that function's doc comment.
 //!
 //! Treating an `EventSet` member as a raw `ActionOccurrenceId` (as both
 //! [`crate::projection::verify_concurrency_preservation`] and
-//! [`crate::compiler::compile_powl_v2`] used to) only coincidentally works
+//! [`crate::compiler::v2::compile_powl_v2`] used to) only coincidentally works
 //! when every occurrence's `ActionOccurrenceId` equals its position — true
 //! of every hand-built fixture in this codebase, and true of
 //! `MfwPlanner::occurrences_from_tape`'s real output only as long as no
@@ -89,9 +90,9 @@ pub struct SilentNode {
 /// This variant exists in the enum so callers can pattern-match on it and
 /// see it is a recognised-but-not-yet-implemented shape — it is never
 /// constructed by [`crate::projection::PowlProjector`] or consumed by
-/// [`crate::compiler::compile_powl_v2`] in this phase. Any code path that
+/// [`crate::compiler::v2::compile_powl_v2`] in this phase. Any code path that
 /// receives one returns a typed error
-/// ([`crate::compiler::CompileErrorV2::UnsupportedNodeKind`]) rather than
+/// ([`crate::compiler::v2::CompileErrorV2::UnsupportedNodeKind`]) rather than
 /// silently ignoring it or treating it as a no-op. Real child-workflow
 /// projection (sub-tape linking, cross-tape receipt chaining) is out of
 /// this phase's time budget — this is MOCKED-as-a-typed-refusal, not a
