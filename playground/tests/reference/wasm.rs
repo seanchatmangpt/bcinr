@@ -292,8 +292,6 @@ pub unsafe extern "C" fn ref_powl_execute(
 
 #[cfg(test)]
 mod tests {
-    use std::ptr;
-
     use super::*;
 
     #[test]

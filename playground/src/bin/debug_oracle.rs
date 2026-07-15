@@ -1,6 +1,9 @@
+//! Debug oracle: prints bishop-attack bitboards from `bcinr`'s
+//! `bishop_attacks` alongside the `chess` crate's reference
+//! `get_bishop_moves`, for eyeballing a divergence at a single square.
 #![allow(unsafe_code)]
-use chess::{get_bishop_moves, get_rook_moves, BitBoard, Square};
-use playground::legal_moves::{bishop_attacks, rook_attacks};
+use chess::{get_bishop_moves, BitBoard, Square};
+use playground::legal_moves::bishop_attacks;
 
 fn print_bb(name: &str, bb: u64) {
     println!("{}:", name);

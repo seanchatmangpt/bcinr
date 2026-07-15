@@ -1,4 +1,6 @@
-#![feature(min_adt_const_params)]
+//! Hoare-logic oracle tests: property-based checks that `playground`'s
+//! branchless Petri/POWL/YAWL primitives satisfy their stated pre/post-
+//! condition invariants across randomized inputs, not just fixed examples.
 #![allow(unsafe_code)]
 
 use playground::{
@@ -265,9 +267,12 @@ proptest! {
 
         powl64_execute_step(&mut state, &op, input_choice, loop_repeat);
 
-        // [POST-CONDITION] Depth cannot underflow or exceed 16 branchlessly
+        // [POST-CONDITION] Depth cannot exceed 16 branchlessly. (No paired
+        // "cannot underflow" check: `stack_depth`'s type is unsigned, so
+        // that comparison is a compile-time tautology, not a real
+        // post-condition — asserting it would be a vacuous check disguised
+        // as verification.)
         assert!(state.stack_depth <= 16, "Oracle Fault: Stack depth exceeded bounds");
-        assert!(state.stack_depth >= 0, "Oracle Fault: Stack depth underflow"); // Unsigned so naturally >=0, but good conceptually
 
         // [INVARIANT] Monotonic progression in completed ops unless it's a loop exit repeat
         let is_loop_repeat = kind as u32 == Powl64OpKind::LoopGate as u32 && ctrl_mask == 0 && ((loop_repeat >> (loop_id & 63)) & 1) != 0;

@@ -1,4 +1,10 @@
 //! POWL v2 → POWL64 compiler and execution engine reference.
+//!
+//! `#![allow(dead_code)]`: see `reference/petri.rs`'s module doc comment —
+//! same reasoning applies here (a comprehensive reference surface compiled
+//! independently into several test binaries, each exercising a different
+//! subset).
+#![allow(dead_code)]
 
 // ── AST & Core Types ────────────────────────────────────────────────────────
 
@@ -873,7 +879,7 @@ pub fn drive_watchdog(
 ) -> WatchdogOutcome {
     if watchdog.is_tripped() {
         let mut frags = Vec::new();
-        for (idx, drained_op) in scope_remaining.iter().enumerate() {
+        for (idx, _drained_op) in scope_remaining.iter().enumerate() {
             frags.push(DrainFragment {
                 op_index: (op_index + 1 + idx as u32),
                 denial: WATCHDOG_DRAIN_DENIAL,
@@ -958,7 +964,9 @@ impl<'p> Powl64Executor<'p> {
         let ops = &self.program.ops;
         let scopes = &self.program.scopes;
 
-        let root_desc = scopes
+        // Validates scope 0 exists (`?` propagates `UnknownScope` if not);
+        // the descriptor itself isn't otherwise read below.
+        let _root_desc = scopes
             .iter()
             .find(|s| s.scope_id == 0)
             .ok_or(ExecutorError::UnknownScope { scope_id: 0 })?;

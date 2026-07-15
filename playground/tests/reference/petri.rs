@@ -1,3 +1,16 @@
+//! Plain-Rust Petri-net reference implementation, mirroring
+//! `wasm4pm-compat`'s `Place`/`Transition`/`Arc`/`Marking` model, for
+//! differential-testing `playground`'s branchless Petri primitives against.
+//!
+//! `#![allow(dead_code)]`: this is a comprehensive reference surface, not a
+//! single-purpose fixture — it is compiled independently into several
+//! separate test binaries via `mod reference;` (`reference_test.rs`,
+//! `differential_tests.rs`, …), and each binary only exercises the subset of
+//! this API its own tests actually call. A method unused by one binary's
+//! compilation is routinely used by another's; item-by-item allows would
+//! just be noise repeated ~20 times over, not a more honest signal.
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 
 // ── Types and Models from wasm4pm-compat ────────────────────────────────────

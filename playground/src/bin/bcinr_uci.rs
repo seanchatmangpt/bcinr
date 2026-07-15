@@ -1,3 +1,6 @@
+//! Minimal UCI (Universal Chess Interface) engine driver backed by
+//! `playground`'s `BranchTorchNNUE` evaluator — reads UCI commands from
+//! stdin, drives search/evaluation, and writes UCI responses to stdout.
 use std::{
     io::{self, BufRead},
     str::FromStr,

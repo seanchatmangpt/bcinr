@@ -1,4 +1,10 @@
 //! Binary YAWL (bYAWL) Routing Engine Reference
+//!
+//! `#![allow(dead_code)]`: see `reference/petri.rs`'s module doc comment —
+//! same reasoning applies here (a comprehensive reference surface compiled
+//! independently into several test binaries, each exercising a different
+//! subset).
+#![allow(dead_code)]
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

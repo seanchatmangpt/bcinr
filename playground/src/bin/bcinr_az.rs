@@ -615,7 +615,10 @@ fn main() {
 }
 
 fn parse_position(t: &[&str]) -> Option<Board> {
-    let mut idx = 1;
+    // No initial value: both live branches below assign `idx` before it is
+    // read, and the `else` branch returns early without reading it, so an
+    // initial `= 1` was dead on arrival — never observed by any path.
+    let mut idx;
     let mut board = if t.get(1) == Some(&"startpos") {
         idx = 2;
         Board::default()

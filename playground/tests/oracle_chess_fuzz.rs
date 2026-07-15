@@ -1,3 +1,6 @@
+//! Fuzz oracle: checks `bcinr`'s branchless `rook_attacks`/`bishop_attacks`
+//! against the `chess` crate's reference move generators over randomized
+//! squares and occupancy bitboards.
 #![allow(unsafe_code)]
 use chess::{get_bishop_moves, get_rook_moves, BitBoard, Square};
 use playground::legal_moves::{bishop_attacks, rook_attacks};

@@ -1,4 +1,6 @@
-#![feature(min_adt_const_params)]
+//! Differential tests: runs `playground`'s branchless Petri/POWL/YAWL
+//! primitives side by side against the `reference` module's plain-Rust
+//! reference implementations and asserts they agree.
 #![allow(unsafe_code)]
 
 mod reference;
@@ -6,7 +8,7 @@ mod reference;
 use playground::{
     petri::{petri_fire_invisible, petri_fire_transition},
     powl::{powl64_execute_step, Powl64Op, Powl64OpKind, PowlState},
-    wasm::{wasm_petri_replay, wasm_yawl_execute_task, WasmBYawlState, WasmReplayResult},
+    wasm::{wasm_petri_replay, WasmReplayResult},
     yawl::{
         BYawlEngine as BranchlessBYawlEngine, BYawlTask as BranchlessBYawlTask,
         JoinType as BranchlessJoinType, SplitType as BranchlessSplitType,
