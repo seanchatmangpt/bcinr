@@ -18,6 +18,8 @@ bcinr-core = { path = "../bcinr-core", version = "26.6.24" }
 bcinr-logic = { path = "../crates/bcinr-logic", version = "26.6.24", features = ["bench", "alloc"] }
 bcinr-pddl = { path = "../crates/bcinr-pddl" }
 bcinr-mcp = { path = "../crates/bcinr-mcp" }
+bcinr-mfw-ir = { path = "../crates/bcinr-mfw-ir" }
+bcinr-powl = { path = "../crates/bcinr-powl" }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -65,6 +67,10 @@ harness = false
 
 [[bench]]
 name = "mcp_cache_bench"
+harness = false
+
+[[bench]]
+name = "mfw_hotpath_bench"
 harness = false
 
 [[example]]
