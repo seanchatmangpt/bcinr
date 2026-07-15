@@ -80,11 +80,64 @@ fn mask_to_event_set(mask: u64) -> EventSet {
     set
 }
 
+/// Canonical content digest of a [`ConcurrencyGuardTable`]: hashes
+/// `nonfaces` in the table's own (deterministic, insertion-ordered `Vec`)
+/// order — each nonface's `members` `EventSet` and `witness_digest`.
+///
+/// This exists so an [`ExecutionReceipt`] can *commit to which guard table
+/// its `fired` set was actually checked against*, not merely record that
+/// *some* table's `admits` call returned `true`. Before this, `guards` was
+/// a live argument to [`seal_execution_receipt`]/[`verify_execution_receipt`]
+/// that never left a trace in the receipt itself: two calls to
+/// `seal_execution_receipt` with the same `fired`/`completed_after` but
+/// different `guards` (e.g. a real compiled table vs.
+/// `ConcurrencyGuardTable::empty()`) produced byte-identical receipts, and
+/// `verify_execution_receipt` would happily "verify" a receipt sealed
+/// against a weak table by re-checking it against that same weak table —
+/// the receipt carried no evidence of *which* table was used, so nothing
+/// stopped a caller from substituting a different/weaker one at both ends.
+/// Folding `digest_guard_table(guards)` into the receipt's hash chain (see
+/// [`canonical_bytes`]) makes the guard table's content part of what the
+/// hash attests to: verifying with a table whose content differs from the
+/// one used at sealing time now fails loudly (see
+/// [`ExecutionIntegrityError::GuardsMismatch`]) instead of silently
+/// succeeding.
+///
+/// This does **not** prove the supplied `guards` is *the* table that
+/// actually corresponds to `powl_model_digest`/`compiled_digest` — that
+/// would require a compiled-model -> guard-table bridge this phase does
+/// not have (see this module's own doc comment: the legacy tape
+/// `scheduler_tick_guarded` runs on and the v2 `PowlModel` /
+/// `ConcurrencyGuardTable` pipeline are not bridged in `bcinr-powl` yet).
+/// A verifier still has to obtain the *correct* table for a claimed model
+/// out of band; what this digest buys is that once they have it, a
+/// mismatched or substituted table is now detectable from the receipt
+/// alone, rather than invisible.
+///
+/// # Complexity
+/// O(`guards.nonfaces.len()`).
+pub fn digest_guard_table(guards: &ConcurrencyGuardTable) -> Digest {
+    let mut buf = Vec::with_capacity(4 + guards.nonfaces.len() * 40);
+    buf.extend_from_slice(&(guards.nonfaces.len() as u32).to_le_bytes());
+    for nf in &guards.nonfaces {
+        push_event_set(&mut buf, &nf.members);
+        buf.extend_from_slice(nf.witness_digest.as_bytes());
+    }
+    Digest::hash(&buf)
+}
+
 // ---------------------------------------------------------------------------
 // ExecutionReceipt
 // ---------------------------------------------------------------------------
 
 /// A receipt attesting to one scheduler tick's real firing decision.
+///
+/// `guards_digest` commits to the exact [`ConcurrencyGuardTable`] content
+/// `fired` was checked against (see [`digest_guard_table`]) — it is what
+/// closes the "seal against a weak table, verify against that same weak
+/// table, get `Ok`" gap: a verifier that supplies a table with different
+/// content than what was used at sealing time now gets
+/// [`ExecutionIntegrityError::GuardsMismatch`] instead of a silent pass.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ExecutionReceipt {
     pub powl_model_digest: Digest,
@@ -93,6 +146,7 @@ pub struct ExecutionReceipt {
     pub scheduler_decision_digest: Digest,
     pub fired: EventSet,
     pub completed_after: EventSet,
+    pub guards_digest: Digest,
     pub prior_hash: Digest,
     pub hash: Digest,
 }
@@ -123,12 +177,24 @@ pub enum ExecutionIntegrityError {
     /// struct-literal syntax rather than produced by
     /// [`seal_execution_receipt`].
     HashMismatch { expected: Digest, found: Digest },
+    /// `guards`'s content digest (see [`digest_guard_table`]) does not
+    /// match `receipt.guards_digest` — the table passed to
+    /// [`verify_execution_receipt`] is not the same table (by content) that
+    /// [`seal_execution_receipt`] checked `fired` against. This is the
+    /// direct defense against "seal against table A, verify against a
+    /// different table B that happens to also admit `fired`": verification
+    /// now requires the *same* table content, not merely *some* table that
+    /// agrees. It does not, by itself, prove `guards` is the table that
+    /// actually corresponds to `powl_model_digest`/`compiled_digest` — see
+    /// [`digest_guard_table`]'s doc comment for that residual gap.
+    GuardsMismatch { expected: Digest, found: Digest },
 }
 
 /// Canonical byte encoding shared by [`seal_execution_receipt`] (which
 /// folds it against `prior_hash` to produce `hash`) and
 /// [`verify_execution_receipt`] (which recomputes it to check `hash` wasn't
 /// tampered with) — kept as one function so the two can never drift apart.
+#[allow(clippy::too_many_arguments)]
 fn canonical_bytes(
     powl_model_digest: Digest,
     compiled_digest: Digest,
@@ -136,14 +202,16 @@ fn canonical_bytes(
     scheduler_decision_digest: Digest,
     fired: &EventSet,
     completed_after: &EventSet,
+    guards_digest: Digest,
 ) -> Vec<u8> {
-    let mut buf = Vec::with_capacity(32 + 32 + 4 + 32 + 8 + 8);
+    let mut buf = Vec::with_capacity(32 + 32 + 4 + 32 + 8 + 8 + 32);
     buf.extend_from_slice(powl_model_digest.as_bytes());
     buf.extend_from_slice(compiled_digest.as_bytes());
     buf.extend_from_slice(&tick.to_le_bytes());
     buf.extend_from_slice(scheduler_decision_digest.as_bytes());
     push_event_set(&mut buf, fired);
     push_event_set(&mut buf, completed_after);
+    buf.extend_from_slice(guards_digest.as_bytes());
     buf
 }
 
@@ -180,6 +248,7 @@ pub fn seal_execution_receipt(
         return Err(ExecutionIntegrityError::InadmissibleFiredSet { fired });
     }
 
+    let guards_digest = digest_guard_table(guards);
     let buf = canonical_bytes(
         powl_model_digest,
         compiled_digest,
@@ -187,6 +256,7 @@ pub fn seal_execution_receipt(
         scheduler_decision_digest,
         &fired,
         &completed_after,
+        guards_digest,
     );
     let hash = fold(&prior_hash, &buf);
 
@@ -197,6 +267,7 @@ pub fn seal_execution_receipt(
         scheduler_decision_digest,
         fired,
         completed_after,
+        guards_digest,
         prior_hash,
         hash,
     })
@@ -228,6 +299,14 @@ pub fn verify_execution_receipt(
         });
     }
 
+    let guards_digest = digest_guard_table(guards);
+    if guards_digest != receipt.guards_digest {
+        return Err(ExecutionIntegrityError::GuardsMismatch {
+            expected: receipt.guards_digest,
+            found: guards_digest,
+        });
+    }
+
     let buf = canonical_bytes(
         receipt.powl_model_digest,
         receipt.compiled_digest,
@@ -235,6 +314,7 @@ pub fn verify_execution_receipt(
         receipt.scheduler_decision_digest,
         &receipt.fired,
         &receipt.completed_after,
+        receipt.guards_digest,
     );
     let expected = fold(&receipt.prior_hash, &buf);
     if expected != receipt.hash {
@@ -459,6 +539,7 @@ mod tests {
             scheduler_decision_digest: Digest::hash(b"decision"),
             fired,
             completed_after: fired,
+            guards_digest: digest_guard_table(&guards),
             prior_hash: Digest::ZERO,
             hash: Digest::hash(b"not-actually-derived-from-the-other-fields"),
         };
@@ -505,6 +586,56 @@ mod tests {
                 assert_eq!(f, fired);
             }
             other => panic!("expected InadmissibleFiredSet, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn verify_execution_receipt_rejects_a_different_guard_table_that_still_admits_fired() {
+        // The exact substitution the gap report describes: `fired` is
+        // admissible under *both* tables (so an `admits`-only check cannot
+        // tell them apart), but table_b is not the table
+        // `seal_execution_receipt` actually checked `fired` against.
+        // Before `guards_digest` was folded into the receipt, this
+        // substitution was undetectable: `verify_execution_receipt(&receipt,
+        // &table_b)` returned `Ok` purely because table_b's `admits` call
+        // also happened to agree, not because table_b was the table
+        // sealing used.
+        let fired = EventSet::empty().with(0).with(1);
+        let table_a = ConcurrencyGuardTable::empty();
+        let table_b = ConcurrencyGuardTable {
+            nonfaces: vec![CompiledNonFace {
+                members: EventSet::empty().with(5).with(6), // disjoint from `fired`
+                witness_digest: Digest::hash(b"unrelated-conflict"),
+            }],
+        };
+        assert!(table_a.admits(&fired));
+        assert!(table_b.admits(&fired)); // both admit -- admits() alone can't tell them apart
+
+        let receipt = seal_execution_receipt(
+            Digest::ZERO,
+            Digest::hash(b"model"),
+            Digest::hash(b"compiled"),
+            1,
+            Digest::hash(b"decision"),
+            fired,
+            fired,
+            &table_a,
+        )
+        .unwrap();
+
+        // Verifying against the real table used at sealing time succeeds.
+        assert_eq!(verify_execution_receipt(&receipt, &table_a), Ok(()));
+
+        // Verifying against a *different* table -- one that also admits
+        // `fired`, so an `admits`-only check would have accepted it -- must
+        // now fail, because its content digest does not match what sealing
+        // actually used.
+        match verify_execution_receipt(&receipt, &table_b) {
+            Err(ExecutionIntegrityError::GuardsMismatch { expected, found }) => {
+                assert_eq!(expected, digest_guard_table(&table_a));
+                assert_eq!(found, digest_guard_table(&table_b));
+            }
+            other => panic!("expected GuardsMismatch, got {other:?}"),
         }
     }
 

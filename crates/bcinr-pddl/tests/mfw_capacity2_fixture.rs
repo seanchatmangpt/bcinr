@@ -679,6 +679,7 @@ fn link8b_seal_and_verify_execution_receipt_reject_a_hand_fabricated_triple_rece
         scheduler_decision_digest: Digest::hash(b"fabricated-decision"),
         fired: fabricated_fired,
         completed_after: fabricated_fired,
+        guards_digest: Digest::hash(b"whatever-guards"),
         prior_hash: Digest::ZERO,
         hash: Digest::hash(b"whatever"),
     };
