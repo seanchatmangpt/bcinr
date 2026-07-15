@@ -202,4 +202,29 @@ mod tests {
         let err = ConformancePredicate::STRICT.check(&m).unwrap_err();
         assert_eq!(err.dim, ConformanceDimension::Precision);
     }
+
+    /// `branchless_first_failure`'s final `_ => ConformanceDimension::Simplicity`
+    /// arm is reached only when fitness, precision, *and* generalization all
+    /// pass and simplicity alone fails. Before this test, that arm had zero
+    /// coverage anywhere in this crate: every other failing-predicate test
+    /// (this file's `strict_predicate_fails_on_precision`, `replay.rs`'s
+    /// `strict_predicate_fails_on_a_perfect_trace_due_to_mocked_dimensions`,
+    /// `tests/replay_law.rs`'s `strict_predicate_fails_on_low_precision`)
+    /// reports `Precision` or `Generalization`, never a pure
+    /// simplicity-only failure. A bug that swapped the `3`/`2` literals in
+    /// `select_u32(gen_ok, 3, 2)` would misreport this exact case as
+    /// `Generalization` (and, symmetrically, misreport a pure
+    /// generalization-only failure as `Simplicity`) — this test would catch
+    /// that; the existing suite would not.
+    #[test]
+    fn strict_predicate_fails_on_simplicity_alone() {
+        let m = ConformanceMetrics {
+            fitness: 0x0001_0000,        // meets min_fitness (0x0001_0000)
+            precision: 0x0001_0000,      // meets min_precision (0x0001_0000)
+            generalization: 0x0000_8000, // meets min_generalization (0x0000_8000)
+            simplicity: 0x0000_0000,     // below min_simplicity (0x0000_8000)
+        };
+        let err = ConformancePredicate::STRICT.check(&m).unwrap_err();
+        assert_eq!(err.dim, ConformanceDimension::Simplicity);
+    }
 }
