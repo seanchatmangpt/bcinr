@@ -496,6 +496,18 @@ pub mod v2 {
         /// (same "structurally well-formed, not proven executable-
         /// concurrent" caveat applies — see that type's doc comment and
         /// `LAW_MINIMAL_NONFACE_REPRESENTATION`).
+        ///
+        /// # Complexity
+        ///
+        /// O(`self.nonfaces.len()`) — one [`EventSet::is_subset_of`] call
+        /// per recorded nonface, each itself O(1) over `EventSet`'s fixed
+        /// 8-word bitset (same cost shape as the mirrored
+        /// `ExecutableConcurrencyComplex::admits`, and the same reason it
+        /// matters here: this is called once per ready-set candidate inside
+        /// [`crate::scheduler::StableMaximalSelector::select`]'s inner
+        /// loop, every scheduler tick — see that function's own `#
+        /// Complexity` note, and `bcinr-bench/benches/mfw_hotpath_bench.rs`,
+        /// which benchmarks exactly this call-volume-sensitive path).
         pub fn admits(&self, candidate: &bcinr_mfw_ir::EventSet) -> bool {
             !self
                 .nonfaces

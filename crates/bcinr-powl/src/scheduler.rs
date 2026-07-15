@@ -298,9 +298,26 @@ pub trait ConcurrencySelector {
 /// satisfied. With an empty guard table every candidate is trivially
 /// admitted, so this selects the entire ready set — the default,
 /// non-regressing behavior (see module docs).
+///
+/// Greedy, not maximum: this selects *a* maximal admissible subset (no
+/// further ready candidate can be added without violating `guards`), not
+/// necessarily *the* maximum-cardinality one — see [`ConcurrencySelector`]'s
+/// trait-level doc comment for why that distinction is load-bearing here,
+/// not just terminology.
 pub struct StableMaximalSelector;
 
 impl ConcurrencySelector for StableMaximalSelector {
+    /// # Complexity
+    ///
+    /// O(`ready.len()` * `guards.nonfaces.len()`) — one
+    /// [`ConcurrencyGuardTable::admits`] call per ready candidate (each
+    /// itself O(`guards.nonfaces.len()`), see that function's own `#
+    /// Complexity` note), inside this loop's single pass over
+    /// `ready.iter_stable()`. This is the exact hot loop
+    /// `bcinr-bench/benches/mfw_hotpath_bench.rs` calls out as invoking
+    /// `admits` "once per ready-set candidate ... on every POWL scheduler
+    /// tick" — i.e. a real per-tick cost proportional to both operands, not
+    /// a one-time setup cost.
     fn select(&mut self, ready: &EventSet, guards: &ConcurrencyGuardTable) -> EventSet {
         let mut selected = EventSet::empty();
         for id in ready.iter_stable() {
