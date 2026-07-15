@@ -148,11 +148,19 @@ fn ensure_lsp_built() {
             return;
         }
         let mut cmd = Command::new("cargo");
+        // The `anti-llm-cheat-lsp` package lives in its own standalone repo,
+        // `/Users/sac/anti-llm-cheat-lsp` -- NOT in `/Users/sac/lsp-max`
+        // (a different, unrelated workspace with 20+ members, none of them
+        // named `anti-llm-cheat-lsp`; pointing here produced "error: package
+        // ID specification `anti-llm-cheat-lsp` did not match any packages"
+        // for every test that shells out to this binary). Matches
+        // Makefile.toml's `lint-anti-llm` task, which already points at the
+        // correct repo.
         cmd.args([
             "build",
             "--quiet",
             "--manifest-path",
-            "/Users/sac/lsp-max/Cargo.toml",
+            "/Users/sac/anti-llm-cheat-lsp/Cargo.toml",
             "--package",
             "anti-llm-cheat-lsp",
         ]);
