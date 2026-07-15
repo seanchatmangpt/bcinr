@@ -16,14 +16,34 @@
 //!
 //! The outer `while candidates != 0` loop is a standard CTZ bit-scan idiom;
 //! its iteration count equals the popcount of `check_mask`, not a predicate.
+//!
+//! # Concurrency-aware scheduling (additive)
+//!
+//! [`scheduler_tick`] itself is untouched by this phase — every existing
+//! caller keeps firing every ready op every tick, exactly as before, with
+//! zero code-path change. [`scheduler_tick_guarded`] is a new, separate
+//! entry point that adds a [`ConcurrencySelector`]-gated selection step
+//! between "compute the ready set" and "actually fire": ready-but-
+//! unselected ops are deferred (carried forward into next tick's
+//! `check_mask`) rather than dropped. With
+//! [`crate::tape::v2::ConcurrencyGuardTable::empty`] and
+//! [`StableMaximalSelector`], selection always chooses the *entire* ready
+//! set (every candidate is trivially admitted by an empty guard table), so
+//! `scheduler_tick_guarded` provably degenerates to calling
+//! `scheduler_tick` — see
+//! `scheduler_tick_guarded_matches_scheduler_tick_with_empty_guards` below,
+//! which checks this tick-by-tick rather than asserting it.
 
+use crate::tape::v2::ConcurrencyGuardTable;
 use crate::tape::{OpKind, Powl64Op, PowlTape};
+use bcinr_mfw_ir::EventSet;
 
 // ---------------------------------------------------------------------------
 // Public types
 // ---------------------------------------------------------------------------
 
 /// Mutable run-state for a POWL tape execution.
+#[derive(Clone)]
 #[repr(C, align(8))]
 pub struct PowlRunState {
     /// Bitmask of slots that have completed.
@@ -211,6 +231,169 @@ pub fn scheduler_tick(tape: &[Powl64Op], state: &mut PowlRunState) -> FiredSet {
         new_done &= !redo_clear;
         new_check |= redo_check;
     }
+
+    state.done_mask = new_done;
+    state.check_mask = new_check & !new_done;
+
+    FiredSet(fired)
+}
+
+// ---------------------------------------------------------------------------
+// Concurrency-aware scheduling (additive — see module docs)
+// ---------------------------------------------------------------------------
+
+/// Chooses which subset of a ready set may actually fire this tick, subject
+/// to a [`ConcurrencyGuardTable`].
+///
+/// Implementors write only [`select`][Self::select] — the business logic.
+/// [`select_checked`][Self::select_checked] is a **shared, non-overridable
+/// helper**: every implementation gets the postcondition check
+/// (`selected.is_subset_of(ready) && guards.admits(&selected)`, enforced
+/// via `debug_assert!` so it costs nothing in release builds) for free,
+/// without having to write it themselves. Callers should go through
+/// `select_checked`, not `select`, directly.
+pub trait ConcurrencySelector {
+    /// Choose a subset of `ready` to fire this tick, respecting `guards`.
+    fn select(&mut self, ready: &EventSet, guards: &ConcurrencyGuardTable) -> EventSet;
+
+    /// Calls [`select`][Self::select] and enforces its postcondition.
+    fn select_checked(&mut self, ready: &EventSet, guards: &ConcurrencyGuardTable) -> EventSet {
+        let selected = self.select(ready, guards);
+        debug_assert!(
+            selected.is_subset_of(ready),
+            "ConcurrencySelector::select returned a set that is not a subset of ready"
+        );
+        debug_assert!(
+            guards.admits(&selected),
+            "ConcurrencySelector::select returned a set the guard table does not admit"
+        );
+        selected
+    }
+}
+
+/// Greedy, order-stable selector: walks `ready.iter_stable()` (ascending
+/// slot index) and incrementally admits each candidate id into the
+/// selected set iff doing so keeps the guard table's `admits()` check
+/// satisfied. With an empty guard table every candidate is trivially
+/// admitted, so this selects the entire ready set — the default,
+/// non-regressing behavior (see module docs).
+pub struct StableMaximalSelector;
+
+impl ConcurrencySelector for StableMaximalSelector {
+    fn select(&mut self, ready: &EventSet, guards: &ConcurrencyGuardTable) -> EventSet {
+        let mut selected = EventSet::empty();
+        for id in ready.iter_stable() {
+            let candidate = selected.with(id);
+            if guards.admits(&candidate) {
+                selected = candidate;
+            }
+        }
+        selected
+    }
+}
+
+/// Convert a `u64` tape-slot bitmask (as used throughout `scheduler_tick`)
+/// into an `EventSet` (as used by `ConcurrencySelector`/`ConcurrencyGuardTable`).
+fn mask_to_event_set(mask: u64) -> EventSet {
+    let mut set = EventSet::empty();
+    let mut bits = mask;
+    while bits != 0 {
+        let i = bits.trailing_zeros() as usize;
+        bits &= bits - 1;
+        set.insert(i);
+    }
+    set
+}
+
+/// Convert an `EventSet` back into a `u64` tape-slot bitmask.
+fn event_set_to_mask(set: &EventSet) -> u64 {
+    let mut mask = 0u64;
+    for id in set.iter_stable() {
+        mask |= 1u64 << id;
+    }
+    mask
+}
+
+/// Advance the scheduler by one tick, gating which of the ready ops
+/// actually fire through a [`ConcurrencySelector`] and
+/// [`ConcurrencyGuardTable`].
+///
+/// # Protocol
+///
+/// 1. **Preview** (no mutation of `state`): run [`scheduler_tick`] on a
+///    clone of `state` to discover exactly which ops would fire absent any
+///    gating — this is the tick's ready set.
+/// 2. **Select**: `selector.select_checked(ready, guards)` chooses the
+///    subset that may actually fire.
+/// 3. **Fast path**: if selection changed nothing (`selected == ready` —
+///    always true for an empty guard table with `StableMaximalSelector`),
+///    delegate to [`scheduler_tick`] on the *real* `state` directly, so the
+///    observable state transition is provably identical to the unguarded
+///    path (same function, same inputs), not merely "similar".
+/// 4. **Divergent path**: otherwise, re-run the real firing logic (mirrors
+///    `scheduler_tick`'s loop) gated to `selected`, and carry the
+///    ready-but-unselected ops forward into next tick's `check_mask` so
+///    they are reconsidered rather than lost.
+pub fn scheduler_tick_guarded<S: ConcurrencySelector>(
+    tape: &[Powl64Op],
+    state: &mut PowlRunState,
+    selector: &mut S,
+    guards: &ConcurrencyGuardTable,
+) -> FiredSet {
+    // Step 1: dry-run preview on a clone -- does not touch the real state.
+    let mut preview = state.clone();
+    let would_fire = scheduler_tick(tape, &mut preview);
+    let ready_mask = would_fire.0;
+    let ready = mask_to_event_set(ready_mask);
+
+    // Step 2: select which of the ready ops may actually fire.
+    let selected = selector.select_checked(&ready, guards);
+    let selected_mask = event_set_to_mask(&selected);
+
+    // Step 3: fast path -- nothing was gated away.
+    if selected_mask == ready_mask {
+        return scheduler_tick(tape, state);
+    }
+
+    // Step 4: divergent path -- mirrors scheduler_tick's own loop, with
+    // fire_mask additionally gated on `selected_bit`.
+    let mut fired = 0u64;
+    let mut new_done = state.done_mask;
+    let mut new_check = 0u64;
+
+    let mut candidates = state.check_mask & !state.done_mask;
+    while candidates != 0 {
+        let i = candidates.trailing_zeros() as usize;
+        candidates &= candidates - 1;
+
+        let op = &tape[i];
+        let bit = 1u64 << i;
+
+        let is_join = kind_mask(op.kind, OpKind::Join);
+        let join_effective = op.pred_mask & state.choice_taken;
+        let effective_pred = (join_effective & is_join) | (op.pred_mask & !is_join);
+
+        let sat = pred_satisfied(new_done, effective_pred);
+        let sat_bit = (sat & 1) as u64;
+        let selected_bit = (selected_mask >> i) & 1;
+        let fire_mask = u64::wrapping_sub(0, sat_bit & selected_bit) & bit;
+
+        fired |= fire_mask;
+        new_done |= fire_mask;
+
+        let fired_this = fire_mask >> i;
+        new_check |= op.succ_mask & u64::wrapping_sub(0, fired_this);
+
+        new_done |= apply_xor_dispatch(op, fire_mask, &mut state.choice_taken);
+
+        let (redo_clear, redo_check) = apply_loop_redo(op, fire_mask, &mut state.loop_iters[i]);
+        new_done &= !redo_clear;
+        new_check |= redo_check;
+    }
+
+    // Carry forward ready-but-unselected ops so they are reconsidered next
+    // tick instead of being lost.
+    new_check |= ready_mask & !selected_mask;
 
     state.done_mask = new_done;
     state.check_mask = new_check & !new_done;
@@ -669,6 +852,219 @@ mod tests {
                 prop_assert_eq!(mask, 0u64,
                     "kind_mask formula: unequal discriminants ({} vs {}) must yield 0, got {:#018x}", a, b, mask);
             }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Concurrency-aware scheduling (additive)
+    // -------------------------------------------------------------------------
+
+    mod concurrency_gated {
+        use super::*;
+        use crate::tape::v2::CompiledNonFace;
+        use bcinr_mfw_ir::Digest;
+
+        /// Runs both `scheduler_tick` and `scheduler_tick_guarded` (with
+        /// `StableMaximalSelector` + an empty guard table) from identical
+        /// starting states, tick by tick, and asserts every observable
+        /// piece of state stays in lockstep. This is the required proof
+        /// that the concurrency-aware scheduling path is additive: an
+        /// empty guard table must fire the *exact same set*, every tick,
+        /// that the pre-existing `scheduler_tick` fires.
+        fn assert_guarded_matches_plain(tape: &PowlTape) {
+            let mut plain_state = PowlRunState::new(tape);
+            let mut guarded_state = PowlRunState::new(tape);
+            let mut selector = StableMaximalSelector;
+            let guards = ConcurrencyGuardTable::empty();
+
+            for tick in 0..20 {
+                let plain_done = plain_state.check_mask == 0 && plain_state.active_mask == 0;
+                let guarded_done =
+                    guarded_state.check_mask == 0 && guarded_state.active_mask == 0;
+                assert_eq!(
+                    plain_done, guarded_done,
+                    "tick {tick}: plain/guarded disagree on termination"
+                );
+                if plain_done {
+                    break;
+                }
+
+                let plain_fired = scheduler_tick(&tape.ops[..tape.len as usize], &mut plain_state);
+                let guarded_fired = scheduler_tick_guarded(
+                    &tape.ops[..tape.len as usize],
+                    &mut guarded_state,
+                    &mut selector,
+                    &guards,
+                );
+
+                assert_eq!(
+                    plain_fired.0, guarded_fired.0,
+                    "tick {tick}: fired sets diverged (plain={:#018x}, guarded={:#018x})",
+                    plain_fired.0, guarded_fired.0
+                );
+                assert_eq!(
+                    plain_state.done_mask, guarded_state.done_mask,
+                    "tick {tick}: done_mask diverged"
+                );
+                assert_eq!(
+                    plain_state.check_mask, guarded_state.check_mask,
+                    "tick {tick}: check_mask diverged"
+                );
+                assert_eq!(
+                    plain_state.choice_taken, guarded_state.choice_taken,
+                    "tick {tick}: choice_taken diverged"
+                );
+                assert_eq!(
+                    plain_state.loop_iters, guarded_state.loop_iters,
+                    "tick {tick}: loop_iters diverged"
+                );
+            }
+        }
+
+        #[test]
+        fn empty_guards_matches_plain_tick_for_linear_chain() {
+            let ast = PowlAstNode::Sequence(vec![
+                PowlAstNode::Atom("a"),
+                PowlAstNode::Atom("b"),
+                PowlAstNode::Atom("c"),
+                PowlAstNode::Atom("d"),
+                PowlAstNode::Atom("e"),
+            ]);
+            let tape = compile_powl(&ast).unwrap();
+            assert_guarded_matches_plain(&tape);
+        }
+
+        #[test]
+        fn empty_guards_matches_plain_tick_for_parallel_ops() {
+            // The multi-bit-ready-set case: two ops become ready on the
+            // same tick, forcing a real ready set of size > 1 through the
+            // gating logic.
+            let ast = PowlAstNode::PartialOrder {
+                children: vec![PowlAstNode::Atom("a"), PowlAstNode::Atom("b")],
+                edges: vec![],
+            };
+            let tape = compile_powl(&ast).unwrap();
+            assert_guarded_matches_plain(&tape);
+        }
+
+        #[test]
+        fn empty_guards_matches_plain_tick_for_xor_choice() {
+            let ast = PowlAstNode::XorChoice(vec![
+                PowlAstNode::Atom("left"),
+                PowlAstNode::Atom("right"),
+            ]);
+            let tape = compile_powl(&ast).unwrap();
+            assert_guarded_matches_plain(&tape);
+        }
+
+        #[test]
+        fn empty_guards_matches_plain_tick_for_bounded_loop() {
+            let ast = PowlAstNode::Loop {
+                body: Box::new(PowlAstNode::Atom("body")),
+                redo: Box::new(PowlAstNode::Atom("redo")),
+                max_iters: 3,
+            };
+            let tape = compile_powl(&ast).unwrap();
+            assert_guarded_matches_plain(&tape);
+        }
+
+        /// The concurrency guard must have a real effect: a nonface
+        /// covering both parallel ops forbids them from firing on the same
+        /// tick, deferring one to a later tick — but both must eventually
+        /// fire (the guard defers, it never permanently starves).
+        #[test]
+        fn nonempty_guard_defers_a_forbidden_pair_but_both_eventually_fire() {
+            let ast = PowlAstNode::PartialOrder {
+                children: vec![PowlAstNode::Atom("a"), PowlAstNode::Atom("b")],
+                edges: vec![],
+            };
+            let tape = compile_powl(&ast).unwrap();
+
+            let guards = ConcurrencyGuardTable {
+                nonfaces: vec![CompiledNonFace {
+                    members: EventSet::empty().with(0).with(1),
+                    witness_digest: Digest::hash(b"a-b-conflict"),
+                }],
+            };
+            let mut state = PowlRunState::new(&tape);
+            let mut selector = StableMaximalSelector;
+
+            let fs1 = scheduler_tick_guarded(
+                &tape.ops[..tape.len as usize],
+                &mut state,
+                &mut selector,
+                &guards,
+            );
+            assert_eq!(
+                fs1.0.count_ones(),
+                1,
+                "guard must defer one of the two conflicting ops on tick 1, got fired={:#018x}",
+                fs1.0
+            );
+            assert!(
+                fs1.0 == 0b01 || fs1.0 == 0b10,
+                "exactly one of a (bit0) or b (bit1) must fire, got {:#018x}",
+                fs1.0
+            );
+
+            let mut total_fired = fs1.0;
+            for _ in 0..10 {
+                if state.check_mask == 0 && state.active_mask == 0 {
+                    break;
+                }
+                let fs = scheduler_tick_guarded(
+                    &tape.ops[..tape.len as usize],
+                    &mut state,
+                    &mut selector,
+                    &guards,
+                );
+                total_fired |= fs.0;
+            }
+            assert_eq!(
+                total_fired & 0b11,
+                0b11,
+                "both conflicting ops must eventually fire (deferred, not dropped)"
+            );
+            assert_eq!(
+                state.check_mask, 0,
+                "run must terminate (join must eventually fire once both preds are done)"
+            );
+        }
+
+        #[test]
+        fn stable_maximal_selector_selects_everything_when_admitted() {
+            let ready = EventSet::empty().with(0).with(1).with(2);
+            let guards = ConcurrencyGuardTable::empty();
+            let mut selector = StableMaximalSelector;
+            let selected = selector.select_checked(&ready, &guards);
+            assert_eq!(selected, ready);
+        }
+
+        #[test]
+        fn stable_maximal_selector_respects_a_nonface() {
+            // {0,1,2} is forbidden together. Greedy build-up over
+            // iter_stable() (ascending) admits 0, then admits 1 (neither
+            // {0} nor {0,1} contains the full nonface {0,1,2} as a
+            // subset), then rejects 2 (adding it would make the candidate
+            // equal to the nonface itself).
+            let ready = EventSet::empty().with(0).with(1).with(2);
+            let guards = ConcurrencyGuardTable {
+                nonfaces: vec![CompiledNonFace {
+                    members: ready,
+                    witness_digest: Digest::hash(b"abc"),
+                }],
+            };
+            let mut selector = StableMaximalSelector;
+            let selected = selector.select_checked(&ready, &guards);
+            assert_eq!(selected, EventSet::empty().with(0).with(1));
+            assert!(guards.admits(&selected));
+        }
+
+        #[test]
+        fn mask_event_set_round_trip() {
+            let mask = 0b1011_0101u64;
+            let set = mask_to_event_set(mask);
+            assert_eq!(event_set_to_mask(&set), mask);
         }
     }
 }
