@@ -89,6 +89,16 @@ impl ExecutableConcurrencyComplex {
     /// As noted at the module level: a `true` result here means
     /// "structurally well-formed against the recorded minimal nonfaces,"
     /// not "proven executable-concurrent" in mfact's sense.
+    ///
+    /// # Complexity
+    ///
+    /// O(`self.minimal_nonfaces.len()`) — one [`EventSet::is_subset_of`]
+    /// call per recorded nonface, each itself O(1) over `EventSet`'s fixed
+    /// 8-word bitset. This is the per-candidate admission gate (called
+    /// once per candidate concurrency set, e.g. once per ready-set
+    /// candidate in a scheduler's inner loop), so a linear-in-nonfaces
+    /// cost here is exactly the shape that matters for callers ticking it
+    /// repeatedly, even though each individual call is cheap.
     pub fn admits(&self, candidate: &EventSet) -> bool {
         !self
             .minimal_nonfaces

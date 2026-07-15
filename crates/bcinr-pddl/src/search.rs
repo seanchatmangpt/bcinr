@@ -56,6 +56,13 @@ pub enum ExactStepOutcome {
     Bounded(BoundHit),
 }
 
+/// A search rail that is allowed to *prove* its search space exhausted.
+///
+/// This is the exact/exploit split's load-bearing half: only an
+/// `ExactSearchRail`'s [`ExactStepOutcome::Exhausted`] may be read as "no
+/// plan exists" — see the module doc comment for why
+/// [`ExploitSearchRail`] has no equivalent variant at all, not merely an
+/// unused one.
 pub trait ExactSearchRail {
     fn step(&mut self) -> ExactStepOutcome;
 }
@@ -125,6 +132,14 @@ pub enum ExploitStepOutcome {
     Idle,
 }
 
+/// A heuristic search rail that can never claim exhaustion.
+///
+/// The counterpart to [`ExactSearchRail`]: [`ExploitStepOutcome`] has no
+/// `Exhausted` variant at all (not merely an unused one), because an
+/// exploit rail is incomplete by construction and can only honestly say
+/// [`ExploitStepOutcome::Idle`] ("nothing more to try right now") — never
+/// "no plan exists." See the module doc comment for the full exact/exploit
+/// split rationale.
 pub trait ExploitSearchRail {
     fn step(&mut self) -> ExploitStepOutcome;
 }
@@ -135,6 +150,17 @@ pub trait ExploitSearchRail {
 /// [`crate::mfw::q_lens`], and advances along the highest-weighted action.
 /// No backtracking — a dead end or revisited state ends the walk (`Idle`),
 /// honestly, rather than silently looping or claiming completeness.
+///
+/// # Complexity
+///
+/// One [`ExploitSearchRail::step`] call is O(A * k), where A is the
+/// ground-action count (`problem.actions.len()`) and k is the average
+/// precondition/effect-list size: the applicability filter and the
+/// per-action scoring pass are each O(A * k), and [`crate::mfw::q_lens`]
+/// is O(A) on top of that. `MfwPortfolio::solve` can tick this rail up to
+/// `max_ticks` times, so the walk's total cost scales with both the
+/// ground-action count and the number of ticks it survives before hitting
+/// a dead end.
 pub struct QLensRail<'a> {
     problem: &'a GroundProblem,
     current_state: BTreeSet<Pddl8GroundAtom>,

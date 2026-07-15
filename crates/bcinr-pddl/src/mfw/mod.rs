@@ -171,6 +171,12 @@ impl<K> WeightedDistribution<K> {
 /// for every degenerate case named in [`QLensError`]. See the module doc
 /// comment for this function's formal standing
 /// (`bcinr_mfw_ir::contracts::LAW_QLENS_RATIO`, `Proven`).
+///
+/// # Complexity
+///
+/// O(n) in `distribution.entries().len()` — two linear passes (one
+/// `powf` + collect, one normalize), each entry doing one `powf()` call
+/// and one division.
 pub fn q_lens<K: Clone>(
     q: QValue,
     distribution: &PositiveDistribution<K>,

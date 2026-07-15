@@ -31,6 +31,10 @@ impl EventSet {
 
     /// Insert `id` into the set in place.
     ///
+    /// O(1): `EVENT_WORDS` is a fixed compile-time constant (8), so this is
+    /// a single word lookup plus a bitwise OR — no loop, no dependence on
+    /// set size.
+    ///
     /// # Panics
     /// Panics if `id >= MAX_EPOCH_EVENTS`.
     pub fn insert(&mut self, id: usize) {
@@ -45,6 +49,8 @@ impl EventSet {
 
     /// True iff `id` is a member of the set. Out-of-range IDs are simply
     /// not members (no panic) — only `insert` enforces the range.
+    ///
+    /// O(1): single word lookup plus a bit test, `EVENT_WORDS` fixed.
     pub fn contains(&self, id: usize) -> bool {
         if id >= MAX_EPOCH_EVENTS {
             return false;
@@ -55,6 +61,9 @@ impl EventSet {
     }
 
     /// True iff every member of `self` is also a member of `other`.
+    ///
+    /// O(1): iterates the fixed `EVENT_WORDS` (8) words, not the set's
+    /// member count — data-independent instruction count.
     pub fn is_subset_of(&self, other: &Self) -> bool {
         self.words
             .iter()
@@ -63,6 +72,9 @@ impl EventSet {
     }
 
     /// True iff `self` and `other` share at least one member.
+    ///
+    /// O(1): iterates the fixed `EVENT_WORDS` (8) words, not the set's
+    /// member count.
     pub fn intersects(&self, other: &Self) -> bool {
         self.words
             .iter()
@@ -71,6 +83,9 @@ impl EventSet {
     }
 
     /// The union of `self` and `other`, as a new set.
+    ///
+    /// O(1): iterates the fixed `EVENT_WORDS` (8) words, not the sets'
+    /// member counts.
     pub fn union(&self, other: &Self) -> Self {
         let mut out = [0u64; EVENT_WORDS];
         for ((o, a), b) in out

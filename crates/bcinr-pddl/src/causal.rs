@@ -142,6 +142,16 @@ impl CausalAnalyzer for PddlCausalAnalyzer {
         // `IndependenceRelation` marks `Dependent`) — the full total order
         // is what genuinely happened, and callers that want the reduced
         // form can derive it from `independence.dependent`'s keys.
+        //
+        // Time complexity: this is an O(n^2) loop in the occurrence count
+        // (every unordered pair), building the full total order — not
+        // O(1)/O(log n) as this workspace's stated default for primitives
+        // would suggest. The independence loop directly below is another,
+        // separate O(n^2) pass whose per-pair `analyze_pair` call also
+        // clones/mutates `BTreeSet<Pddl8GroundAtom>` state proportional to
+        // each action's precondition/effect-list size (via
+        // `simulate_two`), so the real cost of this function is at least
+        // O(n^2 * k) where k = typical precondition/effect set size.
         let mut precedes = StrictPartialOrder::default();
         for i in 0..occurrences.len() {
             for j in (i + 1)..occurrences.len() {

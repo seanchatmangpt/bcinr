@@ -163,6 +163,12 @@ pub struct MakespanObservation {
     pub makespan_milli: i64,
 }
 
+/// How long did the plan actually take? Real inspection — `observe`
+/// copies `result.step_count`/`result.makespan_milli` verbatim (see
+/// [`MakespanObservation`]'s doc comment above), it does not derive or
+/// estimate a minimum from anything else the way the name's "minimum"
+/// might suggest; this horizon just makes the plan's own observed
+/// makespan cacheable and comparable, it does not search for a better one.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct MinimumMakespanHorizon;
 

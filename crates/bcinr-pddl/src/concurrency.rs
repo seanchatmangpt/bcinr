@@ -102,6 +102,17 @@ impl ConcurrencyAnalyzer for PddlConcurrencyAnalyzer {
             .map(|(i, occ)| (occ.id, i))
             .collect();
 
+        // Time complexity: this loop runs once per dependent pair
+        // (`causal.independence.dependent`, up to O(n^2) pairs for n
+        // occurrences), and each iteration's `.find()` below does a
+        // *linear* scan of `precedes.edges` — the full O(n^2) total order
+        // `PddlCausalAnalyzer::analyze` builds over all occurrence pairs
+        // (see `causal.rs`), not a sparse causal-edge set. So this
+        // function is O(m * n^2) where m = |dependent pairs| (itself up to
+        // O(n^2)) — worst case O(n^4) in the occurrence count. This is
+        // hidden behind BTreeMap/BTreeSet abstractions and easy to miss on
+        // a shallow read; see also `causal.rs::PddlCausalAnalyzer::analyze`,
+        // which has the equivalent note for `precedes`'s own construction.
         let mut minimal_nonfaces = Vec::new();
         let mut conflict_witnesses = BTreeMap::new();
 
@@ -111,6 +122,8 @@ impl ConcurrencyAnalyzer for PddlConcurrencyAnalyzer {
             };
             let members = EventSet::empty().with(i).with(j);
 
+            // O(|precedes.edges|) linear scan per dependent pair — see this
+            // loop's leading complexity note.
             let causal_edge = causal
                 .precedes
                 .edges
