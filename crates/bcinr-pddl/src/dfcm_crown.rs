@@ -6,8 +6,13 @@
 //! `tests/dfcm_crown_suite.rs`, so the same suite is what's benchmarked and
 //! what's gated.
 //!
-//! This proves composition stays inside one fixed wall-clock envelope. It
-//! does not claim to be the fastest planner.
+//! This empirically demonstrates composition stays inside one fixed
+//! wall-clock envelope, gated by `dfcm_crown_suite_completes_under_5_seconds`
+//! (`tests/dfcm_crown_suite.rs`) — a single wall-clock `elapsed <= 5.0`
+//! assertion, inherently machine-load-dependent, that can pass on one
+//! run/host and fail on another. It shows the bound held on the runs that
+//! were checked; it is not a general timing proof, and does not claim to be
+//! the fastest planner.
 
 use std::time::Instant;
 
