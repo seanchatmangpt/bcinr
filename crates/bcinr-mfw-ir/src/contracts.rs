@@ -331,7 +331,12 @@ mod tests {
     /// handle). It also pins the ground-truth count from the mfact claim
     /// ceiling table (exactly 3 of 7 are `Proven` today, independently
     /// re-verified this session by reading the cited `mfact` Lean source at
-    /// each citation's line range: `QLens.lean:38-46`,
+    /// each citation's line range: `QLens.lean:25-46` (matching
+    /// `LAW_QLENS_RATIO`'s own citation above — `noncomputable def qLens` at
+    /// line 25 through the end of `theorem qLens_ratio_law`'s sorry-free
+    /// proof at line 46; the theorem declaration itself starts at line 38,
+    /// but the law depends on the deformation `qLens` defines, so citing the
+    /// def+theorem span, not just the theorem, is the accurate citation),
     /// `Observability.lean:134-139`, `Concurrency.lean:293-321` for the
     /// three `Proven` laws; `Concurrency.lean:400-416` — a bare `def` with
     /// no downward-closure/validity proof — for the `Stated` one;
