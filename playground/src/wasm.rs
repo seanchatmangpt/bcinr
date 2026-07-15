@@ -7,7 +7,7 @@ use bcinr::{
 
 use crate::{
     powl::{powl64_execute_step, Powl64Op, PowlState},
-    yawl::{BYawlEngine, BYawlTask},
+    yawl::{BYawlEngine, BYawlTask, JoinType, SplitType},
 };
 
 /// Results of the token replay operation exported to C/WASM.
@@ -174,11 +174,41 @@ pub unsafe extern "C" fn wasm_yawl_execute_task(
         active_locks: 0,
     };
 
+    // `BYawlTask` is `#[repr(C, align(64))]` (see `crate::yawl`) -- a real
+    // `*const BYawlTask` dereference requires 64-byte alignment. `engine`'s
+    // address does *not* satisfy that (`BYawlEngine` carries no alignment
+    // attribute; its natural alignment comes from its `u64` fields, i.e. 8
+    // bytes, not 64): reusing `&mut engine` as the null-pointer-safety
+    // fallback for `safe_task` was a real bug, not just a style choice --
+    // dereferencing it produced "misaligned pointer dereference: address
+    // must be a multiple of 0x40" and aborted the process, defeating the
+    // intentional null-pointer test this branchless masking trick exists to
+    // exercise. A dedicated, correctly-typed `dummy_task: BYawlTask` local
+    // is placed by the compiler at an address that genuinely satisfies
+    // `BYawlTask`'s own `align(64)` requirement, unlike `engine`'s address.
+    let dummy_task = BYawlTask {
+        id: 0,
+        join_type: JoinType::XOR,
+        split_type: SplitType::XOR,
+        min_instances: 0,
+        max_instances: 0,
+        threshold_instances: 0,
+        join_state_bit: 0,
+        flags: 0,
+        consume_mask: 0,
+        produce_mask: 0,
+        cancellation_mask: 0,
+        condition_mask: 0,
+        reset_mask: 0,
+        reachability_mask: 0,
+        interleaved_lock_mask: 0,
+    };
+
     let safe_state = ((state_ptr as usize & valid_mask)
         | (&mut engine as *mut _ as usize & null_mask as usize))
         as *mut WasmBYawlState;
     let safe_task = ((task_ptr as usize & valid_mask)
-        | (&mut engine as *mut _ as usize & null_mask as usize))
+        | (&dummy_task as *const BYawlTask as usize & null_mask as usize))
         as *const BYawlTask;
 
     engine.state_mask = (*safe_state).state_mask;
