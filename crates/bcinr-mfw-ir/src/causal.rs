@@ -158,6 +158,21 @@ pub enum DependenceReason {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DependenceWitness {
     pub reasons: BTreeSet<DependenceReason>,
+    /// Atoms found to be threatened by a genuine `DeleteInterference`
+    /// finding (one action's delete effects intersecting the other's
+    /// preconditions, either direction) — the `Dependent`-side mirror of
+    /// [`PreconditionsStableWitness::threatened_atoms`], which is always
+    /// empty on the `Independent` side by construction (independence
+    /// requires nothing was threatened). Empty whenever `reasons` does not
+    /// contain [`DependenceReason::DeleteInterference`], and also empty
+    /// when an analyzer conservatively reports `DeleteInterference` as a
+    /// fallback reason (e.g. effects provably don't commute but no direct
+    /// atom-level conflict explains why) without having identified a
+    /// specific atom — an empty set here is not itself a claim that no
+    /// interference occurred, only that this field carries no atom-level
+    /// provenance for it. Analyzer-populated; not required to be
+    /// exhaustive across every `DependenceReason`.
+    pub threatened_atoms: BTreeSet<AtomId>,
 }
 
 /// The verdict for one `ActionPair`: independent (with full witness),

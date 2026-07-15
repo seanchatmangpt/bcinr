@@ -168,7 +168,7 @@ impl CausalAnalyzer for PddlCausalAnalyzer {
         for i in 0..occurrences.len() {
             for j in (i + 1)..occurrences.len() {
                 let pair = ActionPair::new(occurrences[i].id, occurrences[j].id);
-                let (witness, reasons, edges) = analyze_pair(
+                let (witness, reasons, threatened_atoms, edges) = analyze_pair(
                     occurrences[i].id,
                     occurrences[j].id,
                     actions[i],
@@ -181,7 +181,13 @@ impl CausalAnalyzer for PddlCausalAnalyzer {
                         independent.insert(pair, w);
                     }
                     None => {
-                        dependent.insert(pair, DependenceWitness { reasons });
+                        dependent.insert(
+                            pair,
+                            DependenceWitness {
+                                reasons,
+                                threatened_atoms,
+                            },
+                        );
                     }
                 }
             }
@@ -238,11 +244,17 @@ fn simulate_two(
     Some(end)
 }
 
-/// Genuinely analyze one action pair. Returns `(Some(witness), reasons, edges)`
-/// only when both real checks (effects-commute, precondition-stability) pass
-/// and neither found a causal-support/delete-interference reason; otherwise
-/// `(None, reasons, edges)` — see the module doc comment for exactly which
-/// sub-witnesses are real vs. vacuous.
+/// Genuinely analyze one action pair. Returns
+/// `(Some(witness), reasons, threatened_atoms, edges)` only when both real
+/// checks (effects-commute, precondition-stability) pass and neither found a
+/// causal-support/delete-interference reason; otherwise
+/// `(None, reasons, threatened_atoms, edges)` — see the module doc comment
+/// for exactly which sub-witnesses are real vs. vacuous. `threatened_atoms`
+/// is the atom-level provenance for a real `DependenceReason::
+/// DeleteInterference` finding (empty when that reason is absent, or present
+/// only via the conservative "closest available reason" fallback below with
+/// no directly identified atom) — the `Dependent`-side mirror of
+/// `CausalSupportEdge`'s provenance for `DependenceReason::CausalSupport`.
 fn analyze_pair(
     id_a: bcinr_mfw_ir::ActionOccurrenceId,
     id_b: bcinr_mfw_ir::ActionOccurrenceId,
@@ -252,6 +264,7 @@ fn analyze_pair(
 ) -> (
     Option<IndependenceWitness>,
     BTreeSet<DependenceReason>,
+    BTreeSet<AtomId>,
     Vec<CausalSupportEdge>,
 ) {
     let mut reasons = BTreeSet::new();
@@ -356,9 +369,9 @@ fn analyze_pair(
                 checked_constraints: BTreeSet::new(),
             },
         };
-        (Some(witness), reasons, support_edges)
+        (Some(witness), reasons, threatened, support_edges)
     } else {
-        (None, reasons, support_edges)
+        (None, reasons, threatened, support_edges)
     }
 }
 
@@ -475,6 +488,25 @@ mod tests {
         assert!(witness
             .reasons
             .contains(&DependenceReason::DeleteInterference));
+
+        // `threatened_atoms` is the atom-level provenance for this finding
+        // (the `Dependent`-side mirror of `CausalSupportEdge`'s provenance
+        // for `CausalSupport`) -- before this fix, the atoms threatened by
+        // a real DeleteInterference finding were computed (`analyze_pair`'s
+        // local `threatened` set) but discarded, never reaching the
+        // witness (`clippy::collection_is_never_read`). `p` (ground atom
+        // with no args) is the exact predicate a1's delete effect threatens
+        // against a2's precondition.
+        let p_atom = wasm4pm_compat::pddl::Pddl8GroundAtom {
+            pred: "p".to_string(),
+            args: vec![],
+        };
+        assert_eq!(
+            witness.threatened_atoms,
+            BTreeSet::from([atom_id(&p_atom)]),
+            "threatened_atoms must name the specific atom (p) the \
+             DeleteInterference finding is about, not be empty"
+        );
     }
 
     /// Covers `analyze_pair`'s conservative fallback (the
@@ -521,6 +553,15 @@ mod tests {
         assert!(witness
             .reasons
             .contains(&DependenceReason::DeleteInterference));
+        assert!(
+            witness.threatened_atoms.is_empty(),
+            "the conservative fallback names DeleteInterference as the \
+             closest available reason without ever identifying a specific \
+             threatened atom (neither direct check fired) -- threatened_atoms \
+             must stay empty here, distinguishing this placeholder case from \
+             a genuine atom-backed DeleteInterference finding \
+             (delete_interference_is_detected)"
+        );
     }
 
     #[test]

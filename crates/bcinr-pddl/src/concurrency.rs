@@ -321,6 +321,7 @@ mod tests {
             unresolvable_pair,
             DependenceWitness {
                 reasons: BTreeSet::from([DependenceReason::CausalSupport]),
+                threatened_atoms: BTreeSet::new(),
             },
         );
         let malformed = CausalPlan {
