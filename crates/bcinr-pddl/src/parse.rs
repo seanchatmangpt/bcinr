@@ -693,11 +693,41 @@ fn lower_precond_def_full(def: &PreconditionGoalDefinition) -> PddlCondition {
     }
 }
 
+/// Lower a `:precondition`-position preference goal into the full
+/// `PddlCondition` algebra.
+///
+/// # Currently-dead silent placeholder: `PreferenceGoalDefinition::Preference`
+///
+/// A *named* preference (`(preference pref-name (p))`, as opposed to a bare
+/// goal) is lowered to `PddlCondition::And(vec![])` — vacuously true,
+/// discarding both the preference's name and its actual condition `(p)`.
+/// This is currently **dead weight, not live corruption**: this function
+/// only feeds `Pddl8ActionSchema.condition` (the "full-fidelity" field for
+/// classical `:action`s via `lower_action31`), and `ground/mod.rs` never
+/// reads `schema.condition` for anything (grep-confirmed — only
+/// `dp.condition` for derived predicates is consulted). So today this
+/// placeholder can never make a real plan silently claim an unsatisfied
+/// preference held.
+///
+/// It reactivates the moment something wires `Pddl8ActionSchema.condition`/
+/// `Pddl31Action` preconditions into a grounder independent of the current
+/// `Pddl8ActionSchema.preconditions: Vec<Pddl8Atom>` path — a plausible next
+/// step for this retrofit. At that point this arm would need to either
+/// evaluate the preference's real condition and track violation (this
+/// crate's `PddlFeature::Preferences` is rated `Unsupported` for a separate,
+/// independent reason — see `capability.rs`'s module doc — so implementing
+/// real preference-violation tracking is out of this fix's scope; a
+/// mechanical fix here would be returning the *inner* condition instead of
+/// `And([])`, at minimum making the goal itself enforceable even though its
+/// preference-cost accounting still would not be, but that changes lowered
+/// semantics and needs its own test, so it is left as documented, still-dead
+/// TODO scope rather than silently changed alongside an unrelated fix).
 fn lower_pref_gd_full(pref: &PreferenceGoalDefinition) -> PddlCondition {
     match pref {
         PreferenceGoalDefinition::Goal(gd) => lower_condition(gd),
         PreferenceGoalDefinition::Preference(_) => {
-            // TODO: lower named preferences into PddlCondition
+            // TODO(dead, see fn doc comment): lower named preferences into
+            // PddlCondition instead of discarding them as And([]).
             PddlCondition::And(vec![])
         }
     }
@@ -1174,11 +1204,43 @@ fn lower_derived_predicate(dp: &pddl::DerivedPredicate) -> DerivedPredicate {
     DerivedPredicate { head, body }
 }
 
+/// Lower a domain-level `(:constraints ...)` block into `PddlConstraint`s.
+///
+/// # Currently-dead silent placeholder: `ConstraintGoalDefinition::Forall`
+///
+/// A `forall`-quantified domain constraint (`(forall (?x - t) (always (p
+/// ?x)))`) has its quantifier silently dropped: the unquantified inner body
+/// is lowered and substituted directly, as if `?x` were never bound at all
+/// (so a body that actually references `?x` keeps a dangling variable
+/// reference through to `PddlCondition`, rather than being enumerated over
+/// every object of type `t` the way `PddlFeature::UniversalPreconditions`'s
+/// `eval_quantifier` `Forall` arm does for durative-action conditions). The
+/// twin arm in [`lower_trajectory_constraint`] below has the identical
+/// disease. This is currently **dead weight, not live corruption**:
+/// `Pddl31Domain.constraints` (populated by `domain31_from_pddl` calling
+/// this function) is never bridged into `Pddl8Domain` at all
+/// (`mfw/planner.rs`'s own doc comment confirms "no Pddl31Domain ->
+/// Pddl8Domain conversion anywhere in this crate; grep-confirmed"), and
+/// `GroundProblem`/`GroundTemporalProblem::build`'s `self.constraints` is
+/// instead built exclusively from `problem.preferences`
+/// (`problem_from_pddl`/`problem31_from_pddl` both hardcode
+/// `preferences: vec![]`, so it is always empty regardless of this
+/// function's output). So today this placeholder can never make a real
+/// plan silently violate an unenumerated quantified constraint — but it
+/// reactivates the instant something wires `Pddl31Domain.constraints` into
+/// a grounder, which is a plausible next step for this exact retrofit.
+/// Implementing real quantified-constraint enumeration is out of this fix's
+/// scope (it needs the same object-domain enumeration machinery
+/// `eval_quantifier`'s `Forall` already has for conditions, wired into the
+/// trajectory-constraint algebra instead — a design decision, not a
+/// mechanical fix); this doc comment exists so the gap is visible instead
+/// of a bare `// TODO`.
 fn lower_constraint_gd(cgd: &ConstraintGoalDefinition) -> Vec<PddlConstraint> {
     match cgd {
         ConstraintGoalDefinition::And(cs) => cs.iter().flat_map(lower_constraint_gd).collect(),
         ConstraintGoalDefinition::Forall(_, inner) => {
-            // TODO: quantified domain constraints — lower inner for now
+            // TODO(dead, see fn doc comment): quantifier silently dropped —
+            // lowers `inner` unquantified rather than enumerating objects.
             lower_constraint_gd(inner)
         }
         other => {
@@ -1191,13 +1253,17 @@ fn lower_constraint_gd(cgd: &ConstraintGoalDefinition) -> Vec<PddlConstraint> {
     }
 }
 
+/// Lower one `(:constraints ...)` clause into the `TrajectoryConstraint`
+/// algebra. See [`lower_constraint_gd`]'s doc comment for the shared
+/// currently-dead `Forall` gap this function's own `Forall` arm has too.
 fn lower_trajectory_constraint(cgd: &ConstraintGoalDefinition) -> TrajectoryConstraint {
     match cgd {
         ConstraintGoalDefinition::And(cs) => {
             TrajectoryConstraint::And(cs.iter().map(lower_trajectory_constraint).collect())
         }
         ConstraintGoalDefinition::Forall(_, inner) => {
-            // TODO: proper forall lowering for trajectory constraints
+            // TODO(dead, see lower_constraint_gd's doc comment): quantifier
+            // silently dropped here too.
             lower_trajectory_constraint(inner)
         }
         ConstraintGoalDefinition::AtEnd(gd) => {
@@ -1240,12 +1306,34 @@ fn lower_trajectory_constraint(cgd: &ConstraintGoalDefinition) -> TrajectoryCons
     }
 }
 
+/// Lower the condition slot of a trajectory constraint (e.g. the `(p)` in
+/// `(always (p))`) into `PddlCondition`.
+///
+/// # Currently-dead silent placeholder: `ConstraintGoalDefinitionInner::Nested`
+///
+/// A nested trajectory constraint used where a plain condition is expected
+/// (e.g. `(always (sometime (p)))`) becomes `PddlCondition::And(vec![])` —
+/// vacuously true, discarding the nested constraint entirely rather than
+/// representing it (`PddlCondition` has no variant for "a nested trajectory
+/// constraint holds here" — `TrajectoryConstraint` and `PddlCondition` are
+/// separate algebras in `wasm4pm_compat::pddl`, and only the caller
+/// ([`lower_trajectory_constraint`]) is in the constraint algebra; this
+/// function's own return type is fixed as `PddlCondition`). Currently
+/// **dead weight, not live corruption** for exactly the same chain of
+/// reasons documented on [`lower_constraint_gd`]: `Pddl31Domain.constraints`
+/// is never bridged into `Pddl8Domain`/any grounder, so this placeholder can
+/// never be reached by anything that consults ground state. Representing a
+/// nested constraint would need extending `PddlCondition` with a variant
+/// that can hold a `TrajectoryConstraint`, or restructuring the two algebras
+/// to share one — a design decision, not a mechanical fix, so left as
+/// documented, still-dead TODO scope rather than silently changed here.
 fn lower_con2gd_condition(inner: &ConstraintGoalDefinitionInner) -> PddlCondition {
     match inner {
         ConstraintGoalDefinitionInner::Goal(gd) => lower_condition(gd),
         ConstraintGoalDefinitionInner::Nested(cgd) => {
-            // Nested trajectory constraint embedded as condition — use And([]) placeholder
-            // TODO: represent nested trajectory constraints properly
+            // TODO(dead, see fn doc comment): nested trajectory constraint
+            // discarded as And([]) — PddlCondition has no variant to
+            // represent it.
             let _ = cgd;
             PddlCondition::And(vec![])
         }
