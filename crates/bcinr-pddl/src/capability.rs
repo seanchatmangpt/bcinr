@@ -55,6 +55,13 @@
 //!   without any substitution/enumeration over objects). Neither bug was
 //!   introduced this phase; both are surfaced here rather than silently
 //!   inherited as an `Exact`/`Approximate` rating that would overclaim.
+//!   [`admit_planning_task`] refuses on this feature two ways: the
+//!   declared-requirement loop (any `:requirements` entry that
+//!   [`requirement_implies`] maps to `ConditionalEffects`), and a separate
+//!   content scan (`effect_list_uses_conditional_or_quantified`) over every
+//!   action's/durative-action's actual effect AST, so a domain that uses
+//!   `when`/`forall` in an effect *without* declaring the requirement is
+//!   still refused instead of silently admitted.
 //! - [`PddlFeature::NumericFluents`] — `Approximate`. Numeric comparisons
 //!   (`eval_numeric`/`Compare`) are genuinely evaluated and load-bearing
 //!   (`capability_router`'s `(>= (attention) 1)` gates every real test in
@@ -113,7 +120,9 @@ use std::collections::BTreeSet;
 use bcinr_mfw_ir::{
     Digest, EpochBounds, InconsistencyWitness, PlannerOutcome, PlanningEpochId, UnsupportedFeature,
 };
-use wasm4pm_compat::pddl::{Pddl31Domain, Pddl31Problem, Pddl8GroundAction, Pddl8GroundAtom};
+use wasm4pm_compat::pddl::{
+    Pddl31Domain, Pddl31Problem, Pddl8GroundAction, Pddl8GroundAtom, PddlEffect,
+};
 
 use crate::ground::GroundProblem;
 
@@ -293,6 +302,45 @@ fn requirement_implies(req: &str, feature: PddlFeature) -> bool {
     }
 }
 
+/// True iff `effect` is (or contains, through a `Timed` wrapper) a
+/// `PddlEffect::When` or `PddlEffect::Forall` node — i.e. the action body
+/// actually *uses* a conditional or quantified effect construct, independent
+/// of what the domain's `:requirements` declare.
+///
+/// This exists because `ground::apply_effect_ground` mishandles both
+/// constructs unconditionally (see this module's doc comment on
+/// [`PddlFeature::ConditionalEffects`]): its `When` arm destructures
+/// `condition` with `..` and fires `effects` regardless of whether the
+/// condition holds, and its `Forall` arm discards `vars` and fires `effects`
+/// exactly once instead of enumerating every object binding. Gating
+/// admission on the *declared* `:conditional-effects` requirement string
+/// alone (see [`requirement_implies`] and the loop in
+/// [`admit_planning_task`]) misses a domain that uses `when`/`forall` in an
+/// effect without ever declaring the requirement — this walk inspects the
+/// actual effect AST instead of trusting the domain author's requirements
+/// list.
+///
+/// # Complexity
+/// O(n) in the number of `PddlEffect` nodes reachable from `effect` — a
+/// single linear walk through `Timed` wrappers, no backtracking.
+fn effect_uses_conditional_or_quantified(effect: &PddlEffect) -> bool {
+    match effect {
+        PddlEffect::When { .. } | PddlEffect::Forall { .. } => true,
+        PddlEffect::Timed(_, inner) => effect_uses_conditional_or_quantified(inner),
+        PddlEffect::Add(_) | PddlEffect::Del(_) | PddlEffect::Numeric(_) => false,
+    }
+}
+
+/// True iff any effect in `effects` uses a conditional/quantified construct —
+/// see [`effect_uses_conditional_or_quantified`] for what counts and why
+/// this check exists.
+///
+/// # Complexity
+/// O(n) in the total number of `PddlEffect` nodes across `effects`.
+fn effect_list_uses_conditional_or_quantified(effects: &[PddlEffect]) -> bool {
+    effects.iter().any(effect_uses_conditional_or_quantified)
+}
+
 /// A domain + problem that passed [`admit_planning_task`]'s structural and
 /// capability checks. Cheap to construct further planning stages from —
 /// `theory_digest` content-addresses exactly the structural identity used
@@ -375,6 +423,53 @@ pub fn admit_planning_task(
                     context: format!(
                         "domain requirement {req:?} implies PddlFeature::{feature:?}, which the \
                          given CapabilityProfile marks Unsupported"
+                    ),
+                });
+            }
+        }
+    }
+
+    // Content-based gate: the loop above only refuses a domain that
+    // *declares* `:conditional-effects` in `:requirements`. That misses a
+    // domain whose action bodies actually *use* `when`/`forall` in an
+    // effect without ever declaring the requirement — `parse.rs`'s
+    // `collect_conditional_effect` (the classical STRIPS8 lowering path)
+    // silently drops a `when`'s condition and folds its effects into
+    // unconditional `add_effects`/`del_effects`, and
+    // `ground::apply_effect_ground` (the durative-action path) fires both
+    // `When` and `Forall` effects without checking/enumerating them either.
+    // Either way the result is a `PlannerOutcome::Found` plan that silently
+    // misrepresents which effects actually held — a wrong answer, not a
+    // refusal. Scan the real effect AST (`domain.actions`/
+    // `domain.durative_actions`, both preserved faithfully by
+    // `lower_action31`/`lower_durative_action`) instead of trusting the
+    // declared requirements list.
+    if profile.support(PddlFeature::ConditionalEffects) == SemanticSupport::Unsupported {
+        for action in &domain.actions {
+            if effect_list_uses_conditional_or_quantified(&action.effect) {
+                return PlannerOutcome::Unsupported(UnsupportedFeature {
+                    feature_name: "ConditionalEffects".to_string(),
+                    context: format!(
+                        "action {:?} uses a `when` or `forall` effect construct even though \
+                         the domain's :requirements never declared :conditional-effects — \
+                         admitting it would let ground::apply_effect_ground (or, for classical \
+                         actions, parse.rs's collect_conditional_effect) silently misapply the \
+                         effect instead of refusing the domain",
+                        action.name
+                    ),
+                });
+            }
+        }
+        for da in &domain.durative_actions {
+            if effect_list_uses_conditional_or_quantified(&da.effects) {
+                return PlannerOutcome::Unsupported(UnsupportedFeature {
+                    feature_name: "ConditionalEffects".to_string(),
+                    context: format!(
+                        "durative action {:?} uses a `when` or `forall` effect construct even \
+                         though the domain's :requirements never declared \
+                         :conditional-effects — see the classical-action case above for why \
+                         this must be refused rather than silently admitted",
+                        da.name
                     ),
                 });
             }
@@ -543,6 +638,59 @@ mod tests {
         match outcome {
             PlannerOutcome::Unsupported(u) => assert_eq!(u.feature_name, "object-fluents"),
             other => panic!("expected Unsupported(object-fluents), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn undeclared_when_effect_is_refused_as_unsupported_not_silently_admitted() {
+        // Adversarial case from the gap report: the domain declares only
+        // `:strips` (no `:conditional-effects`), so the declared-requirement
+        // loop alone would never see anything to refuse — but action `a`'s
+        // effect body actually uses `when`, which
+        // `parse.rs::collect_conditional_effect` (the classical STRIPS8
+        // lowering path) would otherwise silently fold into an unconditional
+        // `add_effects` entry, letting `(r)` be claimed achieved even though
+        // `(q)` was never true. The content scan added to
+        // `admit_planning_task` must catch this regardless of the missing
+        // declaration.
+        let domain = domain31_from_pddl(
+            "(define (domain d) (:requirements :strips) (:predicates (p) (q) (r)) \
+             (:action a :parameters () :precondition (p) :effect (when (q) (r))))",
+        )
+        .unwrap();
+        let problem =
+            problem31_from_pddl("(define (problem pr) (:domain d) (:init (p)) (:goal (r)))")
+                .unwrap();
+        let outcome = admit_planning_task(&domain, &problem, &DefaultCapabilityProfile);
+        match outcome {
+            PlannerOutcome::Unsupported(u) => assert_eq!(u.feature_name, "ConditionalEffects"),
+            other => panic!(
+                "expected Unsupported(ConditionalEffects) for an undeclared `when` effect, got \
+                 {other:?}"
+            ),
+        }
+    }
+
+    #[test]
+    fn undeclared_forall_effect_is_refused_as_unsupported() {
+        let domain = domain31_from_pddl(
+            "(define (domain d) (:requirements :strips :typing) (:types obj) \
+             (:predicates (p ?x - obj)) \
+             (:action a :parameters () :precondition () \
+              :effect (forall (?x - obj) (p ?x))))",
+        )
+        .unwrap();
+        let problem = problem31_from_pddl(
+            "(define (problem pr) (:domain d) (:objects o1 - obj) (:init) (:goal (p o1))))",
+        )
+        .unwrap();
+        let outcome = admit_planning_task(&domain, &problem, &DefaultCapabilityProfile);
+        match outcome {
+            PlannerOutcome::Unsupported(u) => assert_eq!(u.feature_name, "ConditionalEffects"),
+            other => panic!(
+                "expected Unsupported(ConditionalEffects) for an undeclared `forall` effect, \
+                 got {other:?}"
+            ),
         }
     }
 
