@@ -66,7 +66,9 @@ mod tests {
                     if let Some(paren) = after_fn.find('(') {
                         let name = after_fn[..paren].trim().to_string();
                         if name != "main" {
-                            groups.get_mut(&current_group).map(|v| v.push(name));
+                            if let Some(v) = groups.get_mut(&current_group) {
+                                v.push(name);
+                            }
                         }
                     }
                 }
@@ -386,7 +388,10 @@ mod tests {
         );
 
         // At minimum, should find tools
-        assert!(tools.len() > 0, "Extraction logic failed to find any tools");
+        assert!(
+            !tools.is_empty(),
+            "Extraction logic failed to find any tools"
+        );
     }
 
     #[test]

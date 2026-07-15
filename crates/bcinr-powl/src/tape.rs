@@ -223,7 +223,7 @@ pub mod v2 {
     #[inline(always)]
     pub const fn eq_mask_u64(a: u64, b: u64) -> u64 {
         let diff = a ^ b;
-        let nonzero_bit = ((diff | diff.wrapping_neg()) >> 63) as u64;
+        let nonzero_bit = (diff | diff.wrapping_neg()) >> 63;
         nonzero_bit.wrapping_sub(1)
     }
 

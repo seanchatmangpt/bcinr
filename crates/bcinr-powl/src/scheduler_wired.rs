@@ -788,6 +788,12 @@ impl<const SLOTS: usize, const TICKS: usize> FiberPool<SLOTS, TICKS> {
     }
 }
 
+impl<const SLOTS: usize, const TICKS: usize> Default for FiberPool<SLOTS, TICKS> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

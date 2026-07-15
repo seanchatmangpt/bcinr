@@ -220,7 +220,7 @@ pub fn scheduler_tick(tape: &[Powl64Op], state: &mut PowlRunState) -> FiredSet {
         let effective_pred = (join_effective & is_join) | (op.pred_mask & !is_join);
 
         let sat = pred_satisfied(new_done, effective_pred);
-        let sat_bit = (sat & 1) as u64;
+        let sat_bit = sat & 1;
         let fire_mask = u64::wrapping_sub(0, sat_bit) & bit;
 
         fired |= fire_mask;
@@ -695,7 +695,7 @@ mod tests {
             .position(|op| op.kind == OpKind::XorDispatch)
             .unwrap();
         let branch_mask = tape.ops[dispatch_slot].branch_mask;
-        let chosen_bit = branch_mask & branch_mask.wrapping_neg();
+        let chosen_bit = branch_mask.isolate_lowest_one();
         let suppressed_mask = branch_mask & !chosen_bit;
 
         let mut state = PowlRunState::new(&tape);
@@ -737,7 +737,7 @@ mod tests {
             .position(|op| op.kind == OpKind::XorDispatch)
             .unwrap();
         let branch_mask = tape.ops[dispatch_slot].branch_mask;
-        let chosen_bit = branch_mask & branch_mask.wrapping_neg();
+        let chosen_bit = branch_mask.isolate_lowest_one();
         let suppressed_mask = branch_mask & !chosen_bit;
 
         let mut state = PowlRunState::new(&tape);

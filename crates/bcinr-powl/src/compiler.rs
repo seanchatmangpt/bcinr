@@ -301,6 +301,11 @@ fn compile_node<'a>(
 // ---------------------------------------------------------------------------
 
 /// Compute in-degrees for non-LoopRedo slots, ignoring LoopRedo predecessors.
+// `i` indexes both `tape.ops` (read) and `in_deg` (write) in the same loop
+// body, and the inner `while` loop compares a second, unrelated index `j`
+// against `n` -- clippy's `enumerate()`-based rewrite for `needless_range_loop`
+// only tracks one iterated collection and doesn't apply cleanly here.
+#[allow(clippy::needless_range_loop)]
 fn build_in_degrees(tape: &PowlTape, n: usize) -> [u32; 64] {
     let mut in_deg = [0u32; 64];
     for i in 0..n {

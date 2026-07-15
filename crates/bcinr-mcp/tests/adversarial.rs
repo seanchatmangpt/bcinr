@@ -299,8 +299,8 @@ async fn receipt_inspect_detects_tampering() {
         .as_str()
         .unwrap_or("")
         .to_owned();
-    let flipped = if orig_chain.starts_with('a') {
-        format!("b{}", &orig_chain[1..])
+    let flipped = if let Some(rest) = orig_chain.strip_prefix('a') {
+        format!("b{}", rest)
     } else {
         format!("a{}", &orig_chain[1..])
     };

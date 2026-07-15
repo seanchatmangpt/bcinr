@@ -79,14 +79,16 @@ impl OcelEmitArena {
         slot.node_kind = node_kind;
         // _pad is already zeroed (arena is zero-initialised).
 
-        // Pack up to 8 object references; zero-fill the rest.
+        // Pack up to 8 object references; zero-fill the rest. `zip` alone
+        // (no explicit index) already stops at `min(8, obj_refs.len())`,
+        // i.e. exactly `n` pairs -- the two fixed-size collections bound
+        // the iteration themselves.
         let n = obj_refs.len().min(8);
-        for i in 0..n {
-            let (type_idx, object_id) = obj_refs[i];
-            slot.obj_refs[i] = PackedObjRef::new(type_idx, object_id);
+        for (dst, &(type_idx, object_id)) in slot.obj_refs.iter_mut().zip(obj_refs.iter()) {
+            *dst = PackedObjRef::new(type_idx, object_id);
         }
-        for i in n..8 {
-            slot.obj_refs[i] = PackedObjRef::default();
+        for dst in slot.obj_refs.iter_mut().skip(n) {
+            *dst = PackedObjRef::default();
         }
 
         // prior_hash is left as zero bytes; callers fill from the receipt.

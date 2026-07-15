@@ -100,6 +100,12 @@ impl ReceiptLog {
         self.count
     }
 
+    /// True iff no entries have been sealed yet.
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.count == 0
+    }
+
     /// Returns the raw bytes of entry `idx`, or `None` if out of range.
     pub fn entry(&self, idx: usize) -> Option<&[u8; ENTRY_BYTES]> {
         if idx < self.count {

@@ -283,7 +283,16 @@ impl<const OPS: usize> SparseEnabledIndex<OPS> {
     /// `dependents` directly) before the first [`on_complete`][Self::on_complete].
     #[must_use]
     pub fn new(initial_counts: [u32; OPS]) -> Self {
-        let _ = Self::_OPS_BOUND; // force evaluation at instantiation
+        // Deliberate compile-time-assert trick: referencing `_OPS_BOUND`
+        // forces its `assert!` to be evaluated at monomorphization time.
+        // A bare `Self::_OPS_BOUND;` path statement (no `let`) also forces
+        // evaluation, but rustc's built-in `path_statements` lint flags it
+        // as "no effect" (true at runtime, irrelevant here); `let _ =` is
+        // the idiomatic way to reference it without another lint replacing
+        // this one -- `clippy::let_unit_value` is the wrong lens for a
+        // const-assert-forcing statement, not a real "why bind unit" case.
+        #[allow(clippy::let_unit_value)]
+        let _ = Self::_OPS_BOUND;
         Self {
             dependents: [[0u64; 8]; OPS],
             pending_count: initial_counts.map(AtomicU32::new),

@@ -11,7 +11,7 @@ use crate::denial::DenialPolarity;
 /// A packed object reference encoding type index (high 8 bits) and object id
 /// (low 24 bits) in a single `u32`.
 #[repr(transparent)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct PackedObjRef(pub u32);
 
 impl PackedObjRef {
@@ -34,12 +34,6 @@ impl PackedObjRef {
     #[inline]
     pub fn object_id(self) -> u32 {
         self.0 & 0x00FF_FFFF
-    }
-}
-
-impl Default for PackedObjRef {
-    fn default() -> Self {
-        Self(0)
     }
 }
 
