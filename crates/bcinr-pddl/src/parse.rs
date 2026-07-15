@@ -229,13 +229,11 @@ pub fn problem31_from_pddl(text: &str) -> Result<Pddl31Problem, Pddl8Error> {
     for el in prob.init().iter() {
         match el {
             InitElement::Literal(lit) => {
-                if let pddl::Literal::AtomicFormula(af) = lit {
-                    if let pddl::AtomicFormula::Predicate(p) = af {
-                        init_atoms.push(Pddl8Atom {
-                            pred: p.predicate().to_string(),
-                            args: p.values().iter().map(|n| n.to_string()).collect(),
-                        });
-                    }
+                if let pddl::Literal::AtomicFormula(pddl::AtomicFormula::Predicate(p)) = lit {
+                    init_atoms.push(Pddl8Atom {
+                        pred: p.predicate().to_string(),
+                        args: p.values().iter().map(|n| n.to_string()).collect(),
+                    });
                 }
             }
             InitElement::At(time, lit) => {
@@ -522,10 +520,12 @@ fn lower_pred_af(p: &PredicateAtomicFormula<pddl::Term>) -> Pddl8Atom {
     }
 }
 
+/// `(init_atoms, timed_inits, fn_values)` — [`lower_init_full`]'s return
+/// shape, factored into a named alias per clippy's `type_complexity` lint.
+type LoweredInit = (Vec<Pddl8Atom>, Vec<TimedLiteral>, Vec<(PddlFunction, f64)>);
+
 /// Returns (init_atoms, timed_inits, fn_values) from an InitElements.
-fn lower_init_full(
-    init: &pddl::InitElements,
-) -> Result<(Vec<Pddl8Atom>, Vec<TimedLiteral>, Vec<(PddlFunction, f64)>), Pddl8Error> {
+fn lower_init_full(init: &pddl::InitElements) -> Result<LoweredInit, Pddl8Error> {
     let mut atoms = Vec::new();
     let mut timed = Vec::new();
     let mut fn_vals = Vec::new();
@@ -533,13 +533,11 @@ fn lower_init_full(
     for el in init.iter() {
         match el {
             InitElement::Literal(lit) => {
-                if let pddl::Literal::AtomicFormula(af) = lit {
-                    if let pddl::AtomicFormula::Predicate(p) = af {
-                        atoms.push(Pddl8Atom {
-                            pred: p.predicate().to_string(),
-                            args: p.values().iter().map(|n| n.to_string()).collect(),
-                        });
-                    }
+                if let pddl::Literal::AtomicFormula(pddl::AtomicFormula::Predicate(p)) = lit {
+                    atoms.push(Pddl8Atom {
+                        pred: p.predicate().to_string(),
+                        args: p.values().iter().map(|n| n.to_string()).collect(),
+                    });
                 }
             }
             InitElement::At(time, lit) => {
@@ -958,11 +956,7 @@ fn lower_durative_action(da: &pddl::DurativeActionDefinition) -> DurativeAction 
         .map(lower_duration_constraint)
         .unwrap_or(DurationConstraint::Eq(NumericExpr::Number(0.0)));
 
-    let conditions = da
-        .condition()
-        .as_ref()
-        .map(|c| lower_da_gd(c))
-        .unwrap_or_default();
+    let conditions = da.condition().as_ref().map(lower_da_gd).unwrap_or_default();
 
     let effects = da
         .effect()

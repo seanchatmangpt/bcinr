@@ -106,7 +106,14 @@ impl FactStore {
     }
 
     /// Number of facts stored for `pred`.
+    ///
+    /// Pre-existing dead-code under `make check`/`make clippy`'s
+    /// `RUSTFLAGS=-D warnings` (Makefile.toml's `[env]` section): `FactStore`
+    /// is a private, un-re-exported type (`mod facts;` not `pub mod facts;`
+    /// in `ground/mod.rs`), and only this module's own `#[cfg(test)]` tests
+    /// call this today. Kept as real public-API surface, not removed.
     #[must_use]
+    #[allow(dead_code)]
     pub fn arity_count(&self, pred: SymId) -> usize {
         self.by_pred.get(&pred.0).map_or(0, BTreeSet::len)
     }
@@ -117,14 +124,18 @@ impl FactStore {
         self.len
     }
 
-    /// Whether the store holds no atoms.
+    /// Whether the store holds no atoms. See [`Self::arity_count`]'s doc
+    /// comment for why this is `#[allow(dead_code)]`.
     #[must_use]
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
 
-    /// Whether the fast filter has been built.
+    /// Whether the fast filter has been built. See [`Self::arity_count`]'s
+    /// doc comment for why this is `#[allow(dead_code)]`.
     #[must_use]
+    #[allow(dead_code)]
     pub fn is_frozen(&self) -> bool {
         self.filter.is_some()
     }

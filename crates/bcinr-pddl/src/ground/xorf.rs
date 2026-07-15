@@ -188,7 +188,14 @@ impl XorFilter {
 
     /// Fingerprint-array footprint in bytes — the whole filter minus a
     /// constant header. Useful for reporting compactness.
+    ///
+    /// Pre-existing dead-code under `make check`/`make clippy`'s
+    /// `RUSTFLAGS=-D warnings` (Makefile.toml's `[env]` section): `XorFilter`
+    /// is a private, un-re-exported type (`mod xorf;` not `pub mod xorf;`
+    /// in `ground/mod.rs`) and nothing calls this yet outside a doc comment
+    /// claim. Kept as real public-API surface, not removed.
     #[must_use]
+    #[allow(dead_code)]
     pub fn byte_len(&self) -> usize {
         self.fingerprints.len()
     }

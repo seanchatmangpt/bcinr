@@ -167,9 +167,9 @@ fn forward_pass(ops: &[PowlOpSpec], n: usize) -> (Vec<f64>, Vec<f64>) {
     let mut earliest_finish = vec![0.0_f64; n];
     for i in 0..n {
         let mut es = ops[i].start_time.unwrap_or(0.0);
-        for j in 0..i {
+        for (j, &finish) in earliest_finish.iter().enumerate().take(i) {
             if (ops[i].pred_mask >> j) & 1 == 1 {
-                es = es.max(earliest_finish[j]);
+                es = es.max(finish);
             }
         }
         earliest_start[i] = es;

@@ -112,7 +112,7 @@ async fn cached_pddl_plan(cache: &CapabilityCache, domain: &str, problem: &str) 
         let d = domain_from_pddl(domain)?;
         let p = problem_from_pddl(problem)?;
         let ground = GroundProblem::build(&d, &p, None)?;
-        let tape = ground.find_plan()?;
+        let tape = ground.find_plan().into_result()?;
         Ok(serde_json::json!({"ok": true, "step_count": tape.ops.len()}).to_string())
     })()
     .unwrap_or_else(|e| serde_json::json!({"ok": false, "error": e.to_string()}).to_string());

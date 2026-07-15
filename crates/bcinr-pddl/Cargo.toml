@@ -36,6 +36,15 @@ chrono = { version = "0.4", features = ["serde"] }
 # bcinr-pddl depends on it, never the reverse (see bcinr-mfw-ir's own
 # Cargo.toml comment).
 bcinr-mfw-ir = { path = "../bcinr-mfw-ir", version = "26.6.26" }
+# bcinr-powl / bcinr-powl-receipt — OPTIONAL, behind the `mfw-planner`
+# feature only (see src/mfw/mod.rs's module doc comment). This preserves the
+# "No path deps on bcinr-powl ... opt-in only" boundary stated above: the
+# Phase 4 MfwPlanner orchestrator (src/mfw/planner.rs) is this crate's one
+# genuine, intentional opt-in consumer of bcinr-powl's PowlProjector +
+# bcinr-powl-receipt's receipt sealing. Default builds (including praxis's
+# existing path dependency on this crate) never pull either in.
+bcinr-powl = { path = "../bcinr-powl", version = "26.6.25", optional = true }
+bcinr-powl-receipt = { path = "../bcinr-powl-receipt", version = "26.6.24", optional = true }
 
 [features]
 # Surface 7 (docs/DFCM_CONTRACT.md): per-stage allocation attribution for the
@@ -43,6 +52,9 @@ bcinr-mfw-ir = { path = "../bcinr-mfw-ir", version = "26.6.26" }
 # No extra dependency — std-only. Off by default; normal builds/tests never
 # install a non-default global allocator.
 dhat-heap = []
+# Phase 4 integration: the MfwPlanner top-level orchestrator (src/mfw/planner.rs).
+# Off by default — see src/mfw/mod.rs's module doc comment for why.
+mfw-planner = ["dep:bcinr-powl", "dep:bcinr-powl-receipt"]
 
 [dev-dependencies]
 # Nothing from bcinr-powl or wasm4pm-cognition in dev-deps either.

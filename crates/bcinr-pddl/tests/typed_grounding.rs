@@ -96,5 +96,5 @@ fn typed_grounding_restricts_to_type_compatible_bindings() {
 
     // A plan should still be findable — type filtering must not break search.
     let plan = ground.find_plan().into_result().expect("plan found");
-    assert!(plan.len() >= 1);
+    assert!(!plan.is_empty());
 }

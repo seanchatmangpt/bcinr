@@ -271,6 +271,8 @@ name = "bcinr-pddl"
 version = "26.6.26"
 dependencies = [
  "bcinr-mfw-ir",
+ "bcinr-powl",
+ "bcinr-powl-receipt",
  "blake3",
  "chicago-tdd-tools",
  "chrono",

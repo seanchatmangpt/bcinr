@@ -79,13 +79,23 @@ impl Dict {
     }
 
     /// Number of distinct interned strings.
+    ///
+    /// Pre-existing dead-code under `make check`/`make clippy`'s
+    /// `RUSTFLAGS=-D warnings` (Makefile.toml's `[env]` section): only
+    /// this module's own `#[cfg(test)]` tests call it today (`Dict` is a
+    /// private, un-re-exported type, `mod dict;` not `pub mod dict;` in
+    /// `ground/mod.rs`) — real public-API surface kept for symmetry with
+    /// `is_empty`/other interning-table types in this crate, not removed.
     #[must_use]
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.terms.len()
     }
 
-    /// Whether the dictionary is empty.
+    /// Whether the dictionary is empty. See [`Self::len`]'s doc comment for
+    /// why this is `#[allow(dead_code)]`.
     #[must_use]
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.terms.is_empty()
     }

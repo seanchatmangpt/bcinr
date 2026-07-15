@@ -54,7 +54,7 @@ fn logistics_plan_found_and_executed() {
     let tape = gp.find_plan().into_result().expect("plan found");
 
     // BFS finds shortest plan (1–3 steps; without typing, drive-truck alone may suffice)
-    assert!(tape.len() >= 1, "plan must have at least one step");
+    assert!(!tape.is_empty(), "plan must have at least one step");
 
     let initial_state: BTreeSet<Pddl8GroundAtom> = problem
         .init

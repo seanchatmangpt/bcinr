@@ -4,7 +4,7 @@
 //! domain text → admit → problem text → admit → manufacture_world → receipt → POWL tape.
 
 use bcinr_pddl::powl_bridge::temporal_plan_to_powl_tape;
-use bcinr_pddl::{admit_candidate_domain, admit_candidate_problem, manufacture_world};
+use bcinr_pddl::{admit_candidate_domain, manufacture_world};
 
 const CLASSICAL_DOMAIN: &str = "(define (domain blocks) (:requirements :strips) (:predicates (on ?x ?y) (ontable ?x) (clear ?x) (holding ?x) (handempty)) (:action pick-up :parameters (?x) :precondition (and (clear ?x) (ontable ?x) (handempty)) :effect (and (holding ?x) (not (clear ?x)) (not (ontable ?x)) (not (handempty)))) (:action put-down :parameters (?x) :precondition (holding ?x) :effect (and (not (holding ?x)) (clear ?x) (ontable ?x) (handempty))) (:action stack :parameters (?x ?y) :precondition (and (holding ?x) (clear ?y)) :effect (and (not (holding ?x)) (not (clear ?y)) (clear ?x) (on ?x ?y) (handempty))) (:action unstack :parameters (?x ?y) :precondition (and (on ?x ?y) (clear ?x) (handempty)) :effect (and (holding ?x) (clear ?y) (not (on ?x ?y)) (not (clear ?x)) (not (handempty)))))";
 
@@ -68,6 +68,6 @@ fn test_powl_bridge() {
     let receipt = manufacture_world(CLASSICAL_DOMAIN, CLASSICAL_PROBLEM, "test-powl-001", &[]);
     if receipt.admitted {
         let tape = temporal_plan_to_powl_tape(&receipt.plan);
-        assert!(tape.len() > 0, "POWL tape must not be empty");
+        assert!(!tape.is_empty(), "POWL tape must not be empty");
     }
 }

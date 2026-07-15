@@ -482,6 +482,14 @@ mod brce_conformance {
 
     // Recompute manufacture_chain the same way llm_bridge.rs does:
     // BLAKE3(domain_witness.as_bytes() || problem_witness.as_bytes() || plan_chain_hash.as_bytes())
+    //
+    // Pre-existing dead-code under `make check`/`make clippy`'s
+    // `RUSTFLAGS=-D warnings`: every current call site uses
+    // `recompute_chain_full` directly since `goal_reached`/`step_count`
+    // were added to the chain (commit 85115cc3, predating this session).
+    // Kept as a documented convenience wrapper for the common
+    // `goal_reached=false, step_count=0` case, not removed.
+    #[allow(dead_code)]
     fn recompute_chain(domain_w: &str, problem_w: &str, plan_chain: &str) -> String {
         recompute_chain_full(domain_w, problem_w, plan_chain, false, 0)
     }

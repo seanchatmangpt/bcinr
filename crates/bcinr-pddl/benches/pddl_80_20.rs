@@ -2,7 +2,6 @@ use bcinr_pddl::{
     domain_from_pddl, problem_from_pddl, powl_bridge::temporal_plan_to_powl_tape,
     GroundProblem, GroundTemporalProblem,
 };
-use divan::Bencher;
 use std::time::Instant;
 
 fn main() {
@@ -22,31 +21,30 @@ fn measure_and_prove_times(
     let t1 = Instant::now();
     let t_ground;
     let t_solve;
-    let t_powl;
-    
-    if is_temporal {
+
+    let t_powl = if is_temporal {
         let gp = GroundTemporalProblem::build(&domain, &problem).unwrap();
         t_ground = t1.elapsed();
-        
+
         let t2 = Instant::now();
         let plan_res = gp.find_temporal_plan().into_result();
         if plan_res.is_err() { return; }
         let plan = plan_res.unwrap();
         t_solve = t2.elapsed();
-        
+
         let t3 = Instant::now();
         let _powl = temporal_plan_to_powl_tape(&plan);
-        t_powl = t3.elapsed();
+        t3.elapsed()
     } else {
         let gp = GroundProblem::build(&domain, &problem, None).unwrap();
         t_ground = t1.elapsed();
-        
+
         let t2 = Instant::now();
         let plan_res = gp.find_plan().into_result();
         if plan_res.is_err() { return; }
         let plan = plan_res.unwrap();
         t_solve = t2.elapsed();
-        
+
         let t3 = Instant::now();
         // POWL projection for classical
         // Since we don't have classical_plan_to_powl_tape, we can mock it or use an empty operation
@@ -56,9 +54,9 @@ fn measure_and_prove_times(
             powl_ops += 1;
         }
         divan::black_box(powl_ops);
-        t_powl = t3.elapsed();
-    }
-    
+        t3.elapsed()
+    };
+
     let t_total = t0.elapsed();
     
     // Prove T_total >= T_IR + T_ground + T_solve + T_POWL
@@ -88,11 +86,8 @@ pub mod ingress {
         bencher.bench_local(|| {
             // "prove digest(IR_text) == digest(IR_direct)"
             let domain_text = domain_from_pddl(DOMAIN).unwrap();
-            
-            use bcinr_pddl::{Pddl8Domain, Pddl8Atom};
-            use std::collections::BTreeMap;
-            
-            let mut domain_direct = domain_text.clone();
+
+            let domain_direct = domain_text.clone();
             
             let text_json = serde_json::to_vec(&domain_text).unwrap();
             let direct_json = serde_json::to_vec(&domain_direct).unwrap();

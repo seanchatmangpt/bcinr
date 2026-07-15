@@ -72,7 +72,7 @@ fn find_plan_bench(n: usize) {
     let domain = domain_from_pddl(DOMAIN).expect("domain parse");
     let problem = problem_from_pddl(&problem_with_n_packages(n)).expect("problem parse");
     let ground = GroundProblem::build(&domain, &problem, None).expect("grounding");
-    divan::black_box(ground.find_plan().ok());
+    divan::black_box(ground.find_plan().into_result().ok());
 }
 
 fn main() {
