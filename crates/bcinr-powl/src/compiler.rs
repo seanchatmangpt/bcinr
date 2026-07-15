@@ -412,6 +412,463 @@ pub fn compile_powl(root: &PowlAstNode<'_>) -> Result<PowlTape, CompileError> {
     Ok(tape)
 }
 
+// =============================================================================
+// v2 compiler — PowlModel -> tape::v2::PowlTape + ConcurrencyGuardTable
+// =============================================================================
+
+/// Compiles [`crate::model::PowlModel`] (the new planner-output IR) into the
+/// existing v2 tape representation, mirroring [`tape::v2`]'s pattern of
+/// living alongside the legacy AST compiler above rather than replacing it.
+///
+/// `PowlModel`'s node graph is already flat (one node per `ActionOccurrence`
+/// plus precedence edges, not a nested AST), so this module does not reuse
+/// the recursive-descent machinery above (`compile_node`/`wire`/`Segment`)
+/// — there is no tree to recurse over. It *does* reuse the v2 tape's own
+/// primitives unchanged: [`tape::v2::PowlTape::push`],
+/// [`tape::v2::LabelSlab::intern`], and the established `pred_mask`/
+/// `succ_mask` bit convention — no new op/tape encoding is invented here.
+pub mod v2 {
+    use std::collections::BTreeMap;
+
+    use bcinr_mfw_ir::{ActionOccurrenceId, EventSet, PowlNodeId};
+
+    use crate::model::{PowlModel, PowlNode};
+    use crate::tape::v2::{
+        CompiledNonFace, ConcurrencyGuardTable, OpKind as V2OpKind, Powl64Op as V2Op,
+        PowlTape as V2Tape,
+    };
+
+    /// Errors from [`compile_powl_v2`]. Every variant names the exact node
+    /// or action responsible — never a bare "compile failed".
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub enum CompileErrorV2 {
+        /// More than 64 nodes — the v2 `PowlTape` (as opposed to
+        /// `PowlTapeLarge`) has a hard 64-slot cap.
+        TapeFull,
+        /// `model.nodes` was not in dense ascending-`PowlNodeId` order
+        /// (`node.id().0 == index as u64` for every position) — required
+        /// so tape-slot index and `PowlNodeId` numeric value coincide,
+        /// which is what lets the guard-table re-keying below work without
+        /// a second indirection table.
+        NodeIdNotDense { position: usize, found: PowlNodeId },
+        /// A [`crate::model::ChildWorkflowNode`] or
+        /// [`crate::model::ExternalCutNode`] was encountered. These are
+        /// UNSUPPORTED stubs (see `crate::model`'s doc comments) — this
+        /// compiler refuses them with a typed error rather than silently
+        /// dropping or mis-compiling them.
+        UnsupportedNodeKind { id: PowlNodeId },
+        /// A precedence edge referenced an `ActionOccurrenceId` absent
+        /// from `model.provenance` — the edge cannot be wired to a tape
+        /// slot.
+        UnmappedActionInOrder(ActionOccurrenceId),
+        /// A concurrency nonface referenced an `ActionOccurrenceId` absent
+        /// from `model.provenance` — the nonface cannot be re-keyed into
+        /// tape-slot space.
+        UnmappedActionInConcurrency(ActionOccurrenceId),
+    }
+
+    /// The result of compiling a `PowlModel`: the existing v2 `PowlTape`
+    /// plus the new concurrency guard table, plus a side map from each
+    /// activity node's `PowlNodeId` to its interned label's offset in
+    /// `tape.label_slab` (kept separate from `Powl64Op` itself so the
+    /// already-landed, size-asserted 64-byte `Powl64Op` layout is not
+    /// touched by this phase).
+    #[derive(Debug)]
+    pub struct CompiledPowlV2 {
+        pub tape: V2Tape,
+        pub guards: ConcurrencyGuardTable,
+        pub node_labels: BTreeMap<PowlNodeId, u16>,
+    }
+
+    /// Compile a `PowlModel` into a `CompiledPowlV2`.
+    ///
+    /// # Re-keying concurrency into tape-slot space
+    ///
+    /// `model.concurrency` stays `ActionOccurrenceId`-keyed all the way
+    /// through `PowlModel` (see that module's doc comments for why). The
+    /// scheduler, however, operates on tape-slot indices (`0..64`, the
+    /// same numbering as `Powl64Op` array positions). This function is the
+    /// one place that re-keying happens: `model.provenance` is inverted
+    /// into an `ActionOccurrenceId -> PowlNodeId` map, and every minimal
+    /// nonface's `EventSet` members are rewritten through it into
+    /// tape-slot-index space before being stored in the returned
+    /// `ConcurrencyGuardTable`.
+    pub fn compile_powl_v2(model: &PowlModel) -> Result<CompiledPowlV2, CompileErrorV2> {
+        if model.nodes.len() > 64 {
+            return Err(CompileErrorV2::TapeFull);
+        }
+
+        // Tape-slot index and PowlNodeId numeric value must coincide
+        // (dense, ascending, zero-based) -- verified up front rather than
+        // silently assumed.
+        for (position, node) in model.nodes.iter().enumerate() {
+            let id = node.id();
+            if id.0 != position as u64 {
+                return Err(CompileErrorV2::NodeIdNotDense {
+                    position,
+                    found: id,
+                });
+            }
+        }
+
+        let mut tape = V2Tape::new();
+        let mut node_labels = BTreeMap::new();
+
+        for node in &model.nodes {
+            let mut op = V2Op::silent();
+            match node {
+                PowlNode::Activity(a) => {
+                    op.op_kind = V2OpKind::Activity;
+                    let offset = tape.label_slab.intern(&a.label);
+                    node_labels.insert(a.id, offset);
+                }
+                PowlNode::Silent(_) => {
+                    // op_kind already OpKind::Silent via V2Op::silent().
+                }
+                PowlNode::ChildWorkflow(c) => {
+                    return Err(CompileErrorV2::UnsupportedNodeKind { id: c.id });
+                }
+                PowlNode::ExternalCut(e) => {
+                    return Err(CompileErrorV2::UnsupportedNodeKind { id: e.id });
+                }
+            }
+            tape.push(op).ok_or(CompileErrorV2::TapeFull)?;
+        }
+
+        // Invert provenance: ActionOccurrenceId -> PowlNodeId, used both to
+        // wire order edges and to re-key the concurrency complex below.
+        let mut action_to_node: BTreeMap<ActionOccurrenceId, PowlNodeId> = BTreeMap::new();
+        for (node_id, action_id) in &model.provenance {
+            action_to_node.insert(*action_id, *node_id);
+        }
+
+        // Wire precedence edges into pred_mask/succ_mask using the tape's
+        // own established bit convention (mirrors compiler.rs's `wire()`
+        // for the legacy tape, specialised to a flat edge list rather than
+        // a recursive AST).
+        for edge in &model.order.edges {
+            let before_node = *action_to_node
+                .get(&edge.before)
+                .ok_or(CompileErrorV2::UnmappedActionInOrder(edge.before))?;
+            let after_node = *action_to_node
+                .get(&edge.after)
+                .ok_or(CompileErrorV2::UnmappedActionInOrder(edge.after))?;
+            let before_bit = 1u64 << before_node.0;
+            let after_bit = 1u64 << after_node.0;
+            tape.ops[before_node.0 as usize].succ_mask |= after_bit;
+            tape.ops[after_node.0 as usize].pred_mask |= before_bit;
+        }
+
+        let n = tape.len as usize;
+        tape.entry_op = (0..n)
+            .find(|&i| tape.ops[i].pred_mask == 0)
+            .map(|i| i as u8)
+            .unwrap_or(0);
+        tape.exit_op = (0..n)
+            .rev()
+            .find(|&i| tape.ops[i].succ_mask == 0)
+            .map(|i| i as u8)
+            .unwrap_or(0);
+
+        // Re-key the concurrency complex from ActionOccurrenceId space into
+        // tape-slot-index space.
+        let mut guards = ConcurrencyGuardTable::empty();
+        for nf in &model.concurrency.minimal_nonfaces {
+            let mut members = EventSet::empty();
+            for event_id in nf.members.iter_stable() {
+                let action = ActionOccurrenceId(event_id as u32);
+                let node = *action_to_node
+                    .get(&action)
+                    .ok_or(CompileErrorV2::UnmappedActionInConcurrency(action))?;
+                members.insert(node.0 as usize);
+            }
+            guards.nonfaces.push(CompiledNonFace {
+                members,
+                witness_digest: nf.witness_digest,
+            });
+        }
+
+        Ok(CompiledPowlV2 {
+            tape,
+            guards,
+            node_labels,
+        })
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use crate::model::{ActivityNode, SilentNode};
+        use bcinr_mfw_ir::{
+            ConcurrencyConflictWitness, Digest, ExecutableConcurrencyComplex, FluentId,
+            MinimalNonFace, PrecedenceEdge, ResourceConflictWitness, StrictPartialOrder,
+        };
+        use std::collections::BTreeSet;
+
+        fn activity(id: u64, label: &str, action: u32) -> PowlNode {
+            PowlNode::Activity(ActivityNode {
+                id: PowlNodeId(id),
+                label: label.to_string(),
+                source_action: ActionOccurrenceId(action),
+            })
+        }
+
+        #[test]
+        fn two_node_sequence_wires_pred_succ_and_entry_exit() {
+            let mut order_edges = BTreeSet::new();
+            order_edges.insert(PrecedenceEdge {
+                before: ActionOccurrenceId(0),
+                after: ActionOccurrenceId(1),
+            });
+            let mut provenance = BTreeMap::new();
+            provenance.insert(PowlNodeId(0), ActionOccurrenceId(0));
+            provenance.insert(PowlNodeId(1), ActionOccurrenceId(1));
+
+            let model = PowlModel {
+                nodes: vec![activity(0, "a", 0), activity(1, "b", 1)],
+                order: StrictPartialOrder { edges: order_edges },
+                concurrency: ExecutableConcurrencyComplex {
+                    event_count: 2,
+                    minimal_nonfaces: vec![],
+                    conflict_witnesses: BTreeMap::new(),
+                    digest: Digest::hash(b"empty"),
+                },
+                provenance,
+            };
+
+            let compiled = compile_powl_v2(&model).unwrap();
+            assert_eq!(compiled.tape.len, 2);
+            assert_eq!(compiled.tape.ops[0].succ_mask, 0b10);
+            assert_eq!(compiled.tape.ops[1].pred_mask, 0b01);
+            assert_eq!(compiled.tape.entry_op, 0);
+            assert_eq!(compiled.tape.exit_op, 1);
+            assert_eq!(
+                compiled.tape.label_slab.get(compiled.node_labels[&PowlNodeId(0)]),
+                "a"
+            );
+            assert_eq!(
+                compiled.tape.label_slab.get(compiled.node_labels[&PowlNodeId(1)]),
+                "b"
+            );
+            assert!(compiled.guards.nonfaces.is_empty());
+        }
+
+        #[test]
+        fn silent_node_compiles_with_no_label() {
+            let model = PowlModel {
+                nodes: vec![PowlNode::Silent(SilentNode { id: PowlNodeId(0) })],
+                order: StrictPartialOrder::default(),
+                concurrency: ExecutableConcurrencyComplex {
+                    event_count: 0,
+                    minimal_nonfaces: vec![],
+                    conflict_witnesses: BTreeMap::new(),
+                    digest: Digest::hash(b"empty"),
+                },
+                provenance: BTreeMap::new(),
+            };
+            let compiled = compile_powl_v2(&model).unwrap();
+            assert_eq!(compiled.tape.ops[0].op_kind, V2OpKind::Silent);
+            assert!(compiled.node_labels.is_empty());
+        }
+
+        /// The "A, B, C can't all fire together" fixture, re-keyed into
+        /// tape-slot space and checked with the exact same admit/reject
+        /// assertions as `bcinr_mfw_ir::concurrency`'s own worked-complex
+        /// test — proving the re-keying preserves admission semantics.
+        #[test]
+        fn concurrency_guard_table_mirrors_source_admission_semantics() {
+            let abc = EventSet::empty().with(0).with(1).with(2);
+            let witness = ConcurrencyConflictWitness {
+                causal: None,
+                temporal: None,
+                resource: Some(ResourceConflictWitness {
+                    actions: abc,
+                    resource: FluentId(0),
+                    capacity_milli: 2_000,
+                    demanded_milli: 3_000,
+                }),
+            };
+            let witness_digest = Digest::hash(b"abc-resource-conflict");
+            let mut conflict_witnesses = BTreeMap::new();
+            conflict_witnesses.insert(witness_digest, witness);
+
+            let mut provenance = BTreeMap::new();
+            provenance.insert(PowlNodeId(0), ActionOccurrenceId(0));
+            provenance.insert(PowlNodeId(1), ActionOccurrenceId(1));
+            provenance.insert(PowlNodeId(2), ActionOccurrenceId(2));
+
+            let model = PowlModel {
+                nodes: vec![
+                    activity(0, "a", 0),
+                    activity(1, "b", 1),
+                    activity(2, "c", 2),
+                ],
+                order: StrictPartialOrder::default(),
+                concurrency: ExecutableConcurrencyComplex {
+                    event_count: 3,
+                    minimal_nonfaces: vec![MinimalNonFace {
+                        members: abc,
+                        witness_digest,
+                    }],
+                    conflict_witnesses,
+                    digest: Digest::hash(b"complex"),
+                },
+                provenance,
+            };
+
+            let compiled = compile_powl_v2(&model).unwrap();
+            assert_eq!(compiled.guards.nonfaces.len(), 1);
+
+            let empty = EventSet::empty();
+            let a = EventSet::empty().with(0);
+            let ab = EventSet::empty().with(0).with(1);
+            let bc = EventSet::empty().with(1).with(2);
+            let ac = EventSet::empty().with(0).with(2);
+            for candidate in [empty, a, ab, bc, ac] {
+                assert!(compiled.guards.admits(&candidate));
+            }
+            assert!(!compiled.guards.admits(&abc));
+            let abcd = abc.with(3);
+            assert!(!compiled.guards.admits(&abcd));
+        }
+
+        #[test]
+        fn child_workflow_node_is_refused_not_silently_dropped() {
+            let model = PowlModel {
+                nodes: vec![PowlNode::ChildWorkflow(crate::model::ChildWorkflowNode {
+                    id: PowlNodeId(0),
+                })],
+                order: StrictPartialOrder::default(),
+                concurrency: ExecutableConcurrencyComplex {
+                    event_count: 0,
+                    minimal_nonfaces: vec![],
+                    conflict_witnesses: BTreeMap::new(),
+                    digest: Digest::hash(b"empty"),
+                },
+                provenance: BTreeMap::new(),
+            };
+            assert_eq!(
+                compile_powl_v2(&model).unwrap_err(),
+                CompileErrorV2::UnsupportedNodeKind { id: PowlNodeId(0) }
+            );
+        }
+
+        #[test]
+        fn non_dense_node_ids_are_rejected() {
+            let model = PowlModel {
+                // Two nodes but the second claims PowlNodeId(5), not 1.
+                nodes: vec![activity(0, "a", 0), activity(5, "b", 1)],
+                order: StrictPartialOrder::default(),
+                concurrency: ExecutableConcurrencyComplex {
+                    event_count: 0,
+                    minimal_nonfaces: vec![],
+                    conflict_witnesses: BTreeMap::new(),
+                    digest: Digest::hash(b"empty"),
+                },
+                provenance: BTreeMap::new(),
+            };
+            assert_eq!(
+                compile_powl_v2(&model).unwrap_err(),
+                CompileErrorV2::NodeIdNotDense {
+                    position: 1,
+                    found: PowlNodeId(5)
+                }
+            );
+        }
+
+        #[test]
+        fn more_than_64_nodes_is_tape_full() {
+            let nodes: Vec<PowlNode> = (0..65)
+                .map(|i| activity(i, "x", i as u32))
+                .collect();
+            let model = PowlModel {
+                nodes,
+                order: StrictPartialOrder::default(),
+                concurrency: ExecutableConcurrencyComplex {
+                    event_count: 0,
+                    minimal_nonfaces: vec![],
+                    conflict_witnesses: BTreeMap::new(),
+                    digest: Digest::hash(b"empty"),
+                },
+                provenance: BTreeMap::new(),
+            };
+            assert_eq!(compile_powl_v2(&model).unwrap_err(), CompileErrorV2::TapeFull);
+        }
+
+        /// End-to-end: project a real `CausalPlan` +
+        /// `ExecutableConcurrencyComplex` via `PowlProjector`, then compile
+        /// the resulting `PowlModel` -- proving the two new layers compose.
+        #[test]
+        fn compiles_a_real_projector_output_end_to_end() {
+            use bcinr_mfw_ir::{
+                ActionOccurrence, IndependenceRelation, PlanningEpochId,
+                PowlProjector as PowlProjectorTrait,
+            };
+
+            let occurrences = vec![
+                ActionOccurrence {
+                    id: ActionOccurrenceId(0),
+                    action: 10,
+                },
+                ActionOccurrence {
+                    id: ActionOccurrenceId(1),
+                    action: 11,
+                },
+                ActionOccurrence {
+                    id: ActionOccurrenceId(2),
+                    action: 12,
+                },
+            ];
+            let mut edges = BTreeSet::new();
+            edges.insert(PrecedenceEdge {
+                before: ActionOccurrenceId(0),
+                after: ActionOccurrenceId(2),
+            });
+            let causal = bcinr_mfw_ir::CausalPlan {
+                epoch: PlanningEpochId(1),
+                occurrences,
+                precedes: StrictPartialOrder { edges },
+                independence: IndependenceRelation::default(),
+                support_edges: BTreeSet::new(),
+                digest: Digest::hash(b"e2e-causal"),
+            };
+            let abc = EventSet::empty().with(0).with(1).with(2);
+            let witness = ConcurrencyConflictWitness {
+                causal: None,
+                temporal: None,
+                resource: Some(ResourceConflictWitness {
+                    actions: abc,
+                    resource: FluentId(0),
+                    capacity_milli: 2_000,
+                    demanded_milli: 3_000,
+                }),
+            };
+            let witness_digest = Digest::hash(b"e2e-conflict");
+            let mut conflict_witnesses = BTreeMap::new();
+            conflict_witnesses.insert(witness_digest, witness);
+            let concurrency = ExecutableConcurrencyComplex {
+                event_count: 3,
+                minimal_nonfaces: vec![MinimalNonFace {
+                    members: abc,
+                    witness_digest,
+                }],
+                conflict_witnesses,
+                digest: Digest::hash(b"e2e-complex"),
+            };
+
+            let projector = crate::projection::PowlProjector;
+            let (model, _witness) = projector.project(&causal, &concurrency).unwrap();
+            let compiled = compile_powl_v2(&model).unwrap();
+
+            assert_eq!(compiled.tape.len, 3);
+            assert_eq!(compiled.guards.nonfaces.len(), 1);
+            assert!(!compiled.guards.admits(&abc));
+            assert_eq!(compiled.tape.ops[0].succ_mask, 1 << 2);
+            assert_eq!(compiled.tape.ops[2].pred_mask, 1);
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

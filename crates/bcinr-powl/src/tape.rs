@@ -102,7 +102,15 @@ impl Default for PowlTape {
 /// POWL v2 op tape implementation.
 ///
 /// All new types (`Powl64OpV2`, `PowlTapeV2`, `PowlTapeLarge`, `LabelSlab`)
-/// live here.  They are `no_std`-compatible (only `core` imports).
+/// live here.  They are `no_std`-compatible (only `core` imports) — **with
+/// one exception**: [`CompiledNonFace`] and [`ConcurrencyGuardTable`] pull
+/// in `bcinr_mfw_ir::{EventSet, Digest}`, and `bcinr-mfw-ir` itself uses
+/// `std::collections::{BTreeMap, BTreeSet}` (see its `causal.rs`/
+/// `concurrency.rs`), so those two types are not `no_std`-compatible. They
+/// are grouped with the rest of v2 anyway because they are conceptually
+/// part of the same compiled-tape output (the guard table that gates
+/// concurrent firing of the ops right above them), not because they share
+/// the `no_std` property.
 pub mod v2 {
     use core::mem;
     use core::str;
@@ -230,6 +238,7 @@ pub mod v2 {
     /// the length prefix; [`get`][LabelSlab::get] reconstructs a `&str`.
     ///
     /// Total capacity: 1024 bytes of raw storage.
+    #[derive(Debug)]
     pub struct LabelSlab {
         /// Raw packed storage: `[u16-len-le][utf8-bytes]...`
         pub data: [u8; 1024],
@@ -318,6 +327,7 @@ pub mod v2 {
     ///
     /// A single `u64` bitmask is sufficient to represent the full ready-set,
     /// making all scheduling decisions branchless integer operations.
+    #[derive(Debug)]
     pub struct PowlTape {
         /// The flat op array.  Valid entries are `ops[0..len]`.
         pub ops: [Powl64Op; 64],
@@ -429,6 +439,68 @@ pub mod v2 {
     impl Default for PowlTapeLarge {
         fn default() -> Self {
             Self::new()
+        }
+    }
+
+    // =========================================================================
+    // ConcurrencyGuardTable — compiled minimal-nonface admission gate
+    // =========================================================================
+
+    /// A compiled minimal nonface, ready to be checked against a candidate
+    /// ready-set at scheduling time.
+    ///
+    /// `members` is expressed in **tape-slot-index space** (i.e. the same
+    /// numbering as `Powl64Op` array indices / `PowlNodeId` numeric
+    /// values), *not* `ActionOccurrenceId` space — the re-keying from the
+    /// source `ExecutableConcurrencyComplex` (which stays
+    /// `ActionOccurrenceId`-keyed all the way through
+    /// [`crate::model::PowlModel::concurrency`]) into this tape-slot space
+    /// happens once, at compile time, in
+    /// [`crate::compiler::v2::compile_powl_v2`] — see that function's doc
+    /// comment for why that is the right layer to do it in.
+    ///
+    /// `witness_digest` points at the full conflict witness in the source
+    /// `ExecutableConcurrencyComplex::conflict_witnesses` side table (the
+    /// digest itself is carried through unchanged by the re-keying step;
+    /// only `members`'s *interpretation* changes).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct CompiledNonFace {
+        pub members: bcinr_mfw_ir::EventSet,
+        pub witness_digest: bcinr_mfw_ir::Digest,
+    }
+
+    /// A compiled concurrency-guard table: the minimal nonfaces a candidate
+    /// ready-set must avoid (as a subset) to be admissible for simultaneous
+    /// firing this tick.
+    ///
+    /// An empty table (`nonfaces.is_empty()`) admits every candidate —
+    /// this is the default used when no `ExecutableConcurrencyComplex` was
+    /// supplied at compile time, preserving the pre-concurrency-guard
+    /// scheduler behavior exactly (see [`crate::scheduler`]).
+    #[derive(Debug, Clone, Default)]
+    pub struct ConcurrencyGuardTable {
+        pub nonfaces: Vec<CompiledNonFace>,
+    }
+
+    impl ConcurrencyGuardTable {
+        /// A guard table with no recorded nonfaces — admits everything.
+        pub fn empty() -> Self {
+            Self {
+                nonfaces: Vec::new(),
+            }
+        }
+
+        /// True iff `candidate` contains none of `self.nonfaces` as a
+        /// subset — mirrors
+        /// [`bcinr_mfw_ir::ExecutableConcurrencyComplex::admits`] exactly
+        /// (same "structurally well-formed, not proven executable-
+        /// concurrent" caveat applies — see that type's doc comment and
+        /// `LAW_MINIMAL_NONFACE_REPRESENTATION`).
+        pub fn admits(&self, candidate: &bcinr_mfw_ir::EventSet) -> bool {
+            !self
+                .nonfaces
+                .iter()
+                .any(|nf| nf.members.is_subset_of(candidate))
         }
     }
 
