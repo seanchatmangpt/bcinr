@@ -304,6 +304,7 @@ name = "bcinr-powl-receipt"
 version = "26.6.24"
 dependencies = [
  "bcinr-logic",
+ "bcinr-mfw-ir",
  "bcinr-powl",
  "blake3",
  "criterion",
