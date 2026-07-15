@@ -21,6 +21,8 @@
 pub mod alloc_counter;
 pub mod capability;
 pub mod capability_router;
+pub mod causal;
+pub mod concurrency;
 pub mod consequence;
 pub mod dfcm_crown;
 pub mod error;
@@ -36,6 +38,8 @@ pub use capability::{
     admit_planning_task, AdmittedPlanningTask, CapabilityProfile, DefaultCapabilityProfile,
     GroundedPlanningEpoch, PddlFeature, SemanticSupport, ALL_PDDL_FEATURES,
 };
+pub use causal::{CausalAnalysisError, PddlCausalAnalyzer};
+pub use concurrency::{ConcurrencyAnalysisError, PddlConcurrencyAnalyzer};
 pub use consequence::{
     plan_with_standing_cache, ConsequenceHorizon, ExactStateKey, GoalReachabilityHorizon,
     MakespanObservation, MinimumMakespanHorizon, PlanningResult, ResidualDecision,
