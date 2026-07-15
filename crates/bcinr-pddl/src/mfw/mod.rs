@@ -23,6 +23,25 @@
 //! linearly combine the six dimensions at all — a later phase is free to
 //! replace `project`'s body without touching any formal claim, because there
 //! isn't one to preserve.
+//!
+//! # `planner` submodule — feature-gated, not part of the default build
+//!
+//! [`planner`] (only compiled with the `mfw-planner` Cargo feature) is the
+//! top-level `MfwPlanner` orchestrator wiring this crate's `consequence`/
+//! `mfw`/`search`/`causal`/`concurrency` modules together with `bcinr-powl`'s
+//! `PowlProjector` and `bcinr-powl-receipt`'s receipt sealing. It is
+//! feature-gated, not unconditionally compiled, because this crate's own
+//! `Cargo.toml` states a deliberate boundary predating this integration
+//! phase: "No path deps on bcinr-powl ... PDDL must not bleed into every
+//! consumer. Opt-in only via this crate." Adding `bcinr-powl`/
+//! `bcinr-powl-receipt` as unconditional dependencies would silently widen
+//! every existing consumer's (including `praxis`'s) transitive dependency
+//! graph. `mfw-planner` is off by default; enable it with `--features
+//! mfw-planner` (or `cargo test -p bcinr-pddl --features mfw-planner`) to
+//! build/exercise the orchestrator.
+
+#[cfg(feature = "mfw-planner")]
+pub mod planner;
 
 use std::collections::BTreeMap;
 
