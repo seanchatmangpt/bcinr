@@ -30,9 +30,11 @@
 //! [`StableMaximalSelector`], selection always chooses the *entire* ready
 //! set (every candidate is trivially admitted by an empty guard table), so
 //! `scheduler_tick_guarded` provably degenerates to calling
-//! `scheduler_tick` — see
-//! `scheduler_tick_guarded_matches_scheduler_tick_with_empty_guards` below,
-//! which checks this tick-by-tick rather than asserting it.
+//! `scheduler_tick` — see this module's own
+//! `tests::concurrency_gated::empty_guards_matches_plain_tick_for_linear_chain`
+//! / `_for_parallel_ops` / `_for_xor_choice` / `_for_bounded_loop` below,
+//! which check this tick-by-tick (across four distinct tape shapes) rather
+//! than asserting it once.
 
 use crate::tape::v2::ConcurrencyGuardTable;
 use crate::tape::{OpKind, Powl64Op, PowlTape};
