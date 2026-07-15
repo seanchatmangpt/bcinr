@@ -374,7 +374,7 @@ pub fn scheduler_tick_guarded<S: ConcurrencySelector>(
         let effective_pred = (join_effective & is_join) | (op.pred_mask & !is_join);
 
         let sat = pred_satisfied(new_done, effective_pred);
-        let sat_bit = (sat & 1) as u64;
+        let sat_bit = sat & 1;
         let selected_bit = (selected_mask >> i) & 1;
         let fire_mask = u64::wrapping_sub(0, sat_bit & selected_bit) & bit;
 
