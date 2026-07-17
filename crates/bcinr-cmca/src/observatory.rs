@@ -214,3 +214,140 @@ pub fn evaluate_calibration(
     
     wrap_observatory_result(flag)
 }
+
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct SupportStanding {
+    pub is_supported: bool,
+    pub smoothing_applied: bool,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum ModeDelta {
+    Retain,
+    ProposeDelta,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct MeasurementArtifact {
+    pub point_estimate: NonNegativeFixed,
+    pub lower_bound: NonNegativeFixed,
+    pub upper_bound: NonNegativeFixed,
+    pub support_standing: SupportStanding,
+    pub effective_sample_size: NonNegativeFixed,
+    pub dependence_standing: u32,
+    pub numeric_error: NonNegativeFixed,
+    pub drift: NonNegativeFixed,
+    pub gram_lower_bound: NonNegativeFixed,
+    pub graph_digest: u64,
+    pub control_mode_digest: u64,
+    pub proposal: ModeDelta,
+}
+
+use crate::{unroll_8_static, unroll_4_static};
+use crate::generated::case_studies::{N, K, Q};
+use crate::allocator::const_max_i32;
+
+/// Measures the divergence metric $\kappa_v$ and produces a MeasurementArtifact branchlessly.
+#[inline(never)]
+pub fn measure_kappa(
+    v: usize,
+    _q_idx: usize,
+    k: usize,
+    parent: &[i32; N],
+    _is_leaf: &[bool; N],
+    is_subtree_leaf_v: &[bool; N],
+    is_subtree_leaf: &[[bool; N]; N],
+    node_masses: &[[NonNegativeFixed; N]; K],
+    q_val: SignedFixed,
+) -> MeasurementArtifact {
+    let k_masked = k & 3;
+    
+    let mut x = [0i32; N];
+    unroll_8_static!(i, {
+        let mut log_m = 0u32;
+        unroll_4_static!(k_idx, {
+            let matches = const_eq_u32(k_masked as u32, k_idx as u32);
+            log_m = const_select_u32(matches, node_masses[k_idx & 3][i & 7].log2().0 as u32, log_m);
+        });
+        let q_signed = q_val.0 as i32;
+        x[i & 7] = (((q_signed as i64).wrapping_mul(log_m as i32 as i64)) >> 16) as i32;
+    });
+    
+    let mut x_max_meas = i32::MIN;
+    unroll_8_static!(j, {
+        let is_child = const_eq_u32(parent[j & 7] as u32, v as u32);
+        let x_safe = const_select_u32(is_child, x[j & 7] as u32, i32::MIN as u32) as i32;
+        x_max_meas = const_max_i32(x_max_meas, x_safe);
+    });
+    
+    let mut sum_exp_meas = NonNegativeFixed::ZERO;
+    unroll_8_static!(j, {
+        let is_child = const_eq_u32(parent[j & 7] as u32, v as u32);
+        let a_prime = x[j & 7].wrapping_sub(x_max_meas);
+        let exp_val = SignedFixed(a_prime).exp2();
+        sum_exp_meas += NonNegativeFixed(const_select_u32(is_child, exp_val.0, 0));
+    });
+    let l_meas = x_max_meas.wrapping_add(sum_exp_meas.log2().0 as i32);
+
+    let mut x_max_leaf = i32::MIN;
+    unroll_8_static!(x_idx, {
+        let is_sub = is_subtree_leaf_v[x_idx & 7];
+        let x_safe = const_select_u32(is_sub as u32, x[x_idx & 7] as u32, i32::MIN as u32) as i32;
+        x_max_leaf = const_max_i32(x_max_leaf, x_safe);
+    });
+    
+    let mut sum_exp_leaf = NonNegativeFixed::ZERO;
+    unroll_8_static!(x_idx, {
+        let is_sub = is_subtree_leaf_v[x_idx & 7];
+        let a_prime = x[x_idx & 7].wrapping_sub(x_max_leaf);
+        let exp_val = SignedFixed(a_prime).exp2();
+        sum_exp_leaf += NonNegativeFixed(const_select_u32(is_sub as u32, exp_val.0, 0));
+    });
+    let l_leaf = x_max_leaf.wrapping_add(sum_exp_leaf.log2().0 as i32);
+
+    let mut kappa = NonNegativeFixed::ZERO;
+    unroll_8_static!(c, {
+        let is_child = const_eq_u32(parent[c & 7] as u32, v as u32);
+        
+        let mut x_max_c = i32::MIN;
+        unroll_8_static!(x_idx, {
+            let is_sub_c = is_subtree_leaf[c & 7][x_idx & 7];
+            let x_safe = const_select_u32(is_sub_c as u32, x[x_idx & 7] as u32, i32::MIN as u32) as i32;
+            x_max_c = const_max_i32(x_max_c, x_safe);
+        });
+        
+        let mut sum_exp_c = NonNegativeFixed::ZERO;
+        unroll_8_static!(x_idx, {
+            let is_sub_c = is_subtree_leaf[c & 7][x_idx & 7];
+            let a_prime = x[x_idx & 7].wrapping_sub(x_max_c);
+            let exp_val = SignedFixed(a_prime).exp2();
+            sum_exp_c += NonNegativeFixed(const_select_u32(is_sub_c as u32, exp_val.0, 0));
+        });
+        let l_c = x_max_c.wrapping_add(sum_exp_c.log2().0 as i32);
+        
+        let log_ratio = l_c.wrapping_sub(l_meas);
+        let s_leaf_c = NonNegativeFixed(SignedFixed(l_c.wrapping_sub(l_leaf)).exp2().0);
+        
+        let term = s_leaf_c.0 as u64 * log_ratio as u64;
+        kappa += NonNegativeFixed(const_select_u32(is_child, (term >> 16) as u32, 0));
+    });
+    
+    MeasurementArtifact {
+        point_estimate: kappa,
+        lower_bound: kappa,
+        upper_bound: kappa,
+        support_standing: SupportStanding {
+            is_supported: true,
+            smoothing_applied: false,
+        },
+        effective_sample_size: NonNegativeFixed::ONE,
+        dependence_standing: 0,
+        numeric_error: NonNegativeFixed::ZERO,
+        drift: NonNegativeFixed::ZERO,
+        gram_lower_bound: NonNegativeFixed::ZERO,
+        graph_digest: 0,
+        control_mode_digest: 0,
+        proposal: ModeDelta::Retain,
+    }
+}

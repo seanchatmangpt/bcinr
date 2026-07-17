@@ -85,6 +85,7 @@
 
 #![allow(non_upper_case_globals, unused_assignments, unused_mut, dead_code)]
 
+#[macro_export]
 macro_rules! unroll_8_static {
     ($var:ident, $body:expr) => {
         {
@@ -100,6 +101,7 @@ macro_rules! unroll_8_static {
     };
 }
 
+#[macro_export]
 macro_rules! unroll_9_static {
     ($var:ident, $body:expr) => {
         {
@@ -116,6 +118,7 @@ macro_rules! unroll_9_static {
     };
 }
 
+#[macro_export]
 macro_rules! unroll_4_static {
     ($var:ident, $body:expr) => {
         {
@@ -127,6 +130,7 @@ macro_rules! unroll_4_static {
     };
 }
 
+#[macro_export]
 macro_rules! unroll_32_static {
     ($var:ident, $body:expr) => {
         {
@@ -450,7 +454,7 @@ pub fn const_select_bool(condition: u32, a: bool, b: bool) -> bool {
 /// # Complexity
 /// $O(1)$ constant time, branchless.
 #[inline(always)]
-fn const_max_i32(a: i32, b: i32) -> i32 {
+pub(crate) fn const_max_i32(a: i32, b: i32) -> i32 {
     let diff_64 = (a as i64).wrapping_sub(b as i64);
     let is_lt = (diff_64 >> 63) & 1;
     const_select_u32(is_lt as u32, b as u32, a as u32) as i32
@@ -616,104 +620,6 @@ pub(crate) fn clip(val: NonNegativeFixed, min_val: NonNegativeFixed, max_val: No
     let val_or_min = const_select_u32(lt_min, min_val.0, val.0);
     let gt_max = const_lt_u32(max_val.0, val_or_min);
     NonNegativeFixed(const_select_u32(gt_max, max_val.0, val_or_min))
-}
-
-/// Computes the divergence metric $\kappa_v$ for a subtree at node `v` under policy `k`.
-///
-/// $\kappa_v$ measures the Kullback-Leibler (KL) divergence between direct child allocations
-/// and subtree leaf distributions.
-///
-/// # Complexity
-/// $O(N^2)$ operations, which is $O(1)$ since $N=8$.
-#[inline(never)]
-pub(crate) fn compute_kappa(
-    v: usize,
-    _q_idx: usize,
-    k: usize,
-    parent: &[i32; N],
-    _is_leaf: &[bool; N],
-    is_subtree_leaf_v: &[bool; N],
-    is_subtree_leaf: &[[bool; N]; N],
-    node_masses: &[[NonNegativeFixed; N]; K],
-    q_val: SignedFixed,
-) -> NonNegativeFixed {
-    let k_masked = k & 3;
-    
-    let mut x = [0i32; N];
-    unroll_8_static!(i, {
-        let mut log_m = 0u32;
-        unroll_4_static!(k_idx, {
-            let matches = const_eq_u32(k_masked as u32, k_idx as u32);
-            log_m = const_select_u32(matches, node_masses[k_idx & 3][i & 7].log2().0 as u32, log_m);
-        });
-        let q_signed = q_val.0 as i32;
-        x[i & 7] = (((q_signed as i64).wrapping_mul(log_m as i32 as i64)) >> 16) as i32;
-    });
-    
-    let mut x_max_meas = i32::MIN;
-    unroll_8_static!(j, {
-        let is_child = const_eq_u32(parent[j & 7] as u32, v as u32);
-        let x_safe = const_select_u32(is_child, x[j & 7] as u32, i32::MIN as u32) as i32;
-        x_max_meas = const_max_i32(x_max_meas, x_safe);
-    });
-    
-    let mut sum_exp_meas = NonNegativeFixed::ZERO;
-    unroll_8_static!(j, {
-        let is_child = const_eq_u32(parent[j & 7] as u32, v as u32);
-        let a_prime = x[j & 7].wrapping_sub(x_max_meas);
-        let exp_val = SignedFixed(a_prime).exp2();
-        sum_exp_meas += NonNegativeFixed(const_select_u32(is_child, exp_val.0, 0));
-    });
-    let l_meas = x_max_meas.wrapping_add(sum_exp_meas.log2().0 as i32);
-
-    let mut x_max_leaf = i32::MIN;
-    unroll_8_static!(x_idx, {
-        let is_sub = is_subtree_leaf_v[x_idx & 7];
-        let x_safe = const_select_u32(is_sub as u32, x[x_idx & 7] as u32, i32::MIN as u32) as i32;
-        x_max_leaf = const_max_i32(x_max_leaf, x_safe);
-    });
-    
-    let mut sum_exp_leaf = NonNegativeFixed::ZERO;
-    unroll_8_static!(x_idx, {
-        let is_sub = is_subtree_leaf_v[x_idx & 7];
-        let a_prime = x[x_idx & 7].wrapping_sub(x_max_leaf);
-        let exp_val = SignedFixed(a_prime).exp2();
-        sum_exp_leaf += NonNegativeFixed(const_select_u32(is_sub as u32, exp_val.0, 0));
-    });
-    let l_leaf = x_max_leaf.wrapping_add(sum_exp_leaf.log2().0 as i32);
-
-    let mut kappa = NonNegativeFixed::ZERO;
-    unroll_8_static!(c, {
-        let is_child = const_eq_u32(parent[c & 7] as u32, v as u32);
-        
-        let mut x_max_c = i32::MIN;
-        unroll_8_static!(x_idx, {
-            let is_sub_c = is_subtree_leaf[c & 7][x_idx & 7];
-            let x_safe = const_select_u32(is_sub_c as u32, x[x_idx & 7] as u32, i32::MIN as u32) as i32;
-            x_max_c = const_max_i32(x_max_c, x_safe);
-        });
-        
-        let mut sum_exp_c = NonNegativeFixed::ZERO;
-        unroll_8_static!(x_idx, {
-            let is_sub_c = is_subtree_leaf[c & 7][x_idx & 7];
-            let a_prime = x[x_idx & 7].wrapping_sub(x_max_c);
-            let exp_val = SignedFixed(a_prime).exp2();
-            sum_exp_c += NonNegativeFixed(const_select_u32(is_sub_c as u32, exp_val.0, 0));
-        });
-        let y_c = x_max_c.wrapping_add(sum_exp_c.log2().0 as i32);
-        
-        let log_s_leaf = y_c.wrapping_sub(l_leaf);
-        let log_s_meas = x[c & 7].wrapping_sub(l_meas);
-        let log_diff = log_s_leaf.wrapping_sub(log_s_meas);
-        
-        let s_leaf_val = SignedFixed(log_s_leaf).exp2();
-        let term = s_leaf_val * NonNegativeFixed(log_diff as u32);
-        let term_safe = NonNegativeFixed(const_select_u32(const_eq_u32(s_leaf_val.0, 0), 0, term.0));
-        
-        kappa += NonNegativeFixed(const_select_u32(is_child, term_safe.0, 0));
-    });
-    
-    kappa
 }
 
 /// Performs a single straight-line flow propagation step down the node forest.
@@ -963,7 +869,7 @@ pub fn allocate(
     weights: &mut [[NonNegativeFixed; 2 * Q]; N],
     payoffs: &[[NonNegativeFixed; 2 * Q]; N],
     zeta: NonNegativeFixed,
-    epsilon_kappa: NonNegativeFixed,
+    _epsilon_kappa: NonNegativeFixed,
     mu: &[NonNegativeFixed; N],
     costs: &[NonNegativeFixed; N],
     t: u32,
@@ -1200,26 +1106,14 @@ pub fn allocate(
         });
 
         unroll_4_static!(q_idx, {
-            let mut q_val_mutated = SignedFixed(lenses[q_idx & 3].q.0 as i32);
+            let mut _q_val_mutated = SignedFixed(lenses[q_idx & 3].q.0 as i32);
             #[cfg(feature = "mutant_2")]
             {
-                q_val_mutated = SignedFixed(0i32.wrapping_sub(q_val_mutated.0));
+                _q_val_mutated = SignedFixed(0i32.wrapping_sub(_q_val_mutated.0));
             }
-            let kappa = compute_kappa(
-                v,
-                q_idx,
-                0,
-                parent,
-                &is_leaf,
-                &is_subtree_leaf_v,
-                &is_subtree_leaf,
-                &node_masses,
-                q_val_mutated,
-            );
-            let update_active = const_lt_u32(epsilon_kappa.0, kappa.0);
             let w_flat = local_weights[v & 7][(2 * q_idx) & 7];
             let w_desc = local_weights[v & 7][(2 * q_idx + 1) & 7];
-            let is_updating = has_children & (update_active != 0) & update_allowed;
+            let is_updating = has_children & update_allowed;
             local_weights[v & 7][(2 * q_idx) & 7] = NonNegativeFixed(const_select_u32(is_updating as u32, (w_flat * SignedFixed((beta * payoffs[v & 7][(2 * q_idx) & 7]).0 as i32).exp()).0, w_flat.0));
             local_weights[v & 7][(2 * q_idx + 1) & 7] = NonNegativeFixed(const_select_u32(is_updating as u32, (w_desc * SignedFixed((beta * payoffs[v & 7][(2 * q_idx + 1) & 7]).0 as i32).exp()).0, w_desc.0));
         });
