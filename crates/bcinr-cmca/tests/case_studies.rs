@@ -16,14 +16,14 @@ use bcinr_cmca::generated::case_studies::{
 };
 
 fn get_proof() -> Option<AdaptiveUpdate<CertifiedLearning>> {
-    AdaptiveUpdate::new(
-        AdmittedControlState::new(0),
-        CertificateReceipt::new(0),
-        EnvelopeReceipt::new(0),
-        OutcomeReceipt::new(0),
+    AdaptiveUpdate::admit_adaptive_update(
+        AdmittedControlState::admit_control_state(0),
+        CertificateReceipt::admit_certificate(0),
+        EnvelopeReceipt::admit_envelope(0),
+        OutcomeReceipt::admit_outcome(0),
         NonNegativeFixed::ZERO,
         NonNegativeFixed::ONE,
-        CertifiedLearning::new(),
+        CertifiedLearning::admit_learning(),
     )
 }
 use bcinr_cmca::generated::generalization as gen;
@@ -317,38 +317,38 @@ fn test_stability_refusals_and_graceful_fallback() {
 #[test]
 fn test_typestate_bounds_checks() {
     // 1. Safe boundary: temperature = 5.0 (327680), distinguishability = 0.001 (65)
-    let p_ok = AdaptiveUpdate::new(
-        AdmittedControlState::new(0),
-        CertificateReceipt::new(0),
-        EnvelopeReceipt::new(0),
-        OutcomeReceipt::new(0),
+    let p_ok = AdaptiveUpdate::admit_adaptive_update(
+        AdmittedControlState::admit_control_state(0),
+        CertificateReceipt::admit_certificate(0),
+        EnvelopeReceipt::admit_envelope(0),
+        OutcomeReceipt::admit_outcome(0),
         NonNegativeFixed(327680),
         NonNegativeFixed(65),
-        CertifiedLearning::new(),
+        CertifiedLearning::admit_learning(),
     );
     assert!(p_ok.is_some());
 
     // 2. Temp too high: temperature = 5.0 + eps (327681), distinguishability = 0.001 (65)
-    let p_temp_high = AdaptiveUpdate::new(
-        AdmittedControlState::new(0),
-        CertificateReceipt::new(0),
-        EnvelopeReceipt::new(0),
-        OutcomeReceipt::new(0),
+    let p_temp_high = AdaptiveUpdate::admit_adaptive_update(
+        AdmittedControlState::admit_control_state(0),
+        CertificateReceipt::admit_certificate(0),
+        EnvelopeReceipt::admit_envelope(0),
+        OutcomeReceipt::admit_outcome(0),
         NonNegativeFixed(327681),
         NonNegativeFixed(65),
-        CertifiedLearning::new(),
+        CertifiedLearning::admit_learning(),
     );
     assert!(p_temp_high.is_none());
 
     // 3. Distinguishability too low: temperature = 5.0 (327680), distinguishability = 64
-    let p_dist_low = AdaptiveUpdate::new(
-        AdmittedControlState::new(0),
-        CertificateReceipt::new(0),
-        EnvelopeReceipt::new(0),
-        OutcomeReceipt::new(0),
+    let p_dist_low = AdaptiveUpdate::admit_adaptive_update(
+        AdmittedControlState::admit_control_state(0),
+        CertificateReceipt::admit_certificate(0),
+        EnvelopeReceipt::admit_envelope(0),
+        OutcomeReceipt::admit_outcome(0),
         NonNegativeFixed(327680),
         NonNegativeFixed(64),
-        CertifiedLearning::new(),
+        CertifiedLearning::admit_learning(),
     );
     assert!(p_dist_low.is_none());
 }

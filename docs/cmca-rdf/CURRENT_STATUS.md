@@ -6,7 +6,7 @@ This report certifies the successful final integration and verification of the *
 
 All core mathematical components, tree-allocation flows, and online learning algorithms have been implemented under the strict constraints of the **Radon Law ($CC=1$)** and the **Zero-Allocation Boundary**. Timing side-channels and branching hazards are eliminated in the hot-path, replacing data-dependent branches with branchless conditional selection logic at the instruction level.
 
-The implementation scores **100/100** on the **Substrate Integrity Score (SIS)** matrix, with all 19 unit and integration tests passing successfully, and a clean verification from the repository's cheat scanner.
+The implementation scores **100/100** on the **Substrate Integrity Score (SIS)** matrix, with all 19 unit and integration tests passing successfully, and a clean verification from the repository's cheat scanner. Furthermore, **C4 (RDF Semantic Provenance)** is fully active, with all metric layouts automatically derived into a statically generated ledger directly from the root RDF ontology.
 
 ---
 
@@ -101,20 +101,20 @@ The `bcinr-contract-gate` tool enforces the Radon Law across all target director
 The interchangeable decision surface maps semantic factors to resource allocations across an arbitrary tree structure.
 
 ### A. Semantic State Schema
-Each node in the resource tree maintains a `PackedSemanticState` consisting of an identifier and a packed representation of $F=10$ semantic factors, scaled to Q16.16 fixed-point format:
+Each node in the resource tree maintains a `PackedSemanticState` consisting of an identifier and a packed representation of $F$ semantic factors, scaled to Q16.16 fixed-point format. These factors are no longer hardcoded; instead, they are dynamically discovered from the RDF ontology (`cmca-rdf.ttl`) and sorted lexicographically for deterministic generation:
 
-| Factor | Name | Description |
-| :--- | :--- | :--- |
-| **$F_0$** | `recomputationCost` | The computational effort required to reconstruct the node's state. |
-| **$F_1$** | `verificationCost` | The cost of verifying the validity of the node's data. |
-| **$F_2$** | `standing` | The reliability and historical accuracy rating of the node. |
-| **$F_3$** | `validity` | The temporal expiration or current validation status. |
-| **$F_4$** | `accessFrequency` | Historical frequency of read/write requests. |
-| **$F_5$** | `searchDemand` | Volume of query hits looking for this node. |
-| **$F_6$** | `retrievalDemand` | Volume of actual payload transfers for this node. |
-| **$F_7$** | `schedulingDemand` | Wait-time sensitivity or priority requests. |
-| **$F_8$** | `businessValue` | Subjective financial or utility weight. |
-| **$F_9$** | `downstreamConsequence` | Impact or penalty if this node becomes unavailable. |
+- `FACTOR_ACCESS_FREQUENCY`
+- `FACTOR_BUSINESS_VALUE`
+- `FACTOR_DOWNSTREAM_CONSEQUENCE` (computationally derived)
+- `FACTOR_RECOMPUTATION_COST`
+- `FACTOR_RETRIEVAL_DEMAND`
+- `FACTOR_SCHEDULING_DEMAND`
+- `FACTOR_SEARCH_DEMAND`
+- `FACTOR_STANDING`
+- `FACTOR_VALIDITY`
+- `FACTOR_VERIFICATION_COST`
+
+All allocation bounds and measures utilize these static generated constants to read from the packed state without arbitrary, hardcoded array indices, guaranteeing strict provenance mapping directly from semantic ontology definitions.
 
 ### B. Packed State Generation
 Input floats are packed into `PackedSemanticState` structures using branchless rounding and conversion logic:

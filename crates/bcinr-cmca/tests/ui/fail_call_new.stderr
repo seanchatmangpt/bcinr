@@ -1,0 +1,10 @@
+error[E0624]: associated function `new` is private
+ --> tests/ui/fail_call_new.rs:3:32
+  |
+3 |     let _ = CertifiedLearning::new();
+  |                                ^^^ private associated function
+  |
+ ::: src/allocator.rs
+  |
+  |     pub(crate) const fn new() -> Self {
+  |     --------------------------------- private associated function defined here

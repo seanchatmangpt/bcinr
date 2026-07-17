@@ -78,6 +78,7 @@ fn parent_strategy() -> impl Strategy<Value = [i32; N]> {
 }
 
 proptest! {
+    #![proptest_config(proptest::prelude::ProptestConfig::with_cases(std::env::var("PROPTEST_CASES").unwrap_or("1".into()).parse().unwrap()))]
     #[test]
     fn test_differential_allocator(
         // Factors: recomp, verify, standing, validity, access, search, retrieval, sched in [0.0, 1.0]

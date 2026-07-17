@@ -20,7 +20,7 @@
 //!
 //! All checks are combined into a branchless selection tree, guaranteeing $CC=1$.
 
-use crate::fixed::{NonNegativeFixed, SignedFixed, CanonicalMask};
+use crate::fixed::{NonNegativeFixed, SignedFixed};
 use crate::allocator::{const_lt_u32, const_select_u32, const_eq_u32};
 
 /// Telemetry safety and calibration indicators for the runtime observatory.
@@ -245,7 +245,7 @@ pub struct MeasurementArtifact {
 }
 
 use crate::{unroll_8_static, unroll_4_static};
-use crate::generated::case_studies::{N, K, Q};
+use crate::generated::case_studies::{N, K};
 use crate::allocator::const_max_i32;
 
 /// Measures the divergence metric $\kappa_v$ and produces a MeasurementArtifact branchlessly.
@@ -266,41 +266,41 @@ pub fn measure_kappa(
     let mut x = [0i32; N];
     unroll_8_static!(i, {
         let mut log_m = 0u32;
-        unroll_4_static!(k_idx, {
-            let matches = const_eq_u32(k_masked as u32, k_idx as u32);
-            log_m = const_select_u32(matches, node_masses[k_idx & 3][i & 7].log2().0 as u32, log_m);
+        unroll_4_static!(K_IDX, {
+            let matches = const_eq_u32(k_masked as u32, K_IDX as u32);
+            log_m = const_select_u32(matches, node_masses[K_IDX & 3][i & 7].log2().0 as u32, log_m);
         });
         let q_signed = q_val.0 as i32;
         x[i & 7] = (((q_signed as i64).wrapping_mul(log_m as i32 as i64)) >> 16) as i32;
     });
     
     let mut x_max_meas = i32::MIN;
-    unroll_8_static!(j, {
-        let is_child = const_eq_u32(parent[j & 7] as u32, v as u32);
-        let x_safe = const_select_u32(is_child, x[j & 7] as u32, i32::MIN as u32) as i32;
+    unroll_8_static!(J, {
+        let is_child = const_eq_u32(parent[J & 7] as u32, v as u32);
+        let x_safe = const_select_u32(is_child, x[J & 7] as u32, i32::MIN as u32) as i32;
         x_max_meas = const_max_i32(x_max_meas, x_safe);
     });
     
     let mut sum_exp_meas = NonNegativeFixed::ZERO;
-    unroll_8_static!(j, {
-        let is_child = const_eq_u32(parent[j & 7] as u32, v as u32);
-        let a_prime = x[j & 7].wrapping_sub(x_max_meas);
+    unroll_8_static!(J, {
+        let is_child = const_eq_u32(parent[J & 7] as u32, v as u32);
+        let a_prime = x[J & 7].wrapping_sub(x_max_meas);
         let exp_val = SignedFixed(a_prime).exp2();
         sum_exp_meas += NonNegativeFixed(const_select_u32(is_child, exp_val.0, 0));
     });
     let l_meas = x_max_meas.wrapping_add(sum_exp_meas.log2().0 as i32);
 
     let mut x_max_leaf = i32::MIN;
-    unroll_8_static!(x_idx, {
-        let is_sub = is_subtree_leaf_v[x_idx & 7];
-        let x_safe = const_select_u32(is_sub as u32, x[x_idx & 7] as u32, i32::MIN as u32) as i32;
+    unroll_8_static!(X_IDX, {
+        let is_sub = is_subtree_leaf_v[X_IDX & 7];
+        let x_safe = const_select_u32(is_sub as u32, x[X_IDX & 7] as u32, i32::MIN as u32) as i32;
         x_max_leaf = const_max_i32(x_max_leaf, x_safe);
     });
     
     let mut sum_exp_leaf = NonNegativeFixed::ZERO;
-    unroll_8_static!(x_idx, {
-        let is_sub = is_subtree_leaf_v[x_idx & 7];
-        let a_prime = x[x_idx & 7].wrapping_sub(x_max_leaf);
+    unroll_8_static!(X_IDX, {
+        let is_sub = is_subtree_leaf_v[X_IDX & 7];
+        let a_prime = x[X_IDX & 7].wrapping_sub(x_max_leaf);
         let exp_val = SignedFixed(a_prime).exp2();
         sum_exp_leaf += NonNegativeFixed(const_select_u32(is_sub as u32, exp_val.0, 0));
     });
@@ -311,16 +311,16 @@ pub fn measure_kappa(
         let is_child = const_eq_u32(parent[c & 7] as u32, v as u32);
         
         let mut x_max_c = i32::MIN;
-        unroll_8_static!(x_idx, {
-            let is_sub_c = is_subtree_leaf[c & 7][x_idx & 7];
-            let x_safe = const_select_u32(is_sub_c as u32, x[x_idx & 7] as u32, i32::MIN as u32) as i32;
+        unroll_8_static!(X_IDX, {
+            let is_sub_c = is_subtree_leaf[c & 7][X_IDX & 7];
+            let x_safe = const_select_u32(is_sub_c as u32, x[X_IDX & 7] as u32, i32::MIN as u32) as i32;
             x_max_c = const_max_i32(x_max_c, x_safe);
         });
         
         let mut sum_exp_c = NonNegativeFixed::ZERO;
-        unroll_8_static!(x_idx, {
-            let is_sub_c = is_subtree_leaf[c & 7][x_idx & 7];
-            let a_prime = x[x_idx & 7].wrapping_sub(x_max_c);
+        unroll_8_static!(X_IDX, {
+            let is_sub_c = is_subtree_leaf[c & 7][X_IDX & 7];
+            let a_prime = x[X_IDX & 7].wrapping_sub(x_max_c);
             let exp_val = SignedFixed(a_prime).exp2();
             sum_exp_c += NonNegativeFixed(const_select_u32(is_sub_c as u32, exp_val.0, 0));
         });

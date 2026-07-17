@@ -1,0 +1,11 @@
+@prefix cmca: <http://bcinr.org/ontology/cmca#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+cmca:ActiveStabilityProfile a cmca:StabilityProfile ;
+    cmca:betaMMax "0.045"^^xsd:decimal ;
+    cmca:zetaWMax "0.0125"^^xsd:decimal ;
+    cmca:zetaRhoMax "0.02"^^xsd:decimal ;
+    cmca:gammaMuMax "0.01"^^xsd:decimal ;
+    cmca:etaGMin "0.001"^^xsd:decimal ;
+    cmca:contractionMarginMin "0.01"^^xsd:decimal ;
+    cmca:modeDwellRoundsMin "461"^^xsd:integer .

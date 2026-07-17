@@ -10,6 +10,7 @@ rust-version = "1.70"
 bcinr-logic = { path = "../bcinr-logic", version = "26.6.24" }
 
 [dev-dependencies]
+trybuild = "1.0"
 proptest = "1.2.0"
 
 [features]

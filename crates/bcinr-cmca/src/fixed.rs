@@ -9,7 +9,7 @@
 //! - `SignedFixed`: mathematical values in $[-32768.0, 32767.999984741]$, wrapping `i32`.
 //! - `CanonicalMask`: exactly `0` or `u32::MAX`, used for branchless selection.
 
-#[derive(Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CanonicalMask(pub u32);
 
 impl CanonicalMask {
