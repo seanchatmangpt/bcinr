@@ -8,7 +8,7 @@
 
 mod reference;
 
-use bcinr_cmca::fixed::Fixed;
+use bcinr_cmca::fixed::{NonNegativeFixed, SignedFixed, CanonicalMask};
 use bcinr_cmca::allocator::{
     allocate, AdaptiveUpdate, AdmittedControlState, CertificateReceipt,
     EnvelopeReceipt, OutcomeReceipt, CertifiedLearning
@@ -25,25 +25,38 @@ fn get_proof() -> Option<AdaptiveUpdate<CertifiedLearning>> {
         CertificateReceipt,
         EnvelopeReceipt,
         OutcomeReceipt,
-        Fixed::ZERO,
-        Fixed::ONE,
+        NonNegativeFixed::ZERO,
+        NonNegativeFixed::ONE,
     )
 }
 
-// Helper to convert Fixed to f64
-fn to_f64(f: Fixed) -> f64 {
+// Helper to convert NonNegativeFixed to f64
+fn to_f64(f: NonNegativeFixed) -> f64 {
+    (f.0 as f64) / 65536.0
+}
+
+fn to_f64_signed(f: SignedFixed) -> f64 {
+    (f.0 as f64) / 65536.0
+}
+
+fn old_to_f64(f: NonNegativeFixed) -> f64 {
     f.to_bits() as f64 / 65536.0
 }
 
-// Helper to convert f64 to Fixed
-fn to_fixed(v: f64) -> Fixed {
+// Helper to convert f64 to NonNegativeFixed
+fn to_signed_fixed(v: f64) -> SignedFixed {
+    let scaled = (v * 65536.0).round();
+    SignedFixed(scaled as i32)
+}
+
+fn to_fixed(v: f64) -> NonNegativeFixed {
     let scaled = (v * 65536.0).round();
     if scaled >= u32::MAX as f64 {
-        Fixed::MAX
+        NonNegativeFixed::MAX
     } else if scaled <= 0.0 {
-        Fixed::ZERO
+        NonNegativeFixed::ZERO
     } else {
-        Fixed(scaled as u32)
+        NonNegativeFixed(scaled as u32)
     }
 }
 
@@ -108,7 +121,7 @@ proptest! {
         tau_d in 461..1000u32,
     ) {
         // Construct Q16.16 PackedSemanticStates
-        let mut states = [PackedSemanticState { id: 0, factors: [Fixed::ZERO; 10] }; N];
+        let mut states = [PackedSemanticState { id: 0, factors: [NonNegativeFixed::ZERO; 10] }; N];
         for i in 0..N {
             states[i].id = i as u32;
             for f in 0..8 {
@@ -119,14 +132,14 @@ proptest! {
         }
         
         // Construct Q16.16 Lenses
-        let mut lenses = [LensSpec { id: 0, q: Fixed::ZERO }; Q];
+        let mut lenses = [LensSpec { id: 0, q: SignedFixed::ZERO }; Q];
         for q_idx in 0..Q {
             lenses[q_idx].id = q_idx as u32;
-            lenses[q_idx].q = to_fixed(lens_exps[q_idx]);
+            lenses[q_idx].q = to_signed_fixed(lens_exps[q_idx]);
         }
         
         // Construct normalized lambda
-        let mut lambda_fixed = [[Fixed::ZERO; Q]; K];
+        let mut lambda_fixed = [[NonNegativeFixed::ZERO; Q]; K];
         let mut lambda_f64 = [[0.0; Q]; K];
         for k in 0..K {
             let row_sum: f64 = lambda_rows[k].iter().sum();
@@ -142,7 +155,7 @@ proptest! {
         let epsilon_kappa_fixed = to_fixed(epsilon_kappa_val);
         
         // Weights
-        let mut weights_fixed = [[Fixed::ZERO; 2 * Q]; N];
+        let mut weights_fixed = [[NonNegativeFixed::ZERO; 2 * Q]; N];
         let mut weights_f64 = [[0.0; 2 * Q]; N];
         for i in 0..N {
             for e in 0..(2 * Q) {
@@ -167,7 +180,7 @@ proptest! {
         }
         
         // Payoffs
-        let mut payoffs_fixed = [[Fixed::ZERO; 2 * Q]; N];
+        let mut payoffs_fixed = [[NonNegativeFixed::ZERO; 2 * Q]; N];
         let mut payoffs_f64 = [[0.0; 2 * Q]; N];
         for i in 0..N {
             for e in 0..(2 * Q) {
@@ -178,9 +191,9 @@ proptest! {
         }
         
         // Mu and costs
-        let mut mu_fixed = [Fixed::ZERO; N];
+        let mut mu_fixed = [NonNegativeFixed::ZERO; N];
         let mut mu_f64 = [0.0; N];
-        let mut costs_fixed = [Fixed::ZERO; N];
+        let mut costs_fixed = [NonNegativeFixed::ZERO; N];
         let mut costs_f64 = [0.0; N];
         for i in 0..N {
             mu_fixed[i] = to_fixed(mu_vals[i]);
@@ -195,7 +208,7 @@ proptest! {
         let mut last_switch_t_f64 = 0u32;
         let mut prev_mode_f64 = 0u32;
         
-        // Call Fixed-Point Allocator
+        // Call NonNegativeFixed-Point Allocator
         let result_fixed = allocate(
             &states,
             &lenses,
@@ -265,7 +278,7 @@ proptest! {
                     }
                     
                     // Let's print the lenses
-                    println!("lenses: {:?}", lenses.map(|l| to_f64(l.q)));
+                    println!("lenses: {:?}", lenses.map(|l| to_f64_signed(l.q)));
                 }
                 
                 // Allow a small numerical tolerance due to fixed point approximations

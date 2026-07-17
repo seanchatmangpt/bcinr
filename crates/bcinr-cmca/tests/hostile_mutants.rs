@@ -1,20 +1,20 @@
 #![allow(dead_code)]
 
-use bcinr_cmca::fixed::Fixed;
+use bcinr_cmca::fixed::{NonNegativeFixed, SignedFixed, CanonicalMask};
 use bcinr_cmca::observatory::ObservatoryFlag;
 
 // M01: Ignore numeric error in underline kappa. Use kappa_hat instead of kappa_under.
 pub fn evaluate_m01(
-    kappa_hat: Fixed,
-    _kappa_under: Fixed,
-    epsilon_on: Fixed,
-    _gamma_min_plus_hat: Fixed,
-    gamma_min_plus_under: Fixed,
-    epsilon_gram: Fixed,
-    d_js: Fixed,
-    epsilon_drift: Fixed,
-    s_meas: Fixed,
-    s_leaf: Fixed,
+    kappa_hat: NonNegativeFixed,
+    _kappa_under: NonNegativeFixed,
+    epsilon_on: NonNegativeFixed,
+    _gamma_min_plus_hat: NonNegativeFixed,
+    gamma_min_plus_under: NonNegativeFixed,
+    epsilon_gram: NonNegativeFixed,
+    d_js: NonNegativeFixed,
+    epsilon_drift: NonNegativeFixed,
+    s_meas: NonNegativeFixed,
+    s_leaf: NonNegativeFixed,
 ) -> Result<(), ObservatoryFlag> {
     bcinr_cmca::observatory::evaluate_calibration(
         kappa_hat,
@@ -33,32 +33,32 @@ pub fn evaluate_m01(
 #[test]
 fn kill_m01_ignore_numeric_error() {
     let result = evaluate_m01(
-        Fixed::from_bits(66000), // kappa_hat > epsilon_on
-        Fixed::from_bits(65000), // kappa_under < epsilon_on
-        Fixed::from_bits(65536), // epsilon_on = 1.0
-        Fixed::from_bits(65536),
-        Fixed::from_bits(65536),
-        Fixed::from_bits(65536),
-        Fixed::ZERO,
-        Fixed::ONE,
-        Fixed::ONE,
-        Fixed::from_bits(32768),
+        NonNegativeFixed::from_bits(66000), // kappa_hat > epsilon_on
+        NonNegativeFixed::from_bits(65000), // kappa_under < epsilon_on
+        NonNegativeFixed::from_bits(65536), // epsilon_on = 1.0
+        NonNegativeFixed::from_bits(65536),
+        NonNegativeFixed::from_bits(65536),
+        NonNegativeFixed::from_bits(65536),
+        NonNegativeFixed::ZERO,
+        NonNegativeFixed::ONE,
+        NonNegativeFixed::ONE,
+        NonNegativeFixed::from_bits(32768),
     );
     assert_ne!(result, Err(ObservatoryFlag::NumericallyUncertain));
 }
 
 // M03: Use point-estimate Gram gate without subtracting epsilon_gram.
 pub fn evaluate_m03(
-    kappa_hat: Fixed,
-    kappa_under: Fixed,
-    epsilon_on: Fixed,
-    gamma_min_plus_hat: Fixed,
-    _gamma_min_plus_under: Fixed,
-    epsilon_gram: Fixed,
-    d_js: Fixed,
-    epsilon_drift: Fixed,
-    s_meas: Fixed,
-    s_leaf: Fixed,
+    kappa_hat: NonNegativeFixed,
+    kappa_under: NonNegativeFixed,
+    epsilon_on: NonNegativeFixed,
+    gamma_min_plus_hat: NonNegativeFixed,
+    _gamma_min_plus_under: NonNegativeFixed,
+    epsilon_gram: NonNegativeFixed,
+    d_js: NonNegativeFixed,
+    epsilon_drift: NonNegativeFixed,
+    s_meas: NonNegativeFixed,
+    s_leaf: NonNegativeFixed,
 ) -> Result<(), ObservatoryFlag> {
     bcinr_cmca::observatory::evaluate_calibration(
         kappa_hat,
@@ -77,32 +77,32 @@ pub fn evaluate_m03(
 #[test]
 fn kill_m03_point_estimate_gram_gate() {
     let result = evaluate_m03(
-        Fixed::from_bits(131072),
-        Fixed::from_bits(131072),
-        Fixed::from_bits(65536),
-        Fixed::from_bits(131072), // gamma_hat > epsilon_gram
-        Fixed::from_bits(32768),  // gamma_under < epsilon_gram
-        Fixed::from_bits(65536),
-        Fixed::ZERO,
-        Fixed::ONE,
-        Fixed::ONE,
-        Fixed::from_bits(32768),
+        NonNegativeFixed::from_bits(131072),
+        NonNegativeFixed::from_bits(131072),
+        NonNegativeFixed::from_bits(65536),
+        NonNegativeFixed::from_bits(131072), // gamma_hat > epsilon_gram
+        NonNegativeFixed::from_bits(32768),  // gamma_under < epsilon_gram
+        NonNegativeFixed::from_bits(65536),
+        NonNegativeFixed::ZERO,
+        NonNegativeFixed::ONE,
+        NonNegativeFixed::ONE,
+        NonNegativeFixed::from_bits(32768),
     );
     assert_ne!(result, Err(ObservatoryFlag::GramDegenerate));
 }
 
 // M05: Ignore drift.
 pub fn evaluate_m05(
-    kappa_hat: Fixed,
-    kappa_under: Fixed,
-    epsilon_on: Fixed,
-    gamma_min_plus_hat: Fixed,
-    gamma_min_plus_under: Fixed,
-    epsilon_gram: Fixed,
-    _d_js: Fixed,
-    epsilon_drift: Fixed,
-    s_meas: Fixed,
-    s_leaf: Fixed,
+    kappa_hat: NonNegativeFixed,
+    kappa_under: NonNegativeFixed,
+    epsilon_on: NonNegativeFixed,
+    gamma_min_plus_hat: NonNegativeFixed,
+    gamma_min_plus_under: NonNegativeFixed,
+    epsilon_gram: NonNegativeFixed,
+    _d_js: NonNegativeFixed,
+    epsilon_drift: NonNegativeFixed,
+    s_meas: NonNegativeFixed,
+    s_leaf: NonNegativeFixed,
 ) -> Result<(), ObservatoryFlag> {
     bcinr_cmca::observatory::evaluate_calibration(
         kappa_hat,
@@ -111,7 +111,7 @@ pub fn evaluate_m05(
         gamma_min_plus_hat,
         gamma_min_plus_under,
         epsilon_gram,
-        Fixed::ZERO, // MUTANT! Ignores drift by passing 0.
+        NonNegativeFixed::ZERO, // MUTANT! Ignores drift by passing 0.
         epsilon_drift,
         s_meas,
         s_leaf,
@@ -121,39 +121,39 @@ pub fn evaluate_m05(
 #[test]
 fn kill_m05_ignore_drift() {
     let result = evaluate_m05(
-        Fixed::from_bits(131072),
-        Fixed::from_bits(131072),
-        Fixed::from_bits(65536),
-        Fixed::from_bits(131072),
-        Fixed::from_bits(131072),
-        Fixed::from_bits(65536),
-        Fixed::from_bits(131072), // d_js > epsilon_drift
-        Fixed::from_bits(65536),
-        Fixed::ONE,
-        Fixed::from_bits(32768),
+        NonNegativeFixed::from_bits(131072),
+        NonNegativeFixed::from_bits(131072),
+        NonNegativeFixed::from_bits(65536),
+        NonNegativeFixed::from_bits(131072),
+        NonNegativeFixed::from_bits(131072),
+        NonNegativeFixed::from_bits(65536),
+        NonNegativeFixed::from_bits(131072), // d_js > epsilon_drift
+        NonNegativeFixed::from_bits(65536),
+        NonNegativeFixed::ONE,
+        NonNegativeFixed::from_bits(32768),
     );
     assert_ne!(result, Err(ObservatoryFlag::Drifting));
 }
 
 // M07: Activate learner based on kappa only, ignoring Gram distinguishability.
 pub fn evaluate_m07(
-    kappa_hat: Fixed,
-    kappa_under: Fixed,
-    epsilon_on: Fixed,
-    gamma_min_plus_hat: Fixed,
-    _gamma_min_plus_under: Fixed,
-    epsilon_gram: Fixed,
-    d_js: Fixed,
-    epsilon_drift: Fixed,
-    s_meas: Fixed,
-    s_leaf: Fixed,
+    kappa_hat: NonNegativeFixed,
+    kappa_under: NonNegativeFixed,
+    epsilon_on: NonNegativeFixed,
+    gamma_min_plus_hat: NonNegativeFixed,
+    _gamma_min_plus_under: NonNegativeFixed,
+    epsilon_gram: NonNegativeFixed,
+    d_js: NonNegativeFixed,
+    epsilon_drift: NonNegativeFixed,
+    s_meas: NonNegativeFixed,
+    s_leaf: NonNegativeFixed,
 ) -> Result<(), ObservatoryFlag> {
     bcinr_cmca::observatory::evaluate_calibration(
         kappa_hat,
         kappa_under,
         epsilon_on,
         gamma_min_plus_hat,
-        Fixed::from_bits(1310720), // MUTANT! Forcing gamma_under to be large, ignoring actual Gram
+        NonNegativeFixed::from_bits(1310720), // MUTANT! Forcing gamma_under to be large, ignoring actual Gram
         epsilon_gram,
         d_js,
         epsilon_drift,
@@ -165,16 +165,16 @@ pub fn evaluate_m07(
 #[test]
 fn kill_m07_ignore_gram() {
     let result = evaluate_m07(
-        Fixed::from_bits(131072),
-        Fixed::from_bits(131072),
-        Fixed::from_bits(65536),
-        Fixed::from_bits(32768),
-        Fixed::from_bits(32768), // Both gamma < epsilon_gram
-        Fixed::from_bits(65536),
-        Fixed::ZERO,
-        Fixed::ONE,
-        Fixed::ONE,
-        Fixed::from_bits(32768),
+        NonNegativeFixed::from_bits(131072),
+        NonNegativeFixed::from_bits(131072),
+        NonNegativeFixed::from_bits(65536),
+        NonNegativeFixed::from_bits(32768),
+        NonNegativeFixed::from_bits(32768), // Both gamma < epsilon_gram
+        NonNegativeFixed::from_bits(65536),
+        NonNegativeFixed::ZERO,
+        NonNegativeFixed::ONE,
+        NonNegativeFixed::ONE,
+        NonNegativeFixed::from_bits(32768),
     );
     assert_ne!(result, Err(ObservatoryFlag::GramDegenerate));
 }
@@ -194,19 +194,19 @@ fn get_proof() -> Option<AdaptiveUpdate<CertifiedLearning>> {
         CertificateReceipt,
         EnvelopeReceipt,
         OutcomeReceipt,
-        Fixed::ZERO,
-        Fixed::ONE,
+        NonNegativeFixed::ZERO,
+        NonNegativeFixed::ONE,
     )
 }
 
-fn run_alloc_baseline() -> [Fixed; N] {
-    let mut weights = [[Fixed::ONE; 2 * Q]; N];
-    let payoffs = [[Fixed::ZERO; 2 * Q]; N];
+fn run_alloc_baseline() -> [NonNegativeFixed; N] {
+    let mut weights = [[NonNegativeFixed::ONE; 2 * Q]; N];
+    let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
     let mut last_switch_t = 0;
     let mut prev_mode = 0;
     let parent = [-1; N];
-    let mu = [Fixed::ZERO; N];
-    let costs = [Fixed::ZERO; N];
+    let mu = [NonNegativeFixed::ZERO; N];
+    let costs = [NonNegativeFixed::ZERO; N];
     
     allocate(
         &OBJECT_REGISTRY,
@@ -216,8 +216,8 @@ fn run_alloc_baseline() -> [Fixed; N] {
         &parent,
         &mut weights,
         &payoffs,
-        Fixed::ZERO,
-        Fixed::ZERO,
+        NonNegativeFixed::ZERO,
+        NonNegativeFixed::ZERO,
         &mu,
         &costs,
         0,
@@ -229,9 +229,9 @@ fn run_alloc_baseline() -> [Fixed; N] {
     ).unwrap()
 }
 
-fn run_alloc_tree() -> [Fixed; N] {
-    let mut weights = [[Fixed::ONE; 2 * Q]; N];
-    let payoffs = [[Fixed::ZERO; 2 * Q]; N];
+fn run_alloc_tree() -> [NonNegativeFixed; N] {
+    let mut weights = [[NonNegativeFixed::ONE; 2 * Q]; N];
+    let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
     let mut last_switch_t = 0;
     let mut prev_mode = 0;
     
@@ -239,8 +239,8 @@ fn run_alloc_tree() -> [Fixed; N] {
     parent[1] = 0;
     parent[2] = 0;
 
-    let mu = [Fixed::ZERO; N];
-    let costs = [Fixed::ZERO; N];
+    let mu = [NonNegativeFixed::ZERO; N];
+    let costs = [NonNegativeFixed::ZERO; N];
     
     allocate(
         &OBJECT_REGISTRY,
@@ -250,8 +250,8 @@ fn run_alloc_tree() -> [Fixed; N] {
         &parent,
         &mut weights,
         &payoffs,
-        Fixed::ZERO,
-        Fixed::ZERO,
+        NonNegativeFixed::ZERO,
+        NonNegativeFixed::ZERO,
         &mu,
         &costs,
         0,
@@ -263,16 +263,16 @@ fn run_alloc_tree() -> [Fixed; N] {
     ).unwrap()
 }
 
-fn run_alloc_mu_cost() -> [Fixed; N] {
-    let mut weights = [[Fixed::ONE; 2 * Q]; N];
-    let payoffs = [[Fixed::ZERO; 2 * Q]; N];
+fn run_alloc_mu_cost() -> [NonNegativeFixed; N] {
+    let mut weights = [[NonNegativeFixed::ONE; 2 * Q]; N];
+    let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
     let mut last_switch_t = 0;
     let mut prev_mode = 0;
     let parent = [-1; N];
     
     // Set mu negative so clipping to zero differs from unclipped
-    let mu = [Fixed(0u32.wrapping_sub(327680)); N];
-    let costs = [Fixed::ONE; N];
+    let mu = [NonNegativeFixed(0u32.wrapping_sub(327680)); N];
+    let costs = [NonNegativeFixed::ONE; N];
     
     allocate(
         &OBJECT_REGISTRY,
@@ -282,8 +282,8 @@ fn run_alloc_mu_cost() -> [Fixed; N] {
         &parent,
         &mut weights,
         &payoffs,
-        Fixed::ZERO,
-        Fixed::ZERO,
+        NonNegativeFixed::ZERO,
+        NonNegativeFixed::ZERO,
         &mu,
         &costs,
         0,

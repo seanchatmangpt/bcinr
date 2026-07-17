@@ -20,7 +20,7 @@
 //!
 //! All checks are combined into a branchless selection tree, guaranteeing $CC=1$.
 
-use crate::fixed::Fixed;
+use crate::fixed::{NonNegativeFixed, SignedFixed, CanonicalMask};
 use crate::allocator::{const_lt_u32, const_select_u32, const_eq_u32};
 
 /// Telemetry safety and calibration indicators for the runtime observatory.
@@ -152,21 +152,21 @@ pub fn wrap_observatory_result(
 /// # Examples
 ///
 /// ```rust
-/// use bcinr_cmca::fixed::Fixed;
+/// use bcinr_cmca::fixed::NonNegativeFixed;
 /// use bcinr_cmca::observatory::{evaluate_calibration, ObservatoryFlag};
 ///
 /// // Example: Drifting state
 /// let result = evaluate_calibration(
-///     Fixed::from_bits(131072),
-///     Fixed::from_bits(131072),
-///     Fixed::from_bits(65536),
-///     Fixed::from_bits(131072),
-///     Fixed::from_bits(131072),
-///     Fixed::from_bits(65536),
-///     Fixed::from_bits(131072), // d_js (2.0)
-///     Fixed::from_bits(65536),  // epsilon_drift (1.0) -> Drift detected!
-///     Fixed::ONE,
-///     Fixed::from_bits(32768),
+///     NonNegativeFixed::from_bits(131072),
+///     NonNegativeFixed::from_bits(131072),
+///     NonNegativeFixed::from_bits(65536),
+///     NonNegativeFixed::from_bits(131072),
+///     NonNegativeFixed::from_bits(131072),
+///     NonNegativeFixed::from_bits(65536),
+///     NonNegativeFixed::from_bits(131072), // d_js (2.0)
+///     NonNegativeFixed::from_bits(65536),  // epsilon_drift (1.0) -> Drift detected!
+///     NonNegativeFixed::ONE,
+///     NonNegativeFixed::from_bits(32768),
 /// );
 /// assert_eq!(result, Err(ObservatoryFlag::Drifting));
 /// ```
@@ -176,16 +176,16 @@ pub fn wrap_observatory_result(
 /// Checks are performed concurrently using bitwise masks. Prioritization is enforced using
 /// sequential branchless selections `const_select_u32`.
 pub fn evaluate_calibration(
-    kappa_hat: Fixed,
-    kappa_under: Fixed,
-    epsilon_on: Fixed,
-    _gamma_min_plus_hat: Fixed,
-    gamma_min_plus_under: Fixed,
-    epsilon_gram: Fixed,
-    d_js: Fixed,
-    epsilon_drift: Fixed,
-    s_meas: Fixed,
-    s_leaf: Fixed,
+    kappa_hat: NonNegativeFixed,
+    kappa_under: NonNegativeFixed,
+    epsilon_on: NonNegativeFixed,
+    _gamma_min_plus_hat: NonNegativeFixed,
+    gamma_min_plus_under: NonNegativeFixed,
+    epsilon_gram: NonNegativeFixed,
+    d_js: NonNegativeFixed,
+    epsilon_drift: NonNegativeFixed,
+    s_meas: NonNegativeFixed,
+    s_leaf: NonNegativeFixed,
 ) -> Result<(), ObservatoryFlag> {
     
     // Conditions

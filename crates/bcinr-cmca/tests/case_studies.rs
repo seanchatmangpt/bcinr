@@ -6,7 +6,7 @@
     feature = "mutant_5"
 )))]
 
-use bcinr_cmca::fixed::Fixed;
+use bcinr_cmca::fixed::{NonNegativeFixed, SignedFixed, CanonicalMask};
 use bcinr_cmca::allocator::{
     allocate, StabilityRefusal, AdaptiveUpdate, AdmittedControlState,
     CertificateReceipt, EnvelopeReceipt, OutcomeReceipt, CertifiedLearning
@@ -21,8 +21,8 @@ fn get_proof() -> Option<AdaptiveUpdate<CertifiedLearning>> {
         CertificateReceipt,
         EnvelopeReceipt,
         OutcomeReceipt,
-        Fixed::ZERO,
-        Fixed::ONE,
+        NonNegativeFixed::ZERO,
+        NonNegativeFixed::ONE,
     )
 }
 use bcinr_cmca::generated::generalization as gen;
@@ -33,15 +33,15 @@ fn test_case_study_1_cache_choice() {
     // Artifact_A has high recomputation cost (0.9), Artifact_B has low recomputation cost (0.1).
     // Access frequencies are both 0.5. Standings are 1.0.
     // Under Cache Choice head, Artifact_A should receive more resource than Artifact_B.
-    let mut weights = [[Fixed::ONE; 2 * Q]; N];
-    let payoffs = [[Fixed::ZERO; 2 * Q]; N];
+    let mut weights = [[NonNegativeFixed::ONE; 2 * Q]; N];
+    let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
     let mut last_switch_t = 0;
     let mut prev_mode = 0;
     
     // We construct a simple tree where 0 and 1 are root leaf nodes
     let parent = [-1; N];
-    let mu = [Fixed::ZERO; N];
-    let costs = [Fixed::ZERO; N];
+    let mu = [NonNegativeFixed::ZERO; N];
+    let costs = [NonNegativeFixed::ZERO; N];
 
     let result = allocate(
         &OBJECT_REGISTRY,
@@ -51,8 +51,8 @@ fn test_case_study_1_cache_choice() {
         &parent,
         &mut weights,
         &payoffs,
-        Fixed::ZERO,
-        Fixed::ZERO,
+        NonNegativeFixed::ZERO,
+        NonNegativeFixed::ZERO,
         &mu,
         &costs,
         0,
@@ -72,14 +72,14 @@ fn test_case_study_1_cache_choice() {
 fn test_case_study_2_single_object_multiple_decisions() {
     // Obj_Single (index 6) has high retrieval demand (0.9) and high business value (100).
     // Let's verify it gets a significant portion of resource allocation under weighted retrieval.
-    let mut weights = [[Fixed::ONE; 2 * Q]; N];
-    let payoffs = [[Fixed::ZERO; 2 * Q]; N];
+    let mut weights = [[NonNegativeFixed::ONE; 2 * Q]; N];
+    let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
     let mut last_switch_t = 0;
     let mut prev_mode = 0;
     
     let parent = [-1; N];
-    let mu = [Fixed::ZERO; N];
-    let costs = [Fixed::ZERO; N];
+    let mu = [NonNegativeFixed::ZERO; N];
+    let costs = [NonNegativeFixed::ZERO; N];
 
     let result = allocate(
         &OBJECT_REGISTRY,
@@ -89,8 +89,8 @@ fn test_case_study_2_single_object_multiple_decisions() {
         &parent,
         &mut weights,
         &payoffs,
-        Fixed::ZERO,
-        Fixed::ZERO,
+        NonNegativeFixed::ZERO,
+        NonNegativeFixed::ZERO,
         &mu,
         &costs,
         0,
@@ -113,8 +113,8 @@ fn test_case_study_3_downstream_consequence() {
     // Obj_Obligation (index 4) has business value 0, but depends on Obj_Activity which eventually
     // depends on Obj_Value (1000).
     // Consequence mass is 1000. Under search-weighted allocation, it should get a high allocation.
-    let mut weights = [[Fixed::ONE; 2 * Q]; N];
-    let payoffs = [[Fixed::ZERO; 2 * Q]; N];
+    let mut weights = [[NonNegativeFixed::ONE; 2 * Q]; N];
+    let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
     let mut last_switch_t = 0;
     let mut prev_mode = 0;
     
@@ -125,8 +125,8 @@ fn test_case_study_3_downstream_consequence() {
     parent[5] = 3; // Obj_Outcome depends on Obj_Deployment
     parent[7] = 5; // Obj_Value depends on Obj_Outcome
 
-    let mu = [Fixed::ZERO; N];
-    let costs = [Fixed::ZERO; N];
+    let mu = [NonNegativeFixed::ZERO; N];
+    let costs = [NonNegativeFixed::ZERO; N];
 
     let result = allocate(
         &OBJECT_REGISTRY,
@@ -136,8 +136,8 @@ fn test_case_study_3_downstream_consequence() {
         &parent,
         &mut weights,
         &payoffs,
-        Fixed::ZERO,
-        Fixed::ZERO,
+        NonNegativeFixed::ZERO,
+        NonNegativeFixed::ZERO,
         &mu,
         &costs,
         0,
@@ -155,14 +155,14 @@ fn test_case_study_3_downstream_consequence() {
 #[test]
 fn test_case_study_4_generalization() {
     // Run the allocator on the generalization registry data to verify compatibility and execution.
-    let mut weights = [[Fixed::ONE; 2 * gen::Q]; gen::N];
-    let payoffs = [[Fixed::ZERO; 2 * gen::Q]; gen::N];
+    let mut weights = [[NonNegativeFixed::ONE; 2 * gen::Q]; gen::N];
+    let payoffs = [[NonNegativeFixed::ZERO; 2 * gen::Q]; gen::N];
     let mut last_switch_t = 0;
     let mut prev_mode = 0;
     
     let parent = [-1; gen::N];
-    let mu = [Fixed::ZERO; gen::N];
-    let costs = [Fixed::ZERO; gen::N];
+    let mu = [NonNegativeFixed::ZERO; gen::N];
+    let costs = [NonNegativeFixed::ZERO; gen::N];
 
     let gen_states: [bcinr_cmca::generated::case_studies::PackedSemanticState; gen::N] = gen::OBJECT_REGISTRY.map(|state| {
         bcinr_cmca::generated::case_studies::PackedSemanticState {
@@ -185,8 +185,8 @@ fn test_case_study_4_generalization() {
         &parent,
         &mut weights,
         &payoffs,
-        Fixed::ZERO,
-        Fixed::ZERO,
+        NonNegativeFixed::ZERO,
+        NonNegativeFixed::ZERO,
         &mu,
         &costs,
         0,
@@ -197,7 +197,7 @@ fn test_case_study_4_generalization() {
         get_proof().as_ref(),
     ).unwrap();
 
-    // Verify all allocations are valid and sum to 1.0 (Fixed::ONE)
+    // Verify all allocations are valid and sum to 1.0 (NonNegativeFixed::ONE)
     let mut sum = 0u64;
     for i in 0..gen::N {
         println!("result[{}]: {:?}", i, result[i]);
@@ -205,18 +205,18 @@ fn test_case_study_4_generalization() {
     }
     println!("sum: {}", sum);
     // We allow small rounding tolerance
-    assert!((sum as i64 - Fixed::ONE.0 as i64).abs() < 50, "Total allocation should sum to 1.0");
+    assert!((sum as i64 - NonNegativeFixed::ONE.0 as i64).abs() < 50, "Total allocation should sum to 1.0");
 }
 
 #[test]
 fn test_stability_refusals_and_graceful_fallback() {
-    let mut weights = [[Fixed::ONE; 2 * Q]; N];
-    let payoffs = [[Fixed::ZERO; 2 * Q]; N];
+    let mut weights = [[NonNegativeFixed::ONE; 2 * Q]; N];
+    let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
     let mut last_switch_t = 0;
     let mut prev_mode = 0;
     let parent = [-1; N];
-    let mu = [Fixed::ZERO; N];
-    let costs = [Fixed::ZERO; N];
+    let mu = [NonNegativeFixed::ZERO; N];
+    let costs = [NonNegativeFixed::ZERO; N];
 
     // 1. Invalid certificate digest with degrade=false -> should return CertificateDigestMismatch
     let wrong_digest = [0u8; 32];
@@ -228,8 +228,8 @@ fn test_stability_refusals_and_graceful_fallback() {
         &parent,
         &mut weights,
         &payoffs,
-        Fixed::ZERO,
-        Fixed::ZERO,
+        NonNegativeFixed::ZERO,
+        NonNegativeFixed::ZERO,
         &mu,
         &costs,
         0,
@@ -251,8 +251,8 @@ fn test_stability_refusals_and_graceful_fallback() {
         &parent,
         &mut weights,
         &payoffs,
-        Fixed::ZERO,
-        Fixed::ZERO,
+        NonNegativeFixed::ZERO,
+        NonNegativeFixed::ZERO,
         &mu,
         &costs,
         0,
@@ -276,8 +276,8 @@ fn test_stability_refusals_and_graceful_fallback() {
         &parent,
         &mut weights,
         &payoffs,
-        Fixed::ZERO,
-        Fixed::ZERO,
+        NonNegativeFixed::ZERO,
+        NonNegativeFixed::ZERO,
         &mu,
         &costs,
         0,
@@ -290,7 +290,7 @@ fn test_stability_refusals_and_graceful_fallback() {
     assert_eq!(res_dwell, Err(StabilityRefusal::ModeDwellTimeViolated));
 
     // 4. Learning rate outside envelope with degrade=false -> should return LearningRateOutsideEnvelope
-    let high_zeta = Fixed(2000); // Exceeds ZETA_W_MAX (819)
+    let high_zeta = NonNegativeFixed(2000); // Exceeds ZETA_W_MAX (819)
     let res_lr = allocate(
         &OBJECT_REGISTRY,
         &LENS_REGISTRY,
@@ -300,7 +300,7 @@ fn test_stability_refusals_and_graceful_fallback() {
         &mut weights,
         &payoffs,
         high_zeta,
-        Fixed::ZERO,
+        NonNegativeFixed::ZERO,
         &mu,
         &costs,
         0,
@@ -321,8 +321,8 @@ fn test_typestate_bounds_checks() {
         CertificateReceipt,
         EnvelopeReceipt,
         OutcomeReceipt,
-        Fixed(327680),
-        Fixed(65),
+        NonNegativeFixed(327680),
+        NonNegativeFixed(65),
     );
     assert!(p_ok.is_some());
 
@@ -332,8 +332,8 @@ fn test_typestate_bounds_checks() {
         CertificateReceipt,
         EnvelopeReceipt,
         OutcomeReceipt,
-        Fixed(327681),
-        Fixed(65),
+        NonNegativeFixed(327681),
+        NonNegativeFixed(65),
     );
     assert!(p_temp_high.is_none());
 
@@ -343,21 +343,21 @@ fn test_typestate_bounds_checks() {
         CertificateReceipt,
         EnvelopeReceipt,
         OutcomeReceipt,
-        Fixed(327680),
-        Fixed(64),
+        NonNegativeFixed(327680),
+        NonNegativeFixed(64),
     );
     assert!(p_dist_low.is_none());
 }
 
 #[test]
 fn test_rejection_invariance() {
-    let mut weights = [[Fixed::ONE; 2 * Q]; N];
-    let payoffs = [[Fixed::ZERO; 2 * Q]; N];
+    let mut weights = [[NonNegativeFixed::ONE; 2 * Q]; N];
+    let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
     let mut last_switch_t = 123u32;
     let mut prev_mode = 4u32;
     let parent = [-1; N];
-    let mu = [Fixed::ZERO; N];
-    let costs = [Fixed::ZERO; N];
+    let mu = [NonNegativeFixed::ZERO; N];
+    let costs = [NonNegativeFixed::ZERO; N];
 
     let weights_before = weights;
     let last_switch_t_before = last_switch_t;
@@ -372,8 +372,8 @@ fn test_rejection_invariance() {
         &parent,
         &mut weights,
         &payoffs,
-        Fixed::ZERO,
-        Fixed::ZERO,
+        NonNegativeFixed::ZERO,
+        NonNegativeFixed::ZERO,
         &mu,
         &costs,
         0,

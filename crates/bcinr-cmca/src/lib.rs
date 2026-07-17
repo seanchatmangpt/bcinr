@@ -26,20 +26,20 @@
 //! ## Example Usage
 //!
 //! ```rust
-//! use bcinr_cmca::fixed::Fixed;
+//! use bcinr_cmca::fixed::NonNegativeFixed;
 //! use bcinr_cmca::observatory::{evaluate_calibration, ObservatoryFlag};
 //!
 //! // Define typical parameters for telemetry monitoring
-//! let kappa_hat = Fixed::from_bits(131072);       // Estimated condition number (2.0)
-//! let kappa_under = Fixed::from_bits(131072);     // Lower bound condition number (2.0)
-//! let epsilon_on = Fixed::from_bits(65536);       // Upper limit threshold (1.0)
-//! let gamma_min_plus_hat = Fixed::from_bits(131072); // Estimated positive eigenvalue (2.0)
-//! let gamma_min_plus_under = Fixed::from_bits(131072); // Lower bound positive eigenvalue (2.0)
-//! let epsilon_gram = Fixed::from_bits(65536);     // Gram matrix threshold (1.0)
-//! let d_js = Fixed::ZERO;                         // Divergence/Drift measurement (0.0)
-//! let epsilon_drift = Fixed::from_bits(65536);    // Maximum allowed drift threshold (1.0)
-//! let s_meas = Fixed::ONE;                        // Measured scale (1.0)
-//! let s_leaf = Fixed::from_bits(32768);           // Leaf scale target (0.5)
+//! let kappa_hat = NonNegativeFixed::from_bits(131072);       // Estimated condition number (2.0)
+//! let kappa_under = NonNegativeFixed::from_bits(131072);     // Lower bound condition number (2.0)
+//! let epsilon_on = NonNegativeFixed::from_bits(65536);       // Upper limit threshold (1.0)
+//! let gamma_min_plus_hat = NonNegativeFixed::from_bits(131072); // Estimated positive eigenvalue (2.0)
+//! let gamma_min_plus_under = NonNegativeFixed::from_bits(131072); // Lower bound positive eigenvalue (2.0)
+//! let epsilon_gram = NonNegativeFixed::from_bits(65536);     // Gram matrix threshold (1.0)
+//! let d_js = NonNegativeFixed::ZERO;                         // Divergence/Drift measurement (0.0)
+//! let epsilon_drift = NonNegativeFixed::from_bits(65536);    // Maximum allowed drift threshold (1.0)
+//! let s_meas = NonNegativeFixed::ONE;                        // Measured scale (1.0)
+//! let s_leaf = NonNegativeFixed::from_bits(32768);           // Leaf scale target (0.5)
 //!
 //! // Evaluate the calibration state branchlessly
 //! let status = evaluate_calibration(
