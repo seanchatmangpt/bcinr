@@ -21,5 +21,6 @@ pub mod dispatcher;
 pub mod scheduler;
 pub mod scheduler_wide;
 pub mod scheduler_wired;
+pub mod ocel;
 pub mod tape;
 pub mod typestate;
