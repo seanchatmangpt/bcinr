@@ -2,7 +2,7 @@
 #![allow(unused_attributes, clippy::needless_range_loop)]
 #[cfg(feature = "alloc")]
 extern crate alloc;
-#[cfg(all(test, feature = "std"))]
+#[cfg(any(all(test, feature = "std"), feature = "bench"))]
 extern crate std;
 
 pub mod abstractions;
