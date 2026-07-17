@@ -432,6 +432,79 @@ mod tests {
         assert_eq!(pool.active_mask & (1 << slot), 0);
     }
 
+    // -----------------------------------------------------------------------
+    // RING_CAPACITY — must be a power of two for CAS modular arithmetic
+    // -----------------------------------------------------------------------
+
+    /// The CAS modular arithmetic in LockFreeMpmcRing uses `& mask` where
+    /// `mask = N - 1`. This is only correct when N is a power of two.
+    /// RING_CAPACITY=64 satisfies this; verify at test-time.
+    #[test]
+    fn ring_capacity_is_power_of_two() {
+        assert!(RING_CAPACITY.is_power_of_two(),
+            "RING_CAPACITY={} must be a power of two for CAS mask arithmetic", RING_CAPACITY);
+        // Double-check the mask property: (N-1) & N == 0 iff N is power-of-two
+        let mask = RING_CAPACITY - 1;
+        assert_eq!(RING_CAPACITY & mask, 0, "power-of-two check: N & (N-1) must be 0");
+    }
+
+    // -----------------------------------------------------------------------
+    // Ring overflow: push_t1 on a full ring returns 0; overflow must be detectable
+    // -----------------------------------------------------------------------
+
+    /// Law: if push_t1 can return 0 on a full ring, and multiple calls return 0,
+    /// the caller must track overflow_count. This test verifies:
+    /// 1. push_t1 returns u32::MAX on success, 0 on failure (full ring).
+    /// 2. When the ring is full, subsequent pushes fail (return 0).
+    /// 3. A caller that counts failures can detect overflow.
+    #[test]
+    fn ring_overflow_push_returns_zero_on_full_ring() {
+        use bcinr_logic::patterns::deterministic_mpmc::LockFreeMpmcRing;
+
+        // Use capacity=4 (smallest power-of-two testable) to fill quickly.
+        let ring = LockFreeMpmcRing::<u32, 4>::new_checked()
+            .expect("capacity 4 is power of two");
+
+        // Push items until we get a failure (ring full).
+        // push_t1 returns u32::MAX on success, 0 on failure.
+        // Due to CAS retry semantics, a single-threaded ring saturates quickly.
+        let mut pushed = 0u32;
+        let mut first_failure_seen = false;
+        for i in 0..16u32 {
+            let result = ring.push_t1(i);
+            if result == u32::MAX {
+                pushed += 1;
+            } else {
+                // First failure: ring is full (or CAS contention exhausted retries).
+                first_failure_seen = true;
+                break;
+            }
+        }
+        // The ring has finite capacity — either we pushed some items and then failed,
+        // or we saw at least one successful push before overflow.
+        // We need at least one success to test overflow detection:
+        assert!(pushed >= 1, "must push at least 1 item before overflow");
+
+        // Now push more items — some or all must fail (return 0), proving
+        // that push_t1 returns 0 on full ring and caller can count overflow.
+        let _ = first_failure_seen; // suppress lint
+        let mut overflow_count = 0u32;
+        for _ in 0..8u32 {
+            let result = ring.push_t1(99u32);
+            if result == 0 { overflow_count += 1; }
+        }
+        // If the ring was already full, overflow_count > 0.
+        // If somehow not full yet, push_t1 may succeed; either way test passes
+        // as long as we can detect at least one overflow when we deliberately
+        // push beyond the ring's capacity (4 slots, 1 already consumed above).
+        // Force overflow by confirming first_failure_seen or overflow_count > 0.
+        assert!(
+            first_failure_seen || overflow_count > 0,
+            "ring must return 0 (overflow) when full; pushed={} overflow_count={}",
+            pushed, overflow_count
+        );
+    }
+
     #[test]
     fn propagate_check_mask_large_basic() {
         // Single fired op at index 0 with succ at index 1.
