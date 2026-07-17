@@ -41,22 +41,37 @@
 //! let s_meas = NonNegativeFixed::ONE;                        // Measured scale (1.0)
 //! let s_leaf = NonNegativeFixed::from_bits(32768);           // Leaf scale target (0.5)
 //!
+//! // Provide the artifact
+//! use bcinr_cmca::observatory::{MeasurementArtifact, SupportStanding, ModeDelta};
+//! use bcinr_cmca::allocator::CertificateReceipt;
+//!
+//! let artifact = MeasurementArtifact {
+//!     point_estimate: kappa_hat,
+//!     lower_bound: kappa_under,
+//!     upper_bound: kappa_hat,
+//!     support_standing: SupportStanding { is_supported: true, smoothing_applied: false },
+//!     effective_sample_size: NonNegativeFixed::ONE,
+//!     dependence_standing: 0,
+//!     numeric_error: NonNegativeFixed::ZERO,
+//!     drift: d_js,
+//!     gram_lower_bound: gamma_min_plus_under,
+//!     graph_digest: 0,
+//!     control_mode_digest: 42,
+//!     proposal: ModeDelta::ProposeDelta,
+//! };
+//!
 //! // Evaluate the calibration state branchlessly
 //! let status = evaluate_calibration(
-//!     kappa_hat,
-//!     kappa_under,
+//!     &artifact,
 //!     epsilon_on,
-//!     gamma_min_plus_hat,
-//!     gamma_min_plus_under,
 //!     epsilon_gram,
-//!     d_js,
 //!     epsilon_drift,
 //!     s_meas,
 //!     s_leaf,
 //! );
 //!
 //! // The calibration succeeds, proposing recertification
-//! assert_eq!(status, Ok(()));
+//! assert_eq!(status, Ok(CertificateReceipt::new(42)));
 //! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
