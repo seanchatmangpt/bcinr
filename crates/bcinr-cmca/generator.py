@@ -233,7 +233,7 @@ def main():
     # 6. Measure Heads (K)
     measure_heads = [mh for mh, cls in classes.items() if cls == 'cmca:MeasureHead']
     mh_indices = {mh: properties.get(mh, {}).get('cmca:measureIndex', 0) for mh in measure_heads}
-    sorted_mh = sorted(measure_heads, key=lambda m: int(mh_indices[m]))
+    sorted_mh = sorted(measure_heads, key=lambda m: (int(mh_indices[m]), m))
     K = len(sorted_mh)
     if K > K_MAX:
         raise ValueError("CMCA_MEASURE_COUNT_EXCEEDED")
@@ -242,7 +242,7 @@ def main():
     lenses = [lens for lens, cls in classes.items() if cls == 'cmca:Lens']
     lens_indices = {lens: properties.get(lens, {}).get('cmca:lensIndex', 0) for lens in lenses}
     lens_exponents = {lens: properties.get(lens, {}).get('cmca:lensExponent', 0.0) for lens in lenses}
-    sorted_lenses = sorted(lenses, key=lambda l: int(lens_indices[l]))
+    sorted_lenses = sorted(lenses, key=lambda l: (int(lens_indices[l]), l))
     Q = len(sorted_lenses)
     if Q > Q_MAX:
         raise ValueError("CMCA_LENS_COUNT_EXCEEDED")

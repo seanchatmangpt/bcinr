@@ -9,7 +9,7 @@ pub const Q: usize = 4;
 
 pub const GENERATOR_VERSION: &str = "v1.1.0";
 pub const RDF_INPUT_DIGEST: &str = "5f3b550a116aab25628f9e8272ac1348f21d19114eb2cbca11c7c4c9176ebf69";
-pub const GENERATOR_SOURCE_DIGEST: &str = "cbeef6afff37a7eebe5e43dcf4b8deb29f1c6d4d10f580839fc6f846b97b104a";
+pub const GENERATOR_SOURCE_DIGEST: &str = "cb61ea09887e04455d2196aed50c027f18842f58db386e6b6d519988285a9b45";
 pub const FACTOR_ACCESS_FREQUENCY: usize = 0;
 pub const FACTOR_ACCESS_FREQUENCY_IRI: &str = "cmca:accessFrequency";
 pub const FACTOR_BUSINESS_VALUE: usize = 1;

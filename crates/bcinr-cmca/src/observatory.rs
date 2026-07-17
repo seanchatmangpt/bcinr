@@ -162,17 +162,26 @@ pub fn evaluate_calibration(
     let d_js = artifact.drift;
 
     // Conditions
+    #[cfg(not(feature = "mutant_9"))]
     let is_drift = const_lt_u32(epsilon_drift.val, d_js.val);
+    #[cfg(feature = "mutant_9")]
+    let is_drift = const_lt_u32(d_js.val, epsilon_drift.val); // Mutated: drift check inverted
     
     let is_scale_inert = const_eq_u32(s_meas.val, s_leaf.val);
     
     let kappa_hat_on = const_lt_u32(epsilon_on.val, kappa_hat.val) | const_eq_u32(epsilon_on.val, kappa_hat.val);
+    #[cfg(not(feature = "mutant_10"))]
     let kappa_under_off = const_lt_u32(kappa_under.val, epsilon_on.val);
+    #[cfg(feature = "mutant_10")]
+    let kappa_under_off = const_lt_u32(epsilon_on.val, kappa_under.val); // Mutated: inverted
     let is_numerically_uncertain = kappa_hat_on & kappa_under_off;
     
     let kappa_under_on = const_lt_u32(epsilon_on.val, kappa_under.val) | const_eq_u32(epsilon_on.val, kappa_under.val);
     
+    #[cfg(not(feature = "mutant_11"))]
     let gamma_under_off = const_lt_u32(gamma_min_plus_under.val, epsilon_gram.val);
+    #[cfg(feature = "mutant_11")]
+    let gamma_under_off = const_lt_u32(epsilon_gram.val, gamma_min_plus_under.val); // Mutated: inverted
     
     let is_gram_degenerate = kappa_under_on & gamma_under_off;
     
@@ -282,20 +291,20 @@ pub fn measure_kappa(
     });
     let l_leaf = x_max_leaf.wrapping_add(sum_exp_leaf.log2().val as i32);
 
-    let mut kappa = NonNegativeFixed::ZERO;
-    unroll_8_static!(c, {
-        let is_child = const_eq_u32(parent[c & 7] as u32, v as u32);
+    let mut kappa_i64 = 0i64;
+    unroll_8_static!(C, {
+        let is_child = const_eq_u32(parent[C & 7] as u32, v as u32);
         
         let mut x_max_c = i32::MIN;
         unroll_8_static!(X_IDX, {
-            let is_sub_c = is_subtree_leaf[c & 7][X_IDX & 7];
+            let is_sub_c = is_subtree_leaf[C & 7][X_IDX & 7];
             let x_safe = const_select_u32(is_sub_c as u32, x[X_IDX & 7] as u32, i32::MIN as u32) as i32;
             x_max_c = const_max_i32(x_max_c, x_safe);
         });
         
         let mut sum_exp_c = NonNegativeFixed::ZERO;
         unroll_8_static!(X_IDX, {
-            let is_sub_c = is_subtree_leaf[c & 7][X_IDX & 7];
+            let is_sub_c = is_subtree_leaf[C & 7][X_IDX & 7];
             let a_prime = x[X_IDX & 7].wrapping_sub(x_max_c);
             let exp_val = SignedFixed::from_bits(a_prime).exp2();
             sum_exp_c += NonNegativeFixed::from_bits(const_select_u32(is_sub_c as u32, exp_val.val, 0));
@@ -305,9 +314,13 @@ pub fn measure_kappa(
         let log_ratio = l_c.wrapping_sub(l_meas);
         let s_leaf_c = NonNegativeFixed::from_bits(SignedFixed::from_bits(l_c.wrapping_sub(l_leaf)).exp2().val);
         
-        let term = s_leaf_c.val as u64 * log_ratio as u64;
-        kappa += NonNegativeFixed::from_bits(const_select_u32(is_child, (term >> 16) as u32, 0));
+        let term = (s_leaf_c.val as i64).wrapping_mul(log_ratio as i64);
+        let term_selected = const_select_u32(is_child, (term >> 16) as u32, 0) as i32 as i64;
+        kappa_i64 = kappa_i64.wrapping_add(term_selected);
     });
+    
+    let kappa_clipped = const_select_u32((kappa_i64 < 0) as u32, 0, kappa_i64 as u32);
+    let kappa = NonNegativeFixed::from_bits(kappa_clipped);
     
     MeasurementArtifact {
         point_estimate: kappa,

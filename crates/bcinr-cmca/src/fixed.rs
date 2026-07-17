@@ -28,7 +28,10 @@ pub const fn const_lt_u32(a: u32, b: u32) -> CanonicalMask {
 #[inline(always)]
 pub const fn const_eq_u32(a: u32, b: u32) -> CanonicalMask {
     let x = a ^ b;
+    #[cfg(not(feature = "mutant_7"))]
     let nonzero = (x | x.wrapping_neg()) >> 31;
+    #[cfg(feature = "mutant_7")]
+    let nonzero = (!x & !x.wrapping_neg()) >> 31; // Mutated: sign inversion
     CanonicalMask { val: 0u32.wrapping_sub(1u32.wrapping_sub(nonzero)) }
 }
 
@@ -76,7 +79,10 @@ impl NonNegativeFixed {
     #[inline(always)]
     pub const fn saturating_add(self, other: Self) -> Self {
         let sum = self.val.wrapping_add(other.val);
+        #[cfg(not(feature = "mutant_6"))]
         let overflow = const_lt_u32(sum, self.val);
+        #[cfg(feature = "mutant_6")]
+        let overflow = const_lt_u32(self.val, sum); // Mutated: inverted overflow condition
         let e = overflow.select_u32(StabilityRefusal::NumericRangeExceeded as u32, u32::MAX);
         Self {
             val: overflow.select_u32(u32::MAX, sum),
@@ -130,7 +136,9 @@ impl NonNegativeFixed {
         let x3 = ((x2 as i128) + (((x2 as i128) * (e2 >> 32)) >> 62)) as u64;
         
         let n = self.val as u128;
-        let q = (n.wrapping_mul(x3 as u128)) >> (78 - lz);
+        let q_u128 = n.wrapping_mul(x3 as u128);
+        let q_shifted_46 = (q_u128 >> 46) as u64;
+        let q = q_shifted_46 >> (32 - lz);
         
         let rem = ((self.val as u64) << 16).wrapping_sub((q as u64).wrapping_mul(d as u64)) as i64;
         
@@ -169,7 +177,10 @@ impl NonNegativeFixed {
         
         let res = (ip << 16).wrapping_add(corrected_frac as u64);
         
+        #[cfg(not(feature = "mutant_8"))]
         let is_zero = const_eq_u32(self.val, 0);
+        #[cfg(feature = "mutant_8")]
+        let is_zero = const_eq_u32(0, 0); // Mutated: always true
         let computed = (res as u32).wrapping_sub(16 << 16) as i32;
         let e = is_zero.select_u32(StabilityRefusal::UnsupportedDomain as u32, u32::MAX);
         SignedFixed {

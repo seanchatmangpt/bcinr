@@ -84,6 +84,7 @@ pub mod fixed;
 pub mod generated;
 pub mod allocator;
 pub mod observatory;
+pub mod lrc;
 
 pub use allocator::StabilityRefusal;
 

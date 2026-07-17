@@ -346,12 +346,128 @@ fn kill_mutant_5_consequence_truncation() {
     assert_ne!(result_mutant, CORRECT_MU_COST, "Mutant 5 should deviate from correct mu_cost baseline");
 }
 
+#[cfg(feature = "mutant_6")]
+#[test]
+fn kill_mutant_6_saturating_add_false_overflow() {
+    let a = NonNegativeFixed { val: 10, err: u32::MAX };
+    let b = NonNegativeFixed { val: 20, err: u32::MAX };
+    let c = a.saturating_add(b);
+    assert_eq!(c.err, bcinr_cmca::allocator::StabilityRefusal::NumericRangeExceeded as u32, "Mutant 6 should trigger NumericRangeExceeded");
+}
+
+#[cfg(feature = "mutant_7")]
+#[test]
+fn kill_mutant_7_saturating_div_false_zero() {
+    let a = NonNegativeFixed { val: 100, err: u32::MAX };
+    let b = NonNegativeFixed { val: 20, err: u32::MAX };
+    let c = a.saturating_div(b);
+    assert_eq!(c.err, bcinr_cmca::allocator::StabilityRefusal::UnsupportedDomain as u32, "Mutant 7 should trigger UnsupportedDomain");
+}
+
+#[cfg(feature = "mutant_8")]
+#[test]
+fn kill_mutant_8_log2_false_zero() {
+    let a = NonNegativeFixed { val: 100, err: u32::MAX };
+    let c = a.log2();
+    assert_eq!(c.err, bcinr_cmca::allocator::StabilityRefusal::UnsupportedDomain as u32, "Mutant 8 should trigger UnsupportedDomain");
+}
+
+#[cfg(feature = "mutant_9")]
+#[test]
+fn kill_mutant_9_false_drift() {
+    let artifact = bcinr_cmca::observatory::MeasurementArtifact {
+        point_estimate: NonNegativeFixed::from_bits(65536),
+        lower_bound: NonNegativeFixed::from_bits(65536),
+        upper_bound: NonNegativeFixed::from_bits(65536),
+        support_standing: bcinr_cmca::observatory::SupportStanding { is_supported: true, smoothing_applied: false },
+        effective_sample_size: NonNegativeFixed::ONE,
+        dependence_standing: 0,
+        numeric_error: NonNegativeFixed::ZERO,
+        drift: NonNegativeFixed::ZERO,
+        gram_lower_bound: NonNegativeFixed::from_bits(131072),
+        graph_digest: 0,
+        control_mode_digest: 42,
+        proposal: bcinr_cmca::observatory::ModeDelta::ProposeDelta,
+    };
+    let result = bcinr_cmca::observatory::evaluate_calibration(
+        &artifact,
+        NonNegativeFixed::from_bits(131072),
+        NonNegativeFixed::from_bits(65536),
+        NonNegativeFixed::from_bits(65536),
+        NonNegativeFixed::ONE,
+        NonNegativeFixed::from_bits(32768),
+    );
+    assert_eq!(result, Err(bcinr_cmca::observatory::ObservatoryFlag::Drifting));
+}
+
+#[cfg(feature = "mutant_10")]
+#[test]
+fn kill_mutant_10_false_numerically_uncertain() {
+    let artifact = bcinr_cmca::observatory::MeasurementArtifact {
+        point_estimate: NonNegativeFixed::from_bits(131072),
+        lower_bound: NonNegativeFixed::from_bits(131072),
+        upper_bound: NonNegativeFixed::from_bits(131072),
+        support_standing: bcinr_cmca::observatory::SupportStanding { is_supported: true, smoothing_applied: false },
+        effective_sample_size: NonNegativeFixed::ONE,
+        dependence_standing: 0,
+        numeric_error: NonNegativeFixed::ZERO,
+        drift: NonNegativeFixed::ZERO,
+        gram_lower_bound: NonNegativeFixed::from_bits(131072),
+        graph_digest: 0,
+        control_mode_digest: 42,
+        proposal: bcinr_cmca::observatory::ModeDelta::ProposeDelta,
+    };
+    let result = bcinr_cmca::observatory::evaluate_calibration(
+        &artifact,
+        NonNegativeFixed::from_bits(65536),
+        NonNegativeFixed::from_bits(65536),
+        NonNegativeFixed::from_bits(65536),
+        NonNegativeFixed::ONE,
+        NonNegativeFixed::from_bits(32768),
+    );
+    assert_eq!(result, Err(bcinr_cmca::observatory::ObservatoryFlag::NumericallyUncertain));
+}
+
+#[cfg(feature = "mutant_11")]
+#[test]
+fn kill_mutant_11_false_gram_degenerate() {
+    let artifact = bcinr_cmca::observatory::MeasurementArtifact {
+        point_estimate: NonNegativeFixed::from_bits(131072),
+        lower_bound: NonNegativeFixed::from_bits(131072),
+        upper_bound: NonNegativeFixed::from_bits(131072),
+        support_standing: bcinr_cmca::observatory::SupportStanding { is_supported: true, smoothing_applied: false },
+        effective_sample_size: NonNegativeFixed::ONE,
+        dependence_standing: 0,
+        numeric_error: NonNegativeFixed::ZERO,
+        drift: NonNegativeFixed::ZERO,
+        gram_lower_bound: NonNegativeFixed::from_bits(131072),
+        graph_digest: 0,
+        control_mode_digest: 42,
+        proposal: bcinr_cmca::observatory::ModeDelta::ProposeDelta,
+    };
+    let result = bcinr_cmca::observatory::evaluate_calibration(
+        &artifact,
+        NonNegativeFixed::from_bits(65536),
+        NonNegativeFixed::from_bits(65536),
+        NonNegativeFixed::from_bits(65536),
+        NonNegativeFixed::ONE,
+        NonNegativeFixed::from_bits(32768),
+    );
+    assert_eq!(result, Err(bcinr_cmca::observatory::ObservatoryFlag::GramDegenerate));
+}
+
 #[cfg(not(any(
     feature = "mutant_1",
     feature = "mutant_2",
     feature = "mutant_3",
     feature = "mutant_4",
-    feature = "mutant_5"
+    feature = "mutant_5",
+    feature = "mutant_6",
+    feature = "mutant_7",
+    feature = "mutant_8",
+    feature = "mutant_9",
+    feature = "mutant_10",
+    feature = "mutant_11"
 )))]
 #[test]
 fn verify_correctness_baselines() {
