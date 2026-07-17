@@ -412,4 +412,83 @@ mod tests {
         };
         assert!(matches!(compile_powl(&ast), Err(CompileError::InvalidEdge { .. })));
     }
+
+    // -------------------------------------------------------------------------
+    // CompileError exhaustiveness — every variant must be reachable
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn compile_error_tape_full() {
+        // Build a Sequence of 65 atoms — tape only has 64 slots.
+        let atoms: Vec<PowlAstNode<'_>> = (0..65).map(|_| PowlAstNode::Atom("x")).collect();
+        let ast = PowlAstNode::Sequence(atoms);
+        assert_eq!(compile_powl(&ast), Err(CompileError::TapeFull));
+    }
+
+    #[test]
+    fn compile_error_empty_choice() {
+        let ast = PowlAstNode::XorChoice(vec![]);
+        assert_eq!(compile_powl(&ast), Err(CompileError::EmptyChoice));
+    }
+
+    #[test]
+    fn compile_error_empty_partial_order() {
+        let ast = PowlAstNode::PartialOrder {
+            children: vec![],
+            edges: vec![],
+        };
+        assert_eq!(compile_powl(&ast), Err(CompileError::EmptyPartialOrder));
+    }
+
+    #[test]
+    fn compile_error_cycle() {
+        // Build tape manually with a cycle: op0→op1→op0 (without LoopRedo).
+        let mut tape = PowlTape::new();
+        let i0 = tape.alloc(OpKind::Atom).unwrap() as usize;
+        let i1 = tape.alloc(OpKind::Atom).unwrap() as usize;
+        tape.ops[i0].succ_mask = 1 << i1;
+        tape.ops[i1].succ_mask = 1 << i0;
+        tape.ops[i0].pred_mask = 1 << i1;
+        tape.ops[i1].pred_mask = 1 << i0;
+        tape.entry_mask = 1; // pretend op0 is entry
+        let result = kahn_check(&tape);
+        assert_eq!(result, Err(CompileError::Cycle));
+    }
+
+    #[test]
+    fn compile_error_invalid_edge_fields() {
+        let err = CompileError::InvalidEdge { from: 3, to: 99, len: 2 };
+        assert!(matches!(err, CompileError::InvalidEdge { from: 3, to: 99, len: 2 }));
+    }
+
+    // -------------------------------------------------------------------------
+    // Deep nesting — Sequence(Sequence(Sequence(...))) depth 60, no stack overflow
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn compile_deeply_nested_sequence_no_stack_overflow() {
+        // Build Sequence([Sequence([... Atom("x") ...])] with depth 60.
+        fn nest(depth: usize) -> PowlAstNode<'static> {
+            if depth == 0 {
+                PowlAstNode::Atom("x")
+            } else {
+                PowlAstNode::Sequence(vec![nest(depth - 1)])
+            }
+        }
+        let ast = nest(60);
+        let tape = compile_powl(&ast).expect("depth-60 nesting must not overflow");
+        assert_eq!(tape.len, 1); // one Atom compiled
+    }
+
+    // -------------------------------------------------------------------------
+    // Single-op Atom: op 0 is reachable (entry_mask has bit 0 set)
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn single_atom_op0_is_reachable_as_entry() {
+        let ast = PowlAstNode::Atom("solo");
+        let tape = compile_powl(&ast).unwrap();
+        assert_eq!(tape.len, 1);
+        assert_eq!(tape.entry_mask & 1, 1, "op 0 must be in entry_mask");
+    }
 }

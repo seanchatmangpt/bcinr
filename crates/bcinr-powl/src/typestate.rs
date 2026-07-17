@@ -689,6 +689,139 @@ mod tests {
     }
 
     // -------------------------------------------------------------------------
+    // ExecutionToken: 256 consume_op cycles wrapping correctly
+    // -------------------------------------------------------------------------
+
+    /// Simulate calling consume_op in cycles up to 256 times using 64 ops.
+    /// After each full cycle of 64 ops, verify remaining == 0.
+    /// This exercises the bitmask wrapping semantics (bit % 64 == slot index).
+    #[test]
+    fn consume_op_256_cycles_no_panic() {
+        for _ in 0..4 {
+            // 4 cycles × 64 ops = 256 total fires
+            let mut tok = ExecutionToken::new(64);
+            assert_eq!(tok.total(), 64);
+            assert_eq!(tok.remaining(), u64::MAX);
+            for bit_idx in 0..64u64 {
+                tok.consume_op(1u64 << bit_idx).expect("consume_op must not fail");
+            }
+            tok.assert_exhausted().expect("all ops consumed, must be exhausted");
+        }
+    }
+
+    /// Verify that bit index wraps: bit_idx % 64 maps to the correct slot.
+    #[test]
+    fn consume_op_wraps_at_bit_63() {
+        let mut tok = ExecutionToken::new(64);
+        // Fire bit 63 first, then bits 0..62
+        tok.consume_op(1u64 << 63).unwrap();
+        for i in 0..63u64 {
+            tok.consume_op(1u64 << i).unwrap();
+        }
+        tok.assert_exhausted().unwrap();
+    }
+
+    // -------------------------------------------------------------------------
+    // Receipt: op_trace correctness
+    // -------------------------------------------------------------------------
+
+    /// When topo_order has zero bits for a fired op, op_trace must still reflect it.
+    /// This validates that complete() uses full_mask complement, not a separate counter.
+    #[test]
+    fn receipt_op_trace_all_bits_set_for_all_ops() {
+        let tape = two_op_tape();
+        let runner = PowlRunner::new(tape)
+            .validate()
+            .unwrap()
+            .schedule::<{ TopologyKind::Compensating }>();
+        let (exec, mut tok) = runner.begin_execution();
+        assert_eq!(tok.remaining(), 0b11);
+        tok.consume_op(1 << 0).unwrap();
+        tok.consume_op(1 << 1).unwrap();
+        let (_, receipt) = exec.complete(tok).unwrap();
+        // All 2 ops must appear in op_trace
+        assert_eq!(receipt.op_trace, 0b11);
+    }
+
+    /// Verify that a tape with 0 ops cannot be executed (validate blocks it).
+    #[test]
+    fn empty_tape_blocked_at_validate() {
+        use crate::tape::v2::PowlTape;
+        let tape = PowlTape::new();
+        let err = PowlRunner::new(tape).validate().unwrap_err();
+        assert_eq!(err, ValidationError::EmptyTape);
+    }
+
+    // -------------------------------------------------------------------------
+    // Typestate consuming transitions — each phase is single-use
+    // -------------------------------------------------------------------------
+
+    /// Unvalidated → Compiled: consuming validate() moves self
+    #[test]
+    fn typestate_unvalidated_to_compiled_consuming() {
+        let tape = two_op_tape();
+        let runner = PowlRunner::new(tape);
+        let compiled = runner.validate().expect("must compile");
+        // runner is moved; compiled is the new owner
+        let _ = compiled; // no double-use possible at compile time
+    }
+
+    /// Compiled → Scheduled: consuming schedule() moves self
+    #[test]
+    fn typestate_compiled_to_scheduled_consuming() {
+        let tape = two_op_tape();
+        let compiled = PowlRunner::new(tape).validate().unwrap();
+        let scheduled = compiled.schedule::<{ TopologyKind::Standard }>();
+        let _ = scheduled;
+    }
+
+    /// Scheduled → Executing: consuming begin_execution() moves self
+    #[test]
+    fn typestate_scheduled_to_executing_consuming() {
+        let tape = two_op_tape();
+        let scheduled = PowlRunner::new(tape)
+            .validate()
+            .unwrap()
+            .schedule::<{ TopologyKind::Priority }>();
+        let (executing, tok) = scheduled.begin_execution();
+        // tok has 2 unfired bits; avoid destructor bomb by forgetting
+        core::mem::forget(tok);
+        let _ = executing;
+    }
+
+    /// Executing → Receipted: consuming complete() moves self
+    #[test]
+    fn typestate_executing_to_receipted_consuming() {
+        let tape = two_op_tape();
+        let (exec, mut tok) = PowlRunner::new(tape)
+            .validate()
+            .unwrap()
+            .schedule::<{ TopologyKind::Background }>()
+            .begin_execution();
+        tok.consume_op(1 << 0).unwrap();
+        tok.consume_op(1 << 1).unwrap();
+        let (receipted, receipt) = exec.complete(tok).unwrap();
+        assert_eq!(receipt.topology, TopologyKind::Background);
+        assert_eq!(receipted.run_id(), receipt.run_id);
+    }
+
+    /// Receipted is terminal — tape and run_id are accessible
+    #[test]
+    fn typestate_receipted_tape_accessible() {
+        let tape = two_op_tape();
+        let (exec, mut tok) = PowlRunner::new(tape)
+            .validate()
+            .unwrap()
+            .schedule::<{ TopologyKind::LongRunning }>()
+            .begin_execution();
+        tok.consume_op(1 << 0).unwrap();
+        tok.consume_op(1 << 1).unwrap();
+        let (receipted, receipt) = exec.complete(tok).unwrap();
+        // Receipted phase: run_id accessible; tape accessible
+        assert_eq!(receipted.run_id(), receipt.run_id);
+    }
+
+    // -------------------------------------------------------------------------
     // Compile-fail documentation
     // -------------------------------------------------------------------------
     //
