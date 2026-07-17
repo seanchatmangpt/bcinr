@@ -1,7 +1,30 @@
 #![allow(dead_code)]
 
 use bcinr_cmca::fixed::{NonNegativeFixed, SignedFixed, CanonicalMask};
-use bcinr_cmca::observatory::ObservatoryFlag;
+use bcinr_cmca::observatory::{ObservatoryFlag, MeasurementArtifact, SupportStanding, ModeDelta};
+use bcinr_cmca::allocator::CertificateReceipt;
+
+fn make_artifact(
+    kappa_hat: NonNegativeFixed,
+    kappa_under: NonNegativeFixed,
+    gamma_min_plus_under: NonNegativeFixed,
+    d_js: NonNegativeFixed,
+) -> MeasurementArtifact {
+    MeasurementArtifact {
+        point_estimate: kappa_hat,
+        lower_bound: kappa_under,
+        upper_bound: kappa_hat,
+        support_standing: SupportStanding { is_supported: true, smoothing_applied: false },
+        effective_sample_size: NonNegativeFixed::ONE,
+        dependence_standing: 0,
+        numeric_error: NonNegativeFixed::ZERO,
+        drift: d_js,
+        gram_lower_bound: gamma_min_plus_under,
+        graph_digest: 0,
+        control_mode_digest: 42,
+        proposal: ModeDelta::ProposeDelta,
+    }
+}
 
 // M01: Ignore numeric error in underline kappa. Use kappa_hat instead of kappa_under.
 pub fn evaluate_m01(
@@ -15,15 +38,12 @@ pub fn evaluate_m01(
     epsilon_drift: NonNegativeFixed,
     s_meas: NonNegativeFixed,
     s_leaf: NonNegativeFixed,
-) -> Result<(), ObservatoryFlag> {
+) -> Result<CertificateReceipt, ObservatoryFlag> {
+    let artifact = make_artifact(kappa_hat, kappa_hat /* MUTANT! */, gamma_min_plus_under, d_js);
     bcinr_cmca::observatory::evaluate_calibration(
-        kappa_hat,
-        kappa_hat, // MUTANT!
+        &artifact,
         epsilon_on,
-        _gamma_min_plus_hat,
-        gamma_min_plus_under,
         epsilon_gram,
-        d_js,
         epsilon_drift,
         s_meas,
         s_leaf,
@@ -59,15 +79,12 @@ pub fn evaluate_m03(
     epsilon_drift: NonNegativeFixed,
     s_meas: NonNegativeFixed,
     s_leaf: NonNegativeFixed,
-) -> Result<(), ObservatoryFlag> {
+) -> Result<CertificateReceipt, ObservatoryFlag> {
+    let artifact = make_artifact(kappa_hat, kappa_under, gamma_min_plus_hat /* MUTANT! */, d_js);
     bcinr_cmca::observatory::evaluate_calibration(
-        kappa_hat,
-        kappa_under,
+        &artifact,
         epsilon_on,
-        gamma_min_plus_hat,
-        gamma_min_plus_hat, // MUTANT!
         epsilon_gram,
-        d_js,
         epsilon_drift,
         s_meas,
         s_leaf,
@@ -96,22 +113,19 @@ pub fn evaluate_m05(
     kappa_hat: NonNegativeFixed,
     kappa_under: NonNegativeFixed,
     epsilon_on: NonNegativeFixed,
-    gamma_min_plus_hat: NonNegativeFixed,
+    _gamma_min_plus_hat: NonNegativeFixed,
     gamma_min_plus_under: NonNegativeFixed,
     epsilon_gram: NonNegativeFixed,
     _d_js: NonNegativeFixed,
     epsilon_drift: NonNegativeFixed,
     s_meas: NonNegativeFixed,
     s_leaf: NonNegativeFixed,
-) -> Result<(), ObservatoryFlag> {
+) -> Result<CertificateReceipt, ObservatoryFlag> {
+    let artifact = make_artifact(kappa_hat, kappa_under, gamma_min_plus_under, NonNegativeFixed::ZERO /* MUTANT! Ignores drift */);
     bcinr_cmca::observatory::evaluate_calibration(
-        kappa_hat,
-        kappa_under,
+        &artifact,
         epsilon_on,
-        gamma_min_plus_hat,
-        gamma_min_plus_under,
         epsilon_gram,
-        NonNegativeFixed::ZERO, // MUTANT! Ignores drift by passing 0.
         epsilon_drift,
         s_meas,
         s_leaf,
@@ -140,22 +154,19 @@ pub fn evaluate_m07(
     kappa_hat: NonNegativeFixed,
     kappa_under: NonNegativeFixed,
     epsilon_on: NonNegativeFixed,
-    gamma_min_plus_hat: NonNegativeFixed,
+    _gamma_min_plus_hat: NonNegativeFixed,
     _gamma_min_plus_under: NonNegativeFixed,
     epsilon_gram: NonNegativeFixed,
     d_js: NonNegativeFixed,
     epsilon_drift: NonNegativeFixed,
     s_meas: NonNegativeFixed,
     s_leaf: NonNegativeFixed,
-) -> Result<(), ObservatoryFlag> {
+) -> Result<CertificateReceipt, ObservatoryFlag> {
+    let artifact = make_artifact(kappa_hat, kappa_under, NonNegativeFixed::from_bits(1310720) /* MUTANT! Forcing gamma_under to be large */, d_js);
     bcinr_cmca::observatory::evaluate_calibration(
-        kappa_hat,
-        kappa_under,
+        &artifact,
         epsilon_on,
-        gamma_min_plus_hat,
-        NonNegativeFixed::from_bits(1310720), // MUTANT! Forcing gamma_under to be large, ignoring actual Gram
         epsilon_gram,
-        d_js,
         epsilon_drift,
         s_meas,
         s_leaf,
@@ -180,7 +191,7 @@ fn kill_m07_ignore_gram() {
 }
 
 use bcinr_cmca::allocator::{
-    allocate, AdaptiveUpdate, AdmittedControlState, CertificateReceipt,
+    allocate, AdaptiveUpdate, AdmittedControlState,
     EnvelopeReceipt, OutcomeReceipt, CertifiedLearning
 };
 use bcinr_cmca::generated::case_studies::{

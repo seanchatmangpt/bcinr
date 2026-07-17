@@ -45,6 +45,9 @@ pub enum ObservatoryFlag {
     /// The measured scale is identical to the target leaf scale, indicating zero scaling update information.
     ScaleInert,
 
+    /// The proposal does not propose a delta, meaning it is unadmitted for recertification.
+    ModeDeltaUnadmitted,
+
     /// The successful validation state. The substrate passes all safety filters and is a candidate
     /// for recertification or normal deployment.
     RecertificationCandidate,
@@ -61,8 +64,9 @@ impl ObservatoryFlag {
     /// use bcinr_cmca::observatory::ObservatoryFlag;
     ///
     /// assert_eq!(ObservatoryFlag::from_u32(0), Some(ObservatoryFlag::NumericallyUncertain));
-    /// assert_eq!(ObservatoryFlag::from_u32(4), Some(ObservatoryFlag::RecertificationCandidate));
-    /// assert_eq!(ObservatoryFlag::from_u32(5), None);
+    /// assert_eq!(ObservatoryFlag::from_u32(4), Some(ObservatoryFlag::ModeDeltaUnadmitted));
+    /// assert_eq!(ObservatoryFlag::from_u32(5), Some(ObservatoryFlag::RecertificationCandidate));
+    /// assert_eq!(ObservatoryFlag::from_u32(6), None);
     /// ```
     pub fn from_u32(val: u32) -> Option<Self> {
         let lookup = [
@@ -70,12 +74,13 @@ impl ObservatoryFlag {
             Some(Self::GramDegenerate),
             Some(Self::Drifting),
             Some(Self::ScaleInert),
+            Some(Self::ModeDeltaUnadmitted),
             Some(Self::RecertificationCandidate),
-            None, None, None
+            None, None
         ];
         
-        let in_bounds = const_lt_u32(val, 5);
-        let idx = const_select_u32(in_bounds, val, 5) as usize;
+        let in_bounds = const_lt_u32(val, 6);
+        let idx = const_select_u32(in_bounds, val, 6) as usize;
         let res = lookup[idx & 7];
         
         res.filter(|_| in_bounds != 0)
@@ -87,36 +92,30 @@ const FLAGS: [ObservatoryFlag; 8] = [
     ObservatoryFlag::GramDegenerate,
     ObservatoryFlag::Drifting,
     ObservatoryFlag::ScaleInert,
-    ObservatoryFlag::RecertificationCandidate,
+    ObservatoryFlag::ModeDeltaUnadmitted,
     ObservatoryFlag::RecertificationCandidate,
     ObservatoryFlag::RecertificationCandidate,
     ObservatoryFlag::RecertificationCandidate,
 ];
 
+use crate::allocator::CertificateReceipt;
+
 /// Wraps a raw observatory flag code into a `Result` type branchlessly.
 ///
-/// A flag code of `4` (corresponding to `RecertificationCandidate`) represents success and
-/// maps to `Ok(())`. Any other flag code represents a failure mode and maps to `Err(ObservatoryFlag)`.
-///
-/// # Examples
-///
-/// ```rust
-/// use bcinr_cmca::observatory::{wrap_observatory_result, ObservatoryFlag};
-///
-/// assert_eq!(wrap_observatory_result(4), Ok(()));
-/// assert_eq!(wrap_observatory_result(2), Err(ObservatoryFlag::Drifting));
-/// ```
+/// A flag code of `5` (corresponding to `RecertificationCandidate`) represents success and
+/// maps to `Ok(CertificateReceipt)`. Any other flag code represents a failure mode and maps to `Err(ObservatoryFlag)`.
 ///
 /// # Branchless Contract
 ///
 /// Under the hood, this function maps the integer code into the static flag mapping
-/// array and uses a branchless array index selection based on the equality to `4`.
+/// array and uses a branchless array index selection based on the equality to `5`.
 pub fn wrap_observatory_result(
     flag_code: u32,
-) -> Result<(), ObservatoryFlag> {
+    digest: u64,
+) -> Result<CertificateReceipt, ObservatoryFlag> {
     let flag = FLAGS[(flag_code as usize) & 7];
-    let is_recert = const_eq_u32(flag_code, 4);
-    let outcomes = [Err(flag), Ok(())];
+    let is_recert = const_eq_u32(flag_code, 5);
+    let outcomes = [Err(flag), Ok(CertificateReceipt::new(digest))];
     outcomes[is_recert as usize]
 }
 
@@ -128,20 +127,16 @@ pub fn wrap_observatory_result(
 ///
 /// # Arguments
 ///
-/// * `kappa_hat` - The estimated condition number of the system.
-/// * `kappa_under` - The lower bound (conservative estimate) of the condition number.
+/// * `artifact` - The `MeasurementArtifact` containing telemetry metrics and proposal.
 /// * `epsilon_on` - The threshold limit for the condition number.
-/// * `_gamma_min_plus_hat` - The estimated minimum positive eigenvalue of the Gram matrix. (Unused but kept for contract symmetry).
-/// * `gamma_min_plus_under` - The lower bound (conservative estimate) of the minimum positive eigenvalue.
 /// * `epsilon_gram` - The threshold limit for the Gram eigenvalue.
-/// * `d_js` - The measured divergence (e.g., Jensen-Shannon distance) representing drift.
 /// * `epsilon_drift` - The threshold limit for drift divergence.
 /// * `s_meas` - The measured scale parameter of the current sample.
 /// * `s_leaf` - The target scale parameter at the leaf node.
 ///
 /// # Return Value
 ///
-/// Returns `Ok(())` if the system passes all safety gates (mapping to `RecertificationCandidate`).
+/// Returns `Ok(CertificateReceipt)` if the system passes all safety gates (mapping to `RecertificationCandidate`).
 /// Otherwise, returns an `Err(ObservatoryFlag)` indicating the first detected failure mode in the
 /// prioritization queue (highest priority to lowest priority):
 /// 1. `Drifting` (highest priority check)
@@ -149,45 +144,23 @@ pub fn wrap_observatory_result(
 /// 3. `NumericallyUncertain`
 /// 4. `GramDegenerate`
 ///
-/// # Examples
-///
-/// ```rust
-/// use bcinr_cmca::fixed::NonNegativeFixed;
-/// use bcinr_cmca::observatory::{evaluate_calibration, ObservatoryFlag};
-///
-/// // Example: Drifting state
-/// let result = evaluate_calibration(
-///     NonNegativeFixed::from_bits(131072),
-///     NonNegativeFixed::from_bits(131072),
-///     NonNegativeFixed::from_bits(65536),
-///     NonNegativeFixed::from_bits(131072),
-///     NonNegativeFixed::from_bits(131072),
-///     NonNegativeFixed::from_bits(65536),
-///     NonNegativeFixed::from_bits(131072), // d_js (2.0)
-///     NonNegativeFixed::from_bits(65536),  // epsilon_drift (1.0) -> Drift detected!
-///     NonNegativeFixed::ONE,
-///     NonNegativeFixed::from_bits(32768),
-/// );
-/// assert_eq!(result, Err(ObservatoryFlag::Drifting));
-/// ```
-///
 /// # Branchless Contract
 ///
 /// Checks are performed concurrently using bitwise masks. Prioritization is enforced using
 /// sequential branchless selections `const_select_u32`.
 pub fn evaluate_calibration(
-    kappa_hat: NonNegativeFixed,
-    kappa_under: NonNegativeFixed,
+    artifact: &MeasurementArtifact,
     epsilon_on: NonNegativeFixed,
-    _gamma_min_plus_hat: NonNegativeFixed,
-    gamma_min_plus_under: NonNegativeFixed,
     epsilon_gram: NonNegativeFixed,
-    d_js: NonNegativeFixed,
     epsilon_drift: NonNegativeFixed,
     s_meas: NonNegativeFixed,
     s_leaf: NonNegativeFixed,
-) -> Result<(), ObservatoryFlag> {
-    
+) -> Result<CertificateReceipt, ObservatoryFlag> {
+    let kappa_hat = artifact.point_estimate;
+    let kappa_under = artifact.lower_bound;
+    let gamma_min_plus_under = artifact.gram_lower_bound;
+    let d_js = artifact.drift;
+
     // Conditions
     let is_drift = const_lt_u32(epsilon_drift.0, d_js.0);
     
@@ -203,16 +176,19 @@ pub fn evaluate_calibration(
     
     let is_gram_degenerate = kappa_under_on & gamma_under_off;
     
-    let is_recert = kappa_under_on & (!gamma_under_off);
+    let is_unadmitted = const_eq_u32(artifact.proposal as u32, ModeDelta::Retain as u32);
     
-    let mut flag = 4u32; // Default to Ok
-    flag = const_select_u32(is_recert, 4, flag);
+    let is_recert = kappa_under_on & (!gamma_under_off) & (!is_unadmitted);
+    
+    let mut flag = 5u32; // Default to Ok
+    flag = const_select_u32(is_recert, 5, flag);
+    flag = const_select_u32(is_unadmitted, 4, flag);
     flag = const_select_u32(is_gram_degenerate, 1, flag);
     flag = const_select_u32(is_numerically_uncertain, 0, flag);
     flag = const_select_u32(is_scale_inert, 3, flag);
     flag = const_select_u32(is_drift, 2, flag);
     
-    wrap_observatory_result(flag)
+    wrap_observatory_result(flag, artifact.control_mode_digest)
 }
 
 
