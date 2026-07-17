@@ -66,7 +66,7 @@ fn test_case_study_1_cache_choice() {
 
     // Verify that Artifact_A (index 0) gets more cache allocation than Artifact_B (index 1)
     // In our lambda matrix, index 0 is MeasureCache, which dominates lens 0 (2.0) and 1 (1.0).
-    assert!(result[0].0 > result[1].0, "Artifact_A should have higher cache allocation than Artifact_B");
+    assert!(result[0].val > result[1].val, "Artifact_A should have higher cache allocation than Artifact_B");
 }
 
 #[test]
@@ -106,7 +106,7 @@ fn test_case_study_2_single_object_multiple_decisions() {
     for i in 0..N {
         println!("CS2 result[{}]: {:?}", i, result[i]);
     }
-    assert!(result[6].0 > result[4].0, "Obj_Single should have higher allocation than Obj_Obligation");
+    assert!(result[6].val > result[4].val, "Obj_Single should have higher allocation than Obj_Obligation");
 }
 
 #[test]
@@ -150,7 +150,7 @@ fn test_case_study_3_downstream_consequence() {
     ).unwrap();
 
     // Obj_Value (index 7) is the only leaf in the chain, so it receives the allocated resource.
-    assert!(result[7].0 > 0, "Obj_Value should receive allocation");
+    assert!(result[7].val > 0, "Obj_Value should receive allocation");
 }
 
 #[test]
@@ -202,11 +202,11 @@ fn test_case_study_4_generalization() {
     let mut sum = 0u64;
     for i in 0..gen::N {
         println!("result[{}]: {:?}", i, result[i]);
-        sum += result[i].0 as u64;
+        sum += result[i].val as u64;
     }
     println!("sum: {}", sum);
     // We allow small rounding tolerance
-    assert!((sum as i64 - NonNegativeFixed::ONE.0 as i64).abs() < 50, "Total allocation should sum to 1.0");
+    assert!((sum as i64 - NonNegativeFixed::ONE.val as i64).abs() < 50, "Total allocation should sum to 1.0");
 }
 
 #[test]
@@ -291,7 +291,7 @@ fn test_stability_refusals_and_graceful_fallback() {
     assert_eq!(res_dwell, Err(StabilityRefusal::ModeDwellTimeViolated));
 
     // 4. Learning rate outside envelope with degrade=false -> should return LearningRateOutsideEnvelope
-    let high_zeta = NonNegativeFixed(2000); // Exceeds ZETA_W_MAX (819)
+    let high_zeta = NonNegativeFixed::from_bits(2000); // Exceeds ZETA_W_MAX (819)
     let res_lr = allocate(
         &OBJECT_REGISTRY,
         &LENS_REGISTRY,
@@ -322,8 +322,8 @@ fn test_typestate_bounds_checks() {
         CertificateReceipt::new(0),
         EnvelopeReceipt::new(0),
         OutcomeReceipt::new(0),
-        NonNegativeFixed(327680),
-        NonNegativeFixed(65),
+        NonNegativeFixed::from_bits(327680),
+        NonNegativeFixed::from_bits(65),
         CertifiedLearning::new(),
     );
     assert!(p_ok.is_some());
@@ -334,8 +334,8 @@ fn test_typestate_bounds_checks() {
         CertificateReceipt::new(0),
         EnvelopeReceipt::new(0),
         OutcomeReceipt::new(0),
-        NonNegativeFixed(327681),
-        NonNegativeFixed(65),
+        NonNegativeFixed::from_bits(327681),
+        NonNegativeFixed::from_bits(65),
         CertifiedLearning::new(),
     );
     assert!(p_temp_high.is_none());
@@ -346,8 +346,8 @@ fn test_typestate_bounds_checks() {
         CertificateReceipt::new(0),
         EnvelopeReceipt::new(0),
         OutcomeReceipt::new(0),
-        NonNegativeFixed(327680),
-        NonNegativeFixed(64),
+        NonNegativeFixed::from_bits(327680),
+        NonNegativeFixed::from_bits(64),
         CertifiedLearning::new(),
     );
     assert!(p_dist_low.is_none());
