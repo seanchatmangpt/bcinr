@@ -1,7 +1,81 @@
-//! ocel — Object-Centric Event Log for POWL conformance checking.
+//! Object-Centric Event Log (OCEL) and Symmetric Run-Bounded Conformance Gating (SRBCG).
 //!
-//! Records `op_fired` and `run_sealed` events into a fixed-capacity log,
-//! enabling process-mining conformance checks without heap allocation.
+//! This module provides a deterministic, zero-allocation (`no_std` compatible) mechanism for
+//! recording execution traces of Partially Ordered Workflow Language (POWL) workflows and
+//! validating them against a compiled [`crate::tape::PowlTape`].
+//!
+//! # Architecture & Design Goals
+//!
+//! The conformance checking engine is designed to operate within the constraints of the
+//! **deterministic substrate** (refer to the project constitution in `AGENTS.md`). Specifically:
+//! - **Radon Law ($CC=1$) Compliance**: The core slot assignment algorithm ([`process_event_srbcg`])
+//!   is branchless and contains no data-dependent jumps.
+//! - **Zero-Allocation**: No heap allocation is performed during event recording or conformance checking.
+//!   All storage uses fixed-size arrays.
+//! - **Symmetric Run-Bounded Conformance Gating (SRBCG)**: Restricts tracking to a maximum of 64 concurrent
+//!   or unique runs. Any trace exceeding this boundary is rejected with a typed refusal.
+//!
+//! # Core Concepts
+//!
+//! ## Object-Centric Event Log ([`OcelLog`])
+//!
+//! The [`OcelLog`] records discrete events occurring during workflow runs. Each log can store up to 512
+//! events. There are two primary event activities:
+//! - **`op_fired`**: Marks the execution of an operation (`op_idx`) within a given `run_id`.
+//! - **`run_sealed`**: Seals a `run_id` with a bitmask (`op_trace`) representing the set of operations
+//!   asserted to have fired.
+//!
+//! ## Symmetric Run-Bounded Conformance Gating (SRBCG) & Comparison Networks
+//!
+//! Because heap allocation is forbidden, mapping dynamic `run_id`s to state vectors must be done
+//! in bounded stack memory. The engine allocates a static slot array of size 64.
+//!
+//! To determine which slot corresponds to an incoming `run_id` without branching, [`process_event_srbcg`] uses a
+//! **comparison network**. This compiles down to branchless conditional selection instructions
+//! (e.g., `CSEL` on ARM, `CMOV` on x86).
+//!
+//! The comparison network operates as follows:
+//! 1. Iterate over all 64 slots in a fixed loop.
+//! 2. Generate a match mask `is_match = (run_ids[i] == incoming_rid)`.
+//! 3. Use arithmetic selection to set the target index: `match_idx = (is_match * i) + ((1 - is_match) * match_idx)`.
+//! 4. If the run is not found, allocate a new slot.
+//! 5. If no slots are available, set an overflow mask rather than panicking or silent failure.
+//!
+//! ## Conformance Validation Checks
+//!
+//! The [`validate_against_tape`] function performs five consecutive validation checks:
+//!
+//! 1. **Empty Log Check**: Returns [`ConformanceResult::EmptyLog`] if no events are recorded.
+//! 2. **Run Limit Check**: Returns [`ConformanceResult::RunLimitExceeded`] if more than 64 unique run IDs are present.
+//! 3. **Duplicate Fire Check**: Returns [`ConformanceResult::DuplicateFire`] if an operation fires more than once in the same run.
+//! 4. **Seal Mismatch Check**: Returns [`ConformanceResult::SealMismatch`] if the declared `op_trace` in a `run_sealed` event does not match the accumulated fired operations.
+//! 5. **Predecessor Constraint Check**: Returns [`ConformanceResult::Violation`] if an operation is fired before its required predecessors (as compiled into the tape's `pred_mask`).
+//!
+//! # Examples
+//!
+//! ```
+//! use bcinr_powl::ocel::{OcelLog, ConformanceResult};
+//! use bcinr_powl::compiler::{compile_powl, PowlAstNode};
+//!
+//! // 1. Compile a simple POWL sequence: "a" -> "b"
+//! let ast = PowlAstNode::Sequence(vec![
+//!     PowlAstNode::Atom("a"),
+//!     PowlAstNode::Atom("b"),
+//! ]);
+//! let tape = compile_powl(&ast).unwrap();
+//!
+//! // 2. Record conforming events
+//! let mut log = OcelLog::new();
+//! let run_id = 99u64;
+//!
+//! // "a" (op_idx 0) fires, followed by "b" (op_idx 1)
+//! log.record_op_fired(run_id, 0, 0).unwrap();
+//! log.record_op_fired(run_id, 1, 0).unwrap();
+//! log.record_run_sealed(run_id, 0b11).unwrap();
+//!
+//! // 3. Validate
+//! assert_eq!(log.validate_against_tape(&tape), ConformanceResult::Conforms);
+//! ```
 
 #![forbid(unsafe_code)]
 
@@ -10,49 +84,73 @@ use wasm4pm_compat::ocel::{
     OCELEvent, OCELEventAttribute, OCELObject, OCELRelationship, OCELType, OCEL,
 };
 
+/// A discrete event recorded within an [`OcelLog`].
+///
+/// An event represents either the firing of an individual operation or the
+/// sealing of a workflow run.
 pub struct OcelEvent {
+    /// A unique sequential identifier for the event.
     pub event_id: u64,
-    pub activity: &'static str, // "op_fired" | "run_sealed"
-    pub timestamp: u64,         // monotonic tick counter
+    /// The event type, either `"op_fired"` or `"run_sealed"`.
+    pub activity: &'static str,
+    /// A monotonic tick counter used to preserve order of events.
+    pub timestamp: u64,
+    /// The identifier of the execution run.
     pub run_id: u64,
+    /// For `"op_fired"`, the index of the operation that fired.
+    /// For `"run_sealed"`, the low 32 bits of the declared `op_trace` bitmask.
     pub op_idx: u32,
+    /// Auxiliary tag storing the operation kind or metadata.
     pub kind_tag: u8,
 }
 
+/// A fixed-capacity, heap-allocation-free event log.
+///
+/// `OcelLog` can hold up to 512 events of type [`OcelEvent`]. It supports
+/// appending events with guaranteed $O(1)$ time complexity and no dynamic allocation.
 pub struct OcelLog {
     events: [OcelEvent; 512],
     count: usize,
     tick: u64,
 }
 
-/// Error returned when an append operation cannot complete.
+/// Errors that can occur when interacting with [`OcelLog`].
 #[derive(Debug, PartialEq, Eq)]
 pub enum OcelError {
     /// The log is at capacity (512 events); the event was NOT recorded.
     Overflow,
 }
 
-/// Result of conformance checking a log against a POWL tape.
+/// The outcome of conformance checking an [`OcelLog`] against a [`crate::tape::PowlTape`].
 #[derive(Debug, PartialEq, Eq)]
 pub enum ConformanceResult {
+    /// The log is fully compliant with the POWL model.
     Conforms,
     /// A predecessor constraint was violated: op `op_idx` fired in `run_id`
     /// but the ops in `missing_pred_mask` had not yet fired.
     Violation {
+        /// The identifier of the run that violated the constraint.
         run_id: u64,
+        /// The index of the operation that fired out-of-order.
         op_idx: u32,
+        /// A bitmask of predecessor operations that were missing.
         missing_pred_mask: u64,
     },
     /// The same op index fired more than once within a single run.
     DuplicateFire {
+        /// The identifier of the run.
         run_id: u64,
+        /// The index of the operation that fired multiple times.
         op_idx: u32,
     },
     /// The declared `op_trace` at seal time does not exactly equal the set of
     /// `op_fired` events accumulated for that run.
     SealMismatch {
+        /// The identifier of the run.
         run_id: u64,
+        /// The declared bitmask of fired operations.
         declared: u64,
+        /// The actual accumulated bitmask of fired operations.
         accumulated: u64,
     },
     /// The log contains no events.
@@ -63,6 +161,16 @@ pub enum ConformanceResult {
 }
 
 impl OcelLog {
+    /// Creates a new, empty `OcelLog` with a capacity of 512 events.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bcinr_powl::ocel::OcelLog;
+    ///
+    /// let log = OcelLog::new();
+    /// assert_eq!(log.events().len(), 0);
+    /// ```
     pub const fn new() -> Self {
         const DEFAULT_EVENT: OcelEvent = OcelEvent {
             event_id: 0,
@@ -79,10 +187,22 @@ impl OcelLog {
         }
     }
 
-    /// Record that operation `op_idx` fired within `run_id`.
+    /// Records that operation `op_idx` fired within `run_id`.
     ///
-    /// Returns `Err(OcelError::Overflow)` when the log is full; the event is
+    /// # Errors
+    ///
+    /// Returns [`OcelError::Overflow`] when the log is full; the event is
     /// NOT silently dropped — callers must handle the error.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bcinr_powl::ocel::OcelLog;
+    ///
+    /// let mut log = OcelLog::new();
+    /// log.record_op_fired(42, 0, 1).unwrap();
+    /// assert_eq!(log.events().len(), 1);
+    /// ```
     pub fn record_op_fired(
         &mut self,
         run_id: u64,
@@ -105,11 +225,23 @@ impl OcelLog {
         Ok(())
     }
 
-    /// Record that run `run_id` was sealed with the given `op_trace` bitmask.
+    /// Records that run `run_id` was sealed with the given `op_trace` bitmask.
     /// The low 32 bits of `op_trace` are stored in `op_idx`; `kind_tag` is 0.
     ///
-    /// Returns `Err(OcelError::Overflow)` when the log is full; the event is
+    /// # Errors
+    ///
+    /// Returns [`OcelError::Overflow`] when the log is full; the event is
     /// NOT silently dropped — callers must handle the error.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bcinr_powl::ocel::OcelLog;
+    ///
+    /// let mut log = OcelLog::new();
+    /// log.record_run_sealed(42, 0b11).unwrap();
+    /// assert_eq!(log.events().len(), 1);
+    /// ```
     pub fn record_run_sealed(&mut self, run_id: u64, op_trace: u64) -> Result<(), OcelError> {
         if self.count >= 512 {
             return Err(OcelError::Overflow);
@@ -127,18 +259,35 @@ impl OcelLog {
         Ok(())
     }
 
-    /// Return the slice of recorded events.
+    /// Returns the slice of recorded events.
     pub fn events(&self) -> &[OcelEvent] {
         &self.events[..self.count]
     }
 
-    /// Validate the log against the given POWL tape's predecessor masks.
-    /// No heap, no_std safe.
+    /// Validates the log against the given POWL tape's predecessor masks.
+    ///
+    /// This is a heap-free, `no_std` safe check.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bcinr_powl::ocel::{OcelLog, ConformanceResult};
+    /// use bcinr_powl::compiler::{compile_powl, PowlAstNode};
+    ///
+    /// let tape = compile_powl(&PowlAstNode::Atom("a")).unwrap();
+    /// let mut log = OcelLog::new();
+    /// log.record_op_fired(1, 0, 0).unwrap();
+    /// log.record_run_sealed(1, 0b1).unwrap();
+    ///
+    /// assert_eq!(log.validate_against_tape(&tape), ConformanceResult::Conforms);
+    /// ```
     pub fn validate_against_tape(&self, tape: &crate::tape::PowlTape) -> ConformanceResult {
         validate_against_tape(self, tape)
     }
 
-    /// Convert to an OCEL 2.0 structure (std-gated).
+    /// Converts the `OcelLog` into a standard OCEL 2.0 structure.
+    ///
+    /// This method is only available when the `std` feature is enabled.
     #[cfg(feature = "std")]
     pub fn to_ocel_2_0(&self) -> OCEL {
         use std::collections::BTreeSet;
@@ -221,25 +370,57 @@ impl OcelLog {
         }
     }
 
-    /// Serialize to OCEL 2.0 JSON (std-gated).
+    /// Serializes the `OcelLog` to an OCEL 2.0 JSON string.
+    ///
+    /// This method is only available when the `std` feature is enabled.
     #[cfg(feature = "std")]
     pub fn to_ocel_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string_pretty(&self.to_ocel_2_0())
     }
 }
 
-/// Validate an OcelLog against a PowlTape's predecessor masks.
-/// No heap, no_std safe.
+/// Tracks unique run IDs branchlessly using Symmetric Run-Bounded Conformance Gating (SRBCG).
 ///
-/// Checks performed (in order):
-/// 1. `EmptyLog`           — log has no events at all.
-/// 2. `DuplicateFire`      — same op fired twice in one run (per run_id).
-/// 3. `SealMismatch`       — declared op_trace ≠ accumulated fired-op bitmask.
-/// 4. `Violation`          — predecessor constraint: op fired before its pred.
-/// Symmetric Run-Bounded Conformance Gating (SRBCG) Slot Tracker.
+/// This is a core kernel utility that maintains a set of up to 64 unique run IDs and returns
+/// the slot index mapped to `incoming_rid`.
 ///
-/// Ensures CC=1 execution while checking run capacities. No heap allocations
-/// are performed, and no data-dependent jumps are generated.
+/// # Design & Radon Law ($CC=1$) Compliance
+///
+/// To satisfy strict constant-time / branchless requirements:
+/// - It uses a comparison network over the 64-slot `run_ids` array.
+/// - Loop bounds are statically fixed (`0..64`), allowing the compiler to generate unrolled,
+///   straight-line assembly using conditional move instructions (e.g., `CSEL`/`CMOV`).
+/// - Arithmetic and bitwise operations select indices and propagate errors instead of using
+///   conditional control flow (`if` or `match`).
+///
+/// # Slot Allocation Logic
+///
+/// 1. **Search**: Computes `match_idx` by evaluating `is_match = (run_ids[i] == incoming_rid)` for every slot `i`.
+/// 2. **Decision**:
+///    - If a slot matches: returns that index.
+///    - If no slot matches, and `run_count < 64`: assigns a new slot, increments `run_count`, and writes the new `run_id`.
+///    - If no slot matches, and `run_count == 64`: marks overflow in `overflow_mask` and returns slot `64`.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_powl::ocel::process_event_srbcg;
+///
+/// let mut run_ids = [u64::MAX; 64];
+/// let mut run_count = 0;
+/// let mut overflow_mask = 0;
+///
+/// // Allocate first run
+/// let slot_0 = process_event_srbcg(&mut run_ids, &mut run_count, 100, &mut overflow_mask);
+/// assert_eq!(slot_0, 0);
+/// assert_eq!(run_count, 1);
+/// assert_eq!(run_ids[0], 100);
+///
+/// // Retrieve existing run
+/// let slot_ref = process_event_srbcg(&mut run_ids, &mut run_count, 100, &mut overflow_mask);
+/// assert_eq!(slot_ref, 0);
+/// assert_eq!(run_count, 1);
+/// ```
 #[inline(always)]
 pub fn process_event_srbcg(
     run_ids: &mut [u64; 64],
@@ -289,15 +470,54 @@ pub fn process_event_srbcg(
     target_idx
 }
 
-/// Validate an OcelLog against a PowlTape's predecessor masks.
-/// No heap, no_std safe.
+/// Validates an [`OcelLog`] against a [`crate::tape::PowlTape`]'s predecessor constraints.
 ///
-/// Checks performed (in order):
-/// 1. `EmptyLog`           — log has no events at all.
-/// 2. `RunLimitExceeded`   — log has more than 64 unique run IDs.
-/// 3. `DuplicateFire`      — same op fired twice in one run (per run_id).
-/// 4. `SealMismatch`       — declared op_trace ≠ accumulated fired-op bitmask.
-/// 5. `Violation`          — predecessor constraint: op fired before its pred.
+/// This is a heap-free, `no_std` conformance check. It aggregates events by their
+/// active runs (up to 64 concurrent runs) and checks that no operation fires before
+/// its predecessors, no operations fire twice in the same run, and that sealed traces
+/// match the declared execution set.
+///
+/// # Validation Steps (in order)
+///
+/// 1. **Empty Log Verification**:
+///    If the log contains zero events, validation fails immediately with [`ConformanceResult::EmptyLog`].
+/// 2. **Run Limit Check**:
+///    Uses [`process_event_srbcg`] to track unique run IDs. If the log contains more than 64 unique run IDs,
+///    it fails with [`ConformanceResult::RunLimitExceeded`]. This ensures that logs exceeding the capacity
+///    cannot bypass validation or trigger silent false-positives.
+/// 3. **Duplicate Fire Check**:
+///    Iterates over events and tracks if any operation fires twice within the same run. If detected,
+///    validation fails with [`ConformanceResult::DuplicateFire`].
+/// 4. **Seal Mismatch Check**:
+///    For each run that contains a `run_sealed` event, the declared `op_trace` is checked against the
+///    accumulated `op_fired` events. If there is a mismatch (e.g., an operation declared in the trace
+///    never fired, or an operation fired but was not declared), validation fails with [`ConformanceResult::SealMismatch`].
+/// 5. **Predecessor Constraint Check**:
+///    For each fired operation, its predecessor mask is checked against the set of operations that have
+///    already fired in that run. If any required predecessor is missing, validation fails with [`ConformanceResult::Violation`].
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_powl::ocel::{OcelLog, ConformanceResult, validate_against_tape};
+/// use bcinr_powl::compiler::{compile_powl, PowlAstNode};
+///
+/// // Create sequence "a" -> "b"
+/// let ast = PowlAstNode::Sequence(vec![
+///     PowlAstNode::Atom("a"),
+///     PowlAstNode::Atom("b"),
+/// ]);
+/// let tape = compile_powl(&ast).unwrap();
+///
+/// // Conforming log
+/// let mut log = OcelLog::new();
+/// log.record_op_fired(10, 0, 0).unwrap(); // op 0 fired in run 10
+/// log.record_op_fired(10, 1, 0).unwrap(); // op 1 fired in run 10
+/// log.record_run_sealed(10, 0b11).unwrap(); // sealed with both
+///
+/// let result = validate_against_tape(&log, &tape);
+/// assert_eq!(result, ConformanceResult::Conforms);
+/// ```
 pub fn validate_against_tape(log: &OcelLog, tape: &crate::tape::PowlTape) -> ConformanceResult {
     // 1. Empty log.
     if log.events().is_empty() {
@@ -761,4 +981,3 @@ mod tests {
         );
     }
 }
-

@@ -1,14 +1,58 @@
-//! compiler — Compile a POWL AST into a `PowlTape`.
+//! # POWL Compiler & Graph Verification Engines
 //!
-//! # Algorithm
+//! This module compiles a Partially Ordered Workflow Language (POWL) Abstract Syntax Tree (AST)
+//! into a flat execution tape (`PowlTape`). In addition, it provides robust static analysis gates
+//! to ensure correctness and determinism of the compiled workflow graph.
 //!
-//! The compiler does a single recursive descent over the AST, allocating tape
-//! slots as it goes.  Each recursive call returns a `Segment` that describes
-//! the entry slot(s) and exit slot(s) of the compiled sub-tree.  The caller
-//! wires `pred_mask`/`succ_mask` across the boundary.
+//! ## Compilation Strategy
 //!
-//! After compilation a Kahn's-algorithm post-pass verifies there are no
-//! non-loop cycles.
+//! The compiler performs a single recursive descent over the AST, allocating slots on a flat tape
+//! sequentially. Each compilation step returns an internal `Segment` describing:
+//! - **Entry Mask**: A bitmask of slots representing the starting points of execution for the subtree.
+//! - **Exit Mask**: A bitmask of slots representing the termination points of execution for the subtree.
+//!
+//! Node wiring (via predecessor and successor bitmasks) is handled by linking the exit mask of
+//! previous subtrees to the entry mask of subsequent subtrees.
+//!
+//! ## Two-Phase Verification Protocol
+//!
+//! After compiling the AST into a flat tape, the graph must pass two validation passes to ensure
+//! correctness.
+//!
+//! ### Phase 1: Cycle Detection (Kahn's Algorithm)
+//!
+//! To ensure safe execution, the graph must be free of non-loop cycles. This is verified using
+//! Kahn's topological sort algorithm:
+//! 1. Compute the in-degree of all non-`LoopRedo` nodes, ignoring incoming edges from `LoopRedo` nodes.
+//! 2. Perform a BFS traversal starting from nodes with an in-degree of 0.
+//! 3. If the traversal visits fewer non-`LoopRedo` nodes than are present in the tape, a cycle is
+//!    detected, and compilation fails.
+//!
+//! **Complexity**: $O(V + E)$ where $V \le 64$ is the number of tape slots.
+//!
+//! ### Phase 2: Reachability Validation (BP-TCRV)
+//!
+//! The tape must contain no unreachable execution paths. The Bit-Parallel Transitive Closure Reachability
+//! Validation (BP-TCRV) algorithm determines if all active non-`LoopRedo` nodes are reachable from the
+//! `entry_mask` of the tape.
+//!
+//! **Algorithm Steps**:
+//! 1. Initialize the reachability matrix $R_i^{(0)} = \text{succ\_mask}_i \cup \{i\}$.
+//! 2. Compute the transitive closure via a bit-parallel Roy-Warshall algorithm. For each pivot $k \in [0, 63]$:
+//!    $$R_i^{(k+1)} = R_i^{(k)} \cup (R_k^{(k)} \text{ if } k \in R_i^{(k)})$$
+//!    This is executed branchlessly using full-width bitmasks:
+//!
+//! ```text
+//! let can_reach_k = (r[i] >> k) & 1;
+//! let mask = 0u64.wrapping_sub(can_reach_k);
+//! r[i] |= r[k] & mask;
+//! ```
+//! 3. Accumulate nodes reachable from the entry mask:
+//!    $$\text{reachable\_from\_entry} = \bigcup_{e \in \text{entry\_mask}} R_e$$
+//! 4. Check for containment: all active non-`LoopRedo` nodes must be present in `reachable_from_entry`.
+//!
+//! **Complexity**: $O(V^3 / 64)$ steps where $V = 64$. By fixing the matrix size to $64 \times 64$, the
+//! execution is fully deterministic, branchless ($CC=1$), and constant-time, preventing timing leaks.
 
 use crate::tape::{OpKind, PowlTape};
 
@@ -16,27 +60,54 @@ use crate::tape::{OpKind, PowlTape};
 // Public AST
 // ---------------------------------------------------------------------------
 
-/// Minimal local POWL AST (no external wasm4pm-compat dependency).
+/// A node in the Partially Ordered Workflow Language (POWL) Abstract Syntax Tree.
+///
+/// POWL is a process modeling language that combines block-structured constructs
+/// (like sequence, exclusive choice, and loops) with partial orders (where activity
+/// dependency edges are defined explicitly).
+///
+/// This enum represents a node in the AST, which is recursively compiled into
+/// a flat execution tape (`PowlTape`) for bounded, branchless, allocation-free execution.
 pub enum PowlAstNode<'a> {
-    /// A named activity.
+    /// A named activity transition.
+    ///
+    /// The activity is identified by a label string slice.
     Atom(&'a str),
-    /// Silent / tau transition.
+    /// A silent/tau transition.
+    ///
+    /// Used as a placeholder transition that executes without side effects or activity labels.
     Silent,
-    /// Sequential composition: execute children left-to-right.
+    /// Sequential composition of child nodes.
+    ///
+    /// The child nodes execute strictly from left to right.
     Sequence(Vec<PowlAstNode<'a>>),
-    /// Partial-order: children with explicit dependency edges.
-    /// `edges` are `(from_child_idx, to_child_idx)` pairs.
+    /// Partial-order composition.
+    ///
+    /// Children can execute concurrently or with explicit precedence constraints.
+    /// Dependency edges are represented as `(from_child_idx, to_child_idx)` pairs,
+    /// denoting that `children[from_child_idx]` must complete before `children[to_child_idx]`
+    /// can execute.
     PartialOrder {
+        /// The list of child nodes in the partial order.
         children: Vec<PowlAstNode<'a>>,
+        /// Directed acyclic dependency edges between children.
         edges: Vec<(usize, usize)>,
     },
-    /// Exclusive choice: exactly one branch executes.
+    /// Exclusive choice (XOR split-join).
+    ///
+    /// Exactly one of the child branches will be chosen and executed, based on scheduler logic.
     XorChoice(Vec<PowlAstNode<'a>>),
-    /// Loop: `body` executes, then either exits or `redo` executes and loops.
-    /// `max_iters` caps the number of redo cycles (0 = unlimited).
+    /// Loop composition.
+    ///
+    /// Executes the `body` node first. Once the `body` exits, the loop either exits
+    /// (terminating the loop) or executes the `redo` node and cycles back to the `body`.
+    /// The `max_iters` parameter defines the maximum number of redo cycles (0 indicates unlimited).
     Loop {
+        /// The body of the loop, executed first.
         body: Box<PowlAstNode<'a>>,
+        /// The redo path, executed before looping back to the body.
         redo: Box<PowlAstNode<'a>>,
+        /// Bounded iteration count.
         max_iters: u8,
     },
 }
@@ -45,24 +116,38 @@ pub enum PowlAstNode<'a> {
 // Error type
 // ---------------------------------------------------------------------------
 
+/// Errors that can occur during POWL AST compilation or validation.
 #[derive(Debug, PartialEq, Eq)]
 pub enum CompileError {
+    /// The compiled graph has more than 64 nodes, exceeding the capacity of the `PowlTape`.
     TapeFull,
+    /// A sequential composition has no child nodes.
     EmptySequence,
+    /// An exclusive choice has no branches.
     EmptyChoice,
+    /// A partial order has no child nodes.
     EmptyPartialOrder,
+    /// A partial order dependency edge references a non-existent child index.
     InvalidEdge {
+        /// The source child index of the edge.
         from: usize,
+        /// The destination child index of the edge.
         to: usize,
+        /// The total number of children in the partial order.
         len: usize,
     },
+    /// The compiled graph contains a non-loop cycle (e.g. mutual dependency in a partial order).
     Cycle,
-    /// A non-LoopRedo slot is unreachable from the entry mask.
+    /// A node is unreachable from the entry nodes of the tape (excluding LoopRedo nodes).
     Unreachable,
-    /// XorChoice nested inside Loop body or redo — unsafe; LoopRedo can
-    /// re-enable unchosen XOR branches across iterations.
+    /// An exclusive choice (`XorChoice`) is nested inside a loop body or redo path.
+    ///
+    /// This is forbidden because loop iterations could re-enable unchosen XOR branches,
+    /// violating safe execution semantics.
     XorInsideLoop {
+        /// The tape slot index of the XOR dispatch node.
         xor_slot: u8,
+        /// The entry slot index of the loop body.
         loop_body_entry: u8,
     },
 }
@@ -356,16 +441,99 @@ fn run_kahn_walk(tape: &PowlTape, n: usize, mut in_deg: [u32; 64]) -> Result<(),
     }
 }
 
-/// Phase 1 of two-phase Kahn: detect non-loop cycles.
+/// Phase 1 of the two-phase Kahn validation process: detect non-loop cycles.
+///
+/// This function executes Kahn's topological sort algorithm on the tape, ignoring loop redo
+/// back-edges, to guarantee that no non-loop cycles exist.
+///
+/// # Algorithm & Complexity
+///
+/// 1. Computes in-degrees for all non-[`OpKind::LoopRedo`] slots, ignoring any predecessors
+///    originating from [`OpKind::LoopRedo`] nodes.
+/// 2. Performs a BFS traversal starting from slots with an in-degree of 0.
+/// 3. Returns `Ok(())` if the count of visited non-LoopRedo slots equals the total number
+///    of non-LoopRedo slots, otherwise returns `Err(CompileError::Cycle)`.
+///
+/// Complexity: $O(V + E)$ where $V \le 64$ is the number of active slots on the tape.
+///
+/// # Errors
+///
+/// Returns `Err(CompileError::Cycle)` if a non-loop cycle is detected in the graph.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_powl::compiler::{compile_powl, check_full_graph_acyclic, PowlAstNode, CompileError};
+///
+/// // Create a valid sequence
+/// let ast = PowlAstNode::Sequence(vec![
+///     PowlAstNode::Atom("A"),
+///     PowlAstNode::Atom("B"),
+/// ]);
+/// let tape = compile_powl(&ast).unwrap();
+/// assert!(check_full_graph_acyclic(&tape).is_ok());
+/// ```
 pub fn check_full_graph_acyclic(tape: &PowlTape) -> Result<(), CompileError> {
     let n = tape.len as usize;
     let in_deg = build_in_degrees(tape, n);
     run_kahn_walk(tape, n, in_deg)
 }
 
-/// Validate reachability of all non-LoopRedo nodes from the entry mask.
+/// Validate reachability of all active non-LoopRedo nodes from the entry mask.
 ///
-/// Returns `!0u64` (success) or `0u64` (unreachable violation).
+/// This function employs a Bit-Parallel Roy-Warshall transitive closure algorithm to verify
+/// branchlessly that every active non-LoopRedo slot on the tape is reachable from the tape's
+/// entry mask.
+///
+/// # Mathematical Contract (Hoare Logic)
+///
+/// ```text
+/// { P(tape) }
+/// bp_tcrv_validate_reachability(tape)
+/// { Q(tape, result) }
+/// ```
+///
+/// - **Precondition $P$**: The tape length satisfies $L \le 64$.
+/// - **Postcondition $Q$**: The output `result` is:
+///   - `!0u64` (all bits set / `u64::MAX`) if for every slot $i < L$ where `kind != LoopRedo`,
+///     there exists a path from some entry $e \in \text{entry\_mask}$ to $i$ using successor edges.
+///   - `0u64` (all bits zero) otherwise.
+///
+/// # Algorithm & Complexity
+///
+/// The algorithm is implemented branchlessly to comply with timing-invariant constraints:
+/// 1. **Initialization**: Set $R_i^{(0)} = \text{succ\_mask}_i \cup \{i\}$ for all $i < 64$ within bounds.
+/// 2. **Transitive Closure Propagation**: For each pivot $k$ from 0 to 63:
+///    $$R_i^{(k+1)} = R_i^{(k)} \cup (R_k^{(k)} \text{ if } k \in R_i^{(k)})$$
+///    This is calculated via bitwise masks:
+///
+/// ```text
+/// let can_reach_k = (r[i] >> k) & 1;
+/// let mask = 0u64.wrapping_sub(can_reach_k); // !0u64 if reachable, 0u64 otherwise
+/// r[i] |= r[k] & mask;
+/// ```
+/// 3. **Reachability Analysis**: Compute the union of reachable nodes from the entry mask:
+///    $$\text{reachable\_from\_entry} = \bigcup_{e \in \text{entry\_mask}} R_e$$
+/// 4. **Validation**: Compare against the mask of required nodes (`must_be_reachable`).
+///    Returns `!0u64` if `must_be_reachable & !reachable_from_entry == 0`, and `0u64` otherwise.
+///
+/// Complexity: $O(V^3 / 64)$ steps where $V = 64$. With a fixed bound, execution takes a constant
+/// number of clock cycles, guaranteeing timing immunity.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_powl::compiler::{compile_powl, bp_tcrv_validate_reachability, PowlAstNode};
+///
+/// let ast = PowlAstNode::Sequence(vec![
+///     PowlAstNode::Atom("A"),
+///     PowlAstNode::Atom("B"),
+/// ]);
+/// let tape = compile_powl(&ast).unwrap();
+///
+/// // Since B is reachable from A (which is the entry), this returns !0u64.
+/// assert_eq!(bp_tcrv_validate_reachability(&tape), !0u64);
+/// ```
 #[must_use]
 #[inline(always)]
 pub fn bp_tcrv_validate_reachability(tape: &PowlTape) -> u64 {
@@ -419,8 +587,27 @@ pub fn bp_tcrv_validate_reachability(tape: &PowlTape) -> u64 {
     0u64.wrapping_sub(is_valid)
 }
 
-/// Phase 2 of two-phase Kahn: ensure every non-LoopRedo slot is reachable
-/// from at least one entry (entry_mask bit set or transitively via succ_mask).
+/// Phase 2 of the two-phase Kahn validation process: verify reachability.
+///
+/// Ensures that every active non-[`OpKind::LoopRedo`] slot is reachable from at least
+/// one entry node in the entry mask, either directly or transitively via successor edges.
+///
+/// # Errors
+///
+/// Returns `Err(CompileError::Unreachable)` if any non-LoopRedo node is unreachable.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_powl::compiler::{compile_powl, check_all_ops_reachable, PowlAstNode};
+///
+/// let ast = PowlAstNode::Sequence(vec![
+///     PowlAstNode::Atom("A"),
+///     PowlAstNode::Atom("B"),
+/// ]);
+/// let tape = compile_powl(&ast).unwrap();
+/// assert!(check_all_ops_reachable(&tape).is_ok());
+/// ```
 pub fn check_all_ops_reachable(tape: &PowlTape) -> Result<(), CompileError> {
     let status = bp_tcrv_validate_reachability(tape);
     if status == !0u64 {
@@ -439,7 +626,40 @@ fn kahn_check(tape: &PowlTape) -> Result<(), CompileError> {
 // Public entry point
 // ---------------------------------------------------------------------------
 
-/// Compile a POWL AST into a `PowlTape`.
+/// Compiles a POWL AST into a flat [`PowlTape`].
+///
+/// Compilation performs a recursive descent traversal over the AST structure to allocate tape
+/// slots and wire execution flow (represented by predecessor and successor bitmasks).
+/// It then performs a two-phase validation:
+/// 1. **Cycle Detection**: Kahn's algorithm verifies the absence of non-loop cycles.
+/// 2. **Reachability Check**: The bit-parallel Roy-Warshall algorithm verifies that all
+///    non-loop nodes are reachable from the entry mask.
+///
+/// # Errors
+///
+/// Returns a [`CompileError`] if:
+/// - The compiled graph exceeds 64 nodes ([`CompileError::TapeFull`]).
+/// - Structural constraints are violated (e.g., empty sequences, invalid edges, nested XORs).
+/// - Non-loop cycles are detected ([`CompileError::Cycle`]).
+/// - Any node is unreachable from the entry mask ([`CompileError::Unreachable`]).
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_powl::compiler::{compile_powl, PowlAstNode};
+///
+/// // Create a sequence workflow: Atom("A") -> Atom("B")
+/// let ast = PowlAstNode::Sequence(vec![
+///     PowlAstNode::Atom("A"),
+///     PowlAstNode::Atom("B"),
+/// ]);
+///
+/// let tape = compile_powl(&ast).unwrap();
+/// assert_eq!(tape.len, 2);
+/// assert_eq!(tape.entry_mask, 0b01);
+/// assert_eq!(tape.ops[0].succ_mask, 0b10);
+/// assert_eq!(tape.ops[1].pred_mask, 0b01);
+/// ```
 pub fn compile_powl(root: &PowlAstNode<'_>) -> Result<PowlTape, CompileError> {
     let mut tape = PowlTape::new();
     let seg = compile_node(root, &mut tape)?;
@@ -487,13 +707,21 @@ pub mod v2 {
         /// so tape-slot index and `PowlNodeId` numeric value coincide,
         /// which is what lets the guard-table re-keying below work without
         /// a second indirection table.
-        NodeIdNotDense { position: usize, found: PowlNodeId },
+        NodeIdNotDense {
+            /// The index position where the mismatch occurred.
+            position: usize,
+            /// The node ID found at that position.
+            found: PowlNodeId,
+        },
         /// A [`crate::model::ChildWorkflowNode`] or
         /// [`crate::model::ExternalCutNode`] was encountered. These are
         /// UNSUPPORTED stubs (see `crate::model`'s doc comments) — this
         /// compiler refuses them with a typed error rather than silently
         /// dropping or mis-compiling them.
-        UnsupportedNodeKind { id: PowlNodeId },
+        UnsupportedNodeKind {
+            /// The ID of the unsupported node.
+            id: PowlNodeId,
+        },
         /// A precedence edge referenced an `ActionOccurrenceId` absent
         /// from `model.provenance` — the edge cannot be wired to a tape
         /// slot.
@@ -513,14 +741,22 @@ pub mod v2 {
     /// `tape.label_slab` (kept separate from `Powl64Op` itself so the
     /// already-landed, size-asserted 64-byte `Powl64Op` layout is not
     /// touched by this phase).
+    /// Compiled representation of a POWL v2 model, including the flat tape,
+    /// concurrency guards, and label offset mappings.
     #[derive(Debug)]
     pub struct CompiledPowlV2 {
+        /// The compiled flat execution tape.
         pub tape: V2Tape,
+        /// Concurrency guards that dynamically restrict concurrent execution.
         pub guards: ConcurrencyGuardTable,
+        /// Mapping from each node's ID to its interned label offset in the tape's label slab.
         pub node_labels: BTreeMap<PowlNodeId, u16>,
     }
 
-    /// Compile a `PowlModel` into a `CompiledPowlV2`.
+    /// Compiles a [`PowlModel`] into a [`CompiledPowlV2`].
+    ///
+    /// This compiles a flat [`PowlModel`] (a plan projection) into the v2 tape format
+    /// [`PowlTape`](crate::tape::v2::PowlTape) along with its associated [`ConcurrencyGuardTable`].
     ///
     /// # Re-keying concurrency into tape-slot space
     ///
@@ -549,6 +785,59 @@ pub mod v2 {
     /// `link4_adversarial_confirmed_bug_...`-style regression coverage,
     /// mirrored by this crate's own `non_dense_node_ids_are_rejected` and
     /// concurrency-re-keying tests below).
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`CompileErrorV2`] if:
+    /// - The number of nodes exceeds 64 ([`CompileErrorV2::TapeFull`]).
+    /// - Node IDs are not densely packed starting from zero ([`CompileErrorV2::NodeIdNotDense`]).
+    /// - Unsupported node kinds (such as child workflows or external cuts) are present ([`CompileErrorV2::UnsupportedNodeKind`]).
+    /// - Precedence edges reference actions missing from provenance mapping ([`CompileErrorV2::UnmappedActionInOrder`]).
+    /// - Concurrency event sets reference slots that are out of bounds ([`CompileErrorV2::UnmappedConcurrencySlot`]).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bcinr_powl::compiler::v2::{compile_powl_v2, CompileErrorV2};
+    /// use bcinr_powl::model::{PowlModel, PowlNode, ActivityNode};
+    /// use bcinr_mfw_ir::{
+    ///     ActionOccurrenceId, PowlNodeId, StrictPartialOrder, ExecutableConcurrencyComplex, Digest
+    /// };
+    /// use std::collections::BTreeMap;
+    ///
+    /// // Define two activity nodes
+    /// let nodes = vec![
+    ///     PowlNode::Activity(ActivityNode {
+    ///         id: PowlNodeId(0),
+    ///         label: "A".to_string(),
+    ///         source_action: ActionOccurrenceId(0),
+    ///     }),
+    ///     PowlNode::Activity(ActivityNode {
+    ///         id: PowlNodeId(1),
+    ///         label: "B".to_string(),
+    ///         source_action: ActionOccurrenceId(1),
+    ///     }),
+    /// ];
+    ///
+    /// let mut provenance = BTreeMap::new();
+    /// provenance.insert(PowlNodeId(0), ActionOccurrenceId(0));
+    /// provenance.insert(PowlNodeId(1), ActionOccurrenceId(1));
+    ///
+    /// let model = PowlModel {
+    ///     nodes,
+    ///     order: StrictPartialOrder::default(),
+    ///     concurrency: ExecutableConcurrencyComplex {
+    ///         event_count: 2,
+    ///         minimal_nonfaces: vec![],
+    ///         conflict_witnesses: BTreeMap::new(),
+    ///         digest: Digest::hash(b"empty"),
+    ///     },
+    ///     provenance,
+    /// };
+    ///
+    /// let compiled = compile_powl_v2(&model).unwrap();
+    /// assert_eq!(compiled.tape.len, 2);
+    /// ```
     pub fn compile_powl_v2(model: &PowlModel) -> Result<CompiledPowlV2, CompileErrorV2> {
         if model.nodes.len() > 64 {
             return Err(CompileErrorV2::TapeFull);

@@ -1,17 +1,113 @@
-//! POWL v2 TypeState machine — phase-indexed runner with linear-token execution.
+//! POWL v2 TypeState Machine and Branchless Linear Execution Tokens (BLET).
 //!
-//! # Phase lattice
+//! This module implements a static, type-safe execution pipeline for Partially Ordered
+//! Workflow Language (POWL) workflows. The core design is built upon two pillars:
+//!
+//! 1. **Phase-Indexed Typestate Machine ([`PowlRunner`])**: Statically tracks the state
+//!    of execution phases at compile time, guaranteeing that transitions are one-way and
+//!    mutually exclusive.
+//! 2. **Branchless Linear Execution Tokens ([`ExecutionToken`])**: Emulates linear types
+//!    to track in-flight execution of operations. By using branchless bitwise arithmetic,
+//!    it monitors operation execution, detects defects (such as double-firing or out-of-bounds
+//!    execution), and enforces that every workflow task is run exactly once.
+//!
+//! # The Phase Lattice
+//!
+//! The lifetime of a workflow run is governed by a sequence of five distinct compile-time
+//! phases:
 //!
 //! ```text
-//! Unvalidated → Compiled → Scheduled<KIND> → Executing<KIND> → Receipted<KIND>
+//!          [PowlRunner<Unvalidated>]
+//!                      │
+//!                      │ .validate()
+//!                      ▼
+//!           [PowlRunner<Compiled>]
+//!                      │
+//!                      │ .schedule::<KIND>()
+//!                      ▼
+//!        [PowlRunner<Scheduled<KIND>>]
+//!                      │
+//!                      │ .begin_execution()
+//!                      ▼
+//!      ┌──────────────────────────────────────┐
+//!      │  (PowlRunner<Executing<KIND>>,       │
+//!      │   ExecutionToken)                    │
+//!      └──────────────────┬───────────────────┘
+//!                         │
+//!                         │ .complete(token)
+//!                         ▼
+//!       [PowlRunner<Receipted<KIND>>]  +  [Receipt<KIND>]
 //! ```
 //!
-//! Each transition is a consuming method, so the compiler statically forbids
-//! re-use of a runner in an earlier phase.
+//! Each transition in the lattice consumes the previous runner (taking it by value) and
+//! returns a new runner with the updated phase marker. This prevents reuse of a runner in a
+//! stale state or out-of-order phase transitions.
 //!
-//! # Nightly features required
+//! # Branchless Linear Execution Tokens (BLET)
 //!
-//! - `adt_const_params`   — `TopologyKind` as a const generic parameter
+//! To safely coordinate step-by-step execution in a `no_alloc` environment, the runner
+//! yields an [`ExecutionToken`]. This token acts as a linear resource representing the remaining
+//! work on the tape.
+//!
+//! - **Linearity Emulation**: The Rust compiler ensures the token cannot be copied or cloned
+//!   (as it does not implement `Clone` or `Copy`). Additionally, in debug builds, a "destructor bomb"
+//!   ([`Drop`] implementation) will panic if the token is discarded before all tasks are fired.
+//! - **Constant Complexity (`CC = 1`)**: Checking for execution correctness (double-firing,
+//!   out-of-bounds fires, or malformed inputs) is implemented using branch-free bitwise operations.
+//!   Instead of branching on errors during step execution, defects are accumulated into status
+//!   registers using bitwise masks and verified at the end of the transaction.
+//!
+//! # Safety Invariants
+//!
+//! 1. **Phase Isolation**: Only methods defined for a runner's current phase can be called.
+//!    For example, you cannot run execution checks on an `Unvalidated` tape, and you cannot
+//!    re-schedule a runner that is already running.
+//! 2. **Consuming Transactions**: Runner transitions take `self` by value, ensuring that no
+//!    previous reference to the runner remains valid.
+//! 3. **Defect Isolation**: If any operational defect occurs (e.g. firing an out-of-bounds op
+//!    or double-firing an op), the transition from `Executing` to `Receipted` will refuse the commit
+//!    and return an [`ExecutionDefect`] error, keeping the persistent system state clean.
+//!
+//! # Examples
+//!
+//! ```
+//! #![feature(adt_const_params)]
+//! # #![allow(incomplete_features)]
+//! use bcinr_powl::typestate::{PowlRunner, Unvalidated, TopologyKind};
+//! use bcinr_powl::tape::{PowlTape, OpKind};
+//!
+//! // 1. Construct and populate a tape
+//! let mut tape = PowlTape::new();
+//! let op0 = tape.alloc(OpKind::Atom).unwrap();
+//! let op1 = tape.alloc(OpKind::Atom).unwrap();
+//! tape.entry_mask = 1 << op0; // Mark op0 as the entry op
+//!
+//! // 2. Instantiate the Unvalidated runner
+//! let runner = PowlRunner::new(tape);
+//!
+//! // 3. Validate tape: Unvalidated -> Compiled
+//! let compiled = runner.validate().expect("Tape validation failed");
+//!
+//! // 4. Assign Topology: Compiled -> Scheduled
+//! let scheduled = compiled.schedule::<{ TopologyKind::Standard }>();
+//!
+//! // 5. Start Execution: Scheduled -> Executing (yields the Linear Token)
+//! let (executing, mut token) = scheduled.begin_execution();
+//!
+//! // 6. Process the linear token (fire operations)
+//! token.record_fire(op0);
+//! token.consume_op(1 << op0);
+//!
+//! token.record_fire(op1);
+//! token.consume_op(1 << op1);
+//!
+//! // 7. Complete Execution: Executing -> Receipted (consumes the Token)
+//! let (receipted, receipt) = executing.complete(token).expect("Execution failed");
+//!
+//! // Verify execution properties
+//! assert_eq!(receipt.topology, TopologyKind::Standard);
+//! assert_eq!(receipt.op_trace, 0b11);
+//! ```
 
 #![allow(incomplete_features)]
 
@@ -21,17 +117,22 @@ use core::marker::PhantomData;
 // TopologyKind — const generic discriminant
 // =============================================================================
 
-/// Scheduling topology that governs execution priority and retry semantics.
+/// Scheduling topology that governs execution priority, preemption, and retry semantics.
 ///
-/// Used as a const generic parameter so the type system tracks topology across
-/// all post-`Compiled` phases.
+/// Used as a const generic parameter (requiring the `adt_const_params` feature) so the
+/// type system tracks topology across all post-[`Compiled`] phases.
 #[derive(PartialEq, Eq, Clone, Copy, Debug, core::marker::ConstParamTy)]
 #[repr(u8)]
 pub enum TopologyKind {
+    /// High-priority execution path with strict deadlines and immediate retries.
     Priority = 0,
+    /// Standard execution path with default priority and normal retry backoff.
     Standard = 1,
+    /// Low-priority background execution path for non-critical tasks.
     Background = 2,
+    /// Execution path optimized for long-running workflows.
     LongRunning = 3,
+    /// Topology for running compensating transactions during failure recovery.
     Compensating = 4,
 }
 
@@ -40,20 +141,38 @@ pub enum TopologyKind {
 // =============================================================================
 
 /// Phase marker: tape not yet validated.
+///
+/// This is the initial state of a [`PowlRunner`]. In this phase, the tape's structure
+/// (such as cyclic dependencies, size, and entry points) has not yet been verified.
 pub struct Unvalidated;
 
 /// Phase marker: tape has passed structural validation.
 ///
-/// The inner `()` field is private, preventing external construction.
+/// Advanced from [`Unvalidated`] by calling [`PowlRunner::validate`].
+///
+/// The inner `()` field is private, preventing external construction of this marker.
 pub struct Compiled(());
 
 /// Phase marker: runner has been assigned a scheduling topology.
+///
+/// Advanced from [`Compiled`] by calling [`PowlRunner::schedule`].
+///
+/// The topology kind `KIND` is tracked as a const generic parameter.
 pub struct Scheduled<const KIND: TopologyKind>(());
 
 /// Phase marker: execution has started; an [`ExecutionToken`] is in flight.
+///
+/// Advanced from [`Scheduled`] by calling [`PowlRunner::begin_execution`].
+///
+/// During this phase, caller must process all tasks on the tape and record/consume
+/// them using the provided [`ExecutionToken`].
 pub struct Executing<const KIND: TopologyKind>(());
 
 /// Phase marker: execution is complete and a [`Receipt`] has been issued.
+///
+/// Advanced from [`Executing`] by calling [`PowlRunner::complete`].
+///
+/// This is the terminal phase of the runner. No further state transitions are possible.
 pub struct Receipted<const KIND: TopologyKind>(());
 
 // =============================================================================
@@ -126,19 +245,30 @@ impl HasPowlTape for crate::tape::PowlTape {
 // ValidationError
 // =============================================================================
 
-/// Errors produced during the `Unvalidated → Compiled` transition.
+/// Errors produced during the [`Unvalidated`] → [`Compiled`] transition.
+///
+/// These errors indicate that the tape's structure violates basic correctness rules,
+/// preventing the runner from starting safely.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ValidationError {
     /// The tape contains no ops.
     EmptyTape,
     /// The tape contains more than 64 ops (bitmask overflow).
-    TapeTooLarge { len: usize },
+    TapeTooLarge {
+        /// The actual length of the tape.
+        len: usize,
+    },
     /// No op in the tape is reachable from the entry mask (disconnected graph).
     NoEntryOp,
     /// The tape contains a cycle that would deadlock the executor.
     CyclicDependency,
     /// An op references a predecessor index that is out of bounds.
-    InvalidPredecessorIndex { op: u8, pred: u8 },
+    InvalidPredecessorIndex {
+        /// The index of the op making the reference.
+        op: u8,
+        /// The invalid predecessor index.
+        pred: u8,
+    },
 }
 
 impl core::fmt::Display for ValidationError {
@@ -160,19 +290,33 @@ impl core::fmt::Display for ValidationError {
 // ExecutionDefect
 // =============================================================================
 
-/// Errors produced during the `Executing → Receipted` transition.
+/// Errors produced during the [`Executing`] → [`Receipted`] transition.
+///
+/// These defects indicate runtime violations of execution correctness or safety.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ExecutionDefect {
     /// The op bit was already consumed (double-fire).
-    OpAlreadyConsumed { bit: u64 },
+    OpAlreadyConsumed {
+        /// The bitmask representing the double-fired operation.
+        bit: u64,
+    },
     /// `assert_exhausted` was called while some ops remain unfired.
-    UnexhaustedOps { remaining: u64 },
+    UnexhaustedOps {
+        /// The bitmask representing the unfired operations.
+        remaining: u64,
+    },
     /// The [`ExecutionToken`] presented does not belong to this runner.
     TokenMismatch,
     /// Out-of-bounds/inactive operations were fired.
-    InvalidFires { bits: u64 },
+    InvalidFires {
+        /// The bitmask of invalid operations.
+        bits: u64,
+    },
     /// Malformed (zero or multi-bit) operations were fired.
-    MalformedFires { bits: u64 },
+    MalformedFires {
+        /// The bitmask of malformed operations.
+        bits: u64,
+    },
 }
 
 impl core::fmt::Display for ExecutionDefect {
@@ -287,7 +431,10 @@ impl ExecutionToken {
         }
     }
 
-    /// Record that op at index op_idx fired. Branchless bounded write; no-op once event_count == 64.
+    /// Record that op at index `op_idx` fired.
+    ///
+    /// Implements a branchless, bounded write to the topological order buffer.
+    /// No-op once `event_count == 64`.
     #[inline]
     pub fn record_fire(&mut self, op_idx: u8) {
         let slot = (self.event_count as usize).min(63);
@@ -296,12 +443,24 @@ impl ExecutionToken {
         self.event_count = self.event_count.wrapping_add(guard);
     }
 
-    /// Mark an op as fired.
+    /// Mark an op as fired by its bitmask.
     ///
     /// `op_bit` must be a single-bit mask (exactly one bit set) corresponding
     /// to the op that just completed.
     ///
-    /// Implemented branchlessly: uses masking to detect double-fires and out-of-bounds fires.
+    /// # Implementation Details
+    ///
+    /// This function runs in constant-time complexity with zero data-dependent branches
+    /// (`CC = 1`). It uses full-width masks to record defects such as double-firing,
+    /// out-of-bounds firing, and malformed inputs (multiple bits or zero bits set)
+    /// without short-circuiting or branching. The actual defect validation occurs
+    /// during transition to [`Receipted`].
+    ///
+    /// # Invariants
+    ///
+    /// - Fired bits must correspond to valid, active operations on the tape.
+    /// - Each operation must be consumed exactly once.
+    /// - Fired bitmask must have exactly one bit set.
     #[inline]
     pub fn consume_op(&mut self, op_bit: u64) {
         // 1. Accumulate invalid bit fires (bits outside the valid boundary)
@@ -332,6 +491,15 @@ impl ExecutionToken {
     /// Assert that all ops have been fired and consume the token.
     ///
     /// Returns an error if any bits remain set in `remaining` or if any defects occurred.
+    /// This method consumes `self` by value, bypassing the debug destructor bomb.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ExecutionDefect`] if:
+    /// - An operation was double-fired.
+    /// - An invalid (out-of-bounds) operation was fired.
+    /// - A malformed (zero or multi-bit) operation was fired.
+    /// - Unfired operations remain.
     pub fn assert_exhausted(self) -> Result<(), ExecutionDefect> {
         let remaining = self.remaining;
         let defect_malformed = self.defect_malformed;
@@ -389,19 +557,22 @@ impl Drop for ExecutionToken {
 /// `KIND` is the topology under which the runner was scheduled, providing a
 /// compile-time record of the execution context.
 pub struct Receipt<const KIND: TopologyKind> {
-    /// Unique run identifier (monotonic counter or random).
+    /// Unique run identifier assigned at runner construction.
     pub run_id: u64,
-    /// Bitmask recording which ops were fired (op trace).
+    /// Bitmask recording which operations were fired (op trace).
     pub op_trace: u64,
-    /// Runtime topology (mirrors the const generic parameter).
+    /// Runtime topology (mirrors the const generic parameter `KIND`).
     pub topology: TopologyKind,
-    /// 32-byte content hash of the tape at manufacture time.
+    /// 32-byte content hash of the tape at manufacture/validation time.
     pub chain_hash: [u8; 32],
     /// Replay pointer — byte offset into a hypothetical event log.
     pub replay_ptr: u64,
     /// Topological firing order recorded during execution.
+    ///
+    /// The `i`-th element represents the index of the `i`-th fired operation.
+    /// Remaining elements are padded with `u8::MAX`.
     pub topo_order: [u8; 64],
-    /// Number of ops recorded in topo_order.
+    /// Number of operations recorded in `topo_order`.
     pub event_count: u8,
 }
 
@@ -452,7 +623,17 @@ impl<Phase, Tape> core::fmt::Debug for PowlRunner<Phase, Tape> {
 // ---------------------------------------------------------------------------
 
 impl<Tape: HasPowlTape> PowlRunner<Unvalidated, Tape> {
-    /// Construct a new runner wrapping `tape`.
+    /// Construct a new runner in the [`Unvalidated`] phase wrapping `tape`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bcinr_powl::typestate::{PowlRunner, Unvalidated};
+    /// use bcinr_powl::tape::PowlTape;
+    ///
+    /// let tape = PowlTape::new();
+    /// let runner = PowlRunner::new(tape);
+    /// ```
     pub fn new(tape: Tape) -> Self {
         Self {
             tape,
@@ -461,12 +642,32 @@ impl<Tape: HasPowlTape> PowlRunner<Unvalidated, Tape> {
         }
     }
 
-    /// Validate the tape and advance to `Compiled`.
+    /// Validate the tape and transition the runner to the [`Compiled`] phase.
     ///
-    /// Checks performed:
-    /// - tape is non-empty
-    /// - tape has ≤ 64 ops
-    /// - at least one entry op exists (non-zero entry mask)
+    /// # Safety and Correctness Checks
+    ///
+    /// - **Non-Empty**: The tape must contain at least one operation.
+    /// - **Size Limits**: The tape must contain at most 64 operations (ensuring they fit
+    ///   within the 64-bit mask).
+    /// - **Entry Op Presence**: The tape must have at least one entry operation (i.e.
+    ///   the `entry_mask` must not be zero).
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ValidationError`] if any of the correctness checks fail.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bcinr_powl::typestate::{PowlRunner, Unvalidated, ValidationError};
+    /// use bcinr_powl::tape::{PowlTape, OpKind};
+    ///
+    /// let mut tape = PowlTape::new();
+    /// let runner = PowlRunner::new(tape);
+    ///
+    /// // Validation fails on empty tape
+    /// assert_eq!(runner.validate().unwrap_err(), ValidationError::EmptyTape);
+    /// ```
     pub fn validate(self) -> Result<PowlRunner<Compiled, Tape>, ValidationError> {
         let n = self.tape.op_count();
         if n == 0 {
@@ -491,7 +692,25 @@ impl<Tape: HasPowlTape> PowlRunner<Unvalidated, Tape> {
 // ---------------------------------------------------------------------------
 
 impl<Tape: HasPowlTape> PowlRunner<Compiled, Tape> {
-    /// Assign a scheduling topology and advance to `Scheduled<KIND>`.
+    /// Assign a scheduling topology to the runner and transition to the [`Scheduled`] phase.
+    ///
+    /// The topology kind `KIND` is tracked statically at compile time.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// #![feature(adt_const_params)]
+    /// # #![allow(incomplete_features)]
+    /// use bcinr_powl::typestate::{PowlRunner, TopologyKind};
+    /// use bcinr_powl::tape::{PowlTape, OpKind};
+    ///
+    /// let mut tape = PowlTape::new();
+    /// let op = tape.alloc(OpKind::Atom).unwrap();
+    /// tape.entry_mask = 1 << op;
+    ///
+    /// let runner = PowlRunner::new(tape).validate().unwrap();
+    /// let scheduled = runner.schedule::<{ TopologyKind::Standard }>();
+    /// ```
     pub fn schedule<const KIND: TopologyKind>(self) -> PowlRunner<Scheduled<KIND>, Tape> {
         PowlRunner {
             tape: self.tape,
@@ -506,10 +725,32 @@ impl<Tape: HasPowlTape> PowlRunner<Compiled, Tape> {
 // ---------------------------------------------------------------------------
 
 impl<Tape: HasPowlTape, const KIND: TopologyKind> PowlRunner<Scheduled<KIND>, Tape> {
-    /// Begin execution and produce a linear [`ExecutionToken`].
+    /// Begin workflow execution, transitioning to [`Executing`] and yielding an [`ExecutionToken`].
     ///
-    /// The token must be fully consumed (all op bits cleared) before calling
-    /// [`PowlRunner::complete`].
+    /// The returned [`ExecutionToken`] must be consumed (fired for all operations)
+    /// before finishing execution by calling [`PowlRunner::complete`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// #![feature(adt_const_params)]
+    /// # #![allow(incomplete_features)]
+    /// use bcinr_powl::typestate::{PowlRunner, TopologyKind};
+    /// use bcinr_powl::tape::{PowlTape, OpKind};
+    ///
+    /// let mut tape = PowlTape::new();
+    /// let op = tape.alloc(OpKind::Atom).unwrap();
+    /// tape.entry_mask = 1 << op;
+    ///
+    /// let (executing, token) = PowlRunner::new(tape)
+    ///     .validate().unwrap()
+    ///     .schedule::<{ TopologyKind::Standard }>()
+    ///     .begin_execution();
+    ///
+    /// assert_eq!(token.remaining(), 1);
+    /// # // Avoid destructor bomb on token in this test
+    /// # core::mem::forget(token);
+    /// ```
     pub fn begin_execution(self) -> (PowlRunner<Executing<KIND>, Tape>, ExecutionToken) {
         let op_count = self.tape.op_count();
         let token = ExecutionToken::new(op_count);
@@ -527,9 +768,41 @@ impl<Tape: HasPowlTape, const KIND: TopologyKind> PowlRunner<Scheduled<KIND>, Ta
 // ---------------------------------------------------------------------------
 
 impl<Tape: HasPowlTape, const KIND: TopologyKind> PowlRunner<Executing<KIND>, Tape> {
-    /// Complete execution by consuming the [`ExecutionToken`] and issuing a [`Receipt`].
+    /// Complete workflow execution by consuming the [`ExecutionToken`] and issuing a [`Receipt`].
     ///
-    /// Returns `Err` if the token still has unfired ops.
+    /// Transition the runner to the [`Receipted`] phase.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`ExecutionDefect`] if the token validation checks fail, which include:
+    /// - Unfired operations still remaining in the token.
+    /// - Operations double-fired.
+    /// - Invalid (out-of-bounds) operations fired.
+    /// - Malformed operations (zero-bit or multi-bit mask) fired.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// #![feature(adt_const_params)]
+    /// # #![allow(incomplete_features)]
+    /// use bcinr_powl::typestate::{PowlRunner, TopologyKind};
+    /// use bcinr_powl::tape::{PowlTape, OpKind};
+    ///
+    /// let mut tape = PowlTape::new();
+    /// let op = tape.alloc(OpKind::Atom).unwrap();
+    /// tape.entry_mask = 1 << op;
+    ///
+    /// let (executing, mut token) = PowlRunner::new(tape)
+    ///     .validate().unwrap()
+    ///     .schedule::<{ TopologyKind::Standard }>()
+    ///     .begin_execution();
+    ///
+    /// token.record_fire(op);
+    /// token.consume_op(1 << op);
+    ///
+    /// let (receipted, receipt) = executing.complete(token).unwrap();
+    /// assert_eq!(receipt.op_trace, 1);
+    /// ```
     pub fn complete(
         self,
         token: ExecutionToken,
@@ -582,12 +855,12 @@ impl<Tape: HasPowlTape, const KIND: TopologyKind> PowlRunner<Executing<KIND>, Ta
 // ---------------------------------------------------------------------------
 
 impl<Tape: HasPowlTape, const KIND: TopologyKind> PowlRunner<Receipted<KIND>, Tape> {
-    /// Access the underlying tape (read-only) after manufacture.
+    /// Returns a read-only reference to the underlying tape.
     pub fn tape(&self) -> &Tape {
         &self.tape
     }
 
-    /// Return the run identifier assigned at construction.
+    /// Returns the unique run identifier assigned to this workflow run at construction.
     pub fn run_id(&self) -> u64 {
         self.run_id
     }
@@ -598,12 +871,14 @@ impl<Tape: HasPowlTape, const KIND: TopologyKind> PowlRunner<Receipted<KIND>, Ta
 // =============================================================================
 
 impl<const KIND: TopologyKind> Receipt<KIND> {
-    /// Verify that the recorded topo_order is consistent with the tape's pred_mask constraints.
+    /// Verify that the recorded `topo_order` is consistent with the tape's predecessor constraints.
     ///
-    /// Returns `true` if:
-    /// 1. Every op bit set in op_trace appears in topo_order.
-    /// 2. For every op in topo_order, all its predecessors (per tape_ops[].pred_mask) appear
-    ///    at an earlier step in topo_order.
+    /// This method validates that:
+    /// 1. Every operation bit set in `op_trace` is present in `topo_order`.
+    /// 2. For every operation index in `topo_order`, all of its predecessors (as defined
+    ///    by `pred_mask` on the tape) appear at an earlier position in `topo_order`.
+    ///
+    /// Returns `true` if the order is topologically valid, `false` otherwise.
     pub fn verify_topo_order(&self, tape_ops: &[crate::tape::Powl64Op]) -> bool {
         let count = self.event_count as usize;
         let mut step_of = [u8::MAX; 64];

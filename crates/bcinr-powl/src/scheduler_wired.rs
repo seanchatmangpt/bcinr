@@ -1,70 +1,88 @@
-//! Wired scheduler — bcinr-logic primitives driving the POWL hot path.
+//! # Wired Scheduler
 //!
-//! # Branchless invariant
+//! The wired scheduler provides a high-performance execution substrate for Partially Ordered
+//! Workflow Language (POWL) tapes using Petri net models and hardware-inspired primitives.
 //!
-//! The hot path in `petri_tick` (post-fire loop) is fully branchless for per-op
-//! kind dispatch: `XorDispatch` and `LoopRedo` effects are applied via
-//! `apply_xor_dispatch` / `apply_loop_redo` predicated helpers — no `if`/`match`
-//! inside the per-op body generates a conditional branch instruction.
+//! ## Overview
 //!
-//! `build_transition_arrays` likewise computes `effective_pred` for `Join` ops
-//! with `kind_mask` arithmetic, not a `match` arm.
+//! Unlike the plain scheduler, the wired scheduler uses a proven [`PriorityPetriEngine`] to resolve
+//! transition firing order branchlessly in constant time. It also integrates real-time systems features
+//! like a [`TimeWheel`] for O(1) SLA watchdogs, a [`LockFreeMpmcRing`] for parallel dispatch of concurrent
+//! branches, and a [`FiberPool`] backing [`WcetFiber`] for non-blocking budget-aware long activities.
 //!
-//! The outer `while fm != 0` bit-scan loop in `petri_tick` is the standard CTZ
-//! idiom; its iteration count equals `firing_mask.count_ones()`, not a predicate.
+//! ### Petri Net Transition Loop
 //!
-//! # What is NOT branchless
+//! ```text
+//!                         [ Input Done State ]
+//!                                  |
+//!                                  v
+//!                     +--------------------------+
+//!                     |  PriorityPetriEngine     |
+//!                     |  - inputs/outputs masks  |
+//!                     +--------------------------+
+//!                                  |
+//!                                  v (engine.step() - branchless)
+//!                     +--------------------------+
+//!                     |   Joint Firing Mask      |
+//!                     +--------------------------+
+//!                                  |
+//!         +------------------------+------------------------+
+//!         |                        |                        |
+//!         v (Xor/Loop dispatch)    v (Parallel Ring)        v (Event Ring / SLAs)
+//!   [ Update done/check ]    [ WorkItem push ]        [ EventWorkItem push ]
+//!                                                     [ TimeWheel SLAs tick ]
+//! ```
 //!
-//! - The early-exit `if candidates == 0 { return 0; }` guard (one branch per tick,
-//!   unavoidable without changing the public API).
-//! - The `if let Some(r)` / `if let Some(er)` ring-push guards (cold path, optional
-//!   feature; not on the hot firing path).
-//! - The `match PriorityPetriEngine::new_checked(...)` error guard (one branch per
-//!   tick, cold path).
-//! - `dispatch_successors`: inner `if let Some(r)` is structural, not per-kind.
+//! ## Core Primitives
 //!
-//! # Primitives from `bcinr-logic`
+//! - **[`PriorityPetriEngine`]**: Computes state transitions for up to 64 operations using parallel bitwise
+//!   equations. Replaces sequential candidate checking.
+//! - **[`TimeWheel`]**: A circular buffer of size 256 for scheduling SLA deadlines. Advancing the wheel and
+//!   detecting breaches runs in $O(1)$ time (~2ns).
+//! - **[`LockFreeMpmcRing`]**: High-speed, lock-free, single-producer single-consumer or multi-producer
+//!   multi-consumer rings used to dispatch active tasks and telemetry events with minimum overhead.
+//! - **[`FiberPool`]: Manages a fixed set of cooperative [`WcetFiber`] contexts, enabling compute and IO overlap
+//!   by yielding when budget limits or blocking actions are met.
 //!
-//! - **`PriorityPetriEngine`** — branchless priority-ordered transition firing
-//!   for ≤64 ops. Replaces the `trailing_zeros` bit-scan loop in `scheduler_tick`.
-//!   Already `#[inline(always)]`, already proven.
+//! ## Concurrency-Aware Guarding
 //!
-//! - **`TimeWheel<N>`** — O(1) SLA deadline detection. `schedule(delay, op_bit)`
-//!   at compile time; `tick()` fires the due-mask in ~2ns regardless of how many
-//!   ops have active SLAs. Eliminates the O(ops) deadline scan that would otherwise
-//!   dominate the SLA watchdog path.
+//! Similarly to the plain scheduler, `scheduler_wired` offers [`petri_tick_guarded`], which wraps the Petri net
+//! execution loop in a [`ConcurrencySelector`] check against a [`ConcurrencyGuardTable`].
 //!
-//! - **`LockFreeMpmcRing<WorkItem, N>`** — CAS-based dispatch ring for parallel SPO.
-//!   When multiple branches are enabled simultaneously, they are pushed to the ring
-//!   and consumed by rayon/thread workers without mutex overhead. ~10ns per push/pop.
+//! ## Complexity
 //!
-//! - **`WcetFiber<TICKS>`** — context-switch for long-running activities. When an
-//!   Activity op would block (I/O, DB), the fiber suspends with `context_switch` and
-//!   the scheduler tick continues firing other enabled ops. Overlap I/O with compute.
+//! - **Time Complexity**:
+//!   - [`petri_tick`] (firing): $O(T)$ where $T$ is the number of transitions that actually fire. Priority-based
+//!     net resolution is $O(1)$ regarding the total operations size (up to 64) due to parallel bitset arithmetic.
+//!   - [`TimeWheel::tick`]: $O(1)$ constant time.
+//!   - [`LockFreeMpmcRing::push_t1`]: $O(1)$ CAS loop.
+//!   - [`propagate_check_mask_large`]: $O(W \cdot 64)$ where $W$ is the number of active fired words (up to 8).
+//! - **Space Complexity**: $O(1)$ stack allocation. The state fits in a single cache line (align 64).
 //!
-//! - **`prefix_xor_u64x8` / `union_u64_slices`** — bulk check_mask propagation for
-//!   PowlTapeLarge (>64 ops). One call to `union_u64_slices` folds 8 successor words.
+//! ## Examples
 //!
-//! # Concurrency-aware scheduling (additive)
+//! A simple linear sequence executed through the wired Petri net scheduler:
 //!
-//! [`petri_tick`] itself is untouched by this section — every existing caller
-//! keeps firing every op in `PriorityPetriEngine`'s computed firing mask every
-//! tick, exactly as before, with zero code-path change. [`petri_tick_guarded`]
-//! is a new, separate entry point mirroring [`crate::scheduler::scheduler_tick_guarded`]:
-//! it inserts a [`crate::scheduler::ConcurrencySelector`]-gated selection step
-//! between "compute the ready set" and "actually fire," so a fired set
-//! reported by this hot path is checked against a
-//! [`crate::tape::v2::ConcurrencyGuardTable`] (an
-//! [`bcinr_mfw_ir::ExecutableConcurrencyComplex`] compiled to per-tick guard
-//! form) before it is ever reported as fired, closing the gap that made this
-//! module's hot path the one wired scheduler entry point with no
-//! `ConcurrencySelector`/`ConcurrencyGuardTable`/`EventSet` anywhere in it.
-//! With [`crate::tape::v2::ConcurrencyGuardTable::empty`] and
-//! [`crate::scheduler::StableMaximalSelector`], selection always chooses the
-//! entire ready set, so `petri_tick_guarded` provably degenerates to calling
-//! `petri_tick` — see `tests::concurrency_gated::empty_guards_matches_plain_tick_*`
-//! below, checked tick-by-tick across two tape shapes, plus a nonempty-guard
-//! test proving the gate has a real deferring effect, not just plumbing.
+//! ```rust
+//! use bcinr_powl::compiler::{compile_powl, PowlAstNode};
+//! use bcinr_powl::scheduler_wired::{petri_tick, PowlPetriState};
+//!
+//! let ast = PowlAstNode::Sequence(vec![
+//!     PowlAstNode::Atom("op_a"),
+//!     PowlAstNode::Atom("op_b"),
+//! ]);
+//! let tape = compile_powl(&ast).unwrap();
+//! let mut state = PowlPetriState::new(tape.entry_mask);
+//! let ops = &tape.ops[..tape.len as usize];
+//!
+//! // Tick 1: op_a fires
+//! let res = petri_tick(ops, &mut state, None, None, 0);
+//! assert_eq!(res.fired_ops, 0b01);
+//!
+//! // Tick 2: op_b fires
+//! let res = petri_tick(ops, &mut state, None, None, 0);
+//! assert_eq!(res.fired_ops, 0b10);
+//! ```
 
 use bcinr_logic::{
     bitset::union_u64_slices,
@@ -142,15 +160,10 @@ fn apply_loop_redo(op: &Powl64Op, fire_mask: u64, loop_iter: &mut u8) -> (u64, u
 // PowlPetriState — hot state using KBitSet<1> (64-op tapes)
 // ---------------------------------------------------------------------------
 
-/// Scheduler hot state backed by `KBitSet<1>` (one u64 word = 64 ops).
+/// Mutable execution state for the wired Petri net scheduler.
 ///
-/// Replaces `PowlRunState` for the ≤64-op fast path. Layout is 5×u64 = 40 bytes,
-/// fitting in less than one cache line.
-///
-/// `Clone` is required by [`petri_tick_guarded`]'s preview step (it clones
-/// `state`, runs an unguarded [`petri_tick`] on the clone to discover the
-/// tick's ready set, then discards the clone) — cloning does not consume or
-/// otherwise mutate the original.
+/// Designed for maximum cache efficiency, it packs execution state, loop counters,
+/// and the real-time SLA deadline wheel into a structure aligned to 64 bytes (cache line).
 #[derive(Clone)]
 #[repr(C, align(64))]
 pub struct PowlPetriState {
@@ -169,6 +182,17 @@ pub struct PowlPetriState {
 }
 
 impl PowlPetriState {
+    /// Constructs a new `PowlPetriState` initialized with the given tape `entry_mask`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use bcinr_powl::scheduler_wired::PowlPetriState;
+    ///
+    /// let state = PowlPetriState::new(0b01);
+    /// assert_eq!(state.check.words[0], 0b01);
+    /// assert_eq!(state.done.words[0], 0);
+    /// ```
     pub fn new(entry_mask: u64) -> Self {
         Self {
             done: KBitSet { words: [0u64] },
@@ -182,7 +206,19 @@ impl PowlPetriState {
         }
     }
 
-    /// Schedule an SLA deadline for `op_bit` to fire in `delay` ticks.
+    /// Schedules an SLA watchdog deadline for `op_bit` to expire after `delay` ticks.
+    ///
+    /// When the wheel advances by `delay` ticks, the operation's bit index is marked
+    /// as breached in `state.sla_breached`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use bcinr_powl::scheduler_wired::PowlPetriState;
+    ///
+    /// let mut state = PowlPetriState::new(0b01);
+    /// state.schedule_sla(5, 0);
+    /// ```
     #[inline(always)]
     pub fn schedule_sla(&mut self, delay: usize, op_bit: u32) {
         self.sla_wheel.schedule(delay, op_bit);
@@ -193,7 +229,9 @@ impl PowlPetriState {
 // WorkItem — dispatched to LockFreeMpmcRing for parallel SPO branches
 // ---------------------------------------------------------------------------
 
-/// An enabled op dispatched to the parallel ring.
+/// Payload dispatched to the parallel execution ring.
+///
+/// Represents an enabled task that can run concurrently in a thread/worker pool.
 #[derive(Clone, Copy, Default)]
 pub struct WorkItem {
     /// Op index (0..63).
@@ -206,20 +244,10 @@ pub struct WorkItem {
 // EventWorkItem — dispatched to event ring for off-hot-path BLAKE3 hashing
 // ---------------------------------------------------------------------------
 
-/// One fired-op event, pushed to the event ring after each fire.
-/// The ring drains asynchronously via `ReceiptWorker`; BLAKE3 never called
-/// inside `petri_tick`.
+/// Telemetry event dispatched to the receipt worker ring.
 ///
-/// Carries two distinct masks, deliberately not collapsed into one field:
-/// `op_trace_so_far` drives [`crate::receipt_worker::ReceiptWorker`]'s
-/// run-completion detection (which must see a strictly growing value across
-/// a multi-op tick's several events, or the *first* event of a tick that
-/// completes the run would falsely look like the whole run's last event —
-/// see `tick_fired_mask_never_collapses_progressive_completion_detection`
-/// in this module's tests for the regression this guards against);
-/// `tick_fired_mask` drives admissibility checking (which needs the whole
-/// tick's joint FireSet, constant across every event of that tick, not a
-/// partial view of it).
+/// This payload carries information about a fired operation to write to the execution receipt.
+/// Hashing and receipt sealing are computed off-hot-path by the consumer of the event ring.
 #[derive(Clone, Copy, Default)]
 pub struct EventWorkItem {
     /// Op index (0..63) that fired.
@@ -332,23 +360,40 @@ pub struct PetriTickResult {
     pub event_overflow_count: u32,
 }
 
-/// Drives one scheduler tick using `PriorityPetriEngine` branchless core.
+/// Drives one scheduler tick using the `PriorityPetriEngine` branchless core.
 ///
-/// # What changes vs `scheduler_tick`
+/// # Arguments
 ///
-/// | Old | New |
-/// |-----|-----|
-/// | Manual `trailing_zeros` bit-scan | `PriorityPetriEngine::step()` — proven, `inline(always)` |
-/// | No SLA detection | `TimeWheel::tick()` fires due mask, ORed into `sla_breached` |
-/// | No parallel dispatch | `LockFreeMpmcRing::push_t1` for concurrent branches |
+/// * `tape` - The workflow operations tape.
+/// * `state` - The mutable Petri net execution state.
+/// * `ring` - Optional MPMC ring for dispatching concurrent tasks.
+/// * `event_ring` - Optional MPMC ring for posting workflow events.
+/// * `run_id` - Unique run identifier for this execution.
 ///
-/// Returns a `PetriTickResult` with the bitmask of ops fired and overflow count.
+/// # Complexity
+///
+/// $O(T)$ where $T$ is the number of transitions that actually fire. State resolution uses branchless
+/// bitset arithmetic that runs in constant time regarding the number of candidates (up to 64).
+///
+/// # Examples
+///
+/// ```rust
+/// use bcinr_powl::compiler::{compile_powl, PowlAstNode};
+/// use bcinr_powl::scheduler_wired::{petri_tick, PowlPetriState};
+///
+/// let ast = PowlAstNode::Atom("op");
+/// let tape = compile_powl(&ast).unwrap();
+/// let mut state = PowlPetriState::new(tape.entry_mask);
+///
+/// let res = petri_tick(&tape.ops[..tape.len as usize], &mut state, None, None, 0);
+/// assert_eq!(res.fired_ops, 0b01);
+/// ```
 #[inline(always)]
 pub fn petri_tick(
     tape: &[Powl64Op],
     state: &mut PowlPetriState,
-    ring: Option<&LockFreeMpmcRing<WorkItem, RING_CAPACITY>>,
-    event_ring: Option<&LockFreeMpmcRing<EventWorkItem, RING_CAPACITY>>,
+    ring: Option<&LockFreeMpmcRing<WorkItem, 64>>,
+    event_ring: Option<&LockFreeMpmcRing<EventWorkItem, 64>>,
     run_id: u64,
 ) -> PetriTickResult {
     let mut overflow_count: u32 = 0;
@@ -492,64 +537,48 @@ fn event_set_to_mask(set: &EventSet) -> u64 {
     mask
 }
 
-/// Drives one scheduler tick, gating which of the ready ops actually fire
-/// through a [`ConcurrencySelector`] and [`ConcurrencyGuardTable`] — the
-/// `petri_tick` counterpart to
-/// [`crate::scheduler::scheduler_tick_guarded`].
+/// Advances the wired scheduler by one tick, checking the fired set against a concurrency complex.
 ///
-/// # Why this exists
-///
-/// [`petri_tick`] fires every op `PriorityPetriEngine::step` computes as
-/// enabled, every tick, unconditionally — it never consults an
-/// `ExecutableConcurrencyComplex`. A `FireSet` this hot path reports is not
-/// thereby known to be a member of the concurrency complex; it is only known
-/// to satisfy each fired op's own `pred_mask`. `petri_tick_guarded` closes
-/// that gap for this crate's wired hot path exactly the way
-/// `scheduler_tick_guarded` already closes it for the plain hot path.
-///
-/// # Protocol
-///
-/// 1. **Preview** (no mutation of `state`): clone `state` and run
-///    [`petri_tick`] on the clone with `ring`/`event_ring` both `None` (so
-///    the preview cannot double-dispatch to the real ring or double-push a
-///    receipt event) to discover exactly which ops would fire absent any
-///    gating — this tick's ready set. The clone's `sla_wheel` absorbs the
-///    one-tick advance during preview and is then discarded; the real
-///    `state.sla_wheel` is untouched by this step.
-/// 2. **Select**: `selector.select_checked(ready, guards)` chooses the
-///    admissible subset that may actually fire.
-/// 3. **Fast path**: if selection changed nothing (`selected == ready` —
-///    always true for an empty guard table with `StableMaximalSelector`),
-///    delegate to the real, unguarded [`petri_tick`] on `state` directly, so
-///    the observable state transition (including the real `ring`/
-///    `event_ring`/`sla_wheel` side effects) is provably identical to the
-///    unguarded path.
-/// 4. **Divergent path**: otherwise, advance `state.sla_wheel` for real
-///    exactly once, then recompute per-candidate enablement directly with
-///    `pred_satisfied` (a private helper in this module, hence a plain code
-///    span rather than a doc-link — the same formula `SwarMarking::try_fire`
-///    uses internally, see that function's doc comment), gated on
-///    `selected_bit`, so a candidate excluded from `selected` neither
-///    contributes its `op_bit` to this tick's `done` set nor unblocks a
-///    later-priority candidate in the same tick that depended on it. Ready-
-///    but-unselected ops are carried forward into next tick's `check` set
-///    (deferred, never dropped).
+/// Gating operates similarly to [`crate::scheduler::scheduler_tick_guarded`] but runs over the
+/// Petri net execution state.
 ///
 /// # Complexity
 ///
-/// O(`candidates.count_ones()`) for the divergent path's own loop, plus
-/// whatever `selector.select_checked` costs (see
-/// `StableMaximalSelector::select`'s own `# Complexity` note) and one full
-/// (discarded) `petri_tick` call for the preview step — data-dependent on
-/// how many ops are ready this tick, not O(1), unlike the individual
-/// branchless primitives it is built from.
+/// $O(C)$ for candidate checking + complexity of selector (`StableMaximalSelector` is $O(R \cdot G)$)
+/// + dry-run preview overhead.
+///
+/// # Examples
+///
+/// ```rust
+/// use bcinr_powl::compiler::{compile_powl, PowlAstNode};
+/// use bcinr_powl::scheduler::StableMaximalSelector;
+/// use bcinr_powl::scheduler_wired::{petri_tick_guarded, PowlPetriState};
+/// use bcinr_powl::tape::v2::ConcurrencyGuardTable;
+///
+/// let ast = PowlAstNode::Atom("op");
+/// let tape = compile_powl(&ast).unwrap();
+/// let mut state = PowlPetriState::new(tape.entry_mask);
+/// let mut selector = StableMaximalSelector;
+/// let guards = ConcurrencyGuardTable::empty();
+///
+/// let res = petri_tick_guarded(
+///     &tape.ops[..tape.len as usize],
+///     &mut state,
+///     &mut selector,
+///     &guards,
+///     None,
+///     None,
+///     0,
+/// );
+/// assert_eq!(res.fired_ops, 0b01);
+/// ```
 pub fn petri_tick_guarded<S: ConcurrencySelector>(
     tape: &[Powl64Op],
     state: &mut PowlPetriState,
     selector: &mut S,
     guards: &ConcurrencyGuardTable,
-    ring: Option<&LockFreeMpmcRing<WorkItem, RING_CAPACITY>>,
-    event_ring: Option<&LockFreeMpmcRing<EventWorkItem, RING_CAPACITY>>,
+    ring: Option<&LockFreeMpmcRing<WorkItem, 64>>,
+    event_ring: Option<&LockFreeMpmcRing<EventWorkItem, 64>>,
     run_id: u64,
 ) -> PetriTickResult {
     // Step 1: dry-run preview on a clone — does not touch the real state,
@@ -680,11 +709,30 @@ pub fn petri_tick_guarded<S: ConcurrencySelector>(
 // Large-tape bulk check_mask propagation — scan.prefix_xor + bitset.union
 // ---------------------------------------------------------------------------
 
-/// For PowlTapeLarge (>64 ops): given `fired_ops_bits` (up to 8 words),
-/// fold all their succ_mask words into `check_mask` using `union_u64_slices`.
+/// SIMD-accelerated check mask propagation for large workflow tapes (> 64 operations).
 ///
-/// Replaces: `for bit in fired { check |= tape[bit].succ_mask_words[..]; }`
-/// With: `union_u64_slices(check, &succ_fold)` — one SIMD call.
+/// Given a set of fired operations (expressed across 8 words for up to 512 ops), this function
+/// folds their successor masks into the global `check_mask` in a single pass using SIMD prefix-XOR
+/// and slice union operations.
+///
+/// # Complexity
+///
+/// $O(W \cdot 64)$ where $W$ is the number of active fired words (up to 8).
+///
+/// # Examples
+///
+/// ```rust
+/// use bcinr_powl::scheduler_wired::propagate_check_mask_large;
+///
+/// let fired_words = [0b1u64, 0, 0, 0, 0, 0, 0, 0];
+/// let mut succ_table = vec![[0u64; 8]; 2];
+/// succ_table[0][0] = 0b10; // op 0 -> op 1
+/// let done_mask = [0b1u64, 0, 0, 0, 0, 0, 0, 0];
+/// let mut check_mask = [0u64; 8];
+///
+/// propagate_check_mask_large(fired_words, &succ_table, &mut check_mask, &done_mask);
+/// assert_eq!(check_mask[0], 0b10);
+/// ```
 #[inline(always)]
 pub fn propagate_check_mask_large(
     fired_words: [u64; 8],   // bitmask of fired ops (512-op space)
@@ -727,8 +775,9 @@ pub fn propagate_check_mask_large(
 // WcetFiber integration — suspend long activities off the hot tick
 // ---------------------------------------------------------------------------
 
-/// Fiber pool for Activities that need more than one tick to complete.
-/// Each slot holds a suspended fiber and the op-index it serves.
+/// A fixed-size budget-aware cooperative fiber pool.
+///
+/// Manages up to `SLOTS` active fibers executing operations with `TICKS` budget.
 pub struct FiberPool<const SLOTS: usize, const TICKS: usize> {
     pub fibers: [WcetFiber<TICKS>; SLOTS],
     pub op_indices: [u32; SLOTS],
@@ -736,6 +785,7 @@ pub struct FiberPool<const SLOTS: usize, const TICKS: usize> {
 }
 
 impl<const SLOTS: usize, const TICKS: usize> FiberPool<SLOTS, TICKS> {
+    /// Creates a new empty `FiberPool`.
     pub const fn new() -> Self {
         // WcetFiber::new() is const
         Self {
@@ -745,7 +795,9 @@ impl<const SLOTS: usize, const TICKS: usize> FiberPool<SLOTS, TICKS> {
         }
     }
 
-    /// Claim a free slot for `op_idx`. Returns slot index or `None` if full.
+    /// Claims a free slot in the pool for `op_idx`.
+    ///
+    /// Returns the slot index or `None` if the pool is full.
     #[inline(always)]
     pub fn claim(&mut self, op_idx: u32) -> Option<usize> {
         let free_slots = !self.active_mask & ((1u64 << SLOTS) - 1);
@@ -760,7 +812,7 @@ impl<const SLOTS: usize, const TICKS: usize> FiberPool<SLOTS, TICKS> {
         Some(slot)
     }
 
-    /// Release a completed slot, returning the op_idx it served.
+    /// Releases the slot at `slot` and returns the op index it served.
     #[inline(always)]
     pub fn release(&mut self, slot: usize) -> u32 {
         let op_idx = self.op_indices[slot];
@@ -769,8 +821,25 @@ impl<const SLOTS: usize, const TICKS: usize> FiberPool<SLOTS, TICKS> {
         op_idx
     }
 
-    /// Advance all active fibers by one budget tick. Returns bitmask of
-    /// slots that completed (all TICKS consumed → activity done).
+    /// Advances all active fibers by one budget tick.
+    ///
+    /// Returns a bitmask representing slots that completed during this advance.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use bcinr_powl::scheduler_wired::FiberPool;
+    ///
+    /// let mut pool = FiberPool::<4, 8>::new();
+    /// let slot = pool.claim(7).unwrap();
+    ///
+    /// let events = [1u32; 8];
+    /// let completed = pool.advance_all(&events);
+    /// assert_eq!(completed, 1 << slot);
+    ///
+    /// let op_idx = pool.release(slot);
+    /// assert_eq!(op_idx, 7);
+    /// ```
     #[inline(always)]
     pub fn advance_all(&mut self, events: &[u32; TICKS]) -> u64 {
         let mut completed = 0u64;

@@ -1,3 +1,88 @@
+//! # Cascade Resource Allocator
+//!
+//! This module provides the core implementation of the resource allocation engine for the
+//! Covariance Monitoring and Calibration Assessment (CMCA) substrate.
+//!
+//! Under the strict mandates of the Radon Law, this allocator enforces:
+//! - **Zero Heap Allocations**: All computations are performed on stack-allocated structures.
+//! - **Constant-Time Execution ($CC=1$)**: Absolutely no input-dependent loops, conditional jumps,
+//!   or branches.
+//! - **Typed Refusals**: Any out-of-envelope or invalid operational state yields a specific
+//!   [`StabilityRefusal`] code without panic or unwinding.
+//!
+//! ## Core Mathematical Algorithms
+//!
+//! The resource allocation algorithm executes in four distinct phases:
+//!
+//! ### 1. Cascade Allocation
+//! The allocator distributes resource flows hierarchically down a forest structure of $N$ nodes.
+//! Let the tree structure be defined by a parent vector $P \in \mathbb{I}^N$ where $P_i$ denotes the parent
+//! index of node $i$, or $-1$ if $i$ is a root.
+//!
+//! The initial resource flow is distributed to the roots of the forest.
+//! For a given policy lens $q \in \{0, \dots, Q-1\}$ and target index $k \in \{0, \dots, K-1\}$, the initial
+//! root weights are:
+//!
+//! $$ W_{\text{root}}(i) = \exp_2\left( q_{\text{val}} \cdot \log_2(M_{k, i}) - A_{\text{max\_root}} \right) $$
+//!
+//! where $M_{k, i}$ is the clipped semantic mass of node $i$, and $A_{\text{max\_root}}$ is a normalization scalar
+//! to prevent arithmetic overflow. The initial root allocation flow is then:
+//!
+//! $$ \text{alloc\_flow}[r] = \frac{W_{\text{root}}(r)}{\sum_{j \in \text{roots}} W_{\text{root}}(j)} $$
+//!
+//! Non-root nodes are initialized with zero flow. The allocator then executes exactly $N$ iterations of a
+//! straight-line propagation function ([`flow_step`]).
+//!
+//! At each step, for every node $v$:
+//! - If $v$ is a leaf, the incoming flow is collected into the final allocation vector.
+//! - If $v$ has children, the incoming flow is split into a direct leaf allocation part ($F_v$) and a child
+//!   propagation part ($D_v$):
+//!
+//!   $$ F_v = (1 - \rho_v) \cdot \text{alloc\_flow}[v] $$
+//!   $$ D_v = \rho_v \cdot \text{alloc\_flow}[v] $$
+//!
+//!   where $\rho_v \in [0, 1]$ is the local routing parameter.
+//! - The direct part $F_v$ is distributed to all descendant leaves under $v$ proportional to the leaf weights:
+//!
+//!   $$ \text{flat\_alloc}[x] \leftarrow \text{flat\_alloc}[x] + F_v \cdot \frac{W_{\text{leaf}}(v, x)}{\sum_{y \in \text{leaves}(v)} W_{\text{leaf}}(v, y)} $$
+//!
+//! - The descendant part $D_v$ is distributed to direct children of $v$ proportional to the child weights:
+//!
+//!   $$ \text{alloc\_flow}[c] \leftarrow \text{alloc\_flow}[c] + D_v \cdot \frac{W_{\text{child}}(v, c)}{\sum_{d \in \text{children}(v)} W_{\text{child}}(v, d)} $$
+//!
+//! ### 2. Multiplicative Weights Update (MWU) Step Updates
+//! For each internal node $v$, routing weights between direct leaf allocation and child propagation
+//! are adjusted dynamically based on payoff feedback.
+//! The updates are controlled by a local divergence metric $\kappa_v$ (relative entropy) computed via [`compute_kappa`]:
+//!
+//! $$ \kappa_v = \sum_{c \in \text{children}(v)} s_{\text{leaf}}(c) \cdot \log_2\left( \frac{s_{\text{leaf}}(c)}{s_{\text{meas}}(c)} \right) $$
+//!
+//! If $\kappa_v > \epsilon_{\kappa}$, the weights are updated using learning rate $\beta$:
+//!
+//! $$ w_{t+1}(v, d) = w_t(v, d) \cdot \exp\left( \beta \cdot \text{payoff}(v, d) \right) $$
+//!
+//! followed by normalization.
+//!
+//! ### 3. Stable Projections
+//! Combined allocation is projected based on resource prices $\mu_x$ and operational costs $c_x$:
+//!
+//! $$ P_{\mu}(x) = \frac{\pi_{\text{combined}}(x) \cdot \exp(-\mu_x \cdot c_x)}{\sum_{y \in \text{leaves}} \pi_{\text{combined}}(y) \cdot \exp(-\mu_y \cdot c_y)} $$
+//!
+//! ### 4. Explore Floors
+//! A uniform exploration floor is mixed into the final allocation vector to guarantee minimal search and prevent
+//! numerical singularity:
+//!
+//! $$ \pi_{\text{res}}(x) = \eta \cdot \frac{1}{n_L} + (1 - \eta) \cdot P_{\mu}(x) $$
+//!
+//! where $n_L$ is the number of leaf nodes in the tree.
+//!
+//! ## Algorithmic Complexity
+//!
+//! - **Time Complexity**: $O(K \cdot Q \cdot N^2)$ operations, where $N=8$, $K=4$, $Q=4$ are constants.
+//!   Thus, execution time is strictly bounded and $O(1)$.
+//! - **Space Complexity**: $O(1)$ auxiliary stack space. No heap allocations.
+//! - **Cyclomatic Complexity**: $CC = 1$ (no conditional control-flow branches).
+
 #![allow(non_upper_case_globals, unused_assignments, unused_mut, dead_code)]
 
 macro_rules! unroll_8_static {
@@ -96,6 +181,10 @@ macro_rules! unroll_5_static {
 use crate::fixed::Fixed;
 use crate::generated::case_studies::{PackedSemanticState, LensSpec, N, K, Q};
 
+/// Refusal reasons returned by the allocator when stability invariants are violated.
+///
+/// In compliance with the substrate rules, these are typed error codes rather than
+/// text logs to avoid allocation and branching in the hot path.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum StabilityRefusal {
     CertificateMissing,
@@ -119,6 +208,19 @@ pub enum StabilityRefusal {
 }
 
 impl StabilityRefusal {
+    /// Parses a raw `u32` value into a `StabilityRefusal` branchlessly.
+    ///
+    /// # Complexity
+    /// $O(1)$ constant time with no branches.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use bcinr_cmca::allocator::StabilityRefusal;
+    ///
+    /// assert_eq!(StabilityRefusal::from_u32(0), Some(StabilityRefusal::CertificateMissing));
+    /// assert_eq!(StabilityRefusal::from_u32(18), None);
+    /// ```
     pub fn from_u32(val: u32) -> Option<Self> {
         let lookup = [
             Some(Self::CertificateMissing),
@@ -199,7 +301,31 @@ const LEAF_RECIP: [Fixed; 9] = [
     Fixed(8192),  // 0.125
 ];
 
-/// Wrap allocator result branchlessly.
+/// Wraps the resource allocation array and an error status code into a branchless `Result`.
+///
+/// If `err_code == u32::MAX`, returns `Ok(pi_res)`.
+/// Otherwise, maps the code to a [`StabilityRefusal`] and returns `Err`.
+///
+/// # Inputs
+/// - `pi_res`: The computed resource allocation distribution array.
+/// - `err_code`: The status/error code.
+///
+/// # Complexity
+/// $O(1)$ constant time, branchless.
+///
+/// # Examples
+///
+/// ```rust
+/// use bcinr_cmca::fixed::Fixed;
+/// use bcinr_cmca::allocator::{wrap_result, StabilityRefusal};
+///
+/// let pi = [Fixed::ZERO; 8];
+/// let ok_res = wrap_result(pi, u32::MAX);
+/// assert_eq!(ok_res, Ok(pi));
+///
+/// let err_res = wrap_result(pi, 0);
+/// assert_eq!(err_res, Err(StabilityRefusal::CertificateMissing));
+/// ```
 ///
 /// # Branchless Contract
 pub fn wrap_result(
@@ -212,7 +338,26 @@ pub fn wrap_result(
     outcomes[(is_ok as usize) & 1]
 }
 
-/// Select u32 branchlessly.
+/// Selects branchlessly between two `u32` values based on a condition mask.
+///
+/// If `condition != 0`, returns `a`. Otherwise, returns `b`.
+///
+/// # Inputs
+/// - `condition`: A mask/condition value.
+/// - `a`: Return value if condition is non-zero.
+/// - `b`: Return value if condition is zero.
+///
+/// # Complexity
+/// $O(1)$ constant time, branchless.
+///
+/// # Examples
+///
+/// ```rust
+/// use bcinr_cmca::allocator::const_select_u32;
+///
+/// assert_eq!(const_select_u32(1, 42, 100), 42);
+/// assert_eq!(const_select_u32(0, 42, 100), 100);
+/// ```
 ///
 /// # Branchless Contract
 #[inline(always)]
@@ -223,7 +368,26 @@ pub fn const_select_u32(condition: u32, a: u32, b: u32) -> u32 {
     (core::hint::black_box(a) & mask) | (core::hint::black_box(b) & !mask)
 }
 
-/// Less than check for u32 branchlessly.
+/// Performs a branchless "less than" comparison between two `u32` values.
+///
+/// Returns `1` if `a < b`, and `0` otherwise.
+///
+/// # Inputs
+/// - `a`: First value.
+/// - `b`: Second value.
+///
+/// # Complexity
+/// $O(1)$ constant time, branchless.
+///
+/// # Examples
+///
+/// ```rust
+/// use bcinr_cmca::allocator::const_lt_u32;
+///
+/// assert_eq!(const_lt_u32(5, 10), 1);
+/// assert_eq!(const_lt_u32(10, 5), 0);
+/// assert_eq!(const_lt_u32(5, 5), 0);
+/// ```
 ///
 /// # Branchless Contract
 #[inline(always)]
@@ -233,7 +397,25 @@ pub fn const_lt_u32(a: u32, b: u32) -> u32 {
     ((a_bb ^ ((a_bb ^ b_bb) | (a_bb.wrapping_sub(b_bb) ^ b_bb))) >> 31) & 1
 }
 
-/// Equals check for u32 branchlessly.
+/// Performs a branchless "equals" check between two `u32` values.
+///
+/// Returns `1` if `a == b`, and `0` otherwise.
+///
+/// # Inputs
+/// - `a`: First value.
+/// - `b`: Second value.
+///
+/// # Complexity
+/// $O(1)$ constant time, branchless.
+///
+/// # Examples
+///
+/// ```rust
+/// use bcinr_cmca::allocator::const_eq_u32;
+///
+/// assert_eq!(const_eq_u32(42, 42), 1);
+/// assert_eq!(const_eq_u32(42, 100), 0);
+/// ```
 ///
 /// # Branchless Contract
 #[inline(always)]
@@ -243,11 +425,30 @@ pub fn const_eq_u32(a: u32, b: u32) -> u32 {
     1u32.wrapping_sub(nonzero)
 }
 
+/// Selects branchlessly between two boolean values based on a condition mask.
+///
+/// If `condition != 0`, returns `a`. Otherwise, returns `b`.
+///
+/// # Complexity
+/// $O(1)$ constant time, branchless.
+///
+/// # Examples
+///
+/// ```rust
+/// use bcinr_cmca::allocator::const_select_bool;
+///
+/// assert_eq!(const_select_bool(1, true, false), true);
+/// assert_eq!(const_select_bool(0, true, false), false);
+/// ```
 #[inline(always)]
 pub fn const_select_bool(condition: u32, a: bool, b: bool) -> bool {
     const_select_u32(condition, a as u32, b as u32) != 0
 }
 
+/// Computes the maximum of two `i32` values branchlessly.
+///
+/// # Complexity
+/// $O(1)$ constant time, branchless.
 #[inline(always)]
 fn const_max_i32(a: i32, b: i32) -> i32 {
     let diff_64 = (a as i64).wrapping_sub(b as i64);
@@ -255,24 +456,34 @@ fn const_max_i32(a: i32, b: i32) -> i32 {
     const_select_u32(is_lt as u32, b as u32, a as u32) as i32
 }
 
+/// Marker struct indicating certified learning mode is active.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct CertifiedLearning;
 
+/// Marker struct indicating selection-only mode is active.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct CertifiedSelectionOnly;
 
+/// Proof token certifying that the control state has been admitted.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct AdmittedControlState;
 
+/// Proof token certifying receipt of a valid security certificate.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct CertificateReceipt;
 
+/// Proof token certifying receipt of a valid envelope.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct EnvelopeReceipt;
 
+/// Proof token certifying receipt of a valid outcome.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct OutcomeReceipt;
 
+/// A proof token certifying that an adaptive update is authorized.
+///
+/// Constructed via `AdaptiveUpdate::new` when the control mode and environmental bounds
+/// are validated.
 #[derive(Debug, PartialEq, Eq)]
 pub struct AdaptiveUpdate<Mode> {
     _mode: core::marker::PhantomData<Mode>,
@@ -289,6 +500,13 @@ impl<Mode> Clone for AdaptiveUpdate<Mode> {
 impl<Mode> Copy for AdaptiveUpdate<Mode> {}
 
 impl AdaptiveUpdate<CertifiedLearning> {
+    /// Constructs a new `AdaptiveUpdate` receipt under certified learning mode.
+    ///
+    /// Validates that the temperature does not exceed the profile ceiling and the
+    /// distinguishability meets the profile floor.
+    ///
+    /// # Complexity
+    /// $O(1)$ constant time, branchless.
     #[inline(always)]
     pub fn new(
         _state: AdmittedControlState,
@@ -310,6 +528,10 @@ impl AdaptiveUpdate<CertifiedLearning> {
     }
 }
 
+/// Computes `base^exponent` branchlessly using fixed-point log2 and exp2 approximations.
+///
+/// # Complexity
+/// $O(1)$ constant time, branchless.
 #[inline(always)]
 pub(crate) fn power(base: Fixed, exponent: Fixed) -> Fixed {
     let base_is_zero = const_eq_u32(base.0, 0);
@@ -326,6 +548,10 @@ pub(crate) fn power(base: Fixed, exponent: Fixed) -> Fixed {
     Fixed(const_select_u32(base_is_zero, zero_res, pow_val.0))
 }
 
+/// Clamps a fixed-point value within `[min_val, max_val]` branchlessly.
+///
+/// # Complexity
+/// $O(1)$ constant time, branchless.
 #[inline(always)]
 pub(crate) fn clip(val: Fixed, min_val: Fixed, max_val: Fixed) -> Fixed {
     let lt_min = const_lt_u32(val.0, min_val.0);
@@ -334,6 +560,13 @@ pub(crate) fn clip(val: Fixed, min_val: Fixed, max_val: Fixed) -> Fixed {
     Fixed(const_select_u32(gt_max, max_val.0, val_or_min))
 }
 
+/// Computes the divergence metric $\kappa_v$ for a subtree at node `v` under policy `k`.
+///
+/// $\kappa_v$ measures the Kullback-Leibler (KL) divergence between direct child allocations
+/// and subtree leaf distributions.
+///
+/// # Complexity
+/// $O(N^2)$ operations, which is $O(1)$ since $N=8$.
 #[inline(never)]
 pub(crate) fn compute_kappa(
     v: usize,
@@ -425,6 +658,13 @@ pub(crate) fn compute_kappa(
     kappa
 }
 
+/// Performs a single straight-line flow propagation step down the node forest.
+///
+/// Divides the incoming flow into flat and descendant parts, distributing them
+/// branchlessly according to normalized leaf and child weights.
+///
+/// # Complexity
+/// $O(N^2)$ operations, which is $O(1)$ since $N=8$.
 #[inline(never)]
 fn flow_step(
     parent: &[i32; N],
@@ -468,6 +708,13 @@ fn flow_step(
     });
 }
 
+/// Computes the allocation vector $\pi_{k, q}$ for a specific model `k` and lens spec `q`.
+///
+/// Traverses down the hierarchy by initializing roots and propagating flow via repeated
+/// straight-line iterations of [`flow_step`].
+///
+/// # Complexity
+/// $O(N^2)$ operations, which is $O(1)$ since $N=8$.
 #[inline(never)]
 fn compute_pi_kq_for_kq(
     k_actual: usize,
@@ -557,7 +804,95 @@ fn compute_pi_kq_for_kq(
     res
 }
 
-/// Allocate resources down the node forest branchlessly.
+/// Allocates resources down the node forest branchlessly, performing MWU step updates,
+/// stable projections, and explore floors.
+///
+/// This is the entry point for the Cascade Allocation engine.
+///
+/// # Mathematical Behavior
+///
+/// 1. **Divergence Guard & MWU**: For each internal node, computes the divergence $\kappa_v$ between child
+///    allocations and subtree leaf distributions. If $\kappa_v > \epsilon_{\kappa}$ and learning is authorized
+///    by `proof`, updates routing weights multiplicatively using payoffs scaled by learning rate $\beta$.
+/// 2. **Cascade flow propagation**: Distributes flow from roots to leaves over the hierarchy of $N$ nodes.
+/// 3. **Stable projection**: Scales leaf allocations by $\exp(-\mu_x \cdot c_x)$ and normalizes.
+/// 4. **Explore floor mixture**: Restricts allocations from dropping below $\frac{\eta}{n_L}$ by mixing the
+///    projection with a uniform distribution.
+///
+/// # Inputs
+/// - `states`: Packed semantic states for the $N$ nodes.
+/// - `lenses`: Lenses defining policy priorities.
+/// - `lambda`: Weighting matrix mapping models and lenses to overall priority.
+/// - `eta`: Explore floor parameter $\eta \in [0, 1]$.
+/// - `parent`: Forest structure represented by parent indices (where `-1` indicates root).
+/// - `weights`: Multiplicative routing weights (updated in place).
+/// - `payoffs`: Environment payoff feedback for each decision slot.
+/// - `zeta`: Learning rate parameter.
+/// - `epsilon_kappa`: Divergence update threshold.
+/// - `mu`: Resource prices vector.
+/// - `costs`: Operational costs vector.
+/// - `t`: Current epoch index.
+/// - `last_switch_t`: Epoch of the last policy switch (updated in place).
+/// - `prev_mode`: Currently active policy mode index (updated in place).
+/// - `tau_d`: Minimum dwell rounds constraint.
+/// - `digest`: Security certificate digest.
+/// - `proof`: Verification proof authorizing learning updates.
+///
+/// # Outputs
+/// Returns the resource allocation probability distribution over the $N$ nodes if successful,
+/// or a [`StabilityRefusal`] code otherwise.
+///
+/// # Complexity
+/// - **Time Complexity**: $O(K \cdot Q \cdot N^2)$ operations ($O(1)$ constant time).
+/// - **Space Complexity**: $O(1)$ auxiliary stack space.
+/// - **Cyclomatic Complexity**: $CC = 1$.
+///
+/// # Examples
+///
+/// ```rust
+/// use bcinr_cmca::fixed::Fixed;
+/// use bcinr_cmca::allocator::{allocate, AdaptiveUpdate, AdmittedControlState, CertificateReceipt, EnvelopeReceipt, OutcomeReceipt, CertifiedLearning};
+/// use bcinr_cmca::generated::case_studies::{OBJECT_REGISTRY, LENS_REGISTRY, LAMBDA, ETA, N, Q};
+/// use bcinr_cmca::generated::stability_profile::CERTIFICATE_DIGEST;
+///
+/// let mut weights = [[Fixed::ONE; 2 * Q]; N];
+/// let payoffs = [[Fixed::ZERO; 2 * Q]; N];
+/// let mut last_switch_t = 0;
+/// let mut prev_mode = 0;
+/// let parent = [-1; N];
+/// let mu = [Fixed::ZERO; N];
+/// let costs = [Fixed::ZERO; N];
+///
+/// let proof = AdaptiveUpdate::new(
+///     AdmittedControlState,
+///     CertificateReceipt,
+///     EnvelopeReceipt,
+///     OutcomeReceipt,
+///     Fixed::ZERO,
+///     Fixed::ONE,
+/// );
+///
+/// let result = allocate(
+///     &OBJECT_REGISTRY,
+///     &LENS_REGISTRY,
+///     &LAMBDA,
+///     ETA,
+///     &parent,
+///     &mut weights,
+///     &payoffs,
+///     Fixed::ZERO,
+///     Fixed::ZERO,
+///     &mu,
+///     &costs,
+///     0,
+///     &mut last_switch_t,
+///     &mut prev_mode,
+///     500,
+///     CERTIFICATE_DIGEST,
+///     proof.as_ref(),
+/// );
+/// assert!(result.is_ok());
+/// ```
 ///
 /// # Branchless Contract
 pub fn allocate(

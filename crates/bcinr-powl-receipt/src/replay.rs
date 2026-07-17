@@ -1,27 +1,83 @@
-//! replay — token-passing POWL replay verifier with branchless metric accumulation.
+//! Token-passing POWL replay verifier with branchless metric accumulation.
 //!
-//! Uses [`PowlReplayFrame`] — a high-level frame with token-flow semantics
-//! (`node_bit`, `required_tokens`, `produces_tokens`), distinct from the binary-packed
-//! [`crate::causal_receipt::OcelCausalFrame`] used for BLAKE3 hash chaining.
+//! This module provides [`PowlReplayVerifier`] and [`PowlReplayFrame`] to simulate
+//! token-flow semantics on a Partially Ordered Workflow Language (POWL) structure
+//! and derive conformance metrics.
 //!
-//! # Generalization and Simplicity are computed using Q16.16 branchless estimators (RCME)
+//! # Replay Semantics
 //!
-//! [`PowlReplayVerifier::finalize`] computes all four [`ConformanceMetrics`]
-//! dimensions from the replay state:
-//! - `fitness` and `precision` are genuine, derived from token-passing accumulators.
-//! - `generalization` and `simplicity` are proxy estimators (RCME) derived branchlessly
-//!   from tape length, unique replayed node counts, and token configurations.
-//! See the design proposal in `real_conformance_metric_estimators.md` for the formulas
-//! and mathematical rationales.
+//! Replay is modeled as a token-passing game over a Petri-net like graph. Each transition
+//! (node) in the POWL process structure requires a specific set of tokens to be enabled,
+//! and when fired, consumes those tokens and produces new successor tokens.
+//!
+//! - **Required Tokens**: The set of tokens that must be present in the verifier's marking
+//!   for the node to fire.
+//! - **Produced Tokens**: The set of tokens generated and added to the verifier's marking
+//!   after the node fires.
+//! - **Enabled not Taken**: Enabled transitions that were present but not chosen/fired
+//!   during the trace.
+//!
+//! # Mathematical Definitions for Metrics
+//!
+//! Upon completion of the trace, [`PowlReplayVerifier::finalize`] calculates the final metrics:
+//!
+//! 1. **Fitness ($F$):**
+//!    $$F = \frac{\text{Fitted Nodes}}{\text{Replayed Nodes}}$$
+//!    Here, both variables are derived from the unique transitions successfully replayed. For a fully fitting trace,
+//!    this is $1.0$ (`0x0001_0000`).
+//!
+//! 2. **Precision ($P$):**
+//!    $$P = \frac{N_{\text{unique}}}{N_{\text{unique}} + T_{\text{not\_taken}}}$$
+//!    where $N_{\text{unique}}$ is the count of unique replayed nodes (the population of unique transitions observed in the trace),
+//!    and $T_{\text{not\_taken}}$ is the total number of options enabled but never taken throughout the replay trace.
+//!
+//! 3. **Generalization ($G$):**
+//!    $$G = 1.0 - \text{clamp}\left(\frac{N_{\text{unique}}}{L + T_{\text{not\_taken}} + 1}, 0.0, 1.0\right)$$
+//!    where $L$ is the tape length (the number of events processed). If the model only allows the exact observed sequence,
+//!    generalization is low. If it allows flexible alternatives, generalization scales appropriately.
+//!
+//! 4. **Simplicity ($S$):**
+//!    $$S = \frac{K}{N_{\text{unique}} + T_{\text{not\_taken}} + T_{\text{active}} + K}$$
+//!    where $K = 8$ is a scaling constant, and $T_{\text{active}}$ is the count of active tokens remaining in the model marking at the end of execution.
+//!
+//! # Examples
+//!
+//! ```
+//! use bcinr_powl_receipt::replay::{PowlReplayVerifier, PowlReplayFrame};
+//!
+//! // Define a simple replay frame representing the first event
+//! let frame = PowlReplayFrame {
+//!     node_id: 1,
+//!     node_bit: 0x1,
+//!     required_tokens: 0x1,
+//!     produces_tokens: 0x2,
+//!     activity: "Start".to_string(),
+//!     ts_ns: 1000,
+//!     object_ids: vec![],
+//! };
+//!
+//! // Create a verifier initialized with entry token 0x1
+//! let mut verifier = PowlReplayVerifier::new(0x1);
+//!
+//! // Replay the frame
+//! assert!(verifier.replay_frame(&frame).is_ok());
+//!
+//! // Finalize the metrics
+//! let metrics = verifier.finalize();
+//! assert_eq!(metrics.fitness, 0x0001_0000); // 1.0
+//! ```
 
 use crate::conformance::ConformanceMetrics;
 
 /// High-level replay descriptor for one POWL node firing.
 ///
-/// Distinct from [`crate::causal_receipt::OcelCausalFrame`] (binary hash-chaining struct).
+/// This struct holds the token-flow semantics of a single event in the process log
+/// and is used by [`PowlReplayVerifier`] to progress the replay. It is distinct from
+/// [`crate::causal_receipt::OcelCausalFrame`], which is the binary-packed structure
+/// used for cryptographic chaining.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PowlReplayFrame {
-    /// Unique node identifier (for error reporting).
+    /// Unique node identifier (primarily for error reporting and debugging).
     pub node_id: u32,
     /// 1-hot bitmask position for this node (must have exactly one bit set).
     pub node_bit: u64,
@@ -31,7 +87,7 @@ pub struct PowlReplayFrame {
     pub produces_tokens: u64,
     /// Activity label — becomes `ocel:type` in the JSON bridge.
     pub activity: String,
-    /// Nanosecond timestamp.
+    /// Nanosecond timestamp of the event.
     pub ts_ns: u64,
     /// Object identifiers touched by this event (E2O links).
     pub object_ids: Vec<String>,
@@ -39,13 +95,19 @@ pub struct PowlReplayFrame {
 
 /// Token-passing replay verifier for a POWL process model.
 ///
-/// Real (not stubbed) `fitness`/`precision`/`generalization`/`simplicity` accumulation
-/// via [`Self::replay_frame`]'s token-passing state.
+/// Accumulates fitness, precision, generalization, and simplicity metrics during trace replay.
+/// It maintains the active marking (`enabled_tokens`) and counts unique visited nodes,
+/// tape length, and enabled options that were not taken.
 pub struct PowlReplayVerifier {
+    /// Current marking (bitmask of active/enabled tokens).
     enabled_tokens: u64,
+    /// Bitmask of all unique replayed transitions.
     replayed: u64,
+    /// Bitmask of transitions that successfully fit the replay semantics.
     fitted: u64,
+    /// Bitmask of all options enabled during the replay but never chosen/fired.
     enabled_not_taken: u64,
+    /// Total number of events (replay frames) replayed.
     tape_length: u64,
 }
 
@@ -53,15 +115,32 @@ pub struct PowlReplayVerifier {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReplayViolation {
     /// The frame's `required_tokens` were not all present in `enabled_tokens`.
-    TokenNotEnabled { node_id: u32 },
+    TokenNotEnabled {
+        /// The identifier of the node that failed to fire.
+        node_id: u32,
+    },
     /// The frame's `node_bit` is zero or has more than one bit set.
-    UnknownNode { node_id: u32 },
+    UnknownNode {
+        /// The identifier of the node with the invalid bitmask.
+        node_id: u32,
+    },
     /// A XOR-choice edge was violated: a sibling exclusive token was still live.
-    InvalidChoiceEdge { node_id: u32 },
+    InvalidChoiceEdge {
+        /// The identifier of the node associated with the choice violation.
+        node_id: u32,
+    },
 }
 
 impl PowlReplayVerifier {
-    /// Create a verifier with `entry_op_bit` as the initial enabled token.
+    /// Create a new verifier with `entry_op_bit` as the initial enabled token.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bcinr_powl_receipt::replay::PowlReplayVerifier;
+    ///
+    /// let verifier = PowlReplayVerifier::new(0x1);
+    /// ```
     pub fn new(entry_op_bit: u64) -> Self {
         PowlReplayVerifier {
             enabled_tokens: entry_op_bit,
@@ -73,6 +152,33 @@ impl PowlReplayVerifier {
     }
 
     /// Replay one causal frame.
+    ///
+    /// Updates the active token marking and metric accumulators.
+    /// Returns `Ok(())` if the transition can be fired legally under the current marking.
+    /// Otherwise, returns a [`ReplayViolation`].
+    ///
+    /// # Errors
+    ///
+    /// - [`ReplayViolation::UnknownNode`]: If `frame.node_bit` is not a power of 2.
+    /// - [`ReplayViolation::TokenNotEnabled`]: If not all `frame.required_tokens` are present.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bcinr_powl_receipt::replay::{PowlReplayVerifier, PowlReplayFrame};
+    ///
+    /// let mut verifier = PowlReplayVerifier::new(0x1);
+    /// let frame = PowlReplayFrame {
+    ///     node_id: 0,
+    ///     node_bit: 0x1,
+    ///     required_tokens: 0x1,
+    ///     produces_tokens: 0x2,
+    ///     activity: "A".to_string(),
+    ///     ts_ns: 0,
+    ///     object_ids: vec![],
+    /// };
+    /// assert!(verifier.replay_frame(&frame).is_ok());
+    /// ```
     pub fn replay_frame(&mut self, frame: &PowlReplayFrame) -> Result<(), ReplayViolation> {
         // Guard 1: node_bit must be exactly one bit set (power of two, non-zero).
         if frame.node_bit == 0 || (frame.node_bit & frame.node_bit.wrapping_sub(1)) != 0 {
@@ -104,6 +210,21 @@ impl PowlReplayVerifier {
     }
 
     /// Finalise replay and return Q16.16 [`ConformanceMetrics`].
+    ///
+    /// Computes the final fitness, precision, generalization, and simplicity values.
+    /// Computations are branchless, utilizing Q16.16 division and bitwise clamping masks.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bcinr_powl_receipt::replay::PowlReplayVerifier;
+    ///
+    /// let verifier = PowlReplayVerifier::new(0x1);
+    /// let metrics = verifier.finalize();
+    /// // Fitness and precision default to 1.0 when no frames are replayed.
+    /// assert_eq!(metrics.fitness, 0x0001_0000);
+    /// assert_eq!(metrics.precision, 0x0001_0000);
+    /// ```
     pub fn finalize(self) -> ConformanceMetrics {
         let replayed = self.replayed.count_ones() as u64;
         let fitted = self.fitted.count_ones() as u64;
@@ -138,7 +259,9 @@ impl PowlReplayVerifier {
     }
 }
 
-/// Q16.16 fixed-point division. Returns 1.0 when denominator == 0.
+/// Q16.16 fixed-point division.
+///
+/// Returns `0x0001_0000` (1.0) when denominator == 0.
 #[inline]
 fn fixed_div(numerator: u64, denominator: u64) -> u32 {
     if denominator == 0 {

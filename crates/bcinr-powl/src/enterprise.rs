@@ -1,11 +1,58 @@
-//! enterprise — SLA capabilities, saga compensation stacks, op metadata, and
-//! branchless graduation evaluation.
+//! # Enterprise Scheduling and Saga Management Subsystem
 //!
-//! All hot-path operations are `O(1)` and branch-free. The [`SagaStack`] is a
-//! fixed-size LIFO with 32 frames allocated on the stack (no heap). The
-//! [`EnterpriseOpMeta`] parallel array is explicitly `repr(C, align(64))` so
-//! that each entry occupies exactly one cache line and is never interleaved
-//! with the hot tape.
+//! This module implements enterprise SLA capability checks, saga compensation stacks,
+//! scheduling metadata, and branchless graduation evaluation.
+//!
+//! Under the BCINR Radon Law, all runtime execution paths in this module are branchless,
+//! allocation-free (`#![no_std]`), and execute in constant time with `CC = 1`.
+//!
+//! ## Architectural Overview
+//!
+//! ### Saga Compensation & Rollback
+//!
+//! A **Saga** is a sequence of transaction steps. In distributed or message-driven execution,
+//! transaction steps are compensated if a step fails or is aborted.
+//! To manage this safely without dynamic memory allocation or heap-based undo-logs,
+//! this module introduces the Bounded Saga Stack ([`SagaStack`], also known as BSS).
+//!
+//! The workflow progresses as follows:
+//! 1. **Forward Path**: As forward operations complete successfully, their corresponding
+//!    compensating operation indices (`comp_op_idx`) are pushed onto the [`SagaStack`].
+//! 2. **Rollback Trigger**: If any forward operation fails, the engine transitions to compensating mode.
+//! 3. **Compensation Path**: The engine pops compensation operation indices from the stack in a
+//!    Last-In-First-Out (LIFO) order. These compensating operations are executed sequentially to roll
+//!    back the state of the saga.
+//!
+//! ### Indices Multiplexing
+//!
+//! Storing stack elements and modifying stack pointers is normally a branching operation
+//! (e.g., checking bounds and handling overflow/underflow). To satisfy `CC = 1`, [`SagaStack`]
+//! employs **Indices Multiplexing**:
+//!
+//! - **Multiplexed Push**: The stack array allocation has capacity `33` (32 active slots and 1 garbage/sink slot).
+//!   When a push occurs, we calculate a bitmask indicating whether the stack is full (`top >= 32`).
+//!   The write index is multiplexed using bitwise operations:
+//!   `write_idx = (top & !mask) | (sink_idx & mask)`.
+//!   The value is written to `write_idx`, and `top` is incremented by `1` only if the stack was not full.
+//!   If the stack is full, the write goes to the sink slot (index 32), and the top pointer does not advance.
+//! - **Multiplexed Pop**: When a pop occurs, we check if the stack is empty (`top == 0`).
+//!   The `top` pointer is decremented by `1` only if the stack is not empty.
+//!   The read index is multiplexed: if valid, it reads from the new `top` index; if empty, it reads from
+//!   the garbage/sink slot (index 32). The returned [`BranchlessPop`] struct includes the popped value
+//!   and a validity status mask (`0xFFFF` for success, `0` for empty/underflow).
+//!
+//! ### Capability Sets & SLA Tier Evaluation
+//!
+//! Tenants possess a [`CapabilitySet`], which is a 64-bit mask representing granted capabilities.
+//! Operations specify a `required_caps` set. The check [`capability_mask`] determines if all required bits
+//! are present in the granted mask branchlessly:
+//!
+//! - If the check passes, it returns `u64::MAX`.
+//! - Otherwise, it returns `0`.
+//!
+//! Similarly, [`evaluate_graduation`] evaluates post-execution validation requirements branchlessly
+//! based on runtime counters (order violations, SLA breaches, watchdog trips, and instance counts),
+//! returning a unified bitmask of required post-manufacturing passes.
 
 #![forbid(unsafe_code)]
 
@@ -18,12 +65,35 @@
 /// Each bit corresponds to a capability defined by the platform operator.
 /// Bit positions are assigned by convention; this type is intentionally opaque
 /// to the admission layer.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_powl::enterprise::CapabilitySet;
+///
+/// let admin_role: CapabilitySet = 0b0001;
+/// let billing_role: CapabilitySet = 0b0010;
+///
+/// let user_caps: CapabilitySet = admin_role | billing_role;
+/// assert_eq!(user_caps, 0b0011);
+/// ```
 pub type CapabilitySet = u64;
 
 /// Branchless capability check.
 ///
 /// Returns `0xFFFF_FFFF_FFFF_FFFF` (all-ones) when `granted` contains every
 /// bit set in `required`; returns `0` otherwise.
+///
+/// # Mathematical Contract
+///
+/// For any granted mask $G$ and required mask $R$:
+///
+/// $$
+/// \operatorname{capability\_mask}(G, R) = \begin{cases}
+/// 2^{64} - 1 & \text{if } (G \land R) = R \\
+/// 0 & \text{otherwise}
+/// \end{cases}
+/// $$
 ///
 /// # Algorithm
 ///
@@ -43,12 +113,15 @@ pub type CapabilitySet = u64;
 /// ```
 /// use bcinr_powl::enterprise::capability_mask;
 ///
-/// let granted: u64 = 0b1111;
-/// let required: u64 = 0b0101;
+/// let granted = 0b1111;
+/// let required = 0b0101;
 /// assert_eq!(capability_mask(granted, required), u64::MAX);
 ///
-/// let required_missing: u64 = 0b1010_0000;
+/// let required_missing = 0b1010_0000;
 /// assert_eq!(capability_mask(granted, required_missing), 0);
+///
+/// // Empty requirements are satisfied by any set of granted privileges
+/// assert_eq!(capability_mask(0, 0), u64::MAX);
 /// ```
 #[inline(always)]
 pub fn capability_mask(granted: CapabilitySet, required: CapabilitySet) -> u64 {
@@ -69,9 +142,25 @@ pub fn capability_mask(granted: CapabilitySet, required: CapabilitySet) -> u64 {
 // Saga stack
 // ---------------------------------------------------------------------------
 
-/// The return type of branchless pop operations.
+/// The return type of branchless pop operations on [`SagaStack`].
 ///
 /// Contains the popped value and an execution status mask (`0xFFFF` if valid, `0` if empty).
+/// Storing stack operations as a flat struct avoids branching when unwrapping or checking
+/// values on the hot path.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_powl::enterprise::BranchlessPop;
+///
+/// // A successful pop
+/// let ok_pop = BranchlessPop { value: 42, valid_mask: 0xFFFF };
+/// assert_eq!(Option::<u16>::from(ok_pop), Some(42));
+///
+/// // An empty pop
+/// let empty_pop = BranchlessPop { value: 0, valid_mask: 0 };
+/// assert_eq!(Option::<u16>::from(empty_pop), None);
+/// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BranchlessPop {
     /// The compensation op index popped, or a garbage value if the stack was empty.
@@ -81,6 +170,23 @@ pub struct BranchlessPop {
 }
 
 impl From<BranchlessPop> for Option<u16> {
+    /// Convert the branchless pop result into a standard Rust [`Option`].
+    ///
+    /// > [!WARNING]
+    /// > Converting to [`Option`] introduces conditional branching on the variant wrapper.
+    /// > Only perform this conversion when exiting the hot-path execution loop.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bcinr_powl::enterprise::BranchlessPop;
+    ///
+    /// let pop = BranchlessPop { value: 12, valid_mask: 0xFFFF };
+    /// assert_eq!(Option::<u16>::from(pop), Some(12));
+    ///
+    /// let empty = BranchlessPop { value: 0, valid_mask: 0 };
+    /// assert_eq!(Option::<u16>::from(empty), None);
+    /// ```
     #[inline(always)]
     fn from(pop: BranchlessPop) -> Self {
         if pop.valid_mask != 0 {
@@ -96,6 +202,44 @@ impl From<BranchlessPop> for Option<u16> {
 /// Stores up to 32 `u16` compensation op indices with no heap allocation.
 /// Under the BCINR Radon Law, all operations have a cyclomatic complexity of CC=1
 /// and execute with zero conditional branches.
+///
+/// ## Stack Saturation & Multiplexing
+///
+/// Standard stack implementations branch on checks for overflow (during push) and
+/// underflow (during pop). To satisfy the whole-call-graph branchlessness constraint,
+/// `SagaStack` allocates a 33rd slot (`frames[32]`) which acts as a garbage/sink buffer.
+///
+/// - **Pushing on a Full Stack**: When the stack is at its maximum capacity of 32 elements,
+///   subsequent pushes write to the 33rd slot (`frames[32]`) and the stack pointer (`top`)
+///   remains at `32`.
+/// - **Popping from an Empty Stack**: When the stack is empty (`top == 0`), popping reads
+///   from the 33rd slot (`frames[32]`) and returns a [`BranchlessPop`] with `valid_mask` set to `0`.
+///   The stack pointer remains at `0`.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_powl::enterprise::SagaStack;
+///
+/// let mut stack = SagaStack::new();
+/// assert!(stack.is_empty());
+///
+/// // Push elements branchlessly
+/// stack.push(10);
+/// stack.push(20);
+/// assert_eq!(stack.len(), 2);
+///
+/// // Pop elements back in LIFO order
+/// let pop1 = stack.pop();
+/// assert_eq!(Option::<u16>::from(pop1), Some(20));
+///
+/// let pop2 = stack.pop();
+/// assert_eq!(Option::<u16>::from(pop2), Some(10));
+///
+/// // Underflow is handled gracefully without branching or panics
+/// let empty_pop = stack.pop();
+/// assert_eq!(Option::<u16>::from(empty_pop), None);
+/// ```
 #[derive(Debug)]
 pub struct SagaStack {
     /// Storage for 32 stack frames + 1 garbage sink slot.
@@ -106,6 +250,15 @@ pub struct SagaStack {
 
 impl SagaStack {
     /// Create a new empty [`SagaStack`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bcinr_powl::enterprise::SagaStack;
+    ///
+    /// const STACK: SagaStack = SagaStack::new();
+    /// assert!(STACK.is_empty());
+    /// ```
     #[inline(always)]
     pub const fn new() -> Self {
         Self {
@@ -115,18 +268,49 @@ impl SagaStack {
     }
 
     /// Returns `true` when the stack contains no frames.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bcinr_powl::enterprise::SagaStack;
+    ///
+    /// let stack = SagaStack::new();
+    /// assert!(stack.is_empty());
+    /// ```
     #[inline(always)]
     pub const fn is_empty(&self) -> bool {
         self.top == 0
     }
 
     /// Returns `true` when the stack is at capacity (32 frames).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bcinr_powl::enterprise::SagaStack;
+    ///
+    /// let mut stack = SagaStack::new();
+    /// for i in 0..32 {
+    ///     stack.push(i);
+    /// }
+    /// assert!(stack.is_full());
+    /// ```
     #[inline(always)]
     pub const fn is_full(&self) -> bool {
         self.top >= 32
     }
 
     /// Current number of frames on the stack.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bcinr_powl::enterprise::SagaStack;
+    ///
+    /// let mut stack = SagaStack::new();
+    /// stack.push(5);
+    /// assert_eq!(stack.len(), 1);
+    /// ```
     #[inline(always)]
     pub const fn len(&self) -> usize {
         self.top as usize
@@ -136,6 +320,26 @@ impl SagaStack {
     ///
     /// If the stack is full, the write is multiplexed to the garbage sink slot (index 32)
     /// and the pointer does not increment, providing saturating behavior without branching.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bcinr_powl::enterprise::SagaStack;
+    ///
+    /// let mut stack = SagaStack::new();
+    /// stack.push(101);
+    /// assert_eq!(stack.len(), 1);
+    ///
+    /// // Fill the stack to capacity
+    /// for i in 0..31 {
+    ///     stack.push(i);
+    /// }
+    /// assert!(stack.is_full());
+    ///
+    /// // Extra push does not overflow nor panic
+    /// stack.push(999);
+    /// assert_eq!(stack.len(), 32);
+    /// ```
     #[inline(always)]
     pub fn push(&mut self, comp_op_idx: u16) {
         let top_val = self.top as u64;
@@ -157,6 +361,22 @@ impl SagaStack {
     /// Pop the most-recently-pushed compensation op index branchlessly.
     ///
     /// Returns a [`BranchlessPop`] struct containing the status mask and value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bcinr_powl::enterprise::SagaStack;
+    ///
+    /// let mut stack = SagaStack::new();
+    /// stack.push(50);
+    ///
+    /// let result = stack.pop();
+    /// assert_eq!(Option::<u16>::from(result), Some(50));
+    ///
+    /// // Subsequent pops from empty stack return None
+    /// let empty = stack.pop();
+    /// assert_eq!(Option::<u16>::from(empty), None);
+    /// ```
     #[inline(always)]
     pub fn pop(&mut self) -> BranchlessPop {
         let top_val = self.top as u64;
@@ -181,6 +401,7 @@ impl SagaStack {
 }
 
 impl Default for SagaStack {
+    /// Construct a default empty [`SagaStack`].
     fn default() -> Self {
         Self::new()
     }
@@ -191,6 +412,18 @@ impl Default for SagaStack {
 // ---------------------------------------------------------------------------
 
 /// The saga participation role of an op in the workflow.
+///
+/// In a saga, tasks are organized into roles that define their transactional properties
+/// and whether they should trigger compensating workflows on failure.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_powl::enterprise::SagaRole;
+///
+/// let role = SagaRole::Forward;
+/// assert_ne!(role, SagaRole::Compensator);
+/// ```
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SagaRole {
@@ -214,6 +447,26 @@ pub enum SagaRole {
 /// The struct is `repr(C, align(64))` to guarantee exactly one cache-line per
 /// entry (64 bytes). The `_pad` field enforces the size invariant at compile
 /// time via the `const` assertion below.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_powl::enterprise::{EnterpriseOpMeta, SagaRole};
+///
+/// let meta = EnterpriseOpMeta::new(
+///     1_000_000_000, // deadline_ns
+///     0b0101,        // required_caps
+///     4,             // comp_op_idx
+///     SagaRole::Forward,
+///     100,           // sla_tier
+/// );
+///
+/// assert_eq!(meta.deadline_ns, 1_000_000_000);
+/// assert_eq!(meta.required_caps, 0b0101);
+/// assert_eq!(meta.comp_op_idx, 4);
+/// assert_eq!(meta.saga_role, SagaRole::Forward);
+/// assert_eq!(meta.sla_tier, 100);
+/// ```
 #[repr(C, align(64))]
 pub struct EnterpriseOpMeta {
     /// Absolute deadline in nanoseconds (monotonic clock).
@@ -237,6 +490,21 @@ const _: () = assert!(
 
 impl EnterpriseOpMeta {
     /// Construct a zeroed entry with the given fields.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bcinr_powl::enterprise::{EnterpriseOpMeta, SagaRole};
+    ///
+    /// let meta = EnterpriseOpMeta::new(
+    ///     500_000,
+    ///     0b1,
+    ///     u16::MAX,
+    ///     SagaRole::None,
+    ///     0,
+    /// );
+    /// assert_eq!(meta.comp_op_idx, u16::MAX);
+    /// ```
     pub const fn new(
         deadline_ns: u64,
         required_caps: CapabilitySet,
@@ -259,7 +527,10 @@ impl EnterpriseOpMeta {
 // Graduation evaluation
 // ---------------------------------------------------------------------------
 
-/// Bitmask bits returned by [`evaluate_graduation`].
+/// Bitmask flags returned by [`evaluate_graduation`].
+///
+/// These flags signify the post-manufacturing validation passes required for a
+/// given execution run.
 pub mod graduation {
     /// Bit 0: process mining discovery pass required (order violations detected).
     pub const NEEDS_DISCOVERY: u64 = 1 << 0;
@@ -276,7 +547,7 @@ pub mod graduation {
 /// Branchless graduation evaluation.
 ///
 /// Returns a bitmask indicating which post-manufacturing validation passes are
-/// required for this instance set.  Each signal is derived independently and
+/// required for this instance set. Each signal is derived independently and
 /// combined with bitwise OR — no conditional branches, constant latency.
 ///
 /// # Bit assignments
@@ -304,6 +575,13 @@ pub mod graduation {
 /// let bits = evaluate_graduation(1, 0, 0, 0, 0);
 /// assert_ne!(bits & graduation::NEEDS_DISCOVERY, 0);
 /// assert_eq!(bits & graduation::NEEDS_CONFORMANCE, 0);
+///
+/// // Trigger multiple validations simultaneously
+/// let multi_bits = evaluate_graduation(0, 5, 0, 1, 2000);
+/// assert_eq!(
+///     multi_bits,
+///     graduation::NEEDS_CONFORMANCE | graduation::NEEDS_RECEIPTS | graduation::NEEDS_BENCHMARK
+/// );
 /// ```
 #[inline(always)]
 pub fn evaluate_graduation(

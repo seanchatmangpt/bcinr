@@ -1,43 +1,127 @@
-//! conformance — Q16.16 fixed-point conformance metrics and branchless predicate checking.
+//! Conformance metrics and branchless predicate checking for POWL process replay.
 //!
-//! All numeric values are Q16.16 fixed-point: `0x0001_0000` == 1.0.
-//! The `mask_ge` comparison is derived from the B-Calculus `lt_mask_u32` pattern in
-//! `bcinr-logic/src/mask.rs`: produce all-ones when `a >= b`, all-zeros otherwise,
-//! with no conditional branch.
+//! This module provides the types and methods for evaluating conformance metrics of a
+//! replayed process trace against a process model. All conformance values are represented
+//! in **Q16.16 fixed-point format**, where `0x0001_0000` corresponds to `1.0`.
+//!
+//! # Conformance Dimensions
+//!
+//! Conformance is evaluated across four distinct dimensions:
+//!
+//! 1. **Fitness ($F$):** Measures the degree to which the trace can be replayed by the model
+//!    without transitions firing out of order or failing enablement.
+//!    $$F = \frac{\text{Fitted Nodes}}{\text{Replayed Nodes}}$$
+//! 2. **Precision ($P$):** Measures the degree to which the model does not allow behaviors
+//!    unobserved in the trace (minimizing underfitting).
+//!    $$P = \frac{\text{Replayed Nodes}}{\text{Replayed Nodes} + \text{Tokens Enabled but Not Taken}}$$
+//! 3. **Generalization ($G$):** Evaluates the model's capability to generalize to unseen,
+//!    yet consistent, behaviors rather than strictly overfitting to the observed trace.
+//!    This is calculated using a Real Conformance Metric Estimator (RCME) formula:
+//!    $$G = 1.0 - \text{clamp}\left(\frac{N_{\text{unique}}}{L + T_{\text{not\_taken}} + 1}, 0.0, 1.0\right)$$
+//!    where $N_{\text{unique}}$ is the number of unique replayed nodes, $L$ is the tape length (total replayed events),
+//!    and $T_{\text{not\_taken}}$ is the number of tokens that were enabled but never consumed (the count of non-taken options).
+//! 4. **Simplicity ($S$):** Measures the simplicity of the model's structure under the observed replay,
+//!    penalizing overly complex structures and unused transitions.
+//!    This is calculated using a Real Conformance Metric Estimator (RCME) formula:
+//!    $$S = \frac{K}{N_{\text{unique}} + T_{\text{not\_taken}} + T_{\text{active}} + K}$$
+//!    where $K = 8$ is a scaling constant, and $T_{\text{active}}$ is the count of active tokens remaining in the model at finalization.
+//!
+//! # Q16.16 Fixed-Point Representation
+//!
+//! Fixed-point numbers are represented as `u32` integers:
+//! - `0x0001_0000` represents $1.0$ (maximum value).
+//! - `0x0000_8000` represents $0.5$.
+//! - `0x0000_0000` represents $0.0$.
+//!
+//! This representation avoids floating-point operations at runtime, conforming to the
+//! zero-allocation, branchless requirements of the BCINR substrate.
+//!
+//! # Branchless Predicate Checking
+//!
+//! Predicate checks utilize B-Calculus masks (`0xFFFF_FFFF` for true, `0x0000_0000` for false)
+//! instead of conditional branching (`if` / `else`) to achieve constant-time, branchless evaluation.
+//!
+//! # Examples
+//!
+//! ```
+//! use bcinr_powl_receipt::conformance::{ConformanceMetrics, ConformancePredicate};
+//!
+//! // Create a metrics report
+//! let metrics = ConformanceMetrics {
+//!     fitness: 0x0001_0000,        // 1.0 (perfect fitness)
+//!     precision: 0x0001_0000,      // 1.0 (perfect precision)
+//!     generalization: 0x0000_8000, // 0.50
+//!     simplicity: 0x0000_9000,     // 0.5625
+//! };
+//!
+//! // Check metrics against the strict predicate
+//! let result = ConformancePredicate::STRICT.check(&metrics);
+//! assert!(result.is_ok());
+//!
+//! // If any metric falls below the threshold, a conformance violation is returned
+//! let failing_metrics = ConformanceMetrics {
+//!     fitness: 0x0000_8000,        // 0.50 (below strict threshold of 1.0)
+//!     precision: 0x0001_0000,
+//!     generalization: 0x0000_8000,
+//!     simplicity: 0x0000_8000,
+//! };
+//! let result = ConformancePredicate::STRICT.check(&failing_metrics);
+//! assert!(result.is_err());
+//! ```
 
 /// Q16.16 fixed-point conformance metrics.
 ///
-/// Value encoding: `0x0001_0000` == 1.0, `0x0000_8000` == 0.5, `0x0000_0000` == 0.0.
+/// Encoding:
+/// - `0x0001_0000` == 1.0 (perfect conformance)
+/// - `0x0000_8000` == 0.5
+/// - `0x0000_0000` == 0.0 (no conformance)
 ///
-/// All four dimensions are computed:
-/// [`crate::replay::PowlReplayVerifier::finalize`] computes genuine
-/// `fitness`/`precision` from token-passing replay state, and computes
-/// `generalization`/`simplicity` using branchless fixed-point estimators (RCME)
-/// derived from tape length, unique replayed node counts, and token configurations.
+/// All four dimensions are computed branchlessly during trace replay.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConformanceMetrics {
+    /// Fitness ($F$): The ratio of replayed events that fit the process model's allowed transitions.
+    ///
+    /// Range: `0x0000_0000` to `0x0001_0000` (inclusive).
     pub fitness: u32,
+    /// Precision ($P$): The ratio of executed transitions to total enabled transitions during replay.
+    ///
+    /// Range: `0x0000_0000` to `0x0001_0000` (inclusive).
     pub precision: u32,
+    /// Generalization ($G$): The RCME proxy estimator representing the model's capacity to generalize to unseen traces.
+    ///
+    /// Range: `0x0000_0000` to `0x0001_0000` (inclusive).
     pub generalization: u32,
+    /// Simplicity ($S$): The RCME proxy estimator representing structural simplicity based on token passing.
+    ///
+    /// Range: `0x0000_0000` to `0x0001_0000` (inclusive).
     pub simplicity: u32,
 }
 
 /// Threshold predicate for conformance checking.
 ///
-/// Each field is a Q16.16 minimum (inclusive). `check` returns `Ok(())` iff every
-/// dimension of the supplied [`ConformanceMetrics`] meets its threshold — all
-/// comparisons are branchless.
+/// Contains the minimum acceptable values for the four conformance dimensions.
+/// A predicate is met if each measured metric is greater than or equal to the minimum
+/// threshold (inclusive).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConformancePredicate {
+    /// Minimum acceptable fitness threshold (Q16.16).
     pub min_fitness: u32,
+    /// Minimum acceptable precision threshold (Q16.16).
     pub min_precision: u32,
+    /// Minimum acceptable generalization threshold (Q16.16).
     pub min_generalization: u32,
+    /// Minimum acceptable simplicity threshold (Q16.16).
     pub min_simplicity: u32,
 }
 
 impl ConformancePredicate {
-    /// Strict predicate: all four dimensions must be ≥ 1.0 (fitness/precision) or ≥ 0.5
-    /// (generalization/simplicity).
+    /// Strict predicate: requiring perfect fitness and precision (`1.0`), and moderate
+    /// generalization and simplicity (`0.5`).
+    ///
+    /// - Fitness $\ge 1.0$ (`0x0001_0000`)
+    /// - Precision $\ge 1.0$ (`0x0001_0000`)
+    /// - Generalization $\ge 0.5$ (`0x0000_8000`)
+    /// - Simplicity $\ge 0.5$ (`0x0000_8000`)
     pub const STRICT: Self = Self {
         min_fitness: 0x0001_0000,
         min_precision: 0x0001_0000,
@@ -45,8 +129,13 @@ impl ConformancePredicate {
         min_simplicity: 0x0000_8000,
     };
 
-    /// Lenient predicate: all four dimensions must be ≥ 0.5 (fitness/precision) or ≥ 0.25
-    /// (generalization/simplicity).
+    /// Lenient predicate: allowing moderate fitness and precision (`0.5`), and low
+    /// generalization and simplicity (`0.25`).
+    ///
+    /// - Fitness $\ge 0.5$ (`0x0000_8000`)
+    /// - Precision $\ge 0.5$ (`0x0000_8000`)
+    /// - Generalization $\ge 0.25$ (`0x0000_4000`)
+    /// - Simplicity $\ge 0.25$ (`0x0000_4000`)
     pub const LENIENT: Self = Self {
         min_fitness: 0x0000_8000,
         min_precision: 0x0000_8000,
@@ -56,9 +145,32 @@ impl ConformancePredicate {
 
     /// Branchless conformance check.
     ///
-    /// Returns the first dimension that fails its threshold.  All four comparisons
-    /// use `mask_ge` so the CPU never branches on metric values — only the final
-    /// `select_u32`-style reduction materialises the error path.
+    /// Compares the provided [`ConformanceMetrics`] against this predicate's thresholds.
+    /// Returns `Ok(())` if all metrics meet or exceed the thresholds. Otherwise, returns a
+    /// [`ConformanceViolation`] specifying the first failing dimension (in priority order:
+    /// Fitness, Precision, Generalization, Simplicity).
+    ///
+    /// This function evaluates all dimensions unconditionally using branchless comparison
+    /// (`mask_ge`) to prevent timing side channels. The final result is selected branchlessly,
+    /// and a single branch is executed only to construct the error variant or return `Ok(())`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bcinr_powl_receipt::conformance::{ConformanceMetrics, ConformancePredicate, ConformanceDimension};
+    ///
+    /// let metrics = ConformanceMetrics {
+    ///     fitness: 0x0001_0000,        // 1.0 (meets STRICT threshold 1.0)
+    ///     precision: 0x0000_C000,      // 0.75 (below STRICT threshold 1.0)
+    ///     generalization: 0x0000_8000, // 0.5 (meets STRICT threshold 0.5)
+    ///     simplicity: 0x0000_8000,     // 0.5 (meets STRICT threshold 0.5)
+    /// };
+    ///
+    /// let result = ConformancePredicate::STRICT.check(&metrics);
+    /// assert!(result.is_err());
+    /// let violation = result.unwrap_err();
+    /// assert_eq!(violation.dim, ConformanceDimension::Precision);
+    /// ```
     pub fn check(&self, m: &ConformanceMetrics) -> Result<(), ConformanceViolation> {
         // Branchless ≥ comparisons — all four computed unconditionally.
         let fit_ok = mask_ge(m.fitness, self.min_fitness);
@@ -90,12 +202,20 @@ impl ConformancePredicate {
 
 /// Branchless `a >= b` comparison for `u32`.
 ///
-/// Maps from the B-Calculus `lt_mask_u32` pattern:
-/// `lt_mask_u32(a, b)` produces all-ones when `a < b`.
-/// Negating: `ge_mask = !lt_mask`.
+/// Returns `0xFFFF_FFFF` (all ones) if `a >= b`, and `0x0000_0000` (all zeros) if `a < b`.
 ///
-/// `lt_mask_u32(a, b)`: the borrow bit of `a.wrapping_sub(b)` is 1 iff `a < b`.
-/// Broadcast the borrow to all bits via arithmetic right shift (or negation).
+/// This uses sign-bit broadcasting over 64-bit differences to perform the comparison without
+/// conditional branching instructions, preventing timing-based leakage.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_powl_receipt::conformance::mask_ge;
+///
+/// assert_eq!(mask_ge(10, 5), 0xFFFF_FFFF); // true (greater)
+/// assert_eq!(mask_ge(5, 5), 0xFFFF_FFFF);  // true (equal)
+/// assert_eq!(mask_ge(3, 5), 0x0000_0000);  // false (less)
+/// ```
 #[inline(always)]
 pub fn mask_ge(a: u32, b: u32) -> u32 {
     // Widen to i64 to capture the sign of (a as i64) - (b as i64).
@@ -143,19 +263,30 @@ const fn select_u32(mask: u32, a: u32, b: u32) -> u32 {
     (mask & a) | (!mask & b)
 }
 
-/// A conformance violation: records which dimension failed and the full measured metrics.
+/// A conformance violation.
+///
+/// Created when a [`ConformancePredicate`] check fails. Contains the first dimension that
+/// failed the threshold and the full measured metrics.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConformanceViolation {
+    /// The first dimension that failed to meet the predicate threshold.
     pub dim: ConformanceDimension,
+    /// The measured metrics at the time of the violation.
     pub measured: ConformanceMetrics,
 }
 
 /// Conformance dimension discriminant.
+///
+/// Represents one of the four conformance evaluation criteria.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConformanceDimension {
+    /// Fitness criteria.
     Fitness = 0,
+    /// Precision criteria.
     Precision = 1,
+    /// Generalization criteria.
     Generalization = 2,
+    /// Simplicity criteria.
     Simplicity = 3,
 }
 

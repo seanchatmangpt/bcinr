@@ -394,7 +394,66 @@ pub struct GroundDurativeAction {
     pub effects: Vec<PddlEffect>,
 }
 
-/// Grounded temporal problem: classical + durative actions, numeric fluents, timed inits.
+/// A grounded temporal planning problem containing classical and durative actions,
+/// numeric fluents, timed initial literals, and goal conditions.
+///
+/// `GroundTemporalProblem` is the primary evaluation structure for solving temporal planning
+/// tasks. It represents the propositional grounding of a PDDL domain and problem.
+///
+/// # Domain Description & Modeling
+///
+/// In first-order planning (PDDL), problems are described in terms of predicates, functions,
+/// objects, and parameterized schemas. To plan or execute actions, they must be "grounded"—
+/// i.e., parameterized schemas are expanded into concrete propositions by substituting variables
+/// with objects from the domain.
+///
+/// A grounded temporal problem tracks:
+/// - **Initial State**: A set of grounded boolean atoms (`initial_atoms`) and numeric function values (`initial_fn_values`) representing the world at time $t = 0$.
+/// - **Durative Actions**: Actions that span an interval of time, with conditions checked and effects applied at the start, throughout, or at the end of execution.
+/// - **Timed Initial Literals**: State changes or event boundaries pre-scheduled to occur at specific times (e.g., resource availability changes).
+/// - **Goals & Constraints**: Target state conditions (`goal`) and trajectory rules (`constraints`) that must hold over the plan execution.
+///
+/// # Complexity Analysis
+///
+/// - **Grounding Time/Space**: Grounding involves substituting variables in action schemas with type-compatible objects.
+///   For an action schema with $P$ parameters and a universe of $O$ objects, the number of potential grounded actions
+///   is $O(O^P)$. If $A$ is the set of action schemas, the overall complexity of grounding is:
+///   $$O(\sum_{a \in A} |O|^{arity(a)})$$
+///   To safeguard against state-space explosion, the grounding engine enforces a hard limit of `PDDL8_MAX_GROUND`
+///   (65,536) grounded actions. If exceeded, a [`Pddl8Error::BoundExceeded`] is returned.
+///
+/// # Examples
+///
+/// ```
+/// use bcinr_pddl::{domain_from_pddl, problem_from_pddl, GroundTemporalProblem, PlannerOutcome};
+///
+/// let domain_pddl = r#"
+/// (define (domain simple-temporal)
+///   (:requirements :durative-actions :numeric-fluents)
+///   (:functions (attention))
+///   (:durative-action act
+///     :parameters ()
+///     :duration (= ?duration 2)
+///     :condition (and (at start (>= (attention) 1)))
+///     :effect (and
+///       (at start (decrease (attention) 1))
+///       (at end (increase (attention) 1)))))
+/// "#;
+///
+/// let problem_pddl = r#"
+/// (define (problem simple-prob)
+///   (:domain simple-temporal)
+///   (:init (= (attention) 1))
+///   (:goal (and)))
+/// "#;
+///
+/// let domain = domain_from_pddl(domain_pddl).unwrap();
+/// let problem = problem_from_pddl(problem_pddl).unwrap();
+///
+/// let gtp = GroundTemporalProblem::build(&domain, &problem).unwrap();
+/// let outcome = gtp.find_temporal_plan();
+/// assert!(matches!(outcome, PlannerOutcome::Found(_)));
+/// ```
 #[derive(Clone)]
 pub struct GroundTemporalProblem {
     pub initial_atoms: BTreeSet<Pddl8GroundAtom>,
@@ -411,7 +470,16 @@ pub struct GroundTemporalProblem {
 }
 
 impl GroundTemporalProblem {
-    /// Build a `GroundTemporalProblem` from domain + problem.
+    /// Builds a new `GroundTemporalProblem` by grounding action schemas and durative schemas
+    /// over the object universe defined in the problem.
+    ///
+    /// Returns a [`Pddl8Error::BoundExceeded`] if the number of grounded actions or durative actions
+    /// exceeds `PDDL8_MAX_GROUND` (65,536).
+    ///
+    /// # Complexity
+    ///
+    /// Grounding complexity is $O(|A| \cdot |O|^P)$ where $|A|$ is the number of schemas, $|O|$ is the
+    /// number of objects, and $P$ is the maximum schema arity.
     pub fn build(domain: &Pddl8Domain, problem: &Pddl8Problem) -> Result<Self, Pddl8Error> {
         let initial_atoms: BTreeSet<Pddl8GroundAtom> = problem
             .init
@@ -509,14 +577,22 @@ impl GroundTemporalProblem {
         })
     }
 
-    /// Forward-chaining temporal planner using a priority queue ordered by time.
+    /// Executes a forward-chaining temporal state-space search to find a valid `TemporalPlan`.
     ///
-    /// - Starts with initial_atoms + initial_fn_values at t=0
-    /// - Applies at-start effects immediately when an action is selected
-    /// - Advances time to the next action completion
-    /// - Applies at-end effects on completion
-    /// - Checks goal (PddlCondition) after each completion
-    /// - Limits to PDDL8_MAX_PLAN_DEPTH iterations
+    /// The planner maintains a priority queue of scheduled events ordered by time.
+    /// It greedily schedules actions that satisfy preconditions, applying start effects immediately
+    /// and end effects upon completion.
+    ///
+    /// # Complexity
+    ///
+    /// The search is bounded by a maximum depth of `PDDL8_MAX_PLAN_DEPTH` iterations. At each step,
+    /// selecting and applying actions requires evaluating preconditions over the current grounded state,
+    /// resulting in a worst-case time complexity of $O(D \cdot G)$ where $D$ is the depth limit and $G$
+    /// is the cost of evaluating grounded action preconditions.
+    ///
+    /// # Examples
+    ///
+    /// See the struct-level documentation for [`GroundTemporalProblem`] for an end-to-end example.
     pub fn find_temporal_plan(&self) -> PlannerOutcome<TemporalPlan> {
         self.find_temporal_plan_with_fn_overrides(&HashMap::new())
     }

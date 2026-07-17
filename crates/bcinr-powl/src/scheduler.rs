@@ -1,40 +1,97 @@
-//! scheduler — Branchless SWAR scheduling loop for POWL v2.
+//! # POWL SWAR Scheduler
 //!
-//! # Protocol
+//! This module implements the branchless SWAR (SIMD-within-a-register) scheduling loop
+//! for execution of Partially Ordered Workflow Language (POWL) tapes.
 //!
-//! Each call to `scheduler_tick` advances the run-state by one tick:
-//! 1. For each slot `i` in `check_mask`, compute `pred_sat` branchlessly.
-//! 2. Derive a `fire_mask` word using `wrapping_sub(0, pred_sat & available & gate)`.
-//! 3. Update `done_mask`, `active_mask`, `check_mask` from fired slots.
-//! 4. XorDispatch slots pick one branch; LoopRedo slots re-enable the body.
+//! ## Overview
 //!
-//! # Branchless invariant
+//! The POWL scheduler manages the execution of workflows modeled as tapes of operations.
+//! It guarantees deterministic, branchless execution where control-flow transitions are
+//! computed using bitwise operations and bitmasks, ensuring zero timing side-channels
+//! and allocation-free hot path execution.
 //!
-//! Join, XorDispatch, and LoopRedo logic is computed with branchless masks via
-//! `kind_mask`, `apply_xor_dispatch`, and `apply_loop_redo` — no `if`/`match`
-//! inside the per-slot body generates a conditional branch instruction.
+//! ### Execution State and Transition Pipeline
 //!
-//! The outer `while candidates != 0` loop is a standard CTZ bit-scan idiom;
-//! its iteration count equals the popcount of `check_mask`, not a predicate.
+//! The scheduler state is tracked in [`PowlRunState`], which represents the progress
+//! of execution across up to 64 tape slots.
 //!
-//! # Concurrency-aware scheduling (additive)
+//! ```text
+//!               [ Entry Mask ]
+//!                     |
+//!                     v
+//!            +-----------------+
+//!            |   check_mask    | <-----------------+
+//!            +-----------------+                   |
+//!                     |                            |
+//!                     v (Filter: !done_mask)       | (Successors)
+//!            +-----------------+                   |
+//!            |   candidates    |                   |
+//!            +-----------------+                   |
+//!                     |                            |
+//!                     v (Evaluate pred_mask)       |
+//!            +-----------------+                   |
+//!            |  satisfies pred |                   |
+//!            +-----------------+                   |
+//!                     |                            |
+//!                     v (Gated by concurrency)     |
+//!            +-----------------+                   |
+//!            |    fire_mask    | ------------------+
+//!            +-----------------+
+//!                     |
+//!                     +-------------------> [ done_mask ]
+//! ```
 //!
-//! [`scheduler_tick`] itself is untouched by this phase — every existing
-//! caller keeps firing every ready op every tick, exactly as before, with
-//! zero code-path change. [`scheduler_tick_guarded`] is a new, separate
-//! entry point that adds a [`ConcurrencySelector`]-gated selection step
-//! between "compute the ready set" and "actually fire": ready-but-
-//! unselected ops are deferred (carried forward into next tick's
-//! `check_mask`) rather than dropped. With
-//! [`crate::tape::v2::ConcurrencyGuardTable::empty`] and
-//! [`StableMaximalSelector`], selection always chooses the *entire* ready
-//! set (every candidate is trivially admitted by an empty guard table), so
-//! `scheduler_tick_guarded` provably degenerates to calling
-//! `scheduler_tick` — see this module's own
-//! `tests::concurrency_gated::empty_guards_matches_plain_tick_for_linear_chain`
-//! / `_for_parallel_ops` / `_for_xor_choice` / `_for_bounded_loop` below,
-//! which check this tick-by-tick (across four distinct tape shapes) rather
-//! than asserting it once.
+//! 1. **Readiness Evaluation**: For each active slot in the `check_mask`, we check if its
+//!    preconditions (`pred_mask`) are satisfied based on the current `done_mask`.
+//! 2. **Firing Selection**: Candidate slots that are ready are selected to fire, producing a `fire_mask`.
+//!    In the guarded scheduler, this is intersected with a concurrency-complex filter.
+//! 3. **State Commit**: Fired slots update the `done_mask` and active state. Their successors (`succ_mask`)
+//!    are added to the `check_mask` for the next tick.
+//! 4. **Control Dispatch**: Branchless dispatch rules for `XorDispatch` and `LoopRedo` clear finished
+//!    parts and re-enable loop bodies as needed.
+//!
+//! ## Concurrency-Aware Guarding
+//!
+//! In addition to the standard linear execution, this module provides [`scheduler_tick_guarded`],
+//! which enforces mutual exclusion rules defined by a [`ConcurrencyGuardTable`]. The selection process
+//! uses a [`ConcurrencySelector`] to find a maximal compatible subset of ready operations to execute
+//! in parallel.
+//!
+//! ## Complexity
+//!
+//! - **Time Complexity**:
+//!   - [`scheduler_tick`]: $O(C)$ where $C$ is the number of active candidate slots being checked (bounded by 64).
+//!     The candidates are scanned using `trailing_zeros` (CTZ), which runs in constant time per candidate.
+//!   - [`StableMaximalSelector::select`]: $O(R \cdot G)$ where $R$ is the size of the ready set and $G$ is the
+//!     number of nonfaces (exclusion complexes) in the guard table.
+//! - **Space Complexity**: $O(1)$ stack allocation. All structures have fixed compile-time size and do not allocate on the heap.
+//!
+//! ## Examples
+//!
+//! Here is how to compile a simple sequence of operations and step it through the scheduler:
+//!
+//! ```rust
+//! use bcinr_powl::compiler::{compile_powl, PowlAstNode};
+//! use bcinr_powl::scheduler::{scheduler_tick, PowlRunState};
+//!
+//! let ast = PowlAstNode::Sequence(vec![
+//!     PowlAstNode::Atom("op_a"),
+//!     PowlAstNode::Atom("op_b"),
+//! ]);
+//! let tape = compile_powl(&ast).unwrap();
+//! let mut state = PowlRunState::new(&tape);
+//!
+//! // Step 1: op_a fires
+//! let fired = scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
+//! assert_eq!(fired.0, 0b01);
+//!
+//! // Step 2: op_b fires
+//! let fired = scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
+//! assert_eq!(fired.0, 0b10);
+//!
+//! // Complete: check_mask is empty
+//! assert_eq!(state.check_mask, 0);
+//! ```
 
 use crate::tape::v2::ConcurrencyGuardTable;
 use crate::tape::{OpKind, Powl64Op, PowlTape};
@@ -45,6 +102,9 @@ use bcinr_mfw_ir::EventSet;
 // ---------------------------------------------------------------------------
 
 /// Mutable run-state for a POWL tape execution.
+///
+/// Designed to track the status of up to 64 operations (slots) within a single
+/// POWL tape run. It uses compact bitmasks to avoid allocation and branching.
 #[derive(Clone)]
 #[repr(C, align(8))]
 pub struct PowlRunState {
@@ -65,6 +125,20 @@ pub struct PowlRunState {
 
 impl PowlRunState {
     /// Construct initial state for a tape, seeding `check_mask` from its `entry_mask`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use bcinr_powl::compiler::{compile_powl, PowlAstNode};
+    /// use bcinr_powl::scheduler::PowlRunState;
+    ///
+    /// let ast = PowlAstNode::Atom("op");
+    /// let tape = compile_powl(&ast).unwrap();
+    /// let state = PowlRunState::new(&tape);
+    ///
+    /// assert_eq!(state.check_mask, tape.entry_mask);
+    /// assert_eq!(state.done_mask, 0);
+    /// ```
     pub fn new(tape: &PowlTape) -> Self {
         Self {
             done_mask: 0,
@@ -150,6 +224,16 @@ fn apply_xor_dispatch(op: &Powl64Op, fire_mask: u64, choice_taken: &mut u64) -> 
 /// - When `max_iters > 0`: return `u64::MAX` iff `loop_iter < max_iters`.
 ///   We widen to u16, compute `loop_iter as u16 - max_iters as u16`; this
 ///   underflows (sets bit 15) iff `loop_iter < max_iters`. Extract bit 15.
+///
+/// # Examples
+///
+/// ```rust
+/// use bcinr_powl::scheduler::iter_under_limit;
+///
+/// assert_eq!(iter_under_limit(0, 0), u64::MAX);
+/// assert_eq!(iter_under_limit(5, 3), 0);
+/// assert_eq!(iter_under_limit(2, 3), u64::MAX);
+/// ```
 #[inline(always)]
 pub fn iter_under_limit(loop_iter: u8, max_iters: u8) -> u64 {
     // unlimited_mask: u64::MAX when max_iters == 0, else 0.
@@ -192,9 +276,31 @@ fn apply_loop_redo(op: &Powl64Op, fire_mask: u64, loop_iter: &mut u8) -> (u64, u
 // Main tick function
 // ---------------------------------------------------------------------------
 
-/// Advance the scheduler by one tick.
+/// Advance the scheduler by one tick, checking and firing ready candidates.
 ///
-/// Returns the set of slots that fired during this tick.
+/// This is the hot-path scheduler entry point. It scans the `check_mask` for candidate operations
+/// that have not yet run. For each candidate, it checks if its preconditions are satisfied,
+/// fires the operation if so, and updates the execution state (successors, Xor choice, loop state)
+/// using branchless SWAR arithmetic.
+///
+/// # Complexity
+///
+/// $O(C)$ where $C$ is the number of active candidate slots being checked (the population count of
+/// `state.check_mask & !state.done_mask`). The search uses a fast bit-scan (`trailing_zeros`) loop.
+///
+/// # Examples
+///
+/// ```rust
+/// use bcinr_powl::compiler::{compile_powl, PowlAstNode};
+/// use bcinr_powl::scheduler::{scheduler_tick, PowlRunState};
+///
+/// let ast = PowlAstNode::Atom("single_op");
+/// let tape = compile_powl(&ast).unwrap();
+/// let mut state = PowlRunState::new(&tape);
+///
+/// let fired = scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
+/// assert_eq!(fired.0, 0b01);
+/// ```
 #[inline(always)]
 pub fn scheduler_tick(tape: &[Powl64Op], state: &mut PowlRunState) -> FiredSet {
     let mut fired = 0u64;
@@ -249,32 +355,21 @@ pub fn scheduler_tick(tape: &[Powl64Op], state: &mut PowlRunState) -> FiredSet {
 // Concurrency-aware scheduling (additive — see module docs)
 // ---------------------------------------------------------------------------
 
-/// Chooses which subset of a ready set may actually fire this tick, subject
-/// to a [`ConcurrencyGuardTable`].
+/// Trait for selecting a subset of ready operations to execute in parallel,
+/// enforcing concurrency boundaries.
 ///
-/// Implementors write only [`select`][Self::select] — the business logic.
-/// [`select_checked`][Self::select_checked] is a **shared, non-overridable
-/// helper**: every implementation gets the postcondition check
-/// (`selected.is_subset_of(ready) && guards.admits(&selected)`) enforced for
-/// free, without having to write it themselves. Callers should go through
-/// `select_checked`, not `select`, directly.
+/// Implementors of this trait choose which operations from the `ready` set are allowed
+/// to fire in the same tick under the constraints of the `guards` table.
 ///
-/// # Enforcement is unconditional, not debug-only
+/// # Mathematical Contract
 ///
-/// The postcondition is checked with `assert!`, not `debug_assert!` — it
-/// runs in every build profile, including `--release`. This is deliberate:
-/// this workspace's `[profile.release]` does not set
-/// `debug-assertions = true`, so a `debug_assert!` here would compile to
-/// nothing in release builds, silently letting a noncompliant
-/// `ConcurrencySelector` (this trait is public and generic — anything
-/// implementing it reaches [`scheduler_tick_guarded`] through
-/// `S: ConcurrencySelector`) fire a set that is not a member of the
-/// concurrency complex. `FireSet != ReadySet`: a `FireSet` must be a subset
-/// of `ReadySet` *and* a member of the concurrency complex in every build,
-/// not just the ones compiled with debug assertions on. See
-/// `crates/bcinr-powl/tests/release_mode_fireset_gap.rs` for the regression
-/// fixture that pins this down across both `cargo test` and
-/// `cargo test --release`.
+/// For any implementation of `ConcurrencySelector`, the selected subset $S$ must satisfy:
+///
+/// 1. **Subset Invariant**: $S \subseteq \text{ready}$ (cannot fire unready operations).
+/// 2. **Safety Invariant**: $\text{guards.admits}(S)$ (cannot violate exclusion boundaries).
+///
+/// These invariants are checked unconditionally in [`ConcurrencySelector::select_checked`], which panics
+/// if they are violated, even in release builds.
 pub trait ConcurrencySelector {
     /// Choose a subset of `ready` to fire this tick, respecting `guards`.
     fn select(&mut self, ready: &EventSet, guards: &ConcurrencyGuardTable) -> EventSet;
@@ -297,18 +392,31 @@ pub trait ConcurrencySelector {
     }
 }
 
-/// Greedy, order-stable selector: walks `ready.iter_stable()` (ascending
-/// slot index) and incrementally admits each candidate id into the
-/// selected set iff doing so keeps the guard table's `admits()` check
-/// satisfied. With an empty guard table every candidate is trivially
-/// admitted, so this selects the entire ready set — the default,
-/// non-regressing behavior (see module docs).
+/// A greedy, index-order-stable concurrency selector.
 ///
-/// Greedy, not maximum: this selects *a* maximal admissible subset (no
-/// further ready candidate can be added without violating `guards`), not
-/// necessarily *the* maximum-cardinality one — see [`ConcurrencySelector`]'s
-/// trait-level doc comment for why that distinction is load-bearing here,
-/// not just terminology.
+/// This selector iterates through candidate operations in ascending order of their bit index.
+/// It adds each operation to the selection set if and only if the updated set remains admitted
+/// by the guard table.
+///
+/// # Complexity
+///
+/// $O(R \cdot G)$ where $R$ is the size of the ready set and $G$ is the number of nonfaces
+/// (exclusion rules) in the guard table.
+///
+/// # Examples
+///
+/// ```rust
+/// use bcinr_powl::scheduler::{ConcurrencySelector, StableMaximalSelector};
+/// use bcinr_powl::tape::v2::ConcurrencyGuardTable;
+/// use bcinr_mfw_ir::EventSet;
+///
+/// let mut selector = StableMaximalSelector;
+/// let ready = EventSet::empty().with(0).with(1);
+/// let guards = ConcurrencyGuardTable::empty();
+///
+/// let selected = selector.select_checked(&ready, &guards);
+/// assert_eq!(selected, ready);
+/// ```
 pub struct StableMaximalSelector;
 
 impl ConcurrencySelector for StableMaximalSelector {
@@ -361,26 +469,49 @@ fn event_set_to_mask(set: &EventSet) -> u64 {
     mask
 }
 
-/// Advance the scheduler by one tick, gating which of the ready ops
-/// actually fire through a [`ConcurrencySelector`] and
-/// [`ConcurrencyGuardTable`].
+/// Advances the scheduler by one tick, gating the firing set with a concurrency guard.
+///
+/// This is the concurrency-aware scheduler entry point. It evaluates ready candidates,
+/// passes them to the [`ConcurrencySelector`] to check against the [`ConcurrencyGuardTable`], and
+/// fires only the selected subset.
+///
+/// Any ready operations that are *not* selected are carried forward in the `check_mask` for the
+/// next tick rather than being lost.
 ///
 /// # Protocol
 ///
-/// 1. **Preview** (no mutation of `state`): run [`scheduler_tick`] on a
-///    clone of `state` to discover exactly which ops would fire absent any
-///    gating — this is the tick's ready set.
-/// 2. **Select**: `selector.select_checked(ready, guards)` chooses the
-///    subset that may actually fire.
-/// 3. **Fast path**: if selection changed nothing (`selected == ready` —
-///    always true for an empty guard table with `StableMaximalSelector`),
-///    delegate to [`scheduler_tick`] on the *real* `state` directly, so the
-///    observable state transition is provably identical to the unguarded
-///    path (same function, same inputs), not merely "similar".
-/// 4. **Divergent path**: otherwise, re-run the real firing logic (mirrors
-///    `scheduler_tick`'s loop) gated to `selected`, and carry the
-///    ready-but-unselected ops forward into next tick's `check_mask` so
-///    they are reconsidered rather than lost.
+/// 1. **Preview**: Clones the run-state and dry-runs [`scheduler_tick`] to find the complete ready set.
+/// 2. **Select**: Invokes `selector.select_checked` to filter the ready set.
+/// 3. **Fast Path**: If all ready operations are selected, delegates to `scheduler_tick` directly.
+/// 4. **Divergent Path**: If some operations are deferred, applies the state transition only for
+///    the selected operations and carries the deferred ones forward in the check mask.
+///
+/// # Complexity
+///
+/// $O(C)$ for the candidate traversal, plus the complexity of the selector's `select` call
+/// and the preview dry-run.
+///
+/// # Examples
+///
+/// ```rust
+/// use bcinr_powl::compiler::{compile_powl, PowlAstNode};
+/// use bcinr_powl::scheduler::{scheduler_tick_guarded, PowlRunState, StableMaximalSelector};
+/// use bcinr_powl::tape::v2::ConcurrencyGuardTable;
+///
+/// let ast = PowlAstNode::Atom("op");
+/// let tape = compile_powl(&ast).unwrap();
+/// let mut state = PowlRunState::new(&tape);
+/// let mut selector = StableMaximalSelector;
+/// let guards = ConcurrencyGuardTable::empty();
+///
+/// let fired = scheduler_tick_guarded(
+///     &tape.ops[..tape.len as usize],
+///     &mut state,
+///     &mut selector,
+///     &guards,
+/// );
+/// assert_eq!(fired.0, 0b01);
+/// ```
 pub fn scheduler_tick_guarded<S: ConcurrencySelector>(
     tape: &[Powl64Op],
     state: &mut PowlRunState,

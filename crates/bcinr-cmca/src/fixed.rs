@@ -1,3 +1,23 @@
+//! Q16.16 Fixed-Point Arithmetic Substrate
+//!
+//! This module provides a deterministic, branchless, allocation-free Q16.16 fixed-point representation
+//! for bounded computational substrates under Radon Law ($CC=1$).
+//!
+//! # Mathematical Layout
+//! A real number $r$ is represented as a 32-bit unsigned integer $x$ such that:
+//!
+//! $$r = x \times 2^{-16} = \frac{x}{65536}$$
+//!
+//! Consequently:
+//! - The minimum representable value (resolution) is $\epsilon = 2^{-16} \approx 0.000015258$.
+//! - The maximum representable value is $65535.999984741$ (raw bits `u32::MAX`).
+//! - Operations saturate rather than wrap (except where explicitly noted).
+//!
+//! # Runtime Laws (Radon Law)
+//! All operations in this module strictly enforce:
+//! - **Cyclomatic Complexity ($CC = 1$)**: No data-dependent branches, loops, or early returns.
+//! - **Zero Allocation**: $0$ heap allocations.
+//! - **Constant-Time Mechanics**: The instruction flow is independent of input values.
 
 /// Q16.16 Fixed-Point representation wrapping a `u32` under Radon Law (CC=1).
 ///
@@ -42,40 +62,121 @@ const fn const_eq_u32(a: u32, b: u32) -> u32 {
 }
 
 impl Fixed {
-    /// Zero representation
+    /// Zero representation ($0.0$)
     pub const ZERO: Self = Self(0);
 
-    /// One representation
+    /// One representation ($1.0$)
     pub const ONE: Self = Self(65536);
 
-    /// Maximum representation
+    /// Maximum representation ($65535.99998$)
     pub const MAX: Self = Self(u32::MAX);
 
-    /// Create Fixed from raw bits
+    /// Creates a `Fixed` value from its raw 32-bit representation.
+    ///
+    /// # Preconditions
+    /// None. Any 32-bit unsigned value is a valid Q16.16 representation.
+    ///
+    /// # Postconditions
+    /// Returns a `Fixed` value wrapping the exact raw bits provided.
+    ///
+    /// # Examples
+    /// ```
+    /// use bcinr_cmca::fixed::Fixed;
+    ///
+    /// let val = Fixed::from_bits(65536); // represents 1.0
+    /// assert_eq!(val, Fixed::ONE);
+    /// ```
     #[inline(always)]
     pub const fn from_bits(bits: u32) -> Self {
         Self(bits)
     }
 
-    /// Retrieve the raw bits
+    /// Retrieves the underlying raw 32-bit representation.
+    ///
+    /// # Preconditions
+    /// None.
+    ///
+    /// # Postconditions
+    /// Returns the raw `u32` value.
+    ///
+    /// # Examples
+    /// ```
+    /// use bcinr_cmca::fixed::Fixed;
+    ///
+    /// assert_eq!(Fixed::ONE.to_bits(), 65536);
+    /// ```
     #[inline(always)]
     pub const fn to_bits(self) -> u32 {
         self.0
     }
 
-    /// Create Fixed from integer value
+    /// Creates a `Fixed` value from a 32-bit integer.
+    ///
+    /// # Preconditions
+    /// - The integer `num` should be in the range $[0, 65535]$ to prevent wrapping.
+    /// - Input values $\ge 65536$ will wrap due to `wrapping_shl(16)`.
+    ///
+    /// # Postconditions
+    /// Returns a `Fixed` value representing the integer value scaled by $2^{16}$.
+    ///
+    /// # Examples
+    /// ```
+    /// use bcinr_cmca::fixed::Fixed;
+    ///
+    /// let val = Fixed::from_num(5);
+    /// assert_eq!(val.to_bits(), 5 * 65536);
+    /// ```
     #[inline(always)]
     pub const fn from_num(num: u32) -> Self {
         Self(num.wrapping_shl(16))
     }
 
-    /// Convert Fixed to integer value (truncating)
+    /// Converts a `Fixed` value to its truncated integer part.
+    ///
+    /// # Preconditions
+    /// None.
+    ///
+    /// # Postconditions
+    /// Returns the integer part of the fixed-point value, discarding any fractional bits.
+    ///
+    /// # Examples
+    /// ```
+    /// use bcinr_cmca::fixed::Fixed;
+    ///
+    /// let val = Fixed::from_bits(98304); // represents 1.5
+    /// assert_eq!(val.to_num(), 1);
+    /// ```
     #[inline(always)]
     pub const fn to_num(self) -> u32 {
         self.0 >> 16
     }
 
-    /// Saturating addition without branching (CC=1)
+    /// Saturating addition without branching ($CC=1$).
+    ///
+    /// # Mathematical Definition
+    /// Let $x$ and $y$ be Q16.16 fixed-point values.
+    ///
+    /// $$z = \min(x + y, \text{MAX})$$
+    ///
+    /// # Preconditions
+    /// None.
+    ///
+    /// # Postconditions
+    /// - If the mathematical sum $x + y \le 65535.999984741$, the returned value is exactly $x + y$.
+    /// - Otherwise, returns [`Fixed::MAX`].
+    ///
+    /// # Examples
+    /// ```
+    /// use bcinr_cmca::fixed::Fixed;
+    ///
+    /// let a = Fixed::from_num(10);
+    /// let b = Fixed::from_num(20);
+    /// assert_eq!(a.saturating_add(b), Fixed::from_num(30));
+    ///
+    /// // Overflow saturation
+    /// let max_val = Fixed::MAX;
+    /// assert_eq!(max_val.saturating_add(Fixed::ONE), Fixed::MAX);
+    /// ```
     #[inline(always)]
     pub const fn saturating_add(self, other: Self) -> Self {
         let sum = self.0.wrapping_add(other.0);
@@ -83,14 +184,63 @@ impl Fixed {
         Self(const_select_u32(overflow, u32::MAX, sum))
     }
 
-    /// Saturating subtraction without branching (CC=1)
+    /// Saturating subtraction without branching ($CC=1$).
+    ///
+    /// # Mathematical Definition
+    /// Let $x$ and $y$ be Q16.16 fixed-point values.
+    ///
+    /// $$z = \max(x - y, 0)$$
+    ///
+    /// # Preconditions
+    /// None.
+    ///
+    /// # Postconditions
+    /// - If $x \ge y$, the returned value is exactly $x - y$.
+    /// - Otherwise, returns [`Fixed::ZERO`].
+    ///
+    /// # Examples
+    /// ```
+    /// use bcinr_cmca::fixed::Fixed;
+    ///
+    /// let a = Fixed::from_num(30);
+    /// let b = Fixed::from_num(10);
+    /// assert_eq!(a.saturating_sub(b), Fixed::from_num(20));
+    ///
+    /// // Underflow saturation
+    /// assert_eq!(b.saturating_sub(a), Fixed::ZERO);
+    /// ```
     #[inline(always)]
     pub const fn saturating_sub(self, other: Self) -> Self {
         let underflow = const_lt_u32(self.0, other.0);
         Self(const_select_u32(underflow, 0, self.0.wrapping_sub(other.0)))
     }
 
-    /// Saturating multiplication without branching (CC=1)
+    /// Saturating multiplication without branching ($CC=1$).
+    ///
+    /// # Mathematical Definition
+    /// Let $x$ and $y$ be Q16.16 fixed-point values.
+    ///
+    /// $$z = \min(x \times y, \text{MAX})$$
+    ///
+    /// # Preconditions
+    /// None.
+    ///
+    /// # Postconditions
+    /// - Under fixed-point scaling, the product of $x$ and $y$ is computed with 64-bit precision, scaled back, and saturated.
+    /// - If the mathematical product $x \times y \le 65535.999984741$, the returned value is exactly $x \times y$.
+    /// - Otherwise, returns [`Fixed::MAX`].
+    ///
+    /// # Examples
+    /// ```
+    /// use bcinr_cmca::fixed::Fixed;
+    ///
+    /// let a = Fixed::from_bits(98304); // 1.5
+    /// let b = Fixed::from_num(2);      // 2.0
+    /// assert_eq!(a.saturating_mul(b), Fixed::from_num(3));
+    ///
+    /// // Overflow saturation
+    /// assert_eq!(Fixed::MAX.saturating_mul(Fixed::from_num(2)), Fixed::MAX);
+    /// ```
     #[inline(always)]
     pub const fn saturating_mul(self, other: Self) -> Self {
         let prod = (self.0 as u64).wrapping_mul(other.0 as u64);
@@ -100,9 +250,44 @@ impl Fixed {
         Self(const_select_u32(overflow, u32::MAX, res_u64 as u32))
     }
 
-    /// Saturating division without branching (CC=1) using Newton-Raphson reciprocal approximation.
+    /// Saturating division without branching ($CC=1$) using Newton-Raphson reciprocal approximation.
     ///
-    /// # Branchless Contract
+    /// # Mathematical Definition
+    /// Let $n$ be the numerator (`self`) and $d$ be the denominator (`other`).
+    ///
+    /// $$q = \min\left(\frac{n}{d}, \text{MAX}\right)$$
+    ///
+    /// # Algorithm
+    /// The division is computed in constant time without conditional branching:
+    /// 1. Denominator normalization via leading zeros count.
+    /// 2. Initial linear reciprocal guess:
+    ///    $$X_0 = A_{\text{scale}} - B_{\text{coeff}} \times d_{\text{norm}}$$
+    /// 3. Three iterations of Newton-Raphson correction:
+    ///    $$X_{k+1} = X_k \left(2 - d_{\text{norm}} \times X_k\right)$$
+    /// 4. Quotient reconstruction and remainder-based rounding correction.
+    ///
+    /// # Preconditions
+    /// None. If the denominator is zero, the division saturates to [`Fixed::MAX`].
+    ///
+    /// # Postconditions
+    /// - If $d = 0$, returns [`Fixed::MAX`].
+    /// - If $n / d > 65535.999984741$, returns [`Fixed::MAX`].
+    /// - Otherwise, returns $n / d$ with 1-bit accuracy (with remainder correction).
+    ///
+    /// # Examples
+    /// ```
+    /// use bcinr_cmca::fixed::Fixed;
+    ///
+    /// let a = Fixed::from_num(3);
+    /// let b = Fixed::from_bits(98304); // 1.5
+    /// assert_eq!(a.saturating_div(b), Fixed::from_num(2));
+    ///
+    /// // Division by zero saturation
+    /// assert_eq!(a.saturating_div(Fixed::ZERO), Fixed::MAX);
+    ///
+    /// // Overflow saturation
+    /// assert_eq!(Fixed::MAX.saturating_div(Fixed::from_bits(32768)), Fixed::MAX); // divide by 0.5
+    /// ```
     #[inline(always)]
     pub const fn saturating_div(self, other: Self) -> Self {
         let den_is_zero = const_eq_u32(other.0, 0);
@@ -152,9 +337,34 @@ impl Fixed {
         Self(const_select_u32(saturate, u32::MAX, q_corrected as u32))
     }
 
-    /// Branchless Q16.16 binary logarithm (CC=1)
+    /// Branchless Q16.16 binary logarithm ($CC=1$).
     ///
-    /// # Branchless Contract
+    /// # Mathematical Definition
+    /// Let $x$ be the input Q16.16 value.
+    ///
+    /// $$y = \log_2(x)$$
+    ///
+    /// # Preconditions
+    /// - Mathematical logarithm is undefined for $x \le 0$.
+    /// - In this implementation, $x = 0$ is handled safely without branching/panicking, returning a value representing $-16.0$.
+    ///
+    /// # Postconditions
+    /// - For $x > 0$, returns $\log_2(x)$ as a signed Q16.16 value wrapped in [`Fixed`].
+    /// - For $x = 0$, returns a raw value representing $-16.0$ (due to underflow handling).
+    ///
+    /// # Examples
+    /// ```
+    /// use bcinr_cmca::fixed::Fixed;
+    ///
+    /// // log2(1.0) = 0.0
+    /// assert_eq!(Fixed::ONE.log2().to_bits(), 0);
+    ///
+    /// // log2(2.0) = 1.0
+    /// assert_eq!(Fixed::from_num(2).log2(), Fixed::ONE);
+    ///
+    /// // log2(4.0) = 2.0
+    /// assert_eq!(Fixed::from_num(4).log2(), Fixed::from_num(2));
+    /// ```
     #[inline(always)]
     pub fn log2(self) -> Self {
         let val = self.0 as u64;
@@ -173,9 +383,34 @@ impl Fixed {
         Self((res as u32).wrapping_sub(16 << 16))
     }
 
-    /// Branchless Q16.16 exp2 for both positive and negative exponents (CC=1)
+    /// Branchless Q16.16 base-2 exponential ($CC=1$) supporting both positive and negative exponents.
     ///
-    /// # Branchless Contract
+    /// # Mathematical Definition
+    /// Let $x$ be the input Q16.16 value.
+    ///
+    /// $$y = \min\left(2^x, \text{MAX}\right)$$
+    ///
+    /// # Preconditions
+    /// None.
+    ///
+    /// # Postconditions
+    /// - If the input represents $x \ge 16.0$, the result saturates to [`Fixed::MAX`].
+    /// - If the input represents $x \le -17.0$, the result saturates to [`Fixed::ZERO`].
+    /// - Otherwise, returns $2^x$ using a polynomial approximation for the fractional part.
+    ///
+    /// # Examples
+    /// ```
+    /// use bcinr_cmca::fixed::Fixed;
+    ///
+    /// // exp2(0.0) = 1.0
+    /// assert_eq!(Fixed::ZERO.exp2(), Fixed::ONE);
+    ///
+    /// // exp2(1.0) = 2.0
+    /// assert_eq!(Fixed::ONE.exp2(), Fixed::from_num(2));
+    ///
+    /// // exp2(-1.0) = 0.5
+    /// assert_eq!(Fixed(4294901760).exp2().to_bits(), 32768);
+    /// ```
     #[inline(always)]
     pub fn exp2(self) -> Self {
         let x = self.0 as i32;
@@ -207,9 +442,33 @@ impl Fixed {
         Self(res)
     }
 
-    /// Branchless Q16.16 exp (CC=1)
+    /// Branchless Q16.16 natural exponential ($CC=1$).
     ///
-    /// # Branchless Contract
+    /// # Mathematical Definition
+    /// Let $x$ be the input Q16.16 value.
+    ///
+    /// $$y = e^x = 2^{x \log_2(e)}$$
+    ///
+    /// # Algorithm
+    /// The natural exponential is computed by scaling the exponent by $\log_2(e) \approx 1.44269504$:
+    ///
+    /// $$y = 2^{x \times 1.44269504}$$
+    ///
+    /// # Preconditions
+    /// None.
+    ///
+    /// # Postconditions
+    /// - If $x \ge 11.09035$, the result saturates to [`Fixed::MAX`].
+    /// - If $x \le -11.7835$, the result saturates to [`Fixed::ZERO`].
+    /// - Otherwise, returns $e^x$.
+    ///
+    /// # Examples
+    /// ```
+    /// use bcinr_cmca::fixed::Fixed;
+    ///
+    /// // exp(0.0) = 1.0
+    /// assert_eq!(Fixed::ZERO.exp(), Fixed::ONE);
+    /// ```
     #[inline(always)]
     pub fn exp(self) -> Self {
         let x = self.0 as i32;
@@ -359,4 +618,3 @@ mod tests {
         assert_eq!(Fixed::ZERO.exp().to_bits(), 65536);
     }
 }
-
