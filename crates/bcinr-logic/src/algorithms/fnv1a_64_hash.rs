@@ -217,6 +217,7 @@ mod tests {
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
+    use alloc::vec::Vec;
 
     pub fn bench_fnv1a_64_hash(c: &mut Criterion) {
         let data: Vec<u8> = (0u8..=63).collect();

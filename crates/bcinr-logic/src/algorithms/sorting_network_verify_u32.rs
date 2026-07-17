@@ -119,6 +119,7 @@ mod tests {
 pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
+    use alloc::vec::Vec;
 
     pub fn bench_sorting_network_verify_u32(c: &mut Criterion) {
         let data: Vec<u32> = (0..256).collect();
