@@ -206,7 +206,7 @@ def main():
                 val = props.get(f_full, 0.0)
             factors.append(val)
         
-        factor_strs = [f"NonNegativeFixed({to_q16_16(val)})" for val in factors]
+        factor_strs = [f"NonNegativeFixed::from_bits({to_q16_16(val)})" for val in factors]
         obj_local_name = obj.split(':')[-1]
         
         lines = [
@@ -232,15 +232,17 @@ def main():
     
     # 6. Measure Heads (K)
     measure_heads = [mh for mh, cls in classes.items() if cls == 'cmca:MeasureHead']
-    sorted_mh = sorted(measure_heads)
+    mh_indices = {mh: properties.get(mh, {}).get('cmca:measureIndex', 0) for mh in measure_heads}
+    sorted_mh = sorted(measure_heads, key=lambda m: int(mh_indices[m]))
     K = len(sorted_mh)
     if K > K_MAX:
         raise ValueError("CMCA_MEASURE_COUNT_EXCEEDED")
     
     # 7. Lenses (Q)
     lenses = [lens for lens, cls in classes.items() if cls == 'cmca:Lens']
+    lens_indices = {lens: properties.get(lens, {}).get('cmca:lensIndex', 0) for lens in lenses}
     lens_exponents = {lens: properties.get(lens, {}).get('cmca:lensExponent', 0.0) for lens in lenses}
-    sorted_lenses = sorted(lenses)
+    sorted_lenses = sorted(lenses, key=lambda l: int(lens_indices[l]))
     Q = len(sorted_lenses)
     if Q > Q_MAX:
         raise ValueError("CMCA_LENS_COUNT_EXCEEDED")
@@ -252,6 +254,15 @@ def main():
             props = properties.get(coeff_uri, {})
             m_uri = props.get('cmca:measure')
             l_uri = props.get('cmca:lens')
+            if not m_uri and 'cmca:measureIndex' in props:
+                m_idx = int(props['cmca:measureIndex'])
+                if m_idx < len(sorted_mh):
+                    m_uri = sorted_mh[m_idx]
+            if not l_uri and 'cmca:lensIndex' in props:
+                l_idx = int(props['cmca:lensIndex'])
+                if l_idx < len(sorted_lenses):
+                    l_uri = sorted_lenses[l_idx]
+
             val = props.get('cmca:value', 0.0)
             
             if m_uri in sorted_mh and l_uri in sorted_lenses:
@@ -264,7 +275,7 @@ def main():
         row_strs = []
         for l_idx in range(Q):
             val = lambda_coeffs.get((m_idx, l_idx), 0.0)
-            row_strs.append(f"NonNegativeFixed({to_q16_16(val)})")
+            row_strs.append(f"NonNegativeFixed::from_bits({to_q16_16(val)})")
         mh_name = sorted_mh[m_idx].split(':')[-1]
         lambda_matrix_lines.append(f"    [{', '.join(row_strs)}], // {mh_name}")
         
@@ -275,7 +286,7 @@ def main():
         lens_local = lens.split(':')[-1]
         lens_registry_lines.append(
             f"    // {lens_local} ({lens})\n"
-            f"    LensSpec {{ id: {idx}, q: SignedFixed({to_q16_16(exp)}) }},"
+            f"    LensSpec {{ id: {idx}, q: SignedFixed::from_bits({to_q16_16(exp)}) }},"
         )
         
     # 10. Generate index constants and IRI bindings
@@ -334,7 +345,7 @@ pub struct LensSpec {{
     pub q: SignedFixed,
 }}
 
-pub static ETA: NonNegativeFixed = NonNegativeFixed({eta_q}); // {eta_val:.5f}
+pub static ETA: NonNegativeFixed = NonNegativeFixed::from_bits({eta_q}); // {eta_val:.5f}
 
 pub static LAMBDA: [[NonNegativeFixed; Q]; K] = [
 {chr(10).join(lambda_matrix_lines)}
@@ -349,7 +360,6 @@ pub static LENS_REGISTRY: [LensSpec; Q] = [
 ];
 
 // Macro generation
-#[macro_export]
 macro_rules! unroll_n_static {{
     ($idx:ident, $body:block) => {{
 """
@@ -357,9 +367,8 @@ macro_rules! unroll_n_static {{
         generated_code += f"        const $idx: usize = {i};\n"
         generated_code += f"        $body\n"
     
-    generated_code += """    }};
+    generated_code += """    };
 }
-#[macro_export]
 macro_rules! unroll_q_static {
     ($idx:ident, $body:block) => {
 """
@@ -369,7 +378,6 @@ macro_rules! unroll_q_static {
         
     generated_code += """    };
 }
-#[macro_export]
 macro_rules! unroll_k_static {
     ($idx:ident, $body:block) => {
 """

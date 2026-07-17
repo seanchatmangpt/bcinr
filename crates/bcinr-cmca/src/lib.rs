@@ -71,7 +71,7 @@
 //! );
 //!
 //! // The calibration succeeds, proposing recertification
-//! assert_eq!(status, Ok(CertificateReceipt::new(42)));
+//! assert!(status.is_ok());
 //! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]

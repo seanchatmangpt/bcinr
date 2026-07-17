@@ -183,7 +183,14 @@ macro_rules! unroll_5_static {
 }
 
 use crate::fixed::{NonNegativeFixed, SignedFixed, CanonicalMask};
-use crate::generated::case_studies::{PackedSemanticState, LensSpec, N, K, Q};
+use crate::generated::case_studies::{
+    PackedSemanticState, LensSpec, N, K, Q,
+    FACTOR_RECOMPUTATION_COST, FACTOR_VERIFICATION_COST, FACTOR_STANDING,
+    FACTOR_VALIDITY, FACTOR_ACCESS_FREQUENCY, FACTOR_SEARCH_DEMAND,
+    FACTOR_RETRIEVAL_DEMAND, FACTOR_SCHEDULING_DEMAND, FACTOR_BUSINESS_VALUE,
+    FACTOR_DOWNSTREAM_CONSEQUENCE,
+    MEASURE_CACHE, MEASURE_RETRIEVAL, MEASURE_SCHEDULING, MEASURE_SEARCH
+};
 
 /// Refusal reasons returned by the allocator when stability invariants are violated.
 ///
@@ -226,7 +233,7 @@ impl StabilityRefusal {
     /// use bcinr_cmca::allocator::StabilityRefusal;
     ///
     /// assert_eq!(StabilityRefusal::from_u32(0), Some(StabilityRefusal::CertificateMissing));
-    /// assert_eq!(StabilityRefusal::from_u32(18), None);
+    /// assert_eq!(StabilityRefusal::from_u32(99), None);
     /// ```
     pub fn from_u32(val: u32) -> Option<Self> {
         let lookup = [
@@ -1090,15 +1097,25 @@ pub fn allocate(
     let mut node_masses = [[NonNegativeFixed::ZERO; N]; K];
     unroll_8_static!(i, {
         let state = &states[i & 7];
-        let m0 = (state.factors[0] * NonNegativeFixed::from_num(5) + state.factors[1]) * state.factors[4] * state.factors[2];
-        let m1 = (state.factors[8] + state.factors[9]) * state.factors[5] * state.factors[2];
-        let m2 = state.factors[8] * state.factors[6];
-        let m3 = state.factors[8] * state.factors[7];
+        let f_recomp = state.factors[FACTOR_RECOMPUTATION_COST];
+        let f_verify = state.factors[FACTOR_VERIFICATION_COST];
+        let f_stand = state.factors[FACTOR_STANDING];
+        let f_access = state.factors[FACTOR_ACCESS_FREQUENCY];
+        let f_search = state.factors[FACTOR_SEARCH_DEMAND];
+        let f_retrieve = state.factors[FACTOR_RETRIEVAL_DEMAND];
+        let f_sched = state.factors[FACTOR_SCHEDULING_DEMAND];
+        let f_bval = state.factors[FACTOR_BUSINESS_VALUE];
+        let f_conseq = state.factors[FACTOR_DOWNSTREAM_CONSEQUENCE];
+
+        let m_cache = (f_recomp * NonNegativeFixed::from_num(5) + f_verify) * f_access * f_stand;
+        let m_search = (f_bval + f_conseq) * f_search * f_stand;
+        let m_retrieval = f_bval * f_retrieve;
+        let m_sched = f_bval * f_sched;
         
-        node_masses[0][i & 7] = m0;
-        node_masses[1][i & 7] = m1;
-        node_masses[2][i & 7] = m2;
-        node_masses[3][i & 7] = m3;
+        node_masses[MEASURE_CACHE][i & 7] = m_cache;
+        node_masses[MEASURE_RETRIEVAL][i & 7] = m_retrieval;
+        node_masses[MEASURE_SCHEDULING][i & 7] = m_sched;
+        node_masses[MEASURE_SEARCH][i & 7] = m_search;
     });
     
     unroll_4_static!(k, {

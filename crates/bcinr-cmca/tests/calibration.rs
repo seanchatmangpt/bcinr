@@ -131,7 +131,7 @@ fn test_f01_material_scale_information() {
         NonNegativeFixed::ONE,  // s_meas
         NonNegativeFixed::from_bits(32768),  // s_leaf
     );
-    assert_eq!(result, Ok(CertificateReceipt::new(42))); // RECERTIFICATION_CANDIDATE
+    assert_eq!(result, Ok(CertificateReceipt::admit_certificate(42))); // RECERTIFICATION_CANDIDATE
 }
 
 #[test]

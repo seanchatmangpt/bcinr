@@ -9,7 +9,7 @@ pub const Q: usize = 4;
 
 pub const GENERATOR_VERSION: &str = "v1.1.0";
 pub const RDF_INPUT_DIGEST: &str = "5f3b550a116aab25628f9e8272ac1348f21d19114eb2cbca11c7c4c9176ebf69";
-pub const GENERATOR_SOURCE_DIGEST: &str = "7397c5c6d00ad920adbb67d6845f979f4a5f4176aa443630450de0e1fa439efb";
+pub const GENERATOR_SOURCE_DIGEST: &str = "cbeef6afff37a7eebe5e43dcf4b8deb29f1c6d4d10f580839fc6f846b97b104a";
 pub const FACTOR_ACCESS_FREQUENCY: usize = 0;
 pub const FACTOR_ACCESS_FREQUENCY_IRI: &str = "cmca:accessFrequency";
 pub const FACTOR_BUSINESS_VALUE: usize = 1;
@@ -32,18 +32,18 @@ pub const FACTOR_DOWNSTREAM_CONSEQUENCE: usize = 9;
 pub const FACTOR_DOWNSTREAM_CONSEQUENCE_IRI: &str = "cmca:downstreamConsequence";
 pub const MEASURE_CACHE: usize = 0;
 pub const MEASURE_CACHE_IRI: &str = "cmca:MeasureCache";
-pub const MEASURE_RETRIEVAL: usize = 1;
-pub const MEASURE_RETRIEVAL_IRI: &str = "cmca:MeasureRetrieval";
-pub const MEASURE_SCHEDULING: usize = 2;
-pub const MEASURE_SCHEDULING_IRI: &str = "cmca:MeasureScheduling";
-pub const MEASURE_SEARCH: usize = 3;
+pub const MEASURE_SEARCH: usize = 1;
 pub const MEASURE_SEARCH_IRI: &str = "cmca:MeasureSearch";
-pub const LENS_COVERAGE: usize = 0;
-pub const LENS_COVERAGE_IRI: &str = "cmca:LensCoverage";
-pub const LENS_EXPLOITATION: usize = 1;
+pub const MEASURE_RETRIEVAL: usize = 2;
+pub const MEASURE_RETRIEVAL_IRI: &str = "cmca:MeasureRetrieval";
+pub const MEASURE_SCHEDULING: usize = 3;
+pub const MEASURE_SCHEDULING_IRI: &str = "cmca:MeasureScheduling";
+pub const LENS_EXPLOITATION: usize = 0;
 pub const LENS_EXPLOITATION_IRI: &str = "cmca:LensExploitation";
-pub const LENS_PROPORTIONAL: usize = 2;
+pub const LENS_PROPORTIONAL: usize = 1;
 pub const LENS_PROPORTIONAL_IRI: &str = "cmca:LensProportional";
+pub const LENS_COVERAGE: usize = 2;
+pub const LENS_COVERAGE_IRI: &str = "cmca:LensCoverage";
 pub const LENS_RARE: usize = 3;
 pub const LENS_RARE_IRI: &str = "cmca:LensRare";
 pub const OBJECT_ARTIFACT__A: usize = 0;
@@ -75,13 +75,13 @@ pub struct LensSpec {
     pub q: SignedFixed,
 }
 
-pub static ETA: NonNegativeFixed = NonNegativeFixed(32768); // 0.50000
+pub static ETA: NonNegativeFixed = NonNegativeFixed::from_bits(32768); // 0.50000
 
 pub static LAMBDA: [[NonNegativeFixed; Q]; K] = [
-    [NonNegativeFixed(0), NonNegativeFixed(0), NonNegativeFixed(0), NonNegativeFixed(0)], // MeasureCache
-    [NonNegativeFixed(0), NonNegativeFixed(0), NonNegativeFixed(0), NonNegativeFixed(0)], // MeasureRetrieval
-    [NonNegativeFixed(0), NonNegativeFixed(0), NonNegativeFixed(0), NonNegativeFixed(0)], // MeasureScheduling
-    [NonNegativeFixed(0), NonNegativeFixed(0), NonNegativeFixed(0), NonNegativeFixed(0)], // MeasureSearch
+    [NonNegativeFixed::from_bits(26214), NonNegativeFixed::from_bits(19661), NonNegativeFixed::from_bits(13107), NonNegativeFixed::from_bits(6554)], // MeasureCache
+    [NonNegativeFixed::from_bits(6554), NonNegativeFixed::from_bits(13107), NonNegativeFixed::from_bits(19661), NonNegativeFixed::from_bits(26214)], // MeasureSearch
+    [NonNegativeFixed::from_bits(16384), NonNegativeFixed::from_bits(16384), NonNegativeFixed::from_bits(16384), NonNegativeFixed::from_bits(16384)], // MeasureRetrieval
+    [NonNegativeFixed::from_bits(32768), NonNegativeFixed::from_bits(0), NonNegativeFixed::from_bits(32768), NonNegativeFixed::from_bits(0)], // MeasureScheduling
 ];
 
 pub static OBJECT_REGISTRY: [PackedSemanticState; N] = [
@@ -89,139 +89,185 @@ pub static OBJECT_REGISTRY: [PackedSemanticState; N] = [
     PackedSemanticState {
         id: 0,
         factors: [
-            NonNegativeFixed(32768), // accessFrequency: 0.50000
-            NonNegativeFixed(655360), // businessValue: 10.00000
-            NonNegativeFixed(58982), // recomputationCost: 0.90000
-            NonNegativeFixed(0), // retrievalDemand: 0.00000
-            NonNegativeFixed(0), // schedulingDemand: 0.00000
-            NonNegativeFixed(0), // searchDemand: 0.00000
-            NonNegativeFixed(65536), // standing: 1.00000
-            NonNegativeFixed(65536), // validity: 1.00000
-            NonNegativeFixed(6554), // verificationCost: 0.10000
-            NonNegativeFixed(655360), // downstreamConsequence: 10.00000
+            NonNegativeFixed::from_bits(32768), // accessFrequency: 0.50000
+            NonNegativeFixed::from_bits(655360), // businessValue: 10.00000
+            NonNegativeFixed::from_bits(58982), // recomputationCost: 0.90000
+            NonNegativeFixed::from_bits(0), // retrievalDemand: 0.00000
+            NonNegativeFixed::from_bits(0), // schedulingDemand: 0.00000
+            NonNegativeFixed::from_bits(0), // searchDemand: 0.00000
+            NonNegativeFixed::from_bits(65536), // standing: 1.00000
+            NonNegativeFixed::from_bits(65536), // validity: 1.00000
+            NonNegativeFixed::from_bits(6554), // verificationCost: 0.10000
+            NonNegativeFixed::from_bits(655360), // downstreamConsequence: 10.00000
         ],
     },
     // Artifact_B (cmca:Artifact_B)
     PackedSemanticState {
         id: 1,
         factors: [
-            NonNegativeFixed(32768), // accessFrequency: 0.50000
-            NonNegativeFixed(655360), // businessValue: 10.00000
-            NonNegativeFixed(6554), // recomputationCost: 0.10000
-            NonNegativeFixed(0), // retrievalDemand: 0.00000
-            NonNegativeFixed(0), // schedulingDemand: 0.00000
-            NonNegativeFixed(0), // searchDemand: 0.00000
-            NonNegativeFixed(65536), // standing: 1.00000
-            NonNegativeFixed(65536), // validity: 1.00000
-            NonNegativeFixed(58982), // verificationCost: 0.90000
-            NonNegativeFixed(655360), // downstreamConsequence: 10.00000
+            NonNegativeFixed::from_bits(32768), // accessFrequency: 0.50000
+            NonNegativeFixed::from_bits(655360), // businessValue: 10.00000
+            NonNegativeFixed::from_bits(6554), // recomputationCost: 0.10000
+            NonNegativeFixed::from_bits(0), // retrievalDemand: 0.00000
+            NonNegativeFixed::from_bits(0), // schedulingDemand: 0.00000
+            NonNegativeFixed::from_bits(0), // searchDemand: 0.00000
+            NonNegativeFixed::from_bits(65536), // standing: 1.00000
+            NonNegativeFixed::from_bits(65536), // validity: 1.00000
+            NonNegativeFixed::from_bits(58982), // verificationCost: 0.90000
+            NonNegativeFixed::from_bits(655360), // downstreamConsequence: 10.00000
         ],
     },
     // Obj_Activity (cmca:Obj_Activity)
     PackedSemanticState {
         id: 2,
         factors: [
-            NonNegativeFixed(32768), // accessFrequency: 0.50000
-            NonNegativeFixed(0), // businessValue: 0.00000
-            NonNegativeFixed(32768), // recomputationCost: 0.50000
-            NonNegativeFixed(32768), // retrievalDemand: 0.50000
-            NonNegativeFixed(32768), // schedulingDemand: 0.50000
-            NonNegativeFixed(32768), // searchDemand: 0.50000
-            NonNegativeFixed(65536), // standing: 1.00000
-            NonNegativeFixed(65536), // validity: 1.00000
-            NonNegativeFixed(32768), // verificationCost: 0.50000
-            NonNegativeFixed(65536000), // downstreamConsequence: 1000.00000
+            NonNegativeFixed::from_bits(32768), // accessFrequency: 0.50000
+            NonNegativeFixed::from_bits(0), // businessValue: 0.00000
+            NonNegativeFixed::from_bits(32768), // recomputationCost: 0.50000
+            NonNegativeFixed::from_bits(32768), // retrievalDemand: 0.50000
+            NonNegativeFixed::from_bits(32768), // schedulingDemand: 0.50000
+            NonNegativeFixed::from_bits(32768), // searchDemand: 0.50000
+            NonNegativeFixed::from_bits(65536), // standing: 1.00000
+            NonNegativeFixed::from_bits(65536), // validity: 1.00000
+            NonNegativeFixed::from_bits(32768), // verificationCost: 0.50000
+            NonNegativeFixed::from_bits(65536000), // downstreamConsequence: 1000.00000
         ],
     },
     // Obj_Deployment (cmca:Obj_Deployment)
     PackedSemanticState {
         id: 3,
         factors: [
-            NonNegativeFixed(32768), // accessFrequency: 0.50000
-            NonNegativeFixed(0), // businessValue: 0.00000
-            NonNegativeFixed(32768), // recomputationCost: 0.50000
-            NonNegativeFixed(32768), // retrievalDemand: 0.50000
-            NonNegativeFixed(32768), // schedulingDemand: 0.50000
-            NonNegativeFixed(32768), // searchDemand: 0.50000
-            NonNegativeFixed(65536), // standing: 1.00000
-            NonNegativeFixed(65536), // validity: 1.00000
-            NonNegativeFixed(32768), // verificationCost: 0.50000
-            NonNegativeFixed(65536000), // downstreamConsequence: 1000.00000
+            NonNegativeFixed::from_bits(32768), // accessFrequency: 0.50000
+            NonNegativeFixed::from_bits(0), // businessValue: 0.00000
+            NonNegativeFixed::from_bits(32768), // recomputationCost: 0.50000
+            NonNegativeFixed::from_bits(32768), // retrievalDemand: 0.50000
+            NonNegativeFixed::from_bits(32768), // schedulingDemand: 0.50000
+            NonNegativeFixed::from_bits(32768), // searchDemand: 0.50000
+            NonNegativeFixed::from_bits(65536), // standing: 1.00000
+            NonNegativeFixed::from_bits(65536), // validity: 1.00000
+            NonNegativeFixed::from_bits(32768), // verificationCost: 0.50000
+            NonNegativeFixed::from_bits(65536000), // downstreamConsequence: 1000.00000
         ],
     },
     // Obj_Obligation (cmca:Obj_Obligation)
     PackedSemanticState {
         id: 4,
         factors: [
-            NonNegativeFixed(32768), // accessFrequency: 0.50000
-            NonNegativeFixed(0), // businessValue: 0.00000
-            NonNegativeFixed(32768), // recomputationCost: 0.50000
-            NonNegativeFixed(32768), // retrievalDemand: 0.50000
-            NonNegativeFixed(32768), // schedulingDemand: 0.50000
-            NonNegativeFixed(32768), // searchDemand: 0.50000
-            NonNegativeFixed(65536), // standing: 1.00000
-            NonNegativeFixed(65536), // validity: 1.00000
-            NonNegativeFixed(32768), // verificationCost: 0.50000
-            NonNegativeFixed(65536000), // downstreamConsequence: 1000.00000
+            NonNegativeFixed::from_bits(32768), // accessFrequency: 0.50000
+            NonNegativeFixed::from_bits(0), // businessValue: 0.00000
+            NonNegativeFixed::from_bits(32768), // recomputationCost: 0.50000
+            NonNegativeFixed::from_bits(32768), // retrievalDemand: 0.50000
+            NonNegativeFixed::from_bits(32768), // schedulingDemand: 0.50000
+            NonNegativeFixed::from_bits(32768), // searchDemand: 0.50000
+            NonNegativeFixed::from_bits(65536), // standing: 1.00000
+            NonNegativeFixed::from_bits(65536), // validity: 1.00000
+            NonNegativeFixed::from_bits(32768), // verificationCost: 0.50000
+            NonNegativeFixed::from_bits(65536000), // downstreamConsequence: 1000.00000
         ],
     },
     // Obj_Outcome (cmca:Obj_Outcome)
     PackedSemanticState {
         id: 5,
         factors: [
-            NonNegativeFixed(32768), // accessFrequency: 0.50000
-            NonNegativeFixed(0), // businessValue: 0.00000
-            NonNegativeFixed(32768), // recomputationCost: 0.50000
-            NonNegativeFixed(32768), // retrievalDemand: 0.50000
-            NonNegativeFixed(32768), // schedulingDemand: 0.50000
-            NonNegativeFixed(32768), // searchDemand: 0.50000
-            NonNegativeFixed(65536), // standing: 1.00000
-            NonNegativeFixed(65536), // validity: 1.00000
-            NonNegativeFixed(32768), // verificationCost: 0.50000
-            NonNegativeFixed(65536000), // downstreamConsequence: 1000.00000
+            NonNegativeFixed::from_bits(32768), // accessFrequency: 0.50000
+            NonNegativeFixed::from_bits(0), // businessValue: 0.00000
+            NonNegativeFixed::from_bits(32768), // recomputationCost: 0.50000
+            NonNegativeFixed::from_bits(32768), // retrievalDemand: 0.50000
+            NonNegativeFixed::from_bits(32768), // schedulingDemand: 0.50000
+            NonNegativeFixed::from_bits(32768), // searchDemand: 0.50000
+            NonNegativeFixed::from_bits(65536), // standing: 1.00000
+            NonNegativeFixed::from_bits(65536), // validity: 1.00000
+            NonNegativeFixed::from_bits(32768), // verificationCost: 0.50000
+            NonNegativeFixed::from_bits(65536000), // downstreamConsequence: 1000.00000
         ],
     },
     // Obj_Single (cmca:Obj_Single)
     PackedSemanticState {
         id: 6,
         factors: [
-            NonNegativeFixed(52429), // accessFrequency: 0.80000
-            NonNegativeFixed(6553600), // businessValue: 100.00000
-            NonNegativeFixed(52429), // recomputationCost: 0.80000
-            NonNegativeFixed(58982), // retrievalDemand: 0.90000
-            NonNegativeFixed(0), // schedulingDemand: 0.00000
-            NonNegativeFixed(6554), // searchDemand: 0.10000
-            NonNegativeFixed(65536), // standing: 1.00000
-            NonNegativeFixed(65536), // validity: 1.00000
-            NonNegativeFixed(52429), // verificationCost: 0.80000
-            NonNegativeFixed(6553600), // downstreamConsequence: 100.00000
+            NonNegativeFixed::from_bits(52429), // accessFrequency: 0.80000
+            NonNegativeFixed::from_bits(6553600), // businessValue: 100.00000
+            NonNegativeFixed::from_bits(52429), // recomputationCost: 0.80000
+            NonNegativeFixed::from_bits(58982), // retrievalDemand: 0.90000
+            NonNegativeFixed::from_bits(0), // schedulingDemand: 0.00000
+            NonNegativeFixed::from_bits(6554), // searchDemand: 0.10000
+            NonNegativeFixed::from_bits(65536), // standing: 1.00000
+            NonNegativeFixed::from_bits(65536), // validity: 1.00000
+            NonNegativeFixed::from_bits(52429), // verificationCost: 0.80000
+            NonNegativeFixed::from_bits(6553600), // downstreamConsequence: 100.00000
         ],
     },
     // Obj_Value (cmca:Obj_Value)
     PackedSemanticState {
         id: 7,
         factors: [
-            NonNegativeFixed(32768), // accessFrequency: 0.50000
-            NonNegativeFixed(65536000), // businessValue: 1000.00000
-            NonNegativeFixed(32768), // recomputationCost: 0.50000
-            NonNegativeFixed(32768), // retrievalDemand: 0.50000
-            NonNegativeFixed(32768), // schedulingDemand: 0.50000
-            NonNegativeFixed(32768), // searchDemand: 0.50000
-            NonNegativeFixed(65536), // standing: 1.00000
-            NonNegativeFixed(65536), // validity: 1.00000
-            NonNegativeFixed(32768), // verificationCost: 0.50000
-            NonNegativeFixed(65536000), // downstreamConsequence: 1000.00000
+            NonNegativeFixed::from_bits(32768), // accessFrequency: 0.50000
+            NonNegativeFixed::from_bits(65536000), // businessValue: 1000.00000
+            NonNegativeFixed::from_bits(32768), // recomputationCost: 0.50000
+            NonNegativeFixed::from_bits(32768), // retrievalDemand: 0.50000
+            NonNegativeFixed::from_bits(32768), // schedulingDemand: 0.50000
+            NonNegativeFixed::from_bits(32768), // searchDemand: 0.50000
+            NonNegativeFixed::from_bits(65536), // standing: 1.00000
+            NonNegativeFixed::from_bits(65536), // validity: 1.00000
+            NonNegativeFixed::from_bits(32768), // verificationCost: 0.50000
+            NonNegativeFixed::from_bits(65536000), // downstreamConsequence: 1000.00000
         ],
     },
 ];
 
 pub static LENS_REGISTRY: [LensSpec; Q] = [
-    // LensCoverage (cmca:LensCoverage)
-    LensSpec { id: 0, q: SignedFixed(0) },
     // LensExploitation (cmca:LensExploitation)
-    LensSpec { id: 1, q: SignedFixed(131072) },
+    LensSpec { id: 0, q: SignedFixed::from_bits(131072) },
     // LensProportional (cmca:LensProportional)
-    LensSpec { id: 2, q: SignedFixed(65536) },
+    LensSpec { id: 1, q: SignedFixed::from_bits(65536) },
+    // LensCoverage (cmca:LensCoverage)
+    LensSpec { id: 2, q: SignedFixed::from_bits(0) },
     // LensRare (cmca:LensRare)
-    LensSpec { id: 3, q: SignedFixed(-65536) },
+    LensSpec { id: 3, q: SignedFixed::from_bits(-65536) },
 ];
+
+// Macro generation
+macro_rules! unroll_n_static {
+    ($idx:ident, $body:block) => {
+        const $idx: usize = 0;
+        $body
+        const $idx: usize = 1;
+        $body
+        const $idx: usize = 2;
+        $body
+        const $idx: usize = 3;
+        $body
+        const $idx: usize = 4;
+        $body
+        const $idx: usize = 5;
+        $body
+        const $idx: usize = 6;
+        $body
+        const $idx: usize = 7;
+        $body
+    };
+}
+macro_rules! unroll_q_static {
+    ($idx:ident, $body:block) => {
+        const $idx: usize = 0;
+        $body
+        const $idx: usize = 1;
+        $body
+        const $idx: usize = 2;
+        $body
+        const $idx: usize = 3;
+        $body
+    };
+}
+macro_rules! unroll_k_static {
+    ($idx:ident, $body:block) => {
+        const $idx: usize = 0;
+        $body
+        const $idx: usize = 1;
+        $body
+        const $idx: usize = 2;
+        $body
+        const $idx: usize = 3;
+        $body
+    };
+}

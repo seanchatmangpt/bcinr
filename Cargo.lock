@@ -220,6 +220,7 @@ version = "26.6.24"
 dependencies = [
  "bcinr-logic",
  "proptest",
+ "trybuild",
 ]
 
 [[package]]
