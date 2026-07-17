@@ -71,6 +71,47 @@ fn pred_satisfied(done: u64, required: u64) -> u64 {
     0u64.wrapping_sub((unmet == 0) as u64)
 }
 
+/// Branchless: returns `u64::MAX` if `iter < limit` OR `limit == 0`, else `0`.
+///
+/// `limit == 0` means unlimited — always returns MAX.
+/// `iter >= limit` (and limit != 0) returns 0 (gate closed).
+#[inline(always)]
+fn iter_under_limit(iter: u8, limit: u8) -> u64 {
+    let limit_zero = 0u64.wrapping_sub((limit == 0) as u64);
+    let delta = limit.saturating_sub(iter) as u64;
+    let nz = (delta | delta.wrapping_neg()) >> 63;
+    0u64.wrapping_sub(nz) | limit_zero
+}
+
+/// Branchless LoopRedo handler.
+///
+/// When `op.kind == LoopRedo` AND `fire_mask != 0`, gates body re-enablement
+/// by the iteration limit stored in `op.branch_count` (0 = unlimited).
+///
+/// Returns `(done_clear_mask, check_delta)`:
+/// - caller does `new_done &= !done_clear_mask`
+/// - caller does `new_check |= check_delta`
+#[inline(always)]
+fn apply_loop_redo(op: &crate::tape::Powl64Op, fire_mask: u64, loop_iter: &mut u8) -> (u64, u64) {
+    use crate::tape::OpKind;
+    let is_redo = {
+        let diff = (op.kind as u8) ^ (OpKind::LoopRedo as u8);
+        let nz = (((diff | diff.wrapping_neg()) >> 7) & 1) as u64;
+        nz.wrapping_sub(1)
+    };
+    let fire_nz = 0u64.wrapping_sub((fire_mask | fire_mask.wrapping_neg()) >> 63);
+    let active = is_redo & fire_nz;
+
+    let under_limit = iter_under_limit(*loop_iter, op.branch_count);
+    let gated_active = active & under_limit;
+    *loop_iter = loop_iter.saturating_add((active & 1) as u8); // still unconditional
+    let body = op.succ_mask & gated_active;
+    // Clear body entries from done so they can fire again.
+    // Also clear redo predecessors (op.pred_mask) so the redo path can repeat.
+    let done_clear = (body | op.pred_mask) & gated_active;
+    (done_clear, body)
+}
+
 // ---------------------------------------------------------------------------
 // Main tick function
 // ---------------------------------------------------------------------------
@@ -146,16 +187,13 @@ pub fn scheduler_tick(tape: &[crate::tape::Powl64Op], state: &mut PowlRunState) 
             // The join's effective pred will exclude suppressed slots.
         }
 
-        // Handle LoopRedo back-edge: re-enable body entries.
-        if op.kind == OpKind::LoopRedo && fire_mask != 0 {
-            // Reset done for body entries so they can fire again.
-            let body_entries = op.succ_mask;
-            new_done &= !body_entries;
-            new_check |= body_entries;
-            // Increment loop iteration counter.
-            let iter = &mut state.loop_iters[i];
-            *iter = iter.saturating_add(1);
-        }
+        // Handle LoopRedo back-edge: re-enable body entries (gated by max_iters).
+        let (redo_clear, redo_check) = apply_loop_redo(op, fire_mask, &mut state.loop_iters[i]);
+        // When gate is open (redo_clear != 0), also clear the LoopRedo slot itself
+        // from done so it can fire again on the next redo iteration.
+        let gate_open = 0u64.wrapping_sub((redo_clear != 0) as u64);
+        new_done &= !(redo_clear | (bit & gate_open));
+        new_check |= redo_check;
     }
 
     state.done_mask = new_done;
@@ -276,5 +314,73 @@ mod tests {
         // Right branch (slot 3) must NOT have fired via FiredSet
         // (it is suppressed, not a genuine fire).
         assert!(all_fired & (1 << 3) == 0, "unchosen (right) branch must not appear in FiredSet");
+    }
+
+    #[test]
+    fn iter_under_limit_correctness() {
+        assert_eq!(iter_under_limit(0, 3), u64::MAX);
+        assert_eq!(iter_under_limit(2, 3), u64::MAX);
+        assert_eq!(iter_under_limit(3, 3), 0);
+        assert_eq!(iter_under_limit(255, 3), 0);
+        assert_eq!(iter_under_limit(255, 0), u64::MAX);
+        assert_eq!(iter_under_limit(0, 0), u64::MAX);
+    }
+
+    #[test]
+    fn loop_terminates_at_max_iters() {
+        let ast = PowlAstNode::Loop {
+            body: Box::new(PowlAstNode::Atom("body")),
+            redo: Box::new(PowlAstNode::Atom("redo")),
+            max_iters: 3,
+        };
+        let tape = compile_powl(&ast).unwrap();
+
+        let mut state = PowlRunState::new(&tape);
+        let mut body_fires = 0u32;
+        let mut ticks = 0u32;
+
+        for _ in 0..50u32 {
+            if state.check_mask == 0 && state.active_mask == 0 {
+                break;
+            }
+            ticks += 1;
+            let fs = scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
+            // body is slot 0
+            if fs.0 & 1 != 0 {
+                body_fires += 1;
+            }
+        }
+
+        assert!(ticks < 50, "loop must terminate (terminated in {ticks} ticks)");
+        // body fires once initially + once per redo (3 redos) = 4 total
+        assert_eq!(body_fires, 4, "body should fire exactly 4 times (initial + 3 redo re-entries)");
+    }
+
+    #[test]
+    fn loop_redo_gated_at_max_iters() {
+        use crate::tape::{OpKind, Powl64Op};
+        let mut op = Powl64Op::new(OpKind::LoopRedo, 0);
+        op.succ_mask = 0b11;
+        op.branch_count = 2; // max 2 iters
+
+        let mut loop_iter = 2u8; // already at limit
+        let fire_mask = u64::MAX; // active
+        let (done_clear, check_delta) = apply_loop_redo(&op, fire_mask, &mut loop_iter);
+        assert_eq!(done_clear, 0, "at limit: no done_clear");
+        assert_eq!(check_delta, 0, "at limit: no check_delta");
+    }
+
+    #[test]
+    fn loop_redo_unlimited_when_branch_count_zero() {
+        use crate::tape::{OpKind, Powl64Op};
+        let mut op = Powl64Op::new(OpKind::LoopRedo, 0);
+        op.succ_mask = 0b11;
+        op.branch_count = 0; // unlimited
+
+        let mut loop_iter = 255u8;
+        let fire_mask = u64::MAX;
+        let (done_clear, check_delta) = apply_loop_redo(&op, fire_mask, &mut loop_iter);
+        assert_ne!(done_clear, 0, "unlimited: body bits returned");
+        assert_ne!(check_delta, 0, "unlimited: body bits returned");
     }
 }

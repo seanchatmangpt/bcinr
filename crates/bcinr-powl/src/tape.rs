@@ -40,6 +40,7 @@ pub struct Powl64Op {
     /// Index of this slot (redundant but useful for debugging).
     pub index: u8,
     /// For XorDispatch slots: number of branches.
+    /// For LoopRedo slots: maximum allowed iterations (0 = unlimited).
     pub branch_count: u8,
     _pad: [u8; 5],
 }

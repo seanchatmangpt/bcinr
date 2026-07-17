@@ -36,6 +36,7 @@ pub enum PowlAstNode<'a> {
     Loop {
         body: Box<PowlAstNode<'a>>,
         redo: Box<PowlAstNode<'a>>,
+        max_iters: u8,
     },
 }
 
@@ -51,6 +52,7 @@ pub enum CompileError {
     EmptyPartialOrder,
     InvalidEdge { from: usize, to: usize, len: usize },
     Cycle,
+    Unreachable,
 }
 
 // ---------------------------------------------------------------------------
@@ -214,7 +216,7 @@ fn compile_node<'a>(
             Ok(Segment { entries: dispatch_bit, exits: join_bit })
         }
 
-        PowlAstNode::Loop { body, redo } => {
+        PowlAstNode::Loop { body, redo, max_iters } => {
             // Structure:
             //   [body] → exit decision (silent)
             //     ↓ (exit path, normal)        ↓ (redo path via LoopRedo back-edge)
@@ -244,6 +246,8 @@ fn compile_node<'a>(
             // The back-edge slot's succ_mask points to body entries,
             // but with a back-edge flag (scheduler skips Kahn's check for these).
             tape.ops[back_idx as usize].succ_mask = body_seg.entries;
+            // Store max_iters in branch_count of the LoopRedo slot.
+            tape.ops[back_idx as usize].branch_count = *max_iters;
             // Do NOT set pred_mask on body entries for the back-edge
             // (would create a cycle in Kahn's). The scheduler handles
             // LoopRedo back-edges specially.
@@ -261,28 +265,68 @@ fn compile_node<'a>(
 // Kahn's cycle detection (ignoring LoopRedo back-edges)
 // ---------------------------------------------------------------------------
 
-fn kahn_check(tape: &PowlTape) -> Result<(), CompileError> {
+/// Full graph acyclicity check — counts ALL edges including LoopRedo predecessors.
+/// Uses stack arrays only (no Vec/heap).
+fn check_full_graph_acyclic(tape: &PowlTape) -> Result<(), CompileError> {
     let n = tape.len as usize;
-    // in-degree per slot (pred_mask, excluding LoopRedo back-edges as sources)
     let mut in_deg = [0u32; 64];
     for i in 0..n {
-        if tape.ops[i].kind == OpKind::LoopRedo {
-            // back-edges are excluded from cycle check
-            continue;
+        let mut preds = tape.ops[i].pred_mask;
+        while preds != 0 {
+            let j = preds.trailing_zeros() as usize;
+            if j < n {
+                in_deg[i] += 1;
+            }
+            preds &= preds - 1;
         }
-        let mut succs = tape.ops[i].succ_mask;
+        // Also count LoopRedo succ_mask as edges into body entries.
+        if tape.ops[i].kind == OpKind::LoopRedo {
+            let mut succs = tape.ops[i].succ_mask;
+            while succs != 0 {
+                let j = succs.trailing_zeros() as usize;
+                if j < n {
+                    in_deg[j] += 1;
+                }
+                succs &= succs - 1;
+            }
+        }
+    }
+
+    let mut queue = [0usize; 64];
+    let mut head = 0usize;
+    let mut tail = 0usize;
+    for i in 0..n {
+        if in_deg[i] == 0 {
+            queue[tail] = i;
+            tail += 1;
+        }
+    }
+
+    let mut visited = 0usize;
+    while head < tail {
+        let u = queue[head];
+        head += 1;
+        visited += 1;
+        let mut succs = tape.ops[u].succ_mask;
         while succs != 0 {
-            let j = succs.trailing_zeros() as usize;
-            if tape.ops[j].kind != OpKind::LoopRedo {
-                in_deg[j] += 1;
+            let v = succs.trailing_zeros() as usize;
+            if v < n {
+                in_deg[v] = in_deg[v].saturating_sub(1);
+                if in_deg[v] == 0 {
+                    queue[tail] = v;
+                    tail += 1;
+                }
             }
             succs &= succs - 1;
         }
     }
 
-    // Recompute from pred_mask excluding LoopRedo contributions.
-    // Actually recompute in_deg from pred_masks directly.
-    let mut in_deg2 = [0u32; 64];
+    if visited < n { Err(CompileError::Cycle) } else { Ok(()) }
+}
+
+/// Build in-degrees for non-LoopRedo slots, ignoring LoopRedo predecessors.
+fn build_in_degrees(tape: &PowlTape, n: usize) -> [u32; 64] {
+    let mut in_deg = [0u32; 64];
     for i in 0..n {
         if tape.ops[i].kind == OpKind::LoopRedo {
             continue;
@@ -291,41 +335,102 @@ fn kahn_check(tape: &PowlTape) -> Result<(), CompileError> {
         while preds != 0 {
             let j = preds.trailing_zeros() as usize;
             if j < n && tape.ops[j].kind != OpKind::LoopRedo {
-                in_deg2[i] += 1;
+                in_deg[i] += 1;
             }
             preds &= preds - 1;
         }
     }
+    in_deg
+}
 
-    let mut queue: Vec<usize> = (0..n)
-        .filter(|&i| in_deg2[i] == 0 && tape.ops[i].kind != OpKind::LoopRedo)
-        .collect();
+/// BFS walk over non-LoopRedo slots; returns `Err(Cycle)` if any slot unreachable.
+fn run_kahn_walk(tape: &PowlTape, n: usize, mut in_deg: [u32; 64]) -> Result<(), CompileError> {
+    let mut queue = [0usize; 64];
+    let mut head = 0usize;
+    let mut tail = 0usize;
+    for i in 0..n {
+        if in_deg[i] == 0 && tape.ops[i].kind != OpKind::LoopRedo {
+            queue[tail] = i;
+            tail += 1;
+        }
+    }
     let mut visited = 0usize;
 
-    while let Some(u) = queue.pop() {
+    while head < tail {
+        let u = queue[head];
+        head += 1;
         visited += 1;
         let mut succs = tape.ops[u].succ_mask;
         while succs != 0 {
             let v = succs.trailing_zeros() as usize;
             if v < n && tape.ops[v].kind != OpKind::LoopRedo {
-                in_deg2[v] = in_deg2[v].saturating_sub(1);
-                if in_deg2[v] == 0 {
-                    queue.push(v);
+                in_deg[v] = in_deg[v].saturating_sub(1);
+                if in_deg[v] == 0 {
+                    queue[tail] = v;
+                    tail += 1;
                 }
             }
             succs &= succs - 1;
         }
     }
 
-    let non_redo_count = (0..n)
-        .filter(|&i| tape.ops[i].kind != OpKind::LoopRedo)
-        .count();
+    let non_redo_count = (0..n).filter(|&i| tape.ops[i].kind != OpKind::LoopRedo).count();
+    if visited < non_redo_count { Err(CompileError::Cycle) } else { Ok(()) }
+}
 
-    if visited < non_redo_count {
-        Err(CompileError::Cycle)
-    } else {
-        Ok(())
+fn kahn_check(tape: &PowlTape) -> Result<(), CompileError> {
+    // Phase 1: full graph check (including LoopRedo edges). If acyclic, done.
+    if check_full_graph_acyclic(tape).is_ok() {
+        return Ok(());
     }
+    // Phase 2: LoopRedo-exempt Kahn walk.
+    let n = tape.len as usize;
+    let in_deg = build_in_degrees(tape, n);
+    run_kahn_walk(tape, n, in_deg)
+}
+
+/// BFS from entry_mask; all non-LoopRedo slots must be reachable.
+pub(crate) fn check_all_ops_reachable(tape: &PowlTape) -> Result<(), CompileError> {
+    let n = tape.len as usize;
+    let mut visited_mask = 0u64;
+    let mut queue = [0usize; 64];
+    let mut head = 0usize;
+    let mut tail = 0usize;
+
+    // Seed from entry_mask.
+    let mut seeds = tape.entry_mask;
+    while seeds != 0 {
+        let i = seeds.trailing_zeros() as usize;
+        seeds &= seeds - 1;
+        if visited_mask & (1u64 << i) == 0 {
+            visited_mask |= 1u64 << i;
+            queue[tail] = i;
+            tail += 1;
+        }
+    }
+
+    while head < tail {
+        let u = queue[head];
+        head += 1;
+        let mut succs = tape.ops[u].succ_mask;
+        while succs != 0 {
+            let v = succs.trailing_zeros() as usize;
+            succs &= succs - 1;
+            if v < n && visited_mask & (1u64 << v) == 0 {
+                visited_mask |= 1u64 << v;
+                queue[tail] = v;
+                tail += 1;
+            }
+        }
+    }
+
+    // All non-LoopRedo slots must be visited.
+    for i in 0..n {
+        if tape.ops[i].kind != OpKind::LoopRedo && visited_mask & (1u64 << i) == 0 {
+            return Err(CompileError::Unreachable);
+        }
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -338,6 +443,7 @@ pub fn compile_powl(root: &PowlAstNode<'_>) -> Result<PowlTape, CompileError> {
     let seg = compile_node(root, &mut tape)?;
     tape.entry_mask = seg.entries;
     kahn_check(&tape)?;
+    check_all_ops_reachable(&tape)?;
     Ok(tape)
 }
 
@@ -411,5 +517,27 @@ mod tests {
             edges: vec![(0, 5)],
         };
         assert!(matches!(compile_powl(&ast), Err(CompileError::InvalidEdge { .. })));
+    }
+
+    #[test]
+    fn kahn_check_rejects_non_loop_cycle() {
+        // PartialOrder with a→b and b→a — a true cycle.
+        let ast = PowlAstNode::PartialOrder {
+            children: vec![PowlAstNode::Atom("a"), PowlAstNode::Atom("b")],
+            edges: vec![(0, 1), (1, 0)],
+        };
+        assert_eq!(compile_powl(&ast), Err(CompileError::Cycle));
+    }
+
+    #[test]
+    fn unreachable_op_check_direct() {
+        use crate::tape::{OpKind, Powl64Op, PowlTape};
+        // Hand-build a tape with 2 slots where entry_mask = 0b01 and slot 1 has no pred/succ.
+        let mut tape = PowlTape::new();
+        tape.ops[0] = Powl64Op::new(OpKind::Atom, 0);
+        tape.ops[1] = Powl64Op::new(OpKind::Atom, 1);
+        tape.len = 2;
+        tape.entry_mask = 0b01; // only slot 0 is an entry; slot 1 unreachable
+        assert_eq!(check_all_ops_reachable(&tape), Err(CompileError::Unreachable));
     }
 }
