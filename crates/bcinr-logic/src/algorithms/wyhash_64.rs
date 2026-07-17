@@ -149,6 +149,7 @@ pub fn wyhash_64(data: &[u8], seed: u64) -> u64 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
+    use alloc::vec::Vec;
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Simple reference using the wymix primitive directly
@@ -301,6 +302,7 @@ mod tests {
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
+    use alloc::vec::Vec;
     use criterion::{black_box, Criterion};
 
     pub fn bench_wyhash_64(c: &mut Criterion) {

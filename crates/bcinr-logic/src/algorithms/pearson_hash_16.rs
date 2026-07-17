@@ -78,6 +78,7 @@ pub fn pearson_hash_16(data: &[u8]) -> u16 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
+    use alloc::vec::Vec;
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE
@@ -212,6 +213,7 @@ mod tests {
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
+    use alloc::vec::Vec;
     use criterion::{black_box, Criterion};
 
     pub fn bench_pearson_hash_16(c: &mut Criterion) {

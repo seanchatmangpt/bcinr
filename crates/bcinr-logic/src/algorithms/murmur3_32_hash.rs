@@ -105,6 +105,7 @@ pub fn murmur3_32_hash(data: &[u8], seed: u32) -> u32 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
+    use alloc::vec::Vec;
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Reference implementation (branch-based, for correctness)
@@ -268,6 +269,7 @@ mod tests {
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
+    use alloc::vec::Vec;
     use criterion::{black_box, Criterion};
 
     pub fn bench_murmur3_32_hash(c: &mut Criterion) {

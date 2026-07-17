@@ -72,6 +72,7 @@ pub fn crc32c_branchless(data: &[u8], initial: u32) -> u32 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
+    use alloc::vec::Vec;
 
     // -------------------------------------------------------------------------
     // POSITIVE ORACLE: Bit-by-bit CRC-32C reference
@@ -218,6 +219,7 @@ mod tests {
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
+    use alloc::vec::Vec;
     use criterion::{black_box, Criterion};
 
     pub fn bench_crc32c_branchless(c: &mut Criterion) {
