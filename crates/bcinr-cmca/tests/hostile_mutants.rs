@@ -190,12 +190,13 @@ use bcinr_cmca::generated::stability_profile::CERTIFICATE_DIGEST;
 
 fn get_proof() -> Option<AdaptiveUpdate<CertifiedLearning>> {
     AdaptiveUpdate::new(
-        AdmittedControlState,
-        CertificateReceipt,
-        EnvelopeReceipt,
-        OutcomeReceipt,
+        AdmittedControlState::new(0),
+        CertificateReceipt::new(0),
+        EnvelopeReceipt::new(0),
+        OutcomeReceipt::new(0),
         NonNegativeFixed::ZERO,
         NonNegativeFixed::ONE,
+        CertifiedLearning::new(),
     )
 }
 

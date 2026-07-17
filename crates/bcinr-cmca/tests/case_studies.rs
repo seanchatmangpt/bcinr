@@ -17,12 +17,13 @@ use bcinr_cmca::generated::case_studies::{
 
 fn get_proof() -> Option<AdaptiveUpdate<CertifiedLearning>> {
     AdaptiveUpdate::new(
-        AdmittedControlState,
-        CertificateReceipt,
-        EnvelopeReceipt,
-        OutcomeReceipt,
+        AdmittedControlState::new(0),
+        CertificateReceipt::new(0),
+        EnvelopeReceipt::new(0),
+        OutcomeReceipt::new(0),
         NonNegativeFixed::ZERO,
         NonNegativeFixed::ONE,
+        CertifiedLearning::new(),
     )
 }
 use bcinr_cmca::generated::generalization as gen;
@@ -317,34 +318,37 @@ fn test_stability_refusals_and_graceful_fallback() {
 fn test_typestate_bounds_checks() {
     // 1. Safe boundary: temperature = 5.0 (327680), distinguishability = 0.001 (65)
     let p_ok = AdaptiveUpdate::new(
-        AdmittedControlState,
-        CertificateReceipt,
-        EnvelopeReceipt,
-        OutcomeReceipt,
+        AdmittedControlState::new(0),
+        CertificateReceipt::new(0),
+        EnvelopeReceipt::new(0),
+        OutcomeReceipt::new(0),
         NonNegativeFixed(327680),
         NonNegativeFixed(65),
+        CertifiedLearning::new(),
     );
     assert!(p_ok.is_some());
 
     // 2. Temp too high: temperature = 5.0 + eps (327681), distinguishability = 0.001 (65)
     let p_temp_high = AdaptiveUpdate::new(
-        AdmittedControlState,
-        CertificateReceipt,
-        EnvelopeReceipt,
-        OutcomeReceipt,
+        AdmittedControlState::new(0),
+        CertificateReceipt::new(0),
+        EnvelopeReceipt::new(0),
+        OutcomeReceipt::new(0),
         NonNegativeFixed(327681),
         NonNegativeFixed(65),
+        CertifiedLearning::new(),
     );
     assert!(p_temp_high.is_none());
 
     // 3. Distinguishability too low: temperature = 5.0 (327680), distinguishability = 64
     let p_dist_low = AdaptiveUpdate::new(
-        AdmittedControlState,
-        CertificateReceipt,
-        EnvelopeReceipt,
-        OutcomeReceipt,
+        AdmittedControlState::new(0),
+        CertificateReceipt::new(0),
+        EnvelopeReceipt::new(0),
+        OutcomeReceipt::new(0),
         NonNegativeFixed(327680),
         NonNegativeFixed(64),
+        CertifiedLearning::new(),
     );
     assert!(p_dist_low.is_none());
 }

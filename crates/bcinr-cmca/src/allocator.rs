@@ -457,28 +457,82 @@ fn const_max_i32(a: i32, b: i32) -> i32 {
 }
 
 /// Marker struct indicating certified learning mode is active.
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-pub struct CertifiedLearning;
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct CertifiedLearning {
+    _sealed: (),
+}
+
+impl CertifiedLearning {
+    #[inline(always)]
+    pub const fn new() -> Self {
+        Self { _sealed: () }
+    }
+}
 
 /// Marker struct indicating selection-only mode is active.
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-pub struct CertifiedSelectionOnly;
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct CertifiedSelectionOnly {
+    _sealed: (),
+}
+
+impl CertifiedSelectionOnly {
+    #[inline(always)]
+    pub const fn new() -> Self {
+        Self { _sealed: () }
+    }
+}
 
 /// Proof token certifying that the control state has been admitted.
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-pub struct AdmittedControlState;
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct AdmittedControlState {
+    pub(crate) digest: u64,
+}
+
+impl AdmittedControlState {
+    #[inline(always)]
+    pub const fn new(digest: u64) -> Self {
+        Self { digest }
+    }
+}
 
 /// Proof token certifying receipt of a valid security certificate.
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-pub struct CertificateReceipt;
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct CertificateReceipt {
+    pub(crate) digest: u64,
+}
+
+impl CertificateReceipt {
+    #[inline(always)]
+    pub const fn new(digest: u64) -> Self {
+        Self { digest }
+    }
+}
 
 /// Proof token certifying receipt of a valid envelope.
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-pub struct EnvelopeReceipt;
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct EnvelopeReceipt {
+    pub(crate) digest: u64,
+}
+
+impl EnvelopeReceipt {
+    #[inline(always)]
+    pub const fn new(digest: u64) -> Self {
+        Self { digest }
+    }
+}
 
 /// Proof token certifying receipt of a valid outcome.
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-pub struct OutcomeReceipt;
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct OutcomeReceipt {
+    pub(crate) digest: u64,
+}
+
+impl OutcomeReceipt {
+    #[inline(always)]
+    pub const fn new(digest: u64) -> Self {
+        Self { digest }
+    }
+}
 
 /// A proof token certifying that an adaptive update is authorized.
 ///
@@ -509,19 +563,23 @@ impl AdaptiveUpdate<CertifiedLearning> {
     /// $O(1)$ constant time, branchless.
     #[inline(always)]
     pub fn new(
-        _state: AdmittedControlState,
-        _cert: CertificateReceipt,
-        _env: EnvelopeReceipt,
-        _outcome: OutcomeReceipt,
+        state: AdmittedControlState,
+        cert: CertificateReceipt,
+        env: EnvelopeReceipt,
+        outcome: OutcomeReceipt,
         temperature: NonNegativeFixed,
         distinguishability: NonNegativeFixed,
+        _mode: CertifiedLearning,
     ) -> Option<Self> {
         let temp_ceil = ((crate::generated::stability_profile::PROFILE.temperature_ceiling.raw * 65536) / 1_000_000_000) as u32;
         let dist_floor = ((crate::generated::stability_profile::PROFILE.distinguishability_floor.raw * 65536) / 1_000_000_000) as u32;
 
-        let temp_ok = const_lt_u32(temp_ceil, temperature.0) == 0;
-        let dist_ok = const_lt_u32(distinguishability.0, dist_floor) == 0;
-        let ok = temp_ok & dist_ok;
+        let temp_ok = (const_lt_u32(temp_ceil, temperature.0) == 0) as u32;
+        let dist_ok = (const_lt_u32(distinguishability.0, dist_floor) == 0) as u32;
+        
+        let digests_ok = (((state.digest ^ cert.digest) | (state.digest ^ env.digest) | (state.digest ^ outcome.digest)) == 0) as u32;
+
+        let ok = temp_ok & dist_ok & digests_ok;
 
         let outcomes = [None, Some(Self { _mode: core::marker::PhantomData })];
         outcomes[(ok as usize) & 1]
@@ -864,12 +922,13 @@ fn compute_pi_kq_for_kq(
 /// let costs = [NonNegativeFixed::ZERO; N];
 ///
 /// let proof = AdaptiveUpdate::new(
-///     AdmittedControlState,
-///     CertificateReceipt,
-///     EnvelopeReceipt,
-///     OutcomeReceipt,
+///     AdmittedControlState::new(0),
+///     CertificateReceipt::new(0),
+///     EnvelopeReceipt::new(0),
+///     OutcomeReceipt::new(0),
 ///     NonNegativeFixed::ZERO,
 ///     NonNegativeFixed::ONE,
+///     CertifiedLearning::new(),
 /// );
 ///
 /// let result = allocate(
@@ -1282,3 +1341,48 @@ pub fn allocate(
     let err_val = const_select_u32(q_err as u32, 5, const_select_u32(dwell_err as u32, 4, const_select_u32((lr_err | beta_err | eta_err) as u32, 3, const_select_u32((!gd_ok) as u32, 1, const_select_u32(digest_err as u32, 10, 7)))));
     wrap_result(pi_res, const_select_u32(has_refusal as u32, err_val, u32::MAX))
 }
+
+/// ```compile_fail
+/// use bcinr_cmca::allocator::AdmittedControlState;
+/// let state = AdmittedControlState { digest: 0 };
+/// ```
+///
+/// ```compile_fail
+/// use bcinr_cmca::allocator::CertifiedLearning;
+/// let mode = CertifiedLearning { _sealed: () };
+/// ```
+///
+/// ```compile_fail
+/// use bcinr_cmca::allocator::{AdaptiveUpdate, CertifiedLearning};
+/// let update = AdaptiveUpdate::<CertifiedLearning> { _mode: core::marker::PhantomData };
+/// ```
+///
+/// ```compile_fail
+/// use bcinr_cmca::allocator::{AdaptiveUpdate, CertifiedLearning, AdmittedControlState, CertificateReceipt, EnvelopeReceipt};
+/// use bcinr_cmca::fixed::NonNegativeFixed;
+/// // Missing OutcomeReceipt
+/// AdaptiveUpdate::new(
+///     AdmittedControlState::new(0),
+///     CertificateReceipt::new(0),
+///     EnvelopeReceipt::new(0),
+///     NonNegativeFixed::ZERO,
+///     NonNegativeFixed::ONE,
+///     CertifiedLearning::new(),
+/// );
+/// ```
+///
+/// ```compile_fail
+/// use bcinr_cmca::allocator::{AdaptiveUpdate, CertifiedSelectionOnly, AdmittedControlState, CertificateReceipt, EnvelopeReceipt, OutcomeReceipt};
+/// use bcinr_cmca::fixed::NonNegativeFixed;
+/// // mutate from selection-only mode
+/// AdaptiveUpdate::new(
+///     AdmittedControlState::new(0),
+///     CertificateReceipt::new(0),
+///     EnvelopeReceipt::new(0),
+///     OutcomeReceipt::new(0),
+///     NonNegativeFixed::ZERO,
+///     NonNegativeFixed::ONE,
+///     CertifiedSelectionOnly::new(),
+/// );
+/// ```
+pub struct AuthorityCompileFailTests;
