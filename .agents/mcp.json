@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "bcinr-mcp-bridge": {
-      "command": "python3",
-      "args": ["/Users/sac/bcinr/bcinr-mcp-bridge/mcp_server.py"]
-    }
-  }
-}
