@@ -93,6 +93,25 @@ pub struct WorkItem {
 }
 
 // ---------------------------------------------------------------------------
+// EventWorkItem — dispatched to event ring for off-hot-path BLAKE3 hashing
+// ---------------------------------------------------------------------------
+
+/// One fired-op event, pushed to the event ring after each fire.
+/// The ring drains asynchronously via `ReceiptWorker`; BLAKE3 never called
+/// inside `petri_tick`.
+#[derive(Clone, Copy, Default)]
+pub struct EventWorkItem {
+    /// Op index (0..63) that fired.
+    pub op_idx: u32,
+    /// Run-id of the workflow instance.
+    pub run_id: u64,
+    /// Cumulative op-trace bitmask (all ops fired so far this run, OR'd in).
+    pub op_trace_so_far: u64,
+    /// `OpKind` discriminant for receipt classification.
+    pub kind_tag: u8,
+}
+
+// ---------------------------------------------------------------------------
 // PowlPetriEngine — wired tick
 // ---------------------------------------------------------------------------
 
