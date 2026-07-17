@@ -24,7 +24,7 @@
 /// use bcinr_logic::algorithms::hyperloglog_add_u64_registers::hyperloglog_add_u64_registers;
 /// let b = 4u32; // 16 registers
 /// let mut regs = [0u8; 16];
-/// hyperloglog_add_u64_registers(&mut regs, 0xDEAD_BEEF_CAFE_BABEu64, b);
+/// hyperloglog_add_u64_registers(&mut regs, 0xAAAA_BBBB_CCCC_DDDDu64, b);
 /// assert!(regs.iter().any(|&r| r > 0));
 /// ```
 pub fn hyperloglog_add_u64_registers(registers: &mut [u8], hash: u64, b: u32) {

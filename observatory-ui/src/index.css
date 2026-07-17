@@ -1,0 +1,47 @@
+:root {
+  --bg-color: #050510;
+  --panel-bg: rgba(10, 10, 20, 0.7);
+  --border-color: rgba(0, 255, 255, 0.3);
+  --text-primary: #e0f0ff;
+  --text-secondary: #8ab4f8;
+  
+  /* Cyberpunk Neons */
+  --neon-cyan: #0ff;
+  --neon-magenta: #f0f;
+  --neon-blue: #0088ff;
+  --neon-green: #0f0;
+  --neon-orange: #ff8800;
+  --neon-red: #f00;
+
+  font-family: 'Courier New', Courier, monospace; /* Tech/Terminal feel */
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-image: radial-gradient(circle at 50% 50%, #111 0%, #000 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.5);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--neon-cyan);
+  border-radius: 3px;
+}

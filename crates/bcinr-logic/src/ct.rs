@@ -63,8 +63,8 @@ pub fn ct_select_u32(condition: u32, a: u32, b: u32) -> u32 {
 /// # Examples
 /// ```
 /// use bcinr_logic::ct::ct_select_u64;
-/// assert_eq!(ct_select_u64(1, 0xDEAD_BEEF, 0xCAFE_BABE), 0xDEAD_BEEF);
-/// assert_eq!(ct_select_u64(0, 0xDEAD_BEEF, 0xCAFE_BABE), 0xCAFE_BABE);
+/// assert_eq!(ct_select_u64(1, 0xAAAA_BBBB, 0xCCCC_DDDD), 0xAAAA_BBBB);
+/// assert_eq!(ct_select_u64(0, 0xAAAA_BBBB, 0xCCCC_DDDD), 0xCCCC_DDDD);
 /// ```
 #[inline(always)]
 #[must_use]

@@ -169,6 +169,10 @@ pub enum ExecutionDefect {
     UnexhaustedOps { remaining: u64 },
     /// The [`ExecutionToken`] presented does not belong to this runner.
     TokenMismatch,
+    /// Out-of-bounds/inactive operations were fired.
+    InvalidFires { bits: u64 },
+    /// Malformed (zero or multi-bit) operations were fired.
+    MalformedFires { bits: u64 },
 }
 
 impl core::fmt::Display for ExecutionDefect {
@@ -177,6 +181,8 @@ impl core::fmt::Display for ExecutionDefect {
             Self::OpAlreadyConsumed { bit } => write!(f, "op bit {bit:#b} already consumed"),
             Self::UnexhaustedOps { remaining } => write!(f, "unfired ops remain: {remaining:#b}"),
             Self::TokenMismatch => write!(f, "execution token does not match this runner"),
+            Self::InvalidFires { bits } => write!(f, "invalid (out-of-bounds) ops fired: {bits:#b}"),
+            Self::MalformedFires { bits } => write!(f, "malformed (zero/multi-bit) ops fired: {bits:#b}"),
         }
     }
 }
@@ -195,6 +201,12 @@ impl core::fmt::Display for ExecutionDefect {
 pub struct ExecutionToken {
     /// Bitmask of ops not yet fired; starts as `(1 << op_count) - 1`.
     remaining: u64,
+    /// Bitmask defining the valid operational boundary: (1 << total) - 1.
+    valid_mask: u64,
+    /// Stateful Status Accumulators
+    pub(crate) defect_double_fire: u64,
+    pub(crate) defect_invalid: u64,
+    pub(crate) defect_malformed: u64,
     /// Total number of ops (mirrors `remaining.count_ones()` at construction).
     total: u8,
     /// Topological firing order: topo_order[step] = op_idx of the step-th fired op.
@@ -228,8 +240,16 @@ impl ExecutionToken {
             remaining.count_ones(),
             total
         );
+        let is_64 = (total == 64) as u64;
+        let base_mask = (1u64.wrapping_shl(total as u32 & 63)).wrapping_sub(1);
+        let sentinel = 0u64.wrapping_sub(is_64);
+        let valid_mask = base_mask | sentinel;
         Self {
             remaining,
+            valid_mask,
+            defect_double_fire: 0,
+            defect_invalid: 0,
+            defect_malformed: 0,
             total,
             topo_order: [u8::MAX; 64],
             event_count: 0,
@@ -243,13 +263,10 @@ impl ExecutionToken {
         debug_assert!(op_count <= 64, "op_count must be ≤ 64");
         // Branchless bitmask: if op_count == 64 we want all 64 bits set.
         // `(1u64 << 64)` wraps to 0 on most platforms; handle via wrapping_shl.
-        let remaining = if op_count == 0 {
-            0u64
-        } else if op_count == 64 {
-            u64::MAX
-        } else {
-            (1u64 << op_count).wrapping_sub(1)
-        };
+        let is_64 = (op_count == 64) as u64;
+        let base_mask = (1u64.wrapping_shl(op_count as u32 & 63)).wrapping_sub(1);
+        let sentinel = 0u64.wrapping_sub(is_64);
+        let remaining = base_mask | sentinel;
         debug_assert_eq!(
             remaining.count_ones() as u8,
             op_count as u8,
@@ -257,8 +274,13 @@ impl ExecutionToken {
             remaining.count_ones(),
             op_count
         );
+        let valid_mask = remaining;
         Self {
             remaining,
+            valid_mask,
+            defect_double_fire: 0,
+            defect_invalid: 0,
+            defect_malformed: 0,
             total: op_count as u8,
             topo_order: [u8::MAX; 64],
             event_count: 0,
@@ -279,33 +301,53 @@ impl ExecutionToken {
     /// `op_bit` must be a single-bit mask (exactly one bit set) corresponding
     /// to the op that just completed.
     ///
-    /// Implemented branchlessly: uses masking to detect double-fires.
+    /// Implemented branchlessly: uses masking to detect double-fires and out-of-bounds fires.
     #[inline]
-    pub fn consume_op(&mut self, op_bit: u64) -> Result<(), ExecutionDefect> {
-        // Branchless double-fire check: if the bit is NOT in remaining, error.
-        let present = self.remaining & op_bit;
-        // `present == 0` → bit was already cleared (double-fire)
-        // `present != 0` → ok, clear it
-        //
-        // We use a branchless approach: compute an error sentinel and use it.
-        let already_consumed = (present == 0) as u64;
-        // Write through regardless; if it was already 0 this is idempotent.
+    pub fn consume_op(&mut self, op_bit: u64) {
+        // 1. Accumulate invalid bit fires (bits outside the valid boundary)
+        let invalid = op_bit & !self.valid_mask;
+        self.defect_invalid |= invalid;
+
+        // 2. Accumulate double-fire defects
+        // If an op is set in op_bit & valid_mask but is NOT in remaining, it was double-fired.
+        let target_valid = op_bit & self.valid_mask;
+        let present = self.remaining & target_valid;
+        let double_fired = target_valid ^ present;
+        self.defect_double_fire |= double_fired;
+
+        // 3. Accumulate malformed fires (zero bits or multi-bit operations)
+        let is_zero = (op_bit == 0) as u64;
+        let is_multi = ((op_bit & op_bit.wrapping_sub(1)) != 0) as u64;
+        let malformed_flag = is_zero | is_multi;
+        
+        // Write through the malformed flag and the offending bits.
+        // We use 0u64.wrapping_sub(malformed_flag) to propagate a full-width mask.
+        let malformed_mask = (op_bit | 0u64.wrapping_sub(is_zero)) & 0u64.wrapping_sub(malformed_flag);
+        self.defect_malformed |= malformed_mask;
+
+        // 4. Update the remaining mask (idempotent write-through)
         self.remaining &= !op_bit;
-        if already_consumed != 0 {
-            Err(ExecutionDefect::OpAlreadyConsumed { bit: op_bit })
-        } else {
-            Ok(())
-        }
     }
 
     /// Assert that all ops have been fired and consume the token.
     ///
-    /// Returns an error if any bits remain set in `remaining`.
+    /// Returns an error if any bits remain set in `remaining` or if any defects occurred.
     pub fn assert_exhausted(self) -> Result<(), ExecutionDefect> {
         let remaining = self.remaining;
+        let defect_malformed = self.defect_malformed;
+        let defect_invalid = self.defect_invalid;
+        let defect_double_fire = self.defect_double_fire;
+        
         // Prevent the destructor bomb from firing — we're consuming intentionally.
         core::mem::forget(self);
-        if remaining != 0 {
+        
+        if defect_malformed != 0 {
+            Err(ExecutionDefect::MalformedFires { bits: defect_malformed })
+        } else if defect_invalid != 0 {
+            Err(ExecutionDefect::InvalidFires { bits: defect_invalid })
+        } else if defect_double_fire != 0 {
+            Err(ExecutionDefect::OpAlreadyConsumed { bit: defect_double_fire })
+        } else if remaining != 0 {
             Err(ExecutionDefect::UnexhaustedOps { remaining })
         } else {
             Ok(())
@@ -492,13 +534,26 @@ impl<Tape: HasPowlTape, const KIND: TopologyKind> PowlRunner<Executing<KIND>, Ta
         self,
         token: ExecutionToken,
     ) -> Result<(PowlRunner<Receipted<KIND>, Tape>, Receipt<KIND>), ExecutionDefect> {
-        let op_trace = !token.remaining() & full_mask(self.tape.op_count());
-        let remaining = token.remaining();
+        let op_trace = !token.remaining & token.valid_mask;
+        let remaining = token.remaining;
         let topo_order = token.topo_order;
         let event_count = token.event_count;
+        let defect_malformed = token.defect_malformed;
+        let defect_invalid = token.defect_invalid;
+        let defect_double_fire = token.defect_double_fire;
+        
         // Consume token without triggering the destructor bomb.
         core::mem::forget(token);
 
+        if defect_malformed != 0 {
+            return Err(ExecutionDefect::MalformedFires { bits: defect_malformed });
+        }
+        if defect_invalid != 0 {
+            return Err(ExecutionDefect::InvalidFires { bits: defect_invalid });
+        }
+        if defect_double_fire != 0 {
+            return Err(ExecutionDefect::OpAlreadyConsumed { bit: defect_double_fire });
+        }
         if remaining != 0 {
             return Err(ExecutionDefect::UnexhaustedOps { remaining });
         }
@@ -677,8 +732,8 @@ mod tests {
         assert_eq!(token.remaining(), 0b11);
 
         // Fire all ops
-        token.consume_op(1 << 0).expect("op 0 fire");
-        token.consume_op(1 << 1).expect("op 1 fire");
+        token.consume_op(1 << 0);
+        token.consume_op(1 << 1);
         assert_eq!(token.remaining(), 0);
 
         // Complete
@@ -694,8 +749,8 @@ mod tests {
         let compiled = PowlRunner::new(tape).validate().unwrap();
         let sched = compiled.schedule::<{ TopologyKind::Priority }>();
         let (exec, mut tok) = sched.begin_execution();
-        tok.consume_op(1).unwrap();
-        tok.consume_op(2).unwrap();
+        tok.consume_op(1);
+        tok.consume_op(2);
         let (_, receipt) = exec.complete(tok).unwrap();
         assert_eq!(receipt.topology, TopologyKind::Priority);
     }
@@ -706,8 +761,8 @@ mod tests {
         let compiled = PowlRunner::new(tape).validate().unwrap();
         let sched = compiled.schedule::<{ TopologyKind::Background }>();
         let (exec, mut tok) = sched.begin_execution();
-        tok.consume_op(1).unwrap();
-        tok.consume_op(2).unwrap();
+        tok.consume_op(1);
+        tok.consume_op(2);
         let (_, receipt) = exec.complete(tok).unwrap();
         assert_eq!(receipt.topology, TopologyKind::Background);
     }
@@ -754,7 +809,7 @@ mod tests {
             .schedule::<{ TopologyKind::Standard }>();
         let (exec, mut tok) = runner.begin_execution();
         // Only fire op 0; leave op 1 unfired.
-        tok.consume_op(1 << 0).unwrap();
+        tok.consume_op(1 << 0);
 
         let err = exec.complete(tok).unwrap_err();
         assert!(matches!(
@@ -766,12 +821,17 @@ mod tests {
     #[test]
     fn double_consume_op_fails() {
         let mut tok = ExecutionToken::new(2);
-        tok.consume_op(1 << 0).unwrap(); // first time: ok
-        let err = tok.consume_op(1 << 0).unwrap_err(); // second time: error
-        assert_eq!(err, ExecutionDefect::OpAlreadyConsumed { bit: 1 });
-        // Clean up to avoid destructor bomb.
-        tok.consume_op(1 << 1).unwrap();
-        tok.assert_exhausted().unwrap();
+        tok.consume_op(1 << 0); // first time: ok
+        tok.consume_op(1 << 0); // second time: double-fire
+        
+        // Assert that the double-fire defect is accumulated.
+        assert_eq!(tok.defect_double_fire, 1 << 0);
+
+        // Clean up other ops to see if assert_exhausted still fails with double-fire.
+        tok.consume_op(1 << 1);
+        
+        let err = tok.assert_exhausted().unwrap_err();
+        assert_eq!(err, ExecutionDefect::OpAlreadyConsumed { bit: 1 << 0 });
     }
 
     #[test]
@@ -785,10 +845,51 @@ mod tests {
     #[test]
     fn assert_exhausted_after_all_consumed_succeeds() {
         let mut tok = ExecutionToken::new(3);
-        tok.consume_op(1 << 0).unwrap();
-        tok.consume_op(1 << 1).unwrap();
-        tok.consume_op(1 << 2).unwrap();
+        tok.consume_op(1 << 0);
+        tok.consume_op(1 << 1);
+        tok.consume_op(1 << 2);
         tok.assert_exhausted().unwrap();
+    }
+
+    #[test]
+    fn invalid_consume_op_fails() {
+        let mut tok = ExecutionToken::new(2); // valid_mask is 0b11
+        tok.consume_op(1 << 2); // out of bounds: bit 2
+        
+        assert_eq!(tok.defect_invalid, 1 << 2);
+        
+        // Clean up valid bits so assert_exhausted runs.
+        tok.consume_op(1 << 0);
+        tok.consume_op(1 << 1);
+        
+        let err = tok.assert_exhausted().unwrap_err();
+        assert_eq!(err, ExecutionDefect::InvalidFires { bits: 1 << 2 });
+    }
+
+    #[test]
+    fn malformed_consume_op_fails() {
+        let mut tok = ExecutionToken::new(2);
+        tok.consume_op(0); // malformed: zero bit
+        assert_eq!(tok.defect_malformed, u64::MAX);
+        
+        // Clean up
+        tok.consume_op(1 << 0);
+        tok.consume_op(1 << 1);
+        
+        let err = tok.assert_exhausted().unwrap_err();
+        assert_eq!(err, ExecutionDefect::MalformedFires { bits: u64::MAX });
+    }
+
+    #[test]
+    fn malformed_multi_bit_consume_op_fails() {
+        let mut tok = ExecutionToken::new(3);
+        tok.consume_op(0b11); // malformed: multi-bit fire (bit 0 and 1)
+        assert_eq!(tok.defect_malformed, 0b11);
+        
+        // Clean up
+        tok.consume_op(1 << 2);
+        let err = tok.assert_exhausted().unwrap_err();
+        assert_eq!(err, ExecutionDefect::MalformedFires { bits: 0b11 });
     }
 
     // -------------------------------------------------------------------------
@@ -832,8 +933,8 @@ mod tests {
             .unwrap()
             .schedule::<{ TopologyKind::LongRunning }>();
         let (exec, mut tok) = runner.begin_execution();
-        tok.consume_op(0b01).unwrap();
-        tok.consume_op(0b10).unwrap();
+        tok.consume_op(0b01);
+        tok.consume_op(0b10);
         let (_, receipt) = exec.complete(tok).unwrap();
         assert_eq!(receipt.op_trace, 0b11);
         assert_eq!(receipt.topology, TopologyKind::LongRunning);
@@ -910,11 +1011,11 @@ mod tests {
 
         // Fire ops 0, 1, 2 in order.
         token.record_fire(0);
-        token.consume_op(1 << 0).unwrap();
+        token.consume_op(1 << 0);
         token.record_fire(1);
-        token.consume_op(1 << 1).unwrap();
+        token.consume_op(1 << 1);
         token.record_fire(2);
-        token.consume_op(1 << 2).unwrap();
+        token.consume_op(1 << 2);
 
         let (_, receipt) = exec.complete(token).unwrap();
         assert_eq!(&receipt.topo_order[..3], &[0u8, 1, 2]);
@@ -940,11 +1041,11 @@ mod tests {
         let (exec, mut token) = runner.begin_execution();
 
         token.record_fire(0);
-        token.consume_op(1 << 0).unwrap();
+        token.consume_op(1 << 0);
         token.record_fire(1);
-        token.consume_op(1 << 1).unwrap();
+        token.consume_op(1 << 1);
         token.record_fire(2);
-        token.consume_op(1 << 2).unwrap();
+        token.consume_op(1 << 2);
 
         let (_, mut receipt) = exec.complete(token).unwrap();
         // Swap step 0 and step 1 — this violates pred constraint (op 1 requires op 0 first).
@@ -966,9 +1067,9 @@ mod tests {
         let (exec, mut token) = runner.begin_execution();
 
         // Record only op 1 (skip op 0), but consume both.
-        token.consume_op(1 << 0).unwrap();
+        token.consume_op(1 << 0);
         token.record_fire(1);
-        token.consume_op(1 << 1).unwrap();
+        token.consume_op(1 << 1);
 
         let (_, mut receipt) = exec.complete(token).unwrap();
         // op_trace has bit 0 set but topo_order doesn't include op 0 → fail.
@@ -999,8 +1100,7 @@ mod tests {
             let mut tok = ExecutionToken::new(64);
             assert_eq!(tok.total(), 64);
             for bit_idx in 0..64u64 {
-                tok.consume_op(1u64 << bit_idx)
-                    .expect("consume_op must not fail");
+                tok.consume_op(1u64 << bit_idx);
             }
             tok.assert_exhausted()
                 .expect("all ops consumed, must be exhausted");
@@ -1010,9 +1110,9 @@ mod tests {
     #[test]
     fn consume_op_wraps_at_bit_63() {
         let mut tok = ExecutionToken::new(64);
-        tok.consume_op(1u64 << 63).unwrap();
+        tok.consume_op(1u64 << 63);
         for i in 0..63u64 {
-            tok.consume_op(1u64 << i).unwrap();
+            tok.consume_op(1u64 << i);
         }
         tok.assert_exhausted().unwrap();
     }
@@ -1057,8 +1157,8 @@ mod tests {
             .unwrap()
             .schedule::<{ TopologyKind::Background }>()
             .begin_execution();
-        tok.consume_op(1 << 0).unwrap();
-        tok.consume_op(1 << 1).unwrap();
+        tok.consume_op(1 << 0);
+        tok.consume_op(1 << 1);
         let (receipted, receipt) = exec.complete(tok).unwrap();
         assert_eq!(receipt.topology, TopologyKind::Background);
         assert_eq!(receipted.run_id(), receipt.run_id);
@@ -1072,8 +1172,8 @@ mod tests {
             .unwrap()
             .schedule::<{ TopologyKind::LongRunning }>()
             .begin_execution();
-        tok.consume_op(1 << 0).unwrap();
-        tok.consume_op(1 << 1).unwrap();
+        tok.consume_op(1 << 0);
+        tok.consume_op(1 << 1);
         let (receipted, receipt) = exec.complete(tok).unwrap();
         assert_eq!(receipted.run_id(), receipt.run_id);
     }

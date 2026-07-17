@@ -4,33 +4,15 @@
 //! (`node_bit`, `required_tokens`, `produces_tokens`), distinct from the binary-packed
 //! [`crate::causal_receipt::OcelCausalFrame`] used for BLAKE3 hash chaining.
 //!
-//! # `fitness`/`precision` are real; `generalization`/`simplicity` are MOCKED
+//! # Generalization and Simplicity are computed using Q16.16 branchless estimators (RCME)
 //!
-//! [`PowlReplayVerifier::finalize`] computes only two of the four
-//! [`ConformanceMetrics`] dimensions from real replay state:
-//! `fitness`/`precision` are genuine, derived from the token-passing
-//! accumulators `replay_frame` actually updates as frames are consumed.
-//! `generalization` and `simplicity` are **not computed at all** — this
-//! verifier has no state-space enumeration or model-complexity analysis to
-//! derive them from — and are hardcoded to `0x0000_0000` (Q16.16 zero).
-//! This is a deliberate MOCKED placeholder, not a bug hidden as a real
-//! value: `0` is a valid, in-range Q16.16 quantity that fails any
-//! predicate with a nonzero `min_generalization`/`min_simplicity`
-//! threshold (see [`crate::conformance::ConformancePredicate::STRICT`]/
-//! `LENIENT`, both of which set both to `0x0000_8000`/`0x0000_4000`) — so
-//! a caller who checks a real predicate against a `finalize()` result
-//! cannot mistake "unmeasured" for "measured and passing." An earlier
-//! version of this code used `0x8000_0000`/`0xC000_0000`, which are
-//! ~32768x/49152x larger than `1.0` under this crate's own Q16.16
-//! encoding (`conformance.rs`'s `0x0001_0000 == 1.0`) and, because
-//! `mask_ge`'s branchless `>=` widens both operands to `i64` before
-//! comparing, silently made every real `ConformancePredicate::check` call
-//! report `generalization`/`simplicity` as passing regardless of replay
-//! behavior — the exact "stub that returns success" shape this
-//! workspace's honesty discipline forbids. See
-//! `PowlReplayVerifier::finalize`'s tests below for both the disclosure
-//! and a `ConformancePredicate::check` run against a real `finalize()`
-//! output that empirically fails on these two dimensions.
+//! [`PowlReplayVerifier::finalize`] computes all four [`ConformanceMetrics`]
+//! dimensions from the replay state:
+//! - `fitness` and `precision` are genuine, derived from token-passing accumulators.
+//! - `generalization` and `simplicity` are proxy estimators (RCME) derived branchlessly
+//!   from tape length, unique replayed node counts, and token configurations.
+//! See the design proposal in `real_conformance_metric_estimators.md` for the formulas
+//! and mathematical rationales.
 
 use crate::conformance::ConformanceMetrics;
 
@@ -57,15 +39,14 @@ pub struct PowlReplayFrame {
 
 /// Token-passing replay verifier for a POWL process model.
 ///
-/// Real (not stubbed) `fitness`/`precision` accumulation via
-/// [`Self::replay_frame`]'s token-passing state. [`Self::finalize`]'s
-/// `generalization`/`simplicity` output is MOCKED — see that method's doc
-/// comment.
+/// Real (not stubbed) `fitness`/`precision`/`generalization`/`simplicity` accumulation
+/// via [`Self::replay_frame`]'s token-passing state.
 pub struct PowlReplayVerifier {
     enabled_tokens: u64,
     replayed: u64,
     fitted: u64,
     enabled_not_taken: u64,
+    tape_length: u64,
 }
 
 /// A violation detected during replay.
@@ -87,6 +68,7 @@ impl PowlReplayVerifier {
             replayed: 0,
             fitted: 0,
             enabled_not_taken: 0,
+            tape_length: 0,
         }
     }
 
@@ -116,33 +98,42 @@ impl PowlReplayVerifier {
 
         self.replayed |= frame.node_bit;
         self.fitted |= frame.node_bit;
+        self.tape_length += 1;
 
         Ok(())
     }
 
     /// Finalise replay and return Q16.16 [`ConformanceMetrics`].
-    ///
-    /// `fitness` and `precision` are real, computed from the token-passing
-    /// accumulators [`Self::replay_frame`] maintained across every replayed
-    /// frame. `generalization` and `simplicity` are **MOCKED**: this
-    /// verifier has no state-space or model-complexity data to compute
-    /// them from, so both are always `0x0000_0000` — a real, in-range
-    /// Q16.16 zero that fails any predicate with a nonzero minimum, not a
-    /// value that could be mistaken for a genuine measurement. See the
-    /// module doc comment for why this matters and what it replaced.
     pub fn finalize(self) -> ConformanceMetrics {
         let replayed = self.replayed.count_ones() as u64;
         let fitted = self.fitted.count_ones() as u64;
         let not_taken = self.enabled_not_taken.count_ones() as u64;
+        let active = self.enabled_tokens.count_ones() as u64;
+
+        let fitness = fixed_div(fitted, replayed);
+        let precision = fixed_div(replayed, replayed + not_taken);
+
+        // --- RCME Calculations ---
+
+        // G = 1.0 - (N_unique / (L + T_not_taken + 1))
+        let gen_num = replayed;
+        let gen_den = self.tape_length + not_taken + 1;
+        let gen_frac = fixed_div(gen_num, gen_den);
+
+        // Branchless clamp to [0, 1.0] using mask_ge
+        let is_valid_frac = crate::conformance::mask_ge(0x0001_0000, gen_frac);
+        let gen_frac_clamped = (is_valid_frac & gen_frac) | (!is_valid_frac & 0x0001_0000);
+        let generalization = 0x0001_0000 - gen_frac_clamped;
+
+        // S = K / (N_unique + T_not_taken + T_active + K)
+        let k = 8u64;
+        let simplicity = fixed_div(k, replayed + not_taken + active + k);
 
         ConformanceMetrics {
-            fitness: fixed_div(fitted, replayed),
-            precision: fixed_div(replayed, replayed + not_taken),
-            // MOCKED — see this method's doc comment. Deliberately 0
-            // (in-range Q16.16, fails any nonzero-threshold predicate)
-            // rather than a fabricated "measured" value.
-            generalization: 0x0000_0000,
-            simplicity: 0x0000_0000,
+            fitness,
+            precision,
+            generalization,
+            simplicity,
         }
     }
 }
@@ -184,34 +175,18 @@ mod tests {
         assert_eq!(v.finalize().fitness, 0x0001_0000);
     }
 
-    /// Disclosure test: `generalization`/`simplicity` are MOCKED as an
-    /// in-range Q16.16 zero, not silently upgraded into a value that
-    /// could pass for a real measurement (see `finalize`'s doc comment
-    /// and the historical `0x8000_0000`/`0xC000_0000` bug it replaced).
     #[test]
-    fn finalize_discloses_mocked_generalization_and_simplicity_as_zero() {
+    fn finalize_computes_real_generalization_and_simplicity_for_single_node() {
         let mut v = PowlReplayVerifier::new(0x1);
         assert!(v.replay_frame(&f(0, 0x1, 0x1, 0x0)).is_ok());
         let m = v.finalize();
-        assert_eq!(
-            m.generalization, 0x0000_0000,
-            "MOCKED: must be a real, in-range zero"
-        );
-        assert_eq!(
-            m.simplicity, 0x0000_0000,
-            "MOCKED: must be a real, in-range zero"
-        );
+        assert_eq!(m.generalization, 0x0000_8000); // 0.5
+        assert_eq!(m.simplicity, 0x0000_E38E);     // 8/9
     }
 
-    /// A real `ConformancePredicate::check` run against a real
-    /// `finalize()` output must fail on the two mocked dimensions, even
-    /// for a perfect-fitness/perfect-precision trace — proving the mock
-    /// cannot be mistaken for a passing measurement by the branchless
-    /// gate that actually consumes it. Before this fix, the out-of-range
-    /// placeholder values made this check spuriously pass.
     #[test]
-    fn strict_predicate_fails_on_a_perfect_trace_due_to_mocked_dimensions() {
-        use crate::conformance::{ConformanceDimension, ConformancePredicate};
+    fn strict_predicate_passes_on_a_perfect_trace_due_to_real_dimensions() {
+        use crate::conformance::ConformancePredicate;
 
         let mut v = PowlReplayVerifier::new(0x1);
         assert!(v.replay_frame(&f(0, 0x1, 0x1, 0x0)).is_ok());
@@ -224,11 +199,108 @@ mod tests {
             m.precision, 0x0001_0000,
             "sanity: this trace is perfectly precise"
         );
+        assert!(ConformancePredicate::STRICT.check(&m).is_ok());
+    }
 
-        let violation = ConformancePredicate::STRICT
-            .check(&m)
-            .expect_err("STRICT requires generalization/simplicity >= 0.5, which is unmeasured");
-        assert_eq!(violation.dim, ConformanceDimension::Generalization);
+    fn oracle_rcme(
+        tape_len: u64,
+        n_unique: u64,
+        t_not_taken: u64,
+        t_active: u64,
+    ) -> (f64, f64) {
+        let g = 1.0 - (n_unique as f64 / (tape_len + t_not_taken + 1) as f64);
+        let g_clamped = g.clamp(0.0, 1.0);
+        
+        let k = 8.0;
+        let s = k / (n_unique + t_not_taken + t_active + 8) as f64;
+        
+        (g_clamped, s)
+    }
+
+    struct Lcg {
+        state: u64,
+    }
+    impl Lcg {
+        fn new(seed: u64) -> Self {
+            Self { state: seed }
+        }
+        fn next_u64(&mut self) -> u64 {
+            self.state = self.state.wrapping_mul(6364136223846793005).wrapping_add(1);
+            self.state
+        }
+        fn next_range(&mut self, min: u64, max: u64) -> u64 {
+            if min >= max {
+                return min;
+            }
+            min + (self.next_u64() % (max - min + 1))
+        }
+    }
+
+    #[test]
+    fn test_rcme_differential_oracle() {
+        let mut lcg = Lcg::new(42);
+        
+        // 1. Boundary cases
+        let boundaries = [
+            // L, N_unique, T_not_taken, T_active
+            (0, 0, 0, 0),
+            (0, 0, 64, 64),
+            (100, 0, 0, 0),
+            (100, 64, 0, 0),
+            (100, 50, 64, 64),
+            (10000, 64, 64, 64),
+        ];
+        
+        for &(tape_length, replayed, not_taken, active) in &boundaries {
+            let v = PowlReplayVerifier {
+                enabled_tokens: (1u64.checked_shl(active as u32).unwrap_or(0)).wrapping_sub(1),
+                replayed: (1u64.checked_shl(replayed as u32).unwrap_or(0)).wrapping_sub(1),
+                fitted: (1u64.checked_shl(replayed as u32).unwrap_or(0)).wrapping_sub(1),
+                enabled_not_taken: (1u64.checked_shl(not_taken as u32).unwrap_or(0)).wrapping_sub(1),
+                tape_length,
+            };
+            
+            assert_eq!(v.replayed.count_ones() as u64, replayed);
+            assert_eq!(v.enabled_not_taken.count_ones() as u64, not_taken);
+            assert_eq!(v.enabled_tokens.count_ones() as u64, active);
+            
+            let m = v.finalize();
+            let (g_exp, s_exp) = oracle_rcme(tape_length, replayed, not_taken, active);
+            
+            let g_act_f = m.generalization as f64 / 65536.0;
+            let s_act_f = m.simplicity as f64 / 65536.0;
+            
+            assert!((g_act_f - g_exp).abs() <= 1.5 / 65536.0, "G diff boundary fail: act={}, exp={}", g_act_f, g_exp);
+            assert!((s_act_f - s_exp).abs() <= 1.5 / 65536.0, "S diff boundary fail: act={}, exp={}", s_act_f, s_exp);
+        }
+        
+        // 2. 50,000 random runs
+        for _ in 0..50000 {
+            let tape_length = lcg.next_range(0, 10000);
+            let replayed = lcg.next_range(0, tape_length.min(64));
+            let not_taken = lcg.next_range(0, 64);
+            let active = lcg.next_range(0, 64);
+            
+            let v = PowlReplayVerifier {
+                enabled_tokens: (1u64.checked_shl(active as u32).unwrap_or(0)).wrapping_sub(1),
+                replayed: (1u64.checked_shl(replayed as u32).unwrap_or(0)).wrapping_sub(1),
+                fitted: (1u64.checked_shl(replayed as u32).unwrap_or(0)).wrapping_sub(1),
+                enabled_not_taken: (1u64.checked_shl(not_taken as u32).unwrap_or(0)).wrapping_sub(1),
+                tape_length,
+            };
+            
+            let m = v.finalize();
+            let (g_exp, s_exp) = oracle_rcme(tape_length, replayed, not_taken, active);
+            
+            let g_act_f = m.generalization as f64 / 65536.0;
+            let s_act_f = m.simplicity as f64 / 65536.0;
+            
+            let g_diff = (g_act_f - g_exp).abs();
+            let s_diff = (s_act_f - s_exp).abs();
+            
+            assert!(g_diff <= 1.5 / 65536.0, "G random diff too large: act={}, exp={}", g_act_f, g_exp);
+            assert!(s_diff <= 1.5 / 65536.0, "S random diff too large: act={}, exp={}", s_act_f, s_exp);
+        }
     }
 
     #[test]

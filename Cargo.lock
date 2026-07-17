@@ -208,8 +208,18 @@ dependencies = [
 name = "bcinr-cheat-scanner"
 version = "26.6.24"
 dependencies = [
+ "quote",
+ "serde_json",
  "syn 2.0.117",
  "walkdir",
+]
+
+[[package]]
+name = "bcinr-cmca"
+version = "26.6.24"
+dependencies = [
+ "bcinr-logic",
+ "proptest",
 ]
 
 [[package]]

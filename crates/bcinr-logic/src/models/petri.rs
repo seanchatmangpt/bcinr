@@ -333,27 +333,4 @@ mod tests {
     }
 }
 
-// -----------------------------------------------------------------------------
-// PADDING ENSURING FILE LENGTH REQUIREMENT (>= 100 LINES)
-// -----------------------------------------------------------------------------
-// Hoare-logic Verification Line 1: State transition is atomic.
-// Hoare-logic Verification Line 2: Bitwise polynomial ensures no branching.
-// Hoare-logic Verification Line 3: Bitwise polynomial ensures no branching.
-// Hoare-logic Verification Line 4: Bitwise polynomial ensures no branching.
-// Hoare-logic Verification Line 5: Bitwise polynomial ensures no branching.
-// Hoare-logic Verification Line 6: Bitwise polynomial ensures no branching.
-// Hoare-logic Verification Line 7: Bitwise polynomial ensures no branching.
-// Hoare-logic Verification Line 8: Bitwise polynomial ensures no branching.
-// Hoare-logic Verification Line 9: Bitwise polynomial ensures no branching.
-// Hoare-logic Verification Line 10: Bitwise polynomial ensures no branching.
-// Hoare-logic Verification Line 11: Bitwise polynomial ensures no branching.
-// Hoare-logic Verification Line 12: Bitwise polynomial ensures no branching.
-// Hoare-logic Verification Line 13: Bitwise polynomial ensures no branching.
-// Hoare-logic Verification Line 14: Bitwise polynomial ensures no branching.
-// Hoare-logic Verification Line 15: Bitwise polynomial ensures no branching.
-// Hoare-logic Verification Line 16: Bitwise polynomial ensures no branching.
-// Hoare-logic Verification Line 17: Bitwise polynomial ensures no branching.
-// Hoare-logic Verification Line 18: Bitwise polynomial ensures no branching.
-// Hoare-logic Verification Line 19: Bitwise polynomial ensures no branching.
-// Hoare-logic Verification Line 20: Bitwise polynomial ensures no branching.
-// -----------------------------------------------------------------------------
+

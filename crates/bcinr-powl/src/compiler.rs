@@ -363,40 +363,71 @@ pub fn check_full_graph_acyclic(tape: &PowlTape) -> Result<(), CompileError> {
     run_kahn_walk(tape, n, in_deg)
 }
 
+/// Validate reachability of all non-LoopRedo nodes from the entry mask.
+///
+/// Returns `!0u64` (success) or `0u64` (unreachable violation).
+#[must_use]
+#[inline(always)]
+pub fn bp_tcrv_validate_reachability(tape: &PowlTape) -> u64 {
+    let mut r = [0u64; 64];
+    let tape_len = tape.len as usize;
+    let entry_mask = tape.entry_mask;
+
+    // Step 1: Initialize the reachability matrix branchlessly.
+    // Fixed loop bound of 64 allows complete compiler unrolling.
+    for i in 0..64 {
+        let in_bounds = (i < tape_len) as u64;
+        let bounds_mask = 0u64.wrapping_sub(in_bounds);
+
+        let succs = tape.ops[i].succ_mask & bounds_mask;
+        r[i] = succs | (1u64 << i);
+    }
+
+    // Step 2: Bit-Parallel Roy-Warshall transitive closure propagation.
+    // 64 iterations, fully deterministic.
+    for k in 0..64 {
+        let r_k = r[k];
+        for i in 0..64 {
+            let can_reach_k = (r[i] >> k) & 1;
+            let mask = 0u64.wrapping_sub(can_reach_k);
+            r[i] |= r_k & mask;
+        }
+    }
+
+    // Step 3: Accumulate reachable set from entry mask branchlessly.
+    let mut reachable_from_entry = 0u64;
+    for i in 0..64 {
+        let is_entry = (entry_mask >> i) & 1;
+        let mask = 0u64.wrapping_sub(is_entry);
+        reachable_from_entry |= r[i] & mask;
+    }
+
+    // Step 4: Construct mask of nodes requiring reachability.
+    let mut must_be_reachable = 0u64;
+    for i in 0..64 {
+        let in_bounds = (i < tape_len) as u64;
+        let is_not_redo = (tape.ops[i].kind != OpKind::LoopRedo) as u64;
+        let active = in_bounds & is_not_redo;
+        let mask = 0u64.wrapping_sub(active);
+        must_be_reachable |= (1u64 << i) & mask;
+    }
+
+    // Step 5: Check for containment violations.
+    let violation = must_be_reachable & !reachable_from_entry;
+    let is_valid = (violation == 0) as u64;
+
+    0u64.wrapping_sub(is_valid)
+}
+
 /// Phase 2 of two-phase Kahn: ensure every non-LoopRedo slot is reachable
 /// from at least one entry (entry_mask bit set or transitively via succ_mask).
 pub fn check_all_ops_reachable(tape: &PowlTape) -> Result<(), CompileError> {
-    let n = tape.len as usize;
-    let mut visited = 0u64;
-    // BFS from each entry slot.
-    let mut queue: Vec<usize> = Vec::new();
-    let mut seeds = tape.entry_mask;
-    while seeds != 0 {
-        let i = seeds.trailing_zeros() as usize;
-        seeds &= seeds - 1;
-        if i < n && visited & (1u64 << i) == 0 {
-            visited |= 1u64 << i;
-            queue.push(i);
-        }
+    let status = bp_tcrv_validate_reachability(tape);
+    if status == !0u64 {
+        Ok(())
+    } else {
+        Err(CompileError::Unreachable)
     }
-    while let Some(u) = queue.pop() {
-        let mut succs = tape.ops[u].succ_mask;
-        while succs != 0 {
-            let v = succs.trailing_zeros() as usize;
-            succs &= succs - 1;
-            if v < n && visited & (1u64 << v) == 0 {
-                visited |= 1u64 << v;
-                queue.push(v);
-            }
-        }
-    }
-    // Every non-LoopRedo slot must be reachable.
-    for i in 0..n {
-        if tape.ops[i].kind != OpKind::LoopRedo && visited & (1u64 << i) == 0 {
-            return Err(CompileError::Unreachable);
-        }
-    }
-    Ok(())
 }
 
 fn kahn_check(tape: &PowlTape) -> Result<(), CompileError> {
@@ -1151,6 +1182,288 @@ mod tests {
         ]);
         let tape = compile_powl(&ast).unwrap();
         assert!(check_all_ops_reachable(&tape).is_ok());
+    }
+
+    struct SimpleRng(u64);
+    impl SimpleRng {
+        fn next_u64(&mut self) -> u64 {
+            let mut x = self.0;
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            self.0 = x;
+            x
+        }
+        fn next_range(&mut self, min: usize, max: usize) -> usize {
+            let diff = max - min + 1;
+            min + (self.next_u64() as usize % diff)
+        }
+    }
+
+    fn oracle_check_reachability(tape: &PowlTape) -> bool {
+        let mut visited = std::collections::HashSet::new();
+        let mut queue = std::collections::VecDeque::new();
+        
+        // Seed queue with entry nodes
+        for i in 0..tape.len {
+            let idx = i as usize;
+            if (tape.entry_mask & (1 << idx)) != 0 {
+                queue.push_back(idx);
+                visited.insert(idx);
+            }
+        }
+        
+        // BFS traversal
+        while let Some(u) = queue.pop_front() {
+            let succs = tape.ops[u].succ_mask;
+            for v in 0..tape.len {
+                let v_idx = v as usize;
+                if (succs & (1 << v_idx)) != 0 && !visited.contains(&v_idx) {
+                    visited.insert(v_idx);
+                    queue.push_back(v_idx);
+                }
+            }
+        }
+        
+        // Verify all active non-LoopRedo nodes are visited
+        for i in 0..tape.len {
+            let idx = i as usize;
+            if tape.ops[idx].kind != OpKind::LoopRedo && !visited.contains(&idx) {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn mutant1_identity_reachability_omission(tape: &PowlTape) -> u64 {
+        let mut r = [0u64; 64];
+        let tape_len = tape.len as usize;
+        let entry_mask = tape.entry_mask;
+
+        // Mutant 1: r[i] = succs; (omits self-reachability | (1u64 << i))
+        for i in 0..64 {
+            let in_bounds = (i < tape_len) as u64;
+            let bounds_mask = 0u64.wrapping_sub(in_bounds);
+            let succs = tape.ops[i].succ_mask & bounds_mask;
+            r[i] = succs; // Mutant 1 omission
+        }
+
+        for k in 0..64 {
+            let r_k = r[k];
+            for i in 0..64 {
+                let can_reach_k = (r[i] >> k) & 1;
+                let mask = 0u64.wrapping_sub(can_reach_k);
+                r[i] |= r_k & mask;
+            }
+        }
+
+        let mut reachable_from_entry = 0u64;
+        for i in 0..64 {
+            let is_entry = (entry_mask >> i) & 1;
+            let mask = 0u64.wrapping_sub(is_entry);
+            reachable_from_entry |= r[i] & mask;
+        }
+
+        let mut must_be_reachable = 0u64;
+        for i in 0..64 {
+            let in_bounds = (i < tape_len) as u64;
+            let is_not_redo = (tape.ops[i].kind != OpKind::LoopRedo) as u64;
+            let active = in_bounds & is_not_redo;
+            let mask = 0u64.wrapping_sub(active);
+            must_be_reachable |= (1u64 << i) & mask;
+        }
+
+        let violation = must_be_reachable & !reachable_from_entry;
+        let is_valid = (violation == 0) as u64;
+        0u64.wrapping_sub(is_valid)
+    }
+
+    fn mutant2_pivot_index_skew(tape: &PowlTape) -> u64 {
+        let mut r = [0u64; 64];
+        let tape_len = tape.len as usize;
+        let entry_mask = tape.entry_mask;
+
+        for i in 0..64 {
+            let in_bounds = (i < tape_len) as u64;
+            let bounds_mask = 0u64.wrapping_sub(in_bounds);
+            let succs = tape.ops[i].succ_mask & bounds_mask;
+            r[i] = succs | (1u64 << i);
+        }
+
+        for k in 0..64 {
+            // Mutant 2: let r_k = r[(k + 1) & 63];
+            let r_k = r[(k + 1) & 63];
+            for i in 0..64 {
+                let can_reach_k = (r[i] >> k) & 1;
+                let mask = 0u64.wrapping_sub(can_reach_k);
+                r[i] |= r_k & mask;
+            }
+        }
+
+        let mut reachable_from_entry = 0u64;
+        for i in 0..64 {
+            let is_entry = (entry_mask >> i) & 1;
+            let mask = 0u64.wrapping_sub(is_entry);
+            reachable_from_entry |= r[i] & mask;
+        }
+
+        let mut must_be_reachable = 0u64;
+        for i in 0..64 {
+            let in_bounds = (i < tape_len) as u64;
+            let is_not_redo = (tape.ops[i].kind != OpKind::LoopRedo) as u64;
+            let active = in_bounds & is_not_redo;
+            let mask = 0u64.wrapping_sub(active);
+            must_be_reachable |= (1u64 << i) & mask;
+        }
+
+        let violation = must_be_reachable & !reachable_from_entry;
+        let is_valid = (violation == 0) as u64;
+        0u64.wrapping_sub(is_valid)
+    }
+
+    fn mutant3_loop_redo_admittance_corruption(tape: &PowlTape) -> u64 {
+        let mut r = [0u64; 64];
+        let tape_len = tape.len as usize;
+        let entry_mask = tape.entry_mask;
+
+        for i in 0..64 {
+            let in_bounds = (i < tape_len) as u64;
+            let bounds_mask = 0u64.wrapping_sub(in_bounds);
+            let succs = tape.ops[i].succ_mask & bounds_mask;
+            r[i] = succs | (1u64 << i);
+        }
+
+        for k in 0..64 {
+            let r_k = r[k];
+            for i in 0..64 {
+                let can_reach_k = (r[i] >> k) & 1;
+                let mask = 0u64.wrapping_sub(can_reach_k);
+                r[i] |= r_k & mask;
+            }
+        }
+
+        let mut reachable_from_entry = 0u64;
+        for i in 0..64 {
+            let is_entry = (entry_mask >> i) & 1;
+            let mask = 0u64.wrapping_sub(is_entry);
+            reachable_from_entry |= r[i] & mask;
+        }
+
+        // Mutant 3: let active = in_bounds; (omits & is_not_redo check)
+        let mut must_be_reachable = 0u64;
+        for i in 0..64 {
+            let in_bounds = (i < tape_len) as u64;
+            let active = in_bounds; // Mutant 3 omission
+            let mask = 0u64.wrapping_sub(active);
+            must_be_reachable |= (1u64 << i) & mask;
+        }
+
+        let violation = must_be_reachable & !reachable_from_entry;
+        let is_valid = (violation == 0) as u64;
+        0u64.wrapping_sub(is_valid)
+    }
+
+    #[test]
+    fn test_bp_tcrv_differential_and_mutants() {
+        use super::bp_tcrv_validate_reachability;
+        use crate::tape::OpKind;
+        let mut rng = SimpleRng(0xACE1);
+        let mut killed_mutant_1 = false;
+        let mut killed_mutant_2 = false;
+        let mut killed_mutant_3 = false;
+
+        for _ in 0..10000 {
+            let mut tape = PowlTape::new();
+            let len = rng.next_range(1, 64);
+            tape.len = len as u8;
+            
+            for i in 0..len {
+                let kind_val = rng.next_range(0, 4);
+                tape.ops[i].kind = match kind_val {
+                    0 => OpKind::Atom,
+                    1 => OpKind::Silent,
+                    2 => OpKind::XorDispatch,
+                    3 => OpKind::Join,
+                    _ => OpKind::LoopRedo,
+                };
+                if rng.next_range(0, 10) == 0 {
+                    tape.ops[i].kind = OpKind::LoopRedo;
+                }
+            }
+            
+            for i in 0..len {
+                let mut succs = 0u64;
+                for j in (i + 1)..len {
+                    if rng.next_range(0, 3) == 0 {
+                        succs |= 1u64 << j;
+                    }
+                }
+                tape.ops[i].succ_mask = succs;
+            }
+            
+            for i in 0..len {
+                if tape.ops[i].kind == OpKind::LoopRedo {
+                    let mut succs = 0u64;
+                    for j in 0..i {
+                        if rng.next_range(0, 3) == 0 {
+                            succs |= 1u64 << j;
+                        }
+                    }
+                    tape.ops[i].succ_mask = succs;
+                }
+            }
+
+            for i in 0..len {
+                let mut preds = 0u64;
+                for j in 0..len {
+                    if (tape.ops[j].succ_mask & (1u64 << i)) != 0 {
+                        preds |= 1u64 << j;
+                    }
+                }
+                tape.ops[i].pred_mask = preds;
+            }
+
+            let mut entry_mask = 0u64;
+            for i in 0..len {
+                if rng.next_range(0, 4) == 0 {
+                    entry_mask |= 1u64 << i;
+                }
+            }
+            if entry_mask == 0 && len > 0 {
+                entry_mask = 1u64 << rng.next_range(0, len - 1);
+            }
+            tape.entry_mask = entry_mask;
+
+            let expected = oracle_check_reachability(&tape);
+            let actual = bp_tcrv_validate_reachability(&tape);
+            
+            assert_eq!(
+                actual == !0u64,
+                expected,
+                "Reachability mismatch on tape with len={}, entry_mask={:#b}",
+                len,
+                entry_mask
+            );
+
+            let m1 = mutant1_identity_reachability_omission(&tape);
+            if (m1 == !0u64) != expected {
+                killed_mutant_1 = true;
+            }
+
+            let m2 = mutant2_pivot_index_skew(&tape);
+            if (m2 == !0u64) != expected {
+                killed_mutant_2 = true;
+            }
+
+            let m3 = mutant3_loop_redo_admittance_corruption(&tape);
+            if (m3 == !0u64) != expected {
+                killed_mutant_3 = true;
+            }
+        }
+
+        assert!(killed_mutant_1, "Mutant 1 (Identity Reachability Omission) survived!");
+        assert!(killed_mutant_2, "Mutant 2 (Pivot index Skew) survived!");
+        assert!(killed_mutant_3, "Mutant 3 (LoopRedo Admittance Corruption) survived!");
     }
 
     #[test]

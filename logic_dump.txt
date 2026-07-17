@@ -1,0 +1,8 @@
+
+target/release/deps/libbcinr_logic-5c0234568b540a5d.rlib(lib.rmeta):	file format mach-o arm64
+
+target/release/deps/libbcinr_logic-5c0234568b540a5d.rlib(lib.rmeta-link):	file format mach-o arm64
+
+target/release/deps/libbcinr_logic-f90b5850306a235d.rlib(lib.rmeta):	file format mach-o arm64
+
+target/release/deps/libbcinr_logic-f90b5850306a235d.rlib(lib.rmeta-link):	file format mach-o arm64

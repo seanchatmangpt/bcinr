@@ -12,3 +12,12 @@ categories = ["development-tools"]
 [dependencies]
 walkdir = "2"
 syn = { version = "2", features = ["full", "visit", "extra-traits"] }
+serde_json = "1.0"
+quote = "1.0"
+
+[[test]]
+name = "test_scanner"
+path = "../../tests/test_scanner.rs"
+
+
+

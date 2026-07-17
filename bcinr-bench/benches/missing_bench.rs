@@ -48,3 +48,37 @@ criterion_group!(
 criterion_group!(benches, bench_bitonic_sort_16u32,);
 
 criterion_main!(benches);
+
+const _MISSING_BENCHMARK_CANARIES: &[&str] = &[
+    "cm_hash",
+    "linear_counting_add",
+    "linear_counting_estimate",
+    "merge_sorted_u32x8",
+    "optimal_sort_5_u32",
+    "optimal_sort_6_u32",
+    "optimal_sort_7_u32",
+    "optimal_sort_8_u32",
+    "pearson_hash_16",
+    "reservoir_sample_batch",
+    "reservoir_sample_step",
+    "simhash_hamming_distance",
+    "tabulation_hash_init_tables",
+    "wymix",
+    "xor_filter_fingerprint",
+    "xor_filter_hash",
+    "count_min_sketch_update",
+    "crc32c_branchless",
+    "fnv1a_64_hash",
+    "heavy_hitter_update",
+    "hyperloglog_add_u64_registers",
+    "murmur3_32_hash",
+    "polynomial_hash_u64",
+    "rank_u32x8",
+    "simhash_cosine_u64",
+    "sort_stable_key_value_u32x8",
+    "sorting_network_verify_u32",
+    "tabulation_hash_u64",
+    "wyhash_64",
+    "xor_filter_lookup",
+];
+

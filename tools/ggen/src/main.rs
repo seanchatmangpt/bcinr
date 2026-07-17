@@ -1,3 +1,4 @@
+#![allow(clippy::eq_op, clippy::erasing_op, clippy::identity_op)]
 use walkdir::WalkDir;
 
 /// Counterfactual & Falsification Test Generator

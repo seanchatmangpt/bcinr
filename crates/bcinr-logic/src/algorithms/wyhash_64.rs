@@ -269,8 +269,8 @@ mod tests {
     #[test]
     fn test_wyhash_64_sixty_four_bytes() {
         let data: [u8; 64] = core::array::from_fn(|i| i as u8);
-        let h = wyhash_64(&data, 0xDEADBEEF);
-        assert_eq!(h, wyhash_64(&data, 0xDEADBEEF));
+        let h = wyhash_64(&data, 0x00000000);
+        assert_eq!(h, wyhash_64(&data, 0x00000000));
     }
 
     #[test]

@@ -1,0 +1,755 @@
+Algorithm/Abstraction                    | Score      | Status
+----------------------------------------------------------------------
+bitset.rs                                | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+ct.rs                                    | 75         | NEEDS WORK ⚠️
+  -> Issues: JCC detected in ct_byte_slice_eq
+dfa.rs                                   | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+exec.rs                                  | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:1)
+fix.rs                                   | 50         | NEEDS WORK ⚠️
+  -> Issues: JCC detected in isqrt_u32, JCC detected in q16_sqrt, JCC detected in q16_log2, Incomplete mutation matrix (M:0, R:0)
+int.rs                                   | 50         | NEEDS WORK ⚠️
+  -> Issues: JCC detected in gcd_u64, JCC detected in lcm_u64, Incomplete mutation matrix (M:3, R:1)
+mask.rs                                  | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:1)
+mem.rs                                   | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:1)
+models.rs                                | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:1)
+network.rs                               | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+parse.rs                                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+reduce.rs                                | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+scan.rs                                  | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+simd.rs                                  | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0)
+simd_dispatch.rs                         | 25         | NEEDS WORK ⚠️
+  -> Issues: JCC detected in pdep_u64, JCC detected in pext_u64, Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
+sketch.rs                                | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:1)
+swar.rs                                  | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+swar_str.rs                              | 25         | NEEDS WORK ⚠️
+  -> Issues: JCC detected in first_byte_position, JCC detected in find_first_byte_in_slice, JCC detected in parse_8_decimal_digits, JCC detected in parse_4_hex_digits, Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
+utf8.rs                                  | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+utils.rs                                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:2)
+autonomic_substrate.rs                   | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:1)
+kernel.rs                                | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:1)
+metric_accumulator.rs                    | 100        | PhD-Verified ✅
+packed_key_table.rs                      | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:1)
+policy_guard.rs                          | 100        | PhD-Verified ✅
+rl_state.rs                              | 100        | PhD-Verified ✅
+autonomic_arena.rs                       | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
+bitonic_pq.rs                            | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
+bloom_scan.rs                            | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0), Under length constraint (97 lines)
+chacha_sponge.rs                         | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
+consensus_bft.rs                         | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
+deterministic_mpmc.rs                    | 25         | NEEDS WORK ⚠️
+  -> Issues: JCC detected in push_t1, JCC detected in pop_t1, Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0)
+hazard_shield.rs                         | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
+hierarchical_time_wheel.rs               | 25         | NEEDS WORK ⚠️
+  -> Issues: JCC detected in schedule, JCC detected in tick, Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
+integrity_receipt.rs                     | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
+matrix_lru.rs                            | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
+policy_dfa.rs                            | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
+radix_trie.rs                            | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
+register_sql.rs                          | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0), Under length constraint (96 lines)
+swar_petri.rs                            | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
+swar_quotient.rs                         | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
+time_wheel.rs                            | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
+wait_free_multicast.rs                   | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
+wcet_fiber.rs                            | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
+aabb_intersect_branchless.rs             | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+abs_diff_i64.rs                          | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+abs_diff_u64.rs                          | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+add_sat_i32.rs                           | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+adler32_branchless.rs                    | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (40 lines)
+aho_corasick_simd_step.rs                | 50         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0), Formal proofs missing
+ascii_to_lowercase_simd.rs               | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+ascii_to_uppercase_simd.rs               | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+avg_ceil_u64.rs                          | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+avg_u64.rs                               | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+base32_encode_rfc4648.rs                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+base64_decode_chunk4.rs                  | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+base64_decode_simd.rs                    | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+base64_encode_simd.rs                    | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+base85_encode_ascii85.rs                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+bclr_u64.rs                              | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+benes_network_u64.rs                     | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+bext_u64.rs                              | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+binary_search_v_u32x4.rs                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+binom_sat_u32.rs                         | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+bit_matrix_transpose_64x64.rs            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+bit_matrix_transpose_8x8.rs              | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+bit_parallel_sort8_u32.rs                | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+bit_permute_identity_64.rs               | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+bit_permute_step_u64.rs                  | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+bit_swap_u64.rs                          | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+bit_vector_compress_elias_fano.rs        | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+bitonic_merge_u64x8.rs                   | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+bitonic_sort_64u32.rs                    | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+bitpacking_decode_u32_k.rs               | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+bitpacking_encode_u32_k.rs               | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+bloom_filter_add_u64.rs                  | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+bloom_filter_graph_visited.rs            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+bloom_filter_intersect.rs                | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+bloom_filter_query_u64.rs                | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+bloom_filter_union.rs                    | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+blsi_u64.rs                              | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+blsmsk_u64.rs                            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+blsr_u64.rs                              | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+bool_slice_from_mask.rs                  | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+branchless_priority_queue_pop.rs         | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+branchless_priority_queue_push.rs        | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+branchless_ring_buffer_mpmc.rs           | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+branchless_signum_i64.rs                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+branchless_stack_spsc.rs                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+branchless_vtable_lookup.rs              | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+bsd_checksum_u16.rs                      | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+bset_u64.rs                              | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+btst_u64.rs                              | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+burrows_wheeler_transform_step.rs        | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+cardinality_linear_counting.rs           | 25         | NEEDS WORK ⚠️
+  -> Issues: JCC detected in linear_counting_add, JCC detected in linear_counting_estimate, Oracle or Boundary tests missing, Incomplete mutation matrix (M:1, R:1)
+cityhash64.rs                            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+clamp_i64.rs                             | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+clamp_slice_branchless.rs                | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+clamped_scaling_u64.rs                   | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+clhash.rs                                | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+clique_check_branchless.rs               | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+clmul_u64.rs                             | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+compress_bits_u64.rs                     | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+consistent_hash_jump_u64.rs              | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+consistent_hash_maglev.rs                | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+content_defined_chunking_branchless.rs   | 50         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0), Formal proofs missing
+convex_hull_monotone_chain_step.rs       | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+copy_sign_i64.rs                         | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+count_consecutive_set_bits_u64.rs        | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (54 lines)
+count_min_sketch_add.rs                  | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+count_min_sketch_query.rs                | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+count_min_sketch_update.rs               | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (54 lines)
+counting_sort_branchless_u8.rs           | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+crc32c_branchless.rs                     | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (72 lines)
+crossbar_permute_u8x16.rs                | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+csv_scan_row_simd.rs                     | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+cubic_interpolate_u32.rs                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+cuckoo_filter_add_u64.rs                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+cyclic_redundancy_check_crc32c.rs        | 50         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0), Formal proofs missing
+cyclic_redundancy_check_crc64.rs         | 50         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0), Formal proofs missing
+delta_decode_simd_u32.rs                 | 100        | PhD-Verified ✅
+delta_encode_simd_u32.rs                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+delta_swap_u64.rs                        | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+dequantize_u32.rs                        | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+disjoint_set_union_branchless.rs         | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+div_sat_u64.rs                           | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+duffs_device_simd_unroll.rs              | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+epoch_based_reclamation_step.rs          | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+equal_range_branchless_u32.rs            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+euclidean_dist_sq_u32x2.rs               | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+exp2_u64_fixed.rs                        | 100        | PhD-Verified ✅
+expand_bits_u64.rs                       | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+factorial_sat_u32.rs                     | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+farmhash64.rs                            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+fast_inverse_sqrt_u32.rs                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+fibonacci_hash_u64.rs                    | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+find_first_of_branchless.rs              | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+find_last_of_branchless.rs               | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+find_nth_set_bit_u128.rs                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+fixed_point_log2.rs                      | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+fletcher32_branchless.rs                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+fnv1a_64_hash.rs                         | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (64 lines)
+fp_atan2_u32_q16.rs                      | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+fp_div_u32_q16.rs                        | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+fp_mul_u32_q16.rs                        | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+fp_sin_u32_q16.rs                        | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0), Formal proofs missing, Under length constraint (36 lines)
+fp_sqrt_u32_q16.rs                       | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (53 lines)
+frustum_culling_branchless.rs            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+funnel_shift_left_u64.rs                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+funnel_shift_right_u64.rs                | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+gather_bits_u64.rs                       | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (49 lines)
+gaussian_noise_box_muller.rs             | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+gcd_u64_branchless.rs                    | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0), Formal proofs missing, Under length constraint (69 lines)
+get_mask_boundary_high_u64.rs            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+get_mask_boundary_low_u64.rs             | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+graph_bfs_simd_step.rs                   | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+graph_dfs_bit_parallel.rs                | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+gray_decode_u64.rs                       | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+gray_encode_u64.rs                       | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+green_sorting_network_16.rs              | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+halton_sampler_simd.rs                   | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+hamming_dist_simd.rs                     | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+hashing_trick_u64.rs                     | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+hazard_pointer_retire.rs                 | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (59 lines)
+heavy_hitter_update.rs                   | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (62 lines)
+heavy_keepers_add.rs                     | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+hex_decode_simd.rs                       | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+hex_encode_chunk8.rs                     | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+hex_encode_simd.rs                       | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+highwayhash_64.rs                        | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+hilbert_curve_decode_u32.rs              | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+hilbert_curve_encode_u32.rs              | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+huffman_decode_table_step.rs             | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+hyperloglog_add_u64.rs                   | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+hyperloglog_add_u64_registers.rs         | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (53 lines)
+hyperloglog_merge.rs                     | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+insertion_sort_branchless_fixed.rs       | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+internet_checksum_u16.rs                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+inverse_permute_u32x8.rs                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+is_alphanumeric_simd_u8x16.rs            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+is_contiguous_mask_u64.rs                | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+is_digit_simd_u8x16.rs                   | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+is_finite_fp32_branchless.rs             | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+is_nan_fp32_branchless.rs                | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+is_permutation_branchless.rs             | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (80 lines)
+is_prime_u64_branchless.rs               | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+is_sorted_branchless_u32.rs              | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+is_space_simd_u8x16.rs                   | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+is_subset_mask_u64.rs                    | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+jaro_winkler_branchless.rs               | 0          | NEEDS WORK ⚠️
+  -> Issues: JCC detected in jaro_winkler_branchless, Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0), Formal proofs missing, Under length constraint (58 lines)
+json_find_string_escapes_simd.rs         | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+json_find_structural_simd.rs             | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+k_independent_hash_gen.rs                | 50         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0), Formal proofs missing
+knuth_hash_u64.rs                        | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+lcm_u64_branchless.rs                    | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (51 lines)
+lcp_array_step_branchless.rs             | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0), Formal proofs missing, Under length constraint (36 lines)
+leaky_relu_u32.rs                        | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+leb128_decode_u64.rs                     | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:0, R:0)
+leb128_encode_u64.rs                     | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+lerp_sat_u32.rs                          | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+lerp_sat_u8.rs                           | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+levenshtein_dist_branchless.rs           | 0          | NEEDS WORK ⚠️
+  -> Issues: JCC detected in levenshtein_dist_branchless, Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0), Formal proofs missing, Under length constraint (71 lines)
+lex_compare_u8_slices_branchless.rs      | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+linear_congruential_generator_u64.rs     | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+linear_search_simd_u8.rs                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+locality_sensitive_hash_cosine.rs        | 50         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0), Formal proofs missing
+locality_sensitive_hash_euclidean.rs     | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+lockfree_skip_list_step.rs               | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+log2_u64_fixed.rs                        | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+lower_bound_branchless_u32.rs            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+manhattan_dist_u32x2.rs                  | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+mask_from_bool_slice.rs                  | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+mask_range_u64.rs                        | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+mask_xor_reduce_u64.rs                   | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+matrix_mul_simd_f32.rs                   | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+matrix_transpose_simd_f32.rs             | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+max_element_branchless_u32.rs            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+max_flow_edmonds_karp_step.rs            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+median3_u32.rs                           | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+median5_u32.rs                           | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+median9_u32.rs                           | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+merge_sorted_u32x8.rs                    | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
+merge_u32_slices_branchless.rs           | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Under length constraint (54 lines)
+mersenne_twister_step_simd.rs            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+metaphone_encode_branchless.rs           | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+metrohash64.rs                           | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+min_element_branchless_u32.rs            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+minhash_u64_k.rs                         | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+minimum_spanning_tree_prim_step.rs       | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+minmax_element_branchless_u32.rs         | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+mismatch_branchless_u8.rs                | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+misra_gries_add.rs                       | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+modular_add_u64.rs                       | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+modular_mul_u64.rs                       | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+modular_sub_u64.rs                       | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+morton_decode_2d_u32.rs                  | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+morton_encode_2d_u32.rs                  | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+morton_encode_3d_u32.rs                  | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+move_to_front_branchless.rs              | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+mul_sat_i32.rs                           | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+mul_sat_u64.rs                           | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:0, R:0)
+murmur3_32_hash.rs                       | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (84 lines)
+murmur3_x64_128.rs                       | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+next_combination_u64.rs                  | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+next_lexicographic_permutation_u64.rs    | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+norm_u32.rs                              | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (38 lines)
+normalize_slice_branchless.rs            | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (49 lines)
+nth_element_branchless.rs                | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (59 lines)
+octree_insert_branchless.rs              | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+odd_even_merge_sort_16u32.rs             | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+optimal_sort_5_u32.rs                    | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
+optimal_sort_6_u32.rs                    | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
+optimal_sort_7_u32.rs                    | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
+optimal_sort_8_u32.rs                    | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
+page_rank_simd_step.rs                   | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+parallel_bits_deposit_u64.rs             | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Under length constraint (76 lines)
+parallel_bits_extract_u64.rs             | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Under length constraint (76 lines)
+parity_check_u128.rs                     | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+partial_sort_branchless_k.rs             | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+pcg_random_u64.rs                        | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+pearson_hash_16.rs                       | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0)
+pearson_hash_u8.rs                       | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:0, R:0)
+perfect_hash_build_static.rs             | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+perfect_hash_lookup_u32.rs               | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+permute_u32x8.rs                         | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+point_in_polygon_branchless.rs           | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+poisson_noise_branchless.rs              | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+polynomial_hash_u64.rs                   | 25         | NEEDS WORK ⚠️
+  -> Issues: JCC detected in polynomial_hash_u64, Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0)
+popcount_u128.rs                         | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+pow_sat_u64.rs                           | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+prefix_sum_simd_u32x8.rs                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+punycode_encode_branchless.rs            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+quadtree_insert_branchless.rs            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+quantize_u32.rs                          | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+quaternion_mul_branchless.rs             | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+radix_sort_step_branchless.rs            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+random_permutation_fixed_seed.rs         | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+rank_select_dictionary_rrr.rs            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+rank_select_sort_u32.rs                  | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+rank_u128.rs                             | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Under length constraint (55 lines)
+rank_u32x8.rs                            | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Under length constraint (55 lines)
+ray_sphere_intersect_branchless.rs       | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+ray_triangle_intersect_branchless.rs     | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+regex_nfa_simd_step.rs                   | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+relu_u32.rs                              | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+reservoir_sample_branchless.rs           | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+reservoir_sample_simd.rs                 | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Under length constraint (50 lines)
+reservoir_sample_weighted_simd.rs        | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+reverse_bits_u128.rs                     | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+reverse_slice_branchless.rs              | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+rolling_hash_buzhash.rs                  | 50         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0), Formal proofs missing
+rolling_hash_gear.rs                     | 50         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0), Formal proofs missing
+rolling_hash_rabin_karp.rs               | 50         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0), Formal proofs missing
+rotate_left_u64.rs                       | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+rotate_right_u64.rs                      | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+rotate_slice_branchless.rs               | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+round_down_u32.rs                        | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+round_to_nearest_u32.rs                  | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+round_up_u32.rs                          | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+scatter_bits_u64.rs                      | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Under length constraint (60 lines)
+search_eytzinger_u32.rs                  | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+search_van_emde_boas.rs                  | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+select_u128.rs                           | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+set_difference_branchless.rs             | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+set_intersection_branchless.rs           | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+set_symmetric_difference_branchless.rs   | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+set_union_branchless.rs                  | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+shear_sort_bitonic_2d.rs                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+shortest_path_bellman_ford_branchless.rs | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+shuffle_fisher_yates_branchless.rs       | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+sigmoid_sat_u32.rs                       | 75         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing
+simd_memchr_u8x16.rs                     | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+simd_memrchr_u8x16.rs                    | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+simd_strstr_branchless.rs                | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0), Formal proofs missing, Under length constraint (37 lines)
+simhash_cosine_u64.rs                    | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:1, R:1)
+siphash_2_4_branchless.rs                | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+smoothstep_u32.rs                        | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+softmax_u32x4.rs                         | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+sort_index_u32x8.rs                      | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+sort_pairs_u32x4.rs                      | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+sort_stable_key_value_u32x8.rs           | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (69 lines)
+sorting_network_verify_u32.rs            | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (58 lines)
+soundex_encode_branchless.rs             | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+space_saving_add.rs                      | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+spatial_hash_u32.rs                      | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+split_lines_simd.rs                      | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+splitmix64_u64.rs                        | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+spookyhash_v2_128.rs                     | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+stable_partition_branchless.rs           | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+sub_sat_i32.rs                           | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+succinct_bit_vector_rank.rs              | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+succinct_bit_vector_select.rs            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+suffix_array_step_branchless.rs          | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+suffix_sum_simd_u32x8.rs                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+t1mskc_u64.rs                            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+t_digest_add_u32.rs                      | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+tabulation_hash_u64.rs                   | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (62 lines)
+top_k_u32x16.rs                          | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+topological_sort_step_branchless.rs      | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+triangle_count_bitset.rs                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+trim_whitespace_branchless.rs            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+tzmsk_u64.rs                             | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0)
+unique_branchless_u32.rs                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+unrolled_binary_search_u32.rs            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+upper_bound_branchless_u32.rs            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+url_decode_branchless.rs                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+url_encode_branchless.rs                 | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+utf16_to_utf8_simd.rs                    | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+utf8_to_utf16_simd.rs                    | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+utf8_to_utf32_simd.rs                    | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+utf8_validate_chunk8.rs                  | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+varint_decode_simd.rs                    | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+varint_encode_simd.rs                    | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+vector_cross_product_f32.rs              | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+vector_dot_product_simd_f32.rs           | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+waitfree_queue_push.rs                   | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+wavelet_tree_access_branchless.rs        | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+weight_u64.rs                            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+weighted_avg_u32.rs                      | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+weighted_reservoir_sample.rs             | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+wildcard_match_branchless.rs             | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+wyhash_64.rs                             | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (57 lines)
+xor_filter_lookup.rs                     | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (57 lines)
+xoroshiro128_plus.rs                     | 25         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (78 lines)
+xxh3_64.rs                               | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+xxhash64.rs                              | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+z_order_curve_2d_u32.rs                  | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+zigzag_decode_i64.rs                     | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+zigzag_encode_i64.rs                     | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+zobrist_hash_64.rs                       | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+dense_kernel.rs                          | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:0)
+petri.rs                                 | 50         | NEEDS WORK ⚠️
+  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0)
+vision_2030.rs                           | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:1)
+bump_arena.rs                            | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:1)
+epoch_reclamation.rs                     | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:1)
+lock_free_slab.rs                        | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:1)
+resumable_fiber.rs                       | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:1)
+spsc_ring_buffer.rs                      | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:1)
+utf8_classifier.rs                       | 75         | NEEDS WORK ⚠️
+  -> Issues: Incomplete mutation matrix (M:3, R:1)

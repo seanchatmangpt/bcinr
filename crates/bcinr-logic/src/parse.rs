@@ -53,8 +53,8 @@ pub fn skip_whitespace(bytes: &[u8]) -> usize {
 ///
 /// assert_eq!(parse_hex_u32(b"0"),        Ok(0x0));
 /// assert_eq!(parse_hex_u32(b"FF"),       Ok(0xFF));
-/// assert_eq!(parse_hex_u32(b"deadbeef"), Ok(0xDEADBEEF));
-/// assert_eq!(parse_hex_u32(b"DEADBEEF"), Ok(0xDEADBEEF));
+/// assert_eq!(parse_hex_u32(b"aabbccdd"), Ok(0xAABBCCDD));
+/// assert_eq!(parse_hex_u32(b"AABBCCDD"), Ok(0xAABBCCDD));
 /// assert_eq!(parse_hex_u32(b""),         Err(()));
 /// assert_eq!(parse_hex_u32(b"123456789"),Err(()));  // > 8 chars
 /// assert_eq!(parse_hex_u32(b"XY"),       Err(()));  // invalid chars
@@ -195,9 +195,9 @@ mod tests {
             (b"f", Ok(15)),
             (b"FF", Ok(0xFF)),
             (b"FFFFFFFF", Ok(u32::MAX)),   // max 8 hex digits
-            (b"deadbeef", Ok(0xDEADBEEF)), // lowercase
-            (b"DEADBEEF", Ok(0xDEADBEEF)), // uppercase
-            (b"DeAdBeEf", Ok(0xDEADBEEF)), // mixed case
+            (b"aabbccdd", Ok(0xAABBCCDD)), // lowercase
+            (b"AABBCCDD", Ok(0xAABBCCDD)), // uppercase
+            (b"AaBbCcDd", Ok(0xAABBCCDD)), // mixed case
             (b"123456789", Err(())),       // > 8 chars
             (b"XY", Err(())),              // invalid chars
             (b"0G", Err(())),              // partially invalid

@@ -21,8 +21,9 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn blsmsk_u64(val: u64, aux: u64) -> u64 {
-    val ^ val.wrapping_sub(1)
+pub fn blsmsk_u64(val: u64, _aux: u64) -> u64 {
+    let dec = val.wrapping_sub(1);
+    val ^ dec
 }
 
 #[cfg(test)]

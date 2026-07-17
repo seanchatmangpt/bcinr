@@ -1,0 +1,4 @@
+
+target/release/libbcinr_cmca.rlib(lib.rmeta):	file format mach-o arm64
+
+target/release/libbcinr_cmca.rlib(lib.rmeta-link):	file format mach-o arm64

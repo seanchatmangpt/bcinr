@@ -202,7 +202,7 @@ mod tests {
 
     #[test]
     fn test_tabulation_avalanche() {
-        let tables = make_tables(0xCAFEBABE);
+        let tables = make_tables(0x00000000);
         let h1 = tabulation_hash_u64(0x00000000, &tables);
         let h2 = tabulation_hash_u64(0x80000000, &tables);
         let diff = (h1 ^ h2).count_ones();

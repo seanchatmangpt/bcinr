@@ -1,9 +1,8 @@
-//! admit — O(1) phase admission via branchless LUT dispatch.
+//! admit — O(1) phase admission via branchless DPAG.
 //!
 //! [`admit`] maps an [`AdmissionContext`] bitfield to a [`ProcessTopology`]
-//! without any runtime branches. The 8-bit LUT key is derived from the context
-//! word in a single shift/mask operation; the LUT itself is built at compile
-//! time via a `const fn`.
+//! without any runtime branches. It uses dynamic thresholds and sign-mask
+//! multiplexers to route topologies dynamically.
 //!
 //! # AdmissionContext bit layout
 //!
@@ -17,7 +16,9 @@
 
 #![forbid(unsafe_code)]
 
-/// Packed admission context word.  See module-level docs for bit layout.
+use core::sync::atomic::{AtomicU64, Ordering};
+
+/// Packed admission context word. See module-level docs for bit layout.
 pub type AdmissionContext = u64;
 
 /// Routing topology assigned to an admitted process.
@@ -38,103 +39,129 @@ pub enum ProcessTopology {
     Quarantine = 3,
 }
 
+/// Runtime admission thresholds adjusted dynamically by the autonomic MAPE-K loop.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AdmissionParameters {
+    /// Load level above which all processes are routed to Quarantine (0..15).
+    pub load_saturation_threshold: u64,
+    /// Minimum urgency required to enter the Priority lane (0..15).
+    pub urgency_priority_threshold: u64,
+    /// Minimum tenant class required to enter the Priority lane (0..3).
+    pub tenant_class_priority_min: u64,
+    /// Minimum tenant class required to enter the Standard lane (0..3).
+    pub tenant_class_standard_min: u64,
+    /// 1 if SLA token is strictly required for the Priority lane; 0 otherwise.
+    pub sla_required: u64,
+}
+
+/// Thread-safe atomic wrapper for AdmissionParameters.
+pub struct AtomicAdmissionParameters {
+    pub load_saturation_threshold: AtomicU64,
+    pub urgency_priority_threshold: AtomicU64,
+    pub tenant_class_priority_min: AtomicU64,
+    pub tenant_class_standard_min: AtomicU64,
+    pub sla_required: AtomicU64,
+}
+
+impl AtomicAdmissionParameters {
+    /// Create a new AtomicAdmissionParameters initialized with default values.
+    pub const fn new(default: AdmissionParameters) -> Self {
+        Self {
+            load_saturation_threshold: AtomicU64::new(default.load_saturation_threshold),
+            urgency_priority_threshold: AtomicU64::new(default.urgency_priority_threshold),
+            tenant_class_priority_min: AtomicU64::new(default.tenant_class_priority_min),
+            tenant_class_standard_min: AtomicU64::new(default.tenant_class_standard_min),
+            sla_required: AtomicU64::new(default.sla_required),
+        }
+    }
+
+    /// Atomically load the parameter set.
+    pub fn load(&self) -> AdmissionParameters {
+        AdmissionParameters {
+            load_saturation_threshold: self.load_saturation_threshold.load(Ordering::Acquire),
+            urgency_priority_threshold: self.urgency_priority_threshold.load(Ordering::Acquire),
+            tenant_class_priority_min: self.tenant_class_priority_min.load(Ordering::Acquire),
+            tenant_class_standard_min: self.tenant_class_standard_min.load(Ordering::Acquire),
+            sla_required: self.sla_required.load(Ordering::Acquire),
+        }
+    }
+
+    /// Atomically store the parameter set.
+    pub fn store(&self, params: AdmissionParameters) {
+        self.load_saturation_threshold.store(params.load_saturation_threshold, Ordering::Release);
+        self.urgency_priority_threshold.store(params.urgency_priority_threshold, Ordering::Release);
+        self.tenant_class_priority_min.store(params.tenant_class_priority_min, Ordering::Release);
+        self.tenant_class_standard_min.store(params.tenant_class_standard_min, Ordering::Release);
+        self.sla_required.store(params.sla_required, Ordering::Release);
+    }
+}
+
+/// Default admission parameters matching the behavior of the legacy static LUT.
+pub const DEFAULT_PARAMETERS: AdmissionParameters = AdmissionParameters {
+    load_saturation_threshold: 15,
+    urgency_priority_threshold: 8,
+    tenant_class_priority_min: 2,
+    tenant_class_standard_min: 1,
+    sla_required: 1,
+};
+
+/// Global static admission parameters, initialized to DEFAULT_PARAMETERS.
+pub static GLOBAL_ADMISSION_PARAMETERS: AtomicAdmissionParameters =
+    AtomicAdmissionParameters::new(DEFAULT_PARAMETERS);
+
 // ---------------------------------------------------------------------------
-// LUT key extraction helpers (const-friendly)
+// Field extraction helpers (const-friendly)
 // ---------------------------------------------------------------------------
 
 /// Extract `tenant_class` from bits [0..3].
 #[inline(always)]
-const fn tenant_class(ctx: u64) -> u8 {
+pub const fn tenant_class(ctx: u64) -> u8 {
     (ctx & 0xF) as u8
 }
 
 /// Extract `urgency_tier` from bits [4..7].
 #[inline(always)]
-const fn urgency_tier(ctx: u64) -> u8 {
+pub const fn urgency_tier(ctx: u64) -> u8 {
     ((ctx >> 4) & 0xF) as u8
 }
 
 /// Extract `resource_load` from bits [8..11].
 #[inline(always)]
-const fn resource_load(ctx: u64) -> u8 {
+pub const fn resource_load(ctx: u64) -> u8 {
     ((ctx >> 8) & 0xF) as u8
 }
 
 /// Extract `has_sla_token` from bit [12].
 #[inline(always)]
-const fn has_sla_token(ctx: u64) -> u8 {
+pub const fn has_sla_token(ctx: u64) -> u8 {
     ((ctx >> 12) & 0x1) as u8
 }
 
-/// Build the 8-bit LUT key used to index [`TOPOLOGY_LUT`].
-///
-/// Key layout (8 bits):
-/// - bit 7: resource_load == 15 (saturated)
-/// - bits 6..5: tenant_class (0..3, clamped to 2 bits)
-/// - bit 4: has_sla_token
-/// - bits 3..0: urgency_tier >> 1  (8 urgency buckets, values 0–7, each spanning 2 tiers)
-///
-/// This encoding collapses the full context into 256 entries while preserving
-/// all policy-relevant distinctions.
+// ---------------------------------------------------------------------------
+// Branchless primitives
+// ---------------------------------------------------------------------------
+
+/// Returns `!0` (all bits set) if `x >= y`, and `0` if `x < y`.
+/// Inputs should be within bounded range to prevent signed overflow.
 #[inline(always)]
-const fn lut_key(ctx: u64) -> u8 {
-    let saturated = ((resource_load(ctx) == 15) as u8) << 7;
-    let tc = (tenant_class(ctx) & 0x3) << 5;
-    let sla = has_sla_token(ctx) << 4;
-    let urg = (urgency_tier(ctx) >> 1) & 0xF;
-    saturated | tc | sla | urg
+pub const fn ge_mask(x: u64, y: u64) -> u64 {
+    let diff = (y as i64).wrapping_sub(x as i64).wrapping_sub(1);
+    (diff >> 63) as u64
+}
+
+/// Branchless multiplexer selector.
+#[inline(always)]
+pub const fn select(mask: u64, active: u64, fallback: u64) -> u64 {
+    (mask & active) | (!mask & fallback)
 }
 
 // ---------------------------------------------------------------------------
-// Compile-time LUT construction
+// Public admission functions
 // ---------------------------------------------------------------------------
 
-/// The admission LUT — 256 entries, one per possible 8-bit LUT key.
-pub static TOPOLOGY_LUT: [ProcessTopology; 256] = build_topology_lut();
-
-/// Build the 256-entry topology LUT at compile time.
+/// Admit a process context to its routing topology using the global thresholds.
 ///
-/// Policy rules (evaluated in priority order):
-/// 1. resource_load == 15 (bit 7 set)  → Quarantine, unconditionally.
-/// 2. tenant_class >= 2 (enterprise/sovereign) AND has_sla_token AND urgency >= 8
-///    → Priority.
-/// 3. tenant_class >= 1 (standard/enterprise/sovereign)                → Standard.
-/// 4. Otherwise                                                         → Background.
-const fn build_topology_lut() -> [ProcessTopology; 256] {
-    let mut lut = [ProcessTopology::Background; 256];
-    let mut key: usize = 0;
-    while key < 256 {
-        let k = key as u8;
-        let saturated = (k >> 7) & 1;
-        let tc = (k >> 5) & 0x3;
-        let sla = (k >> 4) & 0x1;
-        let urg_bucket = k & 0xF; // urgency_tier >> 1; 4 means original tier >= 8
-
-        lut[key] = if saturated == 1 {
-            ProcessTopology::Quarantine
-        } else if tc >= 2 && sla == 1 && urg_bucket >= 4 {
-            // enterprise or sovereign + SLA token + urgency_tier >= 8
-            ProcessTopology::Priority
-        } else if tc >= 1 {
-            ProcessTopology::Standard
-        } else {
-            ProcessTopology::Background
-        };
-
-        key += 1;
-    }
-    lut
-}
-
-// ---------------------------------------------------------------------------
-// Public admission function
-// ---------------------------------------------------------------------------
-
-/// Admit a process context to its routing topology.
-///
-/// This function is `O(1)` and branch-free at runtime: it reduces the
-/// [`AdmissionContext`] word to an 8-bit key and performs a single array
-/// index into [`TOPOLOGY_LUT`].
+/// This function is `O(1)` and branch-free at runtime.
 ///
 /// # Examples
 ///
@@ -147,7 +174,58 @@ const fn build_topology_lut() -> [ProcessTopology; 256] {
 /// ```
 #[inline(always)]
 pub fn admit(ctx: AdmissionContext) -> ProcessTopology {
-    TOPOLOGY_LUT[lut_key(ctx) as usize]
+    admit_dpag(ctx, &GLOBAL_ADMISSION_PARAMETERS.load())
+}
+
+/// Admit a process context dynamically and branchlessly based on runtime parameters.
+///
+/// This implementation guarantees CC=1, 0 heap allocations, and zero branching.
+pub fn admit_dpag(ctx: AdmissionContext, params: &AdmissionParameters) -> ProcessTopology {
+    // Extract fields
+    let c = (ctx & 0xF) as u64;
+    let u = ((ctx >> 4) & 0xF) as u64;
+    let l = ((ctx >> 8) & 0xF) as u64;
+    let s = ((ctx >> 12) & 0x1) as u64;
+
+    // 1. Quarantine evaluation: load >= load_saturation_threshold
+    let q_mask = ge_mask(l, params.load_saturation_threshold);
+
+    // 2. Priority evaluation: tc >= tc_priority_min && urgency >= urgency_priority_threshold && sla_ok
+    let tc_pri_ok = ge_mask(c, params.tenant_class_priority_min);
+    let urg_ok = ge_mask(u, params.urgency_priority_threshold);
+    
+    // SLA token check: if sla_required is active, has_sla_token must be 1.
+    // Bitwise equivalent: (!sla_required_mask) | has_sla_token_mask
+    let sla_req_mask = 0u64.wrapping_sub(params.sla_required);
+    let sla_has_mask = 0u64.wrapping_sub(s);
+    let sla_ok = (!sla_req_mask) | sla_has_mask;
+
+    let p_mask = tc_pri_ok & urg_ok & sla_ok;
+
+    // 3. Standard evaluation: tc >= tenant_class_standard_min
+    let s_mask = ge_mask(c, params.tenant_class_standard_min);
+
+    // Discriminant constants mapping directly to enum discriminants
+    let topo_q = ProcessTopology::Quarantine as u64;   // 3
+    let topo_p = ProcessTopology::Priority as u64;     // 0
+    let topo_s = ProcessTopology::Standard as u64;     // 1
+    let topo_bg = ProcessTopology::Background as u64;   // 2
+
+    // Apply sequential sign-mask multiplexing (simulating an if-else chain)
+    let v1 = select(s_mask, topo_s, topo_bg);
+    let v2 = select(p_mask, topo_p, v1);
+    let v_final = select(q_mask, topo_q, v2);
+
+    // Map discriminant back to the ProcessTopology enum branchlessly.
+    // Avoids branch-bearing match statements by indexing a tiny stack array.
+    const TOPOLOGIES: [ProcessTopology; 4] = [
+        ProcessTopology::Priority,
+        ProcessTopology::Standard,
+        ProcessTopology::Background,
+        ProcessTopology::Quarantine,
+    ];
+
+    TOPOLOGIES[(v_final & 3) as usize]
 }
 
 // ---------------------------------------------------------------------------
@@ -157,6 +235,12 @@ pub fn admit(ctx: AdmissionContext) -> ProcessTopology {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Typed refusal codes for contract verification in tests.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum StabilityRefusal {
+        ContractViolation,
+    }
 
     /// Construct an AdmissionContext from its fields.
     const fn make_ctx(
@@ -173,9 +257,29 @@ mod tests {
             | ((is_compensating & 0x1) << 15)
     }
 
+    /// Independent branching reference oracle.
+    fn oracle_admit(ctx: AdmissionContext, params: &AdmissionParameters) -> ProcessTopology {
+        let c = (ctx & 0xF) as u64;
+        let u = ((ctx >> 4) & 0xF) as u64;
+        let l = ((ctx >> 8) & 0xF) as u64;
+        let s = ((ctx >> 12) & 0x1) as u64;
+
+        if l >= params.load_saturation_threshold {
+            ProcessTopology::Quarantine
+        } else if c >= params.tenant_class_priority_min
+            && s >= params.sla_required
+            && u >= params.urgency_priority_threshold
+        {
+            ProcessTopology::Priority
+        } else if c >= params.tenant_class_standard_min {
+            ProcessTopology::Standard
+        } else {
+            ProcessTopology::Background
+        }
+    }
+
     #[test]
     fn enterprise_with_sla_is_priority() {
-        // tenant_class=2 (enterprise), urgency=12, load=0, sla=1
         let ctx = make_ctx(2, 12, 0, 1, 0);
         assert_eq!(admit(ctx), ProcessTopology::Priority);
     }
@@ -188,8 +292,6 @@ mod tests {
 
     #[test]
     fn resource_load_15_is_quarantine() {
-        // Even an enterprise+SLA+high-urgency context must be quarantined when
-        // resource_load is fully saturated.
         let ctx = make_ctx(2, 12, 15, 1, 0);
         assert_eq!(admit(ctx), ProcessTopology::Quarantine);
     }
@@ -214,7 +316,6 @@ mod tests {
 
     #[test]
     fn enterprise_with_sla_low_urgency_is_standard() {
-        // urgency_tier=6 → urg_bucket=3 < 4, so not Priority
         let ctx = make_ctx(2, 6, 0, 1, 0);
         assert_eq!(admit(ctx), ProcessTopology::Standard);
     }
@@ -226,13 +327,228 @@ mod tests {
     }
 
     #[test]
-    fn lut_has_no_uninitialised_gaps() {
-        // Smoke test: every entry is a valid discriminant (the compiler
-        // enforces this via the enum repr, but we verify the cast round-trips).
-        for entry in TOPOLOGY_LUT.iter() {
-            let disc = *entry as u8;
-            assert!(disc <= 3, "invalid topology discriminant {disc}");
+    fn exhaustive_differential_testing() {
+        // We select representative parameter sets to cover boundary values and transitions.
+        let load_saturation_vals = [0, 1, 7, 14, 15];
+        let urgency_priority_vals = [0, 1, 7, 8, 14, 15];
+        let tenant_class_pri_vals = [0, 1, 2, 3];
+        let tenant_class_std_vals = [0, 1, 2, 3];
+        let sla_required_vals = [0, 1];
+
+        // 8192 context configurations
+        for c in 0..16 {
+            for u in 0..16 {
+                for l in 0..16 {
+                    for s in 0..2 {
+                        let ctx = make_ctx(c, u, l, s, 0);
+                        
+                        for &load_sat in &load_saturation_vals {
+                            for &urg_pri in &urgency_priority_vals {
+                                for &tc_pri in &tenant_class_pri_vals {
+                                    for &tc_std in &tenant_class_std_vals {
+                                        for &sla_req in &sla_required_vals {
+                                            let params = AdmissionParameters {
+                                                load_saturation_threshold: load_sat,
+                                                urgency_priority_threshold: urg_pri,
+                                                tenant_class_priority_min: tc_pri,
+                                                tenant_class_standard_min: tc_std,
+                                                sla_required: sla_req,
+                                            };
+                                            let got = admit_dpag(ctx, &params);
+                                            let expected = oracle_admit(ctx, &params);
+                                            assert_eq!(
+                                                got, expected,
+                                                "Mismatch for ctx (tc={}, urg={}, load={}, sla={}) with params {:?}",
+                                                c, u, l, s, params
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
+    }
+
+    // --- Hostile Mutant Implementations & Verification ---
+
+    // Mutant 1 (Sign Shift Omission): arithmetic right shift by 62 instead of 63.
+    const fn ge_mask_mutant_1(x: u64, y: u64) -> u64 {
+        let diff = (y as i64).wrapping_sub(x as i64).wrapping_sub(1);
+        (diff as u64 >> 62) as u64
+    }
+
+    fn admit_dpag_mutant_1(ctx: AdmissionContext, params: &AdmissionParameters) -> ProcessTopology {
+        let c = (ctx & 0xF) as u64;
+        let u = ((ctx >> 4) & 0xF) as u64;
+        let l = ((ctx >> 8) & 0xF) as u64;
+        let s = ((ctx >> 12) & 0x1) as u64;
+
+        let q_mask = ge_mask_mutant_1(l, params.load_saturation_threshold);
+        let tc_pri_ok = ge_mask_mutant_1(c, params.tenant_class_priority_min);
+        let urg_ok = ge_mask_mutant_1(u, params.urgency_priority_threshold);
+        let sla_req_mask = 0u64.wrapping_sub(params.sla_required);
+        let sla_has_mask = 0u64.wrapping_sub(s);
+        let sla_ok = (!sla_req_mask) | sla_has_mask;
+        let p_mask = tc_pri_ok & urg_ok & sla_ok;
+        let s_mask = ge_mask_mutant_1(c, params.tenant_class_standard_min);
+
+        let topo_q = ProcessTopology::Quarantine as u64;
+        let topo_p = ProcessTopology::Priority as u64;
+        let topo_s = ProcessTopology::Standard as u64;
+        let topo_bg = ProcessTopology::Background as u64;
+
+        let v1 = select(s_mask, topo_s, topo_bg);
+        let v2 = select(p_mask, topo_p, v1);
+        let v_final = select(q_mask, topo_q, v2);
+
+        const TOPOLOGIES: [ProcessTopology; 4] = [
+            ProcessTopology::Priority,
+            ProcessTopology::Standard,
+            ProcessTopology::Background,
+            ProcessTopology::Quarantine,
+        ];
+        TOPOLOGIES[(v_final & 3) as usize]
+    }
+
+    // Mutant 2 (Priority Bypass / Order Inversion): swapped Quarantine and Priority sequence
+    fn admit_dpag_mutant_2(ctx: AdmissionContext, params: &AdmissionParameters) -> ProcessTopology {
+        let c = (ctx & 0xF) as u64;
+        let u = ((ctx >> 4) & 0xF) as u64;
+        let l = ((ctx >> 8) & 0xF) as u64;
+        let s = ((ctx >> 12) & 0x1) as u64;
+
+        let q_mask = ge_mask(l, params.load_saturation_threshold);
+        let tc_pri_ok = ge_mask(c, params.tenant_class_priority_min);
+        let urg_ok = ge_mask(u, params.urgency_priority_threshold);
+        let sla_req_mask = 0u64.wrapping_sub(params.sla_required);
+        let sla_has_mask = 0u64.wrapping_sub(s);
+        let sla_ok = (!sla_req_mask) | sla_has_mask;
+        let p_mask = tc_pri_ok & urg_ok & sla_ok;
+        let s_mask = ge_mask(c, params.tenant_class_standard_min);
+
+        let topo_q = ProcessTopology::Quarantine as u64;
+        let topo_p = ProcessTopology::Priority as u64;
+        let topo_s = ProcessTopology::Standard as u64;
+        let topo_bg = ProcessTopology::Background as u64;
+
+        // Swapped quarantine and priority sequence order (Quarantine selected before Standard, but after Priority)
+        let v1 = select(s_mask, topo_s, topo_bg);
+        let v2 = select(q_mask, topo_q, v1);
+        let v_final = select(p_mask, topo_p, v2);
+
+        const TOPOLOGIES: [ProcessTopology; 4] = [
+            ProcessTopology::Priority,
+            ProcessTopology::Standard,
+            ProcessTopology::Background,
+            ProcessTopology::Quarantine,
+        ];
+        TOPOLOGIES[(v_final & 3) as usize]
+    }
+
+    // Mutant 3 (Off-by-One Comparison Offset): dropping the -1 in ge_mask
+    const fn ge_mask_mutant_3(x: u64, y: u64) -> u64 {
+        let diff = (y as i64).wrapping_sub(x as i64); // -1 dropped
+        (diff >> 63) as u64
+    }
+
+    fn admit_dpag_mutant_3(ctx: AdmissionContext, params: &AdmissionParameters) -> ProcessTopology {
+        let c = (ctx & 0xF) as u64;
+        let u = ((ctx >> 4) & 0xF) as u64;
+        let l = ((ctx >> 8) & 0xF) as u64;
+        let s = ((ctx >> 12) & 0x1) as u64;
+
+        let q_mask = ge_mask_mutant_3(l, params.load_saturation_threshold);
+        let tc_pri_ok = ge_mask_mutant_3(c, params.tenant_class_priority_min);
+        let urg_ok = ge_mask_mutant_3(u, params.urgency_priority_threshold);
+        let sla_req_mask = 0u64.wrapping_sub(params.sla_required);
+        let sla_has_mask = 0u64.wrapping_sub(s);
+        let sla_ok = (!sla_req_mask) | sla_has_mask;
+        let p_mask = tc_pri_ok & urg_ok & sla_ok;
+        let s_mask = ge_mask_mutant_3(c, params.tenant_class_standard_min);
+
+        let topo_q = ProcessTopology::Quarantine as u64;
+        let topo_p = ProcessTopology::Priority as u64;
+        let topo_s = ProcessTopology::Standard as u64;
+        let topo_bg = ProcessTopology::Background as u64;
+
+        let v1 = select(s_mask, topo_s, topo_bg);
+        let v2 = select(p_mask, topo_p, v1);
+        let v_final = select(q_mask, topo_q, v2);
+
+        const TOPOLOGIES: [ProcessTopology; 4] = [
+            ProcessTopology::Priority,
+            ProcessTopology::Standard,
+            ProcessTopology::Background,
+            ProcessTopology::Quarantine,
+        ];
+        TOPOLOGIES[(v_final & 3) as usize]
+    }
+
+    fn verify_mutant_failure<F>(mutant_admit: F) -> Result<(), StabilityRefusal>
+    where
+        F: Fn(AdmissionContext, &AdmissionParameters) -> ProcessTopology,
+    {
+        // Check if the mutant behaves differently from the oracle.
+        let load_saturation_vals = [0, 1, 7, 14, 15, (1u64 << 62) + 1];
+        let urgency_priority_vals = [0, 1, 7, 8, 14, 15];
+        let tenant_class_pri_vals = [0, 1, 2, 3];
+        let tenant_class_std_vals = [0, 1, 2, 3];
+        let sla_required_vals = [0, 1];
+
+        for c in 0..16 {
+            for u in 0..16 {
+                for l in 0..16 {
+                    for s in 0..2 {
+                        let ctx = make_ctx(c, u, l, s, 0);
+                        for &load_sat in &load_saturation_vals {
+                            for &urg_pri in &urgency_priority_vals {
+                                for &tc_pri in &tenant_class_pri_vals {
+                                    for &tc_std in &tenant_class_std_vals {
+                                        for &sla_req in &sla_required_vals {
+                                            let params = AdmissionParameters {
+                                                load_saturation_threshold: load_sat,
+                                                urgency_priority_threshold: urg_pri,
+                                                tenant_class_priority_min: tc_pri,
+                                                tenant_class_standard_min: tc_std,
+                                                sla_required: sla_req,
+                                            };
+                                            let got = mutant_admit(ctx, &params);
+                                            let expected = oracle_admit(ctx, &params);
+                                            if got != expected {
+                                                // Success: the mutant was detected (killed) by mismatching the oracle!
+                                                return Err(StabilityRefusal::ContractViolation);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn kill_mutant_1_sign_shift_omission() {
+        let result = verify_mutant_failure(admit_dpag_mutant_1);
+        assert_eq!(result, Err(StabilityRefusal::ContractViolation));
+    }
+
+    #[test]
+    fn kill_mutant_2_priority_bypass() {
+        let result = verify_mutant_failure(admit_dpag_mutant_2);
+        assert_eq!(result, Err(StabilityRefusal::ContractViolation));
+    }
+
+    #[test]
+    fn kill_mutant_3_off_by_one_offset() {
+        let result = verify_mutant_failure(admit_dpag_mutant_3);
+        assert_eq!(result, Err(StabilityRefusal::ContractViolation));
     }
 
     // ---------------------------------------------------------------------------
@@ -244,11 +560,32 @@ mod tests {
     proptest! {
         #[test]
         fn prop_admit_lut_exhaustive(ctx: u64) {
-            // admit must not panic for any u64 context, and must return a valid variant.
+            // Ensure admit function with global parameters never panics and returns a valid discriminant
             let topo = admit(ctx);
             let disc = topo as u8;
             prop_assert!(disc <= 3,
                 "admit({:#018x}) returned invalid discriminant {disc}", ctx);
+        }
+
+        #[test]
+        fn prop_admit_dpag_matches_oracle(
+            ctx: u64,
+            load_sat in 0u64..16,
+            urg_pri in 0u64..16,
+            tc_pri in 0u64..4,
+            tc_std in 0u64..4,
+            sla_req in 0u64..2,
+        ) {
+            let params = AdmissionParameters {
+                load_saturation_threshold: load_sat,
+                urgency_priority_threshold: urg_pri,
+                tenant_class_priority_min: tc_pri,
+                tenant_class_standard_min: tc_std,
+                sla_required: sla_req,
+            };
+            let got = admit_dpag(ctx, &params);
+            let expected = oracle_admit(ctx, &params);
+            prop_assert_eq!(got, expected);
         }
     }
 }

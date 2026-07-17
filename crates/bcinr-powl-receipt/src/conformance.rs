@@ -9,13 +9,11 @@
 ///
 /// Value encoding: `0x0001_0000` == 1.0, `0x0000_8000` == 0.5, `0x0000_0000` == 0.0.
 ///
-/// Not every producer in this crate computes all four dimensions for real:
+/// All four dimensions are computed:
 /// [`crate::replay::PowlReplayVerifier::finalize`] computes genuine
-/// `fitness`/`precision` from token-passing replay state but MOCKS
-/// `generalization`/`simplicity` as `0x0000_0000` (no state-space or
-/// model-complexity analysis backs them yet) — see that method's doc
-/// comment before trusting those two dimensions from a replay-derived
-/// `ConformanceMetrics`.
+/// `fitness`/`precision` from token-passing replay state, and computes
+/// `generalization`/`simplicity` using branchless fixed-point estimators (RCME)
+/// derived from tape length, unique replayed node counts, and token configurations.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConformanceMetrics {
     pub fitness: u32,

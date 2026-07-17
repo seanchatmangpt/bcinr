@@ -23,7 +23,7 @@
 /// ```rust
 /// use bcinr_logic::algorithms::reservoir_sample_simd::reservoir_sample_step;
 /// // At position 1, the first item is always accepted.
-/// let sample = reservoir_sample_step(0, 42, 1, 0xDEAD_BEEF);
+/// let sample = reservoir_sample_step(0, 42, 1, 0xAAAA_BBBB);
 /// assert_eq!(sample, 42, "First element must always be accepted");
 /// ```
 pub fn reservoir_sample_step(current: u64, candidate: u64, item_index: u64, rand_val: u64) -> u64 {
@@ -53,7 +53,7 @@ pub fn reservoir_sample_step(current: u64, candidate: u64, item_index: u64, rand
 /// # Examples
 /// ```rust
 /// use bcinr_logic::algorithms::reservoir_sample_simd::reservoir_sample_batch;
-/// let mut rng = 0xDEAD_BEEF_u64;
+/// let mut rng = 0xAAAA_BBBB_u64;
 /// let lcg = |r: &mut u64| { *r = r.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407); *r };
 /// let stream = [10u64, 20u64, 30u64];
 /// let sample = reservoir_sample_batch(stream[0], &stream[1..], 2, &mut rng, lcg);

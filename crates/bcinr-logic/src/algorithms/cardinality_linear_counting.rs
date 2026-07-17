@@ -20,7 +20,7 @@
 ///     linear_counting_add, linear_counting_estimate,
 /// };
 /// let mut bitmap = [0u64; 4]; // 256-bit bitmap
-/// linear_counting_add(&mut bitmap, 0xDEAD_BEEFu64);
+/// linear_counting_add(&mut bitmap, 0xAAAA_BBBBu64);
 /// let est = linear_counting_estimate(&bitmap);
 /// assert!(est >= 1);
 /// ```

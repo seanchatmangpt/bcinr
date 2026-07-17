@@ -57,6 +57,9 @@ pub enum ConformanceResult {
     },
     /// The log contains no events.
     EmptyLog,
+    /// Refusal: The log contains more unique run IDs than the fixed limits
+    /// of the deterministic validator.
+    RunLimitExceeded,
 }
 
 impl OcelLog {
@@ -233,6 +236,68 @@ impl OcelLog {
 /// 2. `DuplicateFire`      — same op fired twice in one run (per run_id).
 /// 3. `SealMismatch`       — declared op_trace ≠ accumulated fired-op bitmask.
 /// 4. `Violation`          — predecessor constraint: op fired before its pred.
+/// Symmetric Run-Bounded Conformance Gating (SRBCG) Slot Tracker.
+///
+/// Ensures CC=1 execution while checking run capacities. No heap allocations
+/// are performed, and no data-dependent jumps are generated.
+#[inline(always)]
+pub fn process_event_srbcg(
+    run_ids: &mut [u64; 64],
+    run_count: &mut usize,
+    incoming_rid: u64,
+    overflow_mask: &mut u64,
+) -> usize {
+    let mut match_idx = 64usize;
+    let current_count = *run_count;
+
+    // Unrolled comparison across all 64 slots.
+    // Compiles to branchless conditional selections (CSEL/CMOV).
+    for i in 0..64 {
+        let is_match = (run_ids[i] == incoming_rid) as usize;
+        // If a match is found, match_idx becomes the slot index.
+        // Otherwise, it remains unchanged.
+        match_idx = (is_match * i) + ((1 - is_match) * match_idx);
+    }
+
+    // Determine if we need to allocate a new slot.
+    let found = (match_idx < 64) as usize;
+    let can_allocate = (current_count < 64) as usize;
+
+    // Actions based on state:
+    // Case 1: Found existing slot -> use match_idx, no count change, no overflow.
+    // Case 2: Not found & can allocate -> use current_count, increment count, no overflow.
+    // Case 3: Not found & cannot allocate -> use 64, no count change, set overflow.
+    
+    let allocate_idx = current_count;
+    let target_idx = (found * match_idx) 
+        + ((1 - found) * (can_allocate * allocate_idx + (1 - can_allocate) * 64));
+
+    // Update count: increment if not found and can allocate.
+    *run_count = current_count + ((1 - found) * can_allocate);
+
+    // Update run_ids: write incoming_rid to target_idx if we allocated a new slot.
+    let should_write = (1 - found) * can_allocate;
+    for i in 0..64 {
+        let mask = 0u64.wrapping_sub((should_write & (i == target_idx) as usize) as u64);
+        run_ids[i] = (incoming_rid & mask) | (run_ids[i] & !mask);
+    }
+
+    // Accumulate overflow mask if not found and cannot allocate.
+    let has_overflowed = (1 - found) * (1 - can_allocate);
+    *overflow_mask |= 0u64.wrapping_sub(has_overflowed as u64);
+
+    target_idx
+}
+
+/// Validate an OcelLog against a PowlTape's predecessor masks.
+/// No heap, no_std safe.
+///
+/// Checks performed (in order):
+/// 1. `EmptyLog`           — log has no events at all.
+/// 2. `RunLimitExceeded`   — log has more than 64 unique run IDs.
+/// 3. `DuplicateFire`      — same op fired twice in one run (per run_id).
+/// 4. `SealMismatch`       — declared op_trace ≠ accumulated fired-op bitmask.
+/// 5. `Violation`          — predecessor constraint: op fired before its pred.
 pub fn validate_against_tape(log: &OcelLog, tape: &crate::tape::PowlTape) -> ConformanceResult {
     // 1. Empty log.
     if log.events().is_empty() {
@@ -245,55 +310,31 @@ pub fn validate_against_tape(log: &OcelLog, tape: &crate::tape::PowlTape) -> Con
     // table of up to 64 run_ids seen in this log.
     const MAX_RUNS: usize = 64;
     let mut run_ids: [u64; MAX_RUNS] = [u64::MAX; MAX_RUNS];
-    let mut accumulated: [u64; MAX_RUNS] = [0u64; MAX_RUNS];
-    let mut fired_twice: [u64; MAX_RUNS] = [0u64; MAX_RUNS]; // bits set on 2nd fire
-    let mut declared: [u64; MAX_RUNS] = [u64::MAX; MAX_RUNS]; // sentinel = not seen
+    let mut accumulated: [u64; MAX_RUNS + 1] = [0u64; MAX_RUNS + 1];
+    let mut fired_twice: [u64; MAX_RUNS + 1] = [0u64; MAX_RUNS + 1]; // bits set on 2nd fire
+    let mut declared: [u64; MAX_RUNS + 1] = [u64::MAX; MAX_RUNS + 1]; // sentinel = not seen
     let mut run_count: usize = 0;
-
-    // Helper: find or insert a run_id slot.  Returns MAX_RUNS on overflow.
-    macro_rules! slot_for {
-        ($rid:expr) => {{
-            let mut found = MAX_RUNS;
-            let mut i = 0;
-            while i < run_count {
-                if run_ids[i] == $rid {
-                    found = i;
-                    break;
-                }
-                i += 1;
-            }
-            if found == MAX_RUNS && run_count < MAX_RUNS {
-                found = run_count;
-                run_ids[run_count] = $rid;
-                run_count += 1;
-            }
-            found
-        }};
-    }
+    let mut overflow_mask: u64 = 0;
 
     for event in log.events() {
         match event.activity {
             "op_fired" => {
-                let s = slot_for!(event.run_id);
-                if s == MAX_RUNS {
-                    continue;
-                } // too many runs; skip
+                let s = process_event_srbcg(&mut run_ids, &mut run_count, event.run_id, &mut overflow_mask);
                 let bit = 1u64.checked_shl(event.op_idx).unwrap_or(0);
-                if accumulated[s] & bit != 0 {
-                    // Already fired — record as duplicate.
-                    fired_twice[s] |= bit;
-                }
+                let has_fired_mask = 0u64.wrapping_sub(((accumulated[s] & bit) != 0) as u64);
+                fired_twice[s] |= bit & has_fired_mask;
                 accumulated[s] |= bit;
             }
             "run_sealed" => {
-                let s = slot_for!(event.run_id);
-                if s == MAX_RUNS {
-                    continue;
-                }
+                let s = process_event_srbcg(&mut run_ids, &mut run_count, event.run_id, &mut overflow_mask);
                 declared[s] = event.op_idx as u64; // low 32 bits stored here
             }
             _ => {}
         }
+    }
+
+    if overflow_mask != 0 {
+        return ConformanceResult::RunLimitExceeded;
     }
 
     // Check each run.
@@ -665,4 +706,59 @@ mod tests {
             }
         );
     }
+
+    #[test]
+    fn validate_rejects_exceeded_run_limit() {
+        use crate::compiler::{compile_powl, PowlAstNode};
+        let tape = compile_powl(&PowlAstNode::Atom("a")).unwrap();
+
+        // 64 runs should succeed.
+        let mut log_64 = OcelLog::new();
+        for i in 0..64 {
+            log_64.record_op_fired(i as u64, 0, 0).unwrap();
+            log_64.record_run_sealed(i as u64, 0b1).unwrap();
+        }
+        assert_eq!(validate_against_tape(&log_64, &tape), ConformanceResult::Conforms);
+
+        // 65 runs should trigger RunLimitExceeded.
+        let mut log_65 = OcelLog::new();
+        for i in 0..65 {
+            log_65.record_op_fired(i as u64, 0, 0).unwrap();
+            log_65.record_run_sealed(i as u64, 0b1).unwrap();
+        }
+        assert_eq!(
+            validate_against_tape(&log_65, &tape),
+            ConformanceResult::RunLimitExceeded
+        );
+    }
+
+    #[test]
+    fn validate_vulnerability_isolation_run_65_violation() {
+        use crate::compiler::{compile_powl, PowlAstNode};
+        // Sequence: op0 -> op1
+        let tape = compile_powl(&PowlAstNode::Sequence(vec![
+            PowlAstNode::Atom("a"),
+            PowlAstNode::Atom("b"),
+        ]))
+        .unwrap();
+
+        // 64 conforming runs.
+        let mut log = OcelLog::new();
+        for i in 0..64 {
+            log.record_op_fired(i as u64, 0, 0).unwrap();
+            log.record_op_fired(i as u64, 1, 0).unwrap();
+            log.record_run_sealed(i as u64, 0b11).unwrap();
+        }
+        // 65th run is non-conforming (predecessor violation: fire op 1 without op 0, seal with 0b10).
+        log.record_op_fired(64, 1, 0).unwrap();
+        log.record_run_sealed(64, 0b10).unwrap();
+
+        // Legitimate validation must return RunLimitExceeded because we have 65 unique run IDs.
+        // It must NOT return Conforms (silent skipping vulnerability) or Violation (analyzing unadmitted runs).
+        assert_eq!(
+            validate_against_tape(&log, &tape),
+            ConformanceResult::RunLimitExceeded
+        );
+    }
 }
+

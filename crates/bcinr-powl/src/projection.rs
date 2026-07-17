@@ -210,38 +210,48 @@ pub fn verify_order_preservation(
     target: &PowlModel,
     map: &ActionNodeBijection,
 ) -> Result<OrderPreservationWitness, PreservationError> {
-    // Bijection totality: every action an order edge references must be
-    // covered by the bijection.
-    for edge in &source.precedes.edges {
-        if !map.action_to_node.contains_key(&edge.before) {
-            return Err(PreservationError::UnmappedAction(edge.before));
-        }
-        if !map.action_to_node.contains_key(&edge.after) {
-            return Err(PreservationError::UnmappedAction(edge.after));
-        }
-    }
+    let mut it_src = source.precedes.edges.iter();
+    let mut it_tgt = target.order.edges.iter();
 
-    // Under-preservation: every source edge must survive into the target.
-    for edge in &source.precedes.edges {
-        if !target.order.edges.contains(edge) {
-            return Err(PreservationError::DroppedOrderEdge(*edge));
-        }
-    }
-    // Over-invention: the target must contain no edge the source didn't have.
-    for edge in &target.order.edges {
-        if !source.precedes.edges.contains(edge) {
-            return Err(PreservationError::InventedOrderEdge(*edge));
+    let mut next_src = it_src.next();
+    let mut next_tgt = it_tgt.next();
+
+    loop {
+        match (next_src, next_tgt) {
+            (Some(&src_edge), Some(&tgt_edge)) => {
+                match src_edge.cmp(&tgt_edge) {
+                    std::cmp::Ordering::Less => {
+                        return Err(PreservationError::DroppedOrderEdge(src_edge));
+                    }
+                    std::cmp::Ordering::Greater => {
+                        return Err(PreservationError::InventedOrderEdge(tgt_edge));
+                    }
+                    std::cmp::Ordering::Equal => {
+                        if !map.action_to_node.contains_key(&src_edge.before) {
+                            return Err(PreservationError::UnmappedAction(src_edge.before));
+                        }
+                        if !map.action_to_node.contains_key(&src_edge.after) {
+                            return Err(PreservationError::UnmappedAction(src_edge.after));
+                        }
+                        next_src = it_src.next();
+                        next_tgt = it_tgt.next();
+                    }
+                }
+            }
+            (Some(&src_edge), None) => {
+                return Err(PreservationError::DroppedOrderEdge(src_edge));
+            }
+            (None, Some(&tgt_edge)) => {
+                return Err(PreservationError::InventedOrderEdge(tgt_edge));
+            }
+            (None, None) => {
+                break;
+            }
         }
     }
 
     let source_order_digest = digest_edges(&source.precedes.edges);
     let projected_order_digest = digest_edges(&target.order.edges);
-    // Order stays ActionOccurrenceId-keyed on both sides (see module docs),
-    // so "mapped through the bijection" and "source" coincide exactly once
-    // the totality check above has passed — this is not a tautology: it's
-    // only reached after both direction checks above already proved set
-    // equality; a broken projector that dropped/invented an edge would have
-    // already returned `Err` before this line runs.
     let mapped_order_digest = source_order_digest;
 
     Ok(OrderPreservationWitness {
@@ -259,42 +269,51 @@ pub fn verify_concurrency_preservation(
     target: &ExecutableConcurrencyComplex,
     map: &ActionNodeBijection,
 ) -> Result<ConcurrencyPreservationWitness, PreservationError> {
-    for nf in &source.minimal_nonfaces {
-        for slot in nf.members.iter_stable() {
-            // `slot` is a position in the causal plan's occurrence list
-            // (see the module doc comment), not a raw `ActionOccurrenceId`.
-            // `PowlProjector::project` builds `PowlNodeId(i)` for
-            // `causal.occurrences[i]`, so `PowlNodeId(slot)` is the node
-            // this position refers to; resolving it through
-            // `map.node_to_action` both confirms coverage and recovers the
-            // real `ActionOccurrenceId`, rather than casting `slot`
-            // directly into one.
-            if !map.node_to_action.contains_key(&PowlNodeId(slot as u64)) {
-                return Err(PreservationError::UnmappedConcurrencySlot(slot));
-            }
-        }
-    }
-
     let source_keys = canonical_nonface_keys(&source.minimal_nonfaces);
     let target_keys = canonical_nonface_keys(&target.minimal_nonfaces);
 
-    for key in &source_keys {
-        if !target_keys.contains(key) {
-            return Err(PreservationError::DroppedNonFace(key.clone()));
-        }
-    }
-    for key in &target_keys {
-        if !source_keys.contains(key) {
-            return Err(PreservationError::InventedNonFace(key.clone()));
+    let mut it_src = source_keys.iter();
+    let mut it_tgt = target_keys.iter();
+
+    let mut next_src = it_src.next();
+    let mut next_tgt = it_tgt.next();
+
+    loop {
+        match (next_src, next_tgt) {
+            (Some(src_key), Some(tgt_key)) => {
+                match src_key.cmp(tgt_key) {
+                    std::cmp::Ordering::Less => {
+                        return Err(PreservationError::DroppedNonFace(src_key.clone()));
+                    }
+                    std::cmp::Ordering::Greater => {
+                        return Err(PreservationError::InventedNonFace(tgt_key.clone()));
+                    }
+                    std::cmp::Ordering::Equal => {
+                        // Confirm totality for all slots in the preserved nonface
+                        for &slot in src_key {
+                            if !map.node_to_action.contains_key(&PowlNodeId(slot as u64)) {
+                                return Err(PreservationError::UnmappedConcurrencySlot(slot));
+                            }
+                        }
+                        next_src = it_src.next();
+                        next_tgt = it_tgt.next();
+                    }
+                }
+            }
+            (Some(src_key), None) => {
+                return Err(PreservationError::DroppedNonFace(src_key.clone()));
+            }
+            (None, Some(tgt_key)) => {
+                return Err(PreservationError::InventedNonFace(tgt_key.clone()));
+            }
+            (None, None) => {
+                break;
+            }
         }
     }
 
     let source_complex_digest = digest_nonface_keys(&source_keys);
     let target_complex_digest = digest_nonface_keys(&target_keys);
-    // Concurrency is carried through unchanged (EventSet member values
-    // are position-keyed on both sides — see module docs), so "mapped"
-    // coincides with "source" once the totality + two-way set-equality
-    // checks above have passed.
     let mapped_source_digest = source_complex_digest;
 
     Ok(ConcurrencyPreservationWitness {

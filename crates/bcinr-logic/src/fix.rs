@@ -534,7 +534,6 @@ mod tests {
             );
         }
         let v = bucketize_u32(u32::MAX, 100);
-        assert!(v <= u32::MAX);
         assert_eq!(v % 100, 0);
     }
 
@@ -585,7 +584,7 @@ mod tests {
 
     #[test]
     fn test_f32_q16_roundtrip() {
-        let vals = [0.0f32, 1.0, -1.0, 0.5, -0.5, 3.14159, 100.0, -100.0];
+        let vals = [0.0f32, 1.0, -1.0, 0.5, -0.5, std::f32::consts::PI, 100.0, -100.0];
         for &v in &vals {
             let encoded = f32_to_q16(v);
             let decoded = q16_to_f32(encoded);

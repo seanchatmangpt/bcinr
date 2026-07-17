@@ -712,6 +712,7 @@ fn test_tier2_f5_detect_version_template() {
 
 #[test]
 fn test_tier2_f5_nonexistent_dir_fails() {
+    ensure_lsp_built();
     let out = Command::new("/tmp/bcinr-e2e-target/debug/anti-llm-cheat-lsp")
         .args(["scan", "--invalid-flag"])
         .current_dir("/Users/sac/bcinr")

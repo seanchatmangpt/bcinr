@@ -26,6 +26,8 @@
 //! Canonical types live in `wasm4pm_compat::pddl` so any crate can import
 //! `Pddl8Tape`, `Pddl8GroundAction`, etc. without pulling in the parser.
 
+#![feature(once_cell_try)]
+
 pub mod alloc_counter;
 pub mod capability;
 pub mod capability_router;

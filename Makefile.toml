@@ -268,3 +268,15 @@ dependencies = ["fmt", "check", "clippy", "scan-cheats", "contract-gate", "facto
 
 [tasks.default]
 alias = "ci"
+
+[tasks.test-mutants]
+category = "Test"
+description = "Verify mutant detection via compile-time injection"
+workspace = false
+script = [
+    "cargo test -p bcinr-cmca --features mutant_1",
+    "cargo test -p bcinr-cmca --features mutant_2",
+    "cargo test -p bcinr-cmca --features mutant_3",
+    "cargo test -p bcinr-cmca --features mutant_4",
+    "cargo test -p bcinr-cmca --features mutant_5",
+]

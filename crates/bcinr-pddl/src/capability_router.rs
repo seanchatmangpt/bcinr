@@ -19,10 +19,11 @@
 //! - `claude-desktop-draft(?f)`: drafts a document referencing a file, locks it for the duration.
 
 use std::cmp::Ordering;
+use std::sync::OnceLock;
 
 use crate::ground::GroundTemporalProblem;
 use crate::schedule_analysis::{analyze_schedule, ScheduleAnalysis64};
-use crate::{domain_from_pddl, problem_from_pddl, Pddl8Error};
+use crate::{domain_from_pddl, problem_from_pddl, Pddl8Domain, Pddl8Error};
 use blake3::Hasher;
 use wasm4pm_compat::pddl::TemporalPlan;
 
@@ -66,6 +67,9 @@ const CAPABILITY_DOMAIN: &str = r#"
       (at start (decrease (attention) 1)) (at start (locked ?f))
       (at end (increase (attention) 1)) (at end (not (locked ?f))) (at end (drafted ?f)))))
 "#;
+
+/// Thread-safe global cache for the pre-compiled capability domain AST.
+static CACHED_DOMAIN: OnceLock<Pddl8Domain> = OnceLock::new();
 
 /// A goal atom this router can plan towards, e.g. `Edited("f1")`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -236,10 +240,10 @@ fn hex(b: &[u8; 32]) -> String {
 /// underlying `Pddl8Error` from `find_temporal_plan` IS the deterministic
 /// refusal, not a separately invented refusal code.
 pub fn route_capability_plan(task: &CapabilityTask) -> Result<CapabilityRouteReceipt, Pddl8Error> {
-    let domain = domain_from_pddl(CAPABILITY_DOMAIN)?;
+    let domain = CACHED_DOMAIN.get_or_try_init(|| domain_from_pddl(CAPABILITY_DOMAIN))?;
     let problem_text = build_problem_text(task);
     let problem = problem_from_pddl(&problem_text)?;
-    let gtp = GroundTemporalProblem::build(&domain, &problem)?;
+    let gtp = GroundTemporalProblem::build(domain, &problem)?;
 
     let plan = match gtp.find_temporal_plan() {
         crate::error::PlannerOutcome::Found(plan) => plan,
@@ -394,5 +398,49 @@ mod tests {
             admitted < refused,
             "an admitted route must always sort before a refused one"
         );
+    }
+
+    #[test]
+    fn test_psdp_cache_structural_equivalence() {
+        // Force initialization by triggering a dummy plan or calling get_or_try_init.
+        let cached = CACHED_DOMAIN
+            .get_or_try_init(|| domain_from_pddl(CAPABILITY_DOMAIN))
+            .expect("cache init should succeed");
+
+        let fresh_parse = domain_from_pddl(CAPABILITY_DOMAIN).expect("fresh parse should succeed");
+        assert_eq!(
+            format!("{cached:?}"),
+            format!("{fresh_parse:?}"),
+            "cached domain AST must be structurally identical to freshly parsed domain AST"
+        );
+    }
+
+    #[test]
+    fn test_psdp_cache_concurrency_determinism() {
+        use std::thread;
+
+        let handles: Vec<_> = (0..10)
+            .map(|_| {
+                thread::spawn(|| {
+                    let task = CapabilityTask {
+                        desired_effects: vec![
+                            DesiredEffect::Edited("f1".to_string()),
+                            DesiredEffect::FormFilled("f2".to_string()),
+                        ],
+                        attention_capacity: 2,
+                    };
+                    route_capability_plan(&task).expect("parallel route should succeed")
+                })
+            })
+            .collect();
+
+        let results: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+        let reference_receipt = &results[0];
+        for receipt in &results[1..] {
+            assert_eq!(
+                receipt.route_chain, reference_receipt.route_chain,
+                "parallel executions must produce identical route chains"
+            );
+        }
     }
 }

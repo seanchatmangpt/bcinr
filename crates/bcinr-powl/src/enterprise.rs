@@ -69,23 +69,47 @@ pub fn capability_mask(granted: CapabilitySet, required: CapabilitySet) -> u64 {
 // Saga stack
 // ---------------------------------------------------------------------------
 
-/// Fixed-capacity LIFO stack for saga compensation operation indices.
+/// The return type of branchless pop operations.
+///
+/// Contains the popped value and an execution status mask (`0xFFFF` if valid, `0` if empty).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BranchlessPop {
+    /// The compensation op index popped, or a garbage value if the stack was empty.
+    pub value: u16,
+    /// Status mask: `0xFFFF` for successful pop, `0` for empty stack.
+    pub valid_mask: u16,
+}
+
+impl From<BranchlessPop> for Option<u16> {
+    #[inline(always)]
+    fn from(pop: BranchlessPop) -> Self {
+        if pop.valid_mask != 0 {
+            Some(pop.value)
+        } else {
+            None
+        }
+    }
+}
+
+/// Fixed-capacity, branchless LIFO stack for saga compensation operation indices.
 ///
 /// Stores up to 32 `u16` compensation op indices with no heap allocation.
-/// Push beyond capacity silently saturates (the top entry is overwritten);
-/// this is intentional — callers that care about overflow should check
-/// [`SagaStack::is_full`] before pushing.
+/// Under the BCINR Radon Law, all operations have a cyclomatic complexity of CC=1
+/// and execute with zero conditional branches.
 #[derive(Debug)]
 pub struct SagaStack {
-    frames: [u16; 32],
+    /// Storage for 32 stack frames + 1 garbage sink slot.
+    frames: [u16; 33],
+    /// Current stack depth (0..=32).
     top: u8,
 }
 
 impl SagaStack {
-    /// Create an empty [`SagaStack`].
+    /// Create a new empty [`SagaStack`].
+    #[inline(always)]
     pub const fn new() -> Self {
         Self {
-            frames: [0u16; 32],
+            frames: [0u16; 33],
             top: 0,
         }
     }
@@ -99,7 +123,7 @@ impl SagaStack {
     /// Returns `true` when the stack is at capacity (32 frames).
     #[inline(always)]
     pub const fn is_full(&self) -> bool {
-        self.top as usize >= 32
+        self.top >= 32
     }
 
     /// Current number of frames on the stack.
@@ -108,29 +132,51 @@ impl SagaStack {
         self.top as usize
     }
 
-    /// Push a compensation op index.
+    /// Push a compensation op index branchlessly.
     ///
-    /// If the stack is full the push is silently dropped (capacity-saturating
-    /// behaviour). The caller is responsible for checking [`SagaStack::is_full`]
-    /// in contexts where overflow is a protocol error.
+    /// If the stack is full, the write is multiplexed to the garbage sink slot (index 32)
+    /// and the pointer does not increment, providing saturating behavior without branching.
     #[inline(always)]
     pub fn push(&mut self, comp_op_idx: u16) {
-        if (self.top as usize) < 32 {
-            self.frames[self.top as usize] = comp_op_idx;
-            self.top = self.top.saturating_add(1);
-        }
+        let top_val = self.top as u64;
+        
+        // diff is non-negative (sign bit 0) when top_val < 32, and negative (sign bit 1) when top_val >= 32.
+        let diff = 32u64.wrapping_sub(top_val).wrapping_sub(1);
+        let is_full_bit = diff >> 63;
+        
+        // Write index: top if not full, 32 if full.
+        let mask = 0u64.wrapping_sub(is_full_bit);
+        let write_idx = (top_val & !mask) | (32 & mask);
+        
+        self.frames[write_idx as usize] = comp_op_idx;
+        
+        // Increment top only if not full
+        self.top = self.top.wrapping_add((1u64.wrapping_sub(is_full_bit)) as u8);
     }
 
-    /// Pop the most-recently-pushed compensation op index.
+    /// Pop the most-recently-pushed compensation op index branchlessly.
     ///
-    /// Returns `None` when the stack is empty.
+    /// Returns a [`BranchlessPop`] struct containing the status mask and value.
     #[inline(always)]
-    pub fn pop(&mut self) -> Option<u16> {
-        if self.top == 0 {
-            return None;
-        }
-        self.top -= 1;
-        Some(self.frames[self.top as usize])
+    pub fn pop(&mut self) -> BranchlessPop {
+        let top_val = self.top as u64;
+        
+        // If top is 0, wrapping_sub(1) has sign bit set (1). If top > 0, sign bit is 0.
+        let is_empty_bit = (top_val.wrapping_sub(1)) >> 63;
+        let is_valid_bit = 1u64.wrapping_sub(is_empty_bit);
+        
+        // Decrement top only if valid
+        self.top = self.top.wrapping_sub(is_valid_bit as u8);
+        
+        // Read index: new top if valid, 32 if empty
+        let valid_mask_u64 = 0u64.wrapping_sub(is_valid_bit);
+        let empty_mask_u64 = 0u64.wrapping_sub(is_empty_bit);
+        let read_idx = ((self.top as u64) & valid_mask_u64) | (32 & empty_mask_u64);
+        
+        let value = self.frames[read_idx as usize];
+        let valid_mask = valid_mask_u64 as u16;
+        
+        BranchlessPop { value, valid_mask }
     }
 }
 
@@ -302,6 +348,8 @@ pub fn evaluate_graduation(
 #[cfg(test)]
 mod tests {
     use super::{graduation, *};
+    use proptest::prelude::*;
+    use proptest as prop;
 
     // -----------------------------------------------------------------------
     // capability_mask
@@ -373,6 +421,24 @@ mod tests {
     // SagaStack
     // -----------------------------------------------------------------------
 
+    struct SlowSagaStack {
+        inner: std::vec::Vec<u16>,
+    }
+
+    impl SlowSagaStack {
+        fn new() -> Self {
+            Self { inner: std::vec::Vec::new() }
+        }
+        fn push(&mut self, val: u16) {
+            if self.inner.len() < 32 {
+                self.inner.push(val);
+            }
+        }
+        fn pop(&mut self) -> Option<u16> {
+            self.inner.pop()
+        }
+    }
+
     #[test]
     fn saga_stack_empty_on_construction() {
         let s = SagaStack::new();
@@ -387,17 +453,34 @@ mod tests {
         s.push(20);
         s.push(30);
         assert_eq!(s.len(), 3);
-        assert_eq!(s.pop(), Some(30));
-        assert_eq!(s.pop(), Some(20));
-        assert_eq!(s.pop(), Some(10));
-        assert_eq!(s.pop(), None);
+        
+        let p3 = s.pop();
+        assert_eq!(p3.valid_mask, 0xFFFF);
+        assert_eq!(p3.value, 30);
+        assert_eq!(Option::<u16>::from(p3), Some(30));
+        
+        let p2 = s.pop();
+        assert_eq!(p2.valid_mask, 0xFFFF);
+        assert_eq!(p2.value, 20);
+        assert_eq!(Option::<u16>::from(p2), Some(20));
+        
+        let p1 = s.pop();
+        assert_eq!(p1.valid_mask, 0xFFFF);
+        assert_eq!(p1.value, 10);
+        assert_eq!(Option::<u16>::from(p1), Some(10));
+        
+        let p0 = s.pop();
+        assert_eq!(p0.valid_mask, 0);
+        assert_eq!(Option::<u16>::from(p0), None);
         assert!(s.is_empty());
     }
 
     #[test]
-    fn saga_stack_pop_empty_returns_none() {
+    fn saga_stack_pop_empty_returns_invalid() {
         let mut s = SagaStack::new();
-        assert_eq!(s.pop(), None);
+        let p = s.pop();
+        assert_eq!(p.valid_mask, 0);
+        assert_eq!(Option::<u16>::from(p), None);
     }
 
     #[test]
@@ -408,11 +491,51 @@ mod tests {
         }
         assert!(s.is_full());
         assert_eq!(s.len(), 32);
-        // Push beyond capacity — must not panic, silently dropped.
+        // Push beyond capacity — must not panic, silently multiplexed to index 32.
         s.push(999);
         assert_eq!(s.len(), 32);
         // LIFO still correct for the last valid frame.
-        assert_eq!(s.pop(), Some(31));
+        let p = s.pop();
+        assert_eq!(p.valid_mask, 0xFFFF);
+        assert_eq!(p.value, 31);
+        assert_eq!(Option::<u16>::from(p), Some(31));
+    }
+
+    proptest! {
+        #[test]
+        fn prop_saga_stack_differential(
+            ops in prop::collection::vec(
+                prop_oneof![
+                    prop::num::u16::ANY.prop_map(|v| (true, v)),
+                    Just((false, 0u16))
+                ],
+                1..200
+            )
+        ) {
+            let mut bss = SagaStack::new();
+            let mut slow = SlowSagaStack::new();
+
+            for (is_push, val) in ops {
+                if is_push {
+                    bss.push(val);
+                    slow.push(val);
+                } else {
+                    let bp = bss.pop();
+                    let sp = slow.pop();
+                    if let Some(expected_val) = sp {
+                        prop_assert_eq!(bp.valid_mask, 0xFFFF);
+                        prop_assert_eq!(bp.value, expected_val);
+                        prop_assert_eq!(Option::<u16>::from(bp), Some(expected_val));
+                    } else {
+                        prop_assert_eq!(bp.valid_mask, 0);
+                        prop_assert_eq!(Option::<u16>::from(bp), None);
+                    }
+                }
+                prop_assert_eq!(bss.len(), slow.inner.len());
+                prop_assert_eq!(bss.is_empty(), slow.inner.is_empty());
+                prop_assert_eq!(bss.is_full(), slow.inner.len() >= 32);
+            }
+        }
     }
 
     // -----------------------------------------------------------------------
