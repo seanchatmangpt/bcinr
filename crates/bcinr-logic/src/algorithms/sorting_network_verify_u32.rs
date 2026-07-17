@@ -43,6 +43,7 @@ pub fn sorting_network_verify_u32(slice: &[u32]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec::Vec;
     use proptest::prelude::*;
 
     #[test]
@@ -118,6 +119,7 @@ mod tests {
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
+    use alloc::vec::Vec;
     use criterion::{black_box, Criterion};
 
     pub fn bench_sorting_network_verify_u32(c: &mut Criterion) {

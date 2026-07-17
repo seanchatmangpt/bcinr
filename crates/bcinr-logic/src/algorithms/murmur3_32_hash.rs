@@ -104,6 +104,7 @@ pub fn murmur3_32_hash(data: &[u8], seed: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec::Vec;
     use proptest::prelude::*;
 
     // -------------------------------------------------------------------------
@@ -268,6 +269,7 @@ mod tests {
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
+    use alloc::vec::Vec;
     use criterion::{black_box, Criterion};
 
     pub fn bench_murmur3_32_hash(c: &mut Criterion) {

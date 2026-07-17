@@ -77,6 +77,7 @@ pub fn pearson_hash_16(data: &[u8]) -> u16 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec::Vec;
     use proptest::prelude::*;
 
     // -------------------------------------------------------------------------
@@ -212,6 +213,7 @@ mod tests {
 #[cfg(feature = "bench")]
 pub mod bench {
     use super::*;
+    use alloc::vec::Vec;
     use criterion::{black_box, Criterion};
 
     pub fn bench_pearson_hash_16(c: &mut Criterion) {
