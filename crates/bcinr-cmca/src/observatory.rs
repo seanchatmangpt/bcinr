@@ -162,17 +162,17 @@ pub fn evaluate_calibration(
     let d_js = artifact.drift;
 
     // Conditions
-    let is_drift = const_lt_u32(epsilon_drift.0, d_js.0);
+    let is_drift = const_lt_u32(epsilon_drift.val, d_js.val);
     
-    let is_scale_inert = const_eq_u32(s_meas.0, s_leaf.0);
+    let is_scale_inert = const_eq_u32(s_meas.val, s_leaf.val);
     
-    let kappa_hat_on = const_lt_u32(epsilon_on.0, kappa_hat.0) | const_eq_u32(epsilon_on.0, kappa_hat.0);
-    let kappa_under_off = const_lt_u32(kappa_under.0, epsilon_on.0);
+    let kappa_hat_on = const_lt_u32(epsilon_on.val, kappa_hat.val) | const_eq_u32(epsilon_on.val, kappa_hat.val);
+    let kappa_under_off = const_lt_u32(kappa_under.val, epsilon_on.val);
     let is_numerically_uncertain = kappa_hat_on & kappa_under_off;
     
-    let kappa_under_on = const_lt_u32(epsilon_on.0, kappa_under.0) | const_eq_u32(epsilon_on.0, kappa_under.0);
+    let kappa_under_on = const_lt_u32(epsilon_on.val, kappa_under.val) | const_eq_u32(epsilon_on.val, kappa_under.val);
     
-    let gamma_under_off = const_lt_u32(gamma_min_plus_under.0, epsilon_gram.0);
+    let gamma_under_off = const_lt_u32(gamma_min_plus_under.val, epsilon_gram.val);
     
     let is_gram_degenerate = kappa_under_on & gamma_under_off;
     
@@ -244,9 +244,9 @@ pub fn measure_kappa(
         let mut log_m = 0u32;
         unroll_4_static!(K_IDX, {
             let matches = const_eq_u32(k_masked as u32, K_IDX as u32);
-            log_m = const_select_u32(matches, node_masses[K_IDX & 3][i & 7].log2().0 as u32, log_m);
+            log_m = const_select_u32(matches, node_masses[K_IDX & 3][i & 7].log2().val as u32, log_m);
         });
-        let q_signed = q_val.0 as i32;
+        let q_signed = q_val.val as i32;
         x[i & 7] = (((q_signed as i64).wrapping_mul(log_m as i32 as i64)) >> 16) as i32;
     });
     
@@ -261,10 +261,10 @@ pub fn measure_kappa(
     unroll_8_static!(J, {
         let is_child = const_eq_u32(parent[J & 7] as u32, v as u32);
         let a_prime = x[J & 7].wrapping_sub(x_max_meas);
-        let exp_val = SignedFixed(a_prime).exp2();
-        sum_exp_meas += NonNegativeFixed(const_select_u32(is_child, exp_val.0, 0));
+        let exp_val = SignedFixed::from_bits(a_prime).exp2();
+        sum_exp_meas += NonNegativeFixed::from_bits(const_select_u32(is_child, exp_val.val, 0));
     });
-    let l_meas = x_max_meas.wrapping_add(sum_exp_meas.log2().0 as i32);
+    let l_meas = x_max_meas.wrapping_add(sum_exp_meas.log2().val as i32);
 
     let mut x_max_leaf = i32::MIN;
     unroll_8_static!(X_IDX, {
@@ -277,10 +277,10 @@ pub fn measure_kappa(
     unroll_8_static!(X_IDX, {
         let is_sub = is_subtree_leaf_v[X_IDX & 7];
         let a_prime = x[X_IDX & 7].wrapping_sub(x_max_leaf);
-        let exp_val = SignedFixed(a_prime).exp2();
-        sum_exp_leaf += NonNegativeFixed(const_select_u32(is_sub as u32, exp_val.0, 0));
+        let exp_val = SignedFixed::from_bits(a_prime).exp2();
+        sum_exp_leaf += NonNegativeFixed::from_bits(const_select_u32(is_sub as u32, exp_val.val, 0));
     });
-    let l_leaf = x_max_leaf.wrapping_add(sum_exp_leaf.log2().0 as i32);
+    let l_leaf = x_max_leaf.wrapping_add(sum_exp_leaf.log2().val as i32);
 
     let mut kappa = NonNegativeFixed::ZERO;
     unroll_8_static!(c, {
@@ -297,16 +297,16 @@ pub fn measure_kappa(
         unroll_8_static!(X_IDX, {
             let is_sub_c = is_subtree_leaf[c & 7][X_IDX & 7];
             let a_prime = x[X_IDX & 7].wrapping_sub(x_max_c);
-            let exp_val = SignedFixed(a_prime).exp2();
-            sum_exp_c += NonNegativeFixed(const_select_u32(is_sub_c as u32, exp_val.0, 0));
+            let exp_val = SignedFixed::from_bits(a_prime).exp2();
+            sum_exp_c += NonNegativeFixed::from_bits(const_select_u32(is_sub_c as u32, exp_val.val, 0));
         });
-        let l_c = x_max_c.wrapping_add(sum_exp_c.log2().0 as i32);
+        let l_c = x_max_c.wrapping_add(sum_exp_c.log2().val as i32);
         
         let log_ratio = l_c.wrapping_sub(l_meas);
-        let s_leaf_c = NonNegativeFixed(SignedFixed(l_c.wrapping_sub(l_leaf)).exp2().0);
+        let s_leaf_c = NonNegativeFixed::from_bits(SignedFixed::from_bits(l_c.wrapping_sub(l_leaf)).exp2().val);
         
-        let term = s_leaf_c.0 as u64 * log_ratio as u64;
-        kappa += NonNegativeFixed(const_select_u32(is_child, (term >> 16) as u32, 0));
+        let term = s_leaf_c.val as u64 * log_ratio as u64;
+        kappa += NonNegativeFixed::from_bits(const_select_u32(is_child, (term >> 16) as u32, 0));
     });
     
     MeasurementArtifact {

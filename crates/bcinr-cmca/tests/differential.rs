@@ -33,11 +33,11 @@ fn get_proof() -> Option<AdaptiveUpdate<CertifiedLearning>> {
 
 // Helper to convert NonNegativeFixed to f64
 fn to_f64(f: NonNegativeFixed) -> f64 {
-    (f.0 as f64) / 65536.0
+    (f.val as f64) / 65536.0
 }
 
 fn to_f64_signed(f: SignedFixed) -> f64 {
-    (f.0 as f64) / 65536.0
+    (f.val as f64) / 65536.0
 }
 
 fn old_to_f64(f: NonNegativeFixed) -> f64 {
@@ -47,7 +47,7 @@ fn old_to_f64(f: NonNegativeFixed) -> f64 {
 // Helper to convert f64 to NonNegativeFixed
 fn to_signed_fixed(v: f64) -> SignedFixed {
     let scaled = (v * 65536.0).round();
-    SignedFixed(scaled as i32)
+    SignedFixed::from_bits(scaled as i32)
 }
 
 fn to_fixed(v: f64) -> NonNegativeFixed {
@@ -57,7 +57,7 @@ fn to_fixed(v: f64) -> NonNegativeFixed {
     } else if scaled <= 0.0 {
         NonNegativeFixed::ZERO
     } else {
-        NonNegativeFixed(scaled as u32)
+        NonNegativeFixed::from_bits(scaled as u32)
     }
 }
 

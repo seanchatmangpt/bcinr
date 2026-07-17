@@ -283,7 +283,7 @@ fn run_alloc_mu_cost() -> [NonNegativeFixed; N] {
     let parent = [-1; N];
     
     // Set mu negative so clipping to zero differs from unclipped
-    let mu = [NonNegativeFixed(0u32.wrapping_sub(327680)); N];
+    let mu = [NonNegativeFixed::from_bits(0u32.wrapping_sub(327680)); N];
     let costs = [NonNegativeFixed::ONE; N];
     
     allocate(
@@ -314,35 +314,35 @@ const CORRECT_MU_COST: [u32; N] = [4096, 4096, 4096, 4096, 4096, 4096, 4096, 409
 #[cfg(feature = "mutant_1")]
 #[test]
 fn kill_mutant_1_single_measure_collapse() {
-    let result_mutant = run_alloc_baseline().map(|x| x.0);
+    let result_mutant = run_alloc_baseline().map(|x| x.val);
     assert_ne!(result_mutant, CORRECT_BASELINE, "Mutant 1 should deviate from correct baseline");
 }
 
 #[cfg(feature = "mutant_2")]
 #[test]
 fn kill_mutant_2_q_sign_inversion() {
-    let result_mutant = run_alloc_baseline().map(|x| x.0);
+    let result_mutant = run_alloc_baseline().map(|x| x.val);
     assert_ne!(result_mutant, CORRECT_BASELINE, "Mutant 2 should deviate from correct baseline");
 }
 
 #[cfg(feature = "mutant_3")]
 #[test]
 fn kill_mutant_3_broken_normalization() {
-    let result_mutant = run_alloc_tree().map(|x| x.0);
+    let result_mutant = run_alloc_tree().map(|x| x.val);
     assert_ne!(result_mutant, CORRECT_TREE, "Mutant 3 should deviate from correct tree baseline");
 }
 
 #[cfg(feature = "mutant_4")]
 #[test]
 fn kill_mutant_4_rdf_identity_skew() {
-    let result_mutant = run_alloc_baseline().map(|x| x.0);
+    let result_mutant = run_alloc_baseline().map(|x| x.val);
     assert_ne!(result_mutant, CORRECT_BASELINE, "Mutant 4 should deviate from correct baseline");
 }
 
 #[cfg(feature = "mutant_5")]
 #[test]
 fn kill_mutant_5_consequence_truncation() {
-    let result_mutant = run_alloc_mu_cost().map(|x| x.0);
+    let result_mutant = run_alloc_mu_cost().map(|x| x.val);
     assert_ne!(result_mutant, CORRECT_MU_COST, "Mutant 5 should deviate from correct mu_cost baseline");
 }
 
@@ -355,7 +355,7 @@ fn kill_mutant_5_consequence_truncation() {
 )))]
 #[test]
 fn verify_correctness_baselines() {
-    assert_eq!(run_alloc_baseline().map(|x| x.0), CORRECT_BASELINE);
-    assert_eq!(run_alloc_tree().map(|x| x.0), CORRECT_TREE);
-    assert_eq!(run_alloc_mu_cost().map(|x| x.0), CORRECT_MU_COST);
+    assert_eq!(run_alloc_baseline().map(|x| x.val), CORRECT_BASELINE);
+    assert_eq!(run_alloc_tree().map(|x| x.val), CORRECT_TREE);
+    assert_eq!(run_alloc_mu_cost().map(|x| x.val), CORRECT_MU_COST);
 }

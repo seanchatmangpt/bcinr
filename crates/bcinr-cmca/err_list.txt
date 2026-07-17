@@ -1,0 +1,58 @@
+unused import: `CanonicalMask`
+unused import: `CanonicalMask`
+unused import: `CanonicalMask`
+unused import: `CanonicalMask`
+unused import: `Q`
+no method named `log2` found for struct `fixed::NonNegativeFixed` in the current scope
+no method named `exp2` found for struct `SignedFixed` in the current scope
+cannot subtract `fixed::NonNegativeFixed` from `fixed::NonNegativeFixed`
+cannot multiply `fixed::NonNegativeFixed` by `fixed::NonNegativeFixed`
+no method named `saturating_div` found for struct `fixed::NonNegativeFixed` in the current scope
+binary assignment operation `+=` cannot be applied to type `fixed::NonNegativeFixed`
+no method named `saturating_div` found for struct `fixed::NonNegativeFixed` in the current scope
+binary assignment operation `+=` cannot be applied to type `fixed::NonNegativeFixed`
+no method named `log2` found for struct `fixed::NonNegativeFixed` in the current scope
+no method named `exp2` found for struct `SignedFixed` in the current scope
+binary assignment operation `+=` cannot be applied to type `fixed::NonNegativeFixed`
+no method named `saturating_div` found for struct `fixed::NonNegativeFixed` in the current scope
+cannot add `fixed::NonNegativeFixed` to `fixed::NonNegativeFixed`
+no method named `saturating_div` found for struct `fixed::NonNegativeFixed` in the current scope
+no method named `log2` found for struct `fixed::NonNegativeFixed` in the current scope
+no method named `exp2` found for struct `SignedFixed` in the current scope
+binary assignment operation `+=` cannot be applied to type `fixed::NonNegativeFixed`
+no method named `log2` found for struct `fixed::NonNegativeFixed` in the current scope
+no method named `exp2` found for struct `SignedFixed` in the current scope
+binary assignment operation `+=` cannot be applied to type `fixed::NonNegativeFixed`
+cannot add `fixed::NonNegativeFixed` to `fixed::NonNegativeFixed`
+cannot multiply `fixed::NonNegativeFixed` by `fixed::NonNegativeFixed`
+cannot add `fixed::NonNegativeFixed` to `fixed::NonNegativeFixed`
+cannot multiply `fixed::NonNegativeFixed` by `fixed::NonNegativeFixed`
+cannot multiply `fixed::NonNegativeFixed` by `fixed::NonNegativeFixed`
+cannot multiply `fixed::NonNegativeFixed` by `fixed::NonNegativeFixed`
+no method named `exp` found for struct `SignedFixed` in the current scope
+cannot multiply `fixed::NonNegativeFixed` by `fixed::NonNegativeFixed`
+no method named `exp` found for struct `SignedFixed` in the current scope
+cannot add `fixed::NonNegativeFixed` to `fixed::NonNegativeFixed`
+no method named `saturating_div` found for struct `fixed::NonNegativeFixed` in the current scope
+no method named `saturating_div` found for struct `fixed::NonNegativeFixed` in the current scope
+cannot multiply `fixed::NonNegativeFixed` by `fixed::NonNegativeFixed`
+cannot multiply `fixed::NonNegativeFixed` by `fixed::NonNegativeFixed`
+no method named `exp` found for struct `SignedFixed` in the current scope
+binary assignment operation `+=` cannot be applied to type `fixed::NonNegativeFixed`
+cannot multiply `fixed::NonNegativeFixed` by `fixed::NonNegativeFixed`
+no method named `exp` found for struct `SignedFixed` in the current scope
+no method named `saturating_div` found for struct `fixed::NonNegativeFixed` in the current scope
+cannot multiply `fixed::NonNegativeFixed` by `fixed::NonNegativeFixed`
+cannot subtract `fixed::NonNegativeFixed` from `fixed::NonNegativeFixed`
+no method named `log2` found for struct `fixed::NonNegativeFixed` in the current scope
+no method named `exp2` found for struct `SignedFixed` in the current scope
+binary assignment operation `+=` cannot be applied to type `fixed::NonNegativeFixed`
+no method named `log2` found for struct `fixed::NonNegativeFixed` in the current scope
+no method named `exp2` found for struct `SignedFixed` in the current scope
+binary assignment operation `+=` cannot be applied to type `fixed::NonNegativeFixed`
+no method named `log2` found for struct `fixed::NonNegativeFixed` in the current scope
+no method named `exp2` found for struct `SignedFixed` in the current scope
+binary assignment operation `+=` cannot be applied to type `fixed::NonNegativeFixed`
+no method named `log2` found for struct `fixed::NonNegativeFixed` in the current scope
+no method named `exp2` found for struct `SignedFixed` in the current scope
+binary assignment operation `+=` cannot be applied to type `fixed::NonNegativeFixed`

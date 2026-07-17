@@ -209,6 +209,9 @@ pub enum StabilityRefusal {
     ResourceResponseBoundViolated,
     StandingResetBoundViolated,
     LearningFrozen,
+    NumericRangeExceeded,
+    UnsupportedDomain,
+    ContractViolation,
 }
 
 impl StabilityRefusal {
@@ -245,12 +248,15 @@ impl StabilityRefusal {
             Some(Self::ResourceResponseBoundViolated),
             Some(Self::StandingResetBoundViolated),
             Some(Self::LearningFrozen),
-            None, None, None, None, None, None, None, None,
+            Some(Self::NumericRangeExceeded),
+            Some(Self::UnsupportedDomain),
+            Some(Self::ContractViolation),
+            None, None, None, None, None,
             None, None, None, None, None, None
         ];
         
-        let in_bounds = const_lt_u32(val, 18);
-        let idx = const_select_u32(in_bounds, val, 18) as usize;
+        let in_bounds = const_lt_u32(val, 21);
+        let idx = const_select_u32(in_bounds, val, 21) as usize;
         let res = lookup[idx & 31];
         
         res
@@ -276,9 +282,9 @@ const REFUSALS: [StabilityRefusal; 32] = [
     StabilityRefusal::ResourceResponseBoundViolated,
     StabilityRefusal::StandingResetBoundViolated,
     StabilityRefusal::LearningFrozen,
-    StabilityRefusal::CertificateMissing,
-    StabilityRefusal::CertificateMissing,
-    StabilityRefusal::CertificateMissing,
+    StabilityRefusal::NumericRangeExceeded,
+    StabilityRefusal::UnsupportedDomain,
+    StabilityRefusal::ContractViolation,
     StabilityRefusal::CertificateMissing,
     StabilityRefusal::CertificateMissing,
     StabilityRefusal::CertificateMissing,
@@ -294,15 +300,15 @@ const REFUSALS: [StabilityRefusal; 32] = [
 
 // Bounded leaf reciprocal lookup table (nl from 1 to 8)
 const LEAF_RECIP: [NonNegativeFixed; 9] = [
-    NonNegativeFixed(0),
-    NonNegativeFixed(65536), // 1.0
-    NonNegativeFixed(32768), // 0.5
-    NonNegativeFixed(21845), // 0.33333
-    NonNegativeFixed(16384), // 0.25
-    NonNegativeFixed(13107), // 0.2
-    NonNegativeFixed(10922), // 0.16667
-    NonNegativeFixed(9362),  // 0.14285
-    NonNegativeFixed(8192),  // 0.125
+    NonNegativeFixed::from_bits(0),
+    NonNegativeFixed::from_bits(65536), // 1.0
+    NonNegativeFixed::from_bits(32768), // 0.5
+    NonNegativeFixed::from_bits(21845), // 0.33333
+    NonNegativeFixed::from_bits(16384), // 0.25
+    NonNegativeFixed::from_bits(13107), // 0.2
+    NonNegativeFixed::from_bits(10922), // 0.16667
+    NonNegativeFixed::from_bits(9362),  // 0.14285
+    NonNegativeFixed::from_bits(8192),  // 0.125
 ];
 
 /// Wraps the resource allocation array and an error status code into a branchless `Result`.
@@ -608,8 +614,8 @@ impl AdaptiveUpdate<CertifiedLearning> {
         let temp_ceil = ((crate::generated::stability_profile::PROFILE.temperature_ceiling.raw * 65536) / 1_000_000_000) as u32;
         let dist_floor = ((crate::generated::stability_profile::PROFILE.distinguishability_floor.raw * 65536) / 1_000_000_000) as u32;
 
-        let temp_ok = (const_lt_u32(temp_ceil, temperature.0) == 0) as u32;
-        let dist_ok = (const_lt_u32(distinguishability.0, dist_floor) == 0) as u32;
+        let temp_ok = (const_lt_u32(temp_ceil, temperature.val) == 0) as u32;
+        let dist_ok = (const_lt_u32(distinguishability.val, dist_floor) == 0) as u32;
         
         let digests_ok = (((state.digest ^ cert.digest) | (state.digest ^ env.digest) | (state.digest ^ outcome.digest)) == 0) as u32;
 
@@ -626,18 +632,18 @@ impl AdaptiveUpdate<CertifiedLearning> {
 /// $O(1)$ constant time, branchless.
 #[inline(always)]
 pub(crate) fn power(base: NonNegativeFixed, exponent: SignedFixed) -> NonNegativeFixed {
-    let base_is_zero = const_eq_u32(base.0, 0);
+    let base_is_zero = const_eq_u32(base.val, 0);
     let log_val = base.log2();
-    let exp_signed = exponent.0 as i32;
-    let log_signed = log_val.0 as i32;
+    let exp_signed = exponent.val as i32;
+    let log_signed = log_val.val as i32;
     let product = (((exp_signed as i64).wrapping_mul(log_signed as i64)) >> 16) as i32;
-    let pow_val = SignedFixed(product).exp2();
-    let exp_val = exponent.0 as i32;
+    let pow_val = SignedFixed::from_bits(product).exp2();
+    let exp_val = exponent.val as i32;
     let exp_gt_zero = (((0i32.wrapping_sub(exp_val)) >> 31) & 1) as u32;
-    let exp_eq_zero = const_eq_u32(exponent.0 as u32, 0);
-    let zero_res = const_select_u32(exp_eq_zero, NonNegativeFixed::ONE.0,
+    let exp_eq_zero = const_eq_u32(exponent.val as u32, 0);
+    let zero_res = const_select_u32(exp_eq_zero, NonNegativeFixed::ONE.val,
                     const_select_u32(exp_gt_zero, 0, u32::MAX));
-    NonNegativeFixed(const_select_u32(base_is_zero, zero_res, pow_val.0))
+    NonNegativeFixed::from_bits(const_select_u32(base_is_zero, zero_res, pow_val.val))
 }
 
 /// Clamps a fixed-point value within `[min_val, max_val]` branchlessly.
@@ -646,10 +652,10 @@ pub(crate) fn power(base: NonNegativeFixed, exponent: SignedFixed) -> NonNegativ
 /// $O(1)$ constant time, branchless.
 #[inline(always)]
 pub(crate) fn clip(val: NonNegativeFixed, min_val: NonNegativeFixed, max_val: NonNegativeFixed) -> NonNegativeFixed {
-    let lt_min = const_lt_u32(val.0, min_val.0);
-    let val_or_min = const_select_u32(lt_min, min_val.0, val.0);
-    let gt_max = const_lt_u32(max_val.0, val_or_min);
-    NonNegativeFixed(const_select_u32(gt_max, max_val.0, val_or_min))
+    let lt_min = const_lt_u32(val.val, min_val.val);
+    let val_or_min = const_select_u32(lt_min, min_val.val, val.val);
+    let gt_max = const_lt_u32(max_val.val, val_or_min);
+    NonNegativeFixed::from_bits(const_select_u32(gt_max, max_val.val, val_or_min))
 }
 
 /// Performs a single straight-line flow propagation step down the node forest.
@@ -675,30 +681,30 @@ fn flow_step(
     unroll_8_static!(v, {
         let has_children = !is_leaf[v & 7];
         
-        let flat_part = NonNegativeFixed(const_select_u32(has_children as u32, ((NonNegativeFixed::ONE - rho[v & 7]) * alloc_flow[v & 7]).0, 0));
-        let desc_part = NonNegativeFixed(const_select_u32(has_children as u32, (rho[v & 7] * alloc_flow[v & 7]).0, 0));
+        let flat_part = NonNegativeFixed::from_bits(const_select_u32(has_children as u32, ((NonNegativeFixed::ONE - rho[v & 7]) * alloc_flow[v & 7]).val, 0));
+        let desc_part = NonNegativeFixed::from_bits(const_select_u32(has_children as u32, (rho[v & 7] * alloc_flow[v & 7]).val, 0));
         
         #[allow(unused_variables)]
-        let l_cond = const_eq_u32(lw_sum[v & 7].0, 0);
+        let l_cond = const_eq_u32(lw_sum[v & 7].val, 0);
         #[cfg(feature = "mutant_3")]
-        let lw_denom = NonNegativeFixed::ONE.0;
+        let lw_denom = NonNegativeFixed::ONE.val;
         #[cfg(not(feature = "mutant_3"))]
-        let lw_denom = const_select_u32(l_cond, NonNegativeFixed::ONE.0, lw_sum[v & 7].0);
+        let lw_denom = const_select_u32(l_cond, NonNegativeFixed::ONE.val, lw_sum[v & 7].val);
         
-        let c_cond = const_eq_u32(cw_sum[v & 7].0, 0);
-        let cw_denom = const_select_u32(c_cond, NonNegativeFixed::ONE.0, cw_sum[v & 7].0);
+        let c_cond = const_eq_u32(cw_sum[v & 7].val, 0);
+        let cw_denom = const_select_u32(c_cond, NonNegativeFixed::ONE.val, cw_sum[v & 7].val);
 
         unroll_8_static!(x, {
             let is_sub = is_subtree_leaf[v & 7][x & 7] & has_children;
-            let flat_addition = flat_part * leaf_w[v & 7][x & 7].saturating_div(NonNegativeFixed(lw_denom));
-            flat_alloc[x & 7] += NonNegativeFixed(const_select_u32(is_sub as u32, flat_addition.0, 0));
+            let flat_addition = flat_part * leaf_w[v & 7][x & 7].saturating_div(NonNegativeFixed::from_bits(lw_denom));
+            flat_alloc[x & 7] += NonNegativeFixed::from_bits(const_select_u32(is_sub as u32, flat_addition.val, 0));
             
             let is_child = (parent[x & 7] == v as i32) & has_children;
-            let flow_addition = desc_part * child_w[v & 7][x & 7].saturating_div(NonNegativeFixed(cw_denom));
-            alloc_flow[x & 7] += NonNegativeFixed(const_select_u32(is_child as u32, flow_addition.0, 0));
+            let flow_addition = desc_part * child_w[v & 7][x & 7].saturating_div(NonNegativeFixed::from_bits(cw_denom));
+            alloc_flow[x & 7] += NonNegativeFixed::from_bits(const_select_u32(is_child as u32, flow_addition.val, 0));
         });
         
-        alloc_flow[v & 7] = NonNegativeFixed(const_select_u32(has_children as u32, 0, alloc_flow[v & 7].0));
+        alloc_flow[v & 7] = NonNegativeFixed::from_bits(const_select_u32(has_children as u32, 0, alloc_flow[v & 7].val));
     });
 }
 
@@ -724,7 +730,7 @@ fn compute_pi_kq_for_kq(
     let mut a_max_root = i32::MIN;
     unroll_8_static!(i, {
         let is_r = parent[i & 7] == -1;
-        let a_i = (((q_val_mutated.0 as i32 as i64).wrapping_mul(node_masses[k_actual & 3][i & 7].log2().0 as i32 as i64)) >> 16) as i32;
+        let a_i = (((q_val_mutated.val as i32 as i64).wrapping_mul(node_masses[k_actual & 3][i & 7].log2().val as i32 as i64)) >> 16) as i32;
         a_roots[i & 7] = const_select_u32(is_r as u32, a_i as u32, i32::MIN as u32) as i32;
         a_max_root = const_max_i32(a_max_root, a_roots[i & 7]);
     });
@@ -732,16 +738,16 @@ fn compute_pi_kq_for_kq(
     let mut root_w = [NonNegativeFixed::ZERO; N];
     let mut root_w_sum = NonNegativeFixed::ZERO;
     unroll_8_static!(i, {
-        root_w[i & 7] = NonNegativeFixed(const_select_u32((parent[i & 7] == -1) as u32, SignedFixed(a_roots[i & 7].wrapping_sub(a_max_root)).exp2().0, 0));
+        root_w[i & 7] = NonNegativeFixed::from_bits(const_select_u32((parent[i & 7] == -1) as u32, SignedFixed::from_bits(a_roots[i & 7].wrapping_sub(a_max_root)).exp2().val, 0));
         root_w_sum += root_w[i & 7];
     });
     
     let mut alloc_flow = [NonNegativeFixed::ZERO; N];
     unroll_8_static!(i, {
         let is_r = parent[i & 7] == -1;
-        let r_cond = const_eq_u32(root_w_sum.0, 0);
-        let flow_val = root_w[i & 7].saturating_div(NonNegativeFixed(const_select_u32(r_cond, NonNegativeFixed::ONE.0, root_w_sum.0)));
-        alloc_flow[i & 7] = NonNegativeFixed(const_select_u32(is_r as u32, flow_val.0, 0));
+        let r_cond = const_eq_u32(root_w_sum.val, 0);
+        let flow_val = root_w[i & 7].saturating_div(NonNegativeFixed::from_bits(const_select_u32(r_cond, NonNegativeFixed::ONE.val, root_w_sum.val)));
+        alloc_flow[i & 7] = NonNegativeFixed::from_bits(const_select_u32(is_r as u32, flow_val.val, 0));
     });
     
     let mut rho = [NonNegativeFixed::ZERO; N];
@@ -752,18 +758,18 @@ fn compute_pi_kq_for_kq(
     
     unroll_8_static!(v, {
         let w_sum = local_weights[v & 7][(2 * q_idx) & 7] + local_weights[v & 7][(2 * q_idx + 1) & 7];
-        rho[v & 7] = NonNegativeFixed(const_select_u32(const_eq_u32(w_sum.0, 0), 32768, local_weights[v & 7][(2 * q_idx + 1) & 7].saturating_div(w_sum).0));
+        rho[v & 7] = NonNegativeFixed::from_bits(const_select_u32(const_eq_u32(w_sum.val, 0), 32768, local_weights[v & 7][(2 * q_idx + 1) & 7].saturating_div(w_sum).val));
         
         let mut a_c = [0i32; N];
         let mut a_max_c = i32::MIN;
         unroll_8_static!(c, {
             let is_c = parent[c & 7] == v as i32;
-            a_c[c & 7] = const_select_u32(is_c as u32, (((q_val_mutated.0 as i32 as i64).wrapping_mul(node_masses[k_actual & 3][c & 7].log2().0 as i32 as i64)) >> 16) as u32, i32::MIN as u32) as i32;
+            a_c[c & 7] = const_select_u32(is_c as u32, (((q_val_mutated.val as i32 as i64).wrapping_mul(node_masses[k_actual & 3][c & 7].log2().val as i32 as i64)) >> 16) as u32, i32::MIN as u32) as i32;
             a_max_c = const_max_i32(a_max_c, a_c[c & 7]);
         });
         unroll_8_static!(c, {
             let matches = a_c[c & 7] != i32::MIN;
-            child_w[v & 7][c & 7] = NonNegativeFixed(const_select_u32(matches as u32, SignedFixed(a_c[c & 7].wrapping_sub(a_max_c)).exp2().0, 0));
+            child_w[v & 7][c & 7] = NonNegativeFixed::from_bits(const_select_u32(matches as u32, SignedFixed::from_bits(a_c[c & 7].wrapping_sub(a_max_c)).exp2().val, 0));
             cw_sum[v & 7] += child_w[v & 7][c & 7];
         });
         
@@ -771,12 +777,12 @@ fn compute_pi_kq_for_kq(
         let mut a_max_l = i32::MIN;
         unroll_8_static!(x, {
             let is_sub = is_subtree_leaf[v & 7][x & 7];
-            a_l[x & 7] = const_select_u32(is_sub as u32, (((q_val_mutated.0 as i32 as i64).wrapping_mul(node_masses[k_actual & 3][x & 7].log2().0 as i32 as i64)) >> 16) as u32, i32::MIN as u32) as i32;
+            a_l[x & 7] = const_select_u32(is_sub as u32, (((q_val_mutated.val as i32 as i64).wrapping_mul(node_masses[k_actual & 3][x & 7].log2().val as i32 as i64)) >> 16) as u32, i32::MIN as u32) as i32;
             a_max_l = const_max_i32(a_max_l, a_l[x & 7]);
         });
         unroll_8_static!(x, {
             let matches = a_l[x & 7] != i32::MIN;
-            leaf_w[v & 7][x & 7] = NonNegativeFixed(const_select_u32(matches as u32, SignedFixed(a_l[x & 7].wrapping_sub(a_max_l)).exp2().0, 0));
+            leaf_w[v & 7][x & 7] = NonNegativeFixed::from_bits(const_select_u32(matches as u32, SignedFixed::from_bits(a_l[x & 7].wrapping_sub(a_max_l)).exp2().val, 0));
             lw_sum[v & 7] += leaf_w[v & 7][x & 7];
         });
     });
@@ -913,10 +919,10 @@ pub fn allocate(
     let mut local_last_switch_t = *last_switch_t;
     let mut local_prev_mode = *prev_mode;
 
-    let beta_max = NonNegativeFixed(6553);
-    let m_min = NonNegativeFixed(6);
-    let m_max = NonNegativeFixed(65536000);
-    let mu_max = NonNegativeFixed(6553600);
+    let beta_max = NonNegativeFixed::from_bits(6553);
+    let m_min = NonNegativeFixed::from_bits(6);
+    let m_max = NonNegativeFixed::from_bits(65536000);
+    let mu_max = NonNegativeFixed::from_bits(6553600);
 
     let proof_some = proof.is_some();
     let degrade_to_certified_selection = proof.is_none();
@@ -945,26 +951,26 @@ pub fn allocate(
     let zeta_w_max_q16 = ((crate::generated::stability_profile::ZETA_W_MAX.raw * 65536) / 1_000_000_000) as u32;
     let eta_g_min_q16 = ((crate::generated::stability_profile::ETA_G_MIN.raw * 65536) / 1_000_000_000) as u32;
 
-    let lr_err = const_lt_u32(zeta_w_max_q16, zeta.0) != 0;
+    let lr_err = const_lt_u32(zeta_w_max_q16, zeta.val) != 0;
     let dwell_err = const_lt_u32(tau_d, crate::generated::stability_profile::MODE_DWELL_ROUNDS_MIN) != 0;
     
     let mut q_err = false;
     unroll_4_static!(q_idx, {
-        let q_val = lenses[q_idx & 3].q.0 as i32;
+        let q_val = lenses[q_idx & 3].q.val as i32;
         q_err = q_err | (q_val < -131072) | (q_val > 131072);
     });
 
     let mut price_err = false;
     unroll_8_static!(i, {
-        price_err = price_err | (const_lt_u32(mu_max.0, mu[i & 7].0) != 0);
+        price_err = price_err | (const_lt_u32(mu_max.val, mu[i & 7].val) != 0);
     });
 
-    let eta_err = const_lt_u32(eta.0, eta_g_min_q16) != 0;
+    let eta_err = const_lt_u32(eta.val, eta_g_min_q16) != 0;
 
-    let is_zeta_less = const_lt_u32(zeta.0, beta_max.0);
-    let beta = NonNegativeFixed(const_select_u32(is_zeta_less, zeta.0, beta_max.0));
+    let is_zeta_less = const_lt_u32(zeta.val, beta_max.val);
+    let beta = NonNegativeFixed::from_bits(const_select_u32(is_zeta_less, zeta.val, beta_max.val));
     let beta_m_max_q16 = ((crate::generated::stability_profile::BETA_M_MAX.raw * 65536) / 1_000_000_000) as u32;
-    let beta_err = const_lt_u32(beta_m_max_q16, beta.0) != 0;
+    let beta_err = const_lt_u32(beta_m_max_q16, beta.val) != 0;
 
     let has_error = !gd_ok | digest_err | lr_err | beta_err | eta_err | dwell_err | q_err | price_err;
     let freeze_learning = has_error & degrade_to_certified_selection;
@@ -1110,7 +1116,7 @@ pub fn allocate(
     unroll_8_static!(idx, {
         let matches = const_eq_u32(root_idx as u32, idx as u32);
         unroll_8_static!(e, {
-            root_weights[e & 7] = NonNegativeFixed(const_select_u32(matches, local_weights[idx & 7][e & 7].0, root_weights[e & 7].0));
+            root_weights[e & 7] = NonNegativeFixed::from_bits(const_select_u32(matches, local_weights[idx & 7][e & 7].val, root_weights[e & 7].val));
         });
     });
 
@@ -1118,8 +1124,8 @@ pub fn allocate(
     let mut dom_mode = 0u32;
     unroll_8_static!(e, {
         let w = root_weights[e & 7];
-        let is_greater = const_lt_u32(max_w.0, w.0);
-        max_w = NonNegativeFixed(const_select_u32(is_greater, w.0, max_w.0));
+        let is_greater = const_lt_u32(max_w.val, w.val);
+        max_w = NonNegativeFixed::from_bits(const_select_u32(is_greater, w.val, max_w.val));
         dom_mode = const_select_u32(is_greater, e as u32, dom_mode);
     });
 
@@ -1136,24 +1142,24 @@ pub fn allocate(
         });
 
         unroll_4_static!(q_idx, {
-            let mut _q_val_mutated = SignedFixed(lenses[q_idx & 3].q.0 as i32);
+            let mut _q_val_mutated = SignedFixed::from_bits(lenses[q_idx & 3].q.val as i32);
             #[cfg(feature = "mutant_2")]
             {
-                _q_val_mutated = SignedFixed(0i32.wrapping_sub(_q_val_mutated.0));
+                _q_val_mutated = SignedFixed::from_bits(0i32.wrapping_sub(_q_val_mutated.val));
             }
             let w_flat = local_weights[v & 7][(2 * q_idx) & 7];
             let w_desc = local_weights[v & 7][(2 * q_idx + 1) & 7];
             let is_updating = has_children & update_allowed;
-            local_weights[v & 7][(2 * q_idx) & 7] = NonNegativeFixed(const_select_u32(is_updating as u32, (w_flat * SignedFixed((beta * payoffs[v & 7][(2 * q_idx) & 7]).0 as i32).exp()).0, w_flat.0));
-            local_weights[v & 7][(2 * q_idx + 1) & 7] = NonNegativeFixed(const_select_u32(is_updating as u32, (w_desc * SignedFixed((beta * payoffs[v & 7][(2 * q_idx + 1) & 7]).0 as i32).exp()).0, w_desc.0));
+            local_weights[v & 7][(2 * q_idx) & 7] = NonNegativeFixed::from_bits(const_select_u32(is_updating as u32, (w_flat * SignedFixed::from_bits((beta * payoffs[v & 7][(2 * q_idx) & 7]).val as i32).exp()).val, w_flat.val));
+            local_weights[v & 7][(2 * q_idx + 1) & 7] = NonNegativeFixed::from_bits(const_select_u32(is_updating as u32, (w_desc * SignedFixed::from_bits((beta * payoffs[v & 7][(2 * q_idx + 1) & 7]).val as i32).exp()).val, w_desc.val));
         });
         
         unroll_4_static!(q_idx, {
             let w_flat = local_weights[v & 7][(2 * q_idx) & 7];
             let w_desc = local_weights[v & 7][(2 * q_idx + 1) & 7];
             let sum_div = w_flat + w_desc;
-            local_weights[v & 7][(2 * q_idx) & 7] = NonNegativeFixed(const_select_u32(update_allowed as u32, w_flat.saturating_div(sum_div).0, w_flat.0));
-            local_weights[v & 7][(2 * q_idx + 1) & 7] = NonNegativeFixed(const_select_u32(update_allowed as u32, w_desc.saturating_div(sum_div).0, w_desc.0));
+            local_weights[v & 7][(2 * q_idx) & 7] = NonNegativeFixed::from_bits(const_select_u32(update_allowed as u32, w_flat.saturating_div(sum_div).val, w_flat.val));
+            local_weights[v & 7][(2 * q_idx + 1) & 7] = NonNegativeFixed::from_bits(const_select_u32(update_allowed as u32, w_desc.saturating_div(sum_div).val, w_desc.val));
         });
     });
 
@@ -1164,14 +1170,14 @@ pub fn allocate(
     unroll_8_static!(idx, {
         let matches = const_eq_u32(root_idx as u32, idx as u32);
         unroll_8_static!(e, {
-            root_weights[e & 7] = NonNegativeFixed(const_select_u32(matches, local_weights[idx & 7][e & 7].0, root_weights[e & 7].0));
+            root_weights[e & 7] = NonNegativeFixed::from_bits(const_select_u32(matches, local_weights[idx & 7][e & 7].val, root_weights[e & 7].val));
         });
     });
     
     unroll_8_static!(e, {
         let w = root_weights[e & 7];
-        let is_greater = const_lt_u32(new_max_w.0, w.0);
-        new_max_w = NonNegativeFixed(const_select_u32(is_greater, w.0, new_max_w.0));
+        let is_greater = const_lt_u32(new_max_w.val, w.val);
+        new_max_w = NonNegativeFixed::from_bits(const_select_u32(is_greater, w.val, new_max_w.val));
         new_dom_mode = const_select_u32(is_greater, e as u32, new_dom_mode);
     });
 
@@ -1188,9 +1194,9 @@ pub fn allocate(
         const k_actual: usize = k;
         
         unroll_4_static!(q_idx, {
-            let q_val_mutated = SignedFixed(lenses[q_idx & 3].q.0 as i32);
+            let q_val_mutated = SignedFixed::from_bits(lenses[q_idx & 3].q.val as i32);
             #[cfg(feature = "mutant_2")]
-            let q_val_mutated = SignedFixed(0i32.wrapping_sub(q_val_mutated.0));
+            let q_val_mutated = SignedFixed::from_bits(0i32.wrapping_sub(q_val_mutated.val));
             
             let res_kq = compute_pi_kq_for_kq(
                 k_actual,
@@ -1224,10 +1230,10 @@ pub fn allocate(
         #[cfg(not(feature = "mutant_5"))]
         let mu_actual = clip(mu[x & 7], NonNegativeFixed::ZERO, mu_max);
         
-        let p = pi_combined[x & 7] * SignedFixed(0i32.wrapping_sub((mu_actual * costs[x & 7]).0 as i32)).exp();
-        priced_sum += NonNegativeFixed(const_select_u32(is_leaf[x & 7] as u32, p.0, 0));
+        let p = pi_combined[x & 7] * SignedFixed::from_bits(0i32.wrapping_sub((mu_actual * costs[x & 7]).val as i32)).exp();
+        priced_sum += NonNegativeFixed::from_bits(const_select_u32(is_leaf[x & 7] as u32, p.val, 0));
     });
-    let psd = NonNegativeFixed(const_select_u32(const_eq_u32(priced_sum.0, 0), NonNegativeFixed::ONE.0, priced_sum.0));
+    let psd = NonNegativeFixed::from_bits(const_select_u32(const_eq_u32(priced_sum.val, 0), NonNegativeFixed::ONE.val, priced_sum.val));
     let mut nl = 0u32;
     unroll_8_static!(i, { nl += is_leaf[i & 7] as u32; });
     unroll_8_static!(x, {
@@ -1236,7 +1242,7 @@ pub fn allocate(
         #[cfg(not(feature = "mutant_5"))]
         let mu_actual = clip(mu[x & 7], NonNegativeFixed::ZERO, mu_max);
         
-        let p_mu = (pi_combined[x & 7] * SignedFixed(0i32.wrapping_sub((mu_actual * costs[x & 7]).0 as i32)).exp()).saturating_div(psd);
+        let p_mu = (pi_combined[x & 7] * SignedFixed::from_bits(0i32.wrapping_sub((mu_actual * costs[x & 7]).val as i32)).exp()).saturating_div(psd);
         
         #[cfg(feature = "mutant_4")]
         let eta_actual = zeta;
@@ -1247,17 +1253,17 @@ pub fn allocate(
         let mut nl_recip = NonNegativeFixed::ZERO;
         unroll_9_static!(idx, {
             let matches = const_eq_u32(nl, idx as u32);
-            nl_recip = NonNegativeFixed(const_select_u32(matches, LEAF_RECIP[idx].0, nl_recip.0));
+            nl_recip = NonNegativeFixed::from_bits(const_select_u32(matches, LEAF_RECIP[idx].val, nl_recip.val));
         });
         
         let val = (eta_actual * nl_recip) + ((NonNegativeFixed::ONE - eta_actual) * p_mu);
         let pi_val = pi_res[x & 7];
-        pi_res[x & 7] = NonNegativeFixed(const_select_u32(is_leaf[x & 7] as u32, val.0, pi_val.0));
+        pi_res[x & 7] = NonNegativeFixed::from_bits(const_select_u32(is_leaf[x & 7] as u32, val.val, pi_val.val));
     });
 
     let has_refusal = has_error & !degrade_to_certified_selection;
     unroll_8_static!(v, {
-        unroll_8_static!(e, { weights[v & 7][e & 7] = NonNegativeFixed(const_select_u32(has_refusal as u32, weights[v & 7][e & 7].0, local_weights[v & 7][e & 7].0)); });
+        unroll_8_static!(e, { weights[v & 7][e & 7] = NonNegativeFixed::from_bits(const_select_u32(has_refusal as u32, weights[v & 7][e & 7].val, local_weights[v & 7][e & 7].val)); });
     });
     *last_switch_t = const_select_u32(has_refusal as u32, *last_switch_t, local_last_switch_t);
     *prev_mode = const_select_u32(has_refusal as u32, *prev_mode, local_prev_mode);
