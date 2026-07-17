@@ -18,6 +18,8 @@ pub mod compiler;
 pub mod const_scheduler;
 pub mod enterprise;
 pub mod dispatcher;
+pub mod ocel;
+pub mod receipt_worker;
 pub mod scheduler;
 pub mod scheduler_wide;
 pub mod scheduler_wired;

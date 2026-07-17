@@ -1,6 +1,29 @@
 //! Wired scheduler — bcinr-logic primitives driving the POWL hot path.
 //!
-//! Three primitives from `bcinr-logic` replace hand-rolled equivalents:
+//! # Branchless invariant
+//!
+//! The hot path in `petri_tick` (post-fire loop) is fully branchless for per-op
+//! kind dispatch: `XorDispatch` and `LoopRedo` effects are applied via
+//! `apply_xor_dispatch` / `apply_loop_redo` predicated helpers — no `if`/`match`
+//! inside the per-op body generates a conditional branch instruction.
+//!
+//! `build_transition_arrays` likewise computes `effective_pred` for `Join` ops
+//! with `kind_mask` arithmetic, not a `match` arm.
+//!
+//! The outer `while fm != 0` bit-scan loop in `petri_tick` is the standard CTZ
+//! idiom; its iteration count equals `firing_mask.count_ones()`, not a predicate.
+//!
+//! # What is NOT branchless
+//!
+//! - The early-exit `if candidates == 0 { return 0; }` guard (one branch per tick,
+//!   unavoidable without changing the public API).
+//! - The `if let Some(r)` / `if let Some(er)` ring-push guards (cold path, optional
+//!   feature; not on the hot firing path).
+//! - The `match PriorityPetriEngine::new_checked(...)` error guard (one branch per
+//!   tick, cold path).
+//! - `dispatch_successors`: inner `if let Some(r)` is structural, not per-kind.
+//!
+//! # Primitives from `bcinr-logic`
 //!
 //! - **`PriorityPetriEngine`** — branchless priority-ordered transition firing
 //!   for ≤64 ops. Replaces the `trailing_zeros` bit-scan loop in `scheduler_tick`.
@@ -35,6 +58,63 @@ use bcinr_logic::{
 };
 
 use crate::tape::{OpKind, Powl64Op};
+
+// ---------------------------------------------------------------------------
+// Branchless helpers (duplicated from scheduler.rs — private, proven)
+// ---------------------------------------------------------------------------
+
+/// Branchless OpKind equality mask.
+///
+/// Returns `u64::MAX` when `kind == target`, `0` otherwise.
+///
+/// Proof: `diff = (kind as u8) ^ (target as u8)`. Zero iff equal.
+/// `(diff | diff.wrapping_neg()) >> 7` sets bit 7 iff diff != 0. Then
+/// `nz.wrapping_sub(1)` maps 0 → u64::MAX, 1 → 0. ∎
+#[inline(always)]
+fn kind_mask(kind: OpKind, target: OpKind) -> u64 {
+    let diff = (kind as u8) ^ (target as u8);
+    let nz = (((diff | diff.wrapping_neg()) >> 7) & 1) as u64;
+    nz.wrapping_sub(1)
+}
+
+/// Branchless XorDispatch handler.
+///
+/// When `op.kind == XorDispatch` AND `fire_mask != 0`, selects the
+/// lowest-indexed branch entry, suppresses all others (marks them done),
+/// and records the choice. All side-effects are predicated through `active`.
+///
+/// Returns `done_delta` — caller does `new_done |= done_delta`.
+#[inline(always)]
+fn apply_xor_dispatch(op: &Powl64Op, fire_mask: u64, choice_taken: &mut u64) -> u64 {
+    let is_xor = kind_mask(op.kind, OpKind::XorDispatch);
+    let fire_nz = 0u64.wrapping_sub((fire_mask | fire_mask.wrapping_neg()) >> 63);
+    let active = is_xor & fire_nz;
+
+    let chosen = op.branch_mask & op.branch_mask.wrapping_neg(); // lowest set bit
+    let suppressed = op.branch_mask & !chosen;
+
+    *choice_taken |= chosen & active;
+    suppressed & active
+}
+
+/// Branchless LoopRedo handler.
+///
+/// When `op.kind == LoopRedo` AND `fire_mask != 0`, resets body entries in
+/// done (so they can fire again), adds them to check, and increments the
+/// per-slot loop counter by exactly 0 or 1 — no branch.
+///
+/// Returns `(done_clear_mask, check_delta)`.
+#[inline(always)]
+fn apply_loop_redo(op: &Powl64Op, fire_mask: u64, loop_iter: &mut u8) -> (u64, u64) {
+    let is_redo = kind_mask(op.kind, OpKind::LoopRedo);
+    let fire_nz = 0u64.wrapping_sub((fire_mask | fire_mask.wrapping_neg()) >> 63);
+    let active = is_redo & fire_nz;
+
+    *loop_iter = loop_iter.saturating_add((active & 1) as u8);
+
+    let body = op.succ_mask & active;
+    (body, body)
+}
 
 // ---------------------------------------------------------------------------
 // PowlPetriState — hot state using KBitSet<1> (64-op tapes)
@@ -93,48 +173,41 @@ pub struct WorkItem {
 }
 
 // ---------------------------------------------------------------------------
+// EventWorkItem — dispatched to event ring for off-hot-path BLAKE3 hashing
+// ---------------------------------------------------------------------------
+
+/// One fired-op event, pushed to the event ring after each fire.
+/// The ring drains asynchronously via `ReceiptWorker`; BLAKE3 never called
+/// inside `petri_tick`.
+#[derive(Clone, Copy, Default)]
+pub struct EventWorkItem {
+    /// Op index (0..63) that fired.
+    pub op_idx: u32,
+    /// Run-id of the workflow instance.
+    pub run_id: u64,
+    /// Cumulative op-trace bitmask (all ops fired so far this run, OR'd in).
+    pub op_trace_so_far: u64,
+    /// `OpKind` discriminant for receipt classification.
+    pub kind_tag: u8,
+}
+
+// ---------------------------------------------------------------------------
 // PowlPetriEngine — wired tick
 // ---------------------------------------------------------------------------
 
 /// Max parallel branches dispatched to the ring per tick.
 const RING_CAPACITY: usize = 64;
 
-/// Drives one scheduler tick using `PriorityPetriEngine` branchless core.
+/// Build per-transition input/output KBitSets and op-index table for `PriorityPetriEngine`.
 ///
-/// # What changes vs `scheduler_tick`
-///
-/// | Old | New |
-/// |-----|-----|
-/// | Manual `trailing_zeros` bit-scan | `PriorityPetriEngine::step()` — proven, `inline(always)` |
-/// | No SLA detection | `TimeWheel::tick()` fires due mask, ORed into `sla_breached` |
-/// | No parallel dispatch | `LockFreeMpmcRing::push_t1` for concurrent branches |
-///
-/// Returns the bitmask of ops fired this tick.
+/// Returns `(inputs, outputs, op_indices)` where each live slot `t` corresponds
+/// to one enabled candidate op.
 #[inline(always)]
-pub fn petri_tick(
+fn build_transition_arrays(
     tape: &[Powl64Op],
-    state: &mut PowlPetriState,
-    ring: Option<&LockFreeMpmcRing<WorkItem, RING_CAPACITY>>,
-) -> u64 {
-    // --- SLA wheel: drain any expired deadlines ---
-    let sla_due = state.sla_wheel.tick();
-    state.sla_breached |= sla_due;
-
-    let done = state.done.words[0];
-    let candidates = state.check.words[0] & !done;
-
-    if candidates == 0 {
-        return 0;
-    }
-
-    // Build per-transition input/output KBitSets for PriorityPetriEngine.
-    // Each enabled candidate is a potential transition: input = pred_mask, output = op_bit.
-    // We collect up to 64 candidates in priority order (lowest index first).
-    let _n = candidates.count_ones() as usize;
-
-    // Stack-allocate the transition arrays (no heap).
-    // Unused slots get input=!0 (all bits required) — never satisfied unless all ops done.
-    // This prevents spurious firing in PriorityPetriEngine's fixed-size 64-slot array.
+    candidates: u64,
+    choice_taken: u64,
+) -> ([KBitSet<1>; 64], [KBitSet<1>; 64], [u32; 64]) {
     let mut inputs  = [KBitSet::<1> { words: [!0u64] }; 64];
     let mut outputs = [KBitSet::<1> { words: [0] }; 64];
     let mut op_indices = [u32::MAX; 64];
@@ -149,23 +222,85 @@ pub fn petri_tick(
         let op_bit = 1u64 << i;
 
         // Effective pred for XOR-join: unchosen branches are virtually done.
-        let effective_pred = match op.kind {
-            OpKind::Join => {
-                let unchosen = op.pred_mask & !state.choice_taken;
-                op.pred_mask & !unchosen
-            }
-            _ => op.pred_mask,
-        };
+        // Branchless: kind_mask selects between join_effective and pred_mask.
+        // For Join: pred_mask & choice_taken (unchosen slots excluded).
+        // For all other kinds: pred_mask unchanged.
+        let is_join = kind_mask(op.kind, OpKind::Join);
+        let join_effective = op.pred_mask & choice_taken;
+        let effective_pred = (join_effective & is_join) | (op.pred_mask & !is_join);
 
         // POWL done-set is monotone: tokens never leave.
-        // Map to Petri net by restoring consumed pred tokens in the output:
-        // output = effective_pred | op_bit
-        // Net effect: state gains op_bit; pred bits stay in marking.
+        // output = effective_pred | op_bit so net effect is: state gains op_bit.
         inputs[t]  = KBitSet { words: [effective_pred] };
         outputs[t] = KBitSet { words: [effective_pred | op_bit] };
         op_indices[t] = i as u32;
         t += 1;
     }
+
+    (inputs, outputs, op_indices)
+}
+
+/// Push enabled successors of a fired op to the parallel dispatch ring.
+#[inline(always)]
+fn dispatch_successors(
+    tape: &[Powl64Op],
+    op_idx: usize,
+    new_done: u64,
+    ring: Option<&LockFreeMpmcRing<WorkItem, RING_CAPACITY>>,
+) {
+    if let Some(r) = ring {
+        let mut succ_bits = tape[op_idx].succ_mask & !new_done;
+        while succ_bits != 0 {
+            let s = succ_bits.trailing_zeros() as usize;
+            succ_bits &= succ_bits - 1;
+            r.push_t1(WorkItem { op_idx: s as u32, succ_mask: tape[s].succ_mask });
+        }
+    }
+}
+
+/// Result returned by `petri_tick`.
+pub struct PetriTickResult {
+    /// Bitmask of ops fired this tick.
+    pub fired_ops: u64,
+    /// Number of event ring overflow events encountered this tick.
+    pub event_overflow_count: u32,
+}
+
+/// Drives one scheduler tick using `PriorityPetriEngine` branchless core.
+///
+/// # What changes vs `scheduler_tick`
+///
+/// | Old | New |
+/// |-----|-----|
+/// | Manual `trailing_zeros` bit-scan | `PriorityPetriEngine::step()` — proven, `inline(always)` |
+/// | No SLA detection | `TimeWheel::tick()` fires due mask, ORed into `sla_breached` |
+/// | No parallel dispatch | `LockFreeMpmcRing::push_t1` for concurrent branches |
+///
+/// Returns a `PetriTickResult` with the bitmask of ops fired and overflow count.
+#[inline(always)]
+pub fn petri_tick(
+    tape: &[Powl64Op],
+    state: &mut PowlPetriState,
+    ring: Option<&LockFreeMpmcRing<WorkItem, RING_CAPACITY>>,
+    event_ring: Option<&LockFreeMpmcRing<EventWorkItem, RING_CAPACITY>>,
+    run_id: u64,
+) -> PetriTickResult {
+    let mut overflow_count: u32 = 0;
+
+    // --- SLA wheel: drain any expired deadlines ---
+    let sla_due = state.sla_wheel.tick();
+    state.sla_breached |= sla_due;
+
+    let done = state.done.words[0];
+    let candidates = state.check.words[0] & !done;
+
+    if candidates == 0 {
+        return PetriTickResult { fired_ops: 0, event_overflow_count: 0 };
+    }
+
+    // Build per-transition arrays for PriorityPetriEngine (stack-allocated, no heap).
+    let (inputs, outputs, op_indices) =
+        build_transition_arrays(tape, candidates, state.choice_taken);
 
     // Construct engine over the live slice. The engine fires transitions in
     // priority order (index 0 first) and accumulates the firing_mask.
@@ -177,7 +312,7 @@ pub fn petri_tick(
         outputs,
     ) {
         Ok(e) => e,
-        Err(_) => return 0,
+        Err(_) => return PetriTickResult { fired_ops: 0, event_overflow_count: 0 },
     };
 
     let firing_mask_64 = engine.step();
@@ -187,7 +322,7 @@ pub fn petri_tick(
     // Use it as new_done instead of accumulating from firing_mask.
     let mut new_done = engine.state.current.words[0];
     let mut new_check = 0u64;
-    let mut fired_ops = 0u64;
+    let mut fired_ops_accumulator = 0u64;
 
     let mut fm = firing_mask_64;
     while fm != 0 {
@@ -201,42 +336,40 @@ pub fn petri_tick(
         let op = &tape[i];
         let op_bit = 1u64 << i;
 
-        fired_ops |= op_bit;
+        fired_ops_accumulator |= op_bit;
         new_done  |= op_bit;
         new_check |= op.succ_mask;
 
-        // XorDispatch: pick lowest-index branch, suppress others.
-        if op.kind == OpKind::XorDispatch {
-            let chosen = op.branch_mask & op.branch_mask.wrapping_neg();
-            let suppressed = op.branch_mask & !chosen;
-            new_done |= suppressed;
-            state.choice_taken |= chosen;
-        }
-
-        // LoopRedo: re-enable body entries.
-        if op.kind == OpKind::LoopRedo {
-            new_done &= !op.succ_mask;
-            new_check |= op.succ_mask;
-            let iter = &mut state.loop_iters[i];
-            *iter = iter.saturating_add(1);
-        }
-
-        // Parallel dispatch: push enabled successors to the ring.
-        if let Some(r) = ring {
-            let mut succ_bits = op.succ_mask & !new_done;
-            while succ_bits != 0 {
-                let s = succ_bits.trailing_zeros() as usize;
-                succ_bits &= succ_bits - 1;
-                let item = WorkItem { op_idx: s as u32, succ_mask: tape[s].succ_mask };
-                r.push_t1(item); // non-blocking; returns u32::MAX on success
+        // Off hot-path: push fire event to event_ring for ReceiptWorker to drain.
+        // BLAKE3 is never computed here — only a cheap push_t1 (~10 ns).
+        if let Some(er) = event_ring {
+            let pushed = er.push_t1(EventWorkItem {
+                op_idx: i as u32,
+                run_id,
+                op_trace_so_far: fired_ops_accumulator,
+                kind_tag: op.kind as u8,
+            });
+            if pushed == 0 {
+                overflow_count += 1;
             }
         }
+
+        // XorDispatch: branchless — pick lowest-index branch, suppress others.
+        new_done |= apply_xor_dispatch(op, op_bit, &mut state.choice_taken);
+
+        // LoopRedo: branchless — re-enable body entries.
+        let (redo_clear, redo_check) = apply_loop_redo(op, op_bit, &mut state.loop_iters[i]);
+        new_done &= !redo_clear;
+        new_check |= redo_check;
+
+        // Parallel dispatch: push enabled successors to the ring.
+        dispatch_successors(tape, i, new_done, ring);
     }
 
     state.done.words[0] = new_done;
     state.check.words[0] = new_check & !new_done;
 
-    fired_ops
+    PetriTickResult { fired_ops: fired_ops_accumulator, event_overflow_count: overflow_count }
 }
 
 // ---------------------------------------------------------------------------
@@ -374,7 +507,7 @@ mod tests {
         let mut total_fired = 0u64;
         for _ in 0..10 {
             if state.check.words[0] == 0 { break; }
-            total_fired += petri_tick(&ops, &mut state, None).count_ones() as u64;
+            total_fired += petri_tick(&ops, &mut state, None, None, 0).fired_ops.count_ones() as u64;
         }
         assert_eq!(total_fired, 3, "all 3 ops must fire");
         assert_eq!(state.done.words[0], 0b111, "all done");
@@ -396,7 +529,7 @@ mod tests {
         let mut ticks = 0u32;
         let mut total = 0u64;
         while state.check.words[0] != 0 && ticks < 10 {
-            total += petri_tick(&ops, &mut state, None).count_ones() as u64;
+            total += petri_tick(&ops, &mut state, None, None, 0).fired_ops.count_ones() as u64;
             ticks += 1;
         }
         // 4 parallel + 1 join = 5 ops total
@@ -412,7 +545,7 @@ mod tests {
         state.schedule_sla(3, 0);
         // Run 4 ticks (op fires on tick 1, SLA expires on tick 3).
         for _ in 0..4 {
-            petri_tick(&ops, &mut state, None);
+            petri_tick(&ops, &mut state, None, None, 0);
         }
         // sla_breached should have bit 0 set after tick 3.
         assert_ne!(state.sla_breached & 1, 0, "op 0 SLA breach should be recorded");
@@ -442,5 +575,18 @@ mod tests {
         let mut check_mask = [0u64; 8];
         propagate_check_mask_large(fired_words, &succ_table, &mut check_mask, &done_mask);
         assert_eq!(check_mask[0], 0b10, "op 1 should be in check_mask");
+    }
+
+    #[test]
+    fn petri_tick_result_has_fired_ops_field() {
+        let tape = compile_powl(&PowlAstNode::Sequence(vec![
+            PowlAstNode::Atom("a"),
+            PowlAstNode::Atom("b"),
+        ])).unwrap();
+        let ops = tape_ops(&tape);
+        let mut state = PowlPetriState::new(tape.entry_mask);
+        let result = petri_tick(&ops, &mut state, None, None, 0);
+        assert_ne!(result.fired_ops, 0, "at least one op must fire on first tick");
+        assert_eq!(result.event_overflow_count, 0, "no event ring present, no overflow");
     }
 }
