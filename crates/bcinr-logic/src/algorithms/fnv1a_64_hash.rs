@@ -215,6 +215,7 @@ mod tests {
 
 #[cfg(feature = "bench")]
 pub mod bench {
+    use alloc::vec::Vec;
     use super::*;
     use criterion::{black_box, Criterion};
 
