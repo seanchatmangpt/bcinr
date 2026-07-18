@@ -216,11 +216,21 @@ dependencies = [
 
 [[package]]
 name = "bcinr-cmca"
-version = "26.6.24"
+version = "26.7.17"
 dependencies = [
  "bcinr-logic",
+ "blake3",
  "proptest",
+ "serde",
+ "serde_json",
  "trybuild",
+]
+
+[[package]]
+name = "bcinr-cmca-audit-harness"
+version = "0.1.0"
+dependencies = [
+ "bcinr-cmca",
 ]
 
 [[package]]
@@ -244,7 +254,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-logic"
-version = "26.6.24"
+version = "26.7.17"
 dependencies = [
  "criterion",
  "proptest",

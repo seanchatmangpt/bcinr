@@ -1,22 +1,55 @@
 [package]
 name = "bcinr-cmca"
-version = "26.6.24"
+version = "26.7.17"
 edition = "2021"
 description = "CMCA-RDF deterministic substrate crate"
 license = "MIT OR Apache-2.0"
 rust-version = "1.70"
+repository = "https://github.com/seanchatmangpt/bcinr"
+readme = "../../README.md"
+keywords = ["branchless", "cmca", "deterministic"]
+# quarantine/ holds superseded legacy RDF generator/ontology sources, kept in-tree
+# for historical reference (see quarantine/README.md) but not reachable from any
+# production build, packaged test, or fixture path (tests/fixtures/pre_migration/
+# is the frozen byte-equivalence baseline captured *from* the quarantined
+# generator and is retained; only quarantine/ itself is excluded from the
+# published package).
+exclude = ["quarantine/**"]
 
 [dependencies]
-bcinr-logic = { path = "../bcinr-logic", version = "26.6.24" }
+bcinr-logic = { path = "../bcinr-logic", version = "26.7.17" }
 
 [dev-dependencies]
 trybuild = "1.0"
 proptest = "1.2.0"
+# Test-time-only deps for Gamma_CMCA artifact verification (src/artifact.rs,
+# gated #[cfg(test)] in lib.rs). Kept as dev-dependencies (not
+# [dependencies]) so non-test builds of bcinr-cmca carry zero additional
+# runtime dependency beyond bcinr-logic; see src/artifact.rs module docs.
+blake3 = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 [features]
 default = []
 alloc = []
 std = ["bcinr-logic/std", "alloc"]
+# Default-off: gates `src/generated_artifact/` (mfw-producer-sourced Gamma_CMCA
+# modules). Compiling that module unconditionally currently fails (611 errors:
+# the producer's cmca_generated.rs calls fixed-point constructors/fields this
+# crate's src/fixed.rs API does not expose under those names). See
+# src/generated_artifact/mod.rs and src/lib.rs for the full account. Not
+# enabled by any other feature; flip on only once src/fixed.rs's owning task
+# reconciles the API surface.
+generated_artifact_pending = []
+# Default-off, dev-only: gates `src/alloc_counter.rs`'s `CountingAlloc` global
+# allocator and `tests/alloc_gate.rs`, which installs it as the process's
+# `#[global_allocator]` to assert zero heap allocations across a call to the
+# authoritative `allocator::allocate()` root. Never enabled by default or by
+# any other feature, and never linked into non-test/non-gated builds, since
+# installing a non-default global allocator is process-wide and would corrupt
+# any other test binary compiled in the same feature set.
+alloc-gate = []
 mutant_1 = []
 mutant_2 = []
 mutant_3 = []
