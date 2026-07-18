@@ -115,7 +115,9 @@ fn run_mock_scanner(src: &str, rule: RuleId) -> bool {
     match rule {
         RuleId::SelfCancelingOperations => {
             if let Ok(syntax) = syn::parse_file(src) {
-                struct CancelVisitor { found: bool }
+                struct CancelVisitor {
+                    found: bool,
+                }
                 impl<'ast> syn::visit::Visit<'ast> for CancelVisitor {
                     fn visit_expr(&mut self, i: &'ast syn::Expr) {
                         if let syn::Expr::Binary(b) = i {
@@ -130,7 +132,8 @@ fn run_mock_scanner(src: &str, rule: RuleId) -> bool {
                                 if let syn::Expr::MethodCall(mc) = &*b.left {
                                     if mc.method == "wrapping_add" {
                                         let receiver = &mc.receiver;
-                                        let rec_str = quote::quote!(#receiver).to_string().replace(" ", "");
+                                        let rec_str =
+                                            quote::quote!(#receiver).to_string().replace(" ", "");
                                         if rec_str == right_str {
                                             self.found = true;
                                         }
@@ -161,7 +164,10 @@ fn run_mock_scanner(src: &str, rule: RuleId) -> bool {
                         syn::visit::visit_item_fn(self, i);
                     }
                 }
-                let mut v = OracleVisitor { functions: std::collections::HashMap::new(), circular: false };
+                let mut v = OracleVisitor {
+                    functions: std::collections::HashMap::new(),
+                    circular: false,
+                };
                 syn::visit::Visit::visit_file(&mut v, &syntax);
                 for (name, body) in &v.functions {
                     if name.ends_with("_reference") {
@@ -178,7 +184,9 @@ fn run_mock_scanner(src: &str, rule: RuleId) -> bool {
         }
         RuleId::MagicConstants => {
             if let Ok(syntax) = syn::parse_file(src) {
-                struct MagicVisitor { found: bool }
+                struct MagicVisitor {
+                    found: bool,
+                }
                 impl<'ast> syn::visit::Visit<'ast> for MagicVisitor {
                     fn visit_expr(&mut self, i: &'ast syn::Expr) {
                         if let syn::Expr::Lit(l) = i {
@@ -204,7 +212,11 @@ fn run_mock_scanner(src: &str, rule: RuleId) -> bool {
         RuleId::BoilerplateVerificationClaims => {
             let mut hoare_count = 0;
             for line in src.lines() {
-                if line.contains("Hoare-logic Verification Line") && line.contains("Branchless path is the unique solution to the state constraints of") {
+                if line.contains("Hoare-logic Verification Line")
+                    && line.contains(
+                        "Branchless path is the unique solution to the state constraints of",
+                    )
+                {
                     hoare_count += 1;
                 }
             }
@@ -212,7 +224,9 @@ fn run_mock_scanner(src: &str, rule: RuleId) -> bool {
         }
         RuleId::ScannerEvasion => {
             if let Ok(syntax) = syn::parse_file(src) {
-                struct EvasionVisitor { found: bool }
+                struct EvasionVisitor {
+                    found: bool,
+                }
                 impl<'ast> syn::visit::Visit<'ast> for EvasionVisitor {
                     fn visit_item_macro(&mut self, i: &'ast syn::ItemMacro) {
                         if let Some(ident) = i.mac.path.get_ident() {
@@ -235,13 +249,16 @@ fn run_mock_scanner(src: &str, rule: RuleId) -> bool {
         }
         RuleId::BenchmarkTheater => {
             if let Ok(syntax) = syn::parse_file(src) {
-                struct BenchVisitor { found: bool }
+                struct BenchVisitor {
+                    found: bool,
+                }
                 impl<'ast> syn::visit::Visit<'ast> for BenchVisitor {
                     fn visit_expr(&mut self, i: &'ast syn::Expr) {
                         if let syn::Expr::MethodCall(mc) = i {
                             if mc.method == "bench_function" || mc.method == "iter" {
                                 let arg_str = quote::quote!(#mc).to_string();
-                                if arg_str.contains("branchless") && !arg_str.contains("black_box") {
+                                if arg_str.contains("branchless") && !arg_str.contains("black_box")
+                                {
                                     self.found = true;
                                 }
                             }
@@ -267,15 +284,36 @@ fn run_mock_scanner(src: &str, rule: RuleId) -> bool {
 
 #[test]
 fn test_cheat_rules_matrix() {
-    assert!(run_mock_scanner(FIXTURE_CHEAT_001_A, RuleId::SelfCancelingOperations));
-    assert!(run_mock_scanner(FIXTURE_CHEAT_001_B, RuleId::SelfCancelingOperations));
+    assert!(run_mock_scanner(
+        FIXTURE_CHEAT_001_A,
+        RuleId::SelfCancelingOperations
+    ));
+    assert!(run_mock_scanner(
+        FIXTURE_CHEAT_001_B,
+        RuleId::SelfCancelingOperations
+    ));
     assert!(run_mock_scanner(FIXTURE_CHEAT_002, RuleId::CircularOracle));
     assert!(run_mock_scanner(FIXTURE_CHEAT_003, RuleId::MagicConstants));
-    assert!(run_mock_scanner(FIXTURE_CHEAT_004, RuleId::ArtificialFileInflation));
-    assert!(run_mock_scanner(FIXTURE_CHEAT_005, RuleId::BoilerplateVerificationClaims));
+    assert!(run_mock_scanner(
+        FIXTURE_CHEAT_004,
+        RuleId::ArtificialFileInflation
+    ));
+    assert!(run_mock_scanner(
+        FIXTURE_CHEAT_005,
+        RuleId::BoilerplateVerificationClaims
+    ));
     assert!(run_mock_scanner(FIXTURE_CHEAT_006, RuleId::ScannerEvasion));
-    assert!(run_mock_scanner(FIXTURE_CHEAT_007, RuleId::DeadPathCompliance));
-    assert!(run_mock_scanner(FIXTURE_CHEAT_008, RuleId::BenchmarkTheater));
+    assert!(run_mock_scanner(
+        FIXTURE_CHEAT_007,
+        RuleId::DeadPathCompliance
+    ));
+    assert!(run_mock_scanner(
+        FIXTURE_CHEAT_008,
+        RuleId::BenchmarkTheater
+    ));
     assert!(run_mock_scanner(FIXTURE_CHEAT_009, RuleId::MutantTheater));
-    assert!(run_mock_scanner(FIXTURE_CHEAT_031, RuleId::BlackBoxBranchlessnessClaim));
+    assert!(run_mock_scanner(
+        FIXTURE_CHEAT_031,
+        RuleId::BlackBoxBranchlessnessClaim
+    ));
 }
