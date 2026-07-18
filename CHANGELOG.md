@@ -5,6 +5,123 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [26.7.17] - 2026-07-17
+
+### Added
+
+- **`bcinr-cmca` artifact-consumer boundary (`src/artifact.rs`)**: new `Gamma_CMCA` verification
+  module (`verify_generated_profile`, doc line 172) that typed-checks a generated artifact's
+  schema version, payload digest, manifest/payload agreement, dimensions, table lengths,
+  registry bounds/uniqueness, numeric-profile compatibility, formula-registry compatibility, and
+  floor-table conservation, each backed by a dedicated refusal test. `cargo tree -p bcinr-cmca`
+  shows no `mfw`/`oxigraph`/`praxis-graphlaw` entries; the crate's only path dependency is
+  `bcinr-logic` (PHASE1_CONSUMER_VERDICT.md checks 3-5). RDF admission and Gamma_CMCA generation
+  now live in `mfw` as a release-time producer; `bcinr-cmca` consumes the committed,
+  digest-verified artifact rather than parsing RDF/Turtle or invoking a generator itself
+  (`crates/bcinr-cmca/src/` contains no RDF/SHACL/ShEx/pyo3/`Command::new("python")` code paths —
+  PHASE1_CONSUMER_VERDICT.md check 1).
+- **C2/C3 authority chain — six new sealed modules**: `proposal.rs`, `shadow.rs`, `jump.rs`,
+  `stability.rs`, `certification.rs`, `mode_switch.rs`, realizing the
+  Measurement -> ModeProposal -> AdmittedProposal -> ShadowExecutionReceipt ->
+  JumpAnalysisReceipt -> StabilityCandidate -> CertificateReceipt -> DwellSatisfied ->
+  CertifiedLearning -> CertifiedModeSwitch -> AtomicSwitch chain as sealed types with private
+  fields and `admit_*`/`seal_*` constructors (63 lib unit tests pass across these modules,
+  PHASE2_RUNTIME_CLOSURE_VERDICT.md). `Observatory::evaluate_calibration` no longer constructs a
+  `CertificateReceipt` directly — it returns an `ObservatoryOutcome`; certificate minting moved
+  to a distinct `seal_certificate` step that independently checks the sealing witness plus 11
+  named bindings (`admitted_graph`, `generated_payload`, `kernel_specialization_identity`,
+  `numeric_profile`, `q_registry`, `pricing_law`, `floor_law`, `control_mode`, `influence_state`,
+  `comparison_derivation`, `round_identity`), each with its own typed `CertificationRefusal`
+  variant and a dedicated `refuses_solo_mismatch_*` test (PHASE2_RUNTIME_CLOSURE_VERDICT.md,
+  C2/C3 table).
+- **`crates/bcinr-cmca/src/lrc.rs`**: new LRC module (commit `3338f59a`).
+- **41 compile-fail attack cases** (`tests/ui/*.rs` under `tests/compile_fail_tests.rs`) covering
+  tuple-construct, field-construct, and struct-update illegal-construction attempts against every
+  sealed type in the numeric and authority surface; all 41 have committed `.stderr` baselines and
+  all 41 pass under `trybuild` (FINAL_RECONCILIATION_VERIFICATION_V3.md item 6). This is finite
+  attack evidence over the currently-pinned API surface, not a universal theorem that no illegal
+  construction is possible anywhere in the sealed API (PHASE2_RUNTIME_CLOSURE_VERDICT.md,
+  Compile-fail section).
+- **11 hostile mutants with lawful oracle-attributed classifications** (`MUTANT_KILL_MATRIX.md`):
+  each of `mutant_1`..`mutant_11`'s own dedicated oracle test passes in isolation
+  (`KILLED_BY_INTENDED_ORACLE`); no mutant `SURVIVED`. `mutant_9`/`10`/`11` additionally carry a
+  `COLLATERAL_FAILURES_PRESENT` annotation — their mutation of shared `observatory.rs` gate logic
+  incidentally breaks unrelated baseline tests (`kill_m01_ignore_numeric_error`,
+  `kill_m03_point_estimate_gram_gate`, `kill_m05_ignore_drift`, `kill_m07_ignore_gram`) when the
+  whole `hostile_mutants` binary is run under that single feature; `Makefile.toml`'s
+  `test-mutants` task was restructured into a gating pass (each mutant's own dedicated oracle
+  test, exact name) and a non-gating diagnostic pass, and now exits 0 (`cargo make test-mutants`,
+  MUTANT_KILL_MATRIX.md).
+
+### Changed
+
+- **Numeric hot path (`src/fixed.rs`, `src/allocator.rs`)**: the previously-public `err` field on
+  `NonNegativeFixed`/`SignedFixed` is replaced by an opaque, private-field `NumericFaultSet` /
+  `RefusalSet` accumulated via `.union()` (bitwise OR), replacing the prior first-error-wins
+  `branchless_err_acc` semantics with union-based fault accumulation — a test
+  (`union_accumulates_both_operands_distinct_faults`) exercises two simultaneous fault-producing
+  inputs and asserts both faults survive. `CanonicalMask` is sealed with a proven public image of
+  exactly `{0, u32::MAX}` (`mask_public_image_is_exactly_zero_or_all_ones`). Direct tuple/field/
+  struct-update construction of these types is compile-rejected (trybuild negative tests). The
+  floor computation is exact Q16.16 base+residual conservation (leaf shares sum to exactly 65536
+  across every admitted leaf count — `floor_shares_sum_exactly_to_65536_for_every_admitted_leaf_count`,
+  a real property-style test run in this session), replacing the previous hand-written
+  `LEAF_RECIP` rounded-reciprocal lookup table that carried no conservation proof
+  (PHASE2_RUNTIME_CLOSURE_VERDICT.md, C1 table).
+- **`allocate(...)` return shape**: now returns a total `AllocationOutcome` (not
+  `Result<[NonNegativeFixed; N], StabilityRefusal>`), documented at `allocator.rs:589` as always
+  constructed via `new_internal`.
+- **Legacy RDF generator and ontology quarantined, not deleted**:
+  `crates/bcinr-cmca/quarantine/legacy-generator/generator.py` and
+  `quarantine/legacy-ontology/{cmca-rdf.ttl,generalization.ttl}` are moved out of the active
+  build graph — no `Makefile.toml` target and no `build.rs` references them
+  (PHASE1_CONSUMER_VERDICT.md check 2). `Cargo.toml` now carries `exclude = ["quarantine/**"]` so
+  the quarantined tree no longer ships in the published crate tarball, closing the packaging gap
+  the pure-consumer Phase 1 verdict originally found (RECONCILIATION_VERIFICATION.md item 1's
+  packaging finding).
+
+### Fixed
+
+- Consumer/producer artifact correspondence: `tests/consumer_correspondence.rs`'s
+  `generalization_numeric_payload_matches_old_lawful_output_exactly` (previously failing on an
+  ordering-only regression against the frozen `PRE_MIGRATION_BASELINE.md` fixture) now passes,
+  alongside its `case_studies` sibling and the `defective_paths_not_exercised_by_current_fixtures_is_a_nonclaim`
+  nonclaim test — 3/3 (FINAL_RECONCILIATION_VERIFICATION_V3.md item 3 references this as closed;
+  the independent rerun documented in RECONCILIATION_VERIFICATION.md shows the fix landing).
+- `cargo make verify-generated`: committed `Gamma_CMCA` artifact digests and `schema_version` now
+  verify against the recomputed digests of the checked-in generated source (previously a digest
+  mismatch on both the `case-studies` and `generalization` ontologies) — PASS, "no generator
+  invoked" (FINAL_RECONCILIATION_VERIFICATION_V3.md item 3).
+- `src/artifact.rs::tests::smoke_test_against_real_mfw_artifact`: previously `#[ignore]`d with a
+  stale reason and, once un-ignored, failing on a missing `leaf_count` manifest field; now passes
+  against the current `GeneratedManifest` struct and the current committed manifest JSON
+  (FINAL_RECONCILIATION_VERIFICATION.md summary table; FINAL_RECONCILIATION_VERIFICATION_V3.md
+  item 5).
+- `cargo test -p bcinr-cmca --all-features`: previously failed to compile (`from_bits` vs.
+  `from_value_bits` API mismatch, ~222 errors) and, after that was resolved, failed 10
+  hostile-mutant tests plus 1 doctest; both are resolved as of this session's independent rerun —
+  100% green under `--all-features` (60 unit + 1 artifact-smoke + 41 compile-fail sub-cases + 3
+  consumer-correspondence + 5 hostile-mutants + 15 doctests, FINAL_RECONCILIATION_VERIFICATION_V3.md
+  item 1).
+
+### Non-claims (explicitly fenced, not resolved this release)
+
+- **C4 (semantic closure) is PARTIAL_ALIVE, not ALIVE.** RDF admission (`C4_mfw_admission`),
+  projection to the `Gamma_CMCA` artifact (`C4_projection`), and `bcinr-cmca`'s consumption of
+  that artifact (`C4_bcinr_consumption`) are each independently evidenced as working
+  (RECONCILIATION_VERIFICATION.md, FINAL_RECONCILIATION_VERIFICATION.md/_V2/_V3). Full
+  SHACL/ShEx/QUDT closure over the ontology inputs is explicitly out of scope for v26.7.17
+  (V26_7_17_RELEASE_LEDGER.md, "Fenced-later-obligations" §1).
+- **C6 (object-code proof) remains UNKNOWN/fenced.** A dedicated linked-executable audit harness
+  was built (`tools/bcinr-cmca-audit-harness/`), but at the time it was run `bcinr-cmca` did not
+  compile (259 pre-existing errors from the same `from_bits`/`.val` API mismatch since resolved),
+  so the disassembly step was never reached and no per-symbol table was produced. Standing:
+  BLOCKED at the compile step, one step before disassembly, not a decoding/inlining failure
+  (OBJECT_CODE_AUDIT.md). The audit has not been rerun since the compile blocker's resolution
+  documented above; this changelog does not claim it has.
+- No claim of "100% verified," "fully proven," "unforgeable," or object-code-level branchlessness
+  is made for this release beyond what the cited verification documents state.
+
 ## [26.6.24] - 2026-06-24
 
 ### Added
