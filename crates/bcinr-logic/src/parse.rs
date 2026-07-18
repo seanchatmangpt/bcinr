@@ -61,6 +61,7 @@ pub fn skip_whitespace(bytes: &[u8]) -> usize {
 /// ```
 #[must_use = "parse result — ignoring discards the parsed value and cursor"]
 #[inline(always)]
+#[allow(clippy::result_unit_err)] // public API signature is fixed; not changing it
 pub fn parse_hex_u32(bytes: &[u8]) -> Result<u32, ()> {
     let mut res = 0u32;
     let len = bytes.len();
@@ -118,6 +119,7 @@ pub fn parse_hex_u32(bytes: &[u8]) -> Result<u32, ()> {
 /// ```
 #[must_use = "parse result — ignoring discards the parsed value and cursor"]
 #[inline(always)]
+#[allow(clippy::result_unit_err)] // public API signature is fixed; not changing it
 pub fn parse_decimal_u64(bytes: &[u8]) -> Result<u64, ()> {
     let len = bytes.len();
     let mut err = (len == 0 || len > 20) as u32;

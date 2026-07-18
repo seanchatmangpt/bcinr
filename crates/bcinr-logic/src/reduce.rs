@@ -507,7 +507,7 @@ mod tests_phd_reduce {
 
     #[test]
     fn test_count_eq_basic() {
-        let word = u64::from_le_bytes([b'a', b'b', b'a', b'a', b'x', b'a', b'b', b'a']);
+        let word = u64::from_le_bytes(*b"abaaxaba");
         assert_eq!(swar_count_eq_u8(word, b'a'), 5);
     }
 

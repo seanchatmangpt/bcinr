@@ -433,8 +433,8 @@ pub fn process_event_srbcg(
 
     // Unrolled comparison across all 64 slots.
     // Compiles to branchless conditional selections (CSEL/CMOV).
-    for i in 0..64 {
-        let is_match = (run_ids[i] == incoming_rid) as usize;
+    for (i, &rid) in run_ids.iter().enumerate() {
+        let is_match = (rid == incoming_rid) as usize;
         // If a match is found, match_idx becomes the slot index.
         // Otherwise, it remains unchanged.
         match_idx = (is_match * i) + ((1 - is_match) * match_idx);
@@ -458,9 +458,9 @@ pub fn process_event_srbcg(
 
     // Update run_ids: write incoming_rid to target_idx if we allocated a new slot.
     let should_write = (1 - found) * can_allocate;
-    for i in 0..64 {
+    for (i, rid) in run_ids.iter_mut().enumerate() {
         let mask = 0u64.wrapping_sub((should_write & (i == target_idx) as usize) as u64);
-        run_ids[i] = (incoming_rid & mask) | (run_ids[i] & !mask);
+        *rid = (incoming_rid & mask) | (*rid & !mask);
     }
 
     // Accumulate overflow mask if not found and cannot allocate.

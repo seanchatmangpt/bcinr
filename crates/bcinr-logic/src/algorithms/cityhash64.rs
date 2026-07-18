@@ -47,7 +47,7 @@ mod tests {
         // Independent: 128-bit multiply truncated to 64 bits, distinct fold step.
         let k0: u128 = 0x9e3779b97f4a7c15;
         let s = (val.wrapping_add(aux)) as u128;
-        let x = (s.wrapping_mul(k0) as u64) & u64::MAX;
+        let x = s.wrapping_mul(k0) as u64;
         let folded = x >> 33;
         x ^ folded
     }

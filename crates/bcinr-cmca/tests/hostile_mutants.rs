@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use bcinr_cmca::allocator::CertificateReceipt;
-use bcinr_cmca::fixed::{CanonicalMask, NonNegativeFixed, SignedFixed};
+use bcinr_cmca::fixed::NonNegativeFixed;
 use bcinr_cmca::observatory::{MeasurementArtifact, ModeDelta, ObservatoryFlag, SupportStanding};
 
 fn make_artifact(
@@ -30,6 +30,7 @@ fn make_artifact(
 }
 
 // M01: Ignore numeric error in underline kappa. Use kappa_hat instead of kappa_under.
+#[allow(clippy::too_many_arguments)]
 pub fn evaluate_m01(
     kappa_hat: NonNegativeFixed,
     _kappa_under: NonNegativeFixed,
@@ -76,6 +77,7 @@ fn kill_m01_ignore_numeric_error() {
 }
 
 // M03: Use point-estimate Gram gate without subtracting epsilon_gram.
+#[allow(clippy::too_many_arguments)]
 pub fn evaluate_m03(
     kappa_hat: NonNegativeFixed,
     kappa_under: NonNegativeFixed,
@@ -122,6 +124,7 @@ fn kill_m03_point_estimate_gram_gate() {
 }
 
 // M05: Ignore drift.
+#[allow(clippy::too_many_arguments)]
 pub fn evaluate_m05(
     kappa_hat: NonNegativeFixed,
     kappa_under: NonNegativeFixed,
@@ -168,6 +171,7 @@ fn kill_m05_ignore_drift() {
 }
 
 // M07: Activate learner based on kappa only, ignoring Gram distinguishability.
+#[allow(clippy::too_many_arguments)]
 pub fn evaluate_m07(
     kappa_hat: NonNegativeFixed,
     kappa_under: NonNegativeFixed,

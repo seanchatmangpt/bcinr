@@ -49,7 +49,7 @@ mod tests {
         // update count and weight, and rebuild via field-wise shifts. The mean
         // is computed by repeated subtraction (long division) rather than `/`.
         let count = (val as u32) as u64;
-        let weight = (val >> 32) as u64;
+        let weight = val >> 32;
         let sample = (aux as u32) as u64;
         let new_count = count + 1; // count <= 2^32-1, so new_count >= 1
         let new_weight = ((weight as u32).wrapping_add(sample as u32)) as u64;

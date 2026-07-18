@@ -803,7 +803,7 @@ mod tests {
     #[test]
     fn test_parse_4_hex_valid_mixed() {
         let word = u32::from_le_bytes(*b"1A2f");
-        assert_eq!(parse_4_hex_digits(word), Some(0x1A2f));
+        assert_eq!(parse_4_hex_digits(word), Some(0x1A2F));
     }
 
     #[test]

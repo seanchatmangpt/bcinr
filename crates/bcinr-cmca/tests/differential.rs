@@ -12,7 +12,7 @@ use bcinr_cmca::allocator::{
     allocate, AdaptiveUpdate, AdmittedControlState, CertificateReceipt, CertifiedLearning,
     EnvelopeReceipt, OutcomeReceipt,
 };
-use bcinr_cmca::fixed::{CanonicalMask, NonNegativeFixed, SignedFixed};
+use bcinr_cmca::fixed::{NonNegativeFixed, SignedFixed};
 use bcinr_cmca::generated::case_studies::{LensSpec, PackedSemanticState, K, N, Q};
 use bcinr_cmca::generated::stability_profile::CERTIFICATE_DIGEST;
 use reference::allocate_f64;
@@ -40,10 +40,6 @@ fn to_f64_signed(f: SignedFixed) -> f64 {
     (f.val as f64) / 65536.0
 }
 
-fn old_to_f64(f: NonNegativeFixed) -> f64 {
-    f.to_bits() as f64 / 65536.0
-}
-
 // Helper to convert f64 to NonNegativeFixed
 fn to_signed_fixed(v: f64) -> SignedFixed {
     let scaled = (v * 65536.0).round();
@@ -65,12 +61,12 @@ fn to_fixed(v: f64) -> NonNegativeFixed {
 fn parent_strategy() -> impl Strategy<Value = [i32; N]> {
     let s0 = Just(-1i32);
     let s1 = any::<bool>().prop_map(|b| if b { 0 } else { -1 });
-    let s2 = (0..3).prop_map(|v| if v == 2 { -1 } else { v as i32 });
-    let s3 = (0..4).prop_map(|v| if v == 3 { -1 } else { v as i32 });
-    let s4 = (0..5).prop_map(|v| if v == 4 { -1 } else { v as i32 });
-    let s5 = (0..6).prop_map(|v| if v == 5 { -1 } else { v as i32 });
-    let s6 = (0..7).prop_map(|v| if v == 6 { -1 } else { v as i32 });
-    let s7 = (0..8).prop_map(|v| if v == 7 { -1 } else { v as i32 });
+    let s2 = (0..3).prop_map(|v| if v == 2 { -1 } else { v });
+    let s3 = (0..4).prop_map(|v| if v == 3 { -1 } else { v });
+    let s4 = (0..5).prop_map(|v| if v == 4 { -1 } else { v });
+    let s5 = (0..6).prop_map(|v| if v == 5 { -1 } else { v });
+    let s6 = (0..7).prop_map(|v| if v == 6 { -1 } else { v });
+    let s7 = (0..8).prop_map(|v| if v == 7 { -1 } else { v });
 
     (s0, s1, s2, s3, s4, s5, s6, s7)
         .prop_map(|(p0, p1, p2, p3, p4, p5, p6, p7)| [p0, p1, p2, p3, p4, p5, p6, p7])
@@ -125,8 +121,8 @@ proptest! {
         let mut states = [PackedSemanticState { id: 0, factors: [NonNegativeFixed::ZERO; 10] }; N];
         for i in 0..N {
             states[i].id = i as u32;
-            for f in 0..8 {
-                states[i].factors[f] = to_fixed(factors[i][f]);
+            for (f, factor) in factors[i].iter().enumerate().take(8) {
+                states[i].factors[f] = to_fixed(*factor);
             }
             states[i].factors[8] = to_fixed(bvals[i]);
             states[i].factors[9] = to_fixed(conseqs[i]);
@@ -251,10 +247,10 @@ proptest! {
 
         // Compare allocations for leaf nodes
         let mut is_leaf = [true; N];
-        for i in 0..N {
-            for j in 0..N {
-                if parent[j] == i as i32 {
-                    is_leaf[i] = false;
+        for (i, leaf) in is_leaf.iter_mut().enumerate() {
+            for &p in parent.iter() {
+                if p == i as i32 {
+                    *leaf = false;
                 }
             }
         }
@@ -274,8 +270,8 @@ proptest! {
                     println!("result_f64:   {:?}", result_f64);
 
                     // Let's print out the raw factors for all nodes
-                    for idx in 0..N {
-                        println!("node {}: factors={:?}", idx, states[idx].factors.map(to_f64));
+                    for (idx, state) in states.iter().enumerate() {
+                        println!("node {}: factors={:?}", idx, state.factors.map(to_f64));
                     }
 
                     // Let's print the lenses

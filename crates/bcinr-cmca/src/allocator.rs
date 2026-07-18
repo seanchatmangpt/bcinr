@@ -346,13 +346,12 @@ macro_rules! unroll_5_static {
     }};
 }
 
-use crate::fixed::{CanonicalMask, NonNegativeFixed, SignedFixed};
+use crate::fixed::{NonNegativeFixed, SignedFixed};
 use crate::generated::case_studies::{
     LensSpec, PackedSemanticState, FACTOR_ACCESS_FREQUENCY, FACTOR_BUSINESS_VALUE,
     FACTOR_DOWNSTREAM_CONSEQUENCE, FACTOR_RECOMPUTATION_COST, FACTOR_RETRIEVAL_DEMAND,
-    FACTOR_SCHEDULING_DEMAND, FACTOR_SEARCH_DEMAND, FACTOR_STANDING, FACTOR_VALIDITY,
-    FACTOR_VERIFICATION_COST, K, MEASURE_CACHE, MEASURE_RETRIEVAL, MEASURE_SCHEDULING,
-    MEASURE_SEARCH, N, Q,
+    FACTOR_SCHEDULING_DEMAND, FACTOR_SEARCH_DEMAND, FACTOR_STANDING, FACTOR_VERIFICATION_COST, K,
+    MEASURE_CACHE, MEASURE_RETRIEVAL, MEASURE_SCHEDULING, MEASURE_SEARCH, N, Q,
 };
 
 /// Refusal reasons returned by the allocator when stability invariants are violated.
@@ -436,9 +435,7 @@ impl StabilityRefusal {
 
         let in_bounds = const_lt_u32(val, 21);
         let idx = const_select_u32(in_bounds, val, 21) as usize;
-        let res = lookup[idx & 31];
-
-        res
+        lookup[idx & 31]
     }
 }
 
@@ -765,9 +762,7 @@ pub struct AdaptiveUpdate<Mode> {
 impl<Mode> Clone for AdaptiveUpdate<Mode> {
     #[inline(always)]
     fn clone(&self) -> Self {
-        Self {
-            _mode: core::marker::PhantomData,
-        }
+        *self
     }
 }
 impl<Mode> Copy for AdaptiveUpdate<Mode> {}
@@ -829,11 +824,11 @@ impl AdaptiveUpdate<CertifiedLearning> {
 pub(crate) fn power(base: NonNegativeFixed, exponent: SignedFixed) -> NonNegativeFixed {
     let base_is_zero = const_eq_u32(base.val, 0);
     let log_val = base.log2();
-    let exp_signed = exponent.val as i32;
-    let log_signed = log_val.val as i32;
+    let exp_signed = exponent.val;
+    let log_signed = log_val.val;
     let product = (((exp_signed as i64).wrapping_mul(log_signed as i64)) >> 16) as i32;
     let pow_val = SignedFixed::from_bits(product).exp2();
-    let exp_val = exponent.val as i32;
+    let exp_val = exponent.val;
     let exp_gt_zero = (((0i32.wrapping_sub(exp_val)) >> 31) & 1) as u32;
     let exp_eq_zero = const_eq_u32(exponent.val as u32, 0);
     let zero_res = const_select_u32(
@@ -868,6 +863,7 @@ pub(crate) fn clip(
 /// # Complexity
 /// $O(N^2)$ operations, which is $O(1)$ since $N=8$.
 #[inline(never)]
+#[allow(clippy::too_many_arguments)] // deliberate wide parameter list for a hot, branchless flow-step kernel
 fn flow_step(
     parent: &[i32; N],
     is_leaf: &[bool; N],
@@ -937,6 +933,7 @@ fn flow_step(
 /// # Complexity
 /// $O(N^2)$ operations, which is $O(1)$ since $N=8$.
 #[inline(never)]
+#[allow(clippy::too_many_arguments)] // deliberate wide parameter list for a hot, branchless kernel
 fn compute_pi_kq_for_kq(
     k_actual: usize,
     q_idx: usize,
@@ -951,8 +948,8 @@ fn compute_pi_kq_for_kq(
     let mut a_max_root = i32::MIN;
     unroll_8_static!(i, {
         let is_r = parent[i & 7] == -1;
-        let a_i = (((q_val_mutated.val as i32 as i64)
-            .wrapping_mul(node_masses[k_actual & 3][i & 7].log2().val as i32 as i64))
+        let a_i = (((q_val_mutated.val as i64)
+            .wrapping_mul(node_masses[k_actual & 3][i & 7].log2().val as i64))
             >> 16) as i32;
         a_roots[i & 7] = const_select_u32(is_r as u32, a_i as u32, i32::MIN as u32) as i32;
         a_max_root = const_max_i32(a_max_root, a_roots[i & 7]);
@@ -1007,8 +1004,8 @@ fn compute_pi_kq_for_kq(
             let is_c = parent[c & 7] == v as i32;
             a_c[c & 7] = const_select_u32(
                 is_c as u32,
-                (((q_val_mutated.val as i32 as i64)
-                    .wrapping_mul(node_masses[k_actual & 3][c & 7].log2().val as i32 as i64))
+                (((q_val_mutated.val as i64)
+                    .wrapping_mul(node_masses[k_actual & 3][c & 7].log2().val as i64))
                     >> 16) as u32,
                 i32::MIN as u32,
             ) as i32;
@@ -1032,8 +1029,8 @@ fn compute_pi_kq_for_kq(
             let is_sub = is_subtree_leaf[v & 7][x & 7];
             a_l[x & 7] = const_select_u32(
                 is_sub as u32,
-                (((q_val_mutated.val as i32 as i64)
-                    .wrapping_mul(node_masses[k_actual & 3][x & 7].log2().val as i32 as i64))
+                (((q_val_mutated.val as i64)
+                    .wrapping_mul(node_masses[k_actual & 3][x & 7].log2().val as i64))
                     >> 16) as u32,
                 i32::MIN as u32,
             ) as i32;
@@ -1249,6 +1246,7 @@ fn compute_pi_kq_for_kq(
 /// ```
 ///
 /// # Branchless Contract
+#[allow(clippy::too_many_arguments)] // deliberate wide parameter list preserving the public allocation API
 pub fn allocate(
     states: &[PackedSemanticState; N],
     lenses: &[LensSpec; Q],
@@ -1301,7 +1299,7 @@ pub fn allocate(
         let d_i_raw = crate::generated::stability_profile::WEIGHT_VECTOR[i].raw as u128;
         let delta_raw = crate::generated::stability_profile::CONTRACTION_MARGIN.raw as u128;
         let rhs = d_i_raw - (delta_raw * d_i_raw / 1_000_000_000);
-        gd_ok = gd_ok & (lhs <= rhs);
+        gd_ok &= lhs <= rhs;
     });
 
     let zeta_w_max_q16 =
@@ -1317,13 +1315,13 @@ pub fn allocate(
 
     let mut q_err = false;
     unroll_4_static!(q_idx, {
-        let q_val = lenses[q_idx & 3].q.val as i32;
-        q_err = q_err | (q_val < -131072) | (q_val > 131072);
+        let q_val = lenses[q_idx & 3].q.val;
+        q_err |= !(-131072..=131072).contains(&q_val);
     });
 
     let mut price_err = false;
     unroll_8_static!(i, {
-        price_err = price_err | (const_lt_u32(mu_max.val, mu[i & 7].val) != 0);
+        price_err |= const_lt_u32(mu_max.val, mu[i & 7].val) != 0;
     });
 
     let eta_err = const_lt_u32(eta.val, eta_g_min_q16) != 0;
@@ -1342,7 +1340,7 @@ pub fn allocate(
     unroll_8_static!(i, {
         unroll_8_static!(j, {
             let is_match = parent[j & 7] == i as i32;
-            is_leaf[i & 7] = is_leaf[i & 7] & !is_match;
+            is_leaf[i & 7] &= !is_match;
         });
     });
 
@@ -1523,7 +1521,7 @@ pub fn allocate(
         });
 
         unroll_4_static!(q_idx, {
-            let mut _q_val_mutated = SignedFixed::from_bits(lenses[q_idx & 3].q.val as i32);
+            let mut _q_val_mutated = SignedFixed::from_bits(lenses[q_idx & 3].q.val);
             #[cfg(feature = "mutant_2")]
             {
                 _q_val_mutated = SignedFixed::from_bits(0i32.wrapping_sub(_q_val_mutated.val));
@@ -1605,7 +1603,7 @@ pub fn allocate(
         const k_actual: usize = k;
 
         unroll_4_static!(q_idx, {
-            let q_val_mutated = SignedFixed::from_bits(lenses[q_idx & 3].q.val as i32);
+            let q_val_mutated = SignedFixed::from_bits(lenses[q_idx & 3].q.val);
             #[cfg(feature = "mutant_2")]
             let q_val_mutated = SignedFixed::from_bits(0i32.wrapping_sub(q_val_mutated.val));
 

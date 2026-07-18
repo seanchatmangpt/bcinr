@@ -543,31 +543,31 @@ pub fn bp_tcrv_validate_reachability(tape: &PowlTape) -> u64 {
 
     // Step 1: Initialize the reachability matrix branchlessly.
     // Fixed loop bound of 64 allows complete compiler unrolling.
-    for i in 0..64 {
+    for (i, (r_i, op)) in r.iter_mut().zip(tape.ops.iter()).enumerate() {
         let in_bounds = (i < tape_len) as u64;
         let bounds_mask = 0u64.wrapping_sub(in_bounds);
 
-        let succs = tape.ops[i].succ_mask & bounds_mask;
-        r[i] = succs | (1u64 << i);
+        let succs = op.succ_mask & bounds_mask;
+        *r_i = succs | (1u64 << i);
     }
 
     // Step 2: Bit-Parallel Roy-Warshall transitive closure propagation.
     // 64 iterations, fully deterministic.
     for k in 0..64 {
         let r_k = r[k];
-        for i in 0..64 {
-            let can_reach_k = (r[i] >> k) & 1;
+        for r_i in r.iter_mut() {
+            let can_reach_k = (*r_i >> k) & 1;
             let mask = 0u64.wrapping_sub(can_reach_k);
-            r[i] |= r_k & mask;
+            *r_i |= r_k & mask;
         }
     }
 
     // Step 3: Accumulate reachable set from entry mask branchlessly.
     let mut reachable_from_entry = 0u64;
-    for i in 0..64 {
+    for (i, r_i) in r.iter().enumerate() {
         let is_entry = (entry_mask >> i) & 1;
         let mask = 0u64.wrapping_sub(is_entry);
-        reachable_from_entry |= r[i] & mask;
+        reachable_from_entry |= r_i & mask;
     }
 
     // Step 4: Construct mask of nodes requiring reachability.
@@ -1530,27 +1530,27 @@ mod tests {
         let entry_mask = tape.entry_mask;
 
         // Mutant 1: r[i] = succs; (omits self-reachability | (1u64 << i))
-        for i in 0..64 {
+        for (i, (r_i, op)) in r.iter_mut().zip(tape.ops.iter()).enumerate() {
             let in_bounds = (i < tape_len) as u64;
             let bounds_mask = 0u64.wrapping_sub(in_bounds);
-            let succs = tape.ops[i].succ_mask & bounds_mask;
-            r[i] = succs; // Mutant 1 omission
+            let succs = op.succ_mask & bounds_mask;
+            *r_i = succs; // Mutant 1 omission
         }
 
         for k in 0..64 {
             let r_k = r[k];
-            for i in 0..64 {
-                let can_reach_k = (r[i] >> k) & 1;
+            for r_i in r.iter_mut() {
+                let can_reach_k = (*r_i >> k) & 1;
                 let mask = 0u64.wrapping_sub(can_reach_k);
-                r[i] |= r_k & mask;
+                *r_i |= r_k & mask;
             }
         }
 
         let mut reachable_from_entry = 0u64;
-        for i in 0..64 {
+        for (i, r_i) in r.iter().enumerate() {
             let is_entry = (entry_mask >> i) & 1;
             let mask = 0u64.wrapping_sub(is_entry);
-            reachable_from_entry |= r[i] & mask;
+            reachable_from_entry |= r_i & mask;
         }
 
         let mut must_be_reachable = 0u64;
@@ -1572,28 +1572,28 @@ mod tests {
         let tape_len = tape.len as usize;
         let entry_mask = tape.entry_mask;
 
-        for i in 0..64 {
+        for (i, (r_i, op)) in r.iter_mut().zip(tape.ops.iter()).enumerate() {
             let in_bounds = (i < tape_len) as u64;
             let bounds_mask = 0u64.wrapping_sub(in_bounds);
-            let succs = tape.ops[i].succ_mask & bounds_mask;
-            r[i] = succs | (1u64 << i);
+            let succs = op.succ_mask & bounds_mask;
+            *r_i = succs | (1u64 << i);
         }
 
         for k in 0..64 {
             // Mutant 2: let r_k = r[(k + 1) & 63];
             let r_k = r[(k + 1) & 63];
-            for i in 0..64 {
-                let can_reach_k = (r[i] >> k) & 1;
+            for r_i in r.iter_mut() {
+                let can_reach_k = (*r_i >> k) & 1;
                 let mask = 0u64.wrapping_sub(can_reach_k);
-                r[i] |= r_k & mask;
+                *r_i |= r_k & mask;
             }
         }
 
         let mut reachable_from_entry = 0u64;
-        for i in 0..64 {
+        for (i, r_i) in r.iter().enumerate() {
             let is_entry = (entry_mask >> i) & 1;
             let mask = 0u64.wrapping_sub(is_entry);
-            reachable_from_entry |= r[i] & mask;
+            reachable_from_entry |= r_i & mask;
         }
 
         let mut must_be_reachable = 0u64;
@@ -1615,27 +1615,27 @@ mod tests {
         let tape_len = tape.len as usize;
         let entry_mask = tape.entry_mask;
 
-        for i in 0..64 {
+        for (i, (r_i, op)) in r.iter_mut().zip(tape.ops.iter()).enumerate() {
             let in_bounds = (i < tape_len) as u64;
             let bounds_mask = 0u64.wrapping_sub(in_bounds);
-            let succs = tape.ops[i].succ_mask & bounds_mask;
-            r[i] = succs | (1u64 << i);
+            let succs = op.succ_mask & bounds_mask;
+            *r_i = succs | (1u64 << i);
         }
 
         for k in 0..64 {
             let r_k = r[k];
-            for i in 0..64 {
-                let can_reach_k = (r[i] >> k) & 1;
+            for r_i in r.iter_mut() {
+                let can_reach_k = (*r_i >> k) & 1;
                 let mask = 0u64.wrapping_sub(can_reach_k);
-                r[i] |= r_k & mask;
+                *r_i |= r_k & mask;
             }
         }
 
         let mut reachable_from_entry = 0u64;
-        for i in 0..64 {
+        for (i, r_i) in r.iter().enumerate() {
             let is_entry = (entry_mask >> i) & 1;
             let mask = 0u64.wrapping_sub(is_entry);
-            reachable_from_entry |= r[i] & mask;
+            reachable_from_entry |= r_i & mask;
         }
 
         // Mutant 3: let active = in_bounds; (omits & is_not_redo check)

@@ -7,7 +7,6 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::{Mutex, MutexGuard, OnceLock};
 
 pub fn str_has_substr(s: &str, pat: &str) -> bool {
     if pat.is_empty() {
@@ -44,6 +43,12 @@ pub fn mod_rs_lock() -> &'static std::sync::Mutex<()> {
 pub struct TestCtx {
     to_cleanup: Vec<PathBuf>,
     original_files: HashMap<PathBuf, String>,
+}
+
+impl Default for TestCtx {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TestCtx {
@@ -112,8 +117,10 @@ fn touch_lib_rs() {
     }
 }
 
+#[allow(dead_code)] // retained helper for e2e tiers that build the CLI binaries on demand
 static BUILD_ONCE: std::sync::Once = std::sync::Once::new();
 
+#[allow(dead_code)] // retained helper for e2e tiers that build the CLI binaries on demand
 fn ensure_binaries_built() {
     BUILD_ONCE.call_once(|| {
         if Path::new("/tmp/bcinr-e2e-target/debug/bcinr-contract-gate").exists()
@@ -248,7 +255,3 @@ pub fn assert_status_eq(output: &std::process::Output, expected: i32) {
 // ==========================================
 
 mod e2e;
-use e2e::tier1::*;
-use e2e::tier2::*;
-use e2e::tier3::*;
-use e2e::tier4::*;

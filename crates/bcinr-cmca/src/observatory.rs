@@ -237,6 +237,7 @@ use crate::{unroll_4_static, unroll_8_static};
 
 /// Measures the divergence metric $\kappa_v$ and produces a MeasurementArtifact branchlessly.
 #[inline(never)]
+#[allow(clippy::too_many_arguments)] // deliberate wide parameter list for a hot, branchless measurement kernel
 pub fn measure_kappa(
     v: usize,
     _q_idx: usize,
@@ -251,18 +252,18 @@ pub fn measure_kappa(
     let k_masked = k & 3;
 
     let mut x = [0i32; N];
-    unroll_8_static!(i, {
+    unroll_8_static!(I, {
         let mut log_m = 0u32;
         unroll_4_static!(K_IDX, {
             let matches = const_eq_u32(k_masked as u32, K_IDX as u32);
             log_m = const_select_u32(
                 matches,
-                node_masses[K_IDX & 3][i & 7].log2().val as u32,
+                node_masses[K_IDX & 3][I & 7].log2().val as u32,
                 log_m,
             );
         });
-        let q_signed = q_val.val as i32;
-        x[i & 7] = (((q_signed as i64).wrapping_mul(log_m as i32 as i64)) >> 16) as i32;
+        let q_signed = q_val.val;
+        x[I & 7] = (((q_signed as i64).wrapping_mul(log_m as i32 as i64)) >> 16) as i32;
     });
 
     let mut x_max_meas = i32::MIN;
@@ -279,7 +280,7 @@ pub fn measure_kappa(
         let exp_val = SignedFixed::from_bits(a_prime).exp2();
         sum_exp_meas += NonNegativeFixed::from_bits(const_select_u32(is_child, exp_val.val, 0));
     });
-    let l_meas = x_max_meas.wrapping_add(sum_exp_meas.log2().val as i32);
+    let l_meas = x_max_meas.wrapping_add(sum_exp_meas.log2().val);
 
     let mut x_max_leaf = i32::MIN;
     unroll_8_static!(X_IDX, {
@@ -296,7 +297,7 @@ pub fn measure_kappa(
         sum_exp_leaf +=
             NonNegativeFixed::from_bits(const_select_u32(is_sub as u32, exp_val.val, 0));
     });
-    let l_leaf = x_max_leaf.wrapping_add(sum_exp_leaf.log2().val as i32);
+    let l_leaf = x_max_leaf.wrapping_add(sum_exp_leaf.log2().val);
 
     let mut kappa_i64 = 0i64;
     unroll_8_static!(C, {
@@ -318,7 +319,7 @@ pub fn measure_kappa(
             sum_exp_c +=
                 NonNegativeFixed::from_bits(const_select_u32(is_sub_c as u32, exp_val.val, 0));
         });
-        let l_c = x_max_c.wrapping_add(sum_exp_c.log2().val as i32);
+        let l_c = x_max_c.wrapping_add(sum_exp_c.log2().val);
 
         let log_ratio = l_c.wrapping_sub(l_meas);
         let s_leaf_c = NonNegativeFixed::from_bits(

@@ -938,18 +938,6 @@ impl<const KIND: TopologyKind> Receipt<KIND> {
 // Internal helpers
 // =============================================================================
 
-/// Produce a bitmask with exactly `n` low bits set (n ≤ 64).
-#[inline(always)]
-const fn full_mask(n: usize) -> u64 {
-    if n == 0 {
-        0
-    } else if n >= 64 {
-        u64::MAX
-    } else {
-        (1u64 << n).wrapping_sub(1)
-    }
-}
-
 /// Generate a pseudo-unique run identifier.
 ///
 /// In `no_std` environments we use a simple wrapping counter seeded by the
@@ -1202,15 +1190,6 @@ mod tests {
         assert_eq!(tok.total(), 64);
         // Clean up without firing (use forget — we just test construction).
         core::mem::forget(tok);
-    }
-
-    #[test]
-    fn full_mask_helper() {
-        assert_eq!(full_mask(0), 0);
-        assert_eq!(full_mask(1), 1);
-        assert_eq!(full_mask(2), 0b11);
-        assert_eq!(full_mask(8), 0xFF);
-        assert_eq!(full_mask(64), u64::MAX);
     }
 
     // -------------------------------------------------------------------------

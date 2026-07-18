@@ -181,14 +181,14 @@ mod tests {
         assert_eq!((dec >> 32) as u32, 20);
 
         // Wrapping: delta=u32::MAX, prev=1 → 0
-        let enc2 = (u32::MAX as u64) | (0u64 << 32);
-        let prev2 = (1u64) | (0u64 << 32);
+        let enc2 = u32::MAX as u64;
+        let prev2 = 1u64;
         let dec2 = delta_decode_simd_u32(enc2, prev2);
         assert_eq!(dec2 as u32, 0);
 
         // High lane wrapping
-        let enc3 = (0u64) | ((u32::MAX as u64) << 32);
-        let prev3 = (0u64) | (1u64 << 32);
+        let enc3 = (u32::MAX as u64) << 32;
+        let prev3 = 1u64 << 32;
         let dec3 = delta_decode_simd_u32(enc3, prev3);
         assert_eq!((dec3 >> 32) as u32, 0);
     }

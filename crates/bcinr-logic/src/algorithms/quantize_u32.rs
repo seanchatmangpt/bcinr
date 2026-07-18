@@ -43,10 +43,9 @@ mod tests {
         // explicit branch for the degenerate zero-step case.
         let x = val as u32;
         let step = aux as u32;
-        if step == 0 {
-            x as u64
-        } else {
-            ((x / step) * step) as u64
+        match x.checked_div(step) {
+            Some(q) => (q * step) as u64,
+            None => x as u64,
         }
     }
 

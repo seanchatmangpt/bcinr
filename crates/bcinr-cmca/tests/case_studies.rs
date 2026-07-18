@@ -10,7 +10,7 @@ use bcinr_cmca::allocator::{
     allocate, AdaptiveUpdate, AdmittedControlState, CertificateReceipt, CertifiedLearning,
     EnvelopeReceipt, OutcomeReceipt, StabilityRefusal,
 };
-use bcinr_cmca::fixed::{CanonicalMask, NonNegativeFixed, SignedFixed};
+use bcinr_cmca::fixed::NonNegativeFixed;
 use bcinr_cmca::generated::case_studies::{ETA, LAMBDA, LENS_REGISTRY, N, OBJECT_REGISTRY, Q};
 
 fn get_proof() -> Option<AdaptiveUpdate<CertifiedLearning>> {
@@ -24,7 +24,6 @@ fn get_proof() -> Option<AdaptiveUpdate<CertifiedLearning>> {
         CertifiedLearning::admit_learning(),
     )
 }
-use bcinr_cmca::generated::generalization as gen;
 use bcinr_cmca::generated::stability_profile::CERTIFICATE_DIGEST;
 
 #[test]
@@ -107,8 +106,8 @@ fn test_case_study_2_single_object_multiple_decisions() {
     .unwrap();
 
     // Obj_Single (index 6) has high business value and retrieval demand, should have higher allocation than Obj_Obligation.
-    for i in 0..N {
-        println!("CS2 result[{}]: {:?}", i, result[i]);
+    for (i, r) in result.iter().enumerate() {
+        println!("CS2 result[{}]: {:?}", i, r);
     }
     assert!(
         result[6].val > result[4].val,

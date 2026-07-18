@@ -360,7 +360,7 @@ impl<'ast> Visit<'ast> for SynCheatVisitor<'_> {
     fn visit_item_macro(&mut self, i: &'ast syn::ItemMacro) {
         // CHEAT-006: SCANNER_EVASION
         if let Some(ident) = &i.mac.path.get_ident() {
-            if ident.to_string() == "macro_rules" {
+            if *ident == "macro_rules" {
                 let mac_str = quote::quote!(#i).to_string();
                 if has_token(&mac_str, "if") || has_token(&mac_str, "match") {
                     self.findings.push(format!(

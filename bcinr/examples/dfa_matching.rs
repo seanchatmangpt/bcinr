@@ -16,6 +16,7 @@
 //! - State 1: odd popcount (accepting)
 //! - Alphabet: {0=zero_byte, 1=one_byte} → alphabet_size = 2
 //! - Transitions: S0+0→S0, S0+1→S1, S1+0→S1, S1+1→S0
+//!
 //! Table (flat): [0, 1, 1, 0]
 
 use bcinr::dfa::{dfa_advance, dfa_is_accepting, dfa_run};

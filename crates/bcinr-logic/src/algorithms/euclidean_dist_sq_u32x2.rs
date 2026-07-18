@@ -42,8 +42,8 @@ mod tests {
         let vy = (val >> 32) as u32;
         let ax = (aux & 0xFFFF_FFFF) as u32;
         let ay = (aux >> 32) as u32;
-        let dx = if vx >= ax { vx - ax } else { ax - vx } as u128;
-        let dy = if vy >= ay { vy - ay } else { ay - vy } as u128;
+        let dx = vx.abs_diff(ax) as u128;
+        let dy = vy.abs_diff(ay) as u128;
         let sum = dx * dx + dy * dy;
         (sum & u64::MAX as u128) as u64
     }

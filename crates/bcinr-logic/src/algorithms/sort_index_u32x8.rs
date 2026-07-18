@@ -57,12 +57,10 @@ mod tests {
             ((val >> 32) & 0xFFFF, 2),
             ((val >> 48) & 0xFFFF, 3),
         ];
-        pairs.sort_by(|a, b| a.0.cmp(&b.0));
+        pairs.sort_by_key(|a| a.0);
         let mut out = 0u64;
-        let mut p = 0u64;
-        for (_, idx) in pairs.iter() {
-            out |= idx << (p * 4);
-            p += 1;
+        for (p, (_, idx)) in pairs.iter().enumerate() {
+            out |= idx << (p as u64 * 4);
         }
         out
     }

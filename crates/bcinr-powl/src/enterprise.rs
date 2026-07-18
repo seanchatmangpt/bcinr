@@ -945,8 +945,6 @@ mod tests {
     // Proptests — capability_mask
     // -----------------------------------------------------------------------
 
-    use proptest::prelude::*;
-
     proptest! {
         #[test]
         fn prop_graduation_no_panic_for_any_inputs(

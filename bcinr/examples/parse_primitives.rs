@@ -25,7 +25,7 @@ fn main() {
     assert_eq!(skip_whitespace(b""), 0, "empty = 0");
     assert_eq!(skip_whitespace(b"   "), 3, "all whitespace");
     // Unlike skip_spaces, byte 9 (tab) and 10 (newline) are also skipped
-    assert_eq!(skip_whitespace(&[b'\t', b'x']), 1, "tab is whitespace");
+    assert_eq!(skip_whitespace(b"\tx"), 1, "tab is whitespace");
     println!(
         "skip_whitespace(b\"\\t\\nhello\")={}",
         skip_whitespace(b"\t\nhello")

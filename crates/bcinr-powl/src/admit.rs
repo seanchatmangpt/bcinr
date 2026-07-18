@@ -187,10 +187,10 @@ pub fn admit(ctx: AdmissionContext) -> ProcessTopology {
 /// This implementation guarantees CC=1, 0 heap allocations, and zero branching.
 pub fn admit_dpag(ctx: AdmissionContext, params: &AdmissionParameters) -> ProcessTopology {
     // Extract fields
-    let c = (ctx & 0xF) as u64;
-    let u = ((ctx >> 4) & 0xF) as u64;
-    let l = ((ctx >> 8) & 0xF) as u64;
-    let s = ((ctx >> 12) & 0x1) as u64;
+    let c = ctx & 0xF;
+    let u = (ctx >> 4) & 0xF;
+    let l = (ctx >> 8) & 0xF;
+    let s = (ctx >> 12) & 0x1;
 
     // 1. Quarantine evaluation: load >= load_saturation_threshold
     let q_mask = ge_mask(l, params.load_saturation_threshold);
@@ -264,10 +264,10 @@ mod tests {
 
     /// Independent branching reference oracle.
     fn oracle_admit(ctx: AdmissionContext, params: &AdmissionParameters) -> ProcessTopology {
-        let c = (ctx & 0xF) as u64;
-        let u = ((ctx >> 4) & 0xF) as u64;
-        let l = ((ctx >> 8) & 0xF) as u64;
-        let s = ((ctx >> 12) & 0x1) as u64;
+        let c = ctx & 0xF;
+        let u = (ctx >> 4) & 0xF;
+        let l = (ctx >> 8) & 0xF;
+        let s = (ctx >> 12) & 0x1;
 
         if l >= params.load_saturation_threshold {
             ProcessTopology::Quarantine
@@ -382,14 +382,14 @@ mod tests {
     // Mutant 1 (Sign Shift Omission): arithmetic right shift by 62 instead of 63.
     const fn ge_mask_mutant_1(x: u64, y: u64) -> u64 {
         let diff = (y as i64).wrapping_sub(x as i64).wrapping_sub(1);
-        (diff as u64 >> 62) as u64
+        diff as u64 >> 62
     }
 
     fn admit_dpag_mutant_1(ctx: AdmissionContext, params: &AdmissionParameters) -> ProcessTopology {
-        let c = (ctx & 0xF) as u64;
-        let u = ((ctx >> 4) & 0xF) as u64;
-        let l = ((ctx >> 8) & 0xF) as u64;
-        let s = ((ctx >> 12) & 0x1) as u64;
+        let c = ctx & 0xF;
+        let u = (ctx >> 4) & 0xF;
+        let l = (ctx >> 8) & 0xF;
+        let s = (ctx >> 12) & 0x1;
 
         let q_mask = ge_mask_mutant_1(l, params.load_saturation_threshold);
         let tc_pri_ok = ge_mask_mutant_1(c, params.tenant_class_priority_min);
@@ -420,10 +420,10 @@ mod tests {
 
     // Mutant 2 (Priority Bypass / Order Inversion): swapped Quarantine and Priority sequence
     fn admit_dpag_mutant_2(ctx: AdmissionContext, params: &AdmissionParameters) -> ProcessTopology {
-        let c = (ctx & 0xF) as u64;
-        let u = ((ctx >> 4) & 0xF) as u64;
-        let l = ((ctx >> 8) & 0xF) as u64;
-        let s = ((ctx >> 12) & 0x1) as u64;
+        let c = ctx & 0xF;
+        let u = (ctx >> 4) & 0xF;
+        let l = (ctx >> 8) & 0xF;
+        let s = (ctx >> 12) & 0x1;
 
         let q_mask = ge_mask(l, params.load_saturation_threshold);
         let tc_pri_ok = ge_mask(c, params.tenant_class_priority_min);
@@ -460,10 +460,10 @@ mod tests {
     }
 
     fn admit_dpag_mutant_3(ctx: AdmissionContext, params: &AdmissionParameters) -> ProcessTopology {
-        let c = (ctx & 0xF) as u64;
-        let u = ((ctx >> 4) & 0xF) as u64;
-        let l = ((ctx >> 8) & 0xF) as u64;
-        let s = ((ctx >> 12) & 0x1) as u64;
+        let c = ctx & 0xF;
+        let u = (ctx >> 4) & 0xF;
+        let l = (ctx >> 8) & 0xF;
+        let s = (ctx >> 12) & 0x1;
 
         let q_mask = ge_mask_mutant_3(l, params.load_saturation_threshold);
         let tc_pri_ok = ge_mask_mutant_3(c, params.tenant_class_priority_min);

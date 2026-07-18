@@ -90,9 +90,7 @@ mod tests {
                     x = s - 1 - x;
                     y = s - 1 - y;
                 }
-                let tmp = x;
-                x = y;
-                y = tmp;
+                std::mem::swap(&mut x, &mut y);
             }
             s /= 2;
         }

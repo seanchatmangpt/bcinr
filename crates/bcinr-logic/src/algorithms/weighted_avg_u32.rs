@@ -49,18 +49,14 @@ mod tests {
     fn weighted_avg_u32_reference(val: u64, aux: u64) -> u64 {
         // Independent derivation: unpack via byte/lane casts and branch on weight.
         let value_a = (val as u32) as u64;
-        let weight_a = (val >> 32) as u64;
+        let weight_a = val >> 32;
         let value_b = (aux as u32) as u64;
-        let weight_b = (aux >> 32) as u64;
+        let weight_b = aux >> 32;
         let numerator = value_a
             .wrapping_mul(weight_a)
             .wrapping_add(value_b.wrapping_mul(weight_b));
         let denominator = weight_a.wrapping_add(weight_b);
-        if denominator == 0 {
-            0
-        } else {
-            numerator / denominator
-        }
+        numerator.checked_div(denominator).unwrap_or(0)
     }
 
     // -------------------------------------------------------------------------

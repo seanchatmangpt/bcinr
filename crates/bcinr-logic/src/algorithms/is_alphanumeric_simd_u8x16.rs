@@ -65,9 +65,9 @@ mod tests {
         let mut out = [0u8; 8];
         for i in 0..8 {
             let b = v[i];
-            let is_digit = b >= b'0' && b <= b'9';
-            let is_upper = b >= b'A' && b <= b'Z';
-            let is_lower = b >= b'a' && b <= b'z';
+            let is_digit = b.is_ascii_digit();
+            let is_upper = b.is_ascii_uppercase();
+            let is_lower = b.is_ascii_lowercase();
             let active = a[i] != 0;
             if (is_digit || is_upper || is_lower) && active {
                 out[i] = 0x80;

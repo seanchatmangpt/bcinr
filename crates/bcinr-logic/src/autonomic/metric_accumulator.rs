@@ -84,7 +84,8 @@ mod tests {
     #[test]
     fn test_metric_accumulator_sat_add_counterfactual_mutants() {
         // Each entry: (mutant_fn, current, val, label)
-        let cases: &[(fn(u64, u64) -> u64, u64, u64, &str)] = &[
+        type MutantCase = (fn(u64, u64) -> u64, u64, u64, &'static str);
+        let cases: &[MutantCase] = &[
             (
                 mutant_metric_accumulator_sat_add_1,
                 u64::MAX,

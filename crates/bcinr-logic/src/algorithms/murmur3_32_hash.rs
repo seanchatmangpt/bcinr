@@ -132,7 +132,7 @@ mod tests {
         if tail.len() >= 2 {
             k1 ^= (tail[1] as u32) << 8;
         }
-        if tail.len() >= 1 {
+        if !tail.is_empty() {
             k1 ^= tail[0] as u32;
             k1 = k1.wrapping_mul(0xcc9e2d51);
             k1 = k1.rotate_left(15);
@@ -276,7 +276,6 @@ pub mod bench {
     use alloc::vec::Vec;
     use criterion::{black_box, Criterion};
     #[cfg(feature = "alloc")]
-
     pub fn bench_murmur3_32_hash(c: &mut Criterion) {
         #[cfg(feature = "alloc")]
         {

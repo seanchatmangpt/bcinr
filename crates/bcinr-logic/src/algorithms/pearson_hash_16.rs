@@ -219,7 +219,6 @@ pub mod bench {
     use alloc::vec::Vec;
     use criterion::{black_box, Criterion};
     #[cfg(feature = "alloc")]
-
     pub fn bench_pearson_hash_16(c: &mut Criterion) {
         #[cfg(feature = "alloc")]
         {

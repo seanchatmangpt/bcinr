@@ -172,13 +172,13 @@ impl NonNegativeFixed {
         let q_shifted_46 = (q_u128 >> 46) as u64;
         let q = q_shifted_46 >> (32 - lz);
 
-        let rem = ((self.val as u64) << 16).wrapping_sub((q as u64).wrapping_mul(d as u64)) as i64;
+        let rem = ((self.val as u64) << 16).wrapping_sub(q.wrapping_mul(d as u64)) as i64;
 
         let is_lt = ((rem >> 63) & 1) as u64;
         let diff = rem.wrapping_sub(d as i64);
         let is_ge = (((!diff) >> 63) & 1) as u64;
 
-        let q_corrected = (q as u64).wrapping_add(is_ge).wrapping_sub(is_lt);
+        let q_corrected = q.wrapping_add(is_ge).wrapping_sub(is_lt);
 
         let overflow_1 = const_lt_u32(u32::MAX, (q_corrected >> 32) as u32).val;
         let overflow_2 = 0u32.wrapping_sub((q_corrected > u32::MAX as u64) as u32);

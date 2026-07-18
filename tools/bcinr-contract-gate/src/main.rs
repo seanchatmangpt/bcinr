@@ -281,15 +281,15 @@ fn main() {
             ));
         }
 
-        if !f.forbidden_ops.is_empty() {
-            if f.name.contains("add_bitwise") || f.name.contains("sub_bitwise") {
-                errors.push(format!(
-                    "FAIL: {} in {} uses forbidden operator(s): {:?} (Bluff detected!)",
-                    f.name,
-                    f.path.display(),
-                    f.forbidden_ops
-                ));
-            }
+        if !f.forbidden_ops.is_empty()
+            && (f.name.contains("add_bitwise") || f.name.contains("sub_bitwise"))
+        {
+            errors.push(format!(
+                "FAIL: {} in {} uses forbidden operator(s): {:?} (Bluff detected!)",
+                f.name,
+                f.path.display(),
+                f.forbidden_ops
+            ));
         }
 
         if matches!(f.vis, Visibility::Public(_)) {

@@ -129,15 +129,15 @@ mod tests {
         assert_eq!((enc >> 32) as u32, 15);
 
         // Lane 0 wraps: 0 - 1 = u32::MAX
-        let val2 = 0u64 | (0u64 << 32);
-        let prev2 = 1u64 | (0u64 << 32);
+        let val2 = 0u64 << 32;
+        let prev2 = 1u64;
         let enc2 = delta_encode_simd_u32(val2, prev2);
         assert_eq!(enc2 as u32, u32::MAX);
         assert_eq!((enc2 >> 32) as u32, 0);
 
         // High lane wraps, low lane unchanged
-        let val3 = (5u64) | (0u64 << 32);
-        let prev3 = (5u64) | (1u64 << 32);
+        let val3 = 5u64;
+        let prev3 = 5u64 | (1u64 << 32);
         let enc3 = delta_encode_simd_u32(val3, prev3);
         assert_eq!(enc3 as u32, 0);
         assert_eq!((enc3 >> 32) as u32, u32::MAX);

@@ -36,10 +36,7 @@ mod tests {
     fn heavy_keepers_add_reference(val: u64, aux: u64) -> u64 {
         // Independent derivation: compute the full-width sum and clamp explicitly on
         // overflow, instead of using saturating_add.
-        match aux.checked_add(val) {
-            Some(sum) => sum,
-            None => u64::MAX,
-        }
+        aux.saturating_add(val)
     }
 
     // -------------------------------------------------------------------------

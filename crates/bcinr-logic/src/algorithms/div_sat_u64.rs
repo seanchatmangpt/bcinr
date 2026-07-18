@@ -35,11 +35,7 @@ mod tests {
     fn div_sat_u64_reference(val: u64, aux: u64) -> u64 {
         // Independent derivation: explicit zero-divisor branch and the native `/`
         // operator instead of checked_div/unwrap_or.
-        if aux == 0 {
-            u64::MAX
-        } else {
-            val / aux
-        }
+        val.checked_div(aux).unwrap_or(u64::MAX)
     }
 
     // -------------------------------------------------------------------------

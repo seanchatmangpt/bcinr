@@ -5,7 +5,6 @@ use walkdir::WalkDir;
 ///
 /// Discovers all 300+ algorithms and generates targeted falsification tests.
 /// Tests generic invariants + algorithm-specific edge cases.
-
 fn main() {
     println!("=== GGEN: Counterfactual & Falsification Test Suite ===");
     println!("Scope: All 300+ algorithms in crates/bcinr-logic/src/algorithms/\n");

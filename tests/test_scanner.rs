@@ -230,7 +230,7 @@ fn run_mock_scanner(src: &str, rule: RuleId) -> bool {
                 impl<'ast> syn::visit::Visit<'ast> for EvasionVisitor {
                     fn visit_item_macro(&mut self, i: &'ast syn::ItemMacro) {
                         if let Some(ident) = i.mac.path.get_ident() {
-                            if ident.to_string() == "macro_rules" {
+                            if ident == "macro_rules" {
                                 let mac_str = quote::quote!(#i).to_string();
                                 if mac_str.contains("if") || mac_str.contains("match") {
                                     self.found = true;

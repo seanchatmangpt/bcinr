@@ -107,7 +107,8 @@ mod tests {
     #[test]
     fn test_policy_guard_mask_gt_counterfactual_mutants() {
         // Each entry: (mutant_fn, val, threshold, label)
-        let cases: &[(fn(u64, u64) -> u64, u64, u64, &str)] = &[
+        type MutantCase = (fn(u64, u64) -> u64, u64, u64, &'static str);
+        let cases: &[MutantCase] = &[
             (mutant_policy_guard_mask_gt_1, 5, 5, "rejects_mutant 1"),
             (mutant_policy_guard_mask_gt_2, 10, 5, "rejects_mutant 2"),
             (mutant_policy_guard_mask_gt_3, 10, 5, "rejects_mutant 3"),
