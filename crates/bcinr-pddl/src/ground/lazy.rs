@@ -18,8 +18,8 @@
 //! 2. **Join-driven materialization.** Ground each schema by joining its
 //!    preconditions against `R`: an atom that introduces new variables is
 //!    resolved by an ordered scan of the sorted, encoded fact store
-//!    ([`super::facts`]); an atom that is already fully determined is settled by
-//!    a single [`XorFilter`](super::xorf::XorFilter)-gated membership probe.
+//!    (`super::facts`); an atom that is already fully determined is settled by
+//!    a single `XorFilter` (`super::xorf::XorFilter`)-gated membership probe.
 //!    Only surviving bindings are materialized, type-filtered exactly as the
 //!    naive grounder's per-parameter candidate lists would be, and emitted in
 //!    the naive grounder's odometer order.

@@ -6,14 +6,12 @@
     feature = "mutant_5"
 )))]
 
-use bcinr_cmca::fixed::{NonNegativeFixed, SignedFixed, CanonicalMask};
 use bcinr_cmca::allocator::{
-    allocate, StabilityRefusal, AdaptiveUpdate, AdmittedControlState,
-    CertificateReceipt, EnvelopeReceipt, OutcomeReceipt, CertifiedLearning
+    allocate, AdaptiveUpdate, AdmittedControlState, CertificateReceipt, CertifiedLearning,
+    EnvelopeReceipt, OutcomeReceipt, StabilityRefusal,
 };
-use bcinr_cmca::generated::case_studies::{
-    OBJECT_REGISTRY, LENS_REGISTRY, LAMBDA, ETA, N, Q
-};
+use bcinr_cmca::fixed::{CanonicalMask, NonNegativeFixed, SignedFixed};
+use bcinr_cmca::generated::case_studies::{ETA, LAMBDA, LENS_REGISTRY, N, OBJECT_REGISTRY, Q};
 
 fn get_proof() -> Option<AdaptiveUpdate<CertifiedLearning>> {
     AdaptiveUpdate::admit_adaptive_update(
@@ -38,7 +36,7 @@ fn test_case_study_1_cache_choice() {
     let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
     let mut last_switch_t = 0;
     let mut prev_mode = 0;
-    
+
     // We construct a simple tree where 0 and 1 are root leaf nodes
     let parent = [-1; N];
     let mu = [NonNegativeFixed::ZERO; N];
@@ -62,11 +60,16 @@ fn test_case_study_1_cache_choice() {
         500,
         CERTIFICATE_DIGEST,
         get_proof().as_ref(),
-    ).unwrap();
+    )
+    .unwrap();
 
     // Verify that Artifact_A (index 0) gets more cache allocation than Artifact_B (index 1)
     // In our lambda matrix, index 0 is MeasureCache, which dominates lens 0 (2.0) and 1 (1.0).
-    println!("result[0]: {:?}, result[1]: {:?}", result[0], result[1]); assert!(result[0].val > result[1].val, "Artifact_A should have higher cache allocation than Artifact_B");
+    println!("result[0]: {:?}, result[1]: {:?}", result[0], result[1]);
+    assert!(
+        result[0].val > result[1].val,
+        "Artifact_A should have higher cache allocation than Artifact_B"
+    );
 }
 
 #[test]
@@ -77,7 +80,7 @@ fn test_case_study_2_single_object_multiple_decisions() {
     let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
     let mut last_switch_t = 0;
     let mut prev_mode = 0;
-    
+
     let parent = [-1; N];
     let mu = [NonNegativeFixed::ZERO; N];
     let costs = [NonNegativeFixed::ZERO; N];
@@ -100,13 +103,17 @@ fn test_case_study_2_single_object_multiple_decisions() {
         500,
         CERTIFICATE_DIGEST,
         get_proof().as_ref(),
-    ).unwrap();
+    )
+    .unwrap();
 
     // Obj_Single (index 6) has high business value and retrieval demand, should have higher allocation than Obj_Obligation.
     for i in 0..N {
         println!("CS2 result[{}]: {:?}", i, result[i]);
     }
-    assert!(result[6].val > result[4].val, "Obj_Single should have higher allocation than Obj_Obligation");
+    assert!(
+        result[6].val > result[4].val,
+        "Obj_Single should have higher allocation than Obj_Obligation"
+    );
 }
 
 #[test]
@@ -118,7 +125,7 @@ fn test_case_study_3_downstream_consequence() {
     let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
     let mut last_switch_t = 0;
     let mut prev_mode = 0;
-    
+
     // Parent-child relationships for Case Study 3
     let mut parent = [-1; N];
     parent[2] = 4; // Obj_Activity depends on Obj_Obligation
@@ -147,7 +154,8 @@ fn test_case_study_3_downstream_consequence() {
         500,
         CERTIFICATE_DIGEST,
         get_proof().as_ref(),
-    ).unwrap();
+    )
+    .unwrap();
 
     // Obj_Value (index 7) is the only leaf in the chain, so it receives the allocated resource.
     assert!(result[7].val > 0, "Obj_Value should receive allocation");
@@ -336,9 +344,16 @@ fn test_rejection_invariance() {
     );
 
     assert!(res.is_err());
-    assert_eq!(weights, weights_before, "CHEAT-021: REJECTION_STATE_DRIFT - weights modified on rejection!");
-    assert_eq!(last_switch_t, last_switch_t_before, "CHEAT-021: REJECTION_STATE_DRIFT - last_switch_t modified on rejection!");
-    assert_eq!(prev_mode, prev_mode_before, "CHEAT-021: REJECTION_STATE_DRIFT - prev_mode modified on rejection!");
+    assert_eq!(
+        weights, weights_before,
+        "CHEAT-021: REJECTION_STATE_DRIFT - weights modified on rejection!"
+    );
+    assert_eq!(
+        last_switch_t, last_switch_t_before,
+        "CHEAT-021: REJECTION_STATE_DRIFT - last_switch_t modified on rejection!"
+    );
+    assert_eq!(
+        prev_mode, prev_mode_before,
+        "CHEAT-021: REJECTION_STATE_DRIFT - prev_mode modified on rejection!"
+    );
 }
-
-

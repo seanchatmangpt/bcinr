@@ -26,7 +26,7 @@
 //!
 //! # `planner` submodule — feature-gated, not part of the default build
 //!
-//! [`planner`] (only compiled with the `mfw-planner` Cargo feature) is the
+//! `planner` (only compiled with the `mfw-planner` Cargo feature) is the
 //! top-level `MfwPlanner` orchestrator wiring this crate's `consequence`/
 //! `mfw`/`search`/`causal`/`concurrency` modules together with `bcinr-powl`'s
 //! `PowlProjector` and `bcinr-powl-receipt`'s receipt sealing. It is

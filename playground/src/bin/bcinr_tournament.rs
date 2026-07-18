@@ -11,7 +11,7 @@
 //! Usage: `bcinr_tournament [opponent_elo] [games] [bcinr_movetime_ms] [sf_go_mode]`
 //!
 //! `sf_go_mode` controls how Stockfish is queried for each move:
-//!   - `depth1`     => `go depth 1`     (absolute fastest; ~58µs warmed up) [DEFAULT]
+//!   - `depth1`     => `go depth 1`     (absolute fastest; ~58µs warmed up) \[DEFAULT\]
 //!   - `fast`       => `go movetime 10`
 //!   - `calibrated` => `go movetime 100`
 //!

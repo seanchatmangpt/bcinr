@@ -6,9 +6,11 @@
     feature = "mutant_5"
 )))]
 
-use bcinr_cmca::fixed::{NonNegativeFixed, SignedFixed, CanonicalMask};
-use bcinr_cmca::observatory::{evaluate_calibration, ObservatoryFlag, MeasurementArtifact, SupportStanding, ModeDelta};
 use bcinr_cmca::allocator::CertificateReceipt;
+use bcinr_cmca::fixed::{CanonicalMask, NonNegativeFixed, SignedFixed};
+use bcinr_cmca::observatory::{
+    evaluate_calibration, MeasurementArtifact, ModeDelta, ObservatoryFlag, SupportStanding,
+};
 
 fn make_artifact(
     kappa_hat: NonNegativeFixed,
@@ -21,7 +23,10 @@ fn make_artifact(
         point_estimate: kappa_hat,
         lower_bound: kappa_under,
         upper_bound: kappa_hat,
-        support_standing: SupportStanding { is_supported: true, smoothing_applied: false },
+        support_standing: SupportStanding {
+            is_supported: true,
+            smoothing_applied: false,
+        },
         effective_sample_size: NonNegativeFixed::ONE,
         dependence_standing: 0,
         numeric_error: NonNegativeFixed::ZERO,
@@ -65,8 +70,8 @@ fn test_f03_gram_degenerate() {
     );
     let result = evaluate_calibration(
         &artifact,
-        NonNegativeFixed::from_bits(65536),  // epsilon_on = 1.0
-        NonNegativeFixed::from_bits(65536),  // epsilon_gram = 1.0
+        NonNegativeFixed::from_bits(65536), // epsilon_on = 1.0
+        NonNegativeFixed::from_bits(65536), // epsilon_gram = 1.0
         NonNegativeFixed::ONE,
         NonNegativeFixed::ONE,
         NonNegativeFixed::from_bits(32768),
@@ -85,9 +90,9 @@ fn test_f09_nonstationary_window() {
     );
     let result = evaluate_calibration(
         &artifact,
-        NonNegativeFixed::from_bits(65536),  // epsilon_on
-        NonNegativeFixed::from_bits(65536),  // epsilon_gram
-        NonNegativeFixed::from_bits(65536),  // epsilon_drift
+        NonNegativeFixed::from_bits(65536), // epsilon_on
+        NonNegativeFixed::from_bits(65536), // epsilon_gram
+        NonNegativeFixed::from_bits(65536), // epsilon_drift
         NonNegativeFixed::ONE,
         NonNegativeFixed::from_bits(32768),
     );
@@ -97,19 +102,19 @@ fn test_f09_nonstationary_window() {
 #[test]
 fn test_f00_exact_scale_collapse() {
     let artifact = make_artifact(
-        NonNegativeFixed::ZERO, // kappa_hat
-        NonNegativeFixed::ZERO, // kappa_under
+        NonNegativeFixed::ZERO,              // kappa_hat
+        NonNegativeFixed::ZERO,              // kappa_under
         NonNegativeFixed::from_bits(131072), // gamma_min_plus_under
-        NonNegativeFixed::ZERO, // d_js
+        NonNegativeFixed::ZERO,              // d_js
         ModeDelta::ProposeDelta,
     );
     let result = evaluate_calibration(
         &artifact,
-        NonNegativeFixed::from_bits(65536),  // epsilon_on
-        NonNegativeFixed::from_bits(65536),  // epsilon_gram
-        NonNegativeFixed::from_bits(65536),  // epsilon_drift
-        NonNegativeFixed::ONE,  // s_meas
-        NonNegativeFixed::ONE,  // s_leaf == s_meas
+        NonNegativeFixed::from_bits(65536), // epsilon_on
+        NonNegativeFixed::from_bits(65536), // epsilon_gram
+        NonNegativeFixed::from_bits(65536), // epsilon_drift
+        NonNegativeFixed::ONE,              // s_meas
+        NonNegativeFixed::ONE,              // s_leaf == s_meas
     );
     assert_eq!(result, Err(ObservatoryFlag::ScaleInert));
 }
@@ -120,16 +125,16 @@ fn test_f01_material_scale_information() {
         NonNegativeFixed::from_bits(131072), // kappa_hat
         NonNegativeFixed::from_bits(131072), // kappa_under
         NonNegativeFixed::from_bits(131072), // gamma_min_plus_under
-        NonNegativeFixed::ZERO, // d_js
+        NonNegativeFixed::ZERO,              // d_js
         ModeDelta::ProposeDelta,
     );
     let result = evaluate_calibration(
         &artifact,
-        NonNegativeFixed::from_bits(65536),  // epsilon_on
-        NonNegativeFixed::from_bits(65536),  // epsilon_gram
-        NonNegativeFixed::from_bits(65536),  // epsilon_drift
-        NonNegativeFixed::ONE,  // s_meas
-        NonNegativeFixed::from_bits(32768),  // s_leaf
+        NonNegativeFixed::from_bits(65536), // epsilon_on
+        NonNegativeFixed::from_bits(65536), // epsilon_gram
+        NonNegativeFixed::from_bits(65536), // epsilon_drift
+        NonNegativeFixed::ONE,              // s_meas
+        NonNegativeFixed::from_bits(32768), // s_leaf
     );
     assert_eq!(result, Ok(CertificateReceipt::admit_certificate(42))); // RECERTIFICATION_CANDIDATE
 }

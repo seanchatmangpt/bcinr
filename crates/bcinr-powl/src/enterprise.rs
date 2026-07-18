@@ -343,19 +343,21 @@ impl SagaStack {
     #[inline(always)]
     pub fn push(&mut self, comp_op_idx: u16) {
         let top_val = self.top as u64;
-        
+
         // diff is non-negative (sign bit 0) when top_val < 32, and negative (sign bit 1) when top_val >= 32.
         let diff = 32u64.wrapping_sub(top_val).wrapping_sub(1);
         let is_full_bit = diff >> 63;
-        
+
         // Write index: top if not full, 32 if full.
         let mask = 0u64.wrapping_sub(is_full_bit);
         let write_idx = (top_val & !mask) | (32 & mask);
-        
+
         self.frames[write_idx as usize] = comp_op_idx;
-        
+
         // Increment top only if not full
-        self.top = self.top.wrapping_add((1u64.wrapping_sub(is_full_bit)) as u8);
+        self.top = self
+            .top
+            .wrapping_add((1u64.wrapping_sub(is_full_bit)) as u8);
     }
 
     /// Pop the most-recently-pushed compensation op index branchlessly.
@@ -380,22 +382,22 @@ impl SagaStack {
     #[inline(always)]
     pub fn pop(&mut self) -> BranchlessPop {
         let top_val = self.top as u64;
-        
+
         // If top is 0, wrapping_sub(1) has sign bit set (1). If top > 0, sign bit is 0.
         let is_empty_bit = (top_val.wrapping_sub(1)) >> 63;
         let is_valid_bit = 1u64.wrapping_sub(is_empty_bit);
-        
+
         // Decrement top only if valid
         self.top = self.top.wrapping_sub(is_valid_bit as u8);
-        
+
         // Read index: new top if valid, 32 if empty
         let valid_mask_u64 = 0u64.wrapping_sub(is_valid_bit);
         let empty_mask_u64 = 0u64.wrapping_sub(is_empty_bit);
         let read_idx = ((self.top as u64) & valid_mask_u64) | (32 & empty_mask_u64);
-        
+
         let value = self.frames[read_idx as usize];
         let valid_mask = valid_mask_u64 as u16;
-        
+
         BranchlessPop { value, valid_mask }
     }
 }
@@ -626,8 +628,8 @@ pub fn evaluate_graduation(
 #[cfg(test)]
 mod tests {
     use super::{graduation, *};
-    use proptest::prelude::*;
     use proptest as prop;
+    use proptest::prelude::*;
 
     // -----------------------------------------------------------------------
     // capability_mask
@@ -705,7 +707,9 @@ mod tests {
 
     impl SlowSagaStack {
         fn new() -> Self {
-            Self { inner: std::vec::Vec::new() }
+            Self {
+                inner: std::vec::Vec::new(),
+            }
         }
         fn push(&mut self, val: u16) {
             if self.inner.len() < 32 {
@@ -731,22 +735,22 @@ mod tests {
         s.push(20);
         s.push(30);
         assert_eq!(s.len(), 3);
-        
+
         let p3 = s.pop();
         assert_eq!(p3.valid_mask, 0xFFFF);
         assert_eq!(p3.value, 30);
         assert_eq!(Option::<u16>::from(p3), Some(30));
-        
+
         let p2 = s.pop();
         assert_eq!(p2.valid_mask, 0xFFFF);
         assert_eq!(p2.value, 20);
         assert_eq!(Option::<u16>::from(p2), Some(20));
-        
+
         let p1 = s.pop();
         assert_eq!(p1.valid_mask, 0xFFFF);
         assert_eq!(p1.value, 10);
         assert_eq!(Option::<u16>::from(p1), Some(10));
-        
+
         let p0 = s.pop();
         assert_eq!(p0.valid_mask, 0);
         assert_eq!(Option::<u16>::from(p0), None);

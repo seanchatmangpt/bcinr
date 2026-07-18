@@ -1,3 +1,8 @@
+//! Spawns real `cargo` subprocesses to exercise CLI tools end-to-end, which
+//! Miri's isolation sandbox blocks (`open` unavailable) and which isn't
+//! meaningful UB-checking territory anyway — skip this binary under Miri.
+#![cfg(not(miri))]
+
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -93,7 +98,7 @@ impl Drop for TestCtx {
 }
 
 pub fn run_cargo_cmd(args: &[&str]) -> std::process::Output {
-        let mut cmd = Command::new("cargo");
+    let mut cmd = Command::new("cargo");
     cmd.args(args);
     cmd.current_dir("/Users/sac/bcinr");
     cmd.env("CARGO_TARGET_DIR", "/tmp/bcinr-e2e-target");
@@ -168,14 +173,26 @@ fn ensure_lsp_built() {
 
 pub fn run_gate_cmd() -> std::process::Output {
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "--manifest-path", "tools/bcinr-contract-gate/Cargo.toml", "--release", "--quiet"]);
+    cmd.args([
+        "run",
+        "--manifest-path",
+        "tools/bcinr-contract-gate/Cargo.toml",
+        "--release",
+        "--quiet",
+    ]);
     cmd.current_dir("/Users/sac/bcinr");
     cmd.output().expect("failed to execute bcinr-contract-gate")
 }
 
 pub fn run_bench_cmd() -> std::process::Output {
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "--manifest-path", "tools/bcinr-bench-auditor/Cargo.toml", "--release", "--quiet"]);
+    cmd.args([
+        "run",
+        "--manifest-path",
+        "tools/bcinr-bench-auditor/Cargo.toml",
+        "--release",
+        "--quiet",
+    ]);
     cmd.current_dir("/Users/sac/bcinr");
     cmd.output().expect("failed to execute bcinr-bench-auditor")
 }
@@ -229,7 +246,6 @@ pub fn assert_status_eq(output: &std::process::Output, expected: i32) {
 // ==========================================
 // FEATURE 1: Workspace Health (f1)
 // ==========================================
-
 
 mod e2e;
 use e2e::tier1::*;

@@ -80,11 +80,11 @@
 #[cfg(feature = "std")]
 extern crate std;
 
+pub mod allocator;
 pub mod fixed;
 pub mod generated;
-pub mod allocator;
-pub mod observatory;
 pub mod lrc;
+pub mod observatory;
 
 pub use allocator::StabilityRefusal;
 
@@ -113,8 +113,6 @@ pub use allocator::StabilityRefusal;
 pub fn dummy_branchless(val: u64) -> u64 {
     val.wrapping_add(1)
 }
-
-
 
 #[cfg(test)]
 mod tests {

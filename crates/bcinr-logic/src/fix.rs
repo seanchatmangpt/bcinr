@@ -584,7 +584,16 @@ mod tests {
 
     #[test]
     fn test_f32_q16_roundtrip() {
-        let vals = [0.0f32, 1.0, -1.0, 0.5, -0.5, std::f32::consts::PI, 100.0, -100.0];
+        let vals = [
+            0.0f32,
+            1.0,
+            -1.0,
+            0.5,
+            -0.5,
+            std::f32::consts::PI,
+            100.0,
+            -100.0,
+        ];
         for &v in &vals {
             let encoded = f32_to_q16(v);
             let decoded = q16_to_f32(encoded);

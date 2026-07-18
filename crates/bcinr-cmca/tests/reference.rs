@@ -1,8 +1,12 @@
-use bcinr_cmca::generated::case_studies::{PackedSemanticState, LensSpec, N, K, Q};
+use bcinr_cmca::generated::case_studies::{LensSpec, PackedSemanticState, K, N, Q};
 
 pub fn compute_measures_f64(state: &PackedSemanticState) -> [f64; K] {
-    let factors: Vec<f64> = state.factors.iter().map(|f| f.to_bits() as f64 / 65536.0).collect();
-    
+    let factors: Vec<f64> = state
+        .factors
+        .iter()
+        .map(|f| f.to_bits() as f64 / 65536.0)
+        .collect();
+
     let recomp = factors[0];
     let verify = factors[1];
     let standing = factors[2];
@@ -127,7 +131,7 @@ pub fn allocate_f64(
         if !is_leaf[v] {
             for q_idx in 0..Q {
                 let q_val = lenses[q_idx].q.to_bits() as f64 / 65536.0;
-                
+
                 // Compute kappa
                 let mut sum_meas_den = 0.0;
                 let mut sum_leaf_den = 0.0;
@@ -139,7 +143,7 @@ pub fn allocate_f64(
                         sum_leaf_den += node_masses[0][i].powf(q_val);
                     }
                 }
-                
+
                 let mut kappa = 0.0;
                 for c in 0..N {
                     if parent[c] == v as i32 {
@@ -249,13 +253,15 @@ pub fn allocate_f64(
 
                         for x in 0..N {
                             if is_subtree_leaf[v][x] {
-                                flat_alloc[x] += flat_part * (node_masses[k][x].powf(q_val) / leaf_sum);
+                                flat_alloc[x] +=
+                                    flat_part * (node_masses[k][x].powf(q_val) / leaf_sum);
                             }
                         }
 
                         for c in 0..N {
                             if parent[c] == v as i32 {
-                                alloc_flow[c] += desc_part * (node_masses[k][c].powf(q_val) / child_sum);
+                                alloc_flow[c] +=
+                                    desc_part * (node_masses[k][c].powf(q_val) / child_sum);
                             }
                         }
 
@@ -285,8 +291,12 @@ pub fn allocate_f64(
     let mut priced_val = [0.0; N];
     for x in 0..N {
         let mut mu_clamped = mu[x];
-        if mu_clamped < 0.0 { mu_clamped = 0.0; }
-        if mu_clamped > 100.0 { mu_clamped = 100.0; }
+        if mu_clamped < 0.0 {
+            mu_clamped = 0.0;
+        }
+        if mu_clamped > 100.0 {
+            mu_clamped = 100.0;
+        }
         let dot_prod = mu_clamped * costs[x];
         priced_val[x] = pi_combined[x] * (-dot_prod).exp();
     }

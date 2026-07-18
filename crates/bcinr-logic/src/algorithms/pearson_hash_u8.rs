@@ -28,15 +28,15 @@ const PEARSON_TABLE: [u8; 256] = [
 ///
 /// # Algorithm (Pearson 1990)
 /// for each input byte b:
-///   h = table[(h ^ b) & 0xFF]
+///   h = table\[(h ^ b) & 0xFF\]
 /// return h
 ///
 /// For a single byte input, this is:
-///   return table[input_byte]
+///   return table\[input_byte\]
 /// To mix with auxiliary data (seed), we XOR before lookup.
 ///
 /// # CONTRACT
-/// **Ensures:** result ∈ [0, 255], uniformly distributed over bytes
+/// **Ensures:** result ∈ \[0, 255\], uniformly distributed over bytes
 /// **Invariant:** Zero conditional branches, constant-time execution
 ///
 /// # Examples

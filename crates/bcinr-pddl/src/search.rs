@@ -313,7 +313,7 @@ impl FairRailScheduler {
     /// Choose the next rail to tick. Forces `Exact` (and resets
     /// `ticks_since_exact` to `0`) whenever there are no exploit rails at
     /// all, or `ticks_since_exact >= max_gap` — this is the fairness
-    /// invariant [`tests::exact_rail_is_never_starved_beyond_max_gap`]
+    /// invariant `tests::exact_rail_is_never_starved_beyond_max_gap`
     /// checks directly. Otherwise round-robins among exploit rails and
     /// increments `ticks_since_exact`.
     pub fn select(&mut self) -> RailSelection {

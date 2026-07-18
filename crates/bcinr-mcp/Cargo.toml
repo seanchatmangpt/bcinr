@@ -5,6 +5,7 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "MCP server exposing bcinr planning, POWL execution, and receipt tools (admission-key cache library surface)"
 repository = "https://github.com/seanchatmangpt/bcinr"
+publish = false
 
 [lib]
 name = "bcinr_mcp"

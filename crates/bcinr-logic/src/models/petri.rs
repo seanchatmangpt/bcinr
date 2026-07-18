@@ -332,5 +332,3 @@ mod tests {
         assert_eq!(same.current, next.current);
     }
 }
-
-

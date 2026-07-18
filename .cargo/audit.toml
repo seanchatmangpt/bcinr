@@ -1,0 +1,28 @@
+# cargo-audit configuration.
+#
+# Every advisory below is a transitive dependency we do not control the
+# version of, and cannot fix by editing this workspace's own Cargo.toml:
+#
+# - RUSTSEC-2026-0194 / RUSTSEC-2026-0195 (quick-xml 0.36.2, high severity
+#   DoS): pulled in by wasm4pm-compat 26.6.29, whose own Cargo.toml pins
+#   `quick-xml = "0.36.0"` (caret-resolves to <0.37). The fix (>=0.41.0) is
+#   outside that range, and `[patch.crates-io]` cannot force a newer
+#   same-registry version past a dependency's own semver bound — only
+#   wasm4pm-compat republishing against quick-xml >=0.41 resolves this.
+#   Remove this ignore once that happens.
+#
+# - RUSTSEC-2020-0036 / RUSTSEC-2019-0036 (failure 0.1.8, unmaintained +
+#   unsound) and RUSTSEC-2024-0436 (paste 1.0.15, unmaintained) and
+#   RUSTSEC-2026-0097 (rand 0.7.3, unsound): all pulled in by the `chess`
+#   crate, a build-dependency of playground's benchmark opponent engine —
+#   not part of core bcinr. Remove once `chess` (or playground's dependency
+#   on it) is updated/replaced.
+[advisories]
+ignore = [
+    "RUSTSEC-2026-0194",
+    "RUSTSEC-2026-0195",
+    "RUSTSEC-2020-0036",
+    "RUSTSEC-2019-0036",
+    "RUSTSEC-2024-0436",
+    "RUSTSEC-2026-0097",
+]

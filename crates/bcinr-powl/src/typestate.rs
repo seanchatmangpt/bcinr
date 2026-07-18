@@ -325,8 +325,12 @@ impl core::fmt::Display for ExecutionDefect {
             Self::OpAlreadyConsumed { bit } => write!(f, "op bit {bit:#b} already consumed"),
             Self::UnexhaustedOps { remaining } => write!(f, "unfired ops remain: {remaining:#b}"),
             Self::TokenMismatch => write!(f, "execution token does not match this runner"),
-            Self::InvalidFires { bits } => write!(f, "invalid (out-of-bounds) ops fired: {bits:#b}"),
-            Self::MalformedFires { bits } => write!(f, "malformed (zero/multi-bit) ops fired: {bits:#b}"),
+            Self::InvalidFires { bits } => {
+                write!(f, "invalid (out-of-bounds) ops fired: {bits:#b}")
+            }
+            Self::MalformedFires { bits } => {
+                write!(f, "malformed (zero/multi-bit) ops fired: {bits:#b}")
+            }
         }
     }
 }
@@ -478,10 +482,11 @@ impl ExecutionToken {
         let is_zero = (op_bit == 0) as u64;
         let is_multi = ((op_bit & op_bit.wrapping_sub(1)) != 0) as u64;
         let malformed_flag = is_zero | is_multi;
-        
+
         // Write through the malformed flag and the offending bits.
         // We use 0u64.wrapping_sub(malformed_flag) to propagate a full-width mask.
-        let malformed_mask = (op_bit | 0u64.wrapping_sub(is_zero)) & 0u64.wrapping_sub(malformed_flag);
+        let malformed_mask =
+            (op_bit | 0u64.wrapping_sub(is_zero)) & 0u64.wrapping_sub(malformed_flag);
         self.defect_malformed |= malformed_mask;
 
         // 4. Update the remaining mask (idempotent write-through)
@@ -505,16 +510,22 @@ impl ExecutionToken {
         let defect_malformed = self.defect_malformed;
         let defect_invalid = self.defect_invalid;
         let defect_double_fire = self.defect_double_fire;
-        
+
         // Prevent the destructor bomb from firing — we're consuming intentionally.
         core::mem::forget(self);
-        
+
         if defect_malformed != 0 {
-            Err(ExecutionDefect::MalformedFires { bits: defect_malformed })
+            Err(ExecutionDefect::MalformedFires {
+                bits: defect_malformed,
+            })
         } else if defect_invalid != 0 {
-            Err(ExecutionDefect::InvalidFires { bits: defect_invalid })
+            Err(ExecutionDefect::InvalidFires {
+                bits: defect_invalid,
+            })
         } else if defect_double_fire != 0 {
-            Err(ExecutionDefect::OpAlreadyConsumed { bit: defect_double_fire })
+            Err(ExecutionDefect::OpAlreadyConsumed {
+                bit: defect_double_fire,
+            })
         } else if remaining != 0 {
             Err(ExecutionDefect::UnexhaustedOps { remaining })
         } else {
@@ -814,18 +825,24 @@ impl<Tape: HasPowlTape, const KIND: TopologyKind> PowlRunner<Executing<KIND>, Ta
         let defect_malformed = token.defect_malformed;
         let defect_invalid = token.defect_invalid;
         let defect_double_fire = token.defect_double_fire;
-        
+
         // Consume token without triggering the destructor bomb.
         core::mem::forget(token);
 
         if defect_malformed != 0 {
-            return Err(ExecutionDefect::MalformedFires { bits: defect_malformed });
+            return Err(ExecutionDefect::MalformedFires {
+                bits: defect_malformed,
+            });
         }
         if defect_invalid != 0 {
-            return Err(ExecutionDefect::InvalidFires { bits: defect_invalid });
+            return Err(ExecutionDefect::InvalidFires {
+                bits: defect_invalid,
+            });
         }
         if defect_double_fire != 0 {
-            return Err(ExecutionDefect::OpAlreadyConsumed { bit: defect_double_fire });
+            return Err(ExecutionDefect::OpAlreadyConsumed {
+                bit: defect_double_fire,
+            });
         }
         if remaining != 0 {
             return Err(ExecutionDefect::UnexhaustedOps { remaining });
@@ -1098,13 +1115,13 @@ mod tests {
         let mut tok = ExecutionToken::new(2);
         tok.consume_op(1 << 0); // first time: ok
         tok.consume_op(1 << 0); // second time: double-fire
-        
+
         // Assert that the double-fire defect is accumulated.
         assert_eq!(tok.defect_double_fire, 1 << 0);
 
         // Clean up other ops to see if assert_exhausted still fails with double-fire.
         tok.consume_op(1 << 1);
-        
+
         let err = tok.assert_exhausted().unwrap_err();
         assert_eq!(err, ExecutionDefect::OpAlreadyConsumed { bit: 1 << 0 });
     }
@@ -1130,13 +1147,13 @@ mod tests {
     fn invalid_consume_op_fails() {
         let mut tok = ExecutionToken::new(2); // valid_mask is 0b11
         tok.consume_op(1 << 2); // out of bounds: bit 2
-        
+
         assert_eq!(tok.defect_invalid, 1 << 2);
-        
+
         // Clean up valid bits so assert_exhausted runs.
         tok.consume_op(1 << 0);
         tok.consume_op(1 << 1);
-        
+
         let err = tok.assert_exhausted().unwrap_err();
         assert_eq!(err, ExecutionDefect::InvalidFires { bits: 1 << 2 });
     }
@@ -1146,11 +1163,11 @@ mod tests {
         let mut tok = ExecutionToken::new(2);
         tok.consume_op(0); // malformed: zero bit
         assert_eq!(tok.defect_malformed, u64::MAX);
-        
+
         // Clean up
         tok.consume_op(1 << 0);
         tok.consume_op(1 << 1);
-        
+
         let err = tok.assert_exhausted().unwrap_err();
         assert_eq!(err, ExecutionDefect::MalformedFires { bits: u64::MAX });
     }
@@ -1160,7 +1177,7 @@ mod tests {
         let mut tok = ExecutionToken::new(3);
         tok.consume_op(0b11); // malformed: multi-bit fire (bit 0 and 1)
         assert_eq!(tok.defect_malformed, 0b11);
-        
+
         // Clean up
         tok.consume_op(1 << 2);
         let err = tok.assert_exhausted().unwrap_err();

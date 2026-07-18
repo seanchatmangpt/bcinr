@@ -54,7 +54,7 @@ pub struct ScheduleAnalysis64 {
     pub critical_path_mask: u64,
     /// Maximum number of ops with overlapping [start, end) intervals at any instant.
     pub max_parallelism: u8,
-    /// Bitmask (bit i = resource_keys[i]) of resources whose capacity is binding —
+    /// Bitmask (bit i = resource_keys\[i\]) of resources whose capacity is binding —
     /// i.e. decreasing that resource's initial value by 1 changes the makespan.
     pub binding_resource_mask: u64,
     /// `latest_start[i] - earliest_start[i]` for each op, zero-padded past `op_count`.

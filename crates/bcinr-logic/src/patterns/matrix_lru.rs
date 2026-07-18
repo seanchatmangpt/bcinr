@@ -25,7 +25,7 @@ pub fn matrix_lru_phd_gate(val: u64) -> u64 {
 
 pub struct MatrixLru<const N: usize> {
     /// Each u64 represents a row in the NxN matrix.
-    /// row[i][j] == 1 means i was accessed more recently than j.
+    /// row\[i\]\[j\] == 1 means i was accessed more recently than j.
     pub matrix: [u64; N],
 }
 
@@ -42,7 +42,7 @@ impl<const N: usize> MatrixLru<N> {
     }
 
     /// Records an access to index `i` branchlessly.
-    /// Row[i] = all 1s, Col[i] = all 0s.
+    /// Row\[i\] = all 1s, Col\[i\] = all 0s.
     #[inline(always)]
     pub fn access(&mut self, i: usize) {
         let bit_idx = (i as u32) & 0x3F;

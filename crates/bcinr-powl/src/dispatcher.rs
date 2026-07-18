@@ -22,7 +22,7 @@
 //!
 //! All primitives use only `core::sync::atomic`. No heap allocation.
 
-use core::sync::atomic::{AtomicU8, AtomicU32, Ordering};
+use core::sync::atomic::{AtomicU32, AtomicU8, Ordering};
 
 // ---------------------------------------------------------------------------
 // OpKind for the POWL v2 op stream
@@ -174,24 +174,27 @@ impl BpadDispatcher {
         let old = self.occupancy.load(Ordering::Acquire);
         let free_mask = !old;
         let slot_idx = free_mask.trailing_zeros() as u8;
-        
+
         let is_full = slot_idx >= 8;
         let target_bit = 1u8 << (slot_idx & 7);
         let proposed = old | target_bit;
-        
+
         // If full, proposed == old, causing the CAS to have no net effect.
-        let success = self.occupancy
+        let success = self
+            .occupancy
             .compare_exchange(old, proposed, Ordering::SeqCst, Ordering::Acquire)
             .is_ok();
-            
+
         let is_ok = success && !is_full;
         let dest_idx = select(is_ok, slot_idx as usize, 8);
-        
+
         // Write to target slot if successful, or to the garbage slot if failed.
-        self.slots[dest_idx].op_index.store(op_idx, Ordering::Release);
-        
+        self.slots[dest_idx]
+            .op_index
+            .store(op_idx, Ordering::Release);
+
         let refusal_code = select(is_full, 1, select(!success, 2, 0)) as u8;
-        
+
         SubmissionResult {
             slot_id: slot_idx,
             is_ok,
@@ -204,11 +207,13 @@ impl BpadDispatcher {
     pub fn try_claim(&self, slot_idx: u8) -> ClaimResult {
         let occ = self.occupancy.load(Ordering::Acquire);
         let is_claimed = ((occ >> (slot_idx & 7)) & 1) == 1;
-        let idx = self.slots[(slot_idx & 7) as usize].op_index.load(Ordering::Acquire);
-        
+        let idx = self.slots[(slot_idx & 7) as usize]
+            .op_index
+            .load(Ordering::Acquire);
+
         let has_op = idx != SLOT_FREE;
         let is_ok = is_claimed && has_op;
-        
+
         ClaimResult {
             op_index: idx,
             is_ok,
@@ -219,10 +224,12 @@ impl BpadDispatcher {
     #[inline(always)]
     pub fn release(&self, slot_idx: u8) {
         let s_idx = (slot_idx & 7) as usize;
-        
+
         // 1. Reset slot index first (Release ordering ensures this happens-before occupancy clear)
-        self.slots[s_idx].op_index.store(SLOT_FREE, Ordering::Release);
-        
+        self.slots[s_idx]
+            .op_index
+            .store(SLOT_FREE, Ordering::Release);
+
         // 2. Clear occupancy bit (Release ordering synchronizes with subsequent Acquire loads)
         self.occupancy.fetch_and(!(1u8 << s_idx), Ordering::Release);
     }
@@ -232,36 +239,41 @@ impl BpadDispatcher {
     pub fn fanout_pair(&self, left: u32, right: u32) -> SubmissionPairResult {
         let old = self.occupancy.load(Ordering::Acquire);
         let free_mask = !old;
-        
+
         // Count free slots using branchless popcnt
         let free_count = free_mask.count_ones();
         let has_two_slots = free_count >= 2;
-        
+
         // Extract two lowest set bits branchlessly
         let first = free_mask.trailing_zeros() as u8;
         let temp = free_mask & (free_mask.wrapping_sub(1));
         let second = temp.trailing_zeros() as u8;
-        
+
         let target_bits = (1u8 << (first & 7)) | (1u8 << (second & 7));
         // If insufficient slots, zero out target bits to make CAS a no-op
         let acquire_mask = target_bits & (0u8.wrapping_sub(has_two_slots as u8));
         let proposed = old | acquire_mask;
-        
-        let success = self.occupancy
+
+        let success = self
+            .occupancy
             .compare_exchange(old, proposed, Ordering::SeqCst, Ordering::Acquire)
             .is_ok();
-            
+
         let is_ok = success && has_two_slots;
-        
+
         let dest_first = select(is_ok, first as usize, 8);
         let dest_second = select(is_ok, second as usize, 8);
-        
+
         // Commit operation indices to their respective slots
-        self.slots[dest_first].op_index.store(left, Ordering::Release);
-        self.slots[dest_second].op_index.store(right, Ordering::Release);
-        
+        self.slots[dest_first]
+            .op_index
+            .store(left, Ordering::Release);
+        self.slots[dest_second]
+            .op_index
+            .store(right, Ordering::Release);
+
         let refusal_code = select(!has_two_slots, 3, select(!success, 2, 0)) as u8;
-        
+
         SubmissionPairResult {
             first: first & 7,
             second: second & 7,
@@ -390,11 +402,11 @@ mod tests {
         let res = d.try_submit(42);
         assert!(res.is_ok, "fresh dispatcher must accept submission");
         let slot = res.slot_id;
-        
+
         let claim = d.try_claim(slot);
         assert!(claim.is_ok, "submitted op must be claimable");
         assert_eq!(claim.op_index, 42);
-        
+
         d.release(slot);
         assert_eq!(d.occupied(), 0);
         assert!(!d.try_claim(slot).is_ok);
@@ -492,15 +504,17 @@ mod tests {
 
         pub fn fanout(&self, left: u32, right: u32) -> Result<(usize, usize), String> {
             let mut guard = self.slots.lock().unwrap();
-            let free_indices: std::vec::Vec<usize> = guard.iter().enumerate()
+            let free_indices: std::vec::Vec<usize> = guard
+                .iter()
+                .enumerate()
                 .filter(|(_, slot)| slot.is_none())
                 .map(|(idx, _)| idx)
                 .collect();
-                
+
             if free_indices.len() < 2 {
                 return Err("InsufficientSlots".into());
             }
-            
+
             let l_idx = free_indices[0];
             let r_idx = free_indices[1];
             guard[l_idx] = Some(left);
@@ -514,7 +528,7 @@ mod tests {
                 guard[slot] = None;
             }
         }
-        
+
         pub fn get_slot(&self, slot: usize) -> Option<u32> {
             let guard = self.slots.lock().unwrap();
             if slot < 8 {
@@ -529,13 +543,13 @@ mod tests {
     fn differential_testing_oracle() {
         let d = BpadDispatcher::new();
         let oracle = OracleDispatcher::new();
-        
+
         let mut seed: u32 = 0x12345678;
         let mut next_random = move || {
             seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
             seed
         };
-        
+
         for _ in 0..10_000 {
             let op_type = next_random() % 4;
             match op_type {
@@ -576,7 +590,7 @@ mod tests {
                     }
                 }
             }
-            
+
             let mut expected_occupied = 0;
             for i in 0..8 {
                 let val_oracle = oracle.get_slot(i);

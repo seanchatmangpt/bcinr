@@ -1,8 +1,9 @@
-
 use crate::allocator::StabilityRefusal;
 
 #[derive(Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
-pub struct CanonicalMask { pub val: u32 }
+pub struct CanonicalMask {
+    pub val: u32,
+}
 
 impl CanonicalMask {
     pub const TRUE: Self = Self { val: u32::MAX };
@@ -22,7 +23,9 @@ impl CanonicalMask {
 #[inline(always)]
 pub const fn const_lt_u32(a: u32, b: u32) -> CanonicalMask {
     let diff = ((a ^ ((a ^ b) | (a.wrapping_sub(b) ^ b))) >> 31) & 1;
-    CanonicalMask { val: 0u32.wrapping_sub(diff) }
+    CanonicalMask {
+        val: 0u32.wrapping_sub(diff),
+    }
 }
 
 #[inline(always)]
@@ -32,7 +35,9 @@ pub const fn const_eq_u32(a: u32, b: u32) -> CanonicalMask {
     let nonzero = (x | x.wrapping_neg()) >> 31;
     #[cfg(feature = "mutant_7")]
     let nonzero = (!x & !x.wrapping_neg()) >> 31; // Mutated: sign inversion
-    CanonicalMask { val: 0u32.wrapping_sub(1u32.wrapping_sub(nonzero)) }
+    CanonicalMask {
+        val: 0u32.wrapping_sub(1u32.wrapping_sub(nonzero)),
+    }
 }
 
 #[inline(always)]
@@ -42,7 +47,9 @@ pub const fn const_lt_i32(a: i32, b: i32) -> CanonicalMask {
     let b_sign = (b as u32) >> 31;
     let diff_sign = diff >> 31;
     let res = (a_sign & (b_sign ^ 1)) | ((!(a_sign ^ b_sign)) & diff_sign);
-    CanonicalMask { val: 0u32.wrapping_sub(res) }
+    CanonicalMask {
+        val: 0u32.wrapping_sub(res),
+    }
 }
 
 #[inline(always)]
@@ -63,18 +70,41 @@ pub struct NonNegativeFixed {
 }
 
 impl NonNegativeFixed {
-    pub const ZERO: Self = Self { val: 0, err: u32::MAX };
-    pub const ONE: Self = Self { val: 65536, err: u32::MAX };
-    pub const MAX: Self = Self { val: u32::MAX, err: u32::MAX };
+    pub const ZERO: Self = Self {
+        val: 0,
+        err: u32::MAX,
+    };
+    pub const ONE: Self = Self {
+        val: 65536,
+        err: u32::MAX,
+    };
+    pub const MAX: Self = Self {
+        val: u32::MAX,
+        err: u32::MAX,
+    };
 
     #[inline(always)]
-    pub const fn from_bits(bits: u32) -> Self { Self { val: bits, err: u32::MAX } }
+    pub const fn from_bits(bits: u32) -> Self {
+        Self {
+            val: bits,
+            err: u32::MAX,
+        }
+    }
     #[inline(always)]
-    pub const fn to_bits(self) -> u32 { self.val }
+    pub const fn to_bits(self) -> u32 {
+        self.val
+    }
     #[inline(always)]
-    pub const fn from_num(num: u32) -> Self { Self { val: num.wrapping_shl(16), err: u32::MAX } }
+    pub const fn from_num(num: u32) -> Self {
+        Self {
+            val: num.wrapping_shl(16),
+            err: u32::MAX,
+        }
+    }
     #[inline(always)]
-    pub const fn to_num(self) -> u32 { self.val >> 16 }
+    pub const fn to_num(self) -> u32 {
+        self.val >> 16
+    }
 
     #[inline(always)]
     pub const fn saturating_add(self, other: Self) -> Self {
@@ -106,7 +136,9 @@ impl NonNegativeFixed {
         let res_u64 = prod >> 16;
         let high = (res_u64 >> 32) as u32;
         let overflow = (high | high.wrapping_neg()) >> 31;
-        let overflow_mask = CanonicalMask { val: 0u32.wrapping_sub(overflow) };
+        let overflow_mask = CanonicalMask {
+            val: 0u32.wrapping_sub(overflow),
+        };
         let e = overflow_mask.select_u32(StabilityRefusal::NumericRangeExceeded as u32, u32::MAX);
         Self {
             val: overflow_mask.select_u32(u32::MAX, res_u64 as u32),
@@ -118,43 +150,50 @@ impl NonNegativeFixed {
     pub const fn saturating_div(self, other: Self) -> Self {
         let den_is_zero = const_eq_u32(other.val, 0);
         let d = den_is_zero.select_u32(1, other.val);
-        
+
         let lz = d.leading_zeros();
         let d_norm = d << lz;
-        
+
         let a_scale = 13021703673752174592u64;
         let b_coeff = 2021160080u64;
         let x0 = a_scale.wrapping_sub(b_coeff.wrapping_mul(d_norm as u64));
-        
+
         let e0 = (1i128 << 94) - (d_norm as i128) * (x0 as i128);
         let x1 = ((x0 as i128) + (((x0 as i128) * (e0 >> 32)) >> 62)) as u64;
-        
+
         let e1 = (1i128 << 94) - (d_norm as i128) * (x1 as i128);
         let x2 = ((x1 as i128) + (((x1 as i128) * (e1 >> 32)) >> 62)) as u64;
-        
+
         let e2 = (1i128 << 94) - (d_norm as i128) * (x2 as i128);
         let x3 = ((x2 as i128) + (((x2 as i128) * (e2 >> 32)) >> 62)) as u64;
-        
+
         let n = self.val as u128;
         let q_u128 = n.wrapping_mul(x3 as u128);
         let q_shifted_46 = (q_u128 >> 46) as u64;
         let q = q_shifted_46 >> (32 - lz);
-        
+
         let rem = ((self.val as u64) << 16).wrapping_sub((q as u64).wrapping_mul(d as u64)) as i64;
-        
+
         let is_lt = ((rem >> 63) & 1) as u64;
         let diff = rem.wrapping_sub(d as i64);
         let is_ge = (((!diff) >> 63) & 1) as u64;
-        
+
         let q_corrected = (q as u64).wrapping_add(is_ge).wrapping_sub(is_lt);
-        
+
         let overflow_1 = const_lt_u32(u32::MAX, (q_corrected >> 32) as u32).val;
         let overflow_2 = 0u32.wrapping_sub((q_corrected > u32::MAX as u64) as u32);
-        let overflow = CanonicalMask { val: overflow_1 | overflow_2 };
-        
-        let saturate = CanonicalMask { val: overflow.val | den_is_zero.val };
-        
-        let e = den_is_zero.select_u32(StabilityRefusal::UnsupportedDomain as u32, overflow.select_u32(StabilityRefusal::NumericRangeExceeded as u32, u32::MAX));
+        let overflow = CanonicalMask {
+            val: overflow_1 | overflow_2,
+        };
+
+        let saturate = CanonicalMask {
+            val: overflow.val | den_is_zero.val,
+        };
+
+        let e = den_is_zero.select_u32(
+            StabilityRefusal::UnsupportedDomain as u32,
+            overflow.select_u32(StabilityRefusal::NumericRangeExceeded as u32, u32::MAX),
+        );
         Self {
             val: saturate.select_u32(u32::MAX, q_corrected as u32),
             err: branchless_err_acc(self.err, branchless_err_acc(other.err, e)),
@@ -164,19 +203,19 @@ impl NonNegativeFixed {
     #[inline(always)]
     pub fn log2(self) -> SignedFixed {
         let x = self.val as u64;
-        let lz = x.leading_zeros(); 
-        let nz = ((x | x.wrapping_neg()) >> 63) & 1; 
-        let ip = 63u64.wrapping_sub(lz as u64) & nz.wrapping_neg(); 
-        
+        let lz = x.leading_zeros();
+        let nz = ((x | x.wrapping_neg()) >> 63) & 1;
+        let ip = 63u64.wrapping_sub(lz as u64) & nz.wrapping_neg();
+
         let mantissa = x.wrapping_shl(lz.wrapping_add(1));
-        let f = (mantissa >> (64 - 16)) as u32; 
-        
+        let f = (mantissa >> (64 - 16)) as u32;
+
         let diff = 65536 - f;
         let correction = (f * diff) >> 16;
         let corrected_frac = f + ((correction * 29013) >> 16);
-        
+
         let res = (ip << 16).wrapping_add(corrected_frac as u64);
-        
+
         #[cfg(not(feature = "mutant_8"))]
         let is_zero = const_eq_u32(self.val, 0);
         #[cfg(feature = "mutant_8")]
@@ -197,26 +236,54 @@ pub struct SignedFixed {
 }
 
 impl SignedFixed {
-    pub const ZERO: Self = Self { val: 0, err: u32::MAX };
-    pub const ONE: Self = Self { val: 65536, err: u32::MAX };
-    pub const MAX: Self = Self { val: i32::MAX, err: u32::MAX };
-    pub const MIN: Self = Self { val: i32::MIN, err: u32::MAX };
+    pub const ZERO: Self = Self {
+        val: 0,
+        err: u32::MAX,
+    };
+    pub const ONE: Self = Self {
+        val: 65536,
+        err: u32::MAX,
+    };
+    pub const MAX: Self = Self {
+        val: i32::MAX,
+        err: u32::MAX,
+    };
+    pub const MIN: Self = Self {
+        val: i32::MIN,
+        err: u32::MAX,
+    };
 
     #[inline(always)]
-    pub const fn from_bits(bits: i32) -> Self { Self { val: bits, err: u32::MAX } }
+    pub const fn from_bits(bits: i32) -> Self {
+        Self {
+            val: bits,
+            err: u32::MAX,
+        }
+    }
     #[inline(always)]
-    pub const fn to_bits(self) -> i32 { self.val }
+    pub const fn to_bits(self) -> i32 {
+        self.val
+    }
     #[inline(always)]
-    pub const fn from_num(num: i32) -> Self { Self { val: num.wrapping_shl(16), err: u32::MAX } }
+    pub const fn from_num(num: i32) -> Self {
+        Self {
+            val: num.wrapping_shl(16),
+            err: u32::MAX,
+        }
+    }
     #[inline(always)]
-    pub const fn to_num(self) -> i32 { self.val >> 16 }
+    pub const fn to_num(self) -> i32 {
+        self.val >> 16
+    }
 
     #[inline(always)]
     pub const fn saturating_add(self, other: Self) -> Self {
         let (sum, overflow) = self.val.overflowing_add(other.val);
         let is_neg = const_lt_i32(self.val, 0);
         let sat_val = is_neg.select_i32(i32::MIN, i32::MAX);
-        let overflow_mask = CanonicalMask { val: 0u32.wrapping_sub(overflow as u32) };
+        let overflow_mask = CanonicalMask {
+            val: 0u32.wrapping_sub(overflow as u32),
+        };
         let e = overflow_mask.select_u32(StabilityRefusal::NumericRangeExceeded as u32, u32::MAX);
         Self {
             val: overflow_mask.select_i32(sat_val, sum),
@@ -229,27 +296,34 @@ impl SignedFixed {
         let (diff, overflow) = self.val.overflowing_sub(other.val);
         let is_neg = const_lt_i32(self.val, 0);
         let sat_val = is_neg.select_i32(i32::MIN, i32::MAX);
-        let overflow_mask = CanonicalMask { val: 0u32.wrapping_sub(overflow as u32) };
+        let overflow_mask = CanonicalMask {
+            val: 0u32.wrapping_sub(overflow as u32),
+        };
         let e = overflow_mask.select_u32(StabilityRefusal::NumericRangeExceeded as u32, u32::MAX);
         Self {
             val: overflow_mask.select_i32(sat_val, diff),
             err: branchless_err_acc(self.err, branchless_err_acc(other.err, e)),
         }
     }
-    
+
     #[inline(always)]
     pub const fn saturating_mul(self, other: Self) -> Self {
         let prod = (self.val as i64).wrapping_mul(other.val as i64);
         let res_i64 = prod >> 16;
-        
-        let overflow_max = CanonicalMask { val: 0u32.wrapping_sub((res_i64 > i32::MAX as i64) as u32) };
-        let overflow_min = CanonicalMask { val: 0u32.wrapping_sub((res_i64 < i32::MIN as i64) as u32) };
-        
+
+        let overflow_max = CanonicalMask {
+            val: 0u32.wrapping_sub((res_i64 > i32::MAX as i64) as u32),
+        };
+        let overflow_min = CanonicalMask {
+            val: 0u32.wrapping_sub((res_i64 < i32::MIN as i64) as u32),
+        };
+
         let mut res = overflow_min.select_i32(i32::MIN, res_i64 as i32);
         res = overflow_max.select_i32(i32::MAX, res);
-        
+
         let is_overflow = overflow_max.val | overflow_min.val;
-        let e = const_eq_u32(is_overflow, 0).select_u32(u32::MAX, StabilityRefusal::NumericRangeExceeded as u32);
+        let e = const_eq_u32(is_overflow, 0)
+            .select_u32(u32::MAX, StabilityRefusal::NumericRangeExceeded as u32);
         Self {
             val: res,
             err: branchless_err_acc(self.err, branchless_err_acc(other.err, e)),
@@ -261,28 +335,35 @@ impl SignedFixed {
         let x = self.val;
         let ip = x >> 16;
         let fp = x.wrapping_sub(ip.wrapping_shl(16));
-        
+
         let y = fp as u32;
         let res1 = (y.wrapping_mul(630)) >> 16;
         let res2 = (y.wrapping_mul(3637u32.wrapping_add(res1))) >> 16;
         let res3 = (y.wrapping_mul(15763u32.wrapping_add(res2))) >> 16;
         let res4 = (y.wrapping_mul(45506u32.wrapping_add(res3))) >> 16;
         let frac_part = 65536u32.wrapping_add(res4);
-        
-        let is_overflow = CanonicalMask { val: 0u32.wrapping_sub(((((ip.wrapping_sub(16)) >> 31) ^ 1) & 1) as u32) };
-        let is_underflow = CanonicalMask { val: 0u32.wrapping_sub((((((-17i32).wrapping_sub(ip)) >> 31) ^ 1) & 1) as u32) };
-        
+
+        let is_overflow = CanonicalMask {
+            val: 0u32.wrapping_sub(((((ip.wrapping_sub(16)) >> 31) ^ 1) & 1) as u32),
+        };
+        let is_underflow = CanonicalMask {
+            val: 0u32.wrapping_sub((((((-17i32).wrapping_sub(ip)) >> 31) ^ 1) & 1) as u32),
+        };
+
         let shl = (ip & 31) as u32;
         let shr = ((ip.wrapping_neg()) & 31) as u32;
-        
+
         let val_shl = frac_part.wrapping_shl(shl);
         let val_shr = frac_part.wrapping_shr(shr);
-        
-        let ip_neg = CanonicalMask { val: 0u32.wrapping_sub(((ip >> 31) & 1) as u32) };
+
+        let ip_neg = CanonicalMask {
+            val: 0u32.wrapping_sub(((ip >> 31) & 1) as u32),
+        };
         let val_shifted = ip_neg.select_u32(val_shr, val_shl);
-        
+
         let res = is_overflow.select_u32(u32::MAX, is_underflow.select_u32(0, val_shifted));
-        let e = const_eq_u32(is_overflow.val | is_underflow.val, 0).select_u32(u32::MAX, StabilityRefusal::NumericRangeExceeded as u32);
+        let e = const_eq_u32(is_overflow.val | is_underflow.val, 0)
+            .select_u32(u32::MAX, StabilityRefusal::NumericRangeExceeded as u32);
         NonNegativeFixed {
             val: res,
             err: branchless_err_acc(self.err, e),
@@ -293,22 +374,103 @@ impl SignedFixed {
     pub fn exp(self) -> NonNegativeFixed {
         let x = self.val;
         let z = (((x as i64).wrapping_mul(94548)) >> 16) as i32;
-        SignedFixed { val: z, err: self.err }.exp2()
+        SignedFixed {
+            val: z,
+            err: self.err,
+        }
+        .exp2()
     }
 }
 
-impl core::ops::Add for NonNegativeFixed { type Output = Self; #[inline(always)] fn add(self, other: Self) -> Self { self.saturating_add(other) } }
-impl core::ops::Sub for NonNegativeFixed { type Output = Self; #[inline(always)] fn sub(self, other: Self) -> Self { self.saturating_sub(other) } }
-impl core::ops::Mul for NonNegativeFixed { type Output = Self; #[inline(always)] fn mul(self, other: Self) -> Self { self.saturating_mul(other) } }
-impl core::ops::Div for NonNegativeFixed { type Output = Self; #[inline(always)] fn div(self, other: Self) -> Self { self.saturating_div(other) } }
-impl core::ops::AddAssign for NonNegativeFixed { #[inline(always)] fn add_assign(&mut self, other: Self) { *self = *self + other; } }
-impl core::ops::SubAssign for NonNegativeFixed { #[inline(always)] fn sub_assign(&mut self, other: Self) { *self = *self - other; } }
-impl core::ops::MulAssign for NonNegativeFixed { #[inline(always)] fn mul_assign(&mut self, other: Self) { *self = *self * other; } }
-impl core::ops::DivAssign for NonNegativeFixed { #[inline(always)] fn div_assign(&mut self, other: Self) { *self = *self / other; } }
+impl core::ops::Add for NonNegativeFixed {
+    type Output = Self;
+    #[inline(always)]
+    fn add(self, other: Self) -> Self {
+        self.saturating_add(other)
+    }
+}
+impl core::ops::Sub for NonNegativeFixed {
+    type Output = Self;
+    #[inline(always)]
+    fn sub(self, other: Self) -> Self {
+        self.saturating_sub(other)
+    }
+}
+impl core::ops::Mul for NonNegativeFixed {
+    type Output = Self;
+    #[inline(always)]
+    fn mul(self, other: Self) -> Self {
+        self.saturating_mul(other)
+    }
+}
+impl core::ops::Div for NonNegativeFixed {
+    type Output = Self;
+    #[inline(always)]
+    fn div(self, other: Self) -> Self {
+        self.saturating_div(other)
+    }
+}
+impl core::ops::AddAssign for NonNegativeFixed {
+    #[inline(always)]
+    fn add_assign(&mut self, other: Self) {
+        *self = *self + other;
+    }
+}
+impl core::ops::SubAssign for NonNegativeFixed {
+    #[inline(always)]
+    fn sub_assign(&mut self, other: Self) {
+        *self = *self - other;
+    }
+}
+impl core::ops::MulAssign for NonNegativeFixed {
+    #[inline(always)]
+    fn mul_assign(&mut self, other: Self) {
+        *self = *self * other;
+    }
+}
+impl core::ops::DivAssign for NonNegativeFixed {
+    #[inline(always)]
+    fn div_assign(&mut self, other: Self) {
+        *self = *self / other;
+    }
+}
 
-impl core::ops::Add for SignedFixed { type Output = Self; #[inline(always)] fn add(self, other: Self) -> Self { self.saturating_add(other) } }
-impl core::ops::Sub for SignedFixed { type Output = Self; #[inline(always)] fn sub(self, other: Self) -> Self { self.saturating_sub(other) } }
-impl core::ops::Mul for SignedFixed { type Output = Self; #[inline(always)] fn mul(self, other: Self) -> Self { self.saturating_mul(other) } }
-impl core::ops::AddAssign for SignedFixed { #[inline(always)] fn add_assign(&mut self, other: Self) { *self = *self + other; } }
-impl core::ops::SubAssign for SignedFixed { #[inline(always)] fn sub_assign(&mut self, other: Self) { *self = *self - other; } }
-impl core::ops::MulAssign for SignedFixed { #[inline(always)] fn mul_assign(&mut self, other: Self) { *self = *self * other; } }
+impl core::ops::Add for SignedFixed {
+    type Output = Self;
+    #[inline(always)]
+    fn add(self, other: Self) -> Self {
+        self.saturating_add(other)
+    }
+}
+impl core::ops::Sub for SignedFixed {
+    type Output = Self;
+    #[inline(always)]
+    fn sub(self, other: Self) -> Self {
+        self.saturating_sub(other)
+    }
+}
+impl core::ops::Mul for SignedFixed {
+    type Output = Self;
+    #[inline(always)]
+    fn mul(self, other: Self) -> Self {
+        self.saturating_mul(other)
+    }
+}
+impl core::ops::AddAssign for SignedFixed {
+    #[inline(always)]
+    fn add_assign(&mut self, other: Self) {
+        *self = *self + other;
+    }
+}
+impl core::ops::SubAssign for SignedFixed {
+    #[inline(always)]
+    fn sub_assign(&mut self, other: Self) {
+        *self = *self - other;
+    }
+}
+impl core::ops::MulAssign for SignedFixed {
+    #[inline(always)]
+    fn mul_assign(&mut self, other: Self) {
+        *self = *self * other;
+    }
+}

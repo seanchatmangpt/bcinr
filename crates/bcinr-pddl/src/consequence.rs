@@ -32,7 +32,7 @@
 //!   this module claims otherwise.
 //! - A standing hit's soundness rides entirely on `theory_digest` actually
 //!   distinguishing theories that differ — see
-//!   [`crate::capability::domain_problem_digest`]'s doc comment for the
+//!   `crate::capability::domain_problem_digest`'s doc comment for the
 //!   precise, current coverage boundary (action bodies, durations, and
 //!   `:init`/`:goal` content are covered; `:constraints`/`:preferences`/
 //!   `:metric`/PDDL+ `:process`/`:event` are not, as of this phase). This
@@ -206,7 +206,7 @@ impl ConsequenceHorizon for MinimumMakespanHorizon {
 /// `theory_digest` actually distinguishes theories that differ**. This
 /// holds today for theories differing in action bodies, durations, or
 /// `:init`/`:goal` content (see
-/// [`crate::capability::domain_problem_digest`], which computes the
+/// `crate::capability::domain_problem_digest`, which computes the
 /// `theory_digest` every caller of this cache is expected to supply), but
 /// not yet for theories differing only in `:constraints`/`:preferences`/
 /// `:metric`/PDDL+ `:process`/`:event` — two such theories still collide on

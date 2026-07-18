@@ -14,8 +14,8 @@
 /// Interpretation: an inclusive suffix (reverse prefix) scan over the two u32
 /// lanes packed in `val` — lane 0 = low 32 bits, lane 1 = high 32 bits. Each
 /// output lane is the wrapping sum of itself and all higher-indexed lanes plus
-/// a carry-in (low 32 bits of `aux`). Thus out[1] = lane1 + carry and
-/// out[0] = lane0 + lane1 + carry, each reduced modulo 2^32 and repacked.
+/// a carry-in (low 32 bits of `aux`). Thus out\[1\] = lane1 + carry and
+/// out\[0\] = lane0 + lane1 + carry, each reduced modulo 2^32 and repacked.
 ///
 /// ```rust
 /// use bcinr_logic::algorithms::suffix_sum_simd_u32x8::suffix_sum_simd_u32x8;
