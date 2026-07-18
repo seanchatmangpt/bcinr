@@ -43,6 +43,11 @@ pub enum ProposalRefusal {
     ProposalDigestMismatch,
     /// The caller-supplied round identity does not match the round the proposal was made
     /// for.
+    ///
+    /// This is one of two owning realizations of `allocator::RefusalSet::ROUND_MISMATCH`
+    /// (the other is `certification::CertificationRefusal::RoundIdentityMismatch`) —
+    /// `allocate()` never constructs that bit itself; see
+    /// `REFUSAL_REALIZATION_REPORT.md` for the full reconciliation.
     RoundIdentityMismatch,
     /// The caller-supplied current-mode digest does not match the mode the proposal was
     /// computed against — the world moved on since the proposal was formed.

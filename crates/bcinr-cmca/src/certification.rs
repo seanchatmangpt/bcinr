@@ -49,6 +49,11 @@ pub enum CertificationRefusal {
     ControlModeMismatch,
     InfluenceStateMismatch,
     ComparisonDerivationMismatch,
+    /// This is one of the owning realizations of both
+    /// `allocator::RefusalSet::ROUND_MISMATCH` and `allocator::RefusalSet::CERTIFICATE_STALE`
+    /// (a certificate bound to a superseded round is exactly a stale certificate) —
+    /// `allocate()` never constructs either bit itself; see
+    /// `REFUSAL_REALIZATION_REPORT.md` for the full reconciliation.
     RoundIdentityMismatch,
 }
 

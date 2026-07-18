@@ -520,13 +520,98 @@ pub struct RefusalSet(u32);
 impl RefusalSet {
     pub const EMPTY: Self = Self(0);
 
+    /// Disposition: REACHABLE. Unioned unconditionally on `nl_is_zero` in [`allocate`] — a
+    /// leafless candidate forest is a structural property of the input (nowhere to
+    /// allocate flow to), not a control-plane/certificate check, so it is never suppressed
+    /// by `has_refusal`'s gating. Same-object test:
+    /// `tests/jtbd_refusal_invariance_regression.rs::no_leaves_only_refusal_leaves_full_state_invariant`
+    /// (passes). Full disposition table: `REFUSAL_REALIZATION_REPORT.md`.
     pub const NO_LEAVES: Self = Self(1 << 0);
+
+    /// Disposition: RESERVED_WITH_EXPLICIT_NONCLAIM. No code path anywhere in this crate
+    /// constructs this bit — not even a masked-to-zero one. "A certificate was never
+    /// presented at all" (as distinct from `DIGEST_MISMATCH`'s "a certificate/digest was
+    /// presented but does not match") has no representable trigger given the current API
+    /// surface: [`allocate`]'s own `digest: [u8; 32]` parameter is mandatory, never
+    /// `Option<[u8; 32]>`, and `mode_switch::apply_mode_switch` likewise takes
+    /// `certificate: CertificateReceipt` by value, never `Option`. Both are deliberate
+    /// consequences of the branchless/fixed-shape-input mandate this module opens with
+    /// ("no input-dependent...branches") and of `numeric-hot-path.md` Invariant 6
+    /// (the authoritative root must stay total over a fixed-shape domain) — introducing an
+    /// `Option` to distinguish "missing" from "mismatched" would require either a branch
+    /// inside the hot path or a caller-side type change, both outside this bit's own
+    /// declaration site. This bit is kept (not removed as vestigial) because "no
+    /// certificate was ever obtained" is a real, meaningful domain condition under
+    /// `authority-and-c3.md` Invariant 1's four-authority chain (a caller can legitimately
+    /// never reach a sealed `CertificateReceipt` at all, e.g. when `seal_certificate`
+    /// returned `Err` upstream), and it is already read meaningfully by
+    /// [`RefusalSet::primary_reason`] — reserved for a future API shape that can actually
+    /// distinguish the two cases at this boundary, not vestigial. Full disposition table:
+    /// `REFUSAL_REALIZATION_REPORT.md`.
     pub const CERTIFICATE_MISSING: Self = Self(1 << 1);
+
+    /// Disposition: OWNED_BY_DIFFERENT_COMPONENT. No code path in `allocate()` constructs
+    /// this bit. "A previously-valid certificate is no longer current" is realized
+    /// downstream, on two other modules' own typed return types — never via `RefusalSet`,
+    /// per `authority-and-c3.md` Invariant 1's four-separate-authorities structure:
+    /// `mode_switch::ModeSwitchRefusal::CertificateDigestMismatch` (the certificate
+    /// presented to `apply_mode_switch` no longer equals the currently expected one —
+    /// exactly what a superseded, once-valid certificate produces) and
+    /// `certification::CertificationRefusal::RoundIdentityMismatch` (one of the eleven
+    /// sealed bindings `seal_certificate` verifies; a certificate bound to an earlier round
+    /// no longer matches the current one). Same-object tests:
+    /// `mode_switch::tests::rejection_cause_certificate_mismatch_leaves_state_untouched`,
+    /// `certification::tests::refuses_solo_mismatch_round_identity` (both pass). Full
+    /// disposition table: `REFUSAL_REALIZATION_REPORT.md`.
     pub const CERTIFICATE_STALE: Self = Self(1 << 2);
+
+    /// Disposition: OWNED_BY_DIFFERENT_COMPONENT. No code path in `allocate()` constructs
+    /// this bit. Round-identity mismatch is realized upstream, on two modules' own typed
+    /// return types: `proposal::ProposalRefusal::RoundIdentityMismatch` (`admit_proposal`
+    /// refuses when the caller-supplied round does not match the round the proposal was
+    /// made for) and `certification::CertificationRefusal::RoundIdentityMismatch` (one of
+    /// the eleven sealed bindings `seal_certificate` verifies). Same-object tests:
+    /// `proposal::tests::refuses_on_round_mismatch`,
+    /// `certification::tests::refuses_solo_mismatch_round_identity` (both pass). Note the
+    /// overlap with `CERTIFICATE_STALE`'s ownership above: certification.rs's single
+    /// `RoundIdentityMismatch` variant is the closest realized analog for both
+    /// higher-level `RefusalSet` bits — the finer-grained module distinguishes the
+    /// binding, the coarser `RefusalSet` vocabulary does not. Full disposition table:
+    /// `REFUSAL_REALIZATION_REPORT.md`.
     pub const ROUND_MISMATCH: Self = Self(1 << 3);
+
+    /// Disposition: REACHABLE. Unioned on `digest_err` (the `digest` parameter mismatching
+    /// the compiled `CERTIFICATE_DIGEST`), gated by `has_refusal`. Same-object test:
+    /// `tests/jtbd_refusal_invariance_regression.rs::digest_mismatch_only_refusal_leaves_full_state_invariant`
+    /// (passes). Full disposition table: `REFUSAL_REALIZATION_REPORT.md`.
     pub const DIGEST_MISMATCH: Self = Self(1 << 4);
+
+    /// Disposition: UNREACHABLE_BY_PROOF. The union site
+    /// (`.union(RefusalSet::AUTHORITY_MISSING.masked(degrade_to_certified_selection as
+    /// u32))`) exists and runs on every call, but the surrounding `gated_refusals` bundle
+    /// is masked again by `has_refusal = (has_error | (nl_is_zero != 0)) &
+    /// !degrade_to_certified_selection`, which requires `degrade_to_certified_selection ==
+    /// false` — the exact negation of this bit's own mask condition
+    /// (`degrade_to_certified_selection == true`). For any boolean value `b`, `b &
+    /// !b == false`, so this bit is masked to zero on every call, unconditionally: a
+    /// proof from the two conjuncts' own definitions, not an empirically-observed absence.
+    /// Confirmed by a targeted run in
+    /// `tests/jtbd_refusal_invariance_regression.rs::authority_missing_is_never_actually_set_verified_by_targeted_run`
+    /// (passes) against the exact scenario (`proof = None` plus a real control-plane
+    /// error) a working `AUTHORITY_MISSING` would be expected to fire under. Full
+    /// disposition table: `REFUSAL_REALIZATION_REPORT.md`.
     pub const AUTHORITY_MISSING: Self = Self(1 << 5);
+
+    /// Disposition: REACHABLE. Unioned on `(!gd_ok) | lr_err | beta_err | eta_err | q_err |
+    /// price_err`, gated by `has_refusal`. Same-object test:
+    /// `tests/jtbd_refusal_invariance_regression.rs::proposal_rejected_only_refusal_leaves_full_state_invariant`
+    /// (passes). Full disposition table: `REFUSAL_REALIZATION_REPORT.md`.
     pub const PROPOSAL_REJECTED: Self = Self(1 << 6);
+
+    /// Disposition: REACHABLE. Unioned on `dwell_err` (`tau_d < MODE_DWELL_ROUNDS_MIN`),
+    /// gated by `has_refusal`. Same-object test:
+    /// `tests/jtbd_refusal_invariance_regression.rs::dwell_unsatisfied_only_refusal_leaves_full_state_invariant`
+    /// (passes). Full disposition table: `REFUSAL_REALIZATION_REPORT.md`.
     pub const DWELL_UNSATISFIED: Self = Self(1 << 7);
 
     /// Branchless Contract: bitwise union — the only accumulation operator for
@@ -1895,6 +1980,69 @@ pub fn allocate(
         pi_res[x & 7] = select_nnf(is_leaf[x & 7] as u32, val, pi_val);
     });
 
+    // Root cause of the N-way conservation defect (numeric-hot-path.md Invariant 4):
+    // `nl_recip` above is exactly conserved via the `q_floor`/`r_floor` base+residual
+    // scheme, but the price-normalized term `p_mu` (a per-leaf `saturating_div`, which
+    // truncates towards zero) is not — it is a second, independent partition of the same
+    // unit budget across leaves, and nothing redistributes its own truncation remainder.
+    // The subsequent `eta_actual * nl_recip + (1 - eta_actual) * p_mu` mix then truncates
+    // *again* per leaf (`saturating_mul` also floors). `floor_conservation_tests` below
+    // only checks the `q_floor`/`r_floor` formula in isolation and never observes this,
+    // because it never exercises the live `eta < ONE` mixed path. The result: whenever
+    // `eta_actual < NonNegativeFixed::ONE` (any non-degenerate mixing weight, e.g. the
+    // real case-studies registry's `ETA = 0.5`), the returned `pi_res` shares under-count
+    // the exact unit budget by the accumulated per-leaf truncation loss.
+    //
+    // Fix: apply the same explicit base-q + residual-r remainder-distribution technique
+    // Invariant 4 mandates, once more, to the *actual returned* per-leaf values — the
+    // only place a caller-visible conservation guarantee is meaningful — rather than only
+    // to the intermediate floor sub-term. This makes `sum(pi_res[x] for is_leaf[x])`
+    // exactly `NonNegativeFixed::ONE.value_bits()` regardless of `eta`, `mu`, `costs`, or
+    // the price distribution, without a magic constant: the correction amount is derived
+    // from the actual observed shortfall (or, symmetrically, any surplus) against the
+    // fixed target, using the same canonical-rank ordering (`leaf_rank`) already computed
+    // above for the floor term.
+    let mut leaf_sum = 0u32;
+    unroll_8_static!(x, {
+        leaf_sum = leaf_sum.wrapping_add(
+            select_nnf(is_leaf[x & 7] as u32, pi_res[x & 7], NonNegativeFixed::ZERO).value_bits(),
+        );
+    });
+    let target_bits = NonNegativeFixed::ONE.value_bits();
+    let is_deficit = const_lt_u32(leaf_sum, target_bits);
+    let is_excess = const_lt_u32(target_bits, leaf_sum);
+    let gap = const_select_u32(
+        is_deficit,
+        target_bits.wrapping_sub(leaf_sum),
+        leaf_sum.wrapping_sub(target_bits),
+    );
+    let gap_safe = const_select_u32(nl_is_zero, 0, gap);
+    let gap_q = gap_safe / nl_safe;
+    let gap_r = gap_safe - gap_q * nl_safe;
+    unroll_8_static!(x, {
+        let gets_extra_unit = const_lt_u32(leaf_rank[x & 7], gap_r);
+        let bump = gap_q + gets_extra_unit;
+        // `from_parts` (not `from_value_bits`) is required here: the latter would
+        // silently erase whatever fault set `pi_res[x]` already accumulated (e.g.
+        // `SATURATION`/`RANGE_VIOLATION` from the mixing step above), violating
+        // numeric-hot-path.md Invariant 2 ("silent erasure" — the selected value's own
+        // fault set must survive a masked select/rewrite, not be re-derived fault-free).
+        let bumped_up = NonNegativeFixed::from_parts(
+            pi_res[x & 7].value_bits().wrapping_add(bump),
+            pi_res[x & 7].faults(),
+        );
+        let bumped_down = NonNegativeFixed::from_parts(
+            pi_res[x & 7].value_bits().wrapping_sub(bump),
+            pi_res[x & 7].faults(),
+        );
+        let corrected = select_nnf(
+            is_deficit,
+            bumped_up,
+            select_nnf(is_excess, bumped_down, pi_res[x & 7]),
+        );
+        pi_res[x & 7] = select_nnf(is_leaf[x & 7] as u32, corrected, pi_res[x & 7]);
+    });
+
     // Defensive, explicit zeroing of the commit mask when there are no leaves at all
     // (item 4): the per-leaf assignment above already only ever touches `pi_res[x]` when
     // `is_leaf[x]` holds, so this is a no-op whenever `nl == 0`, but making it explicit
@@ -1903,7 +2051,27 @@ pub fn allocate(
         pi_res[x & 7] = select_nnf(nl_is_zero, NonNegativeFixed::ZERO, pi_res[x & 7]);
     });
 
-    let has_refusal = has_error & !degrade_to_certified_selection;
+    // `has_refusal` is the state-commit gate: numeric-hot-path.md Invariant 5 requires that
+    // EVERY cause folded into `final_refusals` below (not only the certificate/proposal/
+    // dwell/price/eta/beta/lr control-plane checks `has_error` was originally built from)
+    // leave `weights`/`*last_switch_t`/`*prev_mode` byte-for-byte at their pre-call values.
+    // `nl_is_zero` (the source of `RefusalSet::NO_LEAVES`, unioned into `final_refusals`
+    // independently below) was omitted here until this fix: a NO_LEAVES-only refusal
+    // (structurally empty leaf set, but no control-plane error) left `has_refusal` false,
+    // so the write-back below committed `local_weights` even though the call was refused —
+    // a real Invariant 5 violation, found and documented in
+    // `tests/jtbd_boundary_adversarial_inputs.rs`. `nl_is_zero` is folded into the same
+    // `!degrade_to_certified_selection` gate as `has_error` because the write-back this
+    // variable guards is itself only ever a no-op vs. a real commit along that same axis
+    // (`update_allowed`/`did_switch` both require `proof_some`, i.e. `!degrade_to_certified_
+    // selection`) — when `degrade_to_certified_selection` is true, `local_weights` already
+    // equals `*weights` byte-for-byte regardless of `nl_is_zero`, so gating on the
+    // conjunction changes behavior only in the one case that was actually broken (a real
+    // proof was supplied, and the leaf set was structurally empty).
+    let has_refusal = (has_error | (nl_is_zero != 0)) & !degrade_to_certified_selection;
+    // State surface this gate covers, in full, per numeric-hot-path.md Invariant 5: the
+    // `weights` matrix, `*last_switch_t`, and `*prev_mode` — the entire mutable state
+    // `allocate()` can persist back to its caller.
     unroll_8_static!(v, {
         unroll_8_static!(e, {
             weights[v & 7][e & 7] = select_nnf(
@@ -1927,7 +2095,9 @@ pub fn allocate(
         .masked(has_refusal as u32);
     // `NO_LEAVES` is reported independently of the certified/degraded-mode gate above: an
     // empty leaf set is a structural property of the candidate, not a stability-envelope
-    // violation, so it is never suppressed by `has_refusal`.
+    // violation, so it is never suppressed by `has_refusal`. (It IS, as of the fix above,
+    // now folded into `has_refusal` itself for the purpose of gating the state write-back —
+    // the independence here is about `final_refusals` reporting, not about state commit.)
     let final_refusals = gated_refusals.union(RefusalSet::NO_LEAVES.masked(nl_is_zero));
 
     AllocationOutcome::new_internal(pi_res, local_numeric_faults, final_refusals)

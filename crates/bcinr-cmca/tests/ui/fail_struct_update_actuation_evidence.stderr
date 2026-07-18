@@ -1,0 +1,17 @@
+warning: unreachable statement
+ --> tests/ui/fail_struct_update_actuation_evidence.rs:4:5
+  |
+3 |     let base: ActuationEvidence = unreachable!();
+  |                                   -------------- any code following this expression is unreachable
+4 |     let _ = ActuationEvidence { round_identity: 1, ..base };
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unreachable statement
+  |
+  = note: `#[warn(unreachable_code)]` (part of `#[warn(unused)]`) on by default
+
+error[E0451]: fields `certificate_digest`, `old_control_mode_digest`, `new_control_mode_digest`, `round_identity` and `outcome` of struct `ActuationEvidence` are private
+ --> tests/ui/fail_struct_update_actuation_evidence.rs:4:33
+  |
+4 |     let _ = ActuationEvidence { round_identity: 1, ..base };
+  |                                 ^^^^^^^^^^^^^^^^^    ^^^^ fields `certificate_digest`, `old_control_mode_digest`, `new_control_mode_digest` and `outcome` are private
+  |                                 |
+  |                                 private field

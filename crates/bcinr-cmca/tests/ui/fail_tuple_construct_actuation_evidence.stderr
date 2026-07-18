@@ -1,0 +1,16 @@
+error[E0423]: expected function, tuple struct or tuple variant, found struct `ActuationEvidence`
+ --> tests/ui/fail_tuple_construct_actuation_evidence.rs:3:13
+  |
+3 |     let _ = ActuationEvidence(0u64, 0u64, 0u64, 0u64);
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+ ::: src/mode_switch.rs
+  |
+  | pub struct ActuationEvidence {
+  | ---------------------------- `ActuationEvidence` defined here
+  |
+help: you might have meant to use the `new` associated function
+  |
+3 -     let _ = ActuationEvidence(0u64, 0u64, 0u64, 0u64);
+3 +     let _ = ActuationEvidence::new(_, _, _, _, _);
+  |

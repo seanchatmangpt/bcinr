@@ -425,9 +425,16 @@ fn run_alloc_mu_cost() -> [NonNegativeFixed; N] {
     .unwrap()
 }
 
-const CORRECT_BASELINE: [u32; N] = [8349, 7741, 6684, 6684, 6684, 6684, 7973, 14733];
-const CORRECT_TREE: [u32; N] = [0, 9391, 6623, 8066, 8066, 8066, 9275, 16043];
-const CORRECT_MU_COST: [u32; N] = [4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096];
+// Updated to reflect the numeric-hot-path.md Invariant 4 conservation fix in
+// `src/allocator.rs` (see the comment there above the final-mix remainder-distribution
+// step): the previous constants below pinned the *pre-fix* under-conserving output
+// (e.g. `CORRECT_BASELINE` summed to 65532, `CORRECT_MU_COST` summed to only 32768,
+// both violating exact-budget conservation) as if it were correct. The values below are
+// the real, unmodified `allocate()` output at this commit, post-fix, each of which now
+// sums to exactly `NonNegativeFixed::ONE.value_bits()` (65536) over the leaf set.
+const CORRECT_BASELINE: [u32; N] = [8350, 7742, 6685, 6685, 6684, 6684, 7973, 14733];
+const CORRECT_TREE: [u32; N] = [0, 9392, 6624, 8067, 8067, 8067, 9276, 16043];
+const CORRECT_MU_COST: [u32; N] = [8192, 8192, 8192, 8192, 8192, 8192, 8192, 8192];
 
 // Named-law expected-corruption constants (verification.md Invariant 1): each mutant
 // deterministically corrupts one specific step of `allocate`'s canonical measure-combination
@@ -438,10 +445,16 @@ const CORRECT_MU_COST: [u32; N] = [4096, 4096, 4096, 4096, 4096, 4096, 4096, 409
 // only "something changed"; asserting equality to the exact array below proves detection is
 // tied to *this* named corruption specifically, not an unrelated divergence that would also
 // satisfy `assert_ne!`.
-const WRONG_M1_MEASURE_COLLAPSE: [u32; N] = [8527, 7444, 7506, 7506, 7506, 7506, 12033, 7506];
-const WRONG_M2_Q_SIGN_INVERSION: [u32; N] = [8341, 10039, 7892, 7892, 7892, 7892, 6684, 8900];
-const WRONG_M3_BROKEN_NORMALIZATION: [u32; N] = [0, 9804, 7210, 7937, 7937, 7937, 9099, 15608];
-const WRONG_M4_RDF_IDENTITY_SKEW: [u32; N] = [8507, 7290, 5176, 5176, 5176, 5176, 7754, 21275];
+// Updated to reflect the numeric-hot-path.md Invariant 4 conservation fix in
+// `src/allocator.rs` (see `CORRECT_BASELINE` above): the final-mix remainder-distribution
+// step now runs unconditionally, so every mutant's own corrupted output below shifts by
+// the same fixed amount the correct baseline did. These constants are the real per-mutant
+// `allocate()` output at this commit, post-fix, instrumented one `mutant_N` feature at a
+// time exactly as the surrounding module doc describes.
+const WRONG_M1_MEASURE_COLLAPSE: [u32; N] = [8528, 7445, 7506, 7506, 7506, 7506, 12033, 7506];
+const WRONG_M2_Q_SIGN_INVERSION: [u32; N] = [8342, 10040, 7893, 7893, 7892, 7892, 6684, 8900];
+const WRONG_M3_BROKEN_NORMALIZATION: [u32; N] = [0, 9805, 7211, 7938, 7938, 7937, 9099, 15608];
+const WRONG_M4_RDF_IDENTITY_SKEW: [u32; N] = [8508, 7291, 5177, 5177, 5177, 5177, 7754, 21275];
 
 // Skipped under `mutant_7`: that feature flips the sign of `const_eq_u32`'s nonzero
 // test (src/fixed.rs `const_eq_u32`), which `saturating_div` uses throughout `allocate`
