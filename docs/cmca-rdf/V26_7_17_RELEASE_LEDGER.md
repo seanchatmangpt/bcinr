@@ -594,3 +594,123 @@ terminal release declaration.
   crate compiles again elsewhere.
 - It does not alter or delete any REPORTED-era entry above; it appends a dated closure record
   alongside them.
+
+---
+
+## cmca-release-integrator terminal pass — 2026-07-17
+
+This section is the terminal-phase entry appended by `cmca-release-integrator`, after the two
+sibling tasks (version bump + metadata, CHANGELOG/CURRENT_STATUS/ledger updates) landed on
+`recovery/cmca-v26.7.17-c2`. It records what was actually reproduced in this pass; it does not
+re-derive any number from `MUTANT_KILL_MATRIX.md` or `OBJECT_CODE_AUDIT.md` beyond quoting them.
+
+### Version and commit identity
+
+- Version: `bcinr-cmca` and `bcinr-logic` both read `26.7.17` in their respective `Cargo.toml`
+  (reproduced via `grep '^version' crates/bcinr-cmca/Cargo.toml crates/bcinr-logic/Cargo.toml`
+  in this pass).
+- Branch: `recovery/cmca-v26.7.17-c2`, unchanged for the duration of this pass (`git branch
+  --show-current` checked before and after).
+- Commits created in this pass (additive only, no amend/rebase, no `-A`/`-a`):
+  1. `020b46d0` — `feat(cmca): v26.7.17 mfw/bcinr semantic-mechanical architecture split`
+  2. `077e08a8` — `feat(cmca): numeric fault-set and authority-chain closure for v26.7.17`
+  3. `7e91f37b` — `chore(release): bump bcinr-cmca and bcinr-logic to 26.7.17`
+  4. `ba74772b` — `docs(release): CHANGELOG, status, and release-ledger for v26.7.17`
+- After these four commits, `git status --porcelain` showed a clean tree except
+  `docs/constitution-compiler/` (left untracked — see "Excluded from this release" below) and
+  `.claude/settings.local.json` (gitignored machine-local settings, not part of this release).
+
+### Toolchain / target
+
+- `rustc --version`: `rustc 1.99.0-nightly (daf2e5e18 2026-07-13)`
+- `cargo --version`: `cargo 1.99.0-nightly (59800466c 2026-07-07)`
+- Target triple: host default (Darwin, not cross-compiled in this pass — no `--target` was
+  passed to any command below).
+- Profile: `cargo package`/`cargo publish --dry-run` default (release-equivalent packaging
+  verification build); no `--release` flag used for these specific commands (not accepted by
+  `cargo package`/`cargo publish`).
+- Feature sets: default features only for the package/publish commands below; this pass did not
+  re-run `--all-features` or `--no-default-features` builds (those are cited from prior docs,
+  not re-run here — see G2 citation to `FINAL_RECONCILIATION_VERIFICATION_V3.md` above).
+
+### Gate standings (final, this pass)
+
+Unchanged from the "cmca-verifier terminal pass" table immediately above, which this pass did
+not re-litigate: G2 ALIVE, G3 ALIVE, G4 ALIVE, G5/C4 PARTIAL_ALIVE, G6 UNKNOWN/fenced. This pass
+closes G0 (version now `26.7.17`, confirmed above) and records G9's blocking condition
+concretely below rather than leaving it abstract.
+
+### Mutant coverage (cited, not re-derived)
+
+Per `MUTANT_KILL_MATRIX.md`: 11 mutants (`mutant_1`-`mutant_11`) across `src/allocator.rs`,
+`src/fixed.rs`, `src/observatory.rs`, all disposed `KILLED_BY_INTENDED_ORACLE`; three of the
+eleven (`mutant_9`, `mutant_10`, `mutant_11`) are additionally tagged
+`COLLATERAL_FAILURES_PRESENT` (unrelated hostile-mutant assertions in `tests/hostile_mutants.rs`
+also fail under those same source mutations). This pass did not re-run the mutation harness; the
+11/11 KILLED figure is quoted from that file, not reproduced independently here.
+
+### Compile-fail coverage
+
+`ls crates/bcinr-cmca/tests/ui/*.rs | wc -l` in this pass: 41 files, each with a committed
+`.stderr` baseline (also 41), matching the "41 compile-fail attack cases" figure in
+`CHANGELOG.md`'s v26.7.17 entry. This pass did not re-run `cargo test -p bcinr-cmca
+--test compile_fail_tests` to re-verify all 41 fail with their exact recorded stderr; that
+execution is cited from `FINAL_RECONCILIATION_VERIFICATION_V3.md`, not repeated here.
+
+### Source-shape / allocation / object-flow (cited honestly)
+
+Per `OBJECT_CODE_AUDIT.md` (quoted, not reinterpreted): scope is
+`bcinr_cmca::allocator::allocate`; at the time that audit was written the crate did not compile
+in-tree (259 pre-existing errors) so the disassembly step was never reached and the per-symbol
+table is "Not produced. Standing: UNKNOWN." This pass observed that `cargo package -p
+bcinr-logic --locked` now compiles and verifies cleanly (see below), which is evidence the
+*workspace* compiles again in this coordinate, but this pass did **not** rerun the
+`bcinr-cmca-audit-harness` disassembly step against the current tree — G6 therefore remains
+UNKNOWN/fenced as stated in `OBJECT_CODE_AUDIT.md`, not upgraded on the basis of an unrelated
+crate's package success.
+
+### Package / publish dry-run — exact commands and exit codes
+
+All four commands below were run from `/Users/sac/bcinr` with a committed, clean working tree
+(commits `020b46d0`..`ba74772b` above), no `--allow-dirty` used, per
+`.claude/rules/cmca/packaging.md`.
+
+1. `cargo package -p bcinr-logic --locked` → **exit 0**. Output: "Packaging bcinr-logic
+   v26.7.17 ... Packaged 701 files, 2.4MiB (348.6KiB compressed) ... Verifying bcinr-logic
+   v26.7.17 ... Compiling bcinr-logic v26.7.17 (target/package/bcinr-logic-26.7.17) ...
+   Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.21s".
+2. `cargo package -p bcinr-cmca --locked` → **exit 101**. Output: "error: failed to prepare
+   local package for uploading — Caused by: failed to select a version for the requirement
+   `bcinr-logic = \"^26.7.17\"` — candidate versions found which didn't match: 26.6.24, 26.4.22,
+   26.4.21, ... — location searched: crates.io index — required by package `bcinr-cmca
+   v26.7.17`".
+3. `cargo publish -p bcinr-logic --dry-run --locked` → **exit 0**. Output ends: "Uploading
+   bcinr-logic v26.7.17 ... warning: aborting upload due to dry run".
+4. `cargo publish -p bcinr-cmca --dry-run --locked` → **exit 101**. Same error as (2): cargo's
+   packaging step resolves `bcinr-cmca`'s `bcinr-logic = { path = "../bcinr-logic", version =
+   "26.7.17" }` dependency against the **published crates.io index**, not the local path, once
+   the package is being prepared for upload — and no `bcinr-logic` release `>= 26.7.17` exists
+   on crates.io yet (highest published is `26.6.24`).
+
+This is a genuine, structural publish-ordering blocker, not a git-dirty false positive: `cargo
+package`/`cargo publish` intentionally re-resolve path dependencies against the registry so the
+packaged tarball doesn't silently depend on an unpublishable local path. It is not fixable by a
+`.gitignore` change or by addressing a dirty-tree false positive — the correct real-world fix is
+sequencing: publish `bcinr-logic` 26.7.17 for real (not dry-run) first, then `bcinr-cmca`'s
+dry-run publish will resolve `bcinr-logic = "^26.7.17"` against the registry and can be
+re-attempted. Actually publishing `bcinr-logic` was outside this pass's authorized scope (the
+task authorizes dry-run publish only); this pass did not attempt a real `cargo publish`.
+
+### Verdict inputs
+
+- `bcinr-logic` package + dry-run publish: both exit 0 against the clean, committed tree.
+- `bcinr-cmca` package + dry-run publish: both exit 101, blocked on `bcinr-logic` not yet being
+  published to crates.io at `26.7.17` (or higher) — a real, structural ordering dependency, not
+  a defect in this release's own evidence.
+- The mandated standing sentence — "CMCA v26.7.17 is PARTIAL_ALIVE for the pinned bounded
+  configuration." — remains correct independent of the above: C4 stays PARTIAL_ALIVE (producer,
+  projection, and consumption are each individually ALIVE; full SHACL/ShEx/QUDT closure remains
+  explicitly fenced) and C6 stays UNKNOWN/fenced (per `OBJECT_CODE_AUDIT.md`, unchanged in this
+  pass). Dry-run-publish-readiness and PARTIAL_ALIVE standing are not in tension — this pass
+  reports one crate as dry-run-publish-ready (`bcinr-logic`) and the other as blocked on
+  publish ordering, not on any newly discovered defect.
