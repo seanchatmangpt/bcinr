@@ -1,0 +1,27 @@
+error[E0451]: fields `g`, `d`, `margin_delta`, `noise_radius`, `switch_radius`, `q_ceiling`, `gram_distinguishability_floor`, `dwell_law_id`, `pricing_loop_bound`, `comparison_derivation_identity` and `candidate_digest` of struct `StabilityCandidate` are private
+  --> tests/ui/fail_field_construct_stability_candidate.rs:4:9
+   |
+ 3 |     let _ = StabilityCandidate {
+   |             ------------------ in this type
+ 4 |         g: [[0i64, 0i64], [0i64, 0i64]],
+   |         ^ private field
+ 5 |         d: [0i64, 0i64],
+   |         ^ private field
+ 6 |         margin_delta: 0,
+   |         ^^^^^^^^^^^^ private field
+ 7 |         noise_radius: 0,
+   |         ^^^^^^^^^^^^ private field
+ 8 |         switch_radius: 0,
+   |         ^^^^^^^^^^^^^ private field
+ 9 |         q_ceiling: 0,
+   |         ^^^^^^^^^ private field
+10 |         gram_distinguishability_floor: 0,
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ private field
+11 |         dwell_law_id: 0,
+   |         ^^^^^^^^^^^^ private field
+12 |         pricing_loop_bound: 0,
+   |         ^^^^^^^^^^^^^^^^^^ private field
+13 |         comparison_derivation_identity: 0,
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ private field
+14 |         candidate_digest: 0,
+   |         ^^^^^^^^^^^^^^^^ private field

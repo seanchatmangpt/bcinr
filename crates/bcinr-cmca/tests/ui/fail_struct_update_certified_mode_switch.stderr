@@ -1,0 +1,17 @@
+warning: unreachable statement
+ --> tests/ui/fail_struct_update_certified_mode_switch.rs:4:5
+  |
+3 |     let base: CertifiedModeSwitch = unreachable!();
+  |                                     -------------- any code following this expression is unreachable
+4 |     let _ = CertifiedModeSwitch { target_mode_digest: 1, ..base };
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unreachable statement
+  |
+  = note: `#[warn(unreachable_code)]` (part of `#[warn(unused)]`) on by default
+
+error[E0451]: fields `admitted_state_digest`, `target_mode_digest` and `prepared_digest` of struct `CertifiedModeSwitch` are private
+ --> tests/ui/fail_struct_update_certified_mode_switch.rs:4:35
+  |
+4 |     let _ = CertifiedModeSwitch { target_mode_digest: 1, ..base };
+  |                                   ^^^^^^^^^^^^^^^^^^^^^    ^^^^ fields `admitted_state_digest` and `prepared_digest` are private
+  |                                   |
+  |                                   private field

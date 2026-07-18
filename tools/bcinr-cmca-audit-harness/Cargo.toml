@@ -1,0 +1,13 @@
+[package]
+name = "bcinr-cmca-audit-harness"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Dedicated object-code audit harness for bcinr-cmca's authoritative allocation root (allocate()). Links bcinr-cmca as a real executable so the release binary can be disassembled with otool/objdump, since raw .rlib members were not decodable with otool-classic on this machine."
+
+[dependencies]
+bcinr-cmca = { path = "../../crates/bcinr-cmca" }
+
+[[bin]]
+name = "bcinr-cmca-audit-harness"
+path = "src/main.rs"

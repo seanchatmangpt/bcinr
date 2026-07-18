@@ -1,0 +1,17 @@
+warning: unreachable statement
+ --> tests/ui/fail_struct_update_dwell_satisfied.rs:4:5
+  |
+3 |     let base: DwellSatisfied = unreachable!();
+  |                                -------------- any code following this expression is unreachable
+4 |     let _ = DwellSatisfied { round_identity: 1, ..base };
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unreachable statement
+  |
+  = note: `#[warn(unreachable_code)]` (part of `#[warn(unused)]`) on by default
+
+error[E0451]: fields `round_identity` and `transition_identity` of struct `DwellSatisfied` are private
+ --> tests/ui/fail_struct_update_dwell_satisfied.rs:4:30
+  |
+4 |     let _ = DwellSatisfied { round_identity: 1, ..base };
+  |                              ^^^^^^^^^^^^^^^^^    ^^^^ field `transition_identity` is private
+  |                              |
+  |                              private field

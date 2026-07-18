@@ -1,0 +1,17 @@
+warning: unreachable statement
+ --> tests/ui/fail_struct_update_adaptive_update.rs:5:5
+  |
+4 |     let base: AdaptiveUpdate<CertifiedLearning> = unreachable!();
+  |                                                   -------------- any code following this expression is unreachable
+5 |     let _ = AdaptiveUpdate::<CertifiedLearning> { _mode: PhantomData, ..base };
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unreachable statement
+  |
+  = note: `#[warn(unreachable_code)]` (part of `#[warn(unused)]`) on by default
+
+error[E0451]: field `_mode` of struct `AdaptiveUpdate` is private
+ --> tests/ui/fail_struct_update_adaptive_update.rs:5:51
+  |
+5 |     let _ = AdaptiveUpdate::<CertifiedLearning> { _mode: PhantomData, ..base };
+  |                                                   ^^^^^^^^^^^^^^^^^^    ---- fields  are private
+  |                                                   |
+  |                                                   private field

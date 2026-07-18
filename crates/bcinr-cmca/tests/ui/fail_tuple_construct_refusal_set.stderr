@@ -1,0 +1,11 @@
+error[E0423]: cannot initialize a tuple struct which contains private fields
+ --> tests/ui/fail_tuple_construct_refusal_set.rs:3:13
+  |
+3 |     let _ = RefusalSet(1);
+  |             ^^^^^^^^^^
+  |
+note: constructor is not visible here due to private fields
+ --> src/allocator.rs
+  |
+  | pub struct RefusalSet(u32);
+  |                       ^^^ private field

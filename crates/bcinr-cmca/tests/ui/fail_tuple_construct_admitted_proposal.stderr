@@ -1,0 +1,20 @@
+warning: unreachable statement
+ --> tests/ui/fail_tuple_construct_admitted_proposal.rs:4:5
+  |
+3 |     let proposal: ModeProposal = unreachable!();
+  |                                  -------------- any code following this expression is unreachable
+4 |     let _ = AdmittedProposal(proposal);
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unreachable statement
+  |
+  = note: `#[warn(unreachable_code)]` (part of `#[warn(unused)]`) on by default
+
+error[E0423]: expected function, tuple struct or tuple variant, found struct `AdmittedProposal`
+ --> tests/ui/fail_tuple_construct_admitted_proposal.rs:4:13
+  |
+4 |     let _ = AdmittedProposal(proposal);
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+ ::: src/proposal.rs
+  |
+  | pub struct AdmittedProposal {
+  | --------------------------- `AdmittedProposal` defined here

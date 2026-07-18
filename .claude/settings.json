@@ -1,0 +1,90 @@
+{
+  "model": "claude-haiku-4-5-20251001",
+  "fallbackModel": [
+    "claude-sonnet-4-6"
+  ],
+  "attribution": {
+    "enabled": true,
+    "outputPath": ".claude/attribution.json"
+  },
+  "enabledPlugins": {
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "jdtls-lsp@claude-plugins-official": false,
+    "pyright-lsp@claude-plugins-official": false,
+    "typescript-lsp@claude-plugins-official": false,
+    "frontend-design@claude-plugins-official": false,
+    "explanatory-output-style@claude-plugins-official": false,
+    "superpowers@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true,
+    "ralph-loop@claude-plugins-official": true,
+    "hookify@claude-plugins-official": true,
+    "lumen@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true,
+    "skill-creator@claude-plugins-official": true,
+    "ggen-lsp@ggen": true,
+    "wasm4pm-lsp@wasm4pm": true,
+    "anti-llm-cheat-lsp@wasm4pm": true,
+    "claude-code-config-lsp@claude-code-config-lsp": true
+  },
+  "extraKnownMarketplaces": {
+    "ggen": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/sac/ggen"
+      }
+    },
+    "wasm4pm": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/sac/wasm4pm"
+      }
+    },
+    "claude-code-config-lsp": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/sac/claude-code-config-lsp"
+      }
+    }
+  },
+  "enabledMcpjsonServers": [
+    "oclnr",
+    "bcinr"
+  ],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/gates/block-destructive-git.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/gates/block-generated-edit.sh\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/gates/check-authority-surface.sh\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/gates/check-generated-staleness.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}

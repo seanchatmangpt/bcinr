@@ -1,0 +1,5 @@
+error[E0451]: field `_mode` of struct `AdaptiveUpdate` is private
+ --> tests/ui/fail_field_construct_adaptive_update.rs:4:51
+  |
+4 |     let _ = AdaptiveUpdate::<CertifiedLearning> { _mode: PhantomData };
+  |                                                   ^^^^^ private field

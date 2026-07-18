@@ -1,0 +1,17 @@
+warning: unreachable statement
+ --> tests/ui/fail_struct_update_admitted_proposal.rs:4:5
+  |
+3 |     let base: AdmittedProposal = unreachable!();
+  |                                  -------------- any code following this expression is unreachable
+4 |     let proposal: ModeProposal = unreachable!();
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unreachable statement
+  |
+  = note: `#[warn(unreachable_code)]` (part of `#[warn(unused)]`) on by default
+
+error[E0451]: field `proposal` of struct `AdmittedProposal` is private
+ --> tests/ui/fail_struct_update_admitted_proposal.rs:5:32
+  |
+5 |     let _ = AdmittedProposal { proposal, ..base };
+  |                                ^^^^^^^^    ---- fields  are private
+  |                                |
+  |                                private field

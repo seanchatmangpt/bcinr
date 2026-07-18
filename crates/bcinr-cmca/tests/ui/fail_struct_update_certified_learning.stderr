@@ -1,0 +1,17 @@
+warning: unreachable statement
+ --> tests/ui/fail_struct_update_certified_learning.rs:4:5
+  |
+3 |     let base: CertifiedLearning = unreachable!();
+  |                                   -------------- any code following this expression is unreachable
+4 |     let _ = CertifiedLearning { _sealed: (), ..base };
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unreachable statement
+  |
+  = note: `#[warn(unreachable_code)]` (part of `#[warn(unused)]`) on by default
+
+error[E0451]: field `_sealed` of struct `CertifiedLearning` is private
+ --> tests/ui/fail_struct_update_certified_learning.rs:4:33
+  |
+4 |     let _ = CertifiedLearning { _sealed: (), ..base };
+  |                                 ^^^^^^^^^^^    ---- fields  are private
+  |                                 |
+  |                                 private field

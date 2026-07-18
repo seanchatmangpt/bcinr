@@ -1,0 +1,105 @@
+max_depth: 3
+templates_dir: "${PROJECT_ROOT}/.claude/templates"
+
+agents:
+  # Level 1: Orchestrator
+  - agent_role: powl_orchestrator
+    description: "Top-level coordinator for bcinr-powl audit and fix cycles"
+    model: claude-haiku-4-5-20251001
+    budget:
+      max_cost: 10.00
+      max_tokens: 1000000
+    repos:
+      - "${PROJECT_ROOT}"
+      - "${PROJECT_ROOT}/../chicago-tdd-tools"
+    delegate_to:
+
+      # Level 2: Domain auditors
+      - agent_role: ocel_auditor
+        description: "Audits OCEL 2.0 conformance gaps"
+        model: claude-haiku-4-5-20251001
+        budget:
+          max_cost: 1.00
+          max_tokens: 100000
+        permissions:
+          allow_paths:
+            - "${PROJECT_ROOT}/crates/bcinr-powl/src"
+            - "${PROJECT_ROOT}/crates/bcinr-powl/tests"
+          deny_tools:
+            - file_delete
+          can_write: true
+        delegate_to:
+          # Level 3: Test writers
+          - agent_role: ocel_test_writer
+            description: "Writes targeted OCEL conformance tests"
+            model: claude-haiku-4-5-20251001
+            budget:
+              max_cost: 0.50
+              max_tokens: 50000
+            permissions:
+              allow_paths:
+                - "${PROJECT_ROOT}/crates/bcinr-powl/src/ocel.rs"
+                - "${PROJECT_ROOT}/crates/bcinr-powl/tests"
+              deny_tools:
+                - shell_execute
+                - file_delete
+              can_write: true
+
+      - agent_role: receipt_auditor
+        description: "Audits BLAKE3 receipt chain integrity"
+        model: claude-haiku-4-5-20251001
+        budget:
+          max_cost: 2.00
+          max_tokens: 200000
+        permissions:
+          allow_paths:
+            - "${PROJECT_ROOT}/crates/bcinr-powl/src"
+            - "${PROJECT_ROOT}/../chicago-tdd-tools/src/observability"
+            - "${PROJECT_ROOT}/../chicago-tdd-tools/tests"
+          deny_tools:
+            - file_delete
+          can_write: true
+        delegate_to:
+          - agent_role: receipt_test_writer
+            description: "Writes BLAKE3 chain replay and tamper-evidence tests"
+            model: claude-haiku-4-5-20251001
+            budget:
+              max_cost: 0.50
+              max_tokens: 50000
+            permissions:
+              allow_paths:
+                - "${PROJECT_ROOT}/crates/bcinr-powl/src/receipt_worker.rs"
+                - "${PROJECT_ROOT}/../chicago-tdd-tools/tests/blake3_receipt_tests.rs"
+              deny_tools:
+                - shell_execute
+                - file_delete
+              can_write: true
+
+      - agent_role: typestate_auditor
+        description: "Audits TypeState lattice soundness and compiler correctness"
+        model: claude-haiku-4-5-20251001
+        budget:
+          max_cost: 2.00
+          max_tokens: 200000
+        permissions:
+          allow_paths:
+            - "${PROJECT_ROOT}/crates/bcinr-powl/src/typestate.rs"
+            - "${PROJECT_ROOT}/crates/bcinr-powl/src/compiler.rs"
+          deny_tools:
+            - file_delete
+          can_write: true
+        delegate_to:
+          - agent_role: typestate_test_writer
+            description: "Writes consuming transition and invariant tests"
+            model: claude-haiku-4-5-20251001
+            budget:
+              max_cost: 0.50
+              max_tokens: 50000
+            permissions:
+              allow_paths:
+                - "${PROJECT_ROOT}/crates/bcinr-powl/src/typestate.rs"
+                - "${PROJECT_ROOT}/crates/bcinr-powl/src/compiler.rs"
+              deny_tools:
+                - shell_execute
+                - file_delete
+              can_write: true

@@ -1,0 +1,22 @@
+error[E0423]: expected function, tuple struct or tuple variant, found struct `NonNegativeFixed`
+ --> tests/ui/fail_tuple_construct_non_negative_fixed.rs:3:13
+  |
+3 |     let _ = NonNegativeFixed(0u32, NumericFaultSet::EMPTY);
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+ ::: src/fixed.rs
+  |
+  | pub struct NonNegativeFixed {
+  | --------------------------- `NonNegativeFixed` defined here
+  |
+help: you might have meant to use an associated function to build this type
+  |
+3 -     let _ = NonNegativeFixed(0u32, NumericFaultSet::EMPTY);
+3 +     let _ = NonNegativeFixed::from_value_bits(_);
+  |
+3 -     let _ = NonNegativeFixed(0u32, NumericFaultSet::EMPTY);
+3 +     let _ = NonNegativeFixed::from_parts(_, _);
+  |
+3 -     let _ = NonNegativeFixed(0u32, NumericFaultSet::EMPTY);
+3 +     let _ = NonNegativeFixed::from_num(_);
+  |

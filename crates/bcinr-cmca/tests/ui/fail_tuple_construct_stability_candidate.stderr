@@ -1,0 +1,17 @@
+error[E0423]: expected function, tuple struct or tuple variant, found struct `StabilityCandidate`
+  --> tests/ui/fail_tuple_construct_stability_candidate.rs:3:13
+   |
+ 3 |       let _ = StabilityCandidate(
+   |  _____________^
+ 4 | |         [[0i64, 0i64], [0i64, 0i64]],
+ 5 | |         [0i64, 0i64],
+ 6 | |         0i64,
+...  |
+14 | |         0u64,
+15 | |     );
+   | |_____^
+   |
+  ::: src/stability.rs
+   |
+   |   pub struct StabilityCandidate {
+   |   ----------------------------- `StabilityCandidate` defined here

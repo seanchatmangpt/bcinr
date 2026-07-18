@@ -1,9 +1,9 @@
 use std::fs;
 use std::path::Path;
 use std::process;
-use walkdir::WalkDir;
 use syn::visit::{self, Visit};
-use syn::{Expr, BinOp, ItemFn, ImplItemFn};
+use syn::{BinOp, Expr, ImplItemFn, ItemFn};
+use walkdir::WalkDir;
 
 #[derive(Clone)]
 pub struct CheatRule {
@@ -236,7 +236,9 @@ impl<'ast> Visit<'ast> for SynCheatVisitor<'_> {
 
                 // Check (A.wrapping_add(B)) ^ A
                 if let Expr::MethodCall(mc) = &*b.left {
-                    if (mc.method == "wrapping_add" || mc.method == "wrapping_sub") && is_simple_expr(&mc.receiver) {
+                    if (mc.method == "wrapping_add" || mc.method == "wrapping_sub")
+                        && is_simple_expr(&mc.receiver)
+                    {
                         let receiver = &mc.receiver;
                         let rec_str = quote::quote!(#receiver).to_string().replace(" ", "");
                         if rec_str == right_str {
@@ -251,7 +253,9 @@ impl<'ast> Visit<'ast> for SynCheatVisitor<'_> {
                 }
                 // Check A ^ (A.wrapping_add(B))
                 if let Expr::MethodCall(mc) = &*b.right {
-                    if (mc.method == "wrapping_add" || mc.method == "wrapping_sub") && is_simple_expr(&mc.receiver) {
+                    if (mc.method == "wrapping_add" || mc.method == "wrapping_sub")
+                        && is_simple_expr(&mc.receiver)
+                    {
                         let receiver = &mc.receiver;
                         let rec_str = quote::quote!(#receiver).to_string().replace(" ", "");
                         if rec_str == left_str {
@@ -287,7 +291,9 @@ impl<'ast> Visit<'ast> for SynCheatVisitor<'_> {
             if mc.method == "bench_function" || mc.method == "iter" {
                 let arg_str = quote::quote!(#mc).to_string();
                 // If it is calling algorithms in the benchmark but missing black_box
-                if (arg_str.contains("branchless") || arg_str.contains("allocate")) && !arg_str.contains("black_box") {
+                if (arg_str.contains("branchless") || arg_str.contains("allocate"))
+                    && !arg_str.contains("black_box")
+                {
                     self.findings.push(format!(
                         "CHEAT[CHEAT-008]: {} — benchmark theater: return value of branchless call not consumed via black_box",
                         self.path.display()
@@ -377,7 +383,9 @@ fn check_circular_oracles(functions: &[(String, String)], path: &Path, findings:
     // CHEAT-002: CIRCULAR_ORACLE
     for (name, body) in functions {
         if name.ends_with("_reference") || name.ends_with("_oracle") {
-            let base_name = name.trim_end_matches("_reference").trim_end_matches("_oracle");
+            let base_name = name
+                .trim_end_matches("_reference")
+                .trim_end_matches("_oracle");
             for (p_name, p_body) in functions {
                 if p_name == base_name && body == p_body {
                     findings.push(format!(
@@ -392,12 +400,18 @@ fn check_circular_oracles(functions: &[(String, String)], path: &Path, findings:
     }
 }
 
-fn check_mutation_before_admission(functions: &[(String, String)], path: &Path, findings: &mut Vec<String>) {
+fn check_mutation_before_admission(
+    functions: &[(String, String)],
+    path: &Path,
+    findings: &mut Vec<String>,
+) {
     // CHEAT-020: MUTATION_BEFORE_ADMISSION
     for (name, body) in functions {
         if name == "allocate" {
             // Check if there is speculative state modification before validation checks
-            if body.contains("weights[") && body.find("weights[").unwrap() < body.find("const_lt_u32").unwrap_or(usize::MAX) {
+            if body.contains("weights[")
+                && body.find("weights[").unwrap() < body.find("const_lt_u32").unwrap_or(usize::MAX)
+            {
                 findings.push(format!(
                     "CHEAT[CHEAT-020]: {} — mutation before admission in {}",
                     path.display(),
@@ -410,7 +424,8 @@ fn check_mutation_before_admission(functions: &[(String, String)], path: &Path, 
 
 fn scan_file_text_rules(src: &str, path: &Path, findings: &mut Vec<String>) {
     let normalized = src.to_lowercase();
-    let is_test = path.to_string_lossy().contains("/tests/") || path.to_string_lossy().contains("/benches/");
+    let is_test =
+        path.to_string_lossy().contains("/tests/") || path.to_string_lossy().contains("/benches/");
 
     // CHEAT-003: MAGIC_CONSTANTS (Doc comment or text scan)
     if !is_test {
@@ -500,8 +515,26 @@ fn scan_file_text_rules(src: &str, path: &Path, findings: &mut Vec<String>) {
 
     // CHEAT-009: MUTANT_THEATER
     if is_test && src.contains("mutant") {
-        // If a mutant test uses assert_ne! on baseline without verifying typed refusal
-        if src.contains("assert_ne!") && !src.contains("Err(StabilityRefusal::") && !src.contains("Err(ObservatoryFlag::") {
+        // If a mutant test uses assert_ne! on baseline without verifying typed refusal.
+        //
+        // `Err(StabilityRefusal::`/`Err(ObservatoryFlag::` are the pre-sealed-API refusal
+        // shape (a `Result<_, EnumVariant>`); the sealed API replaced them with opaque
+        // outcome types exposing typed refusals/faults via accessor methods
+        // (`.is_refused()`, `.numeric_faults()`, `.faults()`, `.refusals()` — see
+        // AGENTS.md/cmca sealed-API migration) and, for tests whose corruption is a
+        // deterministic numeric divergence rather than a refusal, a `// Named law:`
+        // comment binding the assertion to the specific violated postcondition
+        // (verification.md Invariant 1's required form). Any of these count as the named
+        // detection mechanism this rule requires; only a bare `assert_ne!` with none of
+        // them present is mutant theater.
+        let has_named_law_evidence = src.contains("Err(StabilityRefusal::")
+            || src.contains("Err(ObservatoryFlag::")
+            || src.contains(".is_refused()")
+            || src.contains(".numeric_faults()")
+            || src.contains(".faults()")
+            || src.contains(".refusals()")
+            || src.contains("// Named law:");
+        if src.contains("assert_ne!") && !has_named_law_evidence {
             findings.push(format!(
                 "CHEAT[CHEAT-009]: {} — mutant theater: test uses weak assert_ne instead of asserting a typed refusal",
                 path.display()
@@ -512,7 +545,24 @@ fn scan_file_text_rules(src: &str, path: &Path, findings: &mut Vec<String>) {
     // CHEAT-021: REJECTION_STATE_DRIFT
     // We expect tests to check that state variables remain bit-for-bit unchanged on rejection.
     // If a test folder contains case_studies, verify that test_rejection_invariance or similar check exists.
-    if path.to_string_lossy().contains("/tests/") && path.to_string_lossy().contains("case_studies.rs") && !src.contains("test_rejection_invariance") {
+    //
+    // Excludes tests/fixtures/** (and any nested tests/ subdirectory): per Cargo's default
+    // test-target discovery, only *.rs files directly under a crate's tests/ are compiled as
+    // integration-test binaries — files nested one or more directories below tests/ (e.g. a
+    // frozen tests/fixtures/pre_migration/case_studies.rs baseline, see
+    // crates/bcinr-cmca/tests/fixtures/PRE_MIGRATION_BASELINE.md) are inert reference/data text,
+    // never a live test target, and cannot carry a #[test] rejection-invariance check at all.
+    // See crates/bcinr-cmca/tests/fixtures/FIXTURE_SCANNER_NOTE.md for the reproduction.
+    let path_str = path.to_string_lossy();
+    let is_nested_under_tests_dir = path_str
+        .split("/tests/")
+        .nth(1)
+        .is_some_and(|after_tests| after_tests.contains('/'));
+    if path_str.contains("/tests/")
+        && path_str.contains("case_studies.rs")
+        && !is_nested_under_tests_dir
+        && !src.contains("test_rejection_invariance")
+    {
         findings.push(format!(
             "CHEAT[CHEAT-021]: {} — rejection state drift: case studies missing test_rejection_invariance check",
             path.display()
@@ -520,7 +570,9 @@ fn scan_file_text_rules(src: &str, path: &Path, findings: &mut Vec<String>) {
     }
 
     // CHEAT-031: BLACK_BOX_BRANCHLESSNESS_CLAIM
-    if normalized.contains("black_box guarantees") || normalized.contains("black_box ensures branchlessness") {
+    if normalized.contains("black_box guarantees")
+        || normalized.contains("black_box ensures branchlessness")
+    {
         findings.push(format!(
             "CHEAT[CHEAT-031]: {} — invalid claim: black_box does not guarantee LLVM branchlessness",
             path.display()
@@ -564,7 +616,9 @@ fn scan_dependencies(_findings: &mut Vec<String>) {
                             let src_dir = parent.join("src");
                             if src_dir.exists() {
                                 // Scan one source file to verify
-                                for entry in WalkDir::new(&src_dir).into_iter().filter_map(|e| e.ok()) {
+                                for entry in
+                                    WalkDir::new(&src_dir).into_iter().filter_map(|e| e.ok())
+                                {
                                     if entry.path().extension().is_some_and(|ext| ext == "rs") {
                                         // Just confirm we checked it
                                         break;
@@ -611,7 +665,11 @@ fn main() {
                         visitor.visit_file(&syntax);
 
                         check_circular_oracles(&visitor.functions, path, &mut visitor.findings);
-                        check_mutation_before_admission(&visitor.functions, path, &mut visitor.findings);
+                        check_mutation_before_admission(
+                            &visitor.functions,
+                            path,
+                            &mut visitor.findings,
+                        );
                         findings.extend(visitor.findings);
                     }
                 }

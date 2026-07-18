@@ -1,0 +1,11 @@
+agent_role: code_reviewer
+description: "Read-only reviewer — style, safety, process conformance"
+model: claude-haiku-4-5-20251001
+permissions:
+  can_write: false
+  deny_tools:
+    - shell_execute
+    - file_delete
+budget:
+  max_cost: 0.25
+  max_tokens: 30000

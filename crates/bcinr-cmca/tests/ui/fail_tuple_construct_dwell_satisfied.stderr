@@ -1,0 +1,10 @@
+error[E0423]: expected function, tuple struct or tuple variant, found struct `DwellSatisfied`
+ --> tests/ui/fail_tuple_construct_dwell_satisfied.rs:3:13
+  |
+3 |     let _ = DwellSatisfied(0u64, 0u64);
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+ ::: src/certification.rs
+  |
+  | pub struct DwellSatisfied {
+  | ------------------------- `DwellSatisfied` defined here

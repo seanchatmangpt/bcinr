@@ -87,109 +87,294 @@
 
 #[macro_export]
 macro_rules! unroll_8_static {
-    ($var:ident, $body:expr) => {
+    ($var:ident, $body:expr) => {{
         {
-            { const $var: usize = 0; $body }
-            { const $var: usize = 1; $body }
-            { const $var: usize = 2; $body }
-            { const $var: usize = 3; $body }
-            { const $var: usize = 4; $body }
-            { const $var: usize = 5; $body }
-            { const $var: usize = 6; $body }
-            { const $var: usize = 7; $body }
+            const $var: usize = 0;
+            $body
         }
-    };
+        {
+            const $var: usize = 1;
+            $body
+        }
+        {
+            const $var: usize = 2;
+            $body
+        }
+        {
+            const $var: usize = 3;
+            $body
+        }
+        {
+            const $var: usize = 4;
+            $body
+        }
+        {
+            const $var: usize = 5;
+            $body
+        }
+        {
+            const $var: usize = 6;
+            $body
+        }
+        {
+            const $var: usize = 7;
+            $body
+        }
+    }};
 }
 
 #[macro_export]
 macro_rules! unroll_9_static {
-    ($var:ident, $body:expr) => {
+    ($var:ident, $body:expr) => {{
         {
-            { const $var: usize = 0; $body }
-            { const $var: usize = 1; $body }
-            { const $var: usize = 2; $body }
-            { const $var: usize = 3; $body }
-            { const $var: usize = 4; $body }
-            { const $var: usize = 5; $body }
-            { const $var: usize = 6; $body }
-            { const $var: usize = 7; $body }
-            { const $var: usize = 8; $body }
+            const $var: usize = 0;
+            $body
         }
-    };
+        {
+            const $var: usize = 1;
+            $body
+        }
+        {
+            const $var: usize = 2;
+            $body
+        }
+        {
+            const $var: usize = 3;
+            $body
+        }
+        {
+            const $var: usize = 4;
+            $body
+        }
+        {
+            const $var: usize = 5;
+            $body
+        }
+        {
+            const $var: usize = 6;
+            $body
+        }
+        {
+            const $var: usize = 7;
+            $body
+        }
+        {
+            const $var: usize = 8;
+            $body
+        }
+    }};
 }
 
 #[macro_export]
 macro_rules! unroll_4_static {
-    ($var:ident, $body:expr) => {
+    ($var:ident, $body:expr) => {{
         {
-            { const $var: usize = 0; $body }
-            { const $var: usize = 1; $body }
-            { const $var: usize = 2; $body }
-            { const $var: usize = 3; $body }
+            const $var: usize = 0;
+            $body
         }
-    };
+        {
+            const $var: usize = 1;
+            $body
+        }
+        {
+            const $var: usize = 2;
+            $body
+        }
+        {
+            const $var: usize = 3;
+            $body
+        }
+    }};
 }
 
 #[macro_export]
 macro_rules! unroll_32_static {
-    ($var:ident, $body:expr) => {
+    ($var:ident, $body:expr) => {{
         {
-            { const $var: usize = 0; $body }
-            { const $var: usize = 1; $body }
-            { const $var: usize = 2; $body }
-            { const $var: usize = 3; $body }
-            { const $var: usize = 4; $body }
-            { const $var: usize = 5; $body }
-            { const $var: usize = 6; $body }
-            { const $var: usize = 7; $body }
-            { const $var: usize = 8; $body }
-            { const $var: usize = 9; $body }
-            { const $var: usize = 10; $body }
-            { const $var: usize = 11; $body }
-            { const $var: usize = 12; $body }
-            { const $var: usize = 13; $body }
-            { const $var: usize = 14; $body }
-            { const $var: usize = 15; $body }
-            { const $var: usize = 16; $body }
-            { const $var: usize = 17; $body }
-            { const $var: usize = 18; $body }
-            { const $var: usize = 19; $body }
-            { const $var: usize = 20; $body }
-            { const $var: usize = 21; $body }
-            { const $var: usize = 22; $body }
-            { const $var: usize = 23; $body }
-            { const $var: usize = 24; $body }
-            { const $var: usize = 25; $body }
-            { const $var: usize = 26; $body }
-            { const $var: usize = 27; $body }
-            { const $var: usize = 28; $body }
-            { const $var: usize = 29; $body }
-            { const $var: usize = 30; $body }
-            { const $var: usize = 31; $body }
+            const $var: usize = 0;
+            $body
         }
-    };
+        {
+            const $var: usize = 1;
+            $body
+        }
+        {
+            const $var: usize = 2;
+            $body
+        }
+        {
+            const $var: usize = 3;
+            $body
+        }
+        {
+            const $var: usize = 4;
+            $body
+        }
+        {
+            const $var: usize = 5;
+            $body
+        }
+        {
+            const $var: usize = 6;
+            $body
+        }
+        {
+            const $var: usize = 7;
+            $body
+        }
+        {
+            const $var: usize = 8;
+            $body
+        }
+        {
+            const $var: usize = 9;
+            $body
+        }
+        {
+            const $var: usize = 10;
+            $body
+        }
+        {
+            const $var: usize = 11;
+            $body
+        }
+        {
+            const $var: usize = 12;
+            $body
+        }
+        {
+            const $var: usize = 13;
+            $body
+        }
+        {
+            const $var: usize = 14;
+            $body
+        }
+        {
+            const $var: usize = 15;
+            $body
+        }
+        {
+            const $var: usize = 16;
+            $body
+        }
+        {
+            const $var: usize = 17;
+            $body
+        }
+        {
+            const $var: usize = 18;
+            $body
+        }
+        {
+            const $var: usize = 19;
+            $body
+        }
+        {
+            const $var: usize = 20;
+            $body
+        }
+        {
+            const $var: usize = 21;
+            $body
+        }
+        {
+            const $var: usize = 22;
+            $body
+        }
+        {
+            const $var: usize = 23;
+            $body
+        }
+        {
+            const $var: usize = 24;
+            $body
+        }
+        {
+            const $var: usize = 25;
+            $body
+        }
+        {
+            const $var: usize = 26;
+            $body
+        }
+        {
+            const $var: usize = 27;
+            $body
+        }
+        {
+            const $var: usize = 28;
+            $body
+        }
+        {
+            const $var: usize = 29;
+            $body
+        }
+        {
+            const $var: usize = 30;
+            $body
+        }
+        {
+            const $var: usize = 31;
+            $body
+        }
+    }};
 }
 
 macro_rules! unroll_5_static {
-    ($var:ident, $body:expr) => {
+    ($var:ident, $body:expr) => {{
         {
-            { const $var: usize = 0; $body }
-            { const $var: usize = 1; $body }
-            { const $var: usize = 2; $body }
-            { const $var: usize = 3; $body }
-            { const $var: usize = 4; $body }
+            const $var: usize = 0;
+            $body
         }
-    };
+        {
+            const $var: usize = 1;
+            $body
+        }
+        {
+            const $var: usize = 2;
+            $body
+        }
+        {
+            const $var: usize = 3;
+            $body
+        }
+        {
+            const $var: usize = 4;
+            $body
+        }
+    }};
 }
 
-use crate::fixed::{NonNegativeFixed, SignedFixed, CanonicalMask};
+use crate::fixed::{CanonicalMask, NonNegativeFixed, NumericFaultSet, SignedFixed};
+
+/// Branchless select over two [`NonNegativeFixed`] alternatives that distributes over the
+/// `(value, faults)` pair as a whole (numeric-hot-path.md Invariant 2): the selected
+/// alternative's own fault set survives, the unselected alternative's fault set is
+/// dropped, and neither is silently re-derived through a fresh fault-free constructor.
+#[inline(always)]
+fn select_nnf(condition: u32, a: NonNegativeFixed, b: NonNegativeFixed) -> NonNegativeFixed {
+    let mask = CanonicalMask::from_lsb(condition);
+    NonNegativeFixed::from_parts(
+        mask.select_u32(a.value_bits(), b.value_bits()),
+        mask.select_faults(a.faults(), b.faults()),
+    )
+}
+
+/// [`select_nnf`], for [`SignedFixed`].
+#[inline(always)]
+fn select_sf(condition: u32, a: SignedFixed, b: SignedFixed) -> SignedFixed {
+    let mask = CanonicalMask::from_lsb(condition);
+    SignedFixed::from_parts(
+        mask.select_i32(a.value_bits(), b.value_bits()),
+        mask.select_faults(a.faults(), b.faults()),
+    )
+}
 use crate::generated::case_studies::{
-    PackedSemanticState, LensSpec, N, K, Q,
-    FACTOR_RECOMPUTATION_COST, FACTOR_VERIFICATION_COST, FACTOR_STANDING,
-    FACTOR_VALIDITY, FACTOR_ACCESS_FREQUENCY, FACTOR_SEARCH_DEMAND,
-    FACTOR_RETRIEVAL_DEMAND, FACTOR_SCHEDULING_DEMAND, FACTOR_BUSINESS_VALUE,
-    FACTOR_DOWNSTREAM_CONSEQUENCE,
-    MEASURE_CACHE, MEASURE_RETRIEVAL, MEASURE_SCHEDULING, MEASURE_SEARCH
+    LensSpec, PackedSemanticState, FACTOR_ACCESS_FREQUENCY, FACTOR_BUSINESS_VALUE,
+    FACTOR_DOWNSTREAM_CONSEQUENCE, FACTOR_RECOMPUTATION_COST, FACTOR_RETRIEVAL_DEMAND,
+    FACTOR_SCHEDULING_DEMAND, FACTOR_SEARCH_DEMAND, FACTOR_STANDING, FACTOR_VERIFICATION_COST, K,
+    MEASURE_CACHE, MEASURE_RETRIEVAL, MEASURE_SCHEDULING, MEASURE_SEARCH, N, Q,
 };
 
 /// Refusal reasons returned by the allocator when stability invariants are violated.
@@ -258,15 +443,23 @@ impl StabilityRefusal {
             Some(Self::NumericRangeExceeded),
             Some(Self::UnsupportedDomain),
             Some(Self::ContractViolation),
-            None, None, None, None, None,
-            None, None, None, None, None, None
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
         ];
-        
+
         let in_bounds = const_lt_u32(val, 21);
         let idx = const_select_u32(in_bounds, val, 21) as usize;
-        let res = lookup[idx & 31];
-        
-        res
+
+        lookup[idx & 31]
     }
 }
 
@@ -305,18 +498,165 @@ const REFUSALS: [StabilityRefusal; 32] = [
     StabilityRefusal::CertificateMissing,
 ];
 
-// Bounded leaf reciprocal lookup table (nl from 1 to 8)
-const LEAF_RECIP: [NonNegativeFixed; 9] = [
-    NonNegativeFixed::from_bits(0),
-    NonNegativeFixed::from_bits(65536), // 1.0
-    NonNegativeFixed::from_bits(32768), // 0.5
-    NonNegativeFixed::from_bits(21845), // 0.33333
-    NonNegativeFixed::from_bits(16384), // 0.25
-    NonNegativeFixed::from_bits(13107), // 0.2
-    NonNegativeFixed::from_bits(10922), // 0.16667
-    NonNegativeFixed::from_bits(9362),  // 0.14285
-    NonNegativeFixed::from_bits(8192),  // 0.125
-];
+// NOTE: the historical rounded-reciprocal lookup table (`LEAF_RECIP`) has been removed.
+// Per numeric-hot-path.md Invariant 4 (exact-budget conservation), the explore-floor
+// term is now computed per-leaf via an exact base-q + residual-r scheme (see the
+// `q_floor`/`r_floor`/`leaf_rank` computation in `allocate`) rather than a single
+// rounded value shared by every leaf, which did not sum exactly to 65536 for values
+// of `nl` that do not divide 65536 evenly. The mfw generated-artifact manifest at
+// `generated-artifact/case-studies/cmca_generation_manifest.json` exposes only a
+// `leaf_floor_n_max` dimension (no `leaf_floor_base`/`leaf_floor_remainder` tables),
+// so the formula is computed directly in Rust below rather than sourced from the
+// artifact.
+
+/// Refusal reasons that can co-occur while producing an [`AllocationOutcome`] — a flag
+/// set, never a lossy single-variant enum, per `authority-and-c3.md` Invariant 2.
+///
+/// The inner representation is private; the only publicly constructible values are
+/// `EMPTY`, unions of named bits, and masked selections thereof.
+#[derive(Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+pub struct RefusalSet(u32);
+
+impl RefusalSet {
+    pub const EMPTY: Self = Self(0);
+
+    pub const NO_LEAVES: Self = Self(1 << 0);
+    pub const CERTIFICATE_MISSING: Self = Self(1 << 1);
+    pub const CERTIFICATE_STALE: Self = Self(1 << 2);
+    pub const ROUND_MISMATCH: Self = Self(1 << 3);
+    pub const DIGEST_MISMATCH: Self = Self(1 << 4);
+    pub const AUTHORITY_MISSING: Self = Self(1 << 5);
+    pub const PROPOSAL_REJECTED: Self = Self(1 << 6);
+    pub const DWELL_UNSATISFIED: Self = Self(1 << 7);
+
+    /// Branchless Contract: bitwise union — the only accumulation operator for
+    /// refusal sets; `{P: true} union(a, b) {Q: result.bits() == a.bits() |
+    /// b.bits()}`, total, no branch (numeric-hot-path.md Invariant 1).
+    #[inline(always)]
+    pub const fn union(self, other: Self) -> Self {
+        Self(self.0 | other.0)
+    }
+
+    #[inline(always)]
+    pub const fn is_empty(self) -> bool {
+        self.0 == 0
+    }
+
+    #[inline(always)]
+    pub const fn bits(self) -> u32 {
+        self.0
+    }
+
+    #[inline(always)]
+    pub const fn contains(self, other: Self) -> bool {
+        (self.0 & other.0) == other.0
+    }
+
+    /// Branchless Contract: zeroes `self` unless `condition` is `1` (mirrors
+    /// [`CanonicalMask::select_faults`]'s masked-selection contract for the analogous
+    /// `NumericFaultSet` type, but as a single-operand mask since the "off" branch of a
+    /// refusal accumulation is always `EMPTY`). `{P: condition in {0,1}} masked(self,
+    /// condition) {Q: result == self if condition == 1 else EMPTY}`, no branch.
+    #[inline(always)]
+    pub const fn masked(self, condition: u32) -> Self {
+        Self(self.0 & 0u32.wrapping_sub(condition & 1))
+    }
+
+    /// Collapses the set down to a single legacy [`StabilityRefusal`], for callers that
+    /// have not migrated off the historical single-enum shape. This projection is
+    /// layered on top of the full set (via [`AllocationOutcome::into_result`]) — it is
+    /// never the sole representation of a refusal (`authority-and-c3.md` Invariant 2).
+    pub fn primary_reason(self) -> StabilityRefusal {
+        if self.contains(Self::DIGEST_MISMATCH) || self.contains(Self::CERTIFICATE_STALE) {
+            StabilityRefusal::CertificateDigestMismatch
+        } else if self.contains(Self::CERTIFICATE_MISSING) || self.contains(Self::AUTHORITY_MISSING)
+        {
+            StabilityRefusal::CertificateMissing
+        } else if self.contains(Self::DWELL_UNSATISFIED) {
+            StabilityRefusal::ModeDwellTimeViolated
+        } else if self.contains(Self::ROUND_MISMATCH) {
+            StabilityRefusal::ContractViolation
+        } else if self.contains(Self::PROPOSAL_REJECTED) {
+            StabilityRefusal::ContractionMarginInsufficient
+        } else {
+            StabilityRefusal::ContractViolation
+        }
+    }
+}
+
+/// Total outcome of a cascade allocation attempt.
+///
+/// Unlike the legacy `Result`-returning shape, `AllocationOutcome` is always
+/// constructible for any admitted input: the authoritative root ([`allocate`]) never
+/// early-returns, panics, or uses `Result`-as-control-flow. Any anomaly is represented
+/// in [`numeric_faults`](Self::numeric_faults) or [`refusals`](Self::refusals) rather
+/// than in the absence of a return (numeric-hot-path.md Invariant 6).
+///
+/// Fields are private and only producible through [`AllocationOutcome::new_internal`],
+/// which is the sole constructor and enforces the aggregation invariant: `numeric_faults`
+/// always equals the union of every candidate element's own `.faults()` with whatever
+/// additional numeric faults were observed along the local allocator's computation path.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct AllocationOutcome {
+    candidate: [NonNegativeFixed; N],
+    numeric_faults: NumericFaultSet,
+    refusals: RefusalSet,
+}
+
+impl AllocationOutcome {
+    /// Sole constructor. Aggregates ALL candidate-contained numeric faults (the union of
+    /// each candidate element's own [`NonNegativeFixed::faults`]) with `local_faults`
+    /// (numeric faults observed along the allocator's own computation path that never
+    /// made it into a candidate element, e.g. a zero-normalization substitution).
+    #[inline(always)]
+    pub(crate) fn new_internal(
+        candidate: [NonNegativeFixed; N],
+        local_faults: NumericFaultSet,
+        refusals: RefusalSet,
+    ) -> Self {
+        let mut folded = local_faults;
+        unroll_8_static!(x, {
+            folded = folded.union(candidate[x & 7].faults());
+        });
+        Self {
+            candidate,
+            numeric_faults: folded,
+            refusals,
+        }
+    }
+
+    #[inline(always)]
+    pub const fn candidate(&self) -> [NonNegativeFixed; N] {
+        self.candidate
+    }
+
+    #[inline(always)]
+    pub const fn numeric_faults(&self) -> NumericFaultSet {
+        self.numeric_faults
+    }
+
+    #[inline(always)]
+    pub const fn refusals(&self) -> RefusalSet {
+        self.refusals
+    }
+
+    #[inline(always)]
+    pub const fn is_refused(&self) -> bool {
+        !self.refusals.is_empty()
+    }
+
+    /// Ergonomic `Result`-based adapter for callers OUTSIDE the audited authoritative
+    /// root. This is not part of the totality guarantee itself — `allocate` remains
+    /// total regardless of whether a caller chooses this adapter or inspects
+    /// `refusals()`/`numeric_faults()` directly.
+    pub fn into_result(self) -> Result<[NonNegativeFixed; N], StabilityRefusal> {
+        if self.refusals.is_empty() {
+            Ok(self.candidate)
+        } else {
+            Err(self.refusals.primary_reason())
+        }
+    }
+}
 
 /// Wraps the resource allocation array and an error status code into a branchless `Result`.
 ///
@@ -593,9 +933,7 @@ pub struct AdaptiveUpdate<Mode> {
 impl<Mode> Clone for AdaptiveUpdate<Mode> {
     #[inline(always)]
     fn clone(&self) -> Self {
-        Self {
-            _mode: core::marker::PhantomData,
-        }
+        *self
     }
 }
 impl<Mode> Copy for AdaptiveUpdate<Mode> {}
@@ -618,17 +956,33 @@ impl AdaptiveUpdate<CertifiedLearning> {
         distinguishability: NonNegativeFixed,
         _mode: CertifiedLearning,
     ) -> Option<Self> {
-        let temp_ceil = ((crate::generated::stability_profile::PROFILE.temperature_ceiling.raw * 65536) / 1_000_000_000) as u32;
-        let dist_floor = ((crate::generated::stability_profile::PROFILE.distinguishability_floor.raw * 65536) / 1_000_000_000) as u32;
+        let temp_ceil = ((crate::generated::stability_profile::PROFILE
+            .temperature_ceiling
+            .raw
+            * 65536)
+            / 1_000_000_000) as u32;
+        let dist_floor = ((crate::generated::stability_profile::PROFILE
+            .distinguishability_floor
+            .raw
+            * 65536)
+            / 1_000_000_000) as u32;
 
-        let temp_ok = (const_lt_u32(temp_ceil, temperature.val) == 0) as u32;
-        let dist_ok = (const_lt_u32(distinguishability.val, dist_floor) == 0) as u32;
-        
-        let digests_ok = (((state.digest ^ cert.digest) | (state.digest ^ env.digest) | (state.digest ^ outcome.digest)) == 0) as u32;
+        let temp_ok = (const_lt_u32(temp_ceil, temperature.value_bits()) == 0) as u32;
+        let dist_ok = (const_lt_u32(distinguishability.value_bits(), dist_floor) == 0) as u32;
+
+        let digests_ok = (((state.digest ^ cert.digest)
+            | (state.digest ^ env.digest)
+            | (state.digest ^ outcome.digest))
+            == 0) as u32;
 
         let ok = temp_ok & dist_ok & digests_ok;
 
-        let outcomes = [None, Some(Self { _mode: core::marker::PhantomData })];
+        let outcomes = [
+            None,
+            Some(Self {
+                _mode: core::marker::PhantomData,
+            }),
+        ];
         outcomes[(ok as usize) & 1]
     }
 }
@@ -639,18 +993,29 @@ impl AdaptiveUpdate<CertifiedLearning> {
 /// $O(1)$ constant time, branchless.
 #[inline(always)]
 pub(crate) fn power(base: NonNegativeFixed, exponent: SignedFixed) -> NonNegativeFixed {
-    let base_is_zero = const_eq_u32(base.val, 0);
+    let base_is_zero = const_eq_u32(base.value_bits(), 0);
     let log_val = base.log2();
-    let exp_signed = exponent.val as i32;
-    let log_signed = log_val.val as i32;
+    let exp_signed = exponent.value_bits();
+    let log_signed = log_val.value_bits();
     let product = (((exp_signed as i64).wrapping_mul(log_signed as i64)) >> 16) as i32;
-    let pow_val = SignedFixed::from_bits(product).exp2();
-    let exp_val = exponent.val as i32;
+    // `product` is derived from both `exponent` and `log_val` (itself derived from
+    // `base`); carry both operands' faults forward through the raw-bits reinterpretation
+    // rather than silently starting fault-free (numeric-hot-path.md Invariant 1).
+    let signed_product =
+        SignedFixed::from_parts(product, exponent.faults().union(log_val.faults()));
+    let pow_val = signed_product.exp2();
+    let exp_val = exponent.value_bits();
     let exp_gt_zero = (((0i32.wrapping_sub(exp_val)) >> 31) & 1) as u32;
-    let exp_eq_zero = const_eq_u32(exponent.val as u32, 0);
-    let zero_res = const_select_u32(exp_eq_zero, NonNegativeFixed::ONE.val,
-                    const_select_u32(exp_gt_zero, 0, u32::MAX));
-    NonNegativeFixed::from_bits(const_select_u32(base_is_zero, zero_res, pow_val.val))
+    let exp_eq_zero = const_eq_u32(exponent.value_bits() as u32, 0);
+    let zero_res_bits = const_select_u32(
+        exp_eq_zero,
+        NonNegativeFixed::ONE.value_bits(),
+        const_select_u32(exp_gt_zero, 0, u32::MAX),
+    );
+    // The `exp == 0` / `exp > 0` branch depends only on `exponent`; the `pow_val`
+    // branch already carries `base`+`exponent`+`log_val` faults via `signed_product`.
+    let zero_branch = NonNegativeFixed::from_parts(zero_res_bits, exponent.faults());
+    select_nnf(base_is_zero, zero_branch, pow_val)
 }
 
 /// Clamps a fixed-point value within `[min_val, max_val]` branchlessly.
@@ -658,11 +1023,15 @@ pub(crate) fn power(base: NonNegativeFixed, exponent: SignedFixed) -> NonNegativ
 /// # Complexity
 /// $O(1)$ constant time, branchless.
 #[inline(always)]
-pub(crate) fn clip(val: NonNegativeFixed, min_val: NonNegativeFixed, max_val: NonNegativeFixed) -> NonNegativeFixed {
-    let lt_min = const_lt_u32(val.val, min_val.val);
-    let val_or_min = const_select_u32(lt_min, min_val.val, val.val);
-    let gt_max = const_lt_u32(max_val.val, val_or_min);
-    NonNegativeFixed::from_bits(const_select_u32(gt_max, max_val.val, val_or_min))
+pub(crate) fn clip(
+    val: NonNegativeFixed,
+    min_val: NonNegativeFixed,
+    max_val: NonNegativeFixed,
+) -> NonNegativeFixed {
+    let lt_min = const_lt_u32(val.value_bits(), min_val.value_bits());
+    let val_or_min = select_nnf(lt_min, min_val, val);
+    let gt_max = const_lt_u32(max_val.value_bits(), val_or_min.value_bits());
+    select_nnf(gt_max, max_val, val_or_min)
 }
 
 /// Performs a single straight-line flow propagation step down the node forest.
@@ -672,6 +1041,12 @@ pub(crate) fn clip(val: NonNegativeFixed, min_val: NonNegativeFixed, max_val: No
 ///
 /// # Complexity
 /// $O(N^2)$ operations, which is $O(1)$ since $N=8$.
+// Fixed-shape (N=8, Q, K bounded) internal step; each parameter is one distinct
+// bounded array/scalar the branchless flow computation reads, not a design smell —
+// splitting them into a struct would add an allocation-free-but-still-indirection
+// layer with no invariant benefit. Documented per AGENTS.md's "no undocumented allow"
+// rule.
+#[allow(clippy::too_many_arguments)]
 #[inline(never)]
 fn flow_step(
     parent: &[i32; N],
@@ -687,31 +1062,43 @@ fn flow_step(
 ) {
     unroll_8_static!(v, {
         let has_children = !is_leaf[v & 7];
-        
-        let flat_part = NonNegativeFixed::from_bits(const_select_u32(has_children as u32, ((NonNegativeFixed::ONE - rho[v & 7]) * alloc_flow[v & 7]).val, 0));
-        let desc_part = NonNegativeFixed::from_bits(const_select_u32(has_children as u32, (rho[v & 7] * alloc_flow[v & 7]).val, 0));
-        
+
+        let flat_part = select_nnf(
+            has_children as u32,
+            (NonNegativeFixed::ONE - rho[v & 7]) * alloc_flow[v & 7],
+            NonNegativeFixed::ZERO,
+        );
+        let desc_part = select_nnf(
+            has_children as u32,
+            rho[v & 7] * alloc_flow[v & 7],
+            NonNegativeFixed::ZERO,
+        );
+
         #[allow(unused_variables)]
-        let l_cond = const_eq_u32(lw_sum[v & 7].val, 0);
+        let l_cond = const_eq_u32(lw_sum[v & 7].value_bits(), 0);
         #[cfg(feature = "mutant_3")]
-        let lw_denom = NonNegativeFixed::ONE.val;
+        let lw_denom = NonNegativeFixed::ONE;
         #[cfg(not(feature = "mutant_3"))]
-        let lw_denom = const_select_u32(l_cond, NonNegativeFixed::ONE.val, lw_sum[v & 7].val);
-        
-        let c_cond = const_eq_u32(cw_sum[v & 7].val, 0);
-        let cw_denom = const_select_u32(c_cond, NonNegativeFixed::ONE.val, cw_sum[v & 7].val);
+        let lw_denom = select_nnf(l_cond, NonNegativeFixed::ONE, lw_sum[v & 7]);
+
+        let c_cond = const_eq_u32(cw_sum[v & 7].value_bits(), 0);
+        let cw_denom = select_nnf(c_cond, NonNegativeFixed::ONE, cw_sum[v & 7]);
 
         unroll_8_static!(x, {
             let is_sub = is_subtree_leaf[v & 7][x & 7] & has_children;
-            let flat_addition = flat_part * leaf_w[v & 7][x & 7].saturating_div(NonNegativeFixed::from_bits(lw_denom));
-            flat_alloc[x & 7] += NonNegativeFixed::from_bits(const_select_u32(is_sub as u32, flat_addition.val, 0));
-            
+            let flat_addition = flat_part * leaf_w[v & 7][x & 7].saturating_div(lw_denom);
+            flat_alloc[x & 7] += select_nnf(is_sub as u32, flat_addition, NonNegativeFixed::ZERO);
+
             let is_child = (parent[x & 7] == v as i32) & has_children;
-            let flow_addition = desc_part * child_w[v & 7][x & 7].saturating_div(NonNegativeFixed::from_bits(cw_denom));
-            alloc_flow[x & 7] += NonNegativeFixed::from_bits(const_select_u32(is_child as u32, flow_addition.val, 0));
+            let flow_addition = desc_part * child_w[v & 7][x & 7].saturating_div(cw_denom);
+            alloc_flow[x & 7] += select_nnf(is_child as u32, flow_addition, NonNegativeFixed::ZERO);
         });
-        
-        alloc_flow[v & 7] = NonNegativeFixed::from_bits(const_select_u32(has_children as u32, 0, alloc_flow[v & 7].val));
+
+        alloc_flow[v & 7] = select_nnf(
+            has_children as u32,
+            NonNegativeFixed::ZERO,
+            alloc_flow[v & 7],
+        );
     });
 }
 
@@ -722,6 +1109,9 @@ fn flow_step(
 ///
 /// # Complexity
 /// $O(N^2)$ operations, which is $O(1)$ since $N=8$.
+// Same rationale as `flow_step` above: fixed-shape bounded parameters, no hidden
+// control flow. Documented allow per AGENTS.md's "no undocumented allow" rule.
+#[allow(clippy::too_many_arguments)]
 #[inline(never)]
 fn compute_pi_kq_for_kq(
     k_actual: usize,
@@ -732,83 +1122,208 @@ fn compute_pi_kq_for_kq(
     is_subtree_leaf: &[[bool; N]; N],
     node_masses: &[[NonNegativeFixed; N]; K],
     local_weights: &[[NonNegativeFixed; 2 * Q]; N],
-) -> [NonNegativeFixed; N] {
+) -> ([NonNegativeFixed; N], NumericFaultSet) {
+    // Faults observed strictly along the raw-i32 exponent/log-domain arithmetic below:
+    // `log2()` (and the `q_val_mutated` operand feeding every product) can carry
+    // `DIVIDE_BY_ZERO`/`INVALID_DOMAIN`/`RANGE_VIOLATION` bits that would otherwise be
+    // silently dropped by extracting `.value_bits()` into plain `i32`/`i64` arithmetic.
+    // Threading them through explicitly (rather than losing them) satisfies
+    // numeric-hot-path.md Invariant 1 for this path.
+    let mut path_faults = NumericFaultSet::EMPTY;
+
     let mut a_roots = [0i32; N];
     let mut a_max_root = i32::MIN;
     unroll_8_static!(i, {
         let is_r = parent[i & 7] == -1;
-        let a_i = (((q_val_mutated.val as i32 as i64).wrapping_mul(node_masses[k_actual & 3][i & 7].log2().val as i32 as i64)) >> 16) as i32;
+        let mass_log = node_masses[k_actual & 3][i & 7].log2();
+        path_faults = path_faults.union(mass_log.faults());
+        let a_i = (((q_val_mutated.value_bits() as i64).wrapping_mul(mass_log.value_bits() as i64))
+            >> 16) as i32;
         a_roots[i & 7] = const_select_u32(is_r as u32, a_i as u32, i32::MIN as u32) as i32;
         a_max_root = const_max_i32(a_max_root, a_roots[i & 7]);
     });
-    
+    path_faults = path_faults.union(q_val_mutated.faults());
+
     let mut root_w = [NonNegativeFixed::ZERO; N];
     let mut root_w_sum = NonNegativeFixed::ZERO;
     unroll_8_static!(i, {
-        root_w[i & 7] = NonNegativeFixed::from_bits(const_select_u32((parent[i & 7] == -1) as u32, SignedFixed::from_bits(a_roots[i & 7].wrapping_sub(a_max_root)).exp2().val, 0));
+        let root_exp = SignedFixed::from_value_bits(a_roots[i & 7].wrapping_sub(a_max_root)).exp2();
+        root_w[i & 7] = select_nnf(
+            (parent[i & 7] == -1) as u32,
+            root_exp,
+            NonNegativeFixed::ZERO,
+        );
         root_w_sum += root_w[i & 7];
     });
-    
+
     let mut alloc_flow = [NonNegativeFixed::ZERO; N];
     unroll_8_static!(i, {
         let is_r = parent[i & 7] == -1;
-        let r_cond = const_eq_u32(root_w_sum.val, 0);
-        let flow_val = root_w[i & 7].saturating_div(NonNegativeFixed::from_bits(const_select_u32(r_cond, NonNegativeFixed::ONE.val, root_w_sum.val)));
-        alloc_flow[i & 7] = NonNegativeFixed::from_bits(const_select_u32(is_r as u32, flow_val.val, 0));
+        let r_cond = const_eq_u32(root_w_sum.value_bits(), 0);
+        let root_w_sum_safe = select_nnf(r_cond, NonNegativeFixed::ONE, root_w_sum);
+        let flow_val = root_w[i & 7].saturating_div(root_w_sum_safe);
+        alloc_flow[i & 7] = select_nnf(is_r as u32, flow_val, NonNegativeFixed::ZERO);
     });
-    
+
     let mut rho = [NonNegativeFixed::ZERO; N];
     let mut child_w = [[NonNegativeFixed::ZERO; N]; N];
     let mut cw_sum = [NonNegativeFixed::ZERO; N];
     let mut leaf_w = [[NonNegativeFixed::ZERO; N]; N];
     let mut lw_sum = [NonNegativeFixed::ZERO; N];
-    
+
     unroll_8_static!(v, {
-        let w_sum = local_weights[v & 7][(2 * q_idx) & 7] + local_weights[v & 7][(2 * q_idx + 1) & 7];
-        rho[v & 7] = NonNegativeFixed::from_bits(const_select_u32(const_eq_u32(w_sum.val, 0), 32768, local_weights[v & 7][(2 * q_idx + 1) & 7].saturating_div(w_sum).val));
-        
+        let w_sum =
+            local_weights[v & 7][(2 * q_idx) & 7] + local_weights[v & 7][(2 * q_idx + 1) & 7];
+        let rho_default = NonNegativeFixed::from_parts(32768, w_sum.faults());
+        let rho_ratio = local_weights[v & 7][(2 * q_idx + 1) & 7].saturating_div(w_sum);
+        rho[v & 7] = select_nnf(const_eq_u32(w_sum.value_bits(), 0), rho_default, rho_ratio);
+
         let mut a_c = [0i32; N];
         let mut a_max_c = i32::MIN;
         unroll_8_static!(c, {
             let is_c = parent[c & 7] == v as i32;
-            a_c[c & 7] = const_select_u32(is_c as u32, (((q_val_mutated.val as i32 as i64).wrapping_mul(node_masses[k_actual & 3][c & 7].log2().val as i32 as i64)) >> 16) as u32, i32::MIN as u32) as i32;
+            let mass_log_c = node_masses[k_actual & 3][c & 7].log2();
+            path_faults = path_faults.union(mass_log_c.faults());
+            a_c[c & 7] = const_select_u32(
+                is_c as u32,
+                (((q_val_mutated.value_bits() as i64).wrapping_mul(mass_log_c.value_bits() as i64))
+                    >> 16) as u32,
+                i32::MIN as u32,
+            ) as i32;
             a_max_c = const_max_i32(a_max_c, a_c[c & 7]);
         });
         unroll_8_static!(c, {
             let matches = a_c[c & 7] != i32::MIN;
-            child_w[v & 7][c & 7] = NonNegativeFixed::from_bits(const_select_u32(matches as u32, SignedFixed::from_bits(a_c[c & 7].wrapping_sub(a_max_c)).exp2().val, 0));
+            let child_exp = SignedFixed::from_value_bits(a_c[c & 7].wrapping_sub(a_max_c)).exp2();
+            child_w[v & 7][c & 7] = select_nnf(matches as u32, child_exp, NonNegativeFixed::ZERO);
             cw_sum[v & 7] += child_w[v & 7][c & 7];
         });
-        
+
         let mut a_l = [0i32; N];
         let mut a_max_l = i32::MIN;
         unroll_8_static!(x, {
             let is_sub = is_subtree_leaf[v & 7][x & 7];
-            a_l[x & 7] = const_select_u32(is_sub as u32, (((q_val_mutated.val as i32 as i64).wrapping_mul(node_masses[k_actual & 3][x & 7].log2().val as i32 as i64)) >> 16) as u32, i32::MIN as u32) as i32;
+            let mass_log_x = node_masses[k_actual & 3][x & 7].log2();
+            path_faults = path_faults.union(mass_log_x.faults());
+            a_l[x & 7] = const_select_u32(
+                is_sub as u32,
+                (((q_val_mutated.value_bits() as i64).wrapping_mul(mass_log_x.value_bits() as i64))
+                    >> 16) as u32,
+                i32::MIN as u32,
+            ) as i32;
             a_max_l = const_max_i32(a_max_l, a_l[x & 7]);
         });
         unroll_8_static!(x, {
             let matches = a_l[x & 7] != i32::MIN;
-            leaf_w[v & 7][x & 7] = NonNegativeFixed::from_bits(const_select_u32(matches as u32, SignedFixed::from_bits(a_l[x & 7].wrapping_sub(a_max_l)).exp2().val, 0));
+            let leaf_exp = SignedFixed::from_value_bits(a_l[x & 7].wrapping_sub(a_max_l)).exp2();
+            leaf_w[v & 7][x & 7] = select_nnf(matches as u32, leaf_exp, NonNegativeFixed::ZERO);
             lw_sum[v & 7] += leaf_w[v & 7][x & 7];
         });
     });
-    
+
     let mut flat_alloc = [NonNegativeFixed::ZERO; N];
-    
+
     // Call flow_step 8 times sequentially to avoid stack frame nesting
-    flow_step(parent, is_leaf, is_subtree_leaf, &rho, &child_w, &cw_sum, &leaf_w, &lw_sum, &mut alloc_flow, &mut flat_alloc);
-    flow_step(parent, is_leaf, is_subtree_leaf, &rho, &child_w, &cw_sum, &leaf_w, &lw_sum, &mut alloc_flow, &mut flat_alloc);
-    flow_step(parent, is_leaf, is_subtree_leaf, &rho, &child_w, &cw_sum, &leaf_w, &lw_sum, &mut alloc_flow, &mut flat_alloc);
-    flow_step(parent, is_leaf, is_subtree_leaf, &rho, &child_w, &cw_sum, &leaf_w, &lw_sum, &mut alloc_flow, &mut flat_alloc);
-    flow_step(parent, is_leaf, is_subtree_leaf, &rho, &child_w, &cw_sum, &leaf_w, &lw_sum, &mut alloc_flow, &mut flat_alloc);
-    flow_step(parent, is_leaf, is_subtree_leaf, &rho, &child_w, &cw_sum, &leaf_w, &lw_sum, &mut alloc_flow, &mut flat_alloc);
-    flow_step(parent, is_leaf, is_subtree_leaf, &rho, &child_w, &cw_sum, &leaf_w, &lw_sum, &mut alloc_flow, &mut flat_alloc);
-    flow_step(parent, is_leaf, is_subtree_leaf, &rho, &child_w, &cw_sum, &leaf_w, &lw_sum, &mut alloc_flow, &mut flat_alloc);
+    flow_step(
+        parent,
+        is_leaf,
+        is_subtree_leaf,
+        &rho,
+        &child_w,
+        &cw_sum,
+        &leaf_w,
+        &lw_sum,
+        &mut alloc_flow,
+        &mut flat_alloc,
+    );
+    flow_step(
+        parent,
+        is_leaf,
+        is_subtree_leaf,
+        &rho,
+        &child_w,
+        &cw_sum,
+        &leaf_w,
+        &lw_sum,
+        &mut alloc_flow,
+        &mut flat_alloc,
+    );
+    flow_step(
+        parent,
+        is_leaf,
+        is_subtree_leaf,
+        &rho,
+        &child_w,
+        &cw_sum,
+        &leaf_w,
+        &lw_sum,
+        &mut alloc_flow,
+        &mut flat_alloc,
+    );
+    flow_step(
+        parent,
+        is_leaf,
+        is_subtree_leaf,
+        &rho,
+        &child_w,
+        &cw_sum,
+        &leaf_w,
+        &lw_sum,
+        &mut alloc_flow,
+        &mut flat_alloc,
+    );
+    flow_step(
+        parent,
+        is_leaf,
+        is_subtree_leaf,
+        &rho,
+        &child_w,
+        &cw_sum,
+        &leaf_w,
+        &lw_sum,
+        &mut alloc_flow,
+        &mut flat_alloc,
+    );
+    flow_step(
+        parent,
+        is_leaf,
+        is_subtree_leaf,
+        &rho,
+        &child_w,
+        &cw_sum,
+        &leaf_w,
+        &lw_sum,
+        &mut alloc_flow,
+        &mut flat_alloc,
+    );
+    flow_step(
+        parent,
+        is_leaf,
+        is_subtree_leaf,
+        &rho,
+        &child_w,
+        &cw_sum,
+        &leaf_w,
+        &lw_sum,
+        &mut alloc_flow,
+        &mut flat_alloc,
+    );
+    flow_step(
+        parent,
+        is_leaf,
+        is_subtree_leaf,
+        &rho,
+        &child_w,
+        &cw_sum,
+        &leaf_w,
+        &lw_sum,
+        &mut alloc_flow,
+        &mut flat_alloc,
+    );
 
     let mut res = [NonNegativeFixed::ZERO; N];
     unroll_8_static!(x, res[x & 7] = flat_alloc[x & 7] + alloc_flow[x & 7]);
-    res
+    (res, path_faults)
 }
 
 /// Allocates resources down the node forest branchlessly, performing MWU step updates,
@@ -899,10 +1414,16 @@ fn compute_pi_kq_for_kq(
 ///     CERTIFICATE_DIGEST,
 ///     proof.as_ref(),
 /// );
-/// assert!(result.is_ok());
+/// assert!(!result.is_refused());
 /// ```
 ///
 /// # Branchless Contract
+// This is the authoritative root: every parameter is a distinct fixed-shape input the
+// admitted-input -> deterministic-output contract requires as its own named binding
+// (per AGENTS.md Invariant 3, a seal/root must bind every enumerated identity
+// explicitly, not through a bundling struct that would obscure which are checked).
+// Documented allow per AGENTS.md's "no undocumented allow" rule.
+#[allow(clippy::too_many_arguments)]
 pub fn allocate(
     states: &[PackedSemanticState; N],
     lenses: &[LensSpec; Q],
@@ -921,22 +1442,25 @@ pub fn allocate(
     tau_d: u32,
     digest: [u8; 32],
     proof: Option<&AdaptiveUpdate<CertifiedLearning>>,
-) -> Result<[NonNegativeFixed; N], StabilityRefusal> {
+) -> AllocationOutcome {
     let mut local_weights = *weights;
     let mut local_last_switch_t = *last_switch_t;
     let mut local_prev_mode = *prev_mode;
 
-    let beta_max = NonNegativeFixed::from_bits(6553);
-    let m_min = NonNegativeFixed::from_bits(6);
-    let m_max = NonNegativeFixed::from_bits(65536000);
-    let mu_max = NonNegativeFixed::from_bits(6553600);
+    let beta_max = NonNegativeFixed::from_value_bits(6553);
+    let m_min = NonNegativeFixed::from_value_bits(6);
+    let m_max = NonNegativeFixed::from_value_bits(65536000);
+    let mu_max = NonNegativeFixed::from_value_bits(6553600);
 
     let proof_some = proof.is_some();
     let degrade_to_certified_selection = proof.is_none();
 
     let mut digest_match = 1u32;
     unroll_32_static!(i, {
-        digest_match &= const_eq_u32(digest[i & 31] as u32, crate::generated::stability_profile::CERTIFICATE_DIGEST[i & 31] as u32);
+        digest_match &= const_eq_u32(
+            digest[i & 31] as u32,
+            crate::generated::stability_profile::CERTIFICATE_DIGEST[i & 31] as u32,
+        );
     });
     let digest_err = const_eq_u32(digest_match, 0) != 0;
 
@@ -952,44 +1476,51 @@ pub fn allocate(
         let d_i_raw = crate::generated::stability_profile::WEIGHT_VECTOR[i].raw as u128;
         let delta_raw = crate::generated::stability_profile::CONTRACTION_MARGIN.raw as u128;
         let rhs = d_i_raw - (delta_raw * d_i_raw / 1_000_000_000);
-        gd_ok = gd_ok & (lhs <= rhs);
+        gd_ok &= lhs <= rhs;
     });
 
-    let zeta_w_max_q16 = ((crate::generated::stability_profile::ZETA_W_MAX.raw * 65536) / 1_000_000_000) as u32;
-    let eta_g_min_q16 = ((crate::generated::stability_profile::ETA_G_MIN.raw * 65536) / 1_000_000_000) as u32;
+    let zeta_w_max_q16 =
+        ((crate::generated::stability_profile::ZETA_W_MAX.raw * 65536) / 1_000_000_000) as u32;
+    let eta_g_min_q16 =
+        ((crate::generated::stability_profile::ETA_G_MIN.raw * 65536) / 1_000_000_000) as u32;
 
-    let lr_err = const_lt_u32(zeta_w_max_q16, zeta.val) != 0;
-    let dwell_err = const_lt_u32(tau_d, crate::generated::stability_profile::MODE_DWELL_ROUNDS_MIN) != 0;
-    
+    let lr_err = const_lt_u32(zeta_w_max_q16, zeta.value_bits()) != 0;
+    let dwell_err = const_lt_u32(
+        tau_d,
+        crate::generated::stability_profile::MODE_DWELL_ROUNDS_MIN,
+    ) != 0;
+
     let mut q_err = false;
     unroll_4_static!(q_idx, {
-        let q_val = lenses[q_idx & 3].q.val as i32;
-        q_err = q_err | (q_val < -131072) | (q_val > 131072);
+        let q_val = lenses[q_idx & 3].q.value_bits();
+        q_err |= !(-131072..=131072).contains(&q_val);
     });
 
     let mut price_err = false;
     unroll_8_static!(i, {
-        price_err = price_err | (const_lt_u32(mu_max.val, mu[i & 7].val) != 0);
+        price_err |= const_lt_u32(mu_max.value_bits(), mu[i & 7].value_bits()) != 0;
     });
 
-    let eta_err = const_lt_u32(eta.val, eta_g_min_q16) != 0;
+    let eta_err = const_lt_u32(eta.value_bits(), eta_g_min_q16) != 0;
 
-    let is_zeta_less = const_lt_u32(zeta.val, beta_max.val);
-    let beta = NonNegativeFixed::from_bits(const_select_u32(is_zeta_less, zeta.val, beta_max.val));
-    let beta_m_max_q16 = ((crate::generated::stability_profile::BETA_M_MAX.raw * 65536) / 1_000_000_000) as u32;
-    let beta_err = const_lt_u32(beta_m_max_q16, beta.val) != 0;
+    let is_zeta_less = const_lt_u32(zeta.value_bits(), beta_max.value_bits());
+    let beta = select_nnf(is_zeta_less, zeta, beta_max);
+    let beta_m_max_q16 =
+        ((crate::generated::stability_profile::BETA_M_MAX.raw * 65536) / 1_000_000_000) as u32;
+    let beta_err = const_lt_u32(beta_m_max_q16, beta.value_bits()) != 0;
 
-    let has_error = !gd_ok | digest_err | lr_err | beta_err | eta_err | dwell_err | q_err | price_err;
+    let has_error =
+        !gd_ok | digest_err | lr_err | beta_err | eta_err | dwell_err | q_err | price_err;
     let freeze_learning = has_error & degrade_to_certified_selection;
 
     let mut is_leaf = [true; N];
     unroll_8_static!(i, {
         unroll_8_static!(j, {
             let is_match = parent[j & 7] == i as i32;
-            is_leaf[i & 7] = is_leaf[i & 7] & !is_match;
+            is_leaf[i & 7] &= !is_match;
         });
     });
-    
+
     #[allow(non_snake_case)]
     let mut P = [[-1i32; N]; 8];
     unroll_8_static!(j, {
@@ -1091,9 +1622,11 @@ pub fn allocate(
 
     let mut is_subtree_leaf = [[false; N]; N];
     unroll_8_static!(i, {
-        unroll_8_static!(k, { is_subtree_leaf[i & 7][k & 7] = is_leaf[k & 7] & is_descendant[i & 7][k & 7]; });
+        unroll_8_static!(k, {
+            is_subtree_leaf[i & 7][k & 7] = is_leaf[k & 7] & is_descendant[i & 7][k & 7];
+        });
     });
-    
+
     let mut node_masses = [[NonNegativeFixed::ZERO; N]; K];
     unroll_8_static!(i, {
         let state = &states[i & 7];
@@ -1111,15 +1644,17 @@ pub fn allocate(
         let m_search = (f_bval + f_conseq) * f_search * f_stand;
         let m_retrieval = f_bval * f_retrieve;
         let m_sched = f_bval * f_sched;
-        
+
         node_masses[MEASURE_CACHE][i & 7] = m_cache;
         node_masses[MEASURE_RETRIEVAL][i & 7] = m_retrieval;
         node_masses[MEASURE_SCHEDULING][i & 7] = m_sched;
         node_masses[MEASURE_SEARCH][i & 7] = m_search;
     });
-    
+
     unroll_4_static!(k, {
-        unroll_8_static!(i, { node_masses[k & 3][i & 7] = clip(node_masses[k & 3][i & 7], m_min, m_max); });
+        unroll_8_static!(i, {
+            node_masses[k & 3][i & 7] = clip(node_masses[k & 3][i & 7], m_min, m_max);
+        });
     });
 
     let mut root_idx = 0usize;
@@ -1133,7 +1668,8 @@ pub fn allocate(
     unroll_8_static!(idx, {
         let matches = const_eq_u32(root_idx as u32, idx as u32);
         unroll_8_static!(e, {
-            root_weights[e & 7] = NonNegativeFixed::from_bits(const_select_u32(matches, local_weights[idx & 7][e & 7].val, root_weights[e & 7].val));
+            root_weights[e & 7] =
+                select_nnf(matches, local_weights[idx & 7][e & 7], root_weights[e & 7]);
         });
     });
 
@@ -1141,8 +1677,8 @@ pub fn allocate(
     let mut dom_mode = 0u32;
     unroll_8_static!(e, {
         let w = root_weights[e & 7];
-        let is_greater = const_lt_u32(max_w.val, w.val);
-        max_w = NonNegativeFixed::from_bits(const_select_u32(is_greater, w.val, max_w.val));
+        let is_greater = const_lt_u32(max_w.value_bits(), w.value_bits());
+        max_w = select_nnf(is_greater, w, max_w);
         dom_mode = const_select_u32(is_greater, e as u32, dom_mode);
     });
 
@@ -1152,49 +1688,72 @@ pub fn allocate(
 
     unroll_8_static!(v, {
         let has_children = !is_leaf[v & 7];
-        
+
         let mut is_subtree_leaf_v = [false; N];
         unroll_8_static!(x, {
             is_subtree_leaf_v[x] = is_subtree_leaf[v & 7][x & 7];
         });
 
         unroll_4_static!(q_idx, {
-            let mut _q_val_mutated = SignedFixed::from_bits(lenses[q_idx & 3].q.val as i32);
+            let mut _q_val_mutated = SignedFixed::from_parts(
+                lenses[q_idx & 3].q.value_bits(),
+                lenses[q_idx & 3].q.faults(),
+            );
             #[cfg(feature = "mutant_2")]
             {
-                _q_val_mutated = SignedFixed::from_bits(0i32.wrapping_sub(_q_val_mutated.val));
+                _q_val_mutated = SignedFixed::from_parts(
+                    0i32.wrapping_sub(_q_val_mutated.value_bits()),
+                    _q_val_mutated.faults(),
+                );
             }
             let w_flat = local_weights[v & 7][(2 * q_idx) & 7];
             let w_desc = local_weights[v & 7][(2 * q_idx + 1) & 7];
             let is_updating = has_children & update_allowed;
-            local_weights[v & 7][(2 * q_idx) & 7] = NonNegativeFixed::from_bits(const_select_u32(is_updating as u32, (w_flat * SignedFixed::from_bits((beta * payoffs[v & 7][(2 * q_idx) & 7]).val as i32).exp()).val, w_flat.val));
-            local_weights[v & 7][(2 * q_idx + 1) & 7] = NonNegativeFixed::from_bits(const_select_u32(is_updating as u32, (w_desc * SignedFixed::from_bits((beta * payoffs[v & 7][(2 * q_idx + 1) & 7]).val as i32).exp()).val, w_desc.val));
+            let flat_payoff = beta * payoffs[v & 7][(2 * q_idx) & 7];
+            let flat_signed =
+                SignedFixed::from_parts(flat_payoff.value_bits() as i32, flat_payoff.faults());
+            let desc_payoff = beta * payoffs[v & 7][(2 * q_idx + 1) & 7];
+            let desc_signed =
+                SignedFixed::from_parts(desc_payoff.value_bits() as i32, desc_payoff.faults());
+            local_weights[v & 7][(2 * q_idx) & 7] =
+                select_nnf(is_updating as u32, w_flat * flat_signed.exp(), w_flat);
+            local_weights[v & 7][(2 * q_idx + 1) & 7] =
+                select_nnf(is_updating as u32, w_desc * desc_signed.exp(), w_desc);
         });
-        
+
         unroll_4_static!(q_idx, {
             let w_flat = local_weights[v & 7][(2 * q_idx) & 7];
             let w_desc = local_weights[v & 7][(2 * q_idx + 1) & 7];
             let sum_div = w_flat + w_desc;
-            local_weights[v & 7][(2 * q_idx) & 7] = NonNegativeFixed::from_bits(const_select_u32(update_allowed as u32, w_flat.saturating_div(sum_div).val, w_flat.val));
-            local_weights[v & 7][(2 * q_idx + 1) & 7] = NonNegativeFixed::from_bits(const_select_u32(update_allowed as u32, w_desc.saturating_div(sum_div).val, w_desc.val));
+            local_weights[v & 7][(2 * q_idx) & 7] = select_nnf(
+                update_allowed as u32,
+                w_flat.saturating_div(sum_div),
+                w_flat,
+            );
+            local_weights[v & 7][(2 * q_idx + 1) & 7] = select_nnf(
+                update_allowed as u32,
+                w_desc.saturating_div(sum_div),
+                w_desc,
+            );
         });
     });
 
     let mut new_dom_mode = 0u32;
     let mut new_max_w = NonNegativeFixed::ZERO;
-    
+
     // Reload root weights
     unroll_8_static!(idx, {
         let matches = const_eq_u32(root_idx as u32, idx as u32);
         unroll_8_static!(e, {
-            root_weights[e & 7] = NonNegativeFixed::from_bits(const_select_u32(matches, local_weights[idx & 7][e & 7].val, root_weights[e & 7].val));
+            root_weights[e & 7] =
+                select_nnf(matches, local_weights[idx & 7][e & 7], root_weights[e & 7]);
         });
     });
-    
+
     unroll_8_static!(e, {
         let w = root_weights[e & 7];
-        let is_greater = const_lt_u32(new_max_w.val, w.val);
-        new_max_w = NonNegativeFixed::from_bits(const_select_u32(is_greater, w.val, new_max_w.val));
+        let is_greater = const_lt_u32(new_max_w.value_bits(), w.value_bits());
+        new_max_w = select_nnf(is_greater, w, new_max_w);
         new_dom_mode = const_select_u32(is_greater, e as u32, new_dom_mode);
     });
 
@@ -1203,19 +1762,30 @@ pub fn allocate(
     local_prev_mode = const_select_u32(did_switch as u32, new_dom_mode, local_prev_mode);
 
     let mut pi_kq = [[[NonNegativeFixed::ZERO; N]; Q]; K];
-    
+    // Numeric faults observed along the exponent/log-domain path of every (k, q) cell,
+    // accumulated as a join-semilattice union (numeric-hot-path.md Invariant 1) rather
+    // than kept per-cell only — the outcome's `numeric_faults` reports the union across
+    // the whole candidate, not just what survives inside individual `pi_res` elements.
+    let mut kq_path_faults = NumericFaultSet::EMPTY;
+
     unroll_4_static!(k, {
         #[cfg(feature = "mutant_1")]
         const k_actual: usize = 0;
         #[cfg(not(feature = "mutant_1"))]
         const k_actual: usize = k;
-        
+
         unroll_4_static!(q_idx, {
-            let q_val_mutated = SignedFixed::from_bits(lenses[q_idx & 3].q.val as i32);
+            let q_val_mutated = SignedFixed::from_parts(
+                lenses[q_idx & 3].q.value_bits(),
+                lenses[q_idx & 3].q.faults(),
+            );
             #[cfg(feature = "mutant_2")]
-            let q_val_mutated = SignedFixed::from_bits(0i32.wrapping_sub(q_val_mutated.val));
-            
-            let res_kq = compute_pi_kq_for_kq(
+            let q_val_mutated = SignedFixed::from_parts(
+                0i32.wrapping_sub(q_val_mutated.value_bits()),
+                q_val_mutated.faults(),
+            );
+
+            let (res_kq, cell_faults) = compute_pi_kq_for_kq(
                 k_actual,
                 q_idx,
                 q_val_mutated,
@@ -1225,10 +1795,11 @@ pub fn allocate(
                 &node_masses,
                 &local_weights,
             );
+            kq_path_faults = kq_path_faults.union(cell_faults);
             unroll_8_static!(x, pi_kq[k & 3][q_idx & 3][x & 7] = res_kq[x & 7]);
         });
     });
-    
+
     let mut pi_combined = [NonNegativeFixed::ZERO; N];
     unroll_4_static!(k, {
         unroll_4_static!(q_idx, {
@@ -1238,7 +1809,7 @@ pub fn allocate(
             });
         });
     });
-    
+
     let mut pi_res = [NonNegativeFixed::ZERO; N];
     let mut priced_sum = NonNegativeFixed::ZERO;
     unroll_8_static!(x, {
@@ -1246,47 +1817,120 @@ pub fn allocate(
         let mu_actual = mu[x & 7];
         #[cfg(not(feature = "mutant_5"))]
         let mu_actual = clip(mu[x & 7], NonNegativeFixed::ZERO, mu_max);
-        
-        let p = pi_combined[x & 7] * SignedFixed::from_bits(0i32.wrapping_sub((mu_actual * costs[x & 7]).val as i32)).exp();
-        priced_sum += NonNegativeFixed::from_bits(const_select_u32(is_leaf[x & 7] as u32, p.val, 0));
+
+        let mu_cost = mu_actual * costs[x & 7];
+        let neg_mu_cost = SignedFixed::from_parts(
+            0i32.wrapping_sub(mu_cost.value_bits() as i32),
+            mu_cost.faults(),
+        );
+        let p = pi_combined[x & 7] * neg_mu_cost.exp();
+        priced_sum += select_nnf(is_leaf[x & 7] as u32, p, NonNegativeFixed::ZERO);
     });
-    let psd = NonNegativeFixed::from_bits(const_select_u32(const_eq_u32(priced_sum.val, 0), NonNegativeFixed::ONE.val, priced_sum.val));
+
+    // Invariant: priced_sum == 0 accumulates INVALID_NORMALIZATION and the computation
+    // continues with the existing safe-denominator substitution (ONE in place of ZERO)
+    // rather than early-returning — the authoritative root stays total (Invariant 6).
+    let priced_sum_is_zero = const_eq_u32(priced_sum.value_bits(), 0);
+    let mut local_numeric_faults = NumericFaultSet::EMPTY.union(kq_path_faults);
+    local_numeric_faults =
+        local_numeric_faults.union(CanonicalMask::from_lsb(priced_sum_is_zero).select_faults(
+            NumericFaultSet::INVALID_NORMALIZATION,
+            NumericFaultSet::EMPTY,
+        ));
+    let psd = select_nnf(priced_sum_is_zero, NonNegativeFixed::ONE, priced_sum);
+
     let mut nl = 0u32;
-    unroll_8_static!(i, { nl += is_leaf[i & 7] as u32; });
+    unroll_8_static!(i, {
+        nl += is_leaf[i & 7] as u32;
+    });
+    // nl == 0 is reported as a refusal (`RefusalSet::NO_LEAVES`, see `final_refusals`
+    // below), not a numeric fault: it is a structural property of the candidate forest
+    // (no leaves to allocate to), not an arithmetic anomaly encountered while computing
+    // a value.
+    let nl_is_zero = const_eq_u32(nl, 0);
+
+    // Exact Q16.16 explore-floor share per leaf (numeric-hot-path.md Invariant 4): rather
+    // than every leaf sharing one rounded reciprocal (whose sum over `nl` leaves does not
+    // in general equal 65536 exactly), split the unit budget as `q = 65536 / nl` plus a
+    // remainder `r = 65536 - q * nl` distributed one extra unit each to the first `r`
+    // leaves under canonical (index) rank. `nl_safe` avoids a divide-by-zero when
+    // `nl == 0`; the divided-out value is unused in that case since no `x` has
+    // `is_leaf[x]` true, and the defensive zeroing below makes that explicit rather than
+    // incidental. The mfw generated-artifact manifest exposes no
+    // `leaf_floor_base`/`leaf_floor_remainder` tables (only a `leaf_floor_n_max`
+    // dimension), so the formula is computed directly here.
+    let nl_safe = const_select_u32(nl_is_zero, 1, nl);
+    let q_floor = 65536u32 / nl_safe;
+    let r_floor = 65536u32 - q_floor * nl_safe;
+    let mut leaf_rank = [0u32; N];
+    let mut running_rank = 0u32;
+    unroll_8_static!(x, {
+        leaf_rank[x & 7] = running_rank;
+        running_rank += is_leaf[x & 7] as u32;
+    });
+
     unroll_8_static!(x, {
         #[cfg(feature = "mutant_5")]
         let mu_actual = mu[x & 7];
         #[cfg(not(feature = "mutant_5"))]
         let mu_actual = clip(mu[x & 7], NonNegativeFixed::ZERO, mu_max);
-        
-        let p_mu = (pi_combined[x & 7] * SignedFixed::from_bits(0i32.wrapping_sub((mu_actual * costs[x & 7]).val as i32)).exp()).saturating_div(psd);
-        
+
+        let mu_cost = mu_actual * costs[x & 7];
+        let neg_mu_cost = SignedFixed::from_parts(
+            0i32.wrapping_sub(mu_cost.value_bits() as i32),
+            mu_cost.faults(),
+        );
+        let p_mu = (pi_combined[x & 7] * neg_mu_cost.exp()).saturating_div(psd);
+
         #[cfg(feature = "mutant_4")]
         let eta_actual = zeta;
         #[cfg(not(feature = "mutant_4"))]
         let eta_actual = eta;
-        
-        // Use lookup table to avoid division
-        let mut nl_recip = NonNegativeFixed::ZERO;
-        unroll_9_static!(idx, {
-            let matches = const_eq_u32(nl, idx as u32);
-            nl_recip = NonNegativeFixed::from_bits(const_select_u32(matches, LEAF_RECIP[idx].val, nl_recip.val));
-        });
-        
+
+        let gets_extra = const_lt_u32(leaf_rank[x & 7], r_floor);
+        let nl_recip = NonNegativeFixed::from_value_bits(q_floor + gets_extra);
+
         let val = (eta_actual * nl_recip) + ((NonNegativeFixed::ONE - eta_actual) * p_mu);
         let pi_val = pi_res[x & 7];
-        pi_res[x & 7] = NonNegativeFixed::from_bits(const_select_u32(is_leaf[x & 7] as u32, val.val, pi_val.val));
+        pi_res[x & 7] = select_nnf(is_leaf[x & 7] as u32, val, pi_val);
+    });
+
+    // Defensive, explicit zeroing of the commit mask when there are no leaves at all
+    // (item 4): the per-leaf assignment above already only ever touches `pi_res[x]` when
+    // `is_leaf[x]` holds, so this is a no-op whenever `nl == 0`, but making it explicit
+    // keeps the invariant testable rather than incidental.
+    unroll_8_static!(x, {
+        pi_res[x & 7] = select_nnf(nl_is_zero, NonNegativeFixed::ZERO, pi_res[x & 7]);
     });
 
     let has_refusal = has_error & !degrade_to_certified_selection;
     unroll_8_static!(v, {
-        unroll_8_static!(e, { weights[v & 7][e & 7] = NonNegativeFixed::from_bits(const_select_u32(has_refusal as u32, weights[v & 7][e & 7].val, local_weights[v & 7][e & 7].val)); });
+        unroll_8_static!(e, {
+            weights[v & 7][e & 7] = select_nnf(
+                has_refusal as u32,
+                weights[v & 7][e & 7],
+                local_weights[v & 7][e & 7],
+            );
+        });
     });
     *last_switch_t = const_select_u32(has_refusal as u32, *last_switch_t, local_last_switch_t);
     *prev_mode = const_select_u32(has_refusal as u32, *prev_mode, local_prev_mode);
 
-    let err_val = const_select_u32(q_err as u32, 5, const_select_u32(dwell_err as u32, 4, const_select_u32((lr_err | beta_err | eta_err) as u32, 3, const_select_u32((!gd_ok) as u32, 1, const_select_u32(digest_err as u32, 10, 7)))));
-    wrap_result(pi_res, const_select_u32(has_refusal as u32, err_val, u32::MAX))
+    let gated_refusals = RefusalSet::EMPTY
+        .union(RefusalSet::DIGEST_MISMATCH.masked(digest_err as u32))
+        .union(RefusalSet::DWELL_UNSATISFIED.masked(dwell_err as u32))
+        .union(
+            RefusalSet::PROPOSAL_REJECTED
+                .masked(((!gd_ok) | lr_err | beta_err | eta_err | q_err | price_err) as u32),
+        )
+        .union(RefusalSet::AUTHORITY_MISSING.masked(degrade_to_certified_selection as u32))
+        .masked(has_refusal as u32);
+    // `NO_LEAVES` is reported independently of the certified/degraded-mode gate above: an
+    // empty leaf set is a structural property of the candidate, not a stability-envelope
+    // violation, so it is never suppressed by `has_refusal`.
+    let final_refusals = gated_refusals.union(RefusalSet::NO_LEAVES.masked(nl_is_zero));
+
+    AllocationOutcome::new_internal(pi_res, local_numeric_faults, final_refusals)
 }
 
 /// ```compile_fail
@@ -1333,3 +1977,70 @@ pub fn allocate(
 /// );
 /// ```
 pub struct AuthorityCompileFailTests;
+
+#[cfg(test)]
+mod floor_conservation_tests {
+    // The crate is `no_std` unless the `std` feature is enabled (see `lib.rs`), and
+    // that feature-gated `extern crate std;` does not cover plain `cargo test` runs
+    // built without `--features std`. `cfg(test)` builds always link std via the
+    // test harness, so re-declaring it here (scoped to this test module only) is
+    // sound and does not affect the no_std authoritative build.
+    extern crate std;
+    use std::vec::Vec;
+
+    /// Independent oracle for the exact base-q + residual-r floor scheme used in
+    /// `allocate` (see the `q_floor`/`r_floor`/`leaf_rank` computation above): computes
+    /// each leaf's share directly from the definition, not by re-deriving the
+    /// implementation's own control flow, and checks the sum against the whole unit
+    /// (numeric-hot-path.md Invariant 4 / Required Evidence Class).
+    fn oracle_shares(nl: u32) -> Vec<u32> {
+        let q = 65536u32 / nl;
+        let r = 65536u32 - q * nl;
+        (0..nl)
+            .map(|rank| q + if rank < r { 1 } else { 0 })
+            .collect()
+    }
+
+    #[test]
+    fn floor_shares_sum_exactly_to_65536_for_every_admitted_leaf_count() {
+        // The allocator's forest is bounded at N = 8 nodes, so 1..=8 is the full
+        // admitted domain for `nl` (0 is handled separately as the NO_LEAVES refusal
+        // path and produces no leaf shares at all).
+        for nl in 1..=8u32 {
+            let shares = oracle_shares(nl);
+            let sum: u32 = shares.iter().sum();
+            assert_eq!(
+                sum, 65536,
+                "nl={nl}: floor shares {shares:?} summed to {sum}, not 65536 (Invariant 4 violation)"
+            );
+            // Every share must be exactly q or q+1 (no share more than 1 unit off any
+            // other), which is the "first r leaves get q+1, rest get q" shape from item 5.
+            let q = 65536u32 / nl;
+            for &s in &shares {
+                assert!(
+                    s == q || s == q + 1,
+                    "nl={nl}: share {s} outside {{{q}, {}}}",
+                    q + 1
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn floor_shares_match_allocator_rank_assignment_construction() {
+        // Mirrors the exact per-leaf construction used inside `allocate`
+        // (`leaf_rank[x]` = count of leaves before `x`; `gets_extra` = rank < r_floor)
+        // against the independent oracle above, for every admitted leaf count and every
+        // rank within it.
+        for nl in 1..=8u32 {
+            let q_floor = 65536u32 / nl;
+            let r_floor = 65536u32 - q_floor * nl;
+            for rank in 0..nl {
+                let gets_extra = (rank < r_floor) as u32;
+                let allocator_share = q_floor + gets_extra;
+                let oracle_share = oracle_shares(nl)[rank as usize];
+                assert_eq!(allocator_share, oracle_share, "nl={nl}, rank={rank}");
+            }
+        }
+    }
+}

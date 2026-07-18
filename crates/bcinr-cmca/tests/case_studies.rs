@@ -6,14 +6,12 @@
     feature = "mutant_5"
 )))]
 
-use bcinr_cmca::fixed::{NonNegativeFixed, SignedFixed, CanonicalMask};
 use bcinr_cmca::allocator::{
-    allocate, StabilityRefusal, AdaptiveUpdate, AdmittedControlState,
-    CertificateReceipt, EnvelopeReceipt, OutcomeReceipt, CertifiedLearning
+    allocate, AdaptiveUpdate, AdmittedControlState, CertificateReceipt, CertifiedLearning,
+    EnvelopeReceipt, OutcomeReceipt, RefusalSet, StabilityRefusal,
 };
-use bcinr_cmca::generated::case_studies::{
-    OBJECT_REGISTRY, LENS_REGISTRY, LAMBDA, ETA, N, Q
-};
+use bcinr_cmca::fixed::{CanonicalMask, NonNegativeFixed, SignedFixed};
+use bcinr_cmca::generated::case_studies::{ETA, LAMBDA, LENS_REGISTRY, N, OBJECT_REGISTRY, Q};
 
 fn get_proof() -> Option<AdaptiveUpdate<CertifiedLearning>> {
     AdaptiveUpdate::admit_adaptive_update(
@@ -38,13 +36,13 @@ fn test_case_study_1_cache_choice() {
     let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
     let mut last_switch_t = 0;
     let mut prev_mode = 0;
-    
+
     // We construct a simple tree where 0 and 1 are root leaf nodes
     let parent = [-1; N];
     let mu = [NonNegativeFixed::ZERO; N];
     let costs = [NonNegativeFixed::ZERO; N];
 
-    let result = allocate(
+    let outcome = allocate(
         &OBJECT_REGISTRY,
         &LENS_REGISTRY,
         &LAMBDA,
@@ -62,11 +60,21 @@ fn test_case_study_1_cache_choice() {
         500,
         CERTIFICATE_DIGEST,
         get_proof().as_ref(),
-    ).unwrap();
+    );
+    assert!(
+        !outcome.is_refused(),
+        "unexpected refusal: {:?}",
+        outcome.refusals()
+    );
+    let result = outcome.candidate();
 
     // Verify that Artifact_A (index 0) gets more cache allocation than Artifact_B (index 1)
     // In our lambda matrix, index 0 is MeasureCache, which dominates lens 0 (2.0) and 1 (1.0).
-    println!("result[0]: {:?}, result[1]: {:?}", result[0], result[1]); assert!(result[0].val > result[1].val, "Artifact_A should have higher cache allocation than Artifact_B");
+    println!("result[0]: {:?}, result[1]: {:?}", result[0], result[1]);
+    assert!(
+        result[0].value_bits() > result[1].value_bits(),
+        "Artifact_A should have higher cache allocation than Artifact_B"
+    );
 }
 
 #[test]
@@ -77,12 +85,12 @@ fn test_case_study_2_single_object_multiple_decisions() {
     let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
     let mut last_switch_t = 0;
     let mut prev_mode = 0;
-    
+
     let parent = [-1; N];
     let mu = [NonNegativeFixed::ZERO; N];
     let costs = [NonNegativeFixed::ZERO; N];
 
-    let result = allocate(
+    let outcome = allocate(
         &OBJECT_REGISTRY,
         &LENS_REGISTRY,
         &LAMBDA,
@@ -100,13 +108,22 @@ fn test_case_study_2_single_object_multiple_decisions() {
         500,
         CERTIFICATE_DIGEST,
         get_proof().as_ref(),
-    ).unwrap();
+    );
+    assert!(
+        !outcome.is_refused(),
+        "unexpected refusal: {:?}",
+        outcome.refusals()
+    );
+    let result = outcome.candidate();
 
     // Obj_Single (index 6) has high business value and retrieval demand, should have higher allocation than Obj_Obligation.
     for i in 0..N {
         println!("CS2 result[{}]: {:?}", i, result[i]);
     }
-    assert!(result[6].val > result[4].val, "Obj_Single should have higher allocation than Obj_Obligation");
+    assert!(
+        result[6].value_bits() > result[4].value_bits(),
+        "Obj_Single should have higher allocation than Obj_Obligation"
+    );
 }
 
 #[test]
@@ -118,7 +135,7 @@ fn test_case_study_3_downstream_consequence() {
     let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
     let mut last_switch_t = 0;
     let mut prev_mode = 0;
-    
+
     // Parent-child relationships for Case Study 3
     let mut parent = [-1; N];
     parent[2] = 4; // Obj_Activity depends on Obj_Obligation
@@ -129,7 +146,7 @@ fn test_case_study_3_downstream_consequence() {
     let mu = [NonNegativeFixed::ZERO; N];
     let costs = [NonNegativeFixed::ZERO; N];
 
-    let result = allocate(
+    let outcome = allocate(
         &OBJECT_REGISTRY,
         &LENS_REGISTRY,
         &LAMBDA,
@@ -147,10 +164,19 @@ fn test_case_study_3_downstream_consequence() {
         500,
         CERTIFICATE_DIGEST,
         get_proof().as_ref(),
-    ).unwrap();
+    );
+    assert!(
+        !outcome.is_refused(),
+        "unexpected refusal: {:?}",
+        outcome.refusals()
+    );
+    let result = outcome.candidate();
 
     // Obj_Value (index 7) is the only leaf in the chain, so it receives the allocated resource.
-    assert!(result[7].val > 0, "Obj_Value should receive allocation");
+    assert!(
+        result[7].value_bits() > 0,
+        "Obj_Value should receive allocation"
+    );
 }
 
 #[test]
@@ -186,7 +212,8 @@ fn test_stability_refusals_and_graceful_fallback() {
         500,
         wrong_digest,
         get_proof().as_ref(),
-    );
+    )
+    .into_result();
     assert_eq!(res, Err(StabilityRefusal::CertificateDigestMismatch));
 
     // 2. Invalid certificate digest with degrade=true -> should succeed but freeze learning (CertifiedSelectionOnly)
@@ -209,7 +236,8 @@ fn test_stability_refusals_and_graceful_fallback() {
         500,
         wrong_digest,
         None,
-    );
+    )
+    .into_result();
     assert!(res_degraded.is_ok());
     // Learning should be frozen, meaning weights are not modified/updated
     assert_eq!(weights, weights_before);
@@ -234,12 +262,24 @@ fn test_stability_refusals_and_graceful_fallback() {
         fast_dwell,
         CERTIFICATE_DIGEST,
         get_proof().as_ref(),
-    );
+    )
+    .into_result();
     assert_eq!(res_dwell, Err(StabilityRefusal::ModeDwellTimeViolated));
 
-    // 4. Learning rate outside envelope with degrade=false -> should return LearningRateOutsideEnvelope
-    let high_zeta = NonNegativeFixed::from_bits(2000); // Exceeds ZETA_W_MAX (819)
-    let res_lr = allocate(
+    // 4. Learning rate outside envelope with degrade=false -> should refuse.
+    //
+    // NOTE (reconciliation finding, not a test-authoring error): in the sealed
+    // `AllocationOutcome`/`RefusalSet` API, `lr_err` (the zeta > ZETA_W_MAX check) is
+    // folded into the single `RefusalSet::PROPOSAL_REJECTED` bit alongside `gd_ok`,
+    // `beta_err`, `eta_err`, `q_err`, and `price_err` (see `allocator::allocate`'s
+    // `gated_refusals` composition). `RefusalSet::primary_reason()` therefore maps this
+    // bit to `StabilityRefusal::ContractionMarginInsufficient` unconditionally — the old
+    // API's distinct `LearningRateOutsideEnvelope` variant is no longer reachable via
+    // `primary_reason()` for this cause. This test now asserts what the sealed API can
+    // actually distinguish (a refusal, with the `PROPOSAL_REJECTED` bit set) rather than
+    // asserting a specific `StabilityRefusal` variant the collapsed bit cannot produce.
+    let high_zeta = NonNegativeFixed::from_value_bits(2000); // Exceeds ZETA_W_MAX (819)
+    let outcome_lr = allocate(
         &OBJECT_REGISTRY,
         &LENS_REGISTRY,
         &LAMBDA,
@@ -258,7 +298,21 @@ fn test_stability_refusals_and_graceful_fallback() {
         CERTIFICATE_DIGEST,
         get_proof().as_ref(),
     );
-    assert_eq!(res_lr, Err(StabilityRefusal::LearningRateOutsideEnvelope));
+    assert!(
+        outcome_lr.is_refused(),
+        "out-of-envelope learning rate should refuse"
+    );
+    assert!(
+        outcome_lr
+            .refusals()
+            .contains(RefusalSet::PROPOSAL_REJECTED),
+        "expected PROPOSAL_REJECTED bit, got {:?}",
+        outcome_lr.refusals()
+    );
+    assert_eq!(
+        outcome_lr.refusals().primary_reason(),
+        StabilityRefusal::ContractionMarginInsufficient
+    );
 }
 
 #[test]
@@ -269,8 +323,8 @@ fn test_typestate_bounds_checks() {
         CertificateReceipt::admit_certificate(0),
         EnvelopeReceipt::admit_envelope(0),
         OutcomeReceipt::admit_outcome(0),
-        NonNegativeFixed::from_bits(327680),
-        NonNegativeFixed::from_bits(65),
+        NonNegativeFixed::from_value_bits(327680),
+        NonNegativeFixed::from_value_bits(65),
         CertifiedLearning::admit_learning(),
     );
     assert!(p_ok.is_some());
@@ -281,8 +335,8 @@ fn test_typestate_bounds_checks() {
         CertificateReceipt::admit_certificate(0),
         EnvelopeReceipt::admit_envelope(0),
         OutcomeReceipt::admit_outcome(0),
-        NonNegativeFixed::from_bits(327681),
-        NonNegativeFixed::from_bits(65),
+        NonNegativeFixed::from_value_bits(327681),
+        NonNegativeFixed::from_value_bits(65),
         CertifiedLearning::admit_learning(),
     );
     assert!(p_temp_high.is_none());
@@ -293,8 +347,8 @@ fn test_typestate_bounds_checks() {
         CertificateReceipt::admit_certificate(0),
         EnvelopeReceipt::admit_envelope(0),
         OutcomeReceipt::admit_outcome(0),
-        NonNegativeFixed::from_bits(327680),
-        NonNegativeFixed::from_bits(64),
+        NonNegativeFixed::from_value_bits(327680),
+        NonNegativeFixed::from_value_bits(64),
         CertifiedLearning::admit_learning(),
     );
     assert!(p_dist_low.is_none());
@@ -335,10 +389,17 @@ fn test_rejection_invariance() {
         get_proof().as_ref(),
     );
 
-    assert!(res.is_err());
-    assert_eq!(weights, weights_before, "CHEAT-021: REJECTION_STATE_DRIFT - weights modified on rejection!");
-    assert_eq!(last_switch_t, last_switch_t_before, "CHEAT-021: REJECTION_STATE_DRIFT - last_switch_t modified on rejection!");
-    assert_eq!(prev_mode, prev_mode_before, "CHEAT-021: REJECTION_STATE_DRIFT - prev_mode modified on rejection!");
+    assert!(res.is_refused(), "expected refusal: {:?}", res.refusals());
+    assert_eq!(
+        weights, weights_before,
+        "CHEAT-021: REJECTION_STATE_DRIFT - weights modified on rejection!"
+    );
+    assert_eq!(
+        last_switch_t, last_switch_t_before,
+        "CHEAT-021: REJECTION_STATE_DRIFT - last_switch_t modified on rejection!"
+    );
+    assert_eq!(
+        prev_mode, prev_mode_before,
+        "CHEAT-021: REJECTION_STATE_DRIFT - prev_mode modified on rejection!"
+    );
 }
-
-

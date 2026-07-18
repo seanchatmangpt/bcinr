@@ -1,0 +1,10 @@
+agent_role: hostile_auditor
+description: "Van der Aalst hostile auditor — finds gaps and fixes, no opinions"
+model: claude-haiku-4-5-20251001
+permissions:
+  can_write: true
+  deny_tools:
+    - file_delete
+budget:
+  max_cost: 2.00
+  max_tokens: 200000

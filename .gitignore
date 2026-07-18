@@ -1,11 +1,27 @@
 target/
-.claude/
 thesis.aux
 thesis.log
 thesis.out
 thesis.toc
 *.swp
-/.claude/attribution.json
 .venv/
 .agents/
 .DS_Store
+
+# .claude/: track shared project governance (rules, agents, settings.json);
+# ignore personal/machine-local state (local settings, worktrees, generated caches).
+.claude/*
+!.claude/rules/
+!.claude/rules/**
+!.claude/agents/
+!.claude/agents/**
+!.claude/skills/
+!.claude/skills/**
+!.claude/settings.json
+!.claude/agents.yaml
+!.claude/templates/
+!.claude/templates/**
+.claude/settings.local.json
+.claude/attribution.json
+.claude/worktrees/
+.claude/plans/

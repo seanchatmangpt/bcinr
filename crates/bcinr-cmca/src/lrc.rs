@@ -1,5 +1,5 @@
-use crate::fixed::{NonNegativeFixed, const_lt_u32};
 use crate::allocator::clip;
+use crate::fixed::{const_lt_u32, NonNegativeFixed};
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct LrcState {
@@ -11,19 +11,19 @@ pub struct LrcState {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct LrcParams {
-    pub alpha: NonNegativeFixed,       // Smoothing factor for EMA (e.g., 0.125)
-    pub phi_max: NonNegativeFixed,     // Maximum stability margin (e.g., 1.0)
-    pub phi_min: NonNegativeFixed,     // Minimum stability margin (e.g., 0.1)
-    pub zeta_0: NonNegativeFixed,      // Baseline MWU step size (e.g., 0.005)
-    pub zeta_min: NonNegativeFixed,    // Minimum MWU step size (e.g., 0.0005)
-    pub zeta_max: NonNegativeFixed,    // Maximum MWU step size (e.g., 0.0125)
-    pub eta_0: NonNegativeFixed,       // Baseline exploration rate (e.g., 0.01)
-    pub eta_min: NonNegativeFixed,     // Minimum exploration rate (e.g., 0.005)
-    pub eta_max: NonNegativeFixed,     // Maximum exploration rate (e.g., 0.1)
-    pub k_kappa: NonNegativeFixed,     // Sensitivity to subtree divergence (e.g., 0.5)
-    pub k_d: NonNegativeFixed,         // Sensitivity to drift (e.g., 0.5)
-    pub gamma: NonNegativeFixed,       // Variance penalty scale for zeta (e.g., 1.0)
-    pub theta: NonNegativeFixed,       // Variance boost scale for eta (e.g., 2.0)
+    pub alpha: NonNegativeFixed,    // Smoothing factor for EMA (e.g., 0.125)
+    pub phi_max: NonNegativeFixed,  // Maximum stability margin (e.g., 1.0)
+    pub phi_min: NonNegativeFixed,  // Minimum stability margin (e.g., 0.1)
+    pub zeta_0: NonNegativeFixed,   // Baseline MWU step size (e.g., 0.005)
+    pub zeta_min: NonNegativeFixed, // Minimum MWU step size (e.g., 0.0005)
+    pub zeta_max: NonNegativeFixed, // Maximum MWU step size (e.g., 0.0125)
+    pub eta_0: NonNegativeFixed,    // Baseline exploration rate (e.g., 0.01)
+    pub eta_min: NonNegativeFixed,  // Minimum exploration rate (e.g., 0.005)
+    pub eta_max: NonNegativeFixed,  // Maximum exploration rate (e.g., 0.1)
+    pub k_kappa: NonNegativeFixed,  // Sensitivity to subtree divergence (e.g., 0.5)
+    pub k_d: NonNegativeFixed,      // Sensitivity to drift (e.g., 0.5)
+    pub gamma: NonNegativeFixed,    // Variance penalty scale for zeta (e.g., 1.0)
+    pub theta: NonNegativeFixed,    // Variance boost scale for eta (e.g., 2.0)
 }
 
 impl LrcState {
@@ -42,11 +42,17 @@ impl LrcState {
         let mean_next = (one_minus_alpha * self.mean_error) + (alpha * current_error);
 
         // 2. Absolute Difference: diff = |current_error - mean_next|
-        let is_lt = const_lt_u32(current_error.val, mean_next.val);
-        let diff = NonNegativeFixed::from_bits(is_lt.select_u32(
-            mean_next.val.wrapping_sub(current_error.val),
-            current_error.val.wrapping_sub(mean_next.val),
-        ));
+        let is_lt = const_lt_u32(current_error.value_bits(), mean_next.value_bits());
+        let diff = NonNegativeFixed::from_value_bits(
+            is_lt.select_u32(
+                mean_next
+                    .value_bits()
+                    .wrapping_sub(current_error.value_bits()),
+                current_error
+                    .value_bits()
+                    .wrapping_sub(mean_next.value_bits()),
+            ),
+        );
 
         // 3. Variance Error Update: var = (1 - alpha) * var + alpha * diff^2
         let diff_sq = diff * diff;

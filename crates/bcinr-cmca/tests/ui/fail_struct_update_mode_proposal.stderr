@@ -1,0 +1,17 @@
+warning: unreachable statement
+ --> tests/ui/fail_struct_update_mode_proposal.rs:4:5
+  |
+3 |     let base: ModeProposal = unreachable!();
+  |                              -------------- any code following this expression is unreachable
+4 |     let _ = ModeProposal { round_identity: 1, ..base };
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unreachable statement
+  |
+  = note: `#[warn(unreachable_code)]` (part of `#[warn(unused)]`) on by default
+
+error[E0451]: fields `proposed_control_delta`, `observation_digest`, `current_mode_digest`, `round_identity`, `flags` and `proposal_digest` of struct `ModeProposal` are private
+ --> tests/ui/fail_struct_update_mode_proposal.rs:4:28
+  |
+4 |     let _ = ModeProposal { round_identity: 1, ..base };
+  |                            ^^^^^^^^^^^^^^^^^    ^^^^ fields `proposed_control_delta`, `observation_digest`, `current_mode_digest`, `flags` and `proposal_digest` are private
+  |                            |
+  |                            private field

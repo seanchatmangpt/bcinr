@@ -1,0 +1,22 @@
+error[E0423]: expected function, tuple struct or tuple variant, found struct `SignedFixed`
+ --> tests/ui/fail_tuple_construct_signed_fixed.rs:3:13
+  |
+3 |     let _ = SignedFixed(0i32, NumericFaultSet::EMPTY);
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+ ::: src/fixed.rs
+  |
+  | pub struct SignedFixed {
+  | ---------------------- `SignedFixed` defined here
+  |
+help: you might have meant to use an associated function to build this type
+  |
+3 -     let _ = SignedFixed(0i32, NumericFaultSet::EMPTY);
+3 +     let _ = SignedFixed::from_value_bits(_);
+  |
+3 -     let _ = SignedFixed(0i32, NumericFaultSet::EMPTY);
+3 +     let _ = SignedFixed::from_parts(_, _);
+  |
+3 -     let _ = SignedFixed(0i32, NumericFaultSet::EMPTY);
+3 +     let _ = SignedFixed::from_num(_);
+  |

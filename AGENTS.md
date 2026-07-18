@@ -1372,3 +1372,139 @@ The affected implementation is quarantined until independently reconstructed or 
 ]
 
 The next useful artifact is an accompanying `bcinr-cheat-scanner` rule specification that turns each constitutional prohibition into a named AST, generated-source, and object-code gate.
+
+---
+
+# Appendix: Claude Code operating model
+
+This section binds the constitution above to concrete Claude Code tooling. It is additive and
+does not alter the numbered sections above.
+
+## Subagents (`.claude/agents/`)
+
+Each roster role in §4 is backed by a real Claude Code subagent, invoked by name or auto-selected
+by its `description`:
+
+| Role (§4)             | Subagent file                             | Owns (write authority per §26) |
+| ---------------------- | ------------------------------------------ | ------------------------------- |
+| `@hoare_oracle`        | `.claude/agents/hoare-oracle.md`          | contracts and proofs            |
+| `@turing_machine`      | `.claude/agents/turing-machine.md`        | scanners and structural gates    |
+| `@armstrong_fault`     | `.claude/agents/armstrong-fault.md`       | mutants and hostile fixtures     |
+| `@von_neumann_bypass`  | `.claude/agents/von-neumann-bypass.md`    | authoritative implementation     |
+
+Each subagent's system prompt restates its exclusive authority and the no-self-certification rule
+(§27) so it refuses to approve its own output against another role's checkpoint.
+
+`.claude/agents.yaml` is a separate, non-standard orchestration hierarchy (budget-scoped
+delegation for `bcinr-powl` audits) and is unrelated to the four files above — do not conflate the
+two.
+
+## Skills (`.claude/skills/`)
+
+The checkpoint protocol (§30) and evidence requirements (§29) are packaged as invokable skills:
+
+| Skill                                          | Implements            |
+| ----------------------------------------------- | ---------------------- |
+| `.claude/skills/mutant-kill-protocol/SKILL.md` | §18-19 (hostile mutation protocol) |
+| `.claude/skills/object-code-audit/SKILL.md`    | §7, §13, §20 (whole-call-graph and object-code audit) |
+| `.claude/skills/cheat-scan/SKILL.md`           | §16-17 (anti-cheat manifesto and scanner requirements) |
+| `.claude/skills/evidence-report/SKILL.md`      | §29, §31 (evidence artifacts and final report format) |
+
+## Plugins (`.claude/settings.json`)
+
+`enabledPlugins` mirrors the effective set used elsewhere in this user's ecosystem (e.g. `~/mfw`,
+which has no project-local override and so inherits the global plugin set):
+
+- `lumen` — semantic code search; use it ahead of `grep`/`find` for exploration.
+- `rust-analyzer-lsp` — LSP-first navigation (`goToDefinition`/`findReferences`) per the global
+  tool-usage rules, instead of text search, for Rust symbols.
+- `anti-llm-cheat-lsp` (`wasm4pm` marketplace) — live `WASM4PM-CHEAT-C*` diagnostics on `.rs`
+  files; complements but does not replace the `cheat-scan` skill/`bcinr-cheat-scanner` gate.
+- `wasm4pm-lsp` — diagnostics for OCEL/receipt/breed-registry surfaces (bcinr depends on
+  `wasm4pm-core`/`wasm4pm-compat`).
+- `ggen-lsp` — diagnostics for the `.ttl`/`.shacl.ttl`/`ggen.toml` ontology files under
+  `crates/bcinr-cmca/ontology/` and `playground/`.
+- `hookify` — local rule enforcement (see `~/mfw/.claude/hookify.*.local.md` for the pattern:
+  hedge-language, unverified-standing-claims, hollow-implementation rules are directly relevant to
+  §28/§31's banned-phrase discipline and should be mirrored here if adopted).
+- `claude-md-management`, `claude-code-config-lsp` — keep this file and `.claude/settings.json`
+  itself internally consistent.
+- `superpowers` — brainstorming/TDD/systematic-debugging process discipline; use before any
+  implementation checkpoint in §30.
+- `ralph-loop`, `code-review`, `skill-creator` — iteration, review, and skill-authoring support.
+
+Language servers unrelated to this crate's stack (`pyright-lsp`, `typescript-lsp`,
+`jdtls-lsp`, `frontend-design`) stay disabled here even though they are enabled globally.
+`explanatory-output-style` is also disabled in this project's `.claude/settings.json`
+(verified by reading that file directly; it was previously omitted from this list, which is
+now corrected).
+
+## v26.7.17 release mission topology
+
+This subsection is additive, added after the four-agent/four-skill content above; it does not
+alter or narrow the general-purpose applicability of the four constitutional agents or four
+skills documented above — it describes one specific, currently active release mission layered
+on top of them.
+
+Five mission-specific subagents own the gates (`G0`-`G9`) of the v26.7.17 CMCA release, defined
+in `.claude/agents/cmca-*.md`:
+
+| Subagent file                            | One-line purpose                                                                 | Gate(s) owned |
+| ------------------------------------------ | ---------------------------------------------------------------------------------- | -------------- |
+| `.claude/agents/cmca-numeric.md`          | Implementation owner of the bcinr-cmca numeric hot path (`fixed.rs`, numeric/floor-projection portions of `allocator.rs`) | G2 (ReleaseOwner; readiness-report only, not completion) |
+| `.claude/agents/cmca-authority.md`        | Implementation owner of the certificate-minting authority-separation chain (`observatory.rs` and the to-be-created proposal/shadow/jump/stability/certification/mode_switch modules) | G3, G4 (ReleaseOwner; readiness-report only, not completion) |
+| `.claude/agents/cmca-semantics.md`        | Sole owner of the CMCA semantic/RDF layer, now relocated into `/Users/sac/mfw` (ontology, SHACL/ShEx shapes, generator, manifest, `Gamma_CMCA` handoff); treats `crates/bcinr-cmca/generator.py` and `crates/bcinr-cmca/ontology/**` as quarantined migration evidence only | G5 (ReleaseOwner; readiness-report only, not completion) |
+| `.claude/agents/cmca-verifier.md`         | Independent verification authority — reproduces REPORTED ledger claims, runs compile-fail/mutant suites and object-code/source-shape audits; read/grep/glob/bash only, no production-source Edit access | G6 (sole authority to declare gate complete) |
+| `.claude/agents/cmca-release-integrator.md` | Terminal release authority — owns release/version metadata, `CHANGELOG.md`, the status ledger, integration ordering across the other agents' work, and package/publish-dry-run execution | G0, G1, G7, G8, G9 |
+
+For the duration of this release mission, the four original constitutional agents
+(`hoare-oracle`, `turing-machine`, `armstrong-fault`, `von-neumann-bypass`) are narrowed to a
+consultative/review-only role relative to the five mission agents above — they do not hold
+ReleaseOwner or gate-closing authority on this release's gates. See
+`docs/cmca-rdf/AGENT_DISPOSITION.md` for the full classification of that narrowing; this
+appendix only points at it and does not restate its content.
+
+## `.claude/rules/` index
+
+Listed from an actual `ls .claude/rules/` and `ls .claude/rules/cmca/` (run during this edit,
+not assumed): 4 unconditional files directly under `.claude/rules/`, plus 6 path-scoped files
+under `.claude/rules/cmca/` — 10 files total.
+
+Unconditional (apply repo-wide):
+
+| File                                          | One-line purpose |
+| ----------------------------------------------- | ------------------- |
+| `.claude/rules/00-release-governance.md`      | States the terminal release gate (a clean `cargo publish --dry-run`) and gate-ownership sequencing law. |
+| `.claude/rules/10-standing-and-evidence.md`   | Defines the standing vocabulary (extends AGENTS.md §28 with `REPORTED`) and evidence/reproduction discipline. |
+| `.claude/rules/20-repository-safety.md`       | Prohibits destructive git operations and unauthorized edits to generated/`DO NOT EDIT` files. |
+| `.claude/rules/30-authority-separation.md`    | States the general "SELECT is never DO" law for authority-bearing code across the whole repo. |
+
+Path-scoped (apply only to the listed paths, per each file's `paths:` frontmatter):
+
+| File                                             | Scoped paths (from frontmatter)                                              | One-line purpose |
+| --------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------- |
+| `.claude/rules/cmca/artifact-boundary.md`        | `crates/bcinr-cmca/src/generated/**`, `crates/bcinr-cmca/generator.py`, `crates/bcinr-cmca/ontology/**` | States the interim bcinr-side contract boundary for the CMCA generated-artifact producer/consumer split. |
+| `.claude/rules/cmca/authority-and-c3.md`         | `observatory.rs`, `proposal.rs`, `shadow.rs`, `jump.rs`, `stability.rs`, `certification.rs`, `mode_switch.rs`, `allocator.rs` | States the certificate-minting authority-separation and C3-chain invariants. |
+| `.claude/rules/cmca/numeric-hot-path.md`         | `fixed.rs`, `allocator.rs`                                                        | States the numeric hot-path invariants (fault-set join-semilattice, masked-selection distribution, floor-projection conservation). |
+| `.claude/rules/cmca/packaging.md`                | `crates/bcinr-cmca/Cargo.toml`, `Cargo.toml`, `CHANGELOG.md`                      | States the release packaging law (dependency-order dry-run, clean-tree evidence, metadata completeness). |
+| `.claude/rules/cmca/rdf-generation.md`           | `crates/bcinr-cmca/generator.py`, `crates/bcinr-cmca/ontology/**`, `/Users/sac/mfw/crates/mfw-meaning/**`, `/Users/sac/mfw/crates/mfw-shacl/**` | States timeless RDF-to-Rust generator and ontology-admission invariants. |
+| `.claude/rules/cmca/verification.md`             | `crates/bcinr-cmca/tests/**`                                                      | States verification standards for bcinr-cmca test suites (e.g., mutant kills require a named-law assertion). |
+
+## Release-control documents
+
+Listed from an actual `ls docs/cmca-rdf/` (run during this edit, not assumed): 8 files. These
+are mutable ledger/spec/design documents, not timeless rules, per the control-plane separation
+discipline established above (rules state invariants; these documents state current, versioned,
+or historical state and are expected to change release-over-release).
+
+| File                                          | One-line purpose |
+| ------------------------------------------------ | ------------------- |
+| `docs/cmca-rdf/AGENT_DISPOSITION.md`          | Classifies the four constitutional agents against the five-agent v26.7.17 mission topology; release-scoped commentary, not a rule or agent definition. |
+| `docs/cmca-rdf/ARCHITECTURE.md`               | Describes the CMCA-RDF architecture and projection rules over RDF-aligned semantic state. |
+| `docs/cmca-rdf/AUDIT_REPORT.md`               | Records a hyper-adversarial audit's findings (tautological mutants, hidden branches, and similar defects found against a prior state of the code). |
+| `docs/cmca-rdf/BASELINE.md`                   | Establishes the repository baseline commit and contract gate jurisdiction for Checkpoint 1. |
+| `docs/cmca-rdf/CMCA_ARTIFACT_CONTRACT.md`     | Draft, versioned contract for the `Gamma_CMCA` artifact format exchanged between the mfw-side generator and bcinr-cmca. |
+| `docs/cmca-rdf/CURRENT_STATUS.md`             | Standing report on the CMCA-RDF subsystem's integration and verification state. |
+| `docs/cmca-rdf/V26_7_17_HOOK_SPEC.md`         | Specification only, explicitly marked as not yet wired: proposed hook/enforcement mechanisms for the release control plane. |
+| `docs/cmca-rdf/V26_7_17_RELEASE_LEDGER.md`    | The mutable execution ledger for the v26.7.17 release gate — the sole permitted location for file:line references and current defect/progress status. |
+

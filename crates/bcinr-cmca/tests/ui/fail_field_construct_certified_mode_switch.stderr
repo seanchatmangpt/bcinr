@@ -1,0 +1,11 @@
+error[E0451]: fields `admitted_state_digest`, `target_mode_digest` and `prepared_digest` of struct `CertifiedModeSwitch` are private
+ --> tests/ui/fail_field_construct_certified_mode_switch.rs:4:9
+  |
+3 |     let _ = CertifiedModeSwitch {
+  |             ------------------- in this type
+4 |         admitted_state_digest: 0,
+  |         ^^^^^^^^^^^^^^^^^^^^^ private field
+5 |         target_mode_digest: 0,
+  |         ^^^^^^^^^^^^^^^^^^ private field
+6 |         prepared_digest: 0,
+  |         ^^^^^^^^^^^^^^^ private field

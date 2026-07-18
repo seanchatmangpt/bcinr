@@ -1,0 +1,15 @@
+error[E0423]: cannot initialize a tuple struct which contains private fields
+ --> tests/ui/fail_tuple_construct_numeric_fault_set.rs:3:13
+  |
+3 |     let _ = NumericFaultSet(1);
+  |             ^^^^^^^^^^^^^^^
+  |
+note: constructor is not visible here due to private fields
+ --> src/fixed.rs
+  |
+  | pub struct NumericFaultSet(u32);
+  |                            ^^^ private field
+help: you might have meant to use the `from_bits_raw` associated function
+  |
+3 |     let _ = NumericFaultSet::from_bits_raw(1);
+  |                            +++++++++++++++
