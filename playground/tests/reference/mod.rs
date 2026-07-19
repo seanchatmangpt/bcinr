@@ -23,6 +23,13 @@
     clippy::type_complexity,
     clippy::manual_range_contains,
     clippy::string_extend_chars,
+    clippy::boxed_local,
+    clippy::large_types_passed_by_value,
+    clippy::wrong_self_convention,
+    clippy::mutable_key_type,
+    clippy::only_used_in_recursion,
+    clippy::vec_init_then_push,
+    clippy::needless_pass_by_value,
 )]
 
 pub mod petri;

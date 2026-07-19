@@ -17,6 +17,8 @@
     clippy::unused_self,
     clippy::absurd_extreme_comparisons,
     clippy::len_zero,
+    clippy::large_types_passed_by_value,
+    clippy::wrong_self_convention,
 )]
 //! Minimal UCI (Universal Chess Interface) engine driver backed by
 //! `playground`'s `BranchTorchNNUE` evaluator — reads UCI commands from

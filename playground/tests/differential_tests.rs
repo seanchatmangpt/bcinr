@@ -22,6 +22,13 @@
     dead_code,
     clippy::large_enum_variant,
     clippy::unnecessary_wraps,
+    clippy::large_types_passed_by_value,
+    clippy::single_match_else,
+    clippy::wrong_self_convention,
+    clippy::mutable_key_type,
+    clippy::only_used_in_recursion,
+    clippy::vec_init_then_push,
+    clippy::needless_pass_by_value,
 )]
 //! Differential tests: runs `playground`'s branchless Petri/POWL/YAWL
 //! primitives side by side against the `reference` module's plain-Rust
