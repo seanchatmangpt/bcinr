@@ -22,6 +22,9 @@
     clippy::recursive_format_impl,
     clippy::large_stack_arrays,
     clippy::to_string_in_format_args,
+    clippy::large_enum_variant,
+    clippy::boxed_local,
+    clippy::unnecessary_wraps,
 )]
 
 // ── AST & Core Types ────────────────────────────────────────────────────────

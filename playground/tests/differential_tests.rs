@@ -20,6 +20,8 @@
     clippy::to_string_in_format_args,
     clippy::match_same_arms,
     dead_code,
+    clippy::large_enum_variant,
+    clippy::unnecessary_wraps,
 )]
 //! Differential tests: runs `playground`'s branchless Petri/POWL/YAWL
 //! primitives side by side against the `reference` module's plain-Rust
