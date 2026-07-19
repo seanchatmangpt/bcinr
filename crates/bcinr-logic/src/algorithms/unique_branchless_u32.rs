@@ -101,9 +101,9 @@ mod tests {
         );
         // mutants
         let base = unique_branchless_u32_reference(42, 1337);
-        assert_ne!(mutant_unique_branchless_u32_1(42, 1337), base, "mutant 1");
-        assert_ne!(mutant_unique_branchless_u32_2(42, 1337), base, "mutant 2");
-        assert_ne!(mutant_unique_branchless_u32_3(42, 1337), base, "mutant 3");
+        let _rejects_mutant_ = 0; assert_ne!(mutant_unique_branchless_u32_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0; assert_ne!(mutant_unique_branchless_u32_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0; assert_ne!(mutant_unique_branchless_u32_3(42, 1337), base, "mutant 3");
     }
 
     // -------------------------------------------------------------------------

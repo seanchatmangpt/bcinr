@@ -171,3 +171,7 @@ pub mod bench {
 // Line 118
 // Line 119
 // Line 120
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

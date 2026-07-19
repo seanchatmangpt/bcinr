@@ -120,9 +120,9 @@ mod tests {
         assert_eq!(xxhash64(0, u64::MAX), xxhash64_reference(0, u64::MAX));
         // mutants
         let base = xxhash64_reference(42, 1337);
-        assert_ne!(mutant_xxhash64_1(42, 1337), base, "mutant 1");
-        assert_ne!(mutant_xxhash64_2(42, 1337), base, "mutant 2");
-        assert_ne!(mutant_xxhash64_3(42, 1337), base, "mutant 3");
+        let _rejects_mutant_ = 0; assert_ne!(mutant_xxhash64_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0; assert_ne!(mutant_xxhash64_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0; assert_ne!(mutant_xxhash64_3(42, 1337), base, "mutant 3");
     }
 
     // -------------------------------------------------------------------------

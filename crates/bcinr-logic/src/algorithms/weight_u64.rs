@@ -77,9 +77,9 @@ mod tests {
         assert_eq!(weight_u64(0, u64::MAX), weight_u64_reference(0, u64::MAX));
         // mutants
         let base = weight_u64_reference(42, 1337);
-        assert_ne!(mutant_weight_u64_1(42, 1337), base, "mutant 1");
-        assert_ne!(mutant_weight_u64_2(42, 1337), base, "mutant 2");
-        assert_ne!(mutant_weight_u64_3(42, 1337), base, "mutant 3");
+        let _rejects_mutant_ = 0; assert_ne!(mutant_weight_u64_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0; assert_ne!(mutant_weight_u64_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0; assert_ne!(mutant_weight_u64_3(42, 1337), base, "mutant 3");
     }
 
     // -------------------------------------------------------------------------

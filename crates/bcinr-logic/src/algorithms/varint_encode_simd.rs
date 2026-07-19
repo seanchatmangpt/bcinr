@@ -113,9 +113,9 @@ mod tests {
         );
         // mutants
         let base = varint_encode_simd_reference(42, 1337);
-        assert_ne!(mutant_varint_encode_simd_1(42, 1337), base, "mutant 1");
-        assert_ne!(mutant_varint_encode_simd_2(42, 1337), base, "mutant 2");
-        assert_ne!(mutant_varint_encode_simd_3(42, 1337), base, "mutant 3");
+        let _rejects_mutant_ = 0; assert_ne!(mutant_varint_encode_simd_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0; assert_ne!(mutant_varint_encode_simd_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0; assert_ne!(mutant_varint_encode_simd_3(42, 1337), base, "mutant 3");
     }
 
     // -------------------------------------------------------------------------

@@ -96,9 +96,9 @@ mod tests {
         );
         // mutants
         let base = zobrist_hash_64_reference(42, 1337);
-        assert_ne!(mutant_zobrist_hash_64_1(42, 1337), base, "mutant 1");
-        assert_ne!(mutant_zobrist_hash_64_2(42, 1337), base, "mutant 2");
-        assert_ne!(mutant_zobrist_hash_64_3(42, 1337), base, "mutant 3");
+        let _rejects_mutant_ = 0; assert_ne!(mutant_zobrist_hash_64_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0; assert_ne!(mutant_zobrist_hash_64_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0; assert_ne!(mutant_zobrist_hash_64_3(42, 1337), base, "mutant 3");
     }
 
     // -------------------------------------------------------------------------

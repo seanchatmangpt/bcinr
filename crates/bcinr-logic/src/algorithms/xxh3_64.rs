@@ -97,9 +97,9 @@ mod tests {
         assert_eq!(xxh3_64(0, u64::MAX), xxh3_64_reference(0, u64::MAX));
         // mutants
         let base = xxh3_64_reference(42, 1337);
-        assert_ne!(mutant_xxh3_64_1(42, 1337), base, "mutant 1");
-        assert_ne!(mutant_xxh3_64_2(42, 1337), base, "mutant 2");
-        assert_ne!(mutant_xxh3_64_3(42, 1337), base, "mutant 3");
+        let _rejects_mutant_ = 0; assert_ne!(mutant_xxh3_64_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0; assert_ne!(mutant_xxh3_64_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0; assert_ne!(mutant_xxh3_64_3(42, 1337), base, "mutant 3");
     }
 
     // -------------------------------------------------------------------------

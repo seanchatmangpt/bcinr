@@ -99,9 +99,9 @@ mod tests {
         );
         // mutants
         let base = utf8_to_utf32_simd_reference(42, 1337);
-        assert_ne!(mutant_utf8_to_utf32_simd_1(42, 1337), base, "mutant 1");
-        assert_ne!(mutant_utf8_to_utf32_simd_2(42, 1337), base, "mutant 2");
-        assert_ne!(mutant_utf8_to_utf32_simd_3(42, 1337), base, "mutant 3");
+        let _rejects_mutant_ = 0; assert_ne!(mutant_utf8_to_utf32_simd_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0; assert_ne!(mutant_utf8_to_utf32_simd_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0; assert_ne!(mutant_utf8_to_utf32_simd_3(42, 1337), base, "mutant 3");
     }
 
     // -------------------------------------------------------------------------
