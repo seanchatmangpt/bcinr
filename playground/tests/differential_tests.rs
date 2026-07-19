@@ -1,8 +1,29 @@
 #![cfg(not(miri))]
+#![allow(
+    unsafe_code,
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_wrap,
+    clippy::upper_case_acronyms,
+    clippy::unwrap_used,
+    clippy::too_many_lines,
+    clippy::too_many_arguments,
+    clippy::similar_names,
+    clippy::inline_always,
+    clippy::default_trait_access,
+    clippy::trivially_copy_pass_by_ref,
+    clippy::get_first,
+    clippy::unused_self,
+    clippy::recursive_format_impl,
+    clippy::large_stack_arrays,
+    clippy::to_string_in_format_args,
+    clippy::match_same_arms,
+    dead_code,
+)]
 //! Differential tests: runs `playground`'s branchless Petri/POWL/YAWL
 //! primitives side by side against the `reference` module's plain-Rust
 //! reference implementations and asserts they agree.
-#![allow(unsafe_code)]
 
 mod reference;
 

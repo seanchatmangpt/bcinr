@@ -1,7 +1,7 @@
 //! Debug oracle: prints bishop-attack bitboards from `bcinr`'s
 //! `bishop_attacks` alongside the `chess` crate's reference
 //! `get_bishop_moves`, for eyeballing a divergence at a single square.
-#![allow(unsafe_code)]
+#![allow(unsafe_code, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 use chess::{get_bishop_moves, BitBoard, Square};
 use playground::legal_moves::bishop_attacks;
 

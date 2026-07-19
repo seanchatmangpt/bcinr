@@ -4,7 +4,25 @@
 //! same reasoning applies here (a comprehensive reference surface compiled
 //! independently into several test binaries, each exercising a different
 //! subset).
-#![allow(dead_code)]
+#![allow(
+    dead_code,
+    clippy::similar_names,
+    clippy::too_many_lines,
+    clippy::too_many_arguments,
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    clippy::match_same_arms,
+    clippy::unwrap_used,
+    clippy::type_complexity,
+    clippy::manual_range_contains,
+    clippy::string_extend_chars,
+    clippy::trivially_copy_pass_by_ref,
+    clippy::get_first,
+    clippy::recursive_format_impl,
+    clippy::large_stack_arrays,
+    clippy::to_string_in_format_args,
+)]
 
 // ── AST & Core Types ────────────────────────────────────────────────────────
 
@@ -352,7 +370,7 @@ pub struct ScopeDesc {
 
 impl ScopeDesc {
     pub const ROOT_PARENT: u16 = 0xFFFF;
-    pub const ROOT_END_BIT: u32 = 262144;
+    pub const ROOT_END_BIT: u32 = 262_144;
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -428,7 +446,7 @@ pub fn causal_mix(
     _delta: &UDelta,
 ) -> UCausalReceipt {
     let mut bytes = r.0;
-    let mix_val = val ^ (u64::from(scope) << 16) ^ (denial << 32) ^ 0x9e3779b97f4a7c15;
+    let mix_val = val ^ (u64::from(scope) << 16) ^ (denial << 32) ^ 0x9e37_79b9_7f4a_7c15;
     let mix_bytes = mix_val.to_ne_bytes();
     for i in 0..8 {
         bytes[i] = bytes[i].wrapping_add(mix_bytes[i]);

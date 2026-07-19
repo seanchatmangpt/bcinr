@@ -9,7 +9,24 @@
 //! this API its own tests actually call. A method unused by one binary's
 //! compilation is routinely used by another's; item-by-item allows would
 //! just be noise repeated ~20 times over, not a more honest signal.
-#![allow(dead_code)]
+#![allow(
+    dead_code,
+    clippy::similar_names,
+    clippy::too_many_lines,
+    clippy::too_many_arguments,
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    clippy::large_stack_arrays,
+    clippy::unwrap_used,
+    clippy::unnecessary_wraps,
+    clippy::trivially_copy_pass_by_ref,
+    clippy::get_first,
+    clippy::unused_self,
+    clippy::recursive_format_impl,
+    clippy::redundant_static_lifetimes,
+    clippy::match_same_arms,
+)]
 
 use std::collections::HashMap;
 

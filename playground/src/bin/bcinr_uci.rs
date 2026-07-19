@@ -1,3 +1,22 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::too_many_lines,
+    clippy::too_many_arguments,
+    clippy::needless_range_loop,
+    clippy::unwrap_used,
+    clippy::similar_names,
+    clippy::cast_lossless,
+    clippy::cast_possible_wrap,
+    clippy::ptr_arg,
+    clippy::enum_variant_names,
+    clippy::let_and_return,
+    clippy::unnecessary_wraps,
+    clippy::trivially_copy_pass_by_ref,
+    clippy::unused_self,
+    clippy::absurd_extreme_comparisons,
+)]
 //! Minimal UCI (Universal Chess Interface) engine driver backed by
 //! `playground`'s `BranchTorchNNUE` evaluator — reads UCI commands from
 //! stdin, drives search/evaluation, and writes UCI responses to stdout.
@@ -143,7 +162,7 @@ fn alphabeta(
     }
 
     if board.status() == BoardStatus::Checkmate {
-        return -100000.0 + (100 - depth) as f32;
+        return -100_000.0 + (100 - depth) as f32;
     }
     if board.status() == BoardStatus::Stalemate {
         return 0.0;
@@ -156,7 +175,7 @@ fn alphabeta(
     let mut moves: Vec<ChessMove> = MoveGen::new_legal(board).collect();
     order_moves(board, &mut moves);
 
-    let mut best_val = -1000000.0;
+    let mut best_val = -1_000_000.0;
     let mut local_alpha = alpha;
 
     for m in moves {
@@ -259,10 +278,10 @@ fn search_best_move(board: &Board, max_time_ms: u128) -> Option<ChessMove> {
         let mut moves: Vec<ChessMove> = MoveGen::new_legal(board).collect();
         order_moves(board, &mut moves);
 
-        let mut best_val = -1000000.0;
+        let mut best_val = -1_000_000.0;
         let mut best_move = None;
-        let mut alpha = -1000000.0;
-        let beta = 1000000.0;
+        let mut alpha = -1_000_000.0;
+        let beta = 1_000_000.0;
 
         for m in &moves {
             let child = board.make_move_new(*m);

@@ -1,7 +1,18 @@
 //! GPU (wgpu compute-shader) variant of the OCEL chess NNUE evaluation drill
 //! — mirrors `ocel_chess`'s CPU evaluation loop but dispatches the NNUE
 //! forward pass to the GPU for throughput comparison.
-#![allow(unsafe_code)]
+#![allow(
+    unsafe_code,
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::unwrap_used,
+    clippy::too_many_lines,
+    clippy::too_many_arguments,
+    clippy::needless_range_loop,
+    clippy::upper_case_acronyms,
+    clippy::default_trait_access,
+)]
 use std::time::Instant;
 
 use bytemuck::{Pod, Zeroable};

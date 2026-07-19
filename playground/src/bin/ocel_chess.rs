@@ -1,6 +1,11 @@
 #![allow(
     clippy::cast_possible_truncation,
     clippy::cast_precision_loss,
+    clippy::inline_always,
+    clippy::match_same_arms,
+    clippy::too_many_lines,
+    clippy::cast_sign_loss,
+    clippy::if_same_then_else,
 )]
 //! Object-Centric Event Log (OCEL) chess drill: plays out a game while
 //! recording each move as an OCEL event, for exercising the OCEL export path

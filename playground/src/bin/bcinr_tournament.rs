@@ -1,3 +1,15 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_wrap,
+    clippy::too_many_lines,
+    clippy::too_many_arguments,
+    clippy::unwrap_used,
+    clippy::similar_names,
+    clippy::let_and_return,
+    clippy::trivially_copy_pass_by_ref,
+)]
 //! Honest Elo measurement harness for the BCINR UCI engine.
 //!
 //! Plays a match of real games against Stockfish (capped to a known `UCI_Elo`),

@@ -1,6 +1,11 @@
 #![allow(
     clippy::cast_possible_truncation,
     clippy::cast_precision_loss,
+    clippy::unwrap_used,
+    clippy::inline_always,
+    clippy::too_many_lines,
+    clippy::if_same_then_else,
+    clippy::needless_range_loop,
 )]
 //! Multi-threaded variant of `nnue_1sec_drill`: runs the same one-second NNUE
 //! evaluation drill across multiple worker threads and reports aggregate
@@ -36,16 +41,16 @@ fn generate_legal_targets(piece: &Piece, empty_mask: u64, enemy_mask: u64, own_m
             if (piece.square / 8) == 1 && single != 0 {
                 targets |= (sq_mask << 16) & empty_mask;
             }
-            targets |= (sq_mask << 7) & 0x7f7f7f7f7f7f7f7f & enemy_mask;
-            targets |= (sq_mask << 9) & 0xfefefefefefefefe & enemy_mask;
+            targets |= (sq_mask << 7) & 0x7f7f_7f7f_7f7f_7f7f & enemy_mask;
+            targets |= (sq_mask << 9) & 0xfefe_fefe_fefe_fefe & enemy_mask;
         } else {
             let single = (sq_mask >> 8) & empty_mask;
             targets |= single;
             if (piece.square / 8) == 6 && single != 0 {
                 targets |= (sq_mask >> 16) & empty_mask;
             }
-            targets |= (sq_mask >> 9) & 0x7f7f7f7f7f7f7f7f & enemy_mask;
-            targets |= (sq_mask >> 7) & 0xfefefefefefefefe & enemy_mask;
+            targets |= (sq_mask >> 9) & 0x7f7f_7f7f_7f7f_7f7f & enemy_mask;
+            targets |= (sq_mask >> 7) & 0xfefe_fefe_fefe_fefe & enemy_mask;
         }
     } else if piece.kind == 1 {
         targets = KNIGHT_MASKS[piece.square];

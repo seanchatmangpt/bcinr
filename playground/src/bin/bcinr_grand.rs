@@ -1,3 +1,4 @@
+#![allow(clippy::too_many_lines)]
 //! COMBINATORIAL MAXIMALISM — the 80/20 overkill demo.
 //!
 //! A single chess decision routed through EVERY branchless technique in the

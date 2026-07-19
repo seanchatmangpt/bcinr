@@ -1,4 +1,12 @@
-#![allow(unsafe_code)]
+#![allow(
+    unsafe_code,
+    clippy::similar_names,
+    clippy::too_many_lines,
+    clippy::too_many_arguments,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::unwrap_used,
+)]
 //! WASM API C-Interface Wrappers Reference Implementation
 
 use std::{ffi::CStr, os::raw::c_char};

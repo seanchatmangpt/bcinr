@@ -1,13 +1,16 @@
 //! Criterion micro-benchmarks for `playground`'s process-intelligence
 //! primitives (YAWL engine, POWL step execution, TEKG snapshot chains, and
 //! their WASM-exported counterparts).
-#![allow(unsafe_code)]
+#![allow(
+    unsafe_code,
+    missing_docs,
+    clippy::unwrap_used,
+)]
 // `criterion_group!`/`criterion_main!` (below) expand to items with no doc
 // comment of their own to annotate, and an `#[allow(missing_docs)]` placed
 // directly on the macro invocation is rejected (`unused_attribute` — it
 // doesn't apply to macro calls in this position) — so the allow has to be
 // crate-wide for this bench binary target, not scoped to just the expansion.
-#![allow(missing_docs)]
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use playground::{
     powl::{powl64_execute_step, Powl64Op, Powl64OpKind, PowlState},
