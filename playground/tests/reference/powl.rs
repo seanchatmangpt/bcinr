@@ -27,6 +27,8 @@
     clippy::unnecessary_wraps,
 )]
 
+use std::fmt::Write;
+
 // ── AST & Core Types ────────────────────────────────────────────────────────
 
 pub const MAX_NODES: usize = 64;
@@ -386,7 +388,7 @@ impl UCausalReceipt {
     pub fn to_hex(&self) -> String {
         let mut s = String::with_capacity(64);
         for &b in &self.0 {
-            s.push_str(&format!("{b:02x}"));
+            let _ = write!(s, "{b:02x}");
         }
         s
     }
@@ -849,8 +851,9 @@ pub struct Dispatcher {
 
 impl Dispatcher {
     pub fn new() -> Self {
-        const INIT: Slot = Slot { active: std::cell::Cell::new(false) };
-        Self { slots: [INIT; 64] }
+        Self {
+            slots: std::array::from_fn(|_| Slot { active: std::cell::Cell::new(false) }),
+        }
     }
 }
 

@@ -50,8 +50,7 @@ fn board_to_accumulator(b: &Board, nnue: &playground::nnue::BranchTorchNNUE) -> 
         chess::Piece::Queen,
         chess::Piece::King,
     ];
-    let mut p_idx = 0;
-    for &p in &pieces {
+    for (p_idx, &p) in pieces.iter().enumerate() {
         let w_bb = *b.color_combined(Color::White) & *b.pieces(p);
         for sq in w_bb {
             let sq_idx = sq.to_index();
@@ -66,7 +65,6 @@ fn board_to_accumulator(b: &Board, nnue: &playground::nnue::BranchTorchNNUE) -> 
                 hidden[i] += nnue.l1_weights[i][(p_idx + 6) * 64 + sq_idx];
             }
         }
-        p_idx += 1;
     }
     Accumulator { hidden }
 }

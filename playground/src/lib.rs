@@ -19,6 +19,12 @@
     clippy::too_many_arguments,
     clippy::unreadable_literal,
     dead_code,
+    clippy::enum_variant_names,
+    clippy::mutable_key_type,
+    clippy::string_extend_chars,
+    clippy::vec_init_then_push,
+    clippy::large_types_passed_by_value,
+    clippy::wrong_self_convention,
 )]
 
 /// BranchTorch: Branchless Neural Training

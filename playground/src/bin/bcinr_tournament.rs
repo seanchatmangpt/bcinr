@@ -253,12 +253,9 @@ fn play_game(
             s
         };
 
-        let mv = match parse_uci(&mv_str) {
-            Some(m) => m,
-            None => {
-                // No legal move offered (resign / "(none)"): mover loses.
-                return if bcinr_to_move { Outcome::StockfishWin } else { Outcome::BcinrWin };
-            }
+        let Some(mv) = parse_uci(&mv_str) else {
+            // No legal move offered (resign / "(none)"): mover loses.
+            return if bcinr_to_move { Outcome::StockfishWin } else { Outcome::BcinrWin };
         };
 
         // Independent legality check: an illegal move forfeits the game.
