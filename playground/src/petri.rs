@@ -2,7 +2,7 @@
     clippy::cast_possible_truncation,
     clippy::cast_possible_wrap,
     clippy::cast_sign_loss,
-    clippy::inline_always,
+    clippy::inline_always
 )]
 //! Branchless Petri net token replay engine implementation.
 //! Adheres strictly to bcinr's Radon Law (CC=1), zero-alloc, and no_std constraints.

@@ -1,8 +1,4 @@
-#![allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_possible_wrap,
-    clippy::cast_sign_loss,
-)]
+#![allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap, clippy::cast_sign_loss)]
 //! Branchless Temporal Event Knowledge Graph (tEKG) matrix compiler.
 //!
 //! Fully branchless (CC = 1), zero-allocation, and `#![no_std]` compliant.

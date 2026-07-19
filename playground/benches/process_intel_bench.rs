@@ -1,11 +1,7 @@
 //! Criterion micro-benchmarks for `playground`'s process-intelligence
 //! primitives (YAWL engine, POWL step execution, TEKG snapshot chains, and
 //! their WASM-exported counterparts).
-#![allow(
-    unsafe_code,
-    missing_docs,
-    clippy::unwrap_used,
-)]
+#![allow(unsafe_code, missing_docs, clippy::unwrap_used)]
 // `criterion_group!`/`criterion_main!` (below) expand to items with no doc
 // comment of their own to annotate, and an `#[allow(missing_docs)]` placed
 // directly on the macro invocation is rejected (`unused_attribute` — it
@@ -158,10 +154,7 @@ fn bench_wasm_ffi_boundaries(c: &mut Criterion) {
     group.bench_function("wasm_yawl_null_redirect", |b| {
         b.iter(|| {
             unsafe {
-                wasm_yawl_execute_task(
-                    black_box(&raw mut yawl_state),
-                    black_box(&raw const task),
-                )
+                wasm_yawl_execute_task(black_box(&raw mut yawl_state), black_box(&raw const task))
             };
         });
     });

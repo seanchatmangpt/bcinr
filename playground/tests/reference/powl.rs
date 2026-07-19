@@ -24,7 +24,7 @@
     clippy::to_string_in_format_args,
     clippy::large_enum_variant,
     clippy::boxed_local,
-    clippy::unnecessary_wraps,
+    clippy::unnecessary_wraps
 )]
 
 use std::fmt::Write;
@@ -851,9 +851,7 @@ pub struct Dispatcher {
 
 impl Dispatcher {
     pub fn new() -> Self {
-        Self {
-            slots: std::array::from_fn(|_| Slot { active: std::cell::Cell::new(false) }),
-        }
+        Self { slots: std::array::from_fn(|_| Slot { active: std::cell::Cell::new(false) }) }
     }
 }
 

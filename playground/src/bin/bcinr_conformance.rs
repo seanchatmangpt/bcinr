@@ -4,7 +4,7 @@
     clippy::unwrap_used,
     clippy::too_many_lines,
     clippy::too_many_arguments,
-    clippy::format_collect,
+    clippy::format_collect
 )]
 //! Attaches the playground's branchless process-intelligence (the Petri-net token
 //! replay engine) to the chess decision engine.

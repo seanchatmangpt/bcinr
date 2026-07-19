@@ -4,7 +4,7 @@
     clippy::cast_sign_loss,
     clippy::cast_possible_truncation,
     clippy::unwrap_used,
-    clippy::needless_range_loop,
+    clippy::needless_range_loop
 )]
 //! Property-based falsification tests for `playground`'s HOEG/TEKG/GNN
 //! compilation pipeline — adversarial proptest cases aimed at breaking the

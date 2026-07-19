@@ -1,8 +1,4 @@
-#![allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_possible_wrap,
-    clippy::cast_sign_loss,
-)]
+#![allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap, clippy::cast_sign_loss)]
 //! Branchless Bitboard Chess Engine mapping for Binarized GNN evaluation.
 //!
 //! Enforces CC=1 by resolving piece movements as 64-bit integer physics.

@@ -1,8 +1,4 @@
-#![allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_possible_wrap,
-    clippy::cast_sign_loss,
-)]
+#![allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap, clippy::cast_sign_loss)]
 //! Branchless POWL v2 OCEL Chess Validator
 //!
 //! Validates OCEL v2 Object-Centric execution transitions for the Chess engine

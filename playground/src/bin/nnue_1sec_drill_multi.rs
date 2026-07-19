@@ -5,7 +5,7 @@
     clippy::inline_always,
     clippy::too_many_lines,
     clippy::if_same_then_else,
-    clippy::needless_range_loop,
+    clippy::needless_range_loop
 )]
 //! Multi-threaded variant of `nnue_1sec_drill`: runs the same one-second NNUE
 //! evaluation drill across multiple worker threads and reports aggregate

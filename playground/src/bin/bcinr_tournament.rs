@@ -11,7 +11,7 @@
     clippy::trivially_copy_pass_by_ref,
     clippy::let_unit_value,
     clippy::large_types_passed_by_value,
-    clippy::wrong_self_convention,
+    clippy::wrong_self_convention
 )]
 //! Honest Elo measurement harness for the BCINR UCI engine.
 //!

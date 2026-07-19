@@ -5,7 +5,7 @@
     clippy::too_many_lines,
     clippy::missing_errors_doc,
     clippy::inline_always,
-    clippy::missing_panics_doc,
+    clippy::missing_panics_doc
 )]
 //! Branchless POWL ontology matrix compiler and executor.
 //!
@@ -127,7 +127,8 @@ pub fn powl64_execute_step(
     let is_loop_mask = 0u64.wrapping_sub((8u64 >> kind_val) & 1);
 
     // 1. Determine if this op's scope is active.
-    let parent_scope = u64::from(state.scope_stack[(state.stack_depth.wrapping_sub(1) & 15) as usize]);
+    let parent_scope =
+        u64::from(state.scope_stack[(state.stack_depth.wrapping_sub(1) & 15) as usize]);
     let scope_to_check = select_u64(is_enter_scope_mask, parent_scope, u64::from(op.scope));
 
     let scope_bit = (state.active_scopes >> (scope_to_check & 63)) & 1;

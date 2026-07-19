@@ -7,7 +7,7 @@
     clippy::too_many_arguments,
     clippy::needless_range_loop,
     clippy::default_trait_access,
-    clippy::items_after_statements,
+    clippy::items_after_statements
 )]
 //! BCINR-AZ: a branchless AlphaZero-style (`DeepMind` paradigm) chess engine that
 //! drives an MCTS tree and evaluates leaf positions in *batches* on the Apple

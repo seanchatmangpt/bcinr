@@ -11,7 +11,7 @@
     clippy::too_many_arguments,
     clippy::needless_range_loop,
     clippy::upper_case_acronyms,
-    clippy::default_trait_access,
+    clippy::default_trait_access
 )]
 use std::time::Instant;
 

@@ -29,7 +29,7 @@
     clippy::mutable_key_type,
     clippy::only_used_in_recursion,
     clippy::vec_init_then_push,
-    clippy::needless_pass_by_value,
+    clippy::needless_pass_by_value
 )]
 
 pub mod petri;

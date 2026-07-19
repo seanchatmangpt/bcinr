@@ -5,7 +5,7 @@
     clippy::match_same_arms,
     clippy::too_many_lines,
     clippy::cast_sign_loss,
-    clippy::if_same_then_else,
+    clippy::if_same_then_else
 )]
 //! Object-Centric Event Log (OCEL) chess drill: plays out a game while
 //! recording each move as an OCEL event, for exercising the OCEL export path
@@ -160,9 +160,8 @@ fn main() {
     for i in 0..64 {
         let rank = (i / 8) + 1;
         let file = (b'a' + (i % 8) as u8) as char;
-        objects.push(format!(
-            r#"    {{ "id": "{file}{rank}", "type": "Square", "attributes": [] }}"#
-        ));
+        objects
+            .push(format!(r#"    {{ "id": "{file}{rank}", "type": "Square", "attributes": [] }}"#));
     }
     for p in &pieces {
         objects.push(format!(r#"    {{ "id": "{}", "type": "Piece", "attributes": [{{ "name": "color", "time": "1970-01-01T00:00:00Z", "value": "{}" }}] }}"#, p.id, p.color));

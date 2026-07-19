@@ -5,7 +5,7 @@
     clippy::too_many_arguments,
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
-    clippy::unwrap_used,
+    clippy::unwrap_used
 )]
 //! WASM API C-Interface Wrappers Reference Implementation
 

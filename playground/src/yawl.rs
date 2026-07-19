@@ -3,7 +3,7 @@
     clippy::cast_possible_wrap,
     clippy::cast_sign_loss,
     clippy::similar_names,
-    clippy::inline_always,
+    clippy::inline_always
 )]
 //! Branchless YAWL routing semantics engine.
 

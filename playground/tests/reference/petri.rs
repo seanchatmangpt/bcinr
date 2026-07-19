@@ -27,7 +27,7 @@
     clippy::redundant_static_lifetimes,
     clippy::match_same_arms,
     clippy::large_enum_variant,
-    clippy::boxed_local,
+    clippy::boxed_local
 )]
 
 use std::collections::HashMap;

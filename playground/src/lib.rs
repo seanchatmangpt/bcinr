@@ -24,7 +24,7 @@
     clippy::string_extend_chars,
     clippy::vec_init_then_push,
     clippy::large_types_passed_by_value,
-    clippy::wrong_self_convention,
+    clippy::wrong_self_convention
 )]
 
 /// BranchTorch: Branchless Neural Training

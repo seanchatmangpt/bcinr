@@ -4,7 +4,7 @@
     clippy::inline_always,
     clippy::too_many_lines,
     clippy::if_same_then_else,
-    clippy::needless_range_loop,
+    clippy::needless_range_loop
 )]
 //! One-second NNUE evaluation drill: runs `BranchTorchNNUE` over a fixed
 //! opening position as fast as possible for ~1s and reports evaluations/sec.
