@@ -58,7 +58,7 @@ async fn run() {
     let mut game_data = vec![GameState { boards_low: [0; 12], boards_high: [0; 12] }; num_games];
     // Seed the boards
     for i in 0..num_games {
-        game_data[i].boards_low[0] = 0x0000FFFF;
+        game_data[i].boards_low[0] = 0x0000_FFFF;
     }
 
     let nnue_buffer = device.create_buffer(&wgpu::BufferDescriptor {

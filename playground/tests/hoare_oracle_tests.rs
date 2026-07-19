@@ -1,3 +1,4 @@
+#![cfg(not(miri))]
 //! Hoare-logic oracle tests: property-based checks that `playground`'s
 //! branchless Petri/POWL/YAWL primitives satisfy their stated pre/post-
 //! condition invariants across randomized inputs, not just fixed examples.
