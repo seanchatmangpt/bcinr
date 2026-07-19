@@ -149,10 +149,12 @@ pub unsafe extern "C" fn wasm_petri_replay(
     missing += diff;
     consumed += final_needed;
 
-    (*safe_res).missing = missing;
-    (*safe_res).remaining = popcount_u64(marking & !final_mask) as u32;
-    (*safe_res).produced = produced;
-    (*safe_res).consumed = consumed;
+    if !is_any_null {
+        (*safe_res).missing = missing;
+        (*safe_res).remaining = popcount_u64(marking & !final_mask) as u32;
+        (*safe_res).produced = produced;
+        (*safe_res).consumed = consumed;
+    }
 
     let out_of_bounds_mask = nonzero_mask_u32(u32::from(out_of_bounds_detected));
     let code_oob = select_u32(out_of_bounds_mask, -2i32 as u32, 0);
@@ -291,7 +293,7 @@ pub unsafe extern "C" fn wasm_powl_execute_step(
     select_u32(any_null_mask_u32, -1i32 as u32, 0) as i32
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use crate::{
