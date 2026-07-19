@@ -47,7 +47,7 @@ pub fn delta_decode_simd_u32(val: u64, aux: u64) -> u64 {
     (r0 as u64) | ((r1 as u64) << 32)
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::super::delta_encode_simd_u32::delta_encode_simd_u32;
     use super::*;

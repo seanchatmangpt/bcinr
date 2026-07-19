@@ -60,7 +60,7 @@ pub fn polynomial_hash_u64(data: &[u8], base: u64, prime: u64) -> u64 {
     hash
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

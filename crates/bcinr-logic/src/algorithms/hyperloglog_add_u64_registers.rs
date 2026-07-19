@@ -42,7 +42,7 @@ pub fn hyperloglog_add_u64_registers(registers: &mut [u8], hash: u64, b: u32) {
     registers[idx] = (rho & mask) | (current & !mask);
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

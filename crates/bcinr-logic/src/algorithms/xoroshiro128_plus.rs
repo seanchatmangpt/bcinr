@@ -7,7 +7,7 @@ pub fn xoroshiro128_plus(val: u64, aux: u64) -> u64 {
     s0.rotate_left(24) ^ s1 ^ (s1 << 16)
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

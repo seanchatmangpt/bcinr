@@ -63,7 +63,7 @@ pub fn sort_stable_key_value_u32x8(pairs: [(u32, u32); 8]) -> [(u32, u32); 8] {
     output
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

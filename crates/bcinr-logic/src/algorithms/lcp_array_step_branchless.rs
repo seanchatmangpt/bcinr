@@ -8,7 +8,7 @@ pub fn lcp_array_step_branchless(val: u64, aux: u64) -> u64 {
     (nonzero.trailing_zeros() as u64) >> 3
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

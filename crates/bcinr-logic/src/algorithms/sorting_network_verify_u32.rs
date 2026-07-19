@@ -41,7 +41,7 @@ pub fn sorting_network_verify_u32(slice: &[u32]) -> bool {
     result != 0
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

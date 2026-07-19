@@ -36,7 +36,7 @@ pub fn exp2_u64_fixed(val: u64, _aux: u64) -> u64 {
     (result & !sat_mask) | sat_mask
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

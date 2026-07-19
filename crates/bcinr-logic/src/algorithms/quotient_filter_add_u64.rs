@@ -12,7 +12,7 @@ pub fn quotient_filter_add_u64(val: u64, aux: u64) -> u64 {
     val | (insert * has_zero)
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

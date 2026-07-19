@@ -102,7 +102,7 @@ pub fn murmur3_32_hash(data: &[u8], seed: u32) -> u32 {
     fmix32(h1)
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

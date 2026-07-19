@@ -76,7 +76,7 @@ pub fn fnv1a_64_hash(data: &[u8]) -> u64 {
     hash
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

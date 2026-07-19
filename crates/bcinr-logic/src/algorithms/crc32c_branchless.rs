@@ -69,7 +69,7 @@ pub fn crc32c_branchless(data: &[u8], initial: u32) -> u32 {
     crc
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

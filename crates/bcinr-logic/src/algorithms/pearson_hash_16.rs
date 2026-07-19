@@ -75,7 +75,7 @@ pub fn pearson_hash_16(data: &[u8]) -> u16 {
     (hi << 8) | lo
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

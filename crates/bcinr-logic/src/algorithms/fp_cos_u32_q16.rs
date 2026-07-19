@@ -29,7 +29,7 @@ pub fn fp_cos_u32_q16(val: u64, aux: u64) -> u64 {
     fp_sin_u32_q16(val.wrapping_add(QUARTER), aux)
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

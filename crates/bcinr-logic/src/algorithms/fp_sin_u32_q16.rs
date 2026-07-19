@@ -42,7 +42,7 @@ pub fn fp_sin_u32_q16(val: u64, _aux: u64) -> u64 {
     result as u64
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

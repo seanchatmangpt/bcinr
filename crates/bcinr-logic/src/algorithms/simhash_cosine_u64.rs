@@ -60,7 +60,7 @@ pub fn simhash_hamming_distance(a: u64, b: u64) -> u32 {
     (a ^ b).count_ones()
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

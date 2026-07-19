@@ -50,7 +50,7 @@ pub fn sigmoid_sat_u32(val: u64, _aux: u64) -> u64 {
     approx as u64
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

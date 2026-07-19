@@ -88,7 +88,7 @@ pub fn linear_counting_estimate(bitmap: &[u64]) -> u64 {
     r_saturated + r_normal
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;
