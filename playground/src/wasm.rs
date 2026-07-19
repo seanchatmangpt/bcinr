@@ -1,4 +1,14 @@
-#![allow(unsafe_code)]
+#![allow(
+    unsafe_code,
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    clippy::unwrap_used,
+    clippy::inline_always,
+    clippy::too_many_lines,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc
+)]
 
 use bcinr::{
     int::popcount_u64,
@@ -79,8 +89,8 @@ pub unsafe extern "C" fn wasm_petri_replay(
 
     let is_any_null = is_null_in | is_null_out | is_null_trace | is_null_res;
 
-    let any_null_mask_u32 = nonzero_mask_u32(is_any_null as u32);
-    let null_mask = (any_null_mask_u32 as i32 as i64) as u64;
+    let any_null_mask_u32 = nonzero_mask_u32(u32::from(is_any_null));
+    let null_mask = i64::from(any_null_mask_u32 as i32) as u64;
     let valid_mask = !null_mask as usize;
 
     let mut marking = initial_mask;
@@ -94,7 +104,7 @@ pub unsafe extern "C" fn wasm_petri_replay(
     let safe_trace =
         ((trace_events as usize & valid_mask) | (4 & null_mask as usize)) as *const u32;
     let safe_res = ((out_result as usize & valid_mask)
-        | (&mut marking as *mut _ as usize & null_mask as usize))
+        | (&raw mut marking as usize & null_mask as usize))
         as *mut WasmReplayResult;
 
     let clean_n_transitions = select_u32(any_null_mask_u32, 0, n_transitions);
@@ -111,13 +121,13 @@ pub unsafe extern "C" fn wasm_petri_replay(
         let is_valid_idx = t_idx < clean_n_transitions;
         out_of_bounds_detected |= !is_valid_idx;
 
-        let valid_idx_mask = nonzero_mask_u32(is_valid_idx as u32);
+        let valid_idx_mask = nonzero_mask_u32(u32::from(is_valid_idx));
         let safe_t_idx = select_u32(valid_idx_mask, t_idx, 0) as usize;
 
         let in_mask = trans_in[safe_t_idx];
         let out_mask = trans_out[safe_t_idx];
 
-        let fire_mask = (valid_idx_mask as i32 as i64) as u64;
+        let fire_mask = i64::from(valid_idx_mask as i32) as u64;
 
         let actual_in_mask = in_mask & fire_mask;
         let actual_out_mask = out_mask & fire_mask;
@@ -139,12 +149,14 @@ pub unsafe extern "C" fn wasm_petri_replay(
     missing += diff;
     consumed += final_needed;
 
-    (*safe_res).missing = missing;
-    (*safe_res).remaining = popcount_u64(marking & !final_mask) as u32;
-    (*safe_res).produced = produced;
-    (*safe_res).consumed = consumed;
+    if !is_any_null {
+        (*safe_res).missing = missing;
+        (*safe_res).remaining = popcount_u64(marking & !final_mask) as u32;
+        (*safe_res).produced = produced;
+        (*safe_res).consumed = consumed;
+    }
 
-    let out_of_bounds_mask = nonzero_mask_u32(out_of_bounds_detected as u32);
+    let out_of_bounds_mask = nonzero_mask_u32(u32::from(out_of_bounds_detected));
     let code_oob = select_u32(out_of_bounds_mask, -2i32 as u32, 0);
 
     select_u32(any_null_mask_u32, -1i32 as u32, code_oob) as i32
@@ -162,8 +174,8 @@ pub unsafe extern "C" fn wasm_yawl_execute_task(
     let is_null_task = task_ptr.is_null();
     let is_any_null = is_null_state | is_null_task;
 
-    let any_null_mask_u32 = nonzero_mask_u32(is_any_null as u32);
-    let null_mask = (any_null_mask_u32 as i32 as i64) as u64;
+    let any_null_mask_u32 = nonzero_mask_u32(u32::from(is_any_null));
+    let null_mask = i64::from(any_null_mask_u32 as i32) as u64;
     let valid_mask = !null_mask as usize;
 
     let mut engine = BYawlEngine {
@@ -205,10 +217,10 @@ pub unsafe extern "C" fn wasm_yawl_execute_task(
     };
 
     let safe_state = ((state_ptr as usize & valid_mask)
-        | (&mut engine as *mut _ as usize & null_mask as usize))
+        | (&raw mut engine as usize & null_mask as usize))
         as *mut WasmBYawlState;
     let safe_task = ((task_ptr as usize & valid_mask)
-        | (&dummy_task as *const BYawlTask as usize & null_mask as usize))
+        | (&raw const dummy_task as usize & null_mask as usize))
         as *const BYawlTask;
 
     engine.state_mask = (*safe_state).state_mask;
@@ -242,8 +254,8 @@ pub unsafe extern "C" fn wasm_powl_execute_step(
     let is_null_op = op_ptr.is_null();
     let is_any_null = is_null_state | is_null_op;
 
-    let any_null_mask_u32 = nonzero_mask_u32(is_any_null as u32);
-    let null_mask = (any_null_mask_u32 as i32 as i64) as u64;
+    let any_null_mask_u32 = nonzero_mask_u32(u32::from(is_any_null));
+    let null_mask = i64::from(any_null_mask_u32 as i32) as u64;
     let valid_mask = !null_mask as usize;
 
     let mut engine_state = PowlState {
@@ -256,10 +268,10 @@ pub unsafe extern "C" fn wasm_powl_execute_step(
     };
 
     let safe_state = ((state_ptr as usize & valid_mask)
-        | (&mut engine_state as *mut _ as usize & null_mask as usize))
+        | (&raw mut engine_state as usize & null_mask as usize))
         as *mut WasmPowlState;
     let safe_op = ((op_ptr as usize & valid_mask)
-        | (&mut engine_state as *mut _ as usize & null_mask as usize))
+        | (&raw mut engine_state as usize & null_mask as usize))
         as *const Powl64Op;
 
     engine_state.completed_ops = (*safe_state).completed_ops;
@@ -281,7 +293,7 @@ pub unsafe extern "C" fn wasm_powl_execute_step(
     select_u32(any_null_mask_u32, -1i32 as u32, 0) as i32
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use crate::{
@@ -306,7 +318,7 @@ mod tests {
                 2,
                 trace.as_ptr(),
                 2,
-                &mut result,
+                &raw mut result,
             )
         };
 
@@ -351,7 +363,7 @@ mod tests {
                 1,
                 trace.as_ptr(),
                 1,
-                &mut result,
+                &raw mut result,
             )
         };
         assert_eq!(rc, -2);
@@ -387,7 +399,7 @@ mod tests {
             interleaved_lock_mask: 0,
         };
 
-        let rc = unsafe { wasm_yawl_execute_task(&mut state, &task) };
+        let rc = unsafe { wasm_yawl_execute_task(&raw mut state, &raw const task) };
         assert_eq!(rc, -1); // Fired mask in i32 is -1 (u64::MAX)
         assert_eq!(state.state_mask, 0b100);
     }
@@ -423,7 +435,7 @@ mod tests {
             _pad: [0; 7],
         };
 
-        let rc = unsafe { wasm_powl_execute_step(&mut state, &op, 0, 0) };
+        let rc = unsafe { wasm_powl_execute_step(&raw mut state, &raw const op, 0, 0) };
         assert_eq!(rc, 0);
         assert_eq!(state.completed_ops, 1 << 5);
     }

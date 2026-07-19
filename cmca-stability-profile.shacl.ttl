@@ -1,0 +1,25 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix cmca: <http://bcinr.org/ontology/cmca#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+cmca:StabilityProfileShape
+    a sh:NodeShape ;
+    sh:targetClass cmca:StabilityProfile ;
+    sh:property [
+        sh:path cmca:betaMMax ;
+        sh:datatype xsd:decimal ;
+        sh:maxInclusive 1.0 ;
+        sh:minExclusive 0.0 ;
+    ] ;
+    sh:property [
+        sh:path cmca:zetaWMax ;
+        sh:datatype xsd:decimal ;
+        sh:maxInclusive 1.0 ;
+        sh:minExclusive 0.0 ;
+    ] ;
+    sh:property [
+        sh:path cmca:gammaMuMax ;
+        sh:datatype xsd:decimal ;
+        sh:maxInclusive 1.0 ;
+        sh:minExclusive 0.0 ;
+    ] .

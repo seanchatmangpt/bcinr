@@ -39,11 +39,7 @@ mod tests {
         // Independent derivation: compose the rotation from two shifts and an OR
         // rather than the intrinsic, handling the zero-shift case explicitly.
         let s = (aux % 64) as u32;
-        if s == 0 {
-            val
-        } else {
-            (val << s) | (val >> (64 - s))
-        }
+        val.rotate_left(s)
     }
 
     // -------------------------------------------------------------------------

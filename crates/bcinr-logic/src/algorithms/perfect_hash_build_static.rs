@@ -48,14 +48,10 @@ mod tests {
         let mixed = ((val as u128 * golden) as u64) ^ aux;
         let r = ((aux & 63) + 1) as u32; // 1..=64
                                          // left rotate by r using shift/OR (r in 1..=64)
-        let folded = if r == 64 {
-            mixed
-        } else {
-            (mixed << r) | (mixed >> (64 - r))
-        };
+        let folded = mixed.rotate_left(r);
         let summed = folded.wrapping_add(aux.wrapping_mul(0x100000001B3));
-        // right rotate by 17 via shifts
-        (summed >> 17) | (summed << (64 - 17))
+        // right rotate by 17
+        summed.rotate_right(17)
     }
 
     // -------------------------------------------------------------------------

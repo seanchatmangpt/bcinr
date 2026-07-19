@@ -26,7 +26,7 @@
 //!   the entire rest of the pipeline with zero search — real, not a stub,
 //!   and sound **to the extent `theory_digest` actually distinguishes
 //!   theories that differ** (see
-//!   [`crate::capability::domain_problem_digest`]'s doc comment for the
+//!   `crate::capability::domain_problem_digest`'s doc comment for the
 //!   precise, current coverage boundary: action bodies, durations, and
 //!   `:init`/`:goal` are covered; `:constraints`/`:preferences`/`:metric`/
 //!   PDDL+ are not, so two domains differing only in one of those would
@@ -127,7 +127,7 @@ pub enum MfwPlanError {
     /// further to build a `PlannedWorkflow` from. Sound to the extent
     /// `theory_digest` actually distinguishes theories that differ — see
     /// the module doc comment's "Real gap #1" section and
-    /// [`crate::capability::domain_problem_digest`] for the current
+    /// `crate::capability::domain_problem_digest` for the current
     /// coverage boundary.
     CachedUnreachable,
     /// The portfolio's exact rail proved no plan exists.

@@ -38,10 +38,7 @@ mod tests {
     fn space_saving_add_reference(val: u64, aux: u64) -> u64 {
         // Independent structure: detect overflow explicitly via checked_add and
         // clamp to MAX, rather than calling saturating_add.
-        match val.checked_add(aux) {
-            Some(sum) => sum,
-            None => u64::MAX,
-        }
+        val.saturating_add(aux)
     }
 
     // -------------------------------------------------------------------------

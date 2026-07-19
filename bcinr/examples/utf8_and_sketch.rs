@@ -6,6 +6,7 @@
 //! **Doc references:**
 //!   - `crates/bcinr-logic/src/utf8.rs`
 //!   - `crates/bcinr-logic/src/sketch.rs`
+//!
 //! **Also see:** `examples/scan_primitives.rs` — `is_ascii_u64_slice` detects ASCII-only input.
 //!
 //! `count_codepoints`: counts UTF-8 codepoints by skipping continuation bytes (0x80..=0xBF).

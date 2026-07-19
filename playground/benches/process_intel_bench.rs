@@ -1,13 +1,12 @@
 //! Criterion micro-benchmarks for `playground`'s process-intelligence
 //! primitives (YAWL engine, POWL step execution, TEKG snapshot chains, and
 //! their WASM-exported counterparts).
-#![allow(unsafe_code)]
+#![allow(unsafe_code, missing_docs, clippy::unwrap_used)]
 // `criterion_group!`/`criterion_main!` (below) expand to items with no doc
 // comment of their own to annotate, and an `#[allow(missing_docs)]` placed
 // directly on the macro invocation is rejected (`unused_attribute` — it
 // doesn't apply to macro calls in this position) — so the allow has to be
 // crate-wide for this bench binary target, not scoped to just the expansion.
-#![allow(missing_docs)]
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use playground::{
     powl::{powl64_execute_step, Powl64Op, Powl64OpKind, PowlState},
@@ -25,13 +24,13 @@ fn bench_granular_yawl(c: &mut Criterion) {
     group.bench_function("trigger_event_bitwise", |b| {
         b.iter(|| {
             engine.trigger_event(black_box(0b1000));
-        })
+        });
     });
 
     group.bench_function("spawn_instances_128bit_simd", |b| {
         b.iter(|| {
             engine.spawn_instances(black_box(14), black_box(5));
-        })
+        });
     });
 
     let task = BYawlTask {
@@ -55,7 +54,7 @@ fn bench_granular_yawl(c: &mut Criterion) {
     group.bench_function("execute_task_branchless", |b| {
         b.iter(|| {
             engine.execute_task_branchless(black_box(&task));
-        })
+        });
     });
 
     group.finish();
@@ -83,7 +82,7 @@ fn bench_granular_powl(c: &mut Criterion) {
     group.bench_function("execute_step_swar", |b| {
         b.iter(|| {
             powl64_execute_step(black_box(&mut state), black_box(&op), black_box(0), black_box(0));
-        })
+        });
     });
 
     group.finish();
@@ -118,13 +117,13 @@ fn bench_wasm_ffi_boundaries(c: &mut Criterion) {
         b.iter(|| {
             unsafe {
                 wasm_powl_execute_step(
-                    black_box(&mut powl_state as *mut WasmPowlState),
-                    black_box(&op as *const Powl64Op),
+                    black_box(&raw mut powl_state),
+                    black_box(&raw const op),
                     black_box(0), // No overrides
                     black_box(0),
                 )
             };
-        })
+        });
     });
 
     let mut yawl_state = WasmBYawlState {
@@ -155,12 +154,9 @@ fn bench_wasm_ffi_boundaries(c: &mut Criterion) {
     group.bench_function("wasm_yawl_null_redirect", |b| {
         b.iter(|| {
             unsafe {
-                wasm_yawl_execute_task(
-                    black_box(&mut yawl_state as *mut WasmBYawlState),
-                    black_box(&task as *const BYawlTask),
-                )
+                wasm_yawl_execute_task(black_box(&raw mut yawl_state), black_box(&raw const task))
             };
-        })
+        });
     });
 
     group.finish();
@@ -186,7 +182,7 @@ fn bench_tekg_compiler(c: &mut Criterion) {
         b.iter(|| {
             compile_snapshot_chain(black_box(1), black_box(&timestamps), black_box(&mut out))
                 .unwrap();
-        })
+        });
     });
 
     group.finish();

@@ -4,7 +4,30 @@
 //! same reasoning applies here (a comprehensive reference surface compiled
 //! independently into several test binaries, each exercising a different
 //! subset).
-#![allow(dead_code)]
+#![allow(
+    dead_code,
+    clippy::similar_names,
+    clippy::too_many_lines,
+    clippy::too_many_arguments,
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    clippy::match_same_arms,
+    clippy::unwrap_used,
+    clippy::type_complexity,
+    clippy::manual_range_contains,
+    clippy::string_extend_chars,
+    clippy::trivially_copy_pass_by_ref,
+    clippy::get_first,
+    clippy::recursive_format_impl,
+    clippy::large_stack_arrays,
+    clippy::to_string_in_format_args,
+    clippy::large_enum_variant,
+    clippy::boxed_local,
+    clippy::unnecessary_wraps
+)]
+
+use std::fmt::Write;
 
 // ── AST & Core Types ────────────────────────────────────────────────────────
 
@@ -352,7 +375,7 @@ pub struct ScopeDesc {
 
 impl ScopeDesc {
     pub const ROOT_PARENT: u16 = 0xFFFF;
-    pub const ROOT_END_BIT: u32 = 262144;
+    pub const ROOT_END_BIT: u32 = 262_144;
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -365,7 +388,7 @@ impl UCausalReceipt {
     pub fn to_hex(&self) -> String {
         let mut s = String::with_capacity(64);
         for &b in &self.0 {
-            s.push_str(&format!("{:02x}", b));
+            let _ = write!(s, "{b:02x}");
         }
         s
     }
@@ -428,20 +451,20 @@ pub fn causal_mix(
     _delta: &UDelta,
 ) -> UCausalReceipt {
     let mut bytes = r.0;
-    let mix_val = val ^ (u64::from(scope) << 16) ^ (denial << 32) ^ 0x9e3779b97f4a7c15;
+    let mix_val = val ^ (u64::from(scope) << 16) ^ (denial << 32) ^ 0x9e37_79b9_7f4a_7c15;
     let mix_bytes = mix_val.to_ne_bytes();
     for i in 0..8 {
         bytes[i] = bytes[i].wrapping_add(mix_bytes[i]);
-        bytes[i + 8] = bytes[i + 8] ^ mix_bytes[i];
+        bytes[i + 8] ^= mix_bytes[i];
         bytes[i + 16] = bytes[i + 16].wrapping_sub(mix_bytes[i]);
-        bytes[i + 24] = bytes[i + 24] ^ mix_bytes[7 - i];
+        bytes[i + 24] ^= mix_bytes[7 - i];
     }
     UCausalReceipt(bytes)
 }
 
 fn compute_causal_receipt(ops: &[Powl64Op]) -> UCausalReceipt {
     let mut r = UCausalReceipt::genesis();
-    let delta = UDelta::default();
+    let delta = UDelta;
     for op in ops {
         if op.kind == Powl64OpKind::Activity {
             r = causal_mix(r, u64::from(op.activity), op.scope, op.succ_mask, &delta);
@@ -828,8 +851,7 @@ pub struct Dispatcher {
 
 impl Dispatcher {
     pub fn new() -> Self {
-        const INIT: Slot = Slot { active: std::cell::Cell::new(false) };
-        Self { slots: [INIT; 64] }
+        Self { slots: std::array::from_fn(|_| Slot { active: std::cell::Cell::new(false) }) }
     }
 }
 
@@ -926,7 +948,7 @@ pub struct ExecutionReport {
 impl ExecutionReport {
     pub fn receipt(&self) -> UCausalReceipt {
         let mut r = UCausalReceipt::genesis();
-        let zero = UDelta::default();
+        let zero = UDelta;
         for ev in &self.events {
             r = causal_mix(r, u64::from(ev.op_index), ev.scope, ev.denial, &zero);
         }

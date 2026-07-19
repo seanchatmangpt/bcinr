@@ -75,7 +75,7 @@ pub fn pearson_hash_16(data: &[u8]) -> u16 {
     (hi << 8) | lo
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;
@@ -219,7 +219,6 @@ pub mod bench {
     use alloc::vec::Vec;
     use criterion::{black_box, Criterion};
     #[cfg(feature = "alloc")]
-
     pub fn bench_pearson_hash_16(c: &mut Criterion) {
         #[cfg(feature = "alloc")]
         {

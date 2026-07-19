@@ -63,7 +63,7 @@
 //!   inherited as an `Exact`/`Approximate` rating that would overclaim.
 //!   [`admit_planning_task`] refuses on this feature two ways: the
 //!   declared-requirement loop (any `:requirements` entry that
-//!   [`requirement_implies`] maps to `ConditionalEffects`), and a separate
+//!   `requirement_implies` maps to `ConditionalEffects`), and a separate
 //!   content scan (`effect_list_uses_conditional_or_quantified`) over every
 //!   action's/durative-action's actual effect AST, so a domain that uses
 //!   `when`/`forall` in an effect *without* declaring the requirement is
@@ -136,7 +136,7 @@ use crate::ground::GroundProblem;
 
 /// The sixteen PDDL-requirement-shaped capabilities this crate's planners
 /// might need. Not a 1:1 mirror of the `pddl` crate's `Requirement` enum —
-/// see [`requirement_implies`] for how the wider requirement vocabulary
+/// see `requirement_implies` for how the wider requirement vocabulary
 /// (`Adl`, `Fluents`, `QuantifiedPreconditions`, `ObjectFluents`, ...) maps
 /// onto these sixteen (or, for `ObjectFluents`, is rejected structurally
 /// instead, since it has no corresponding `PddlFeature`).
@@ -425,14 +425,14 @@ fn effect_list_uses_object_fluent_sentinel(effects: &[PddlEffect]) -> bool {
 
 /// A domain + problem that passed [`admit_planning_task`]'s structural and
 /// capability checks. Cheap to construct further planning stages from —
-/// `theory_digest` (see [`domain_problem_digest`] for exactly which fields
+/// `theory_digest` (see `domain_problem_digest` for exactly which fields
 /// it walks) content-addresses the domain's/problem's action bodies,
 /// durations, and `:init`/`:goal` content, not just their names — it is
 /// *not* the same construction as `crate::llm_bridge::compute_domain_witness`/
 /// `compute_problem_witness` (those remain name/requirements-only, for a
 /// human-readable LLM-facing witness string, not a semantic content digest).
 /// `theory_digest` still does not cover `:constraints`/`:preferences`/
-/// `:metric`/PDDL+ `:process`/`:event` — see [`domain_problem_digest`]'s doc
+/// `:metric`/PDDL+ `:process`/`:event` — see `domain_problem_digest`'s doc
 /// comment for the precise, current coverage boundary. Two domains/problems
 /// differing only in one of those uncovered fields will still collide.
 #[derive(Debug, Clone)]

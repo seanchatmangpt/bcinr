@@ -1,7 +1,18 @@
 //! GPU (wgpu compute-shader) variant of the OCEL chess NNUE evaluation drill
 //! — mirrors `ocel_chess`'s CPU evaluation loop but dispatches the NNUE
 //! forward pass to the GPU for throughput comparison.
-#![allow(unsafe_code)]
+#![allow(
+    unsafe_code,
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::unwrap_used,
+    clippy::too_many_lines,
+    clippy::too_many_arguments,
+    clippy::needless_range_loop,
+    clippy::upper_case_acronyms,
+    clippy::default_trait_access
+)]
 use std::time::Instant;
 
 use bytemuck::{Pod, Zeroable};
@@ -58,7 +69,7 @@ async fn run() {
     let mut game_data = vec![GameState { boards_low: [0; 12], boards_high: [0; 12] }; num_games];
     // Seed the boards
     for i in 0..num_games {
-        game_data[i].boards_low[0] = 0x0000FFFF;
+        game_data[i].boards_low[0] = 0x0000_FFFF;
     }
 
     let nnue_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -152,7 +163,7 @@ async fn run() {
         let mut cpass = encoder.begin_compute_pass(&Default::default());
         cpass.set_pipeline(&pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
-        cpass.dispatch_workgroups((num_games as u32 + 63) / 64, 1, 1);
+        cpass.dispatch_workgroups((num_games as u32).div_ceil(64), 1, 1);
     }
 
     queue.submit(Some(encoder.finish()));
@@ -161,8 +172,8 @@ async fn run() {
     let duration = start.elapsed();
 
     println!("--- METAL GPU 40-CORE NNUE EXECUTION PASS ---");
-    println!("Games Evaluated: {}", num_games);
-    println!("Total Execution Time: {:?}", duration);
+    println!("Games Evaluated: {num_games}");
+    println!("Total Execution Time: {duration:?}");
     println!("Nodes Per Second (NPS): {}", (num_games as f64 / duration.as_secs_f64()) as u64);
 }
 

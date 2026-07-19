@@ -97,7 +97,7 @@ fn mask_to_event_set(mask: u64) -> EventSet {
 /// the receipt carried no evidence of *which* table was used, so nothing
 /// stopped a caller from substituting a different/weaker one at both ends.
 /// Folding `digest_guard_table(guards)` into the receipt's hash chain (see
-/// [`canonical_bytes`]) makes the guard table's content part of what the
+/// `canonical_bytes`) makes the guard table's content part of what the
 /// hash attests to: verifying with a table whose content differs from the
 /// one used at sealing time now fails loudly (see
 /// [`ExecutionIntegrityError::GuardsMismatch`]) instead of silently

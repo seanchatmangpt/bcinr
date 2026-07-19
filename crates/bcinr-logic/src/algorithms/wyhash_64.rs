@@ -152,7 +152,7 @@ pub fn wyhash_64(data: &[u8], seed: u64) -> u64 {
     wymix(WY_P1 ^ len as u64, wymix(a ^ WY_P1, b ^ seed))
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;
@@ -311,7 +311,6 @@ pub mod bench {
     use alloc::vec::Vec;
     use criterion::{black_box, Criterion};
     #[cfg(feature = "alloc")]
-
     pub fn bench_wyhash_64(c: &mut Criterion) {
         #[cfg(feature = "alloc")]
         {

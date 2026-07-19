@@ -9,7 +9,26 @@
 //! this API its own tests actually call. A method unused by one binary's
 //! compilation is routinely used by another's; item-by-item allows would
 //! just be noise repeated ~20 times over, not a more honest signal.
-#![allow(dead_code)]
+#![allow(
+    dead_code,
+    clippy::similar_names,
+    clippy::too_many_lines,
+    clippy::too_many_arguments,
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    clippy::large_stack_arrays,
+    clippy::unwrap_used,
+    clippy::unnecessary_wraps,
+    clippy::trivially_copy_pass_by_ref,
+    clippy::get_first,
+    clippy::unused_self,
+    clippy::recursive_format_impl,
+    clippy::redundant_static_lifetimes,
+    clippy::match_same_arms,
+    clippy::large_enum_variant,
+    clippy::boxed_local
+)]
 
 use std::collections::HashMap;
 
@@ -107,7 +126,7 @@ impl Marking {
         &self.tokens
     }
     pub fn tokens_on(&self, place_id: &str) -> usize {
-        self.tokens.iter().find(|(id, _)| id == place_id).map(|(_, n)| *n).unwrap_or(0)
+        self.tokens.iter().find(|(id, _)| id == place_id).map_or(0, |(_, n)| *n)
     }
 }
 
@@ -200,7 +219,7 @@ impl ObjectCentricPetriNet {
     }
     pub fn validate(&self) -> Result<(), PetriRefusal> {
         let type_set: std::collections::HashSet<&str> =
-            self.object_types.iter().map(|s| s.as_str()).collect();
+            self.object_types.iter().map(std::string::String::as_str).collect();
         for arc in &self.net.arcs {
             if let Some((ref ot, _)) = arc.object_type {
                 if !type_set.contains(ot.as_str()) {
@@ -264,11 +283,11 @@ impl ReplayResult {
         if total == 0 && self.produced == 0 {
             return 1.0;
         }
-        let denom = (total + self.produced) as f64;
+        let denom = f64::from(total + self.produced);
         if denom == 0.0 {
             return 1.0;
         }
-        1.0 - (self.missing as f64 + self.remaining as f64) / denom
+        1.0 - (f64::from(self.missing) + f64::from(self.remaining)) / denom
     }
     pub fn is_perfect(&self) -> bool {
         self.missing == 0 && self.remaining == 0

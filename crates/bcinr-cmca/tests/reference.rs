@@ -1,8 +1,12 @@
-use bcinr_cmca::generated::case_studies::{PackedSemanticState, LensSpec, N, K, Q};
+use bcinr_cmca::generated::case_studies::{LensSpec, PackedSemanticState, K, N, Q};
 
 pub fn compute_measures_f64(state: &PackedSemanticState) -> [f64; K] {
-    let factors: Vec<f64> = state.factors.iter().map(|f| f.to_bits() as f64 / 65536.0).collect();
-    
+    let factors: Vec<f64> = state
+        .factors
+        .iter()
+        .map(|f| f.to_bits() as f64 / 65536.0)
+        .collect();
+
     let recomp = factors[0];
     let verify = factors[1];
     let standing = factors[2];
@@ -21,6 +25,7 @@ pub fn compute_measures_f64(state: &PackedSemanticState) -> [f64; K] {
     [m0, m1, m2, m3]
 }
 
+#[allow(clippy::too_many_arguments)] // deliberate wide parameter list mirroring the fixed-point reference API
 pub fn allocate_f64(
     states: &[PackedSemanticState; N],
     lenses: &[LensSpec; Q],
@@ -40,16 +45,17 @@ pub fn allocate_f64(
 ) -> [f64; N] {
     // 1. Identify leaves
     let mut is_leaf = [true; N];
-    for i in 0..N {
-        for j in 0..N {
-            if parent[j] == i as i32 {
-                is_leaf[i] = false;
+    for (i, leaf) in is_leaf.iter_mut().enumerate() {
+        for &p in parent.iter() {
+            if p == i as i32 {
+                *leaf = false;
             }
         }
     }
 
     // 2. Identify subtree leaf relationships
     let mut is_descendant = [[false; N]; N];
+    #[allow(clippy::needless_range_loop)] // diagonal self-index into a 2-D array
     for i in 0..N {
         is_descendant[i][i] = true;
     }
@@ -57,6 +63,8 @@ pub fn allocate_f64(
         for j in 0..N {
             let p = parent[j];
             if p != -1 {
+                #[allow(clippy::needless_range_loop)]
+                // is_descendant[j][k] and is_descendant[p][k] share index k but are distinct rows
                 for k in 0..N {
                     if is_descendant[j][k] {
                         is_descendant[p as usize][k] = true;
@@ -86,14 +94,10 @@ pub fn allocate_f64(
     let mut node_masses = raw_masses;
 
     // Clamp masses
+    #[allow(clippy::needless_range_loop)] // node_masses[k][i] indexed across two dimensions
     for k in 0..K {
         for i in 0..N {
-            if node_masses[k][i] < 0.0001 {
-                node_masses[k][i] = 0.0001;
-            }
-            if node_masses[k][i] > 1000.0 {
-                node_masses[k][i] = 1000.0;
-            }
+            node_masses[k][i] = node_masses[k][i].clamp(0.0001, 1000.0);
         }
     }
 
@@ -103,17 +107,17 @@ pub fn allocate_f64(
 
     // Dwell Time Lock
     let mut root_idx = 0usize;
-    for i in 0..N {
-        if parent[i] == -1 {
+    for (i, &p) in parent.iter().enumerate() {
+        if p == -1 {
             root_idx = i;
         }
     }
 
     let mut max_w = -1.0;
     let mut dom_mode = 0u32;
-    for e in 0..(2 * Q) {
-        if weights[root_idx][e] > max_w {
-            max_w = weights[root_idx][e];
+    for (e, &w) in weights[root_idx].iter().enumerate() {
+        if w > max_w {
+            max_w = w;
             dom_mode = e as u32;
         }
     }
@@ -127,7 +131,7 @@ pub fn allocate_f64(
         if !is_leaf[v] {
             for q_idx in 0..Q {
                 let q_val = lenses[q_idx].q.to_bits() as f64 / 65536.0;
-                
+
                 // Compute kappa
                 let mut sum_meas_den = 0.0;
                 let mut sum_leaf_den = 0.0;
@@ -139,7 +143,7 @@ pub fn allocate_f64(
                         sum_leaf_den += node_masses[0][i].powf(q_val);
                     }
                 }
-                
+
                 let mut kappa = 0.0;
                 for c in 0..N {
                     if parent[c] == v as i32 {
@@ -186,9 +190,9 @@ pub fn allocate_f64(
     // Dwell Time Lock Post-Update
     let mut new_dom_mode = 0u32;
     let mut new_max_w = -1.0;
-    for e in 0..(2 * Q) {
-        if weights[root_idx][e] > new_max_w {
-            new_max_w = weights[root_idx][e];
+    for (e, &w) in weights[root_idx].iter().enumerate() {
+        if w > new_max_w {
+            new_max_w = w;
             new_dom_mode = e as u32;
         }
     }
@@ -249,13 +253,15 @@ pub fn allocate_f64(
 
                         for x in 0..N {
                             if is_subtree_leaf[v][x] {
-                                flat_alloc[x] += flat_part * (node_masses[k][x].powf(q_val) / leaf_sum);
+                                flat_alloc[x] +=
+                                    flat_part * (node_masses[k][x].powf(q_val) / leaf_sum);
                             }
                         }
 
                         for c in 0..N {
                             if parent[c] == v as i32 {
-                                alloc_flow[c] += desc_part * (node_masses[k][c].powf(q_val) / child_sum);
+                                alloc_flow[c] +=
+                                    desc_part * (node_masses[k][c].powf(q_val) / child_sum);
                             }
                         }
 
@@ -284,9 +290,7 @@ pub fn allocate_f64(
     // 8. Apply resource prices post-escort
     let mut priced_val = [0.0; N];
     for x in 0..N {
-        let mut mu_clamped = mu[x];
-        if mu_clamped < 0.0 { mu_clamped = 0.0; }
-        if mu_clamped > 100.0 { mu_clamped = 100.0; }
+        let mu_clamped = mu[x].clamp(0.0, 100.0);
         let dot_prod = mu_clamped * costs[x];
         priced_val[x] = pi_combined[x] * (-dot_prod).exp();
     }
@@ -307,8 +311,8 @@ pub fn allocate_f64(
 
     // 9. Apply unpriced global floor
     let mut num_leaves = 0;
-    for i in 0..N {
-        if is_leaf[i] {
+    for &leaf in is_leaf.iter() {
+        if leaf {
             num_leaves += 1;
         }
     }

@@ -69,7 +69,7 @@ pub fn crc32c_branchless(data: &[u8], initial: u32) -> u32 {
     crc
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;
@@ -222,7 +222,6 @@ pub mod bench {
     use alloc::vec::Vec;
     use criterion::{black_box, Criterion};
     #[cfg(feature = "alloc")]
-
     pub fn bench_crc32c_branchless(c: &mut Criterion) {
         #[cfg(feature = "alloc")]
         {

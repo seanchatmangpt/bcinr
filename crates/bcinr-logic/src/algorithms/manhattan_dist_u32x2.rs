@@ -40,7 +40,7 @@ mod tests {
         let vy = (val >> 32) as i64;
         let ax = (aux & 0xFFFF_FFFF) as i64;
         let ay = (aux >> 32) as i64;
-        ((vx - ax).abs() as u64) + ((vy - ay).abs() as u64)
+        (vx - ax).unsigned_abs() + (vy - ay).unsigned_abs()
     }
 
     // -------------------------------------------------------------------------

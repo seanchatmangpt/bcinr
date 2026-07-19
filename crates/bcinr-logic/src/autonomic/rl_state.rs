@@ -101,7 +101,8 @@ mod tests {
     #[test]
     fn test_rl_state_checksum_counterfactual_mutants() {
         // Each entry: (mutant_fn, low, high, label)
-        let cases: &[(fn(u64, u64) -> u64, u64, u64, &str)] = &[
+        type MutantCase = (fn(u64, u64) -> u64, u64, u64, &'static str);
+        let cases: &[MutantCase] = &[
             (mutant_rl_state_checksum_1, 10, 20, "rejects_mutant 1"),
             (mutant_rl_state_checksum_2, 10, 20, "rejects_mutant 2"),
             (mutant_rl_state_checksum_3, 10, 15, "rejects_mutant 3"),

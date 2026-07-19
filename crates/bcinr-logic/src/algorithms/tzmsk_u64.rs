@@ -23,7 +23,7 @@ pub fn tzmsk_u64(val: u64, aux: u64) -> u64 {
     (!val) & val.wrapping_sub(1)
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

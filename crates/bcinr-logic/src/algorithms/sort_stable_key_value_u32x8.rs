@@ -63,7 +63,7 @@ pub fn sort_stable_key_value_u32x8(pairs: [(u32, u32); 8]) -> [(u32, u32); 8] {
     output
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;
@@ -71,7 +71,7 @@ mod tests {
     fn reference_stable_sort(pairs: [(u32, u32); 8]) -> [(u32, u32); 8] {
         let mut v: [(u32, u32); 8] = pairs;
         // Rust's sort_by is stable
-        v.sort_by(|a, b| a.0.cmp(&b.0));
+        v.sort_by_key(|a| a.0);
         v
     }
 

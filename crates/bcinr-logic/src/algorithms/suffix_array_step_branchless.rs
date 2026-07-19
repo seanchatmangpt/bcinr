@@ -42,10 +42,8 @@ mod tests {
         let primary = val.to_le_bytes();
         let secondary = aux.to_le_bytes();
         let mut bytes = [0u8; 8];
-        for i in 0..4 {
-            bytes[i] = secondary[i]; // low 32 bits = aux
-            bytes[i + 4] = primary[i]; // high 32 bits = val
-        }
+        bytes[..4].copy_from_slice(&secondary[..4]); // low 32 bits = aux
+        bytes[4..8].copy_from_slice(&primary[..4]); // high 32 bits = val
         u64::from_le_bytes(bytes)
     }
 

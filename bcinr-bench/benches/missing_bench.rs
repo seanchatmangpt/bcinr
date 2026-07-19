@@ -81,4 +81,3 @@ const _MISSING_BENCHMARK_CANARIES: &[&str] = &[
     "wyhash_64",
     "xor_filter_lookup",
 ];
-

@@ -17,7 +17,7 @@
 //!
 //! `bcinr-powl` and `bcinr-powl-receipt` *are* optional path deps of this
 //! crate (see `Cargo.toml`), enabled only by the `mfw-planner` feature (off
-//! by default) for the `MfwPlanner` orchestrator in [`mfw::planner`]. A
+//! by default) for the `MfwPlanner` orchestrator in `mfw::planner`. A
 //! default build of this crate — and every existing consumer that does not
 //! opt into `mfw-planner`, including praxis's own path dependency on this
 //! crate — pulls in neither. This is the one genuine, intentional exception

@@ -7,7 +7,7 @@ pub fn hazard_pointer_retire(val: u64, aux: u64) -> u64 {
     (val & ptr_mask) | (aux & epoch_mask)
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

@@ -49,7 +49,7 @@ pub fn rank_u32x8(arr: [u32; 8]) -> [u32; 8] {
     ranks
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

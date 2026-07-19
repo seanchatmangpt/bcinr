@@ -1,3 +1,11 @@
+#![cfg(not(miri))]
+#![allow(
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_truncation,
+    clippy::unwrap_used,
+    clippy::needless_range_loop
+)]
 //! Property-based falsification tests for `playground`'s HOEG/TEKG/GNN
 //! compilation pipeline — adversarial proptest cases aimed at breaking the
 //! compiled-matrix/snapshot-chain invariants rather than confirming them.
@@ -156,7 +164,7 @@ fn mutant1_compile_snapshot_chain(
     out: &mut [Tekg64Node],
 ) -> Result<usize, &'static str> {
     let res = compile_snapshot_chain(entity_id, update_timestamps, out);
-    if let Ok(_) = res {
+    if res.is_ok() {
         out[0].label = TekgLabel::Log; // Mutant: Wrong base label
     }
     res
@@ -275,19 +283,19 @@ fn test_falsify_hoeg_mutants() {
     }; 3];
     compile_hoeg_matrix(&nt, &ft, &cn, &mut out_real).unwrap();
 
-    let mut out_m1 = out_real.clone();
+    let mut out_m1 = out_real;
     mutant1_compile_hoeg_matrix(&nt, &ft, &cn, &mut out_m1).unwrap();
     if !hoeg_nodes_eq(&out_real, &out_m1) {
         m1_caught = true;
     }
 
-    let mut out_m2 = out_real.clone();
+    let mut out_m2 = out_real;
     mutant2_compile_hoeg_matrix(&nt, &ft, &cn, &mut out_m2).unwrap();
     if !hoeg_nodes_eq(&out_real, &out_m2) {
         m2_caught = true;
     }
 
-    let mut out_m3 = out_real.clone();
+    let mut out_m3 = out_real;
     mutant3_compile_hoeg_matrix(&nt, &ft, &cn, &mut out_m3).unwrap();
     if !hoeg_nodes_eq(&out_real, &out_m3) {
         m3_caught = true;
@@ -371,19 +379,19 @@ fn test_falsify_tekg_mutants() {
     }; 4];
     compile_snapshot_chain(entity_id, &timestamps, &mut out_real).unwrap();
 
-    let mut out_m1 = out_real.clone();
+    let mut out_m1 = out_real;
     mutant1_compile_snapshot_chain(entity_id, &timestamps, &mut out_m1).unwrap();
     if !tekg_nodes_eq(&out_real, &out_m1) {
         m1_caught = true;
     }
 
-    let mut out_m2 = out_real.clone();
+    let mut out_m2 = out_real;
     mutant2_compile_snapshot_chain(entity_id, &timestamps, &mut out_m2).unwrap();
     if !tekg_nodes_eq(&out_real, &out_m2) {
         m2_caught = true;
     }
 
-    let mut out_m3 = out_real.clone();
+    let mut out_m3 = out_real;
     mutant3_compile_snapshot_chain(entity_id, &timestamps, &mut out_m3).unwrap();
     if !tekg_nodes_eq(&out_real, &out_m3) {
         m3_caught = true;

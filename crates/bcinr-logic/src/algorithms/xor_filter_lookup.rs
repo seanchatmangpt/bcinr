@@ -78,7 +78,7 @@ pub fn xor_filter_hash(key: u64, seed: u64, block: u64) -> u64 {
     h
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

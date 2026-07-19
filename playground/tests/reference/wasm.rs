@@ -1,4 +1,12 @@
-#![allow(unsafe_code)]
+#![allow(
+    unsafe_code,
+    clippy::similar_names,
+    clippy::too_many_lines,
+    clippy::too_many_arguments,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::unwrap_used
+)]
 //! WASM API C-Interface Wrappers Reference Implementation
 
 use std::{ffi::CStr, os::raw::c_char};
@@ -300,10 +308,10 @@ mod tests {
             let net = ref_petri_create();
             assert!(!net.is_null());
 
-            let p0 = CStr::from_bytes_with_nul(b"p0\0").unwrap().as_ptr();
-            let p1 = CStr::from_bytes_with_nul(b"p1\0").unwrap().as_ptr();
-            let t0 = CStr::from_bytes_with_nul(b"t0\0").unwrap().as_ptr();
-            let label = CStr::from_bytes_with_nul(b"a\0").unwrap().as_ptr();
+            let p0 = c"p0".as_ptr();
+            let p1 = c"p1".as_ptr();
+            let t0 = c"t0".as_ptr();
+            let label = c"a".as_ptr();
 
             ref_petri_add_place(net, p0);
             ref_petri_add_place(net, p1);
@@ -314,7 +322,7 @@ mod tests {
             ref_petri_set_initial_marking(net, p0, 1);
             ref_petri_set_final_marking(net, p1, 1);
 
-            let act = CStr::from_bytes_with_nul(b"a\0").unwrap().as_ptr();
+            let act = c"a".as_ptr();
             let acts = [act];
 
             let mut missing = 0u32;
@@ -326,10 +334,10 @@ mod tests {
                 net,
                 acts.as_ptr(),
                 1,
-                &mut missing,
-                &mut remaining,
-                &mut produced,
-                &mut consumed,
+                &raw mut missing,
+                &raw mut remaining,
+                &raw mut produced,
+                &raw mut consumed,
             );
 
             assert!(ok);

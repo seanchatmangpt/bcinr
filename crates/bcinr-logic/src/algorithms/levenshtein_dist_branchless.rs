@@ -38,7 +38,7 @@ pub fn levenshtein_dist_branchless(val: u64, aux: u64) -> u64 {
     dp[8][8]
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

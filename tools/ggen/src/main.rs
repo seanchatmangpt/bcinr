@@ -5,7 +5,6 @@ use walkdir::WalkDir;
 ///
 /// Discovers all 300+ algorithms and generates targeted falsification tests.
 /// Tests generic invariants + algorithm-specific edge cases.
-
 fn main() {
     println!("=== GGEN: Counterfactual & Falsification Test Suite ===");
     println!("Scope: All 300+ algorithms in crates/bcinr-logic/src/algorithms/\n");
@@ -395,7 +394,7 @@ fn test_math_monotonicity() -> u32 {
 // ============================================================================
 
 /// Test: Cross-lane isolation
-/// Property: Bitwise AND/OR operations on lane[i] must not affect lane[j] for i ≠ j
+/// Property: Bitwise AND/OR operations on lane\[i\] must not affect lane\[j\] for i ≠ j
 /// Falsified by: Bugs that accidentally clear/set bits in wrong lanes
 fn test_swar_cross_lane_isolation() -> u32 {
     let mut failures = 0;

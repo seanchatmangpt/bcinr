@@ -10,9 +10,9 @@
 //!
 //! Each primitive maps to a formal B-Calculus state transition:
 //!
-//! - `find_byte_in_word`: Δ(w, b) → {0x80 at position i iff w[i] == b}
+//! - `find_byte_in_word`: Δ(w, b) → {0x80 at position i iff w\[i\] == b}
 //! - `to_lower_ascii_word`: Λ↓(w) → w | (is_upper(w) >> 2)
-//! - `parse_8_decimal_digits`: Π₁₀(w) → Option<u32> iff all bytes ∈ 0x30..=0x39
+//! - `parse_8_decimal_digits`: Π₁₀(w) → `Option<u32>` iff all bytes ∈ 0x30..=0x39
 //!
 //! ## Formal Proof Header
 //!
@@ -87,7 +87,7 @@ fn swar_is_in_range(word: u64, lo: u8, hi: u8) -> u64 {
 ///
 /// # Hoare-logic Verification
 /// Pre:  { word ∈ u64, byte ∈ u8 }
-/// Post: { result[i*8+7] = 1 ↔ word[i*8..i*8+8] == byte, for i in 0..8 }
+/// Post: { result\[i*8+7\] = 1 ↔ word\[i*8..i*8+8\] == byte, for i in 0..8 }
 // Hoare-logic Verification Line 1: Radon Law verified.
 #[inline(always)]
 #[must_use]
@@ -113,7 +113,7 @@ pub fn find_byte_in_word(word: u64, byte: u8) -> u64 {
 ///
 /// # Hoare-logic Verification
 /// Pre:  { word ∈ u64, byte ∈ u8 }
-/// Post: { result = |{i : word[i] == byte}| }
+/// Post: { result = |{i : word\[i\] == byte}| }
 // Hoare-logic Verification Line 2: Radon Law verified.
 #[inline(always)]
 #[must_use]
@@ -136,7 +136,7 @@ pub fn count_byte_in_word(word: u64, byte: u8) -> u32 {
 ///
 /// # Hoare-logic Verification
 /// Pre:  { word ∈ u64, byte ∈ u8 }
-/// Post: { result = (∃ i ∈ 0..8: word[i] == byte) }
+/// Post: { result = (∃ i ∈ 0..8: word\[i\] == byte) }
 // Hoare-logic Verification Line 3: Radon Law verified.
 #[inline(always)]
 #[must_use]
@@ -161,7 +161,7 @@ pub fn has_byte_in_word(word: u64, byte: u8) -> bool {
 ///
 /// # Hoare-logic Verification
 /// Pre:  { word ∈ u64, byte ∈ u8 }
-/// Post: { result = Some(min{i : word[i] == byte}) ∨ result = None }
+/// Post: { result = Some(min{i : word\[i\] == byte}) ∨ result = None }
 // Hoare-logic Verification Line 4: Radon Law verified.
 #[inline(always)]
 #[must_use]
@@ -192,7 +192,7 @@ pub fn first_byte_position(word: u64, byte: u8) -> Option<u32> {
 ///
 /// # Hoare-logic Verification
 /// Pre:  { word ∈ u64 }
-/// Post: { ∀ i: result[i] = if word[i] ∈ A..Z then word[i] | 0x20 else word[i] }
+/// Post: { ∀ i: result\[i\] = if word\[i\] ∈ A..Z then word\[i\] | 0x20 else word\[i\] }
 // Hoare-logic Verification Line 5: Radon Law verified.
 #[inline(always)]
 #[must_use]
@@ -217,7 +217,7 @@ pub fn to_lower_ascii_word(word: u64) -> u64 {
 ///
 /// # Hoare-logic Verification
 /// Pre:  { word ∈ u64 }
-/// Post: { ∀ i: result[i] = if word[i] ∈ a..z then word[i] & !0x20 else word[i] }
+/// Post: { ∀ i: result\[i\] = if word\[i\] ∈ a..z then word\[i\] & !0x20 else word\[i\] }
 // Hoare-logic Verification Line 6: Radon Law verified.
 #[inline(always)]
 #[must_use]
@@ -241,8 +241,8 @@ pub fn to_upper_ascii_word(word: u64) -> u64 {
 /// ```
 ///
 /// # Hoare-logic Verification
-/// Pre:  { bytes ∈ &[u8], target ∈ u8 }
-/// Post: { result = |{i : bytes[i] == target}| }
+/// Pre:  { bytes ∈ &\[u8\], target ∈ u8 }
+/// Post: { result = |{i : bytes\[i\] == target}| }
 // Hoare-logic Verification Line 7: Radon Law verified.
 #[must_use]
 pub fn count_byte_in_slice(bytes: &[u8], target: u8) -> usize {
@@ -276,8 +276,8 @@ pub fn count_byte_in_slice(bytes: &[u8], target: u8) -> usize {
 /// ```
 ///
 /// # Hoare-logic Verification
-/// Pre:  { bytes ∈ &[u8], target ∈ u8 }
-/// Post: { result = Some(min{i : bytes[i] == target}) ∨ result = None }
+/// Pre:  { bytes ∈ &\[u8\], target ∈ u8 }
+/// Post: { result = Some(min{i : bytes\[i\] == target}) ∨ result = None }
 // Hoare-logic Verification Line 8: Radon Law verified.
 #[must_use]
 pub fn find_first_byte_in_slice(bytes: &[u8], target: u8) -> Option<usize> {
@@ -316,8 +316,8 @@ pub fn find_first_byte_in_slice(bytes: &[u8], target: u8) -> Option<usize> {
 /// ```
 ///
 /// # Hoare-logic Verification
-/// Pre:  { bytes ∈ &[u8] }
-/// Post: { result = (∀ i: bytes[i] & 0x80 == 0) }
+/// Pre:  { bytes ∈ &\[u8\] }
+/// Post: { result = (∀ i: bytes\[i\] & 0x80 == 0) }
 // Hoare-logic Verification Line 9: Radon Law verified.
 #[must_use]
 pub fn is_all_ascii(bytes: &[u8]) -> bool {
@@ -358,7 +358,7 @@ pub fn is_all_ascii(bytes: &[u8]) -> bool {
 ///
 /// # Hoare-logic Verification
 /// Pre:  { word ∈ u64 }
-/// Post: { ∀ i: result[i] encodes character class of word[i] }
+/// Post: { ∀ i: result\[i\] encodes character class of word\[i\] }
 // Hoare-logic Verification Line 10: Radon Law verified.
 #[inline(always)]
 #[must_use]
@@ -402,7 +402,7 @@ pub fn swar_classify_bytes(word: u64) -> u64 {
 ///
 /// # Hoare-logic Verification
 /// Pre:  { word ∈ u64 }
-/// Post: { result = Some(Σ word[i]*10^(7-i)) ∨ result = None if any byte ∉ 0x30..0x39 }
+/// Post: { result = Some(Σ word\[i\]*10^(7-i)) ∨ result = None if any byte ∉ 0x30..0x39 }
 // Hoare-logic Verification Line 11: Radon Law verified.
 #[inline(always)]
 #[must_use]
@@ -481,7 +481,7 @@ pub fn parse_8_decimal_digits(word: u64) -> Option<u32> {
 ///
 /// # Hoare-logic Verification
 /// Pre:  { word ∈ u32 }
-/// Post: { result = Some(Σ hex(word[i])*16^(3-i)) ∨ result = None if any byte invalid }
+/// Post: { result = Some(Σ hex(word\[i\])*16^(3-i)) ∨ result = None if any byte invalid }
 // Hoare-logic Verification Line 12: Radon Law verified.
 #[inline(always)]
 #[must_use]
@@ -803,7 +803,7 @@ mod tests {
     #[test]
     fn test_parse_4_hex_valid_mixed() {
         let word = u32::from_le_bytes(*b"1A2f");
-        assert_eq!(parse_4_hex_digits(word), Some(0x1A2f));
+        assert_eq!(parse_4_hex_digits(word), Some(0x1A2F));
     }
 
     #[test]

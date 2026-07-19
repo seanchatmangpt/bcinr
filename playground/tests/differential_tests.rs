@@ -1,7 +1,38 @@
+#![cfg(not(miri))]
+#![allow(
+    unsafe_code,
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_wrap,
+    clippy::upper_case_acronyms,
+    clippy::unwrap_used,
+    clippy::too_many_lines,
+    clippy::too_many_arguments,
+    clippy::similar_names,
+    clippy::inline_always,
+    clippy::default_trait_access,
+    clippy::trivially_copy_pass_by_ref,
+    clippy::get_first,
+    clippy::unused_self,
+    clippy::recursive_format_impl,
+    clippy::large_stack_arrays,
+    clippy::to_string_in_format_args,
+    clippy::match_same_arms,
+    dead_code,
+    clippy::large_enum_variant,
+    clippy::unnecessary_wraps,
+    clippy::large_types_passed_by_value,
+    clippy::single_match_else,
+    clippy::wrong_self_convention,
+    clippy::mutable_key_type,
+    clippy::only_used_in_recursion,
+    clippy::vec_init_then_push,
+    clippy::needless_pass_by_value
+)]
 //! Differential tests: runs `playground`'s branchless Petri/POWL/YAWL
 //! primitives side by side against the `reference` module's plain-Rust
 //! reference implementations and asserts they agree.
-#![allow(unsafe_code)]
 
 mod reference;
 
@@ -322,14 +353,7 @@ proptest! {
         let is_preds_completed = diff == 0;
         let exec = is_scope_active && is_preds_completed;
 
-        if !exec {
-            // State fields should remain unchanged if not executable
-            assert_eq!(state.completed_ops, completed_ops);
-            assert_eq!(state.completed_branches, completed_branches);
-            assert_eq!(state.active_scopes, active_scopes);
-            assert_eq!(state.stack_depth, stack_depth);
-            assert_eq!(state.completed_loops, completed_loops);
-        } else {
+        if exec {
             match kind {
                 Powl64OpKind::Activity | Powl64OpKind::PartialOrderGate | Powl64OpKind::Promote | Powl64OpKind::Demote | Powl64OpKind::Watchdog => {
                     assert_eq!(state.completed_ops, completed_ops | succ_mask);
@@ -365,10 +389,10 @@ proptest! {
                     let should_repeat = ((loop_repeat >> (loop_id & 63)) & 1) != 0;
 
                     if is_enter {
-                        if !should_repeat {
-                            assert_eq!(state.completed_loops, completed_loops | loop_bit);
-                        } else {
+                        if should_repeat {
                             assert_eq!(state.completed_loops, completed_loops);
+                        } else {
+                            assert_eq!(state.completed_loops, completed_loops | loop_bit);
                         }
                         assert_eq!(state.completed_ops, completed_ops);
                     } else {
@@ -383,6 +407,13 @@ proptest! {
                     }
                 }
             }
+        } else {
+            // State fields should remain unchanged if not executable
+            assert_eq!(state.completed_ops, completed_ops);
+            assert_eq!(state.completed_branches, completed_branches);
+            assert_eq!(state.active_scopes, active_scopes);
+            assert_eq!(state.stack_depth, stack_depth);
+            assert_eq!(state.completed_loops, completed_loops);
         }
     }
 }
@@ -424,9 +455,9 @@ fn test_wasm_petri_replay_e2e_differential() {
     let ref_result = replay_trace(&bitmask_net, &ref_trace);
 
     // WASM API Replay
-    let in_masks = vec![1u64, 2u64];
-    let out_masks = vec![2u64, 4u64];
-    let trace_indices = vec![0u32, 1u32];
+    let in_masks = [1u64, 2u64];
+    let out_masks = [2u64, 4u64];
+    let trace_indices = [0u32, 1u32];
 
     let mut branchless_result =
         WasmReplayResult { missing: 99, remaining: 99, produced: 99, consumed: 99 };
@@ -440,7 +471,7 @@ fn test_wasm_petri_replay_e2e_differential() {
             2,
             trace_indices.as_ptr(),
             2,
-            &mut branchless_result,
+            &raw mut branchless_result,
         )
     };
 

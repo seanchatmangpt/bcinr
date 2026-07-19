@@ -36,7 +36,7 @@
 //! silently assumed away.
 //!
 //! `CausalSupportEdge`'s `AtomId`/`FluentId` fields are populated via
-//! [`atom_id`], a deterministic (not guaranteed collision-free) hash of the
+//! `atom_id`, a deterministic (not guaranteed collision-free) hash of the
 //! atom's label truncated to 32 bits — adequate for a witness field at the
 //! problem sizes this crate's `PDDL8_MAX_GROUND` bound implies, not a
 //! claimed bijection.

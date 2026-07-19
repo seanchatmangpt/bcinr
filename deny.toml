@@ -1,0 +1,69 @@
+# cargo-deny configuration (schema v2; targets cargo-deny >= 0.16).
+# Run locally with `cargo deny check` or `just deny`; enforced in CI.
+# Docs: https://embarkstudios.github.io/cargo-deny/
+
+[graph]
+all-features = true
+
+[advisories]
+version = 2
+# RustSec advisory DB — local cache and upstream URL.
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+# Vulnerabilities are always denied in this cargo-deny schema; `vulnerability`
+# and `notice` config keys were removed upstream (see EmbarkStudios/cargo-deny#611).
+unmaintained = "workspace"
+yanked = "warn"
+# Transitive-only, not fixable from this workspace's own Cargo.toml — see
+# .cargo/audit.toml for the full rationale per advisory. cargo-deny's default
+# graph doesn't reach playground's build-dependency-only advisories
+# (failure/paste/rand via chess), so only the quick-xml entries match here;
+# `cargo audit`'s ignore list (which does see the full build-dep graph)
+# covers all six.
+ignore = [
+    "RUSTSEC-2026-0194", # quick-xml 0.36.2, via wasm4pm-compat's own pin
+    "RUSTSEC-2026-0195", # quick-xml 0.36.2, via wasm4pm-compat's own pin
+]
+
+[licenses]
+version = 2
+# House policy: permissive licenses only. Copyleft (GPL/AGPL/LGPL) is denied
+# by omission so a transitive copyleft dep fails CI loudly.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-DFS-2016",
+    "Unicode-3.0",
+    "CC0-1.0",
+    "Zlib",
+    "MPL-2.0",
+    "BSL-1.0",
+    "0BSD",
+    # prolog8 (bcinr-pddl's admission-gate engine, load-bearing per
+    # CLAUDE.md) — source-available, converts to Apache-2.0 after its
+    # change date. Intentional, pre-existing house dependency.
+    "BUSL-1.1",
+]
+# pddl (bcinr-pddl's PDDL parser dep) is EUPL-1.2, a genuine OSI-approved
+# copyleft license. Deliberately NOT added to `allow` above — copyleft is
+# denied by omission so this keeps failing loudly until a human makes the
+# licensing call on it.
+confidence-threshold = 0.9
+exceptions = []
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# Path deps within the house ecosystem are allowed to use wildcard versions.
+allow-wildcard-paths = true
+deny = []
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = ["https://github.com/seanchatmangpt"]

@@ -78,7 +78,7 @@ pub fn tabulation_hash_init_tables(seed: u64, tables: &mut [[u64; 256]; 4]) {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

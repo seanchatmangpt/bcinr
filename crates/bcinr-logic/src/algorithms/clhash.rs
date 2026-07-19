@@ -48,7 +48,7 @@ mod tests {
     fn clhash_reference(val: u64, aux: u64) -> u64 {
         // Independent: use to-le-bytes derived 32-bit lanes and u128 product.
         let lo32 = |w: u64| (w as u32) as u64;
-        let hi32 = |w: u64| (w >> 32) as u64;
+        let hi32 = |w: u64| w >> 32;
         let s_lo = (lo32(val).wrapping_add(lo32(aux)) as u32) as u128;
         let s_hi = (hi32(val).wrapping_add(hi32(aux)) as u32) as u128;
         let nh = (s_lo * s_hi) as u64;

@@ -20,8 +20,8 @@
 //!
 //! All checks are combined into a branchless selection tree, guaranteeing $CC=1$.
 
-use crate::fixed::{NonNegativeFixed, SignedFixed, CanonicalMask};
-use crate::allocator::{const_lt_u32, const_select_u32, const_eq_u32};
+use crate::allocator::{const_eq_u32, const_lt_u32, const_select_u32};
+use crate::fixed::{NonNegativeFixed, SignedFixed};
 
 /// Telemetry safety and calibration indicators for the runtime observatory.
 ///
@@ -45,6 +45,9 @@ pub enum ObservatoryFlag {
     /// The measured scale is identical to the target leaf scale, indicating zero scaling update information.
     ScaleInert,
 
+    /// The proposal does not propose a delta, meaning it is unadmitted for recertification.
+    ModeDeltaUnadmitted,
+
     /// The successful validation state. The substrate passes all safety filters and is a candidate
     /// for recertification or normal deployment.
     RecertificationCandidate,
@@ -61,8 +64,9 @@ impl ObservatoryFlag {
     /// use bcinr_cmca::observatory::ObservatoryFlag;
     ///
     /// assert_eq!(ObservatoryFlag::from_u32(0), Some(ObservatoryFlag::NumericallyUncertain));
-    /// assert_eq!(ObservatoryFlag::from_u32(4), Some(ObservatoryFlag::RecertificationCandidate));
-    /// assert_eq!(ObservatoryFlag::from_u32(5), None);
+    /// assert_eq!(ObservatoryFlag::from_u32(4), Some(ObservatoryFlag::ModeDeltaUnadmitted));
+    /// assert_eq!(ObservatoryFlag::from_u32(5), Some(ObservatoryFlag::RecertificationCandidate));
+    /// assert_eq!(ObservatoryFlag::from_u32(6), None);
     /// ```
     pub fn from_u32(val: u32) -> Option<Self> {
         let lookup = [
@@ -70,14 +74,16 @@ impl ObservatoryFlag {
             Some(Self::GramDegenerate),
             Some(Self::Drifting),
             Some(Self::ScaleInert),
+            Some(Self::ModeDeltaUnadmitted),
             Some(Self::RecertificationCandidate),
-            None, None, None
+            None,
+            None,
         ];
-        
-        let in_bounds = const_lt_u32(val, 5);
-        let idx = const_select_u32(in_bounds, val, 5) as usize;
+
+        let in_bounds = const_lt_u32(val, 6);
+        let idx = const_select_u32(in_bounds, val, 6) as usize;
         let res = lookup[idx & 7];
-        
+
         res.filter(|_| in_bounds != 0)
     }
 }
@@ -87,36 +93,30 @@ const FLAGS: [ObservatoryFlag; 8] = [
     ObservatoryFlag::GramDegenerate,
     ObservatoryFlag::Drifting,
     ObservatoryFlag::ScaleInert,
-    ObservatoryFlag::RecertificationCandidate,
+    ObservatoryFlag::ModeDeltaUnadmitted,
     ObservatoryFlag::RecertificationCandidate,
     ObservatoryFlag::RecertificationCandidate,
     ObservatoryFlag::RecertificationCandidate,
 ];
 
+use crate::allocator::CertificateReceipt;
+
 /// Wraps a raw observatory flag code into a `Result` type branchlessly.
 ///
-/// A flag code of `4` (corresponding to `RecertificationCandidate`) represents success and
-/// maps to `Ok(())`. Any other flag code represents a failure mode and maps to `Err(ObservatoryFlag)`.
-///
-/// # Examples
-///
-/// ```rust
-/// use bcinr_cmca::observatory::{wrap_observatory_result, ObservatoryFlag};
-///
-/// assert_eq!(wrap_observatory_result(4), Ok(()));
-/// assert_eq!(wrap_observatory_result(2), Err(ObservatoryFlag::Drifting));
-/// ```
+/// A flag code of `5` (corresponding to `RecertificationCandidate`) represents success and
+/// maps to `Ok(CertificateReceipt)`. Any other flag code represents a failure mode and maps to `Err(ObservatoryFlag)`.
 ///
 /// # Branchless Contract
 ///
 /// Under the hood, this function maps the integer code into the static flag mapping
-/// array and uses a branchless array index selection based on the equality to `4`.
+/// array and uses a branchless array index selection based on the equality to `5`.
 pub fn wrap_observatory_result(
     flag_code: u32,
-) -> Result<(), ObservatoryFlag> {
+    digest: u64,
+) -> Result<CertificateReceipt, ObservatoryFlag> {
     let flag = FLAGS[(flag_code as usize) & 7];
-    let is_recert = const_eq_u32(flag_code, 4);
-    let outcomes = [Err(flag), Ok(())];
+    let is_recert = const_eq_u32(flag_code, 5);
+    let outcomes = [Err(flag), Ok(CertificateReceipt::new(digest))];
     outcomes[is_recert as usize]
 }
 
@@ -128,20 +128,16 @@ pub fn wrap_observatory_result(
 ///
 /// # Arguments
 ///
-/// * `kappa_hat` - The estimated condition number of the system.
-/// * `kappa_under` - The lower bound (conservative estimate) of the condition number.
+/// * `artifact` - The `MeasurementArtifact` containing telemetry metrics and proposal.
 /// * `epsilon_on` - The threshold limit for the condition number.
-/// * `_gamma_min_plus_hat` - The estimated minimum positive eigenvalue of the Gram matrix. (Unused but kept for contract symmetry).
-/// * `gamma_min_plus_under` - The lower bound (conservative estimate) of the minimum positive eigenvalue.
 /// * `epsilon_gram` - The threshold limit for the Gram eigenvalue.
-/// * `d_js` - The measured divergence (e.g., Jensen-Shannon distance) representing drift.
 /// * `epsilon_drift` - The threshold limit for drift divergence.
 /// * `s_meas` - The measured scale parameter of the current sample.
 /// * `s_leaf` - The target scale parameter at the leaf node.
 ///
 /// # Return Value
 ///
-/// Returns `Ok(())` if the system passes all safety gates (mapping to `RecertificationCandidate`).
+/// Returns `Ok(CertificateReceipt)` if the system passes all safety gates (mapping to `RecertificationCandidate`).
 /// Otherwise, returns an `Err(ObservatoryFlag)` indicating the first detected failure mode in the
 /// prioritization queue (highest priority to lowest priority):
 /// 1. `Drifting` (highest priority check)
@@ -149,72 +145,63 @@ pub fn wrap_observatory_result(
 /// 3. `NumericallyUncertain`
 /// 4. `GramDegenerate`
 ///
-/// # Examples
-///
-/// ```rust
-/// use bcinr_cmca::fixed::NonNegativeFixed;
-/// use bcinr_cmca::observatory::{evaluate_calibration, ObservatoryFlag};
-///
-/// // Example: Drifting state
-/// let result = evaluate_calibration(
-///     NonNegativeFixed::from_bits(131072),
-///     NonNegativeFixed::from_bits(131072),
-///     NonNegativeFixed::from_bits(65536),
-///     NonNegativeFixed::from_bits(131072),
-///     NonNegativeFixed::from_bits(131072),
-///     NonNegativeFixed::from_bits(65536),
-///     NonNegativeFixed::from_bits(131072), // d_js (2.0)
-///     NonNegativeFixed::from_bits(65536),  // epsilon_drift (1.0) -> Drift detected!
-///     NonNegativeFixed::ONE,
-///     NonNegativeFixed::from_bits(32768),
-/// );
-/// assert_eq!(result, Err(ObservatoryFlag::Drifting));
-/// ```
-///
 /// # Branchless Contract
 ///
 /// Checks are performed concurrently using bitwise masks. Prioritization is enforced using
 /// sequential branchless selections `const_select_u32`.
 pub fn evaluate_calibration(
-    kappa_hat: NonNegativeFixed,
-    kappa_under: NonNegativeFixed,
+    artifact: &MeasurementArtifact,
     epsilon_on: NonNegativeFixed,
-    _gamma_min_plus_hat: NonNegativeFixed,
-    gamma_min_plus_under: NonNegativeFixed,
     epsilon_gram: NonNegativeFixed,
-    d_js: NonNegativeFixed,
     epsilon_drift: NonNegativeFixed,
     s_meas: NonNegativeFixed,
     s_leaf: NonNegativeFixed,
-) -> Result<(), ObservatoryFlag> {
-    
+) -> Result<CertificateReceipt, ObservatoryFlag> {
+    let kappa_hat = artifact.point_estimate;
+    let kappa_under = artifact.lower_bound;
+    let gamma_min_plus_under = artifact.gram_lower_bound;
+    let d_js = artifact.drift;
+
     // Conditions
-    let is_drift = const_lt_u32(epsilon_drift.0, d_js.0);
-    
-    let is_scale_inert = const_eq_u32(s_meas.0, s_leaf.0);
-    
-    let kappa_hat_on = const_lt_u32(epsilon_on.0, kappa_hat.0) | const_eq_u32(epsilon_on.0, kappa_hat.0);
-    let kappa_under_off = const_lt_u32(kappa_under.0, epsilon_on.0);
+    #[cfg(not(feature = "mutant_9"))]
+    let is_drift = const_lt_u32(epsilon_drift.val, d_js.val);
+    #[cfg(feature = "mutant_9")]
+    let is_drift = const_lt_u32(d_js.val, epsilon_drift.val); // Mutated: drift check inverted
+
+    let is_scale_inert = const_eq_u32(s_meas.val, s_leaf.val);
+
+    let kappa_hat_on =
+        const_lt_u32(epsilon_on.val, kappa_hat.val) | const_eq_u32(epsilon_on.val, kappa_hat.val);
+    #[cfg(not(feature = "mutant_10"))]
+    let kappa_under_off = const_lt_u32(kappa_under.val, epsilon_on.val);
+    #[cfg(feature = "mutant_10")]
+    let kappa_under_off = const_lt_u32(epsilon_on.val, kappa_under.val); // Mutated: inverted
     let is_numerically_uncertain = kappa_hat_on & kappa_under_off;
-    
-    let kappa_under_on = const_lt_u32(epsilon_on.0, kappa_under.0) | const_eq_u32(epsilon_on.0, kappa_under.0);
-    
-    let gamma_under_off = const_lt_u32(gamma_min_plus_under.0, epsilon_gram.0);
-    
+
+    let kappa_under_on = const_lt_u32(epsilon_on.val, kappa_under.val)
+        | const_eq_u32(epsilon_on.val, kappa_under.val);
+
+    #[cfg(not(feature = "mutant_11"))]
+    let gamma_under_off = const_lt_u32(gamma_min_plus_under.val, epsilon_gram.val);
+    #[cfg(feature = "mutant_11")]
+    let gamma_under_off = const_lt_u32(epsilon_gram.val, gamma_min_plus_under.val); // Mutated: inverted
+
     let is_gram_degenerate = kappa_under_on & gamma_under_off;
-    
-    let is_recert = kappa_under_on & (!gamma_under_off);
-    
-    let mut flag = 4u32; // Default to Ok
-    flag = const_select_u32(is_recert, 4, flag);
+
+    let is_unadmitted = const_eq_u32(artifact.proposal as u32, ModeDelta::Retain as u32);
+
+    let is_recert = kappa_under_on & (!gamma_under_off) & (!is_unadmitted);
+
+    let mut flag = 5u32; // Default to Ok
+    flag = const_select_u32(is_recert, 5, flag);
+    flag = const_select_u32(is_unadmitted, 4, flag);
     flag = const_select_u32(is_gram_degenerate, 1, flag);
     flag = const_select_u32(is_numerically_uncertain, 0, flag);
     flag = const_select_u32(is_scale_inert, 3, flag);
     flag = const_select_u32(is_drift, 2, flag);
-    
-    wrap_observatory_result(flag)
-}
 
+    wrap_observatory_result(flag, artifact.control_mode_digest)
+}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct SupportStanding {
@@ -244,12 +231,13 @@ pub struct MeasurementArtifact {
     pub proposal: ModeDelta,
 }
 
-use crate::{unroll_8_static, unroll_4_static};
-use crate::generated::case_studies::{N, K, Q};
 use crate::allocator::const_max_i32;
+use crate::generated::case_studies::{K, N};
+use crate::{unroll_4_static, unroll_8_static};
 
 /// Measures the divergence metric $\kappa_v$ and produces a MeasurementArtifact branchlessly.
 #[inline(never)]
+#[allow(clippy::too_many_arguments)] // deliberate wide parameter list for a hot, branchless measurement kernel
 pub fn measure_kappa(
     v: usize,
     _q_idx: usize,
@@ -262,77 +250,90 @@ pub fn measure_kappa(
     q_val: SignedFixed,
 ) -> MeasurementArtifact {
     let k_masked = k & 3;
-    
+
     let mut x = [0i32; N];
-    unroll_8_static!(i, {
+    unroll_8_static!(I, {
         let mut log_m = 0u32;
-        unroll_4_static!(k_idx, {
-            let matches = const_eq_u32(k_masked as u32, k_idx as u32);
-            log_m = const_select_u32(matches, node_masses[k_idx & 3][i & 7].log2().0 as u32, log_m);
+        unroll_4_static!(K_IDX, {
+            let matches = const_eq_u32(k_masked as u32, K_IDX as u32);
+            log_m = const_select_u32(
+                matches,
+                node_masses[K_IDX & 3][I & 7].log2().val as u32,
+                log_m,
+            );
         });
-        let q_signed = q_val.0 as i32;
-        x[i & 7] = (((q_signed as i64).wrapping_mul(log_m as i32 as i64)) >> 16) as i32;
+        let q_signed = q_val.val;
+        x[I & 7] = (((q_signed as i64).wrapping_mul(log_m as i32 as i64)) >> 16) as i32;
     });
-    
+
     let mut x_max_meas = i32::MIN;
-    unroll_8_static!(j, {
-        let is_child = const_eq_u32(parent[j & 7] as u32, v as u32);
-        let x_safe = const_select_u32(is_child, x[j & 7] as u32, i32::MIN as u32) as i32;
+    unroll_8_static!(J, {
+        let is_child = const_eq_u32(parent[J & 7] as u32, v as u32);
+        let x_safe = const_select_u32(is_child, x[J & 7] as u32, i32::MIN as u32) as i32;
         x_max_meas = const_max_i32(x_max_meas, x_safe);
     });
-    
+
     let mut sum_exp_meas = NonNegativeFixed::ZERO;
-    unroll_8_static!(j, {
-        let is_child = const_eq_u32(parent[j & 7] as u32, v as u32);
-        let a_prime = x[j & 7].wrapping_sub(x_max_meas);
-        let exp_val = SignedFixed(a_prime).exp2();
-        sum_exp_meas += NonNegativeFixed(const_select_u32(is_child, exp_val.0, 0));
+    unroll_8_static!(J, {
+        let is_child = const_eq_u32(parent[J & 7] as u32, v as u32);
+        let a_prime = x[J & 7].wrapping_sub(x_max_meas);
+        let exp_val = SignedFixed::from_bits(a_prime).exp2();
+        sum_exp_meas += NonNegativeFixed::from_bits(const_select_u32(is_child, exp_val.val, 0));
     });
-    let l_meas = x_max_meas.wrapping_add(sum_exp_meas.log2().0 as i32);
+    let l_meas = x_max_meas.wrapping_add(sum_exp_meas.log2().val);
 
     let mut x_max_leaf = i32::MIN;
-    unroll_8_static!(x_idx, {
-        let is_sub = is_subtree_leaf_v[x_idx & 7];
-        let x_safe = const_select_u32(is_sub as u32, x[x_idx & 7] as u32, i32::MIN as u32) as i32;
+    unroll_8_static!(X_IDX, {
+        let is_sub = is_subtree_leaf_v[X_IDX & 7];
+        let x_safe = const_select_u32(is_sub as u32, x[X_IDX & 7] as u32, i32::MIN as u32) as i32;
         x_max_leaf = const_max_i32(x_max_leaf, x_safe);
     });
-    
-    let mut sum_exp_leaf = NonNegativeFixed::ZERO;
-    unroll_8_static!(x_idx, {
-        let is_sub = is_subtree_leaf_v[x_idx & 7];
-        let a_prime = x[x_idx & 7].wrapping_sub(x_max_leaf);
-        let exp_val = SignedFixed(a_prime).exp2();
-        sum_exp_leaf += NonNegativeFixed(const_select_u32(is_sub as u32, exp_val.0, 0));
-    });
-    let l_leaf = x_max_leaf.wrapping_add(sum_exp_leaf.log2().0 as i32);
 
-    let mut kappa = NonNegativeFixed::ZERO;
-    unroll_8_static!(c, {
-        let is_child = const_eq_u32(parent[c & 7] as u32, v as u32);
-        
+    let mut sum_exp_leaf = NonNegativeFixed::ZERO;
+    unroll_8_static!(X_IDX, {
+        let is_sub = is_subtree_leaf_v[X_IDX & 7];
+        let a_prime = x[X_IDX & 7].wrapping_sub(x_max_leaf);
+        let exp_val = SignedFixed::from_bits(a_prime).exp2();
+        sum_exp_leaf +=
+            NonNegativeFixed::from_bits(const_select_u32(is_sub as u32, exp_val.val, 0));
+    });
+    let l_leaf = x_max_leaf.wrapping_add(sum_exp_leaf.log2().val);
+
+    let mut kappa_i64 = 0i64;
+    unroll_8_static!(C, {
+        let is_child = const_eq_u32(parent[C & 7] as u32, v as u32);
+
         let mut x_max_c = i32::MIN;
-        unroll_8_static!(x_idx, {
-            let is_sub_c = is_subtree_leaf[c & 7][x_idx & 7];
-            let x_safe = const_select_u32(is_sub_c as u32, x[x_idx & 7] as u32, i32::MIN as u32) as i32;
+        unroll_8_static!(X_IDX, {
+            let is_sub_c = is_subtree_leaf[C & 7][X_IDX & 7];
+            let x_safe =
+                const_select_u32(is_sub_c as u32, x[X_IDX & 7] as u32, i32::MIN as u32) as i32;
             x_max_c = const_max_i32(x_max_c, x_safe);
         });
-        
+
         let mut sum_exp_c = NonNegativeFixed::ZERO;
-        unroll_8_static!(x_idx, {
-            let is_sub_c = is_subtree_leaf[c & 7][x_idx & 7];
-            let a_prime = x[x_idx & 7].wrapping_sub(x_max_c);
-            let exp_val = SignedFixed(a_prime).exp2();
-            sum_exp_c += NonNegativeFixed(const_select_u32(is_sub_c as u32, exp_val.0, 0));
+        unroll_8_static!(X_IDX, {
+            let is_sub_c = is_subtree_leaf[C & 7][X_IDX & 7];
+            let a_prime = x[X_IDX & 7].wrapping_sub(x_max_c);
+            let exp_val = SignedFixed::from_bits(a_prime).exp2();
+            sum_exp_c +=
+                NonNegativeFixed::from_bits(const_select_u32(is_sub_c as u32, exp_val.val, 0));
         });
-        let l_c = x_max_c.wrapping_add(sum_exp_c.log2().0 as i32);
-        
+        let l_c = x_max_c.wrapping_add(sum_exp_c.log2().val);
+
         let log_ratio = l_c.wrapping_sub(l_meas);
-        let s_leaf_c = NonNegativeFixed(SignedFixed(l_c.wrapping_sub(l_leaf)).exp2().0);
-        
-        let term = s_leaf_c.0 as u64 * log_ratio as u64;
-        kappa += NonNegativeFixed(const_select_u32(is_child, (term >> 16) as u32, 0));
+        let s_leaf_c = NonNegativeFixed::from_bits(
+            SignedFixed::from_bits(l_c.wrapping_sub(l_leaf)).exp2().val,
+        );
+
+        let term = (s_leaf_c.val as i64).wrapping_mul(log_ratio as i64);
+        let term_selected = const_select_u32(is_child, (term >> 16) as u32, 0) as i32 as i64;
+        kappa_i64 = kappa_i64.wrapping_add(term_selected);
     });
-    
+
+    let kappa_clipped = const_select_u32((kappa_i64 < 0) as u32, 0, kappa_i64 as u32);
+    let kappa = NonNegativeFixed::from_bits(kappa_clipped);
+
     MeasurementArtifact {
         point_estimate: kappa,
         lower_bound: kappa,

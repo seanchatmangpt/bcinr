@@ -1,3 +1,11 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::unwrap_used,
+    clippy::too_many_lines,
+    clippy::too_many_arguments,
+    clippy::format_collect
+)]
 //! Attaches the playground's branchless process-intelligence (the Petri-net token
 //! replay engine) to the chess decision engine.
 //!
@@ -29,7 +37,7 @@ const EVALUATED: u64 = 1 << 2;
 const SEARCHED: u64 = 1 << 3;
 const SELECTED: u64 = 1 << 4;
 
-/// Lawful transitions: (name, in_place, out_place). Firing consumes the input
+/// Lawful transitions: (name, `in_place`, `out_place`). Firing consumes the input
 /// place's token and produces the output place's token.
 const TRANSITIONS: &[(&str, u64, u64)] = &[
     ("Perceive", READY, PERCEIVED),
@@ -176,7 +184,7 @@ fn main() {
         r.consumed,
         r.produced
     );
-    println!("  final receipt = {}", log.last().map(|e| e.receipt.as_str()).unwrap_or("-"));
+    println!("  final receipt = {}", log.last().map_or("-", |e| e.receipt.as_str()));
 
     // --- Negative test: one decision skips the lawful Evaluate stage. ---
     let mut board = Board::default();

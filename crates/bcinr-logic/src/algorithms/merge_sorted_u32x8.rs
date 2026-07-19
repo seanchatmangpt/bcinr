@@ -74,7 +74,7 @@ pub fn merge_sorted_u32x8(a: [u32; 4], b: [u32; 4]) -> [u32; 8] {
     c
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

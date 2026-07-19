@@ -35,11 +35,7 @@ mod tests {
     // -------------------------------------------------------------------------
     fn abs_diff_u64_reference(val: u64, aux: u64) -> u64 {
         // Independent: order the pair, subtract larger minus smaller.
-        if val >= aux {
-            val - aux
-        } else {
-            aux - val
-        }
+        val.abs_diff(aux)
     }
 
     // -------------------------------------------------------------------------

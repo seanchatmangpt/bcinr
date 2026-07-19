@@ -53,7 +53,7 @@ pub fn optimal_sort_5_u32(mut a: [u32; 5]) -> [u32; 5] {
     a
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

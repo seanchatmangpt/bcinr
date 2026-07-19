@@ -11,7 +11,7 @@ pub fn simd_strstr_branchless(val: u64, aux: u64) -> u64 {
     (zero_bytes.trailing_zeros() as u64 >> 3) * found + 8 * (1 - found)
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;

@@ -76,7 +76,7 @@ pub fn fnv1a_64_hash(data: &[u8]) -> u64 {
     hash
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;
@@ -226,7 +226,6 @@ pub mod bench {
     use alloc::vec::Vec;
     use criterion::{black_box, Criterion};
     #[cfg(feature = "alloc")]
-
     pub fn bench_fnv1a_64_hash(c: &mut Criterion) {
         #[cfg(feature = "alloc")]
         {

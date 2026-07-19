@@ -42,7 +42,7 @@ pub fn fp_sin_u32_q16(val: u64, _aux: u64) -> u64 {
     result as u64
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;
@@ -80,8 +80,8 @@ mod tests {
     // -------------------------------------------------------------------------
     #[test]
     fn test_fp_sin_u32_q16_cardinal_angles() {
-        // 0 degrees: sin(0) = 0
-        assert_eq!(fp_sin_u32_q16(0 * 65536, 0), 0u64);
+        // 0 degrees (0 * 65536 in Q16): sin(0) = 0
+        assert_eq!(fp_sin_u32_q16(0, 0), 0u64);
         // 90 degrees: sin(90) = 1.0, Q16 = 65536
         assert_eq!(fp_sin_u32_q16(90 * 65536, 0), 65536u64);
         // 180 degrees: sin(180) = 0

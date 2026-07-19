@@ -60,7 +60,7 @@ pub fn polynomial_hash_u64(data: &[u8], base: u64, prime: u64) -> u64 {
     hash
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;
@@ -215,7 +215,6 @@ pub mod bench {
     use alloc::vec::Vec;
     use criterion::{black_box, Criterion};
     #[cfg(feature = "alloc")]
-
     pub fn bench_polynomial_hash_u64(c: &mut Criterion) {
         #[cfg(feature = "alloc")]
         {

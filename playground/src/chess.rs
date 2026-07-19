@@ -1,3 +1,4 @@
+#![allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap, clippy::cast_sign_loss)]
 //! Branchless Bitboard Chess Engine mapping for Binarized GNN evaluation.
 //!
 //! Enforces CC=1 by resolving piece movements as 64-bit integer physics.
@@ -28,6 +29,7 @@ const _: () = assert!(core::mem::align_of::<ChessBitboard>() == 64);
 impl ChessBitboard {
     /// Initializes a standard chess starting position (simplified).
     /// Ranks 1 & 2 for White, Ranks 7 & 8 for Black.
+    #[must_use]
     pub fn starting_position() -> Self {
         Self {
             white_pieces: 0x0000_0000_0000_FFFF, // First 16 squares
@@ -40,6 +42,7 @@ impl ChessBitboard {
     /// Generates forward pseudo-legal pawn pushes for White simultaneously.
     /// CC=1 logic: Left-shift all white pawns by 8 squares, mask with empty squares.
     #[inline(always)]
+    #[must_use]
     pub fn white_pawn_pushes(&self, white_pawns: u64) -> u64 {
         let empty_squares = !(self.white_pieces | self.black_pieces);
         (white_pawns << 8) & empty_squares

@@ -1,3 +1,25 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::too_many_lines,
+    clippy::too_many_arguments,
+    clippy::needless_range_loop,
+    clippy::unwrap_used,
+    clippy::similar_names,
+    clippy::cast_lossless,
+    clippy::cast_possible_wrap,
+    clippy::ptr_arg,
+    clippy::enum_variant_names,
+    clippy::let_and_return,
+    clippy::unnecessary_wraps,
+    clippy::trivially_copy_pass_by_ref,
+    clippy::unused_self,
+    clippy::absurd_extreme_comparisons,
+    clippy::len_zero,
+    clippy::large_types_passed_by_value,
+    clippy::wrong_self_convention
+)]
 //! Minimal UCI (Universal Chess Interface) engine driver backed by
 //! `playground`'s `BranchTorchNNUE` evaluator — reads UCI commands from
 //! stdin, drives search/evaluation, and writes UCI responses to stdout.
@@ -28,8 +50,7 @@ fn board_to_accumulator(b: &Board, nnue: &playground::nnue::BranchTorchNNUE) -> 
         chess::Piece::Queen,
         chess::Piece::King,
     ];
-    let mut p_idx = 0;
-    for &p in &pieces {
+    for (p_idx, &p) in pieces.iter().enumerate() {
         let w_bb = *b.color_combined(Color::White) & *b.pieces(p);
         for sq in w_bb {
             let sq_idx = sq.to_index();
@@ -44,7 +65,6 @@ fn board_to_accumulator(b: &Board, nnue: &playground::nnue::BranchTorchNNUE) -> 
                 hidden[i] += nnue.l1_weights[i][(p_idx + 6) * 64 + sq_idx];
             }
         }
-        p_idx += 1;
     }
     Accumulator { hidden }
 }
@@ -138,12 +158,12 @@ fn alphabeta(
 ) -> f32 {
     *nodes += 1;
 
-    if *nodes % 2048 == 0 && start_time.elapsed().as_millis() >= max_time_ms {
+    if (*nodes).is_multiple_of(2048) && start_time.elapsed().as_millis() >= max_time_ms {
         return 0.0; // Time out
     }
 
     if board.status() == BoardStatus::Checkmate {
-        return -100000.0 + (100 - depth) as f32;
+        return -100_000.0 + (100 - depth) as f32;
     }
     if board.status() == BoardStatus::Stalemate {
         return 0.0;
@@ -156,7 +176,7 @@ fn alphabeta(
     let mut moves: Vec<ChessMove> = MoveGen::new_legal(board).collect();
     order_moves(board, &mut moves);
 
-    let mut best_val = -1000000.0;
+    let mut best_val = -1_000_000.0;
     let mut local_alpha = alpha;
 
     for m in moves {
@@ -245,7 +265,7 @@ fn latency_probe(board: &Board, depth: usize, iters: usize) {
         pick(0.50),
         pick(0.99),
         samples[iters - 1],
-        mv.map(|m| m.to_string()).unwrap_or_else(|| "none".into())
+        mv.map_or_else(|| "none".into(), |m| m.to_string())
     );
 }
 
@@ -259,10 +279,10 @@ fn search_best_move(board: &Board, max_time_ms: u128) -> Option<ChessMove> {
         let mut moves: Vec<ChessMove> = MoveGen::new_legal(board).collect();
         order_moves(board, &mut moves);
 
-        let mut best_val = -1000000.0;
+        let mut best_val = -1_000_000.0;
         let mut best_move = None;
-        let mut alpha = -1000000.0;
-        let beta = 1000000.0;
+        let mut alpha = -1_000_000.0;
+        let beta = 1_000_000.0;
 
         for m in &moves {
             let child = board.make_move_new(*m);
@@ -304,7 +324,7 @@ fn search_best_move(board: &Board, max_time_ms: u128) -> Option<ChessMove> {
             depth,
             nodes,
             elapsed,
-            (nodes as u128 * 1000) / elapsed.max(1)
+            (u128::from(nodes) * 1000) / elapsed.max(1)
         );
     }
 
@@ -388,13 +408,13 @@ fn main() {
                     search_best_move(&board, max_time_ms)
                 };
                 if let Some(m) = chosen {
-                    println!("bestmove {}", m);
+                    println!("bestmove {m}");
                 } else {
                     let moves: Vec<ChessMove> = MoveGen::new_legal(&board).collect();
-                    if !moves.is_empty() {
-                        println!("bestmove {}", moves[0]);
-                    } else {
+                    if moves.is_empty() {
                         println!("bestmove 0000");
+                    } else {
+                        println!("bestmove {}", moves[0]);
                     }
                 }
             }

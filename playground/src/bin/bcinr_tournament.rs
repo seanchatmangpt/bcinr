@@ -1,3 +1,18 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_wrap,
+    clippy::too_many_lines,
+    clippy::too_many_arguments,
+    clippy::unwrap_used,
+    clippy::similar_names,
+    clippy::let_and_return,
+    clippy::trivially_copy_pass_by_ref,
+    clippy::let_unit_value,
+    clippy::large_types_passed_by_value,
+    clippy::wrong_self_convention
+)]
 //! Honest Elo measurement harness for the BCINR UCI engine.
 //!
 //! Plays a match of real games against Stockfish (capped to a known `UCI_Elo`),
@@ -11,7 +26,7 @@
 //! Usage: `bcinr_tournament [opponent_elo] [games] [bcinr_movetime_ms] [sf_go_mode]`
 //!
 //! `sf_go_mode` controls how Stockfish is queried for each move:
-//!   - `depth1`     => `go depth 1`     (absolute fastest; ~58µs warmed up) [DEFAULT]
+//!   - `depth1`     => `go depth 1`     (absolute fastest; ~58µs warmed up) \[DEFAULT\]
 //!   - `fast`       => `go movetime 10`
 //!   - `calibrated` => `go movetime 100`
 //!
@@ -238,12 +253,9 @@ fn play_game(
             s
         };
 
-        let mv = match parse_uci(&mv_str) {
-            Some(m) => m,
-            None => {
-                // No legal move offered (resign / "(none)"): mover loses.
-                return if bcinr_to_move { Outcome::StockfishWin } else { Outcome::BcinrWin };
-            }
+        let Some(mv) = parse_uci(&mv_str) else {
+            // No legal move offered (resign / "(none)"): mover loses.
+            return if bcinr_to_move { Outcome::StockfishWin } else { Outcome::BcinrWin };
         };
 
         // Independent legality check: an illegal move forfeits the game.

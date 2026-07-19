@@ -1,3 +1,9 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    clippy::missing_errors_doc
+)]
 //! BranchTorch: Zero-Allocation Branchless Training Framework.
 //!
 //! A `#![no_std]` evolutionary matrix that strictly mutates and trains
@@ -20,7 +26,7 @@ pub struct BranchlessRng {
 impl BranchlessRng {
     /// Generates the next random u64 using pure branchless arithmetic.
     #[inline(always)]
-    pub fn next(&mut self) -> u64 {
+    pub fn next_u64(&mut self) -> u64 {
         let mut x = self.seed;
         x ^= x << 13;
         x ^= x >> 7;
@@ -33,7 +39,7 @@ impl BranchlessRng {
 /// Executes a branchless evolutionary mutation step across a BGNN layer.
 ///
 /// Instead of backpropagation (which relies on expensive floating-point gradients
-/// and calculus), BranchTorch utilizes bitwise Genetic Algorithm permutations.
+/// and calculus), `BranchTorch` utilizes bitwise Genetic Algorithm permutations.
 /// It iterates over the neural matrix and stochastically flips weight bits
 /// based on the RNG mask in constant O(1) clock cycles.
 ///
@@ -62,17 +68,17 @@ pub fn mutate_weights_branchless(
     // CC=1 unrolled mutation matrix
     for i in 0..64 {
         // Generate a random bitmask
-        let mutation_mask = rng.next();
+        let mutation_mask = rng.next_u64();
 
         // Isolate roughly ~1.5% of bits to randomly flip using sparse ANDing
-        let sparse_flip = mutation_mask & rng.next() & rng.next() & rng.next();
+        let sparse_flip = mutation_mask & rng.next_u64() & rng.next_u64() & rng.next_u64();
 
         // Branchlessly flip the selected weights using XOR
         layer.weights[i] ^= sparse_flip;
     }
 
     // Mutate bias
-    layer.bias ^= rng.next() & rng.next() & rng.next() & rng.next();
+    layer.bias ^= rng.next_u64() & rng.next_u64() & rng.next_u64() & rng.next_u64();
 
     Ok(())
 }

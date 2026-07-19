@@ -1,3 +1,4 @@
+#![cfg(not(miri))]
 //! Hoare-logic oracle tests: property-based checks that `playground`'s
 //! branchless Petri/POWL/YAWL primitives satisfy their stated pre/post-
 //! condition invariants across randomized inputs, not just fixed examples.
@@ -179,7 +180,7 @@ proptest! {
 
             let has_reset = (engine_pre.state_mask & task.reset_mask) != 0;
             let has_reset_tokens_mask = if has_reset { !0u64 } else { 0u64 } & allowed_by_lock_mask;
-            let reset_bit = 1u64.wrapping_shl(task.join_state_bit as u32 & 63);
+            let reset_bit = 1u64.wrapping_shl(u32::from(task.join_state_bit) & 63);
 
             let expected_state = engine_pre.state_mask & !(task.reset_mask & has_reset_tokens_mask);
             let expected_fired_joins = engine_pre.fired_joins_mask & !(reset_bit & has_reset_tokens_mask);
@@ -263,7 +264,7 @@ proptest! {
             completed_loops,
         };
 
-        let state_pre = state.clone();
+        let state_pre = state;
 
         powl64_execute_step(&mut state, &op, input_choice, loop_repeat);
 

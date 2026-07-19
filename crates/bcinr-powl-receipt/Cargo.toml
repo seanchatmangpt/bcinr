@@ -5,6 +5,9 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "OCEL event emission and causal receipt generation for bcinr-powl"
 repository = "https://github.com/seanchatmangpt/bcinr"
+keywords = ["powl", "workflow", "receipt", "blake3", "ocel"]
+categories = ["algorithms"]
+readme = "../../README.md"
 
 [dependencies]
 bcinr-powl = { path = "../bcinr-powl", version = "26.6.25" }

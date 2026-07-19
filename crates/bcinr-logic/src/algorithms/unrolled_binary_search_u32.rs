@@ -75,8 +75,8 @@ mod tests {
     fn unrolled_binary_search_u32_reference(val: u64, aux: u64) -> u64 {
         // Independent oracle: a real loop-based binary search for the lower
         // bound of `k` in the identity array [0, len). Equivalent to min(k,len).
-        let len = (val & 0xFFFF_FFFF) as u64;
-        let k = (aux & 0xFFFF_FFFF) as u64;
+        let len = val & 0xFFFF_FFFF;
+        let k = aux & 0xFFFF_FFFF;
         let mut lo = 0u64;
         let mut hi = len;
         while lo < hi {

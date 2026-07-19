@@ -42,7 +42,7 @@ mod tests {
     fn misra_gries_add_reference(val: u64, aux: u64) -> u64 {
         // Independent: ordinary branch on the match signal with checked arithmetic.
         if aux != 0 {
-            val.checked_add(1).unwrap_or(u64::MAX)
+            val.saturating_add(1)
         } else if val == 0 {
             0
         } else {

@@ -1,3 +1,9 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    clippy::inline_always
+)]
 //! Branchless Petri net token replay engine implementation.
 //! Adheres strictly to bcinr's Radon Law (CC=1), zero-alloc, and no_std constraints.
 
@@ -21,6 +27,7 @@ pub struct ReplayResult {
 
 impl ReplayResult {
     /// Creates a new `ReplayResult`.
+    #[must_use]
     pub const fn new(missing: u32, remaining: u32, produced: u32, consumed: u32) -> Self {
         Self { missing, remaining, produced, consumed }
     }
@@ -30,6 +37,7 @@ impl ReplayResult {
     /// Fitness is computed as:
     /// `1.0 - (missing + remaining) / (consumed + missing + produced)`
     /// Returns 1.0 if the denominator is 0.
+    #[must_use]
     pub fn fitness(&self) -> f64 {
         let denom_u32 = self.consumed.wrapping_add(self.missing).wrapping_add(self.produced);
         let is_zero = is_zero_mask_u32(denom_u32);
@@ -44,6 +52,7 @@ impl ReplayResult {
     }
 
     /// Returns true if the replay was perfect (no missing and no remaining tokens).
+    #[must_use]
     pub fn is_perfect(&self) -> bool {
         let sum = self.missing | self.remaining;
         sum == 0
@@ -103,9 +112,9 @@ pub fn petri_fire_invisible(marking: &mut u64, inv_in_masks: &[u64], inv_out_mas
             let diff = (*marking & in_mask) ^ in_mask;
             let lo_zero = is_zero_mask_u32(diff as u32);
             let hi_zero = is_zero_mask_u32((diff >> 32) as u32);
-            let zero_mask_64 = ((lo_zero & hi_zero) as u64) | (((lo_zero & hi_zero) as u64) << 32);
+            let zero_mask_64 = u64::from(lo_zero & hi_zero) | (u64::from(lo_zero & hi_zero) << 32);
 
-            let is_valid_64 = (is_valid as u64) | ((is_valid as u64) << 32);
+            let is_valid_64 = u64::from(is_valid) | (u64::from(is_valid) << 32);
             let is_enabled = zero_mask_64 & is_valid_64;
 
             // Can it fire? (is_enabled & not already_fired)

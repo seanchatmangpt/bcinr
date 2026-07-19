@@ -2,14 +2,14 @@ use super::super::*;
 
 #[test]
 fn test_tier2_f1_invalid_manifest() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let out = run_cargo_cmd(&["check", "--manifest-path", "non_existent.toml"]);
     assert_status_not(&out, 0);
 }
 
 #[test]
 fn test_tier2_f1_invalid_syntax_fails_check() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let mut ctx = TestCtx::new();
     ctx.create_temp_algo_file("temp_invalid", "pub fn error_syntax { invalid;", true);
     let out = run_cargo_cmd(&["check", "-p", "bcinr-logic"]);
@@ -18,21 +18,21 @@ fn test_tier2_f1_invalid_syntax_fails_check() {
 
 #[test]
 fn test_tier2_f1_offline_mode() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let out = run_cargo_cmd(&["check", "-p", "bcinr-core", "--offline"]);
     assert_status_in(&out, &[0, 1, 101]);
 }
 
 #[test]
 fn test_tier2_f1_nonexistent_test_filter() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let out = run_cargo_cmd(&["test", "-p", "bcinr-core", "nonexistent_test_filter_xyz"]);
     assert_status_in(&out, &[0, 1, 101]);
 }
 
 #[test]
 fn test_tier2_f1_check_quiet() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let out = run_cargo_cmd(&["check", "-p", "bcinr-core", "--quiet"]);
     assert_status_in(&out, &[0, 1, 101]);
 }
@@ -43,14 +43,14 @@ fn test_tier2_f1_check_quiet() {
 
 #[test]
 fn test_tier1_f2_run_tool() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let out = run_gate_cmd();
     assert_status_eq(&out, 0);
 }
 
 #[test]
 fn test_tier1_f2_output_contains_header() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let out = run_gate_cmd();
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(str_has_substr(&stdout, "BCINR INTEGRITY AUDIT"));
@@ -58,7 +58,7 @@ fn test_tier1_f2_output_contains_header() {
 
 #[test]
 fn test_tier1_f2_scan_logic_files() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let out = run_gate_cmd();
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(str_has_substr(&stdout, "Verified"));
@@ -66,7 +66,7 @@ fn test_tier1_f2_scan_logic_files() {
 
 #[test]
 fn test_tier1_f2_has_expected_error() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let out = run_gate_cmd();
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(!str_has_substr(&stdout, "MISSING_U64_CONTRACT"));
@@ -74,14 +74,14 @@ fn test_tier1_f2_has_expected_error() {
 
 #[test]
 fn test_tier1_f2_runs_with_no_errors_on_empty() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let out = run_gate_cmd();
     assert_status_eq(&out, 0);
 }
 
 #[test]
 fn test_tier2_f2_complexity_fail() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let mut ctx = TestCtx::new();
     ctx.create_temp_algo_file("temp_gate_complex", 
                                "/// Branchless Contract\npub fn temp_complex(val: u64, aux: u64) -> u64 {\n    if val > 0 { val } else { aux }\n}",
@@ -95,7 +95,7 @@ fn test_tier2_f2_complexity_fail() {
 
 #[test]
 fn test_tier2_f2_forbidden_ops_fail() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let mut ctx = TestCtx::new();
     ctx.create_temp_algo_file("temp_gate_add_bitwise", 
                                "/// Branchless Contract\npub fn add_bitwise(val: u64, aux: u64) -> u64 {\n    val + aux\n}",
@@ -109,7 +109,7 @@ fn test_tier2_f2_forbidden_ops_fail() {
 
 #[test]
 fn test_tier2_f2_missing_comment_fail() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let mut ctx = TestCtx::new();
     ctx.create_temp_algo_file(
         "temp_gate_missing",
@@ -124,9 +124,9 @@ fn test_tier2_f2_missing_comment_fail() {
 
 #[test]
 fn test_tier2_f2_ignore_non_rust() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let mut ctx = TestCtx::new();
-    let file_path = Path::new("/Users/sac/bcinr")
+    let file_path = Path::new(get_repo_root().to_str().unwrap())
         .join("crates/bcinr-logic/src/algorithms/temp_gate_ignore.txt");
     fs::write(&file_path, "Random non-rust content.").unwrap();
     ctx.to_cleanup.push(file_path);
@@ -137,7 +137,7 @@ fn test_tier2_f2_ignore_non_rust() {
 
 #[test]
 fn test_tier2_f2_legacy_mod_rs_skipped() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let out = run_gate_cmd();
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(!str_has_substr(
@@ -152,10 +152,10 @@ fn test_tier2_f2_legacy_mod_rs_skipped() {
 
 #[test]
 fn test_tier1_f3_cargo_fmt_check() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let out = Command::new("cargo")
         .args(["fmt", "--check"])
-        .current_dir("/Users/sac/bcinr")
+        .current_dir(get_repo_root().to_str().unwrap())
         .output()
         .unwrap();
     assert_status_in(&out, &[0, 1]);
@@ -163,10 +163,10 @@ fn test_tier1_f3_cargo_fmt_check() {
 
 #[test]
 fn test_tier1_f3_cargo_clippy() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let out = Command::new("cargo")
         .args(["clippy", "--quiet"])
-        .current_dir("/Users/sac/bcinr")
+        .current_dir(get_repo_root().to_str().unwrap())
         .output()
         .unwrap();
     assert_status_in(&out, &[0, 1, 101]);
@@ -174,10 +174,10 @@ fn test_tier1_f3_cargo_clippy() {
 
 #[test]
 fn test_tier1_f3_clippy_on_logic() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let out = Command::new("cargo")
         .args(["clippy", "-p", "bcinr-logic"])
-        .current_dir("/Users/sac/bcinr")
+        .current_dir(get_repo_root().to_str().unwrap())
         .output()
         .unwrap();
     assert_status_in(&out, &[0, 1, 101]);
@@ -185,10 +185,10 @@ fn test_tier1_f3_clippy_on_logic() {
 
 #[test]
 fn test_tier1_f3_clippy_on_core() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let out = Command::new("cargo")
         .args(["clippy", "-p", "bcinr-core"])
-        .current_dir("/Users/sac/bcinr")
+        .current_dir(get_repo_root().to_str().unwrap())
         .output()
         .unwrap();
     assert_status_in(&out, &[0, 1, 101]);
@@ -196,10 +196,10 @@ fn test_tier1_f3_clippy_on_core() {
 
 #[test]
 fn test_tier1_f3_clippy_on_bench() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let out = Command::new("cargo")
         .args(["clippy", "-p", "bcinr-bench"])
-        .current_dir("/Users/sac/bcinr")
+        .current_dir(get_repo_root().to_str().unwrap())
         .output()
         .unwrap();
     assert_status_in(&out, &[0, 1, 101]);
@@ -207,7 +207,7 @@ fn test_tier1_f3_clippy_on_bench() {
 
 #[test]
 fn test_tier2_f3_poor_format_fails() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let mut ctx = TestCtx::new();
     ctx.create_temp_algo_file(
         "temp_bad_fmt",
@@ -216,7 +216,7 @@ fn test_tier2_f3_poor_format_fails() {
     );
     let out = Command::new("cargo")
         .args(["fmt", "--check"])
-        .current_dir("/Users/sac/bcinr")
+        .current_dir(get_repo_root().to_str().unwrap())
         .output()
         .unwrap();
     assert_status_eq(&out, 1);
@@ -224,7 +224,7 @@ fn test_tier2_f3_poor_format_fails() {
 
 #[test]
 fn test_tier2_f3_clippy_unused_var() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let mut ctx = TestCtx::new();
     ctx.create_temp_algo_file("temp_unused", 
                                "/// Branchless Contract\npub fn temp_unused(val: u64, _aux: u64) -> u64 {\n    let x = 123;\n    val\n}",
@@ -243,12 +243,12 @@ fn test_tier2_f3_clippy_unused_var() {
 
 #[test]
 fn test_tier2_f3_fmt_empty_file() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let mut ctx = TestCtx::new();
     ctx.create_temp_algo_file("temp_empty", "", false);
     let out = Command::new("cargo")
         .args(["fmt", "--check"])
-        .current_dir("/Users/sac/bcinr")
+        .current_dir(get_repo_root().to_str().unwrap())
         .output()
         .unwrap();
     assert_status_in(&out, &[0, 1]);
@@ -256,17 +256,17 @@ fn test_tier2_f3_fmt_empty_file() {
 
 #[test]
 fn test_tier2_f3_clippy_nonexistent_package() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let out = run_cargo_cmd(&["clippy", "-p", "non_existent_pkg"]);
     assert_status_not(&out, 0);
 }
 
 #[test]
 fn test_tier2_f3_clippy_quiet() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let out = Command::new("cargo")
         .args(["clippy", "--quiet"])
-        .current_dir("/Users/sac/bcinr")
+        .current_dir(get_repo_root().to_str().unwrap())
         .output()
         .unwrap();
     assert_status_in(&out, &[0, 1, 101]);
@@ -278,21 +278,21 @@ fn test_tier2_f3_clippy_quiet() {
 
 #[test]
 fn test_tier1_f4_run_tool() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let out = run_bench_cmd();
     assert_status_eq(&out, 0);
 }
 
 #[test]
 fn test_tier1_f4_output_failed() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let out = run_bench_cmd();
     assert_status_eq(&out, 0);
 }
 
 #[test]
 fn test_tier1_f4_missing_count() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let out = run_bench_cmd();
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(str_has_substr(&stdout, "SUCCESS"));
@@ -300,7 +300,7 @@ fn test_tier1_f4_missing_count() {
 
 #[test]
 fn test_tier1_f4_lists_abs_i32() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let mut ctx = TestCtx::new();
     ctx.create_temp_algo_file(
         "abs_i32",
@@ -314,14 +314,14 @@ fn test_tier1_f4_lists_abs_i32() {
 
 #[test]
 fn test_tier1_f4_help() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let out = run_bench_cmd();
     assert!(!out.stdout.is_empty() || !out.stderr.is_empty());
 }
 
 #[test]
 fn test_tier2_f4_unbenchmarked_fn() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let mut ctx = TestCtx::new();
     ctx.create_temp_algo_file("temp_unbench", 
                                "/// Branchless Contract\npub fn temp_unbenchmarked_fn(val: u64, aux: u64) -> u64 {\n    val\n}",
@@ -334,7 +334,7 @@ fn test_tier2_f4_unbenchmarked_fn() {
 
 #[test]
 fn test_tier2_f4_private_fn_ignored() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let mut ctx = TestCtx::new();
     ctx.create_temp_algo_file(
         "temp_private",
@@ -348,7 +348,7 @@ fn test_tier2_f4_private_fn_ignored() {
 
 #[test]
 fn test_tier2_f4_ignored_names() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let mut ctx = TestCtx::new();
     ctx.create_temp_algo_file("temp_ignored_names", 
                                "/// Branchless Contract\npub fn new(val: u64) -> u64 { val }\n/// Branchless Contract\npub fn default() -> u64 { 0 }",
@@ -361,7 +361,7 @@ fn test_tier2_f4_ignored_names() {
 
 #[test]
 fn test_tier2_f4_empty_benches_dir() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let out = run_bench_cmd();
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(str_has_substr(&stdout, "FAILED") || str_has_substr(&stdout, "SUCCESS"));
@@ -369,7 +369,7 @@ fn test_tier2_f4_empty_benches_dir() {
 
 #[test]
 fn test_tier2_f4_cfg_test_stripped() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let mut ctx = TestCtx::new();
     ctx.create_temp_algo_file(
         "temp_cfg_test",
@@ -406,14 +406,14 @@ fn create_dirty_temp_dir() -> tempfile::TempDir {
 
 #[test]
 fn test_tier1_f5_run_tool() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
-    let out = run_lsp_cmd("/Users/sac/bcinr");
+    let _e2e_lock = crate::acquire_mod_rs_lock();
+    let out = run_lsp_cmd(get_repo_root().to_str().unwrap());
     assert_status_eq(&out, 0);
 }
 
 #[test]
 fn test_tier1_f5_output_contains_violations() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let temp_dir = create_dirty_temp_dir();
     let out = run_lsp_cmd(&temp_dir.path().to_string_lossy());
     let stdout = String::from_utf8_lossy(&out.stdout);
@@ -422,7 +422,7 @@ fn test_tier1_f5_output_contains_violations() {
 
 #[test]
 fn test_tier1_f5_contains_specific_diagnostic() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let temp_dir = create_dirty_temp_dir();
     let out = run_lsp_cmd(&temp_dir.path().to_string_lossy());
     let stdout = String::from_utf8_lossy(&out.stdout);
@@ -435,7 +435,7 @@ fn test_tier1_f5_contains_specific_diagnostic() {
 
 #[test]
 fn test_tier1_f5_finds_default_version() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let temp_dir = create_dirty_temp_dir();
     let out = run_lsp_cmd(&temp_dir.path().to_string_lossy());
     let stdout = String::from_utf8_lossy(&out.stdout);
@@ -444,7 +444,7 @@ fn test_tier1_f5_finds_default_version() {
 
 #[test]
 fn test_tier1_f5_finds_strange_rule() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let temp_dir = create_dirty_temp_dir();
     let out = run_lsp_cmd(&temp_dir.path().to_string_lossy());
     let stdout = String::from_utf8_lossy(&out.stdout);
@@ -453,7 +453,7 @@ fn test_tier1_f5_finds_strange_rule() {
 
 #[test]
 fn test_tier2_f5_detect_plain_towerlsp_canary() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let temp_dir = tempfile::tempdir().unwrap();
     let cargo_toml_path = temp_dir.path().join("Cargo.toml");
     let res = fs::write(
@@ -473,7 +473,7 @@ fn test_tier2_f5_detect_plain_towerlsp_canary() {
 
 #[test]
 fn test_tier2_f5_detect_version_template() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let temp_dir = tempfile::tempdir().unwrap();
     let cargo_toml_path = temp_dir.path().join("Cargo.toml");
     let res = fs::write(&cargo_toml_path, format!("{} = \"{}\"", "version", "1.0.0"));
@@ -486,11 +486,11 @@ fn test_tier2_f5_detect_version_template() {
 
 #[test]
 fn test_tier2_f5_nonexistent_dir_fails() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     ensure_lsp_built();
     let out = Command::new("/tmp/bcinr-e2e-target/debug/anti-llm-cheat-lsp")
         .args(["scan", "--invalid-flag"])
-        .current_dir("/Users/sac/bcinr")
+        .current_dir(get_repo_root().to_str().unwrap())
         .output()
         .unwrap();
     assert_status_not(&out, 0);
@@ -498,7 +498,7 @@ fn test_tier2_f5_nonexistent_dir_fails() {
 
 #[test]
 fn test_tier2_f5_clean_rs_no_diagnostics() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let temp_dir = tempfile::tempdir().unwrap();
     let main_rs_path = temp_dir.path().join("main.rs");
     fs::write(&main_rs_path, "fn main() {}").unwrap();
@@ -510,7 +510,7 @@ fn test_tier2_f5_clean_rs_no_diagnostics() {
 
 #[test]
 fn test_tier2_f5_detect_substring_check() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let temp_dir = tempfile::tempdir().unwrap();
     let main_rs_path = temp_dir.path().join("main.rs");
     fs::write(
@@ -533,7 +533,7 @@ fn test_tier2_f5_detect_substring_check() {
 
 #[test]
 fn test_tier3_gate_vs_cargo_check() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let mut ctx = TestCtx::new();
     ctx.create_temp_algo_file("temp_cross_gate_check", 
                                "/// Branchless Contract\npub fn temp_cross(val: u64, aux: u64) -> u64 {\n    if val > 0 { val } else { aux }\n}",
@@ -546,7 +546,7 @@ fn test_tier3_gate_vs_cargo_check() {
 
 #[test]
 fn test_tier3_clippy_vs_gate() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let mut ctx = TestCtx::new();
     ctx.create_temp_algo_file("temp_cross_clippy_gate", 
                                "/// Branchless Contract\npub fn temp_cross_cg(val: u64, aux: u64) -> u64 {\n    let x = 42;\n    val & aux\n}",
@@ -567,7 +567,7 @@ fn test_tier3_clippy_vs_gate() {
 
 #[test]
 fn test_tier3_complex_and_unbenchmarked() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let mut ctx = TestCtx::new();
     ctx.create_temp_algo_file(
         "temp_cross_complex_unbench",
@@ -586,7 +586,7 @@ fn test_tier3_complex_and_unbenchmarked() {
 
 #[test]
 fn test_tier3_towerlsp_canary_in_tool() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let temp_dir = tempfile::tempdir().unwrap();
     let cargo_toml_path = temp_dir.path().join("Cargo.toml");
     let main_rs_path = temp_dir.path().join("main.rs");
@@ -610,7 +610,7 @@ fn test_tier3_towerlsp_canary_in_tool() {
 
 #[test]
 fn test_tier3_all_fail() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let mut ctx = TestCtx::new();
     ctx.create_temp_algo_file(
         "temp_cross_all",
@@ -620,7 +620,7 @@ fn test_tier3_all_fail() {
 
     let res_fmt = Command::new("cargo")
         .args(["fmt", "--check"])
-        .current_dir("/Users/sac/bcinr")
+        .current_dir(get_repo_root().to_str().unwrap())
         .output()
         .unwrap();
     let res_gate = run_gate_cmd();
@@ -637,7 +637,7 @@ fn test_tier3_all_fail() {
 
 #[test]
 fn test_tier4_scenario_workspace_cargo() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let res_check = run_cargo_cmd(&["check"]);
     let res_test = run_cargo_cmd(&["test", "-p", "bcinr-core", "--lib"]);
     assert_status_in(&res_check, &[0, 1, 101]);
@@ -646,7 +646,7 @@ fn test_tier4_scenario_workspace_cargo() {
 
 #[test]
 fn test_tier4_scenario_contract_gate() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let res = run_gate_cmd();
     assert_status_eq(&res, 0);
     let stdout = String::from_utf8_lossy(&res.stdout);
@@ -655,7 +655,7 @@ fn test_tier4_scenario_contract_gate() {
 
 #[test]
 fn test_tier4_scenario_bench_auditor() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let res = run_bench_cmd();
     assert_status_eq(&res, 0);
     let stdout = String::from_utf8_lossy(&res.stdout);
@@ -664,8 +664,8 @@ fn test_tier4_scenario_bench_auditor() {
 
 #[test]
 fn test_tier4_scenario_anti_llm_lsp() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
-    let res = run_lsp_cmd("/Users/sac/bcinr");
+    let _e2e_lock = crate::acquire_mod_rs_lock();
+    let res = run_lsp_cmd(get_repo_root().to_str().unwrap());
     assert_status_eq(&res, 0);
     let stdout = String::from_utf8_lossy(&res.stdout);
     assert!(str_has_substr(&stdout, "Diagnostics emitted: 0"));
@@ -673,12 +673,11 @@ fn test_tier4_scenario_anti_llm_lsp() {
 
 #[test]
 fn test_tier4_scenario_cargo_fmt() {
-    let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
+    let _e2e_lock = crate::acquire_mod_rs_lock();
     let out = Command::new("cargo")
         .args(["fmt", "--check"])
-        .current_dir("/Users/sac/bcinr")
+        .current_dir(get_repo_root().to_str().unwrap())
         .output()
         .unwrap();
     assert_status_in(&out, &[0, 1]);
 }
-
