@@ -73,6 +73,12 @@ pub fn mod_rs_lock() -> &'static std::sync::Mutex<()> {
     LOCK.get_or_init(|| std::sync::Mutex::new(()))
 }
 
+pub fn acquire_mod_rs_lock() -> std::sync::MutexGuard<'static, ()> {
+    mod_rs_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 pub struct TestCtx {
     to_cleanup: Vec<PathBuf>,
     original_files: HashMap<PathBuf, String>,
