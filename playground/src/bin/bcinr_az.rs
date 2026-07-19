@@ -1,4 +1,4 @@
-//! BCINR-AZ: a branchless AlphaZero-style (DeepMind paradigm) chess engine that
+//! BCINR-AZ: a branchless AlphaZero-style (`DeepMind` paradigm) chess engine that
 //! drives an MCTS tree and evaluates leaf positions in *batches* on the Apple
 //! M3 Max 40-core GPU via the dual-head NNUE compute shader.
 //!
@@ -389,7 +389,7 @@ impl<'a> Mcts<'a> {
             }
             self.nodes[leaf].expanded = true;
             self.nodes[leaf].pending_value =
-                parent_vals.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+                parent_vals.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         }
 
         // --- 4. Back-propagate every path, removing the virtual loss.
@@ -445,7 +445,7 @@ fn softmax(xs: &[f32]) -> Vec<f32> {
     if xs.is_empty() {
         return Vec::new();
     }
-    let m = xs.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+    let m = xs.iter().copied().fold(f32::NEG_INFINITY, f32::max);
     let exps: Vec<f32> = xs.iter().map(|&x| (x - m).exp()).collect();
     let sum: f32 = exps.iter().sum();
     exps.iter().map(|&e| e / sum).collect()
@@ -489,8 +489,8 @@ fn search(
         sims,
         gpu_boards,
         elapsed,
-        (sims as u128 * 1000) / elapsed,
-        (gpu_boards as u128 * 1000) / elapsed
+        (u128::from(sims) * 1000) / elapsed,
+        (u128::from(gpu_boards) * 1000) / elapsed
     );
     mv
 }
@@ -549,7 +549,7 @@ fn main() {
             }
             "ucinewgame" => board = Board::default(),
             "position" => {
-                board = parse_position(&t).unwrap_or_else(Board::default);
+                board = parse_position(&t).unwrap_or_default();
             }
             "go" => {
                 let mut max_ms = 1000u128;
@@ -594,7 +594,7 @@ fn main() {
                     moves.iter().map(|m| board_to_acc(&board.make_move_new(*m), &nnue)).collect();
                 let cps = gpu.values(&accs);
                 let mut scored: Vec<(ChessMove, i32)> =
-                    moves.iter().cloned().zip(cps.iter().cloned()).collect();
+                    moves.iter().copied().zip(cps.iter().copied()).collect();
                 // best for side-to-move: lowest white_cp if black to move, highest if white
                 let stm = board.side_to_move();
                 scored.sort_by_key(|(_, cp)| if stm == Color::White { -*cp } else { *cp });

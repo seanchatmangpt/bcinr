@@ -124,19 +124,19 @@ fn main() {
         ("Pawn_h", "Pawn", 15),
     ];
 
-    for (name, kind, pos) in setup.iter() {
+    for (name, kind, pos) in &setup {
         pieces.push(Piece {
-            id: format!("White_{}", name),
+            id: format!("White_{name}"),
             kind,
             color: "White",
             alive: true,
             square: *pos,
         });
     }
-    for (name, kind, pos) in setup.iter() {
+    for (name, kind, pos) in &setup {
         let real_pos = if *pos >= 8 { 48 + (*pos - 8) } else { 56 + *pos };
         pieces.push(Piece {
-            id: format!("Black_{}", name),
+            id: format!("Black_{name}"),
             kind,
             color: "Black",
             alive: true,
@@ -152,8 +152,7 @@ fn main() {
         let rank = (i / 8) + 1;
         let file = (b'a' + (i % 8) as u8) as char;
         objects.push(format!(
-            r#"    {{ "id": "{}{}", "type": "Square", "attributes": [] }}"#,
-            file, rank
+            r#"    {{ "id": "{file}{rank}", "type": "Square", "attributes": [] }}"#
         ));
     }
     for p in &pieces {
@@ -276,7 +275,7 @@ fn main() {
     }
 
     let duration = start_time.elapsed();
-    eprintln!("NNUE Distillation & Game Execution completed in: {:?}", duration);
+    eprintln!("NNUE Distillation & Game Execution completed in: {duration:?}");
 
     println!("{{");
     println!(r#"  "objectTypes": [ {{ "name": "Piece" }}, {{ "name": "Square" }} ],"#);

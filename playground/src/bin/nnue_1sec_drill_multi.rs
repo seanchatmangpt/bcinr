@@ -153,7 +153,7 @@ fn main() {
 
         while !game_over && turn_counter <= 100 {
             let is_white = turn_counter % 2 != 0;
-            let color_filter = if is_white { 0 } else { 1 };
+            let color_filter = u8::from(!is_white);
 
             let bb = get_bitboards(&pieces);
             let mut white_mask = 0u64;
@@ -241,6 +241,6 @@ fn main() {
     println!("--- M3 MAX MULTI-CORE 1-SECOND NNUE DISTILLATION ---");
     println!("Total Training Games Played: {}", games_played.load(Ordering::Relaxed));
     println!("Total Plies (Half-Moves) Played: {}", moves_played.load(Ordering::Relaxed));
-    println!("Total CPU NNUE Nodes Evaluated: {}", nps);
-    println!("CPU Nodes per second (NPS): {}", nps);
+    println!("Total CPU NNUE Nodes Evaluated: {nps}");
+    println!("CPU Nodes per second (NPS): {nps}");
 }

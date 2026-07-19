@@ -1,3 +1,10 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    clippy::similar_names,
+    clippy::inline_always,
+)]
 //! Branchless YAWL routing semantics engine.
 
 use bcinr::int::popcount_u64;
@@ -50,7 +57,7 @@ pub enum JoinType {
     OR = 2,
     /// Complex join (N-out-of-M, Discriminator): fires once when threshold is met.
     Complex = 3,
-    /// ThreadMerge join: fires if any incoming token is present.
+    /// `ThreadMerge` join: fires if any incoming token is present.
     ThreadMerge = 4,
 }
 
@@ -159,7 +166,7 @@ impl BYawlEngine {
     /// Spawns instances dynamically during runtime.
     #[inline(always)]
     pub fn spawn_instances(&mut self, place_bit: u8, count: u8) {
-        let in_bounds_mask = nz_mask_u64((place_bit < 64) as u64);
+        let in_bounds_mask = nz_mask_u64(u64::from(place_bit < 64));
         let count_v = splat_u8x16(count);
         let place_v = splat_u8x16(place_bit);
         let in_bounds_v = splat_u8x16((in_bounds_mask as u8).wrapping_neg());
@@ -186,13 +193,13 @@ impl BYawlEngine {
         process_chunk(&mut self.active_instances, 32, eq2);
         process_chunk(&mut self.active_instances, 48, eq3);
 
-        self.state_mask |= (1u64.wrapping_shl(place_bit as u32 & 63)) & in_bounds_mask;
+        self.state_mask |= (1u64.wrapping_shl(u32::from(place_bit) & 63)) & in_bounds_mask;
     }
 
     /// Executes task splits, joins, resets, locks, and cancellations branchlessly using mask calculus.
     pub fn execute_task_branchless(&mut self, task: &BYawlTask) -> u64 {
         // --- 1. Evaluate Lock & Conditions ---
-        let is_release_mask = nz_mask_u64((task.flags & 4) as u64);
+        let is_release_mask = nz_mask_u64(u64::from(task.flags & 4));
         let conflict_mask = nz_mask_u64(self.active_locks & task.interleaved_lock_mask);
         let allowed_by_lock_mask = (!conflict_mask) | is_release_mask;
 
@@ -202,7 +209,7 @@ impl BYawlEngine {
         // --- 2. Reset Complex Joins ---
         let has_reset_tokens_mask =
             nz_mask_u64(self.state_mask & task.reset_mask) & allowed_by_lock_mask;
-        let reset_bit = 1u64.wrapping_shl(task.join_state_bit as u32 & 63);
+        let reset_bit = 1u64.wrapping_shl(u32::from(task.join_state_bit) & 63);
 
         self.fired_joins_mask &= !(reset_bit & has_reset_tokens_mask);
         self.state_mask &= !(task.reset_mask & has_reset_tokens_mask);
@@ -219,9 +226,9 @@ impl BYawlEngine {
         let aux = self.state_mask & task.reachability_mask;
         let join_or_mask = nz_mask_u64(val) & z_mask_u64(aux & !val);
 
-        let complex_bit = 1u64.wrapping_shl(task.join_state_bit as u32 & 63);
+        let complex_bit = 1u64.wrapping_shl(u32::from(task.join_state_bit) & 63);
         let complex_has_fired_mask = nz_mask_u64(self.fired_joins_mask & complex_bit);
-        let diff = (count_ones as i16).wrapping_sub(task.threshold_instances as i16);
+        let diff = (count_ones as i16).wrapping_sub(i16::from(task.threshold_instances));
         let threshold_met_mask = !((diff >> 15) as u64);
         let join_complex_mask = !complex_has_fired_mask & threshold_met_mask;
 
@@ -242,7 +249,7 @@ impl BYawlEngine {
             | (join_thread_merge_mask & is_thread_merge);
 
         // Transient trigger check (WCP-23)
-        let is_transient_mask = nz_mask_u64((task.flags & 1) as u64);
+        let is_transient_mask = nz_mask_u64(u64::from(task.flags & 1));
         let has_transient_trigger_mask =
             is_transient_mask & nz_mask_u64(self.active_triggers & task.consume_mask);
 
@@ -265,7 +272,7 @@ impl BYawlEngine {
         // Active locks (Acquire)
         self.active_locks |= task.interleaved_lock_mask & fired_mask;
         // Active locks (Release)
-        let release_mask = nz_mask_u64((task.flags & 4) as u64);
+        let release_mask = nz_mask_u64(u64::from(task.flags & 4));
         self.active_locks &= !(task.interleaved_lock_mask & fired_mask & release_mask);
 
         // Fired complex joins
@@ -287,7 +294,7 @@ impl BYawlEngine {
         process_cancel(&mut self.active_instances, 48, cancel_mask);
 
         // Complete MI Activity
-        let is_complete_mi_mask = nz_mask_u64((task.flags & 8) as u64);
+        let is_complete_mi_mask = nz_mask_u64(u64::from(task.flags & 8));
         let clear_mi_mask = fired_mask & is_complete_mi_mask;
         let mi_cancel = task.produce_mask & clear_mi_mask;
         let zero_v = splat_u8x16(0);
@@ -338,7 +345,7 @@ impl BYawlEngine {
         let max_inst_v = splat_u8x16(task.max_instances);
         let target_idx_v = splat_u8x16(target_idx as u8);
         let target_valid_v =
-            splat_u8x16((nz_mask_u64((target_idx < 64) as u64) as u8).wrapping_neg());
+            splat_u8x16((nz_mask_u64(u64::from(target_idx < 64)) as u8).wrapping_neg());
 
         let idx0 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
         let idx1 = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31];
@@ -368,12 +375,12 @@ mod tests {
     fn execute_task_mutant_1(engine: &mut BYawlEngine, task: &BYawlTask) -> u64 {
         let mut fake_engine = engine.clone();
         let has_reset_tokens_mask = nz_mask_u64(fake_engine.state_mask & task.reset_mask);
-        let reset_bit = 1u64.wrapping_shl(task.join_state_bit as u32 & 63);
+        let reset_bit = 1u64.wrapping_shl(u32::from(task.join_state_bit) & 63);
 
         fake_engine.fired_joins_mask &= !(reset_bit & has_reset_tokens_mask);
         fake_engine.state_mask &= !(task.reset_mask & has_reset_tokens_mask);
 
-        let is_release_mask = nz_mask_u64((task.flags & 4) as u64);
+        let is_release_mask = nz_mask_u64(u64::from(task.flags & 4));
         let conflict_mask = nz_mask_u64(fake_engine.active_locks & task.interleaved_lock_mask);
         let allowed_by_lock_mask = (!conflict_mask) | is_release_mask;
 
@@ -392,9 +399,9 @@ mod tests {
         let aux = fake_engine.state_mask & task.reachability_mask;
         let join_or_mask = nz_mask_u64(val) & z_mask_u64(aux & !val);
 
-        let complex_bit = 1u64.wrapping_shl(task.join_state_bit as u32 & 63);
+        let complex_bit = 1u64.wrapping_shl(u32::from(task.join_state_bit) & 63);
         let complex_has_fired_mask = nz_mask_u64(fake_engine.fired_joins_mask & complex_bit);
-        let diff = (count_ones as i16).wrapping_sub(task.threshold_instances as i16);
+        let diff = (count_ones as i16).wrapping_sub(i16::from(task.threshold_instances));
         let threshold_met_mask = !((diff >> 15) as u64);
         let join_complex_mask = !complex_has_fired_mask & threshold_met_mask;
 
@@ -413,7 +420,7 @@ mod tests {
             | (join_complex_mask & is_complex)
             | (join_thread_merge_mask & is_thread_merge);
 
-        let is_transient_mask = nz_mask_u64((task.flags & 1) as u64);
+        let is_transient_mask = nz_mask_u64(u64::from(task.flags & 1));
         let has_transient_trigger_mask =
             is_transient_mask & nz_mask_u64(fake_engine.active_triggers & task.consume_mask);
 
@@ -429,14 +436,14 @@ mod tests {
         fake_engine.active_triggers &= !(task.consume_mask & fired_mask & is_transient_mask);
 
         fake_engine.active_locks |= task.interleaved_lock_mask & fired_mask;
-        let release_mask = nz_mask_u64((task.flags & 4) as u64);
+        let release_mask = nz_mask_u64(u64::from(task.flags & 4));
         fake_engine.active_locks &= !(task.interleaved_lock_mask & fired_mask & release_mask);
 
         fake_engine.fired_joins_mask |= complex_bit & fired_mask & is_complex;
 
         // OMITTED: Cancellations (this makes it mutant 1)
 
-        let is_complete_mi_mask = nz_mask_u64((task.flags & 8) as u64);
+        let is_complete_mi_mask = nz_mask_u64(u64::from(task.flags & 8));
         let clear_mi_mask = fired_mask & is_complete_mi_mask;
         let mi_cancel = task.produce_mask & clear_mi_mask;
         let zero_v = splat_u8x16(0);
@@ -484,7 +491,7 @@ mod tests {
         let max_inst_v = splat_u8x16(task.max_instances);
         let target_idx_v = splat_u8x16(target_idx as u8);
         let target_valid_v =
-            splat_u8x16((nz_mask_u64((target_idx < 64) as u64) as u8).wrapping_neg());
+            splat_u8x16((nz_mask_u64(u64::from(target_idx < 64)) as u8).wrapping_neg());
 
         let idx0 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
         let idx1 = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31];
@@ -510,12 +517,12 @@ mod tests {
     fn execute_task_mutant_2(engine: &mut BYawlEngine, task: &BYawlTask) -> u64 {
         let mut fake_engine = engine.clone();
         let has_reset_tokens_mask = nz_mask_u64(fake_engine.state_mask & task.reset_mask);
-        let reset_bit = 1u64.wrapping_shl(task.join_state_bit as u32 & 63);
+        let reset_bit = 1u64.wrapping_shl(u32::from(task.join_state_bit) & 63);
 
         fake_engine.fired_joins_mask &= !(reset_bit & has_reset_tokens_mask);
         fake_engine.state_mask &= !(task.reset_mask & has_reset_tokens_mask);
 
-        let is_release_mask = nz_mask_u64((task.flags & 4) as u64);
+        let is_release_mask = nz_mask_u64(u64::from(task.flags & 4));
         let conflict_mask = nz_mask_u64(fake_engine.active_locks & task.interleaved_lock_mask);
         let allowed_by_lock_mask = (!conflict_mask) | is_release_mask;
 
@@ -534,9 +541,9 @@ mod tests {
         // MUTATED: ignores reachability (this makes it mutant 2)
         let join_or_mask = nz_mask_u64(val);
 
-        let complex_bit = 1u64.wrapping_shl(task.join_state_bit as u32 & 63);
+        let complex_bit = 1u64.wrapping_shl(u32::from(task.join_state_bit) & 63);
         let complex_has_fired_mask = nz_mask_u64(fake_engine.fired_joins_mask & complex_bit);
-        let diff = (count_ones as i16).wrapping_sub(task.threshold_instances as i16);
+        let diff = (count_ones as i16).wrapping_sub(i16::from(task.threshold_instances));
         let threshold_met_mask = !((diff >> 15) as u64);
         let join_complex_mask = !complex_has_fired_mask & threshold_met_mask;
 
@@ -555,7 +562,7 @@ mod tests {
             | (join_complex_mask & is_complex)
             | (join_thread_merge_mask & is_thread_merge);
 
-        let is_transient_mask = nz_mask_u64((task.flags & 1) as u64);
+        let is_transient_mask = nz_mask_u64(u64::from(task.flags & 1));
         let has_transient_trigger_mask =
             is_transient_mask & nz_mask_u64(fake_engine.active_triggers & task.consume_mask);
 
@@ -571,7 +578,7 @@ mod tests {
         fake_engine.active_triggers &= !(task.consume_mask & fired_mask & is_transient_mask);
 
         fake_engine.active_locks |= task.interleaved_lock_mask & fired_mask;
-        let release_mask = nz_mask_u64((task.flags & 4) as u64);
+        let release_mask = nz_mask_u64(u64::from(task.flags & 4));
         fake_engine.active_locks &= !(task.interleaved_lock_mask & fired_mask & release_mask);
 
         fake_engine.fired_joins_mask |= complex_bit & fired_mask & is_complex;
@@ -590,7 +597,7 @@ mod tests {
         process_cancel(&mut fake_engine.active_instances, 32, cancel_mask);
         process_cancel(&mut fake_engine.active_instances, 48, cancel_mask);
 
-        let is_complete_mi_mask = nz_mask_u64((task.flags & 8) as u64);
+        let is_complete_mi_mask = nz_mask_u64(u64::from(task.flags & 8));
         let clear_mi_mask = fired_mask & is_complete_mi_mask;
         let mi_cancel = task.produce_mask & clear_mi_mask;
         let zero_v = splat_u8x16(0);
@@ -638,7 +645,7 @@ mod tests {
         let max_inst_v = splat_u8x16(task.max_instances);
         let target_idx_v = splat_u8x16(target_idx as u8);
         let target_valid_v =
-            splat_u8x16((nz_mask_u64((target_idx < 64) as u64) as u8).wrapping_neg());
+            splat_u8x16((nz_mask_u64(u64::from(target_idx < 64)) as u8).wrapping_neg());
 
         let idx0 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
         let idx1 = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31];
@@ -664,12 +671,12 @@ mod tests {
     fn execute_task_mutant_3(engine: &mut BYawlEngine, task: &BYawlTask) -> u64 {
         let mut fake_engine = engine.clone();
         let has_reset_tokens_mask = nz_mask_u64(fake_engine.state_mask & task.reset_mask);
-        let reset_bit = 1u64.wrapping_shl(task.join_state_bit as u32 & 63);
+        let reset_bit = 1u64.wrapping_shl(u32::from(task.join_state_bit) & 63);
 
         fake_engine.fired_joins_mask &= !(reset_bit & has_reset_tokens_mask);
         fake_engine.state_mask &= !(task.reset_mask & has_reset_tokens_mask);
 
-        let is_release_mask = nz_mask_u64((task.flags & 4) as u64);
+        let is_release_mask = nz_mask_u64(u64::from(task.flags & 4));
         let conflict_mask = nz_mask_u64(fake_engine.active_locks & task.interleaved_lock_mask);
         let allowed_by_lock_mask = (!conflict_mask) | is_release_mask;
 
@@ -688,9 +695,9 @@ mod tests {
         let aux = fake_engine.state_mask & task.reachability_mask;
         let join_or_mask = nz_mask_u64(val) & z_mask_u64(aux & !val);
 
-        let complex_bit = 1u64.wrapping_shl(task.join_state_bit as u32 & 63);
+        let complex_bit = 1u64.wrapping_shl(u32::from(task.join_state_bit) & 63);
         let complex_has_fired_mask = nz_mask_u64(fake_engine.fired_joins_mask & complex_bit);
-        let diff = (count_ones as i16).wrapping_sub(task.threshold_instances as i16);
+        let diff = (count_ones as i16).wrapping_sub(i16::from(task.threshold_instances));
         let threshold_met_mask = !((diff >> 15) as u64);
         let join_complex_mask = !complex_has_fired_mask & threshold_met_mask;
 
@@ -709,7 +716,7 @@ mod tests {
             | (join_complex_mask & is_complex)
             | (join_thread_merge_mask & is_thread_merge);
 
-        let is_transient_mask = nz_mask_u64((task.flags & 1) as u64);
+        let is_transient_mask = nz_mask_u64(u64::from(task.flags & 1));
         let has_transient_trigger_mask =
             is_transient_mask & nz_mask_u64(fake_engine.active_triggers & task.consume_mask);
 
@@ -725,7 +732,7 @@ mod tests {
         fake_engine.active_triggers &= !(task.consume_mask & fired_mask & is_transient_mask);
 
         fake_engine.active_locks |= task.interleaved_lock_mask & fired_mask;
-        let release_mask = nz_mask_u64((task.flags & 4) as u64);
+        let release_mask = nz_mask_u64(u64::from(task.flags & 4));
         fake_engine.active_locks &= !(task.interleaved_lock_mask & fired_mask & release_mask);
 
         fake_engine.fired_joins_mask |= complex_bit & fired_mask & is_complex;
@@ -744,7 +751,7 @@ mod tests {
         process_cancel(&mut fake_engine.active_instances, 32, cancel_mask);
         process_cancel(&mut fake_engine.active_instances, 48, cancel_mask);
 
-        let is_complete_mi_mask = nz_mask_u64((task.flags & 8) as u64);
+        let is_complete_mi_mask = nz_mask_u64(u64::from(task.flags & 8));
         let clear_mi_mask = fired_mask & is_complete_mi_mask;
         let mi_cancel = task.produce_mask & clear_mi_mask;
         let zero_v = splat_u8x16(0);
@@ -783,7 +790,7 @@ mod tests {
         let max_inst_v = splat_u8x16(task.max_instances);
         let target_idx_v = splat_u8x16(target_idx as u8);
         let target_valid_v =
-            splat_u8x16((nz_mask_u64((target_idx < 64) as u64) as u8).wrapping_neg());
+            splat_u8x16((nz_mask_u64(u64::from(target_idx < 64)) as u8).wrapping_neg());
 
         let idx0 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
         let idx1 = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31];

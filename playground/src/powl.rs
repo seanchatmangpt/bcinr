@@ -1,3 +1,12 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    clippy::too_many_lines,
+    clippy::missing_errors_doc,
+    clippy::inline_always,
+    clippy::missing_panics_doc,
+)]
 //! Branchless POWL ontology matrix compiler and executor.
 //!
 //! Fully branchless (CC = 1), zero-allocation, and `#![no_std]` compliant.
@@ -79,6 +88,7 @@ pub struct PowlState {
 
 impl PowlState {
     /// Creates a new `PowlState` with scope 0 active.
+    #[must_use]
     pub fn new() -> Self {
         let mut scope_stack = [0u16; 16];
         scope_stack[0] = 0;
@@ -117,8 +127,8 @@ pub fn powl64_execute_step(
     let is_loop_mask = 0u64.wrapping_sub((8u64 >> kind_val) & 1);
 
     // 1. Determine if this op's scope is active.
-    let parent_scope = state.scope_stack[(state.stack_depth.wrapping_sub(1) & 15) as usize] as u64;
-    let scope_to_check = select_u64(is_enter_scope_mask, parent_scope, op.scope as u64);
+    let parent_scope = u64::from(state.scope_stack[(state.stack_depth.wrapping_sub(1) & 15) as usize]);
+    let scope_to_check = select_u64(is_enter_scope_mask, parent_scope, u64::from(op.scope));
 
     let scope_bit = (state.active_scopes >> (scope_to_check & 63)) & 1;
     let is_scope_active_mask = 0u64.wrapping_sub(scope_bit);
@@ -201,8 +211,8 @@ pub fn powl64_execute_step(
     let idx = state.stack_depth as usize & 15;
     state.scope_stack[idx] = select_u32(
         (exec_mask & is_enter_scope_mask) as u32,
-        op.scope as u32,
-        state.scope_stack[idx] as u32,
+        u32::from(op.scope),
+        u32::from(state.scope_stack[idx]),
     ) as u16;
 
     let depth_change = select_u32(
@@ -246,8 +256,8 @@ pub fn compile_powl_to_swar(powl: &Powl, out: &mut [Powl64Op]) -> Result<usize, 
                 };
                 op_count += 1;
             }
-            PowlNodeKind::Silent => {
-                // Silent transitions compiled out in execution layer
+            PowlNodeKind::Silent | PowlNodeKind::Start | PowlNodeKind::End => {
+                // Silent/Start/End nodes compile to no-ops
             }
             PowlNodeKind::PartialOrder(_) => {
                 // Emits PartialOrderGates based on global precedence edges
@@ -270,9 +280,6 @@ pub fn compile_powl_to_swar(powl: &Powl, out: &mut [Powl64Op]) -> Result<usize, 
                     };
                     op_count += 1;
                 }
-            }
-            PowlNodeKind::Start | PowlNodeKind::End => {
-                // Start/End sentinel nodes compile to no-ops
             }
             PowlNodeKind::ChoiceGraph { nodes: _, edges: cg_edges } => {
                 // Flatten unified choice/cyclic topology directly into branchless jump masks!

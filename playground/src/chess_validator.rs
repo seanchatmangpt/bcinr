@@ -1,3 +1,8 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+)]
 //! Branchless POWL v2 OCEL Chess Validator
 //!
 //! Validates OCEL v2 Object-Centric execution transitions for the Chess engine
@@ -39,7 +44,7 @@ pub fn validate_chess_move_powl(transition: &Hoeg64Node) -> Result<bool, &'stati
     let constraint_op = Powl64Op {
         kind: Powl64OpKind::PartialOrderGate,
         lane: 0,
-        activity: transition.node_id as u16,
+        activity: transition.node_id,
         scope: 0,
         branch: 0,
         loop_id: 0,

@@ -152,7 +152,7 @@ async fn run() {
         let mut cpass = encoder.begin_compute_pass(&Default::default());
         cpass.set_pipeline(&pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
-        cpass.dispatch_workgroups((num_games as u32 + 63) / 64, 1, 1);
+        cpass.dispatch_workgroups((num_games as u32).div_ceil(64), 1, 1);
     }
 
     queue.submit(Some(encoder.finish()));
@@ -161,8 +161,8 @@ async fn run() {
     let duration = start.elapsed();
 
     println!("--- METAL GPU 40-CORE NNUE EXECUTION PASS ---");
-    println!("Games Evaluated: {}", num_games);
-    println!("Total Execution Time: {:?}", duration);
+    println!("Games Evaluated: {num_games}");
+    println!("Total Execution Time: {duration:?}");
     println!("Nodes Per Second (NPS): {}", (num_games as f64 / duration.as_secs_f64()) as u64);
 }
 

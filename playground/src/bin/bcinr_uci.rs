@@ -138,7 +138,7 @@ fn alphabeta(
 ) -> f32 {
     *nodes += 1;
 
-    if *nodes % 2048 == 0 && start_time.elapsed().as_millis() >= max_time_ms {
+    if (*nodes).is_multiple_of(2048) && start_time.elapsed().as_millis() >= max_time_ms {
         return 0.0; // Time out
     }
 
@@ -245,7 +245,7 @@ fn latency_probe(board: &Board, depth: usize, iters: usize) {
         pick(0.50),
         pick(0.99),
         samples[iters - 1],
-        mv.map(|m| m.to_string()).unwrap_or_else(|| "none".into())
+        mv.map_or_else(|| "none".into(), |m| m.to_string())
     );
 }
 
@@ -304,7 +304,7 @@ fn search_best_move(board: &Board, max_time_ms: u128) -> Option<ChessMove> {
             depth,
             nodes,
             elapsed,
-            (nodes as u128 * 1000) / elapsed.max(1)
+            (u128::from(nodes) * 1000) / elapsed.max(1)
         );
     }
 
@@ -388,13 +388,13 @@ fn main() {
                     search_best_move(&board, max_time_ms)
                 };
                 if let Some(m) = chosen {
-                    println!("bestmove {}", m);
+                    println!("bestmove {m}");
                 } else {
                     let moves: Vec<ChessMove> = MoveGen::new_legal(&board).collect();
-                    if !moves.is_empty() {
-                        println!("bestmove {}", moves[0]);
-                    } else {
+                    if moves.is_empty() {
                         println!("bestmove 0000");
+                    } else {
+                        println!("bestmove {}", moves[0]);
                     }
                 }
             }

@@ -365,7 +365,7 @@ impl UCausalReceipt {
     pub fn to_hex(&self) -> String {
         let mut s = String::with_capacity(64);
         for &b in &self.0 {
-            s.push_str(&format!("{:02x}", b));
+            s.push_str(&format!("{b:02x}"));
         }
         s
     }
@@ -432,16 +432,16 @@ pub fn causal_mix(
     let mix_bytes = mix_val.to_ne_bytes();
     for i in 0..8 {
         bytes[i] = bytes[i].wrapping_add(mix_bytes[i]);
-        bytes[i + 8] = bytes[i + 8] ^ mix_bytes[i];
+        bytes[i + 8] ^= mix_bytes[i];
         bytes[i + 16] = bytes[i + 16].wrapping_sub(mix_bytes[i]);
-        bytes[i + 24] = bytes[i + 24] ^ mix_bytes[7 - i];
+        bytes[i + 24] ^= mix_bytes[7 - i];
     }
     UCausalReceipt(bytes)
 }
 
 fn compute_causal_receipt(ops: &[Powl64Op]) -> UCausalReceipt {
     let mut r = UCausalReceipt::genesis();
-    let delta = UDelta::default();
+    let delta = UDelta;
     for op in ops {
         if op.kind == Powl64OpKind::Activity {
             r = causal_mix(r, u64::from(op.activity), op.scope, op.succ_mask, &delta);
@@ -926,7 +926,7 @@ pub struct ExecutionReport {
 impl ExecutionReport {
     pub fn receipt(&self) -> UCausalReceipt {
         let mut r = UCausalReceipt::genesis();
-        let zero = UDelta::default();
+        let zero = UDelta;
         for ev in &self.events {
             r = causal_mix(r, u64::from(ev.op_index), ev.scope, ev.denial, &zero);
         }

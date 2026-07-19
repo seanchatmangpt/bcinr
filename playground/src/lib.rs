@@ -2,6 +2,24 @@
 //! Adheres strictly to `#![no_std]` and zero heap allocations.
 
 #![no_std]
+#![allow(
+    clippy::unwrap_used,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::missing_safety_doc,
+    clippy::too_many_lines,
+    clippy::similar_names,
+    clippy::unused_self,
+    clippy::inline_always,
+    clippy::needless_range_loop,
+    clippy::large_stack_arrays,
+    clippy::pub_underscore_fields,
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::too_many_arguments,
+    clippy::unreadable_literal,
+    dead_code,
+)]
 
 /// BranchTorch: Branchless Neural Training
 pub mod branchtorch;

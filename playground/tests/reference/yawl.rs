@@ -80,7 +80,7 @@ impl Default for BYawlEngine {
 pub fn synchronizing_merge_wcp37(val: u64, aux: u64) -> u64 {
     let present = val != 0;
     let no_upstream = (aux & !val) == 0;
-    (present && no_upstream) as u64
+    u64::from(present && no_upstream)
 }
 
 impl BYawlEngine {
@@ -135,7 +135,7 @@ impl BYawlEngine {
         // 1. Join Semantics
         let can_join = match task.join_type {
             JoinType::AND => (self.state_mask & task.consume_mask) == task.consume_mask,
-            JoinType::XOR => (self.state_mask & task.consume_mask).count_ones() == 1,
+            JoinType::XOR => (self.state_mask & task.consume_mask).is_power_of_two(),
             JoinType::OR => {
                 synchronizing_merge_wcp37(
                     self.state_mask & task.consume_mask,

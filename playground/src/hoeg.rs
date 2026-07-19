@@ -1,3 +1,10 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    clippy::inline_always,
+    clippy::too_many_lines,
+)]
 //! Branchless Heterogeneous Object Event Graph (HOEG) matrix compiler.
 //!
 //! Fully branchless (CC = 1), zero-allocation, and `#![no_std]` compliant.
@@ -8,9 +15,9 @@
 #[repr(C, align(64))]
 #[derive(Clone, Copy, Debug)]
 pub struct Hoeg64Node {
-    /// Bitwise projection of the feature matrix row ($X_i$)
+    /// Bitwise projection of the feature matrix row ($`X_i`$)
     pub feature_mask: u64,
-    /// Bitwise projection of the adjacency matrix row ($A_i$)
+    /// Bitwise projection of the adjacency matrix row ($`A_i`$)
     pub adjacency_mask: u64,
     /// Local identity
     pub node_id: u16,

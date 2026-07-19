@@ -6,7 +6,7 @@ use chess::{get_bishop_moves, BitBoard, Square};
 use playground::legal_moves::bishop_attacks;
 
 fn print_bb(name: &str, bb: u64) {
-    println!("{}:", name);
+    println!("{name}:");
     for r in (0..8).rev() {
         for f in 0..8 {
             let sq = r * 8 + f;
@@ -30,7 +30,7 @@ fn main() {
     let chess_sq = unsafe { Square::new(sq as u8) };
     let chess_attacks = get_bishop_moves(chess_sq, BitBoard::new(occupied)).0;
 
-    println!("SQ: {}", sq);
+    println!("SQ: {sq}");
     print_bb("BCINR", bcinr);
     print_bb("CHESS", chess_attacks);
 }

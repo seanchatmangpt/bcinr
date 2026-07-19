@@ -153,7 +153,7 @@ fn main() {
 
         while !game_over && turn_counter <= 100 {
             let is_white = turn_counter % 2 != 0;
-            let color_filter = if is_white { 0 } else { 1 };
+            let color_filter = u8::from(!is_white);
 
             let bb = get_bitboards(&pieces);
             let mut white_mask = 0u64;
@@ -241,8 +241,8 @@ fn main() {
     }
 
     println!("--- 1-SECOND ZERO-ALLOCATION NNUE DISTILLATION BENCHMARK ---");
-    println!("Total Training Games Played: {}", games_played);
-    println!("Total Plies (Half-Moves) Played: {}", moves_played);
-    println!("Total NNUE Nodes Forward/Backpropped: {}", nodes_evaluated);
-    println!("Nodes per second (NPS): {}", nodes_evaluated);
+    println!("Total Training Games Played: {games_played}");
+    println!("Total Plies (Half-Moves) Played: {moves_played}");
+    println!("Total NNUE Nodes Forward/Backpropped: {nodes_evaluated}");
+    println!("Nodes per second (NPS): {nodes_evaluated}");
 }

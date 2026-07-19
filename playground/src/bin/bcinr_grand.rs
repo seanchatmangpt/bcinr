@@ -3,9 +3,9 @@
 //! A single chess decision routed through EVERY branchless technique in the
 //! playground, each a real call, all tied into one cryptographic receipt:
 //!
-//!   chess (bitboards) -> legal_moves (Kogge-Stone) -> hoeg (event graph)
+//!   chess (bitboards) -> `legal_moves` (Kogge-Stone) -> hoeg (event graph)
 //!     -> gnn (binarized GNN eval) -> branchtorch (evolutionary training)
-//!     -> nnue (signed eval) -> chess_validator+powl (POWL v2 legality)
+//!     -> nnue (signed eval) -> `chess_validator+powl` (POWL v2 legality)
 //!     -> yawl (workflow routing) -> petri (process conformance)
 //!     -> tekg (temporal knowledge graph) -> wasm (boundary receipts)
 //!
@@ -124,7 +124,7 @@ fn main() {
     };
     let lawful = validate_chess_move_powl(&transition).unwrap_or(false);
     let powl_state = PowlState::new();
-    h.update(&[lawful as u8]);
+    h.update(&[u8::from(lawful)]);
     println!(
         "[7] validator    POWL v2 legality of {first}: {}",
         if lawful { "LAWFUL" } else { "rejected" }

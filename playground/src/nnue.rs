@@ -1,3 +1,10 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    clippy::missing_errors_doc,
+)]
+
 /// A simplified 768 -> 16 -> 1 NNUE architecture
 pub struct BranchTorchNNUE {
     /// Layer-1 weights: `l1_weights[neuron][feature]`, one 768-wide row per
@@ -15,8 +22,22 @@ pub struct BranchTorchNNUE {
     pub _pad: [i32; 3],
 }
 
+impl Default for BranchTorchNNUE {
+    fn default() -> Self {
+        Self {
+            l1_weights: [[0; 768]; 16],
+            l1_biases: [0; 16],
+            l2_weights_value: [0; 16],
+            l2_weights_policy: [[0; 64]; 16],
+            l2_bias_value: 0,
+            _pad: [0; 3],
+        }
+    }
+}
+
 impl BranchTorchNNUE {
     /// Branchless forward pass: 12 bitboards -> (value, hidden, activated)
+    #[must_use]
     pub fn forward(&self, bb: &[u64; 12]) -> (i32, [i32; 16], [i32; 16]) {
         let mut hidden = [0i32; 16];
         // Accumulate L1: weight[neuron][feature] * feature_active
@@ -80,6 +101,7 @@ impl BranchTorchNNUE {
 
     /// Construct a network seeded with classical material values in hidden
     /// neuron 0 (see the body below), all other weights zeroed.
+    #[must_use]
     pub const fn new() -> Self {
         let mut nnue = Self {
             l1_weights: [[0; 768]; 16],
@@ -157,7 +179,7 @@ impl BranchTorchNNUE {
                 // `7 - rank`.
                 let w_pst = pst[piece_idx][(7 - rank) * 8 + file];
                 let val = piece_values[piece_idx] + w_pst;
-                nnue.l1_weights[0][piece_idx * 64 + sq] = val as i32;
+                nnue.l1_weights[0][piece_idx * 64 + sq] = val;
 
                 // Black: a black piece on board `sq` mirrors to the white PST
                 // value of the rank-flipped square (rank -> 7 - rank), then is
@@ -165,7 +187,7 @@ impl BranchTorchNNUE {
                 let b_rank = 7 - rank;
                 let b_pst = pst[piece_idx][(7 - b_rank) * 8 + file];
                 let b_val = piece_values[piece_idx] + b_pst;
-                nnue.l1_weights[0][(piece_idx + 6) * 64 + sq] = -(b_val as i32);
+                nnue.l1_weights[0][(piece_idx + 6) * 64 + sq] = -b_val;
 
                 sq += 1;
             }
