@@ -320,7 +320,7 @@ pub fn ct_clamp_u32(val: u32, lo: u32, hi: u32) -> u32 {
     ct_min_u32(ct_max_u32(val, lo), hi)
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
     use proptest::prelude::*;
