@@ -126,7 +126,7 @@ fn test_tier2_f2_missing_comment_fail() {
 fn test_tier2_f2_ignore_non_rust() {
     let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
     let mut ctx = TestCtx::new();
-    let file_path = Path::new("/Users/sac/bcinr")
+    let file_path = Path::new(get_repo_root().to_str().unwrap())
         .join("crates/bcinr-logic/src/algorithms/temp_gate_ignore.txt");
     fs::write(&file_path, "Random non-rust content.").unwrap();
     ctx.to_cleanup.push(file_path);
@@ -155,7 +155,7 @@ fn test_tier1_f3_cargo_fmt_check() {
     let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
     let out = Command::new("cargo")
         .args(["fmt", "--check"])
-        .current_dir("/Users/sac/bcinr")
+        .current_dir(get_repo_root().to_str().unwrap())
         .output()
         .unwrap();
     assert_status_in(&out, &[0, 1]);
@@ -166,7 +166,7 @@ fn test_tier1_f3_cargo_clippy() {
     let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
     let out = Command::new("cargo")
         .args(["clippy", "--quiet"])
-        .current_dir("/Users/sac/bcinr")
+        .current_dir(get_repo_root().to_str().unwrap())
         .output()
         .unwrap();
     assert_status_in(&out, &[0, 1, 101]);
@@ -177,7 +177,7 @@ fn test_tier1_f3_clippy_on_logic() {
     let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
     let out = Command::new("cargo")
         .args(["clippy", "-p", "bcinr-logic"])
-        .current_dir("/Users/sac/bcinr")
+        .current_dir(get_repo_root().to_str().unwrap())
         .output()
         .unwrap();
     assert_status_in(&out, &[0, 1, 101]);
@@ -188,7 +188,7 @@ fn test_tier1_f3_clippy_on_core() {
     let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
     let out = Command::new("cargo")
         .args(["clippy", "-p", "bcinr-core"])
-        .current_dir("/Users/sac/bcinr")
+        .current_dir(get_repo_root().to_str().unwrap())
         .output()
         .unwrap();
     assert_status_in(&out, &[0, 1, 101]);
@@ -199,7 +199,7 @@ fn test_tier1_f3_clippy_on_bench() {
     let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
     let out = Command::new("cargo")
         .args(["clippy", "-p", "bcinr-bench"])
-        .current_dir("/Users/sac/bcinr")
+        .current_dir(get_repo_root().to_str().unwrap())
         .output()
         .unwrap();
     assert_status_in(&out, &[0, 1, 101]);
@@ -216,7 +216,7 @@ fn test_tier2_f3_poor_format_fails() {
     );
     let out = Command::new("cargo")
         .args(["fmt", "--check"])
-        .current_dir("/Users/sac/bcinr")
+        .current_dir(get_repo_root().to_str().unwrap())
         .output()
         .unwrap();
     assert_status_eq(&out, 1);
@@ -248,7 +248,7 @@ fn test_tier2_f3_fmt_empty_file() {
     ctx.create_temp_algo_file("temp_empty", "", false);
     let out = Command::new("cargo")
         .args(["fmt", "--check"])
-        .current_dir("/Users/sac/bcinr")
+        .current_dir(get_repo_root().to_str().unwrap())
         .output()
         .unwrap();
     assert_status_in(&out, &[0, 1]);
@@ -266,7 +266,7 @@ fn test_tier2_f3_clippy_quiet() {
     let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
     let out = Command::new("cargo")
         .args(["clippy", "--quiet"])
-        .current_dir("/Users/sac/bcinr")
+        .current_dir(get_repo_root().to_str().unwrap())
         .output()
         .unwrap();
     assert_status_in(&out, &[0, 1, 101]);
@@ -407,7 +407,7 @@ fn create_dirty_temp_dir() -> tempfile::TempDir {
 #[test]
 fn test_tier1_f5_run_tool() {
     let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
-    let out = run_lsp_cmd("/Users/sac/bcinr");
+    let out = run_lsp_cmd(get_repo_root().to_str().unwrap());
     assert_status_eq(&out, 0);
 }
 
@@ -490,7 +490,7 @@ fn test_tier2_f5_nonexistent_dir_fails() {
     ensure_lsp_built();
     let out = Command::new("/tmp/bcinr-e2e-target/debug/anti-llm-cheat-lsp")
         .args(["scan", "--invalid-flag"])
-        .current_dir("/Users/sac/bcinr")
+        .current_dir(get_repo_root().to_str().unwrap())
         .output()
         .unwrap();
     assert_status_not(&out, 0);
@@ -620,7 +620,7 @@ fn test_tier3_all_fail() {
 
     let res_fmt = Command::new("cargo")
         .args(["fmt", "--check"])
-        .current_dir("/Users/sac/bcinr")
+        .current_dir(get_repo_root().to_str().unwrap())
         .output()
         .unwrap();
     let res_gate = run_gate_cmd();
@@ -665,7 +665,7 @@ fn test_tier4_scenario_bench_auditor() {
 #[test]
 fn test_tier4_scenario_anti_llm_lsp() {
     let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
-    let res = run_lsp_cmd("/Users/sac/bcinr");
+    let res = run_lsp_cmd(get_repo_root().to_str().unwrap());
     assert_status_eq(&res, 0);
     let stdout = String::from_utf8_lossy(&res.stdout);
     assert!(str_has_substr(&stdout, "Diagnostics emitted: 0"));
@@ -676,7 +676,7 @@ fn test_tier4_scenario_cargo_fmt() {
     let _e2e_lock = crate::mod_rs_lock().lock().unwrap();
     let out = Command::new("cargo")
         .args(["fmt", "--check"])
-        .current_dir("/Users/sac/bcinr")
+        .current_dir(get_repo_root().to_str().unwrap())
         .output()
         .unwrap();
     assert_status_in(&out, &[0, 1]);
