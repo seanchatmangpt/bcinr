@@ -10,11 +10,35 @@ use std::process::Command;
 
 pub fn get_repo_root() -> PathBuf {
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    Path::new(manifest_dir)
-        .ancestors()
-        .find(|p| p.join("Cargo.toml").exists())
-        .map(|p| p.to_path_buf())
-        .expect("Could not find repository root")
+    let mut current = Path::new(manifest_dir).to_path_buf();
+
+    loop {
+        // Check if we're at a workspace root (has Cargo.toml and it's likely the main one)
+        // Keep going up until we find a directory that doesn't have a parent with Cargo.toml
+        let has_cargo = current.join("Cargo.toml").exists();
+        if !has_cargo {
+            if let Some(parent) = current.parent() {
+                current = parent.to_path_buf();
+                continue;
+            }
+            break;
+        }
+
+        // If we found a Cargo.toml, check if parent also has one
+        if let Some(parent) = current.parent() {
+            if !parent.join("Cargo.toml").exists() {
+                // Parent doesn't have Cargo.toml, so current is the root
+                return current;
+            }
+            // Parent has Cargo.toml too, keep searching
+            current = parent.to_path_buf();
+        } else {
+            // No parent, we're at filesystem root
+            return current;
+        }
+    }
+
+    Path::new(manifest_dir).to_path_buf()
 }
 
 pub fn str_has_substr(s: &str, pat: &str) -> bool {

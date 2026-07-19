@@ -20,6 +20,7 @@ impl CanonicalMask {
     }
 }
 
+/// Branchless Contract: Constant-time less-than comparison for u32.
 #[inline(always)]
 pub const fn const_lt_u32(a: u32, b: u32) -> CanonicalMask {
     let diff = ((a ^ ((a ^ b) | (a.wrapping_sub(b) ^ b))) >> 31) & 1;
@@ -28,6 +29,7 @@ pub const fn const_lt_u32(a: u32, b: u32) -> CanonicalMask {
     }
 }
 
+/// Branchless Contract: Constant-time equality comparison for u32.
 #[inline(always)]
 pub const fn const_eq_u32(a: u32, b: u32) -> CanonicalMask {
     let x = a ^ b;
