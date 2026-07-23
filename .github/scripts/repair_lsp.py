@@ -14,12 +14,13 @@ def replace_once(text: str, old: str, new: str, label: str) -> str:
 
 andon_path = Path("crates/bcinr-pddl-lsp/src/andon_bus/mod.rs")
 andon = andon_path.read_text()
-andon = replace_once(
-    andon,
-    "use lsp_types_max::{Diagnostic, DiagnosticSeverity, MessageType, Position, Range};\n",
-    "use lsp_types_max::{Diagnostic, DiagnosticSeverity, MessageType, Position, Range};\nuse serde::{Deserialize, Serialize};\n",
-    "andon serde import",
-)
+if "use serde::{Deserialize, Serialize};" not in andon:
+    andon = replace_once(
+        andon,
+        "use lsp_types_max::{Diagnostic, DiagnosticSeverity, MessageType, Position, Range};\n",
+        "use lsp_types_max::{Diagnostic, DiagnosticSeverity, MessageType, Position, Range};\nuse serde::{Deserialize, Serialize};\n",
+        "andon serde import",
+    )
 andon = replace_once(
     andon,
     "#[derive(Debug, Clone, PartialEq)]\npub enum AndonSeverity",
