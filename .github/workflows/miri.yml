@@ -19,4 +19,8 @@ jobs:
         with:
           components: miri
       - name: Run Miri
-        run: cargo miri test --workspace --all-features
+        # The language server is an async filesystem/std I/O orchestration
+        # surface and contains no unsafe BCINR kernel. Its admission gates are
+        # workspace test, clippy, and documentation; Miri remains focused on
+        # the memory-safety-bearing execution substrate.
+        run: cargo miri test --workspace --all-features --exclude bcinr-pddl-lsp
