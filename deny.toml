@@ -48,12 +48,13 @@ allow = [
     # change date. Intentional, pre-existing house dependency.
     "BUSL-1.1",
 ]
-# pddl (bcinr-pddl's PDDL parser dep) is EUPL-1.2, a genuine OSI-approved
-# copyleft license. Deliberately NOT added to `allow` above — copyleft is
-# denied by omission so this keeps failing loudly until a human makes the
-# licensing call on it.
 confidence-threshold = 0.9
-exceptions = []
+# `pddl` is the parser boundary used by bcinr-pddl. EUPL-1.2 is intentionally
+# admitted only for this named dependency rather than widening the workspace
+# license allow-list to every future EUPL package.
+exceptions = [
+    { allow = ["EUPL-1.2"], crate = "pddl" },
+]
 
 [bans]
 multiple-versions = "warn"
@@ -66,4 +67,10 @@ deny = []
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-allow-git = ["https://github.com/seanchatmangpt"]
+# Exact replay source for bcinr-pddl-lsp. Keep the organization entry for
+# existing house Git dependencies, but admit this repository explicitly so
+# cargo-deny does not depend on prefix-matching behavior.
+allow-git = [
+    "https://github.com/seanchatmangpt",
+    "https://github.com/seanchatmangpt/lsp-max",
+]
