@@ -15,18 +15,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Branch-bounded actuation rail for the verifier-derived repair set. Removed
-  # after the generated commit is observed and replayed by normal CI.
-  apply_gate_repairs:
-    name: Apply verifier-derived repairs
+  # Temporary read-only manufacturing rail. It applies the exact verifier
+  # findings and exports complete replacement files for connector actuation.
+  manufacture_gate_repairs:
+    name: Manufacture verifier-derived repairs
     if: github.event_name == 'pull_request' && github.head_ref == 'agent/finish-bcinr-lsp'
-    permissions:
-      contents: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: agent/finish-bcinr-lsp
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
@@ -46,66 +42,28 @@ jobs:
               raise SystemExit(f"{label}: expected source text not found")
 
           planner = "crates/bcinr-pddl-lsp/src/planner_client/mod.rs"
-          replace_once(
-              planner,
-              "    Pddl8ExecutionLog, Pddl8ExecutionReceipt,\n",
-              "    Pddl8Error, Pddl8ExecutionLog, Pddl8ExecutionReceipt,\n",
-              "typed planner error import",
-          )
-          replace_once(
-              planner,
-              "    NoAdmittedPlan,\n    ExecutionError(String),\n",
-              "    NoAdmittedPlan,\n    PlanningFailed(Pddl8Error),\n    ExecutionError(String),\n",
-              "typed planner error variant",
-          )
-          replace_once(
-              planner,
-              "            Self::NoAdmittedPlan => write!(f, \"NO_ADMITTED_PLAN: BFS exhausted reachable states\"),\n            Self::ExecutionError(s) => write!(f, \"Execution error: {s}\"),\n",
-              "            Self::NoAdmittedPlan => write!(f, \"NO_ADMITTED_PLAN: BFS exhausted reachable states\"),\n            Self::PlanningFailed(e) => write!(f, \"Planning failed: {e}\"),\n            Self::ExecutionError(s) => write!(f, \"Execution error: {s}\"),\n",
-              "typed planner error display",
-          )
-          replace_once(
-              planner,
-              "    let tape = gp.find_plan().map_err(|_| PlannerError::NoAdmittedPlan)?;\n",
-              "    let tape = gp\n        .find_plan()\n        .into_result()\n        .map_err(Pddl8Error::from)\n        .map_err(PlannerError::PlanningFailed)?;\n",
-              "planner outcome conversion",
-          )
+          replace_once(planner, "    Pddl8ExecutionLog, Pddl8ExecutionReceipt,\n", "    Pddl8Error, Pddl8ExecutionLog, Pddl8ExecutionReceipt,\n", "typed planner error import")
+          replace_once(planner, "    NoAdmittedPlan,\n    ExecutionError(String),\n", "    NoAdmittedPlan,\n    PlanningFailed(Pddl8Error),\n    ExecutionError(String),\n", "typed planner error variant")
+          replace_once(planner, "            Self::NoAdmittedPlan => write!(f, \"NO_ADMITTED_PLAN: BFS exhausted reachable states\"),\n            Self::ExecutionError(s) => write!(f, \"Execution error: {s}\"),\n", "            Self::NoAdmittedPlan => write!(f, \"NO_ADMITTED_PLAN: BFS exhausted reachable states\"),\n            Self::PlanningFailed(e) => write!(f, \"Planning failed: {e}\"),\n            Self::ExecutionError(s) => write!(f, \"Execution error: {s}\"),\n", "typed planner error display")
+          replace_once(planner, "    let tape = gp.find_plan().map_err(|_| PlannerError::NoAdmittedPlan)?;\n", "    let tape = gp\n        .find_plan()\n        .into_result()\n        .map_err(Pddl8Error::from)\n        .map_err(PlannerError::PlanningFailed)?;\n", "planner outcome conversion")
 
-          replace_once(
-              "crates/bcinr-pddl-lsp/src/bounds/mod.rs",
-              "    let mut checks_run = vec![\"goal_atoms\".to_string(), \"init_atoms\".to_string()];\n",
-              "    let checks_run = vec![\"goal_atoms\".to_string(), \"init_atoms\".to_string()];\n",
-              "immutable problem checks",
-          )
+          replace_once("crates/bcinr-pddl-lsp/src/bounds/mod.rs", "    let mut checks_run = vec![\"goal_atoms\".to_string(), \"init_atoms\".to_string()];\n", "    let checks_run = vec![\"goal_atoms\".to_string(), \"init_atoms\".to_string()];\n", "immutable problem checks")
 
           invariants = Path("crates/bcinr-pddl-lsp/src/invariants/mod.rs")
           text = invariants.read_text()
-          text = text.replace(
-              "fn invariant_need9(lifecycle: &crate::lifecycle::ProjectLifecycle) -> InvariantRecord {",
-              "fn invariant_need9(_lifecycle: &crate::lifecycle::ProjectLifecycle) -> InvariantRecord {",
-              1,
-          )
-          text = text.replace(
-              "fn invariant_candidate_not_admitted(\n    lifecycle: &crate::lifecycle::ProjectLifecycle,\n) -> InvariantRecord {",
-              "fn invariant_candidate_not_admitted(\n    _lifecycle: &crate::lifecycle::ProjectLifecycle,\n) -> InvariantRecord {",
-              1,
-          )
+          text = text.replace("fn invariant_need9(lifecycle: &crate::lifecycle::ProjectLifecycle) -> InvariantRecord {", "fn invariant_need9(_lifecycle: &crate::lifecycle::ProjectLifecycle) -> InvariantRecord {", 1)
+          text = text.replace("fn invariant_candidate_not_admitted(\n    lifecycle: &crate::lifecycle::ProjectLifecycle,\n) -> InvariantRecord {", "fn invariant_candidate_not_admitted(\n    _lifecycle: &crate::lifecycle::ProjectLifecycle,\n) -> InvariantRecord {", 1)
           invariants.write_text(text)
 
           backend = Path("crates/bcinr-pddl-lsp/src/backend.rs")
           text = backend.read_text()
           text = text.replace("    lifecycle: lifecycle::ProjectLifecycle,\n", "", 1)
           text = text.replace("                lifecycle: lc.clone(),\n", "", 1)
-          text = text.replace(
-              "        let (candidate, proj) = {\n            let cache = self.plan_cache.lock().await;\n            match cache.as_ref() {\n                Some(c) => (c.candidate.clone(), c.projection.clone()),\n",
-              "        let candidate = {\n            let cache = self.plan_cache.lock().await;\n            match cache.as_ref() {\n                Some(c) => c.candidate.clone(),\n",
-              1,
-          )
+          text = text.replace("        let (candidate, proj) = {\n            let cache = self.plan_cache.lock().await;\n            match cache.as_ref() {\n                Some(c) => (c.candidate.clone(), c.projection.clone()),\n", "        let candidate = {\n            let cache = self.plan_cache.lock().await;\n            match cache.as_ref() {\n                Some(c) => c.candidate.clone(),\n", 1)
           backend.write_text(text)
 
           manifest = Path("crates/bcinr-pddl/Cargo.toml")
-          text = manifest.read_text().replace('divan = "0.1"\n\n[[bench]]', '[[bench]]', 1)
-          manifest.write_text(text)
+          manifest.write_text(manifest.read_text().replace('divan = "0.1"\n\n[[bench]]', '[[bench]]', 1))
 
           deny = Path("deny.toml")
           text = deny.read_text()
@@ -114,19 +72,26 @@ jobs:
           text = text.replace('    "https://github.com/seanchatmangpt",\n', '', 1)
           deny.write_text(text)
           PY
-      - name: Format deterministic outputs
+      - name: Format exact replacement files
         run: cargo fmt --all
-      - name: Commit repair set
+      - name: Stage repair artifact
         run: |
-          if git diff --quiet; then
-            echo "Verifier-derived repair set is already applied."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add crates/bcinr-pddl-lsp crates/bcinr-pddl/Cargo.toml deny.toml
-          git commit -m "fix: close restored LSP verifier findings"
-          git push origin HEAD:agent/finish-bcinr-lsp
+          mkdir -p repair/crates/bcinr-pddl-lsp/src/planner_client
+          mkdir -p repair/crates/bcinr-pddl-lsp/src/bounds
+          mkdir -p repair/crates/bcinr-pddl-lsp/src/invariants
+          mkdir -p repair/crates/bcinr-pddl-lsp/src
+          mkdir -p repair/crates/bcinr-pddl
+          cp crates/bcinr-pddl-lsp/src/planner_client/mod.rs repair/crates/bcinr-pddl-lsp/src/planner_client/mod.rs
+          cp crates/bcinr-pddl-lsp/src/bounds/mod.rs repair/crates/bcinr-pddl-lsp/src/bounds/mod.rs
+          cp crates/bcinr-pddl-lsp/src/invariants/mod.rs repair/crates/bcinr-pddl-lsp/src/invariants/mod.rs
+          cp crates/bcinr-pddl-lsp/src/backend.rs repair/crates/bcinr-pddl-lsp/src/backend.rs
+          cp crates/bcinr-pddl/Cargo.toml repair/crates/bcinr-pddl/Cargo.toml
+          cp deny.toml repair/deny.toml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verifier-derived-repairs
+          path: repair/
+          if-no-files-found: error
 
   style:
     name: Format & Clippy
