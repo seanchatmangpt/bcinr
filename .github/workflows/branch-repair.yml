@@ -16,7 +16,7 @@ env:
 
 jobs:
   repair:
-    name: Format and lock workspace
+    name: Replace stub ANDON and lock workspace
     if: github.event_name == 'push' || github.head_ref == 'agent/finish-bcinr-lsp'
     runs-on: ubuntu-latest
     steps:
@@ -26,6 +26,151 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
+      - name: Replace upstream stub with local admitted ANDON engine
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          andon_path = Path("crates/bcinr-pddl-lsp/src/andon_bus/mod.rs")
+          andon = andon_path.read_text()
+          andon = andon.replace(
+              "use lsp_types_max::{Diagnostic, DiagnosticSeverity, MessageType, Position, Range};\n",
+              "use lsp_types_max::{Diagnostic, DiagnosticSeverity, MessageType, Position, Range};\nuse serde::{Deserialize, Serialize};\n",
+          )
+          andon = andon.replace(
+              "#[derive(Debug, Clone, PartialEq)]\npub enum AndonSeverity",
+              "#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]\npub enum AndonSeverity",
+          )
+          andon = andon.replace(
+              "#[derive(Debug, Clone)]\npub struct AndonEvent",
+              "#[derive(Debug, Clone, Serialize, Deserialize)]\npub struct AndonEvent",
+          )
+          anchor = "}\n\npub struct AndonAnalysis {"
+          insertion = '''}
+
+#[derive(Debug, Default)]
+pub struct AndonBus {
+    events: Vec<AndonEvent>,
+}
+
+impl AndonBus {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn push(&mut self, event: AndonEvent) {
+        self.events.push(event);
+    }
+
+    pub fn events(&self) -> &[AndonEvent] {
+        &self.events
+    }
+
+    pub fn drain(&mut self) -> Vec<AndonEvent> {
+        std::mem::take(&mut self.events)
+    }
+}
+
+/// Typed custom notification for the BCINR ANDON stream.
+pub struct BcinrPddlAndonRaised;
+
+impl lsp_types_max::notification::Notification for BcinrPddlAndonRaised {
+    type Params = AndonEvent;
+    const METHOD: &'static str = "bcinrPddl/andonRaised";
+}
+
+pub struct AndonAnalysis {'''
+          if "pub struct AndonBus" not in andon:
+              if anchor not in andon:
+                  raise SystemExit("ANDON insertion anchor not found")
+              andon = andon.replace(anchor, insertion, 1)
+          andon_path.write_text(andon)
+
+          backend_path = Path("crates/bcinr-pddl-lsp/src/backend.rs")
+          backend = backend_path.read_text()
+          old_imports = '''use lsp_max_andon::analysis::AnalysisPipeline;
+use lsp_max_andon::andon::{AndonBus, AndonEvent};
+use lsp_max_andon::core::InvariantRegistry;
+use lsp_max_andon::lsp::{LspMaxAndonRaised, LspPushAdapter};
+use lsp_max_andon::patterns::{
+    build_brokered_command, build_empty_registry_invariant, build_marker_admission,
+    build_need_n_invariant, build_non_empty_check_set, build_receipt_required,
+    build_required_artifact_invariant,
+};
+'''
+          new_imports = '''use crate::andon_bus::{
+    self, AndonAnalysis, AndonBus, AndonEvent, BcinrPddlAndonRaised,
+};
+'''
+          backend = backend.replace(old_imports, new_imports)
+          backend = backend.replace(
+              "    pub registry: Arc<StdMutex<InvariantRegistry>>,\n    pub andon_bus: Arc<StdMutex<AndonBus>>,\n",
+              "    pub andon_bus: Arc<StdMutex<AndonBus>>,\n",
+          )
+          registry_setup = '''        let mut registry = InvariantRegistry::new();
+        registry.register(build_empty_registry_invariant());
+        registry.register(build_required_artifact_invariant("docs/prd.md"));
+        registry.register(build_marker_admission("ADMITTED"));
+        registry.register(build_need_n_invariant(8));
+        registry.register(build_non_empty_check_set());
+        registry.register(build_brokered_command());
+        registry.register(build_receipt_required());
+
+'''
+          backend = backend.replace(registry_setup, "")
+          backend = backend.replace(
+              "            registry: Arc::new(StdMutex::new(registry)),\n            andon_bus: Arc::new(StdMutex::new(AndonBus::new())),\n",
+              "            andon_bus: Arc::new(StdMutex::new(AndonBus::new())),\n",
+          )
+          backend = backend.replace(
+              "cache.as_ref().map(|c| c.gate.clone()).unwrap_or(gate)",
+              "cache.as_ref().map(|c| c.gate.clone()).unwrap_or_else(|| gate.clone())",
+          )
+          backend = backend.replace("            } else {\n                gate\n", "            } else {\n                gate.clone()\n", 1)
+          old_analysis = '''        let andon_events = {
+            let registry = self.registry.lock().unwrap();
+            AnalysisPipeline::evaluate_registry(&registry)
+        };
+
+        for event in andon_events {
+            // Andon events are pushed as custom LSP notifications, not as standard diagnostics
+            self.push_andon(event).await;
+        }
+'''
+          new_analysis = '''        let broker_snapshot = self.broker.lock().await.clone();
+        let analysis = AndonAnalysis {
+            lifecycle: lc.clone(),
+            bounds_report: bounds_report.clone(),
+            plan_candidate: None,
+            gate: gate.clone(),
+            broker: broker_snapshot,
+        };
+
+        for event in andon_bus::derive_events(&analysis) {
+            all_diags.push(andon_bus::to_lsp_diagnostic(&event));
+            self.push_andon(event).await;
+        }
+'''
+          if "AnalysisPipeline::evaluate_registry" in backend:
+              if old_analysis not in backend:
+                  raise SystemExit("backend analysis block did not match")
+              backend = backend.replace(old_analysis, new_analysis, 1)
+          backend = backend.replace(
+              "send_notification::<LspMaxAndonRaised>",
+              "send_notification::<BcinrPddlAndonRaised>",
+          )
+          if "lsp_max_andon" in backend or "AnalysisPipeline" in backend:
+              raise SystemExit("stub ANDON references remain in backend")
+          backend_path.write_text(backend)
+
+          manifest_path = Path("crates/bcinr-pddl-lsp/Cargo.toml")
+          manifest = manifest_path.read_text()
+          manifest = "\n".join(
+              line for line in manifest.splitlines()
+              if not line.startswith("lsp-max-andon = ")
+          ) + "\n"
+          manifest_path.write_text(manifest)
+          PY
       - name: Manufacture deterministic workspace outputs
         run: |
           cargo fmt --all
@@ -33,11 +178,11 @@ jobs:
       - name: Commit deterministic outputs
         run: |
           if git diff --quiet -- Cargo.lock crates/bcinr-pddl-lsp; then
-            echo "Workspace formatting and lockfile are already current."
+            echo "Stub replacement, formatting, and lockfile are already current."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Cargo.lock crates/bcinr-pddl-lsp
-          git commit -m "chore: format restored LSP and refresh lockfile"
+          git commit -m "fix(lsp): route ANDON through local admitted engine"
           git push origin HEAD:agent/finish-bcinr-lsp
