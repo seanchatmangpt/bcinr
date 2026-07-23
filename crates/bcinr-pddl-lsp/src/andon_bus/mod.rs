@@ -3,6 +3,7 @@
 //! Pure sync. All derived from `AndonAnalysis` — no I/O, no async.
 
 use lsp_types_max::{Diagnostic, DiagnosticSeverity, MessageType, Position, Range};
+use serde::{Deserialize, Serialize};
 
 use crate::bounds::{BoundReport, BoundReportStatus};
 use crate::build_broker::BuildBrokerState;
@@ -10,7 +11,7 @@ use crate::lifecycle::{LifecycleStage, ProjectLifecycle};
 use crate::planner_client::{PlanCandidate, PlannerError};
 use crate::publish_gate::{PublishGate, PublishGateStatus};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AndonSeverity {
     Info,
     Warning,
@@ -18,7 +19,7 @@ pub enum AndonSeverity {
     Refuse,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AndonEvent {
     pub id: String,
     pub severity: AndonSeverity,
@@ -59,6 +60,37 @@ impl AndonEvent {
             admission_allowed: true,
         }
     }
+}
+
+#[derive(Debug, Default)]
+pub struct AndonBus {
+    events: Vec<AndonEvent>,
+}
+
+impl AndonBus {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn push(&mut self, event: AndonEvent) {
+        self.events.push(event);
+    }
+
+    pub fn events(&self) -> &[AndonEvent] {
+        &self.events
+    }
+
+    pub fn drain(&mut self) -> Vec<AndonEvent> {
+        std::mem::take(&mut self.events)
+    }
+}
+
+/// Typed custom notification for the BCINR ANDON stream.
+pub struct BcinrPddlAndonRaised;
+
+impl lsp_types_max::notification::Notification for BcinrPddlAndonRaised {
+    type Params = AndonEvent;
+    const METHOD: &'static str = "bcinrPddl/andonRaised";
 }
 
 pub struct AndonAnalysis {

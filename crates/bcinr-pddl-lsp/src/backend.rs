@@ -13,15 +13,7 @@ use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 use tokio::sync::Mutex;
 
-use lsp_max_andon::analysis::AnalysisPipeline;
-use lsp_max_andon::andon::{AndonBus, AndonEvent};
-use lsp_max_andon::core::InvariantRegistry;
-use lsp_max_andon::lsp::{LspMaxAndonRaised, LspPushAdapter};
-use lsp_max_andon::patterns::{
-    build_brokered_command, build_empty_registry_invariant, build_marker_admission,
-    build_need_n_invariant, build_non_empty_check_set, build_receipt_required,
-    build_required_artifact_invariant,
-};
+use crate::andon_bus::{self, AndonAnalysis, AndonBus, AndonEvent, BcinrPddlAndonRaised};
 
 fn uri_to_path(uri: &Uri) -> Option<PathBuf> {
     let s = uri.as_str();
@@ -61,28 +53,17 @@ pub struct PddlLspBackend {
     workspace_root: Arc<Mutex<Option<PathBuf>>>,
     /// build broker state
     broker: Arc<Mutex<build_broker::BuildBrokerState>>,
-    pub registry: Arc<StdMutex<InvariantRegistry>>,
     pub andon_bus: Arc<StdMutex<AndonBus>>,
 }
 
 impl PddlLspBackend {
     pub fn new(client: Client) -> Self {
-        let mut registry = InvariantRegistry::new();
-        registry.register(build_empty_registry_invariant());
-        registry.register(build_required_artifact_invariant("docs/prd.md"));
-        registry.register(build_marker_admission("ADMITTED"));
-        registry.register(build_need_n_invariant(8));
-        registry.register(build_non_empty_check_set());
-        registry.register(build_brokered_command());
-        registry.register(build_receipt_required());
-
         Self {
             client,
             documents: DashMap::new(),
             plan_cache: Arc::new(Mutex::new(None)),
             workspace_root: Arc::new(Mutex::new(None)),
             broker: Arc::new(Mutex::new(build_broker::BuildBrokerState::default())),
-            registry: Arc::new(StdMutex::new(registry)),
             andon_bus: Arc::new(StdMutex::new(AndonBus::new())),
         }
     }
@@ -115,9 +96,12 @@ impl PddlLspBackend {
             // Preserve any existing admission — projection mode never clears it
             let admission = cache.as_mut().and_then(|c| c.admission.take());
             let final_gate = if admission.is_some() {
-                cache.as_ref().map(|c| c.gate.clone()).unwrap_or(gate)
+                cache
+                    .as_ref()
+                    .map(|c| c.gate.clone())
+                    .unwrap_or_else(|| gate.clone())
             } else {
-                gate
+                gate.clone()
             };
             *cache = Some(CachedPlan {
                 projection: proj.clone(),
@@ -132,13 +116,17 @@ impl PddlLspBackend {
         let mut all_diags = diag_mod::lifecycle_diagnostics(&lc);
         all_diags.extend(diag_mod::bound_diagnostics(&bounds_report));
 
-        let andon_events = {
-            let registry = self.registry.lock().unwrap();
-            AnalysisPipeline::evaluate_registry(&registry)
+        let broker_snapshot = self.broker.lock().await.clone();
+        let analysis = AndonAnalysis {
+            lifecycle: lc.clone(),
+            bounds_report: bounds_report.clone(),
+            plan_candidate: None,
+            gate: gate.clone(),
+            broker: broker_snapshot,
         };
 
-        for event in andon_events {
-            // Andon events are pushed as custom LSP notifications, not as standard diagnostics
+        for event in andon_bus::derive_events(&analysis) {
+            all_diags.push(andon_bus::to_lsp_diagnostic(&event));
             self.push_andon(event).await;
         }
 
@@ -169,7 +157,7 @@ impl PddlLspBackend {
     async fn push_andon(&self, event: AndonEvent) {
         let _ = self
             .client
-            .send_notification::<LspMaxAndonRaised>(event.clone())
+            .send_notification::<BcinrPddlAndonRaised>(event.clone())
             .await;
 
         if event.requires_ack {

@@ -408,7 +408,6 @@ dependencies = [
  "bcinr-pddl",
  "dashmap",
  "lsp-max",
- "lsp-max-andon",
  "lsp-types-max",
  "serde",
  "serde_json",
@@ -2454,16 +2453,6 @@ dependencies = [
  "wasm4pm-cognition",
  "wasm4pm-compat",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "lsp-max-andon"
-version = "26.7.1"
-source = "git+https://github.com/seanchatmangpt/lsp-max?rev=571bed55009675d44f0c9228e63dabf04d7959b5#571bed55009675d44f0c9228e63dabf04d7959b5"
-dependencies = [
- "lsp-types-max",
- "serde",
- "serde_json",
 ]
 
 [[package]]

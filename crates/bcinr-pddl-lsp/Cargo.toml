@@ -22,7 +22,6 @@ wasm4pm-compat = { version = "26.6.28" }
 # commit. This removes the former hidden dependency on ../../../lsp-max while
 # preserving exact replay across developer machines and CI runners.
 lsp-max = { git = "https://github.com/seanchatmangpt/lsp-max", rev = "571bed55009675d44f0c9228e63dabf04d7959b5", features = ["proposed"] }
-lsp-max-andon = { git = "https://github.com/seanchatmangpt/lsp-max", rev = "571bed55009675d44f0c9228e63dabf04d7959b5" }
 lsp-types-max = { version = "26.6.24", features = ["proposed"] }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
