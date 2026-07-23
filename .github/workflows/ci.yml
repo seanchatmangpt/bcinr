@@ -45,6 +45,41 @@ jobs:
           path: repair/
           if-no-files-found: error
 
+  # Temporary verifier report. It captures complete concise gate output even
+  # when the enforcing jobs stop at the first failure.
+  gate_diagnostics:
+    name: Gate diagnostics
+    if: github.event_name == 'pull_request' && github.head_ref == 'agent/finish-bcinr-lsp'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Capture clippy report
+        run: |
+          mkdir -p gate-report
+          set +e
+          cargo clippy --workspace --all-targets --message-format=short -- -D warnings > gate-report/clippy.log 2>&1
+          echo $? > gate-report/clippy.exit
+          exit 0
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+      - name: Capture dependency policy report
+        run: |
+          set +e
+          cargo deny check > gate-report/deny.log 2>&1
+          echo $? > gate-report/deny.exit
+          exit 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bcinr-gate-report
+          path: gate-report/
+          if-no-files-found: error
+
   # 1. Lint & Format
   style:
     name: Format & Clippy
