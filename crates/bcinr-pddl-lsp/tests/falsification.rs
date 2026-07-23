@@ -20,15 +20,23 @@ fn write(dir: &TempDir, path: &str, content: &str) {
 
 mod empty_project {
     use super::*;
-    use bcinr_pddl_lsp::{lifecycle::{scan, LifecycleStage}, publish_gate, projection, planner_client};
+    use bcinr_pddl_lsp::{
+        lifecycle::{scan, LifecycleStage},
+        planner_client, projection, publish_gate,
+    };
 
     #[test]
     fn has_at_most_intent_if_readme_present() {
         let dir = TempDir::new().unwrap();
         write(&dir, "README.md", "intent");
         let lc = scan(dir.path());
-        assert!(lc.true_stages.iter().all(|s| *s == LifecycleStage::IntentCaptured),
-            "empty project should only have intent_captured at most, got: {:?}", lc.true_stages);
+        assert!(
+            lc.true_stages
+                .iter()
+                .all(|s| *s == LifecycleStage::IntentCaptured),
+            "empty project should only have intent_captured at most, got: {:?}",
+            lc.true_stages
+        );
         // Falsification: add docs/prd.md → PrdExists would also appear.
     }
 
@@ -46,8 +54,12 @@ mod empty_project {
         let dir = TempDir::new().unwrap();
         let lc = scan(dir.path());
         let gate = publish_gate::from_lifecycle(&lc);
-        assert_eq!(gate.status_label(), "OPEN",
-            "empty project (no stages) must be OPEN, not {}", gate.status_label());
+        assert_eq!(
+            gate.status_label(),
+            "OPEN",
+            "empty project (no stages) must be OPEN, not {}",
+            gate.status_label()
+        );
         // Falsification: fill all required stages → gate becomes PARTIAL.
     }
 
@@ -55,7 +67,10 @@ mod empty_project {
     fn no_receipt_exists() {
         let dir = TempDir::new().unwrap();
         let lc = scan(dir.path());
-        assert!(!lc.has(&LifecycleStage::Published), "empty project must not be Published");
+        assert!(
+            !lc.has(&LifecycleStage::Published),
+            "empty project must not be Published"
+        );
         // Falsification: add receipt with goal_reached=true → Published appears.
     }
 
@@ -66,7 +81,10 @@ mod empty_project {
         let lc = scan(dir.path());
         let proj = projection::project(&lc);
         let candidate = planner_client::plan(&proj);
-        assert!(candidate.is_ok(), "intent-captured project should produce a candidate plan");
+        assert!(
+            candidate.is_ok(),
+            "intent-captured project should produce a candidate plan"
+        );
         // Falsification: remove README.md → intent not captured; plan must still produce one
         // (intent_captured is always injected in emit_problem).
     }
@@ -92,8 +110,10 @@ mod prd_exists_not_admitted {
         let dir = TempDir::new().unwrap();
         write(&dir, "docs/prd.md", "# PRD\n## Status: CANDIDATE");
         let lc = scan(dir.path());
-        assert!(!lc.has(&LifecycleStage::PrdAdmitted),
-            "PRD with CANDIDATE marker must not be admitted");
+        assert!(
+            !lc.has(&LifecycleStage::PrdAdmitted),
+            "PRD with CANDIDATE marker must not be admitted"
+        );
         // Falsification: change to ADMITTED → PrdAdmitted becomes true.
     }
 
@@ -109,15 +129,18 @@ mod prd_exists_not_admitted {
 
     #[test]
     fn plan_includes_admit_prd_action() {
-        use bcinr_pddl_lsp::{projection, planner_client};
+        use bcinr_pddl_lsp::{planner_client, projection};
         let dir = TempDir::new().unwrap();
         write(&dir, "README.md", "intent");
         write(&dir, "docs/prd.md", "# PRD\n## Status: CANDIDATE");
         let lc = scan(dir.path());
         let proj = projection::project(&lc);
         let candidate = planner_client::plan(&proj).expect("plan must succeed");
-        assert!(candidate.plan_steps.iter().any(|s| s.contains("admit_prd")),
-            "plan must include admit_prd, got: {:?}", candidate.plan_steps);
+        assert!(
+            candidate.plan_steps.iter().any(|s| s.contains("admit_prd")),
+            "plan must include admit_prd, got: {:?}",
+            candidate.plan_steps
+        );
         // Falsification: mark PRD ADMITTED → admit_prd drops from plan.
     }
 }
@@ -156,14 +179,17 @@ mod ard_exists_not_admitted {
         write(&dir, "docs/ard.md", "# ARD\n## Status: CANDIDATE");
         let lc = scan(dir.path());
         // ARD exists but not admitted → next step is admit_ard (ArdAdmitted), not derive_ard (ArdExists)
-        assert_eq!(lc.next_missing(), Some(&LifecycleStage::ArdAdmitted),
-            "next missing must be ArdAdmitted when ARD exists but unadmitted");
+        assert_eq!(
+            lc.next_missing(),
+            Some(&LifecycleStage::ArdAdmitted),
+            "next missing must be ArdAdmitted when ARD exists but unadmitted"
+        );
         // Falsification: if ArdExists were next_missing here, the stage ordering would be wrong.
     }
 
     #[test]
     fn plan_includes_admit_ard_not_derive_ard() {
-        use bcinr_pddl_lsp::{projection, planner_client};
+        use bcinr_pddl_lsp::{planner_client, projection};
         let dir = TempDir::new().unwrap();
         write(&dir, "README.md", "intent");
         write(&dir, "docs/prd.md", "# PRD\n## Status: ADMITTED");
@@ -171,11 +197,19 @@ mod ard_exists_not_admitted {
         let lc = scan(dir.path());
         let proj = projection::project(&lc);
         let candidate = planner_client::plan(&proj).expect("plan must succeed");
-        assert!(candidate.plan_steps.iter().any(|s| s.contains("admit_ard")),
-            "plan must include admit_ard");
+        assert!(
+            candidate.plan_steps.iter().any(|s| s.contains("admit_ard")),
+            "plan must include admit_ard"
+        );
         // derive_ard should NOT appear (ard_exists is already true)
-        assert!(!candidate.plan_steps.iter().any(|s| s.contains("derive_ard")),
-            "derive_ard must NOT appear when ARD already exists, got: {:?}", candidate.plan_steps);
+        assert!(
+            !candidate
+                .plan_steps
+                .iter()
+                .any(|s| s.contains("derive_ard")),
+            "derive_ard must NOT appear when ARD already exists, got: {:?}",
+            candidate.plan_steps
+        );
         // Falsification: remove docs/ard.md → derive_ard appears in plan.
     }
 }
@@ -195,8 +229,10 @@ mod need9_work_unit {
 
     #[test]
     fn eight_tasks_no_violation() {
-        assert!(bounds::check_work_unit("unit-x", 8).is_none(),
-            "8 tasks must not trigger Need9");
+        assert!(
+            bounds::check_work_unit("unit-x", 8).is_none(),
+            "8 tasks must not trigger Need9"
+        );
         // Falsification: lower limit to 7 → 8 tasks triggers Need9.
     }
 
@@ -239,13 +275,16 @@ mod candidate_not_admission {
 
         // Gate from lifecycle alone (no execution): OPEN or BLOCKED, never ADMITTED
         let gate = publish_gate::from_lifecycle(&lc);
-        assert!(!gate.is_admitted(), "projection mode must never produce ADMITTED gate");
+        assert!(
+            !gate.is_admitted(),
+            "projection mode must never produce ADMITTED gate"
+        );
         assert_ne!(gate.status_label(), "ADMITTED");
         assert_ne!(gate.status_label(), "PUBLISHED");
 
         // Candidate itself is not an AdmissionResult
         let _ = candidate; // would need explicit admit() to get receipt
-        // Falsification: if from_lifecycle returned ADMITTED, the law CANDIDATE≠ADMITTED breaks.
+                           // Falsification: if from_lifecycle returned ADMITTED, the law CANDIDATE≠ADMITTED breaks.
     }
 
     #[test]
@@ -279,7 +318,10 @@ mod explicit_admission {
         match result {
             Ok(r) => {
                 // Receipt must exist
-                assert!(!r.receipt.chain_hash.is_empty(), "chain_hash must be non-empty");
+                assert!(
+                    !r.receipt.chain_hash.is_empty(),
+                    "chain_hash must be non-empty"
+                );
                 // OCEL must have events if tape was non-empty
                 if !candidate.plan_steps.is_empty() {
                     // admission produces OCEL events
@@ -328,9 +370,15 @@ mod build_slot_denial {
         broker.acquire_slot("cargo build").unwrap();
 
         let result = broker.request_slot("wasm-pack build");
-        assert!(result.is_err(), "second slot request while acquired must be denied");
+        assert!(
+            result.is_err(),
+            "second slot request while acquired must be denied"
+        );
         let denial = result.unwrap_err();
-        assert!(denial.reason.contains("occupied"), "denial reason must mention occupancy");
+        assert!(
+            denial.reason.contains("occupied"),
+            "denial reason must mention occupancy"
+        );
         // Falsification: allow second slot → concurrency is unbound (Need9 for builds).
     }
 
@@ -351,7 +399,10 @@ mod build_slot_denial {
         broker.acquire_slot("cargo build").unwrap();
         let _ = broker.request_slot("wasm-pack");
         let event = broker.last_ocel_event.as_deref().unwrap_or("");
-        assert!(event.contains("BUILD_SLOT_DENIED"), "denial must emit OCEL event, got: {event}");
+        assert!(
+            event.contains("BUILD_SLOT_DENIED"),
+            "denial must emit OCEL event, got: {event}"
+        );
         // Falsification: remove OCEL emission → unreceipted build denial.
     }
 }
@@ -364,8 +415,12 @@ mod direct_heavy_command_blocked {
     #[test]
     fn wasm_pack_without_slot_is_blocked() {
         let broker = BuildBrokerState::default(); // no slot acquired
-        let violation = build_broker::check_direct_command("wasm-pack build --target nodejs", &broker);
-        assert!(violation.is_some(), "wasm-pack without broker must be blocked");
+        let violation =
+            build_broker::check_direct_command("wasm-pack build --target nodejs", &broker);
+        assert!(
+            violation.is_some(),
+            "wasm-pack without broker must be blocked"
+        );
         let v = violation.unwrap();
         assert_eq!(v.diagnostic_code(), "DIRECT_HEAVY_COMMAND_BLOCKED");
         // Falsification: acquire slot first → no violation.
@@ -393,7 +448,10 @@ mod direct_heavy_command_blocked {
         broker.request_slot("cargo build").unwrap();
         broker.acquire_slot("cargo build").unwrap();
         let violation = build_broker::check_direct_command("cargo build", &broker);
-        assert!(violation.is_none(), "heavy command with acquired slot must not be blocked");
+        assert!(
+            violation.is_none(),
+            "heavy command with acquired slot must not be blocked"
+        );
         // Falsification: ignore slot state → all heavy commands always blocked.
     }
 }
@@ -408,11 +466,16 @@ mod receipt_integrity {
     fn goal_reached_false_does_not_advance_published() {
         let dir = TempDir::new().unwrap();
         write(&dir, "README.md", "intent");
-        write(&dir, ".bcinr/receipts/latest.json",
-            r#"{"goal_reached": false, "chain_hash": "abc"}"#);
+        write(
+            &dir,
+            ".bcinr/receipts/latest.json",
+            r#"{"goal_reached": false, "chain_hash": "abc"}"#,
+        );
         let lc = scan(dir.path());
-        assert!(!lc.has(&LifecycleStage::Published),
-            "goal_reached=false must not produce Published stage");
+        assert!(
+            !lc.has(&LifecycleStage::Published),
+            "goal_reached=false must not produce Published stage"
+        );
         // Falsification: ignore goal_reached field → any receipt file advances Published.
     }
 
@@ -420,19 +483,24 @@ mod receipt_integrity {
     fn goal_reached_true_advances_published() {
         let dir = TempDir::new().unwrap();
         write(&dir, "README.md", "intent");
-        write(&dir, ".bcinr/receipts/latest.json",
-            r#"{"goal_reached": true, "chain_hash": "abc123"}"#);
+        write(
+            &dir,
+            ".bcinr/receipts/latest.json",
+            r#"{"goal_reached": true, "chain_hash": "abc123"}"#,
+        );
         let lc = scan(dir.path());
-        assert!(lc.has(&LifecycleStage::Published),
-            "goal_reached=true must produce Published stage");
+        assert!(
+            lc.has(&LifecycleStage::Published),
+            "goal_reached=true must produce Published stage"
+        );
         // Falsification: check for 'true' without the field name → would match 'false' prefixed by 'true'.
     }
 
     #[test]
     fn refused_when_goal_reached_false_in_plan_result() {
-        use bcinr_pddl_lsp::{lifecycle::scan, planner_client::{PlanResult}, publish_gate};
-        use wasm4pm_compat::pddl::{Pddl8ExecutionLog, Pddl8ExecutionReceipt};
+        use bcinr_pddl_lsp::{lifecycle::scan, planner_client::PlanResult, publish_gate};
         use wasm4pm_compat::ocel::OCEL;
+        use wasm4pm_compat::pddl::{Pddl8ExecutionLog, Pddl8ExecutionReceipt};
 
         let dir = TempDir::new().unwrap();
         let lc = scan(dir.path());
@@ -453,12 +521,21 @@ mod receipt_integrity {
                 goal_reached: false,
                 step_count: 0,
             },
-            ocel: OCEL { events: vec![], objects: vec![], object_types: vec![], event_types: vec![] },
+            ocel: OCEL {
+                events: vec![],
+                objects: vec![],
+                object_types: vec![],
+                event_types: vec![],
+            },
         };
 
         let gate = publish_gate::from_plan_result(&lc, &result);
-        assert_eq!(gate.status_label(), "REFUSED",
-            "goal_reached=false must produce REFUSED gate, got: {}", gate.status_label());
+        assert_eq!(
+            gate.status_label(),
+            "REFUSED",
+            "goal_reached=false must produce REFUSED gate, got: {}",
+            gate.status_label()
+        );
         assert!(!gate.is_admitted());
         // Falsification: return ADMITTED from from_plan_result for false goal_reached → law breaks.
     }
@@ -474,8 +551,16 @@ mod end_to_end_publish {
         write(dir, "README.md", "intent");
         write(dir, "docs/prd.md", "# PRD\n## Status: ADMITTED");
         write(dir, "docs/ard.md", "# ARD\n## Status: ADMITTED");
-        write(dir, "docs/adr/001-decision.md", "# ADR-001\n## Status: ADMITTED");
-        write(dir, "docs/work-units.md", "# Work Units\n- Task 1\n- Task 2");
+        write(
+            dir,
+            "docs/adr/001-decision.md",
+            "# ADR-001\n## Status: ADMITTED",
+        );
+        write(
+            dir,
+            "docs/work-units.md",
+            "# Work Units\n- Task 1\n- Task 2",
+        );
         write(dir, "src/lib.rs", "pub fn main() {}");
         write(dir, ".bcinr/test-report.json", r#"{"status": "passed"}"#);
         write(dir, "docs/architecture.md", "# Architecture");
@@ -514,8 +599,11 @@ mod end_to_end_publish {
         //  request_build_slot, acquire_build_slot, implement_work_units, run_tests,
         //  record_build_ocel, project_docs, prepare_release, emit_receipt, publish_release)
         // Some actions depend on the grounding — count what was generated
-        assert!(dom.actions.len() >= 10,
-            "lifecycle domain must have ≥10 actions, got {}", dom.actions.len());
+        assert!(
+            dom.actions.len() >= 10,
+            "lifecycle domain must have ≥10 actions, got {}",
+            dom.actions.len()
+        );
         // Falsification: remove an action from emit_domain() → count drops.
     }
 
@@ -524,7 +612,10 @@ mod end_to_end_publish {
         use bcinr_pddl::domain_from_pddl;
         let domain = bcinr_pddl_lsp::projection::emit_domain();
         let dom = domain_from_pddl(&domain).expect("domain must parse");
-        let publish = dom.actions.iter().find(|a| a.name == "publish_release")
+        let publish = dom
+            .actions
+            .iter()
+            .find(|a| a.name == "publish_release")
             .expect("publish_release must exist in domain");
         let prec_count = publish.preconditions.len();
         assert_eq!(prec_count, 8,
@@ -537,15 +628,21 @@ mod end_to_end_publish {
         let dir = TempDir::new().unwrap();
         setup_full_project(&dir);
         // Also add receipt to make Published true
-        write(&dir, ".bcinr/receipts/latest.json",
-            r#"{"goal_reached": true, "chain_hash": "abc123"}"#);
+        write(
+            &dir,
+            ".bcinr/receipts/latest.json",
+            r#"{"goal_reached": true, "chain_hash": "abc123"}"#,
+        );
         let lc = scan(dir.path());
         let gate = publish_gate::from_lifecycle(&lc);
 
         // If Published is in true_stages, next_missing is None
         let next = lc.next_missing();
-        assert!(next.is_none() || next.map(|s| s.predicate_name()) == Some("published"),
-            "fully-admitted project next_step must be None or 'published', got: {:?}", next);
+        assert!(
+            next.is_none() || next.map(|s| s.predicate_name()) == Some("published"),
+            "fully-admitted project next_step must be None or 'published', got: {:?}",
+            next
+        );
         assert_eq!(gate.status_label(), "PUBLISHED");
         // Falsification: remove receipt → Published drops; next_step returns Some(published).
     }

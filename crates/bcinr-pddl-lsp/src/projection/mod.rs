@@ -137,7 +137,8 @@ pub fn emit_domain() -> String {
       (ocel_present ?p))
     :effect (published ?p))
 )
-"#.to_string()
+"#
+    .to_string()
 }
 
 /// Generate the problem from current lifecycle state.

@@ -41,10 +41,17 @@ mod lifecycle_scanner {
     fn prd_without_admitted_marker_gives_prd_exists_not_admitted() {
         let dir = TempDir::new().unwrap();
         write(&dir, "README.md", "intent");
-        write(&dir, "docs/prd.md", "# PRD\n\n## Status: CANDIDATE\n\nThis is the plan.");
+        write(
+            &dir,
+            "docs/prd.md",
+            "# PRD\n\n## Status: CANDIDATE\n\nThis is the plan.",
+        );
         let lc = scan(dir.path());
         assert!(lc.has(&LifecycleStage::PrdExists), "PRD exists");
-        assert!(!lc.has(&LifecycleStage::PrdAdmitted), "PRD not yet admitted");
+        assert!(
+            !lc.has(&LifecycleStage::PrdAdmitted),
+            "PRD not yet admitted"
+        );
         // Counterfactual: add ADMITTED → PrdAdmitted must appear.
     }
 
@@ -52,7 +59,11 @@ mod lifecycle_scanner {
     fn prd_with_admitted_marker_gives_prd_admitted() {
         let dir = TempDir::new().unwrap();
         write(&dir, "README.md", "intent");
-        write(&dir, "docs/prd.md", "# PRD\n\n## Status: ADMITTED\n\nFull PRD text.");
+        write(
+            &dir,
+            "docs/prd.md",
+            "# PRD\n\n## Status: ADMITTED\n\nFull PRD text.",
+        );
         let lc = scan(dir.path());
         assert!(lc.has(&LifecycleStage::PrdAdmitted));
         // Counterfactual: remove 'ADMITTED' from prd.md → PrdAdmitted must disappear.
@@ -63,7 +74,11 @@ mod lifecycle_scanner {
         let dir = TempDir::new().unwrap();
         write(&dir, "README.md", "intent");
         write(&dir, "docs/prd.md", "# PRD\n## Status: ADMITTED");
-        write(&dir, "docs/ard.md", "# ARD\n## Status: ADMITTED\nArchitecture.");
+        write(
+            &dir,
+            "docs/ard.md",
+            "# ARD\n## Status: ADMITTED\nArchitecture.",
+        );
         let lc = scan(dir.path());
         assert!(lc.has(&LifecycleStage::ArdAdmitted));
     }
@@ -72,8 +87,11 @@ mod lifecycle_scanner {
     fn published_requires_receipt_with_goal_reached() {
         let dir = TempDir::new().unwrap();
         write(&dir, "README.md", "intent");
-        write(&dir, ".bcinr/receipts/latest.json",
-            r#"{"goal_reached": true, "chain_hash": "abc123"}"#);
+        write(
+            &dir,
+            ".bcinr/receipts/latest.json",
+            r#"{"goal_reached": true, "chain_hash": "abc123"}"#,
+        );
         let lc = scan(dir.path());
         assert!(lc.has(&LifecycleStage::Published));
         // Counterfactual: set goal_reached=false → Published must not appear.
@@ -83,8 +101,11 @@ mod lifecycle_scanner {
     fn published_not_triggered_by_false_goal_reached() {
         let dir = TempDir::new().unwrap();
         write(&dir, "README.md", "intent");
-        write(&dir, ".bcinr/receipts/latest.json",
-            r#"{"goal_reached": false, "chain_hash": "abc123"}"#);
+        write(
+            &dir,
+            ".bcinr/receipts/latest.json",
+            r#"{"goal_reached": false, "chain_hash": "abc123"}"#,
+        );
         let lc = scan(dir.path());
         assert!(!lc.has(&LifecycleStage::Published));
     }
@@ -103,8 +124,8 @@ mod lifecycle_scanner {
 
 mod projection {
     use super::*;
-    use bcinr_pddl_lsp::projection;
     use bcinr_pddl_lsp::lifecycle::scan;
+    use bcinr_pddl_lsp::projection;
 
     #[test]
     fn domain_text_is_valid_pddl8() {
@@ -126,7 +147,7 @@ mod projection {
         assert!(problem.contains("(prd_exists"));
         assert!(problem.contains("(prd_admitted"));
         assert!(problem.contains("(published")); // goal
-        // Counterfactual: remove prd.md → prd_admitted must not appear in problem.
+                                                 // Counterfactual: remove prd.md → prd_admitted must not appear in problem.
     }
 
     #[test]
@@ -161,7 +182,11 @@ mod planner_invocation {
         write(&dir, "README.md", "intent");
         write(&dir, "docs/prd.md", "# PRD\n## Status: ADMITTED");
         write(&dir, "docs/ard.md", "# ARD\n## Status: ADMITTED");
-        write(&dir, "docs/work-units.md", "# Work Units\n- Task 1\n- Task 2");
+        write(
+            &dir,
+            "docs/work-units.md",
+            "# Work Units\n- Task 1\n- Task 2",
+        );
         write(&dir, "src/lib.rs", "pub fn main() {}");
         write(&dir, ".bcinr/test-report.json", r#"{"status": "passed"}"#);
         write(&dir, "docs/architecture.md", "# Architecture");
@@ -175,8 +200,10 @@ mod planner_invocation {
             Ok(r) => {
                 // If we get a plan, it may be empty (goal already met at init)
                 // or a short sequence. Either way, goal_reached must be true.
-                assert!(r.log.goal_reached || r.plan_steps.is_empty(),
-                    "fully staged project should reach goal");
+                assert!(
+                    r.log.goal_reached || r.plan_steps.is_empty(),
+                    "fully staged project should reach goal"
+                );
                 assert!(!r.receipt.chain_hash.is_empty());
             }
             Err(e) => {
@@ -184,7 +211,10 @@ mod planner_invocation {
                 // (BFS finds goal at init, tape is empty, goal check passes)
                 let msg = format!("{e}");
                 // Should not be a parse error
-                assert!(!msg.contains("parse error"), "unexpected parse error: {msg}");
+                assert!(
+                    !msg.contains("parse error"),
+                    "unexpected parse error: {msg}"
+                );
             }
         }
     }
@@ -194,12 +224,19 @@ mod planner_invocation {
         use bcinr_pddl::domain_from_pddl;
         let domain = bcinr_pddl_lsp::projection::emit_domain();
         let result = domain_from_pddl(&domain);
-        assert!(result.is_ok(), "lifecycle domain must parse: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "lifecycle domain must parse: {:?}",
+            result.err()
+        );
         let dom = result.unwrap();
         assert_eq!(dom.name, "bcinr-lifecycle");
         // Domain now has lifecycle + build slot actions (≥10)
-        assert!(dom.actions.len() >= 10,
-            "domain must have ≥10 actions, got {}", dom.actions.len());
+        assert!(
+            dom.actions.len() >= 10,
+            "domain must have ≥10 actions, got {}",
+            dom.actions.len()
+        );
         // Counterfactual: remove an action → count drops.
     }
 }
@@ -241,8 +278,12 @@ mod publish_gate_tests {
         let lc = scan(dir.path());
         let gate = publish_gate::from_lifecycle(&lc);
         // Empty project has no stages → OPEN (per spec 10.1 and publish_gate rules)
-        assert_eq!(gate.status_label(), "OPEN",
-            "empty project must be OPEN, got {}", gate.status_label());
+        assert_eq!(
+            gate.status_label(),
+            "OPEN",
+            "empty project must be OPEN, got {}",
+            gate.status_label()
+        );
         // Counterfactual: fill all required lifecycle stages → gate becomes PARTIAL.
     }
 
@@ -270,10 +311,16 @@ mod publish_gate_tests {
         let lc = scan(dir.path());
         let gate = publish_gate::from_lifecycle(&lc);
         // Should be BLOCKED with named missing stages
-        assert_eq!(gate.status_label(), "BLOCKED", "partial project must be BLOCKED");
+        assert_eq!(
+            gate.status_label(),
+            "BLOCKED",
+            "partial project must be BLOCKED"
+        );
         let blockers = &gate.blockers;
-        assert!(blockers.contains(&"ard_admitted".to_string())
-            || blockers.contains(&"tests_passed".to_string()),
-            "blockers must name lifecycle stages, got: {blockers:?}");
+        assert!(
+            blockers.contains(&"ard_admitted".to_string())
+                || blockers.contains(&"tests_passed".to_string()),
+            "blockers must name lifecycle stages, got: {blockers:?}"
+        );
     }
 }

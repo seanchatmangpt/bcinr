@@ -23,9 +23,14 @@ pub enum ProbeOutcome {
 }
 
 impl ProbeOutcome {
-    pub fn is_passing(&self) -> bool { *self == ProbeOutcome::Pass }
+    pub fn is_passing(&self) -> bool {
+        *self == ProbeOutcome::Pass
+    }
     pub fn is_blocking(&self) -> bool {
-        matches!(self, ProbeOutcome::Refuse | ProbeOutcome::Stop | ProbeOutcome::Unknown)
+        matches!(
+            self,
+            ProbeOutcome::Refuse | ProbeOutcome::Stop | ProbeOutcome::Unknown
+        )
     }
     pub fn label(&self) -> &'static str {
         match self {
@@ -48,16 +53,32 @@ pub struct ProbeResult {
 
 impl ProbeResult {
     pub fn pass(observed: impl Into<String>) -> Self {
-        Self { outcome: ProbeOutcome::Pass, code: None, observed: observed.into() }
+        Self {
+            outcome: ProbeOutcome::Pass,
+            code: None,
+            observed: observed.into(),
+        }
     }
     pub fn refuse(code: impl Into<String>, observed: impl Into<String>) -> Self {
-        Self { outcome: ProbeOutcome::Refuse, code: Some(code.into()), observed: observed.into() }
+        Self {
+            outcome: ProbeOutcome::Refuse,
+            code: Some(code.into()),
+            observed: observed.into(),
+        }
     }
     pub fn stop(code: impl Into<String>, observed: impl Into<String>) -> Self {
-        Self { outcome: ProbeOutcome::Stop, code: Some(code.into()), observed: observed.into() }
+        Self {
+            outcome: ProbeOutcome::Stop,
+            code: Some(code.into()),
+            observed: observed.into(),
+        }
     }
     pub fn unknown(reason: impl Into<String>) -> Self {
-        Self { outcome: ProbeOutcome::Unknown, code: Some("UNKNOWN".into()), observed: reason.into() }
+        Self {
+            outcome: ProbeOutcome::Unknown,
+            code: Some("UNKNOWN".into()),
+            observed: reason.into(),
+        }
     }
 }
 
@@ -87,16 +108,32 @@ pub struct Witness {
 
 impl Witness {
     pub fn virtual_doc(uri: impl Into<String>) -> Self {
-        Self { kind: WitnessKind::PddlProjection, uri: uri.into(), summary: None }
+        Self {
+            kind: WitnessKind::PddlProjection,
+            uri: uri.into(),
+            summary: None,
+        }
     }
     pub fn bound_report(summary: impl Into<String>) -> Self {
-        Self { kind: WitnessKind::BoundReport, uri: "bcinr-pddl://bounds/report".into(), summary: Some(summary.into()) }
+        Self {
+            kind: WitnessKind::BoundReport,
+            uri: "bcinr-pddl://bounds/report".into(),
+            summary: Some(summary.into()),
+        }
     }
     pub fn receipt(uri: impl Into<String>) -> Self {
-        Self { kind: WitnessKind::Receipt, uri: uri.into(), summary: None }
+        Self {
+            kind: WitnessKind::Receipt,
+            uri: uri.into(),
+            summary: None,
+        }
     }
     pub fn diagnostic(code: impl Into<String>) -> Self {
-        Self { kind: WitnessKind::Diagnostic, uri: "bcinr-pddl://truth/andon".into(), summary: Some(code.into()) }
+        Self {
+            kind: WitnessKind::Diagnostic,
+            uri: "bcinr-pddl://truth/andon".into(),
+            summary: Some(code.into()),
+        }
     }
 }
 
@@ -159,8 +196,16 @@ pub struct CounterfactualProbe {
 }
 
 impl CounterfactualProbe {
-    pub fn new(mutation: CounterfactualMutation, desc: impl Into<String>, result: ProbeResult) -> Self {
-        Self { mutation, description: desc.into(), result }
+    pub fn new(
+        mutation: CounterfactualMutation,
+        desc: impl Into<String>,
+        result: ProbeResult,
+    ) -> Self {
+        Self {
+            mutation,
+            description: desc.into(),
+            result,
+        }
     }
 }
 
@@ -265,15 +310,22 @@ impl InvariantRecord {
             InvariantVerdict::Stop | InvariantVerdict::Unknown => {
                 (AndonSeverity::Stop, format!("INVARIANT_STOP:{}", self.id))
             }
-            InvariantVerdict::Refuse => {
-                (AndonSeverity::Refuse, format!("INVARIANT_REFUSED:{}", self.id))
-            }
+            InvariantVerdict::Refuse => (
+                AndonSeverity::Refuse,
+                format!("INVARIANT_REFUSED:{}", self.id),
+            ),
             InvariantVerdict::Pass => {
                 // Pass but missing witness or repair or counterfactual
-                (AndonSeverity::Warning, format!("INVARIANT_INCOMPLETE:{}", self.id))
+                (
+                    AndonSeverity::Warning,
+                    format!("INVARIANT_INCOMPLETE:{}", self.id),
+                )
             }
         };
-        let next = self.repair.as_ref().and_then(|r| r.command.clone())
+        let next = self
+            .repair
+            .as_ref()
+            .and_then(|r| r.command.clone())
             .or_else(|| self.repair.as_ref().map(|r| r.description.clone()));
         Some(AndonEvent {
             id: format!("invariant:{}", self.id),
@@ -284,7 +336,10 @@ impl InvariantRecord {
             invariant_id: self.id.clone(),
             observed_state: self.true_case.observed.clone(),
             expected_state: format!("TRUE=PASS, FALSE=REFUSE, CF≥1, WITNESS≠∅, REPAIR≠∅"),
-            blocking: matches!(self.verdict, InvariantVerdict::Stop | InvariantVerdict::Unknown),
+            blocking: matches!(
+                self.verdict,
+                InvariantVerdict::Stop | InvariantVerdict::Unknown
+            ),
             requires_ack: self.verdict == InvariantVerdict::Unknown,
             next_lawful_step: next,
             required_command: self.repair.as_ref().and_then(|r| r.command.clone()),
@@ -308,8 +363,10 @@ fn compute_verdict(
     if !true_ok || !false_ok {
         return InvariantVerdict::Refuse;
     }
-    if matches!(true_case.outcome, ProbeOutcome::Unknown | ProbeOutcome::Stop)
-        || matches!(false_case.outcome, ProbeOutcome::Unknown)
+    if matches!(
+        true_case.outcome,
+        ProbeOutcome::Unknown | ProbeOutcome::Stop
+    ) || matches!(false_case.outcome, ProbeOutcome::Unknown)
     {
         return InvariantVerdict::Stop;
     }
@@ -347,8 +404,13 @@ fn invariant_prd_admission(lifecycle: &crate::lifecycle::ProjectLifecycle) -> In
         ProbeResult::unknown("PRD not present — cannot evaluate admission")
     };
 
-    let false_case = if lifecycle.has(&LifecycleStage::PrdExists) && !lifecycle.has(&LifecycleStage::PrdAdmitted) {
-        ProbeResult::refuse("PRD_NOT_ADMITTED", "PRD without ADMITTED marker correctly rejected")
+    let false_case = if lifecycle.has(&LifecycleStage::PrdExists)
+        && !lifecycle.has(&LifecycleStage::PrdAdmitted)
+    {
+        ProbeResult::refuse(
+            "PRD_NOT_ADMITTED",
+            "PRD without ADMITTED marker correctly rejected",
+        )
     } else if !lifecycle.has(&LifecycleStage::PrdExists) {
         // No PRD at all — false case is vacuously met (nothing to admit)
         ProbeResult::refuse("PRD_MISSING", "No PRD file — admission correctly blocked")
@@ -403,7 +465,9 @@ fn invariant_need9(lifecycle: &crate::lifecycle::ProjectLifecycle) -> InvariantR
         "100 tasks → same O(1) rejection",
         ProbeResult::refuse("WORK_UNIT_NEED9", "O(1) confirmed"),
     ))
-    .with_witness(Witness::bound_report("check_work_unit(8)=None, check_work_unit(9)=Some(WORK_UNIT_NEED9)"))
+    .with_witness(Witness::bound_report(
+        "check_work_unit(8)=None, check_work_unit(9)=Some(WORK_UNIT_NEED9)",
+    ))
     .with_repair(RepairAction::command(
         "Split work unit into two units of ≤8 tasks",
         "bcinrPddl.splitNeed9",
@@ -416,20 +480,31 @@ fn invariant_bound_checks_ran(bounds_report: &crate::bounds::BoundReport) -> Inv
     let true_case = match bounds_report.status {
         BoundReportStatus::Pass => {
             if bounds_report.checks_run.is_empty() {
-                ProbeResult::stop("BOUND_CHECKS_NOT_EXECUTED",
-                    "Status=Pass but checks_run is empty — this is a stub, not a real check")
+                ProbeResult::stop(
+                    "BOUND_CHECKS_NOT_EXECUTED",
+                    "Status=Pass but checks_run is empty — this is a stub, not a real check",
+                )
             } else {
-                ProbeResult::pass(format!("{} checks ran, 0 violations", bounds_report.checks_run.len()))
+                ProbeResult::pass(format!(
+                    "{} checks ran, 0 violations",
+                    bounds_report.checks_run.len()
+                ))
             }
         }
-        BoundReportStatus::Refused => ProbeResult::refuse("BOUND_VIOLATION",
-            format!("{} violations found", bounds_report.violations.len())),
-        BoundReportStatus::Andon => ProbeResult::stop("BOUND_CHECKS_NOT_EXECUTED",
-            "BoundReport status is ANDON — checks did not execute"),
+        BoundReportStatus::Refused => ProbeResult::refuse(
+            "BOUND_VIOLATION",
+            format!("{} violations found", bounds_report.violations.len()),
+        ),
+        BoundReportStatus::Andon => ProbeResult::stop(
+            "BOUND_CHECKS_NOT_EXECUTED",
+            "BoundReport status is ANDON — checks did not execute",
+        ),
     };
 
-    let false_case = ProbeResult::stop("BOUND_CHECKS_NOT_EXECUTED",
-        "False case: empty BoundReport is ANDON, not PASS");
+    let false_case = ProbeResult::stop(
+        "BOUND_CHECKS_NOT_EXECUTED",
+        "False case: empty BoundReport is ANDON, not PASS",
+    );
 
     InvariantRecord::new(
         "bound_checks_ran",
@@ -452,7 +527,9 @@ fn invariant_bound_checks_ran(bounds_report: &crate::bounds::BoundReport) -> Inv
     ))
 }
 
-fn invariant_publish_requires_receipt(lifecycle: &crate::lifecycle::ProjectLifecycle) -> InvariantRecord {
+fn invariant_publish_requires_receipt(
+    lifecycle: &crate::lifecycle::ProjectLifecycle,
+) -> InvariantRecord {
     use crate::lifecycle::LifecycleStage;
 
     let true_case = if lifecycle.has(&LifecycleStage::Published) {
@@ -462,7 +539,10 @@ fn invariant_publish_requires_receipt(lifecycle: &crate::lifecycle::ProjectLifec
     };
 
     let false_case = if !lifecycle.has(&LifecycleStage::Published) {
-        ProbeResult::refuse("RECEIPT_MISSING", "No valid receipt → Published correctly blocked")
+        ProbeResult::refuse(
+            "RECEIPT_MISSING",
+            "No valid receipt → Published correctly blocked",
+        )
     } else {
         ProbeResult::pass("Published — false case verifiable only via counterfactual")
     };
@@ -491,13 +571,15 @@ fn invariant_publish_requires_receipt(lifecycle: &crate::lifecycle::ProjectLifec
     ))
 }
 
-fn invariant_candidate_not_admitted(lifecycle: &crate::lifecycle::ProjectLifecycle) -> InvariantRecord {
+fn invariant_candidate_not_admitted(
+    lifecycle: &crate::lifecycle::ProjectLifecycle,
+) -> InvariantRecord {
     let true_case = ProbeResult::pass(
-        "Projection mode produces PlanCandidate with no receipt — CANDIDATE ≠ ADMITTED"
+        "Projection mode produces PlanCandidate with no receipt — CANDIDATE ≠ ADMITTED",
     );
     let false_case = ProbeResult::refuse(
         "CANDIDATE_USED_AS_ADMISSION",
-        "PlanCandidate without receipt must not advance gate to ADMITTED"
+        "PlanCandidate without receipt must not advance gate to ADMITTED",
     );
     InvariantRecord::new(
         "candidate_not_admitted",
@@ -521,20 +603,27 @@ fn invariant_candidate_not_admitted(lifecycle: &crate::lifecycle::ProjectLifecyc
 // ── Render ────────────────────────────────────────────────────────────────────
 
 pub fn render_invariant_table(records: &[InvariantRecord]) -> String {
-    let rows: Vec<serde_json::Value> = records.iter().map(|r| {
-        let cf_verdicts: Vec<&str> = r.counterfactuals.iter().map(|cf| cf.result.outcome.label()).collect();
-        serde_json::json!({
-            "id": r.id,
-            "statement": r.statement,
-            "scope": r.scope,
-            "true_case": r.true_case.outcome.label(),
-            "false_case": r.false_case.outcome.label(),
-            "counterfactuals": cf_verdicts,
-            "witness_present": r.witness.is_some(),
-            "repair_present": r.repair.is_some(),
-            "verdict": r.verdict.label(),
-            "admission_allowed": r.verdict.admission_allowed(),
+    let rows: Vec<serde_json::Value> = records
+        .iter()
+        .map(|r| {
+            let cf_verdicts: Vec<&str> = r
+                .counterfactuals
+                .iter()
+                .map(|cf| cf.result.outcome.label())
+                .collect();
+            serde_json::json!({
+                "id": r.id,
+                "statement": r.statement,
+                "scope": r.scope,
+                "true_case": r.true_case.outcome.label(),
+                "false_case": r.false_case.outcome.label(),
+                "counterfactuals": cf_verdicts,
+                "witness_present": r.witness.is_some(),
+                "repair_present": r.repair.is_some(),
+                "verdict": r.verdict.label(),
+                "admission_allowed": r.verdict.admission_allowed(),
+            })
         })
-    }).collect();
+        .collect();
     serde_json::to_string_pretty(&rows).unwrap_or_else(|_| "[]".into())
 }

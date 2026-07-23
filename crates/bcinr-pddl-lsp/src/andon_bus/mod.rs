@@ -93,12 +93,7 @@ pub fn derive_events(analysis: &AndonAnalysis) -> Vec<AndonEvent> {
     if analysis.bounds_report.status == BoundReportStatus::Refused {
         for violation in &analysis.bounds_report.violations {
             let code = violation.diagnostic_code();
-            let mut ev = AndonEvent::new(
-                code,
-                AndonSeverity::Refuse,
-                code,
-                &violation.message(),
-            );
+            let mut ev = AndonEvent::new(code, AndonSeverity::Refuse, code, &violation.message());
             ev.blocking = true;
             ev.admission_allowed = false;
             ev.next_lawful_step = Some("bcinrPddl.splitNeed9".into());
@@ -217,9 +212,15 @@ pub fn to_lsp_diagnostic(event: &AndonEvent) -> Diagnostic {
         AndonSeverity::Warning => DiagnosticSeverity::WARNING,
         AndonSeverity::Info => DiagnosticSeverity::INFORMATION,
     };
-    let zero = Position { line: 0, character: 0 };
+    let zero = Position {
+        line: 0,
+        character: 0,
+    };
     Diagnostic {
-        range: Range { start: zero, end: zero },
+        range: Range {
+            start: zero,
+            end: zero,
+        },
         severity: Some(severity),
         code: Some(lsp_types_max::NumberOrString::String(event.code.clone())),
         source: Some("bcinr-pddl-lsp".to_string()),
@@ -248,7 +249,9 @@ pub fn notification_method(event: &AndonEvent) -> &'static str {
     match event.code.as_str() {
         "GOAL_REACHED_FALSE" => "bcinrPddl/publishGateBlocked",
         "BUILD_SLOT_DENIED" => "bcinrPddl/buildSlotDenied",
-        _ if matches!(event.severity, AndonSeverity::Stop | AndonSeverity::Refuse) && event.blocking => {
+        _ if matches!(event.severity, AndonSeverity::Stop | AndonSeverity::Refuse)
+            && event.blocking =>
+        {
             "bcinrPddl/andonRaised"
         }
         _ if matches!(event.severity, AndonSeverity::Info) => "bcinrPddl/truthTableChanged",

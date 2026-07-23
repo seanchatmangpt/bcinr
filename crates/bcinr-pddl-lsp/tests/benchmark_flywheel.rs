@@ -6,7 +6,11 @@
 //! This is not criterion — it is a falsifiable timing contract:
 //! if the flywheel slows past 8s, this test fails.
 
-use std::{fs, path::PathBuf, time::{Duration, Instant}};
+use std::{
+    fs,
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 use tempfile::TempDir;
 
 fn write_file(dir: &TempDir, path: &str, content: &str) {
@@ -25,7 +29,11 @@ fn fixture_root() -> PathBuf {
 fn full_project(dir: &TempDir) {
     write_file(dir, "README.md", "# Project\n## Status: ADMITTED");
     write_file(dir, "docs/prd.md", "# PRD\n## Status: ADMITTED\nFull plan.");
-    write_file(dir, "docs/ard.md", "# ARD\n## Status: ADMITTED\nArchitecture.");
+    write_file(
+        dir,
+        "docs/ard.md",
+        "# ARD\n## Status: ADMITTED\nArchitecture.",
+    );
     write_file(dir, "docs/adr/0001.md", "# ADR\n## Status: ADMITTED");
     write_file(dir, "docs/work-units.md", "# Work Units\n- T1\n- T2\n- T3");
     write_file(dir, "src/lib.rs", "pub fn main() {}");
@@ -67,16 +75,20 @@ fn measure<F: FnMut()>(name: &'static str, iters: u32, mut f: F) -> Sample {
     for _ in 0..iters {
         f();
     }
-    Sample { name, elapsed: start.elapsed(), iterations: iters }
+    Sample {
+        name,
+        elapsed: start.elapsed(),
+        iterations: iters,
+    }
 }
 
 #[test]
 fn flywheel_benchmark() {
+    use bcinr_pddl::domain_from_pddl;
     use bcinr_pddl_lsp::{
         bounds, build_broker, education, lifecycle, planner_client, projection, publish_gate,
         virtual_docs,
     };
-    use bcinr_pddl::domain_from_pddl;
 
     let mut samples: Vec<Sample> = Vec::new();
     let wall_start = Instant::now();
@@ -256,17 +268,28 @@ fn flywheel_benchmark() {
     let wall_elapsed = wall_start.elapsed();
 
     // ── Print table ───────────────────────────────────────────────────────
-    println!("\n{:<40} {:>8} {:>10} {:>8}", "Operation", "iters", "per-iter", "total");
+    println!(
+        "\n{:<40} {:>8} {:>10} {:>8}",
+        "Operation", "iters", "per-iter", "total"
+    );
     println!("{}", "─".repeat(70));
     for s in &samples {
-        println!("{:<40} {:>8} {:>9.2}{} {:>7.1}ms",
-            s.name, s.iterations, s.value(), s.label(),
+        println!(
+            "{:<40} {:>8} {:>9.2}{} {:>7.1}ms",
+            s.name,
+            s.iterations,
+            s.value(),
+            s.label(),
             s.elapsed.as_secs_f64() * 1000.0
         );
     }
     println!("{}", "─".repeat(70));
-    println!("{:<40} {:>8} {:>10} {:>7.1}ms",
-        "TOTAL WALL CLOCK", "", "", wall_elapsed.as_secs_f64() * 1000.0
+    println!(
+        "{:<40} {:>8} {:>10} {:>7.1}ms",
+        "TOTAL WALL CLOCK",
+        "",
+        "",
+        wall_elapsed.as_secs_f64() * 1000.0
     );
 
     // ── Falsifiable contract: total ≤ 8 000ms ─────────────────────────────
@@ -281,44 +304,50 @@ fn flywheel_benchmark() {
         let ns = s.ns_per_iter();
         match s.name {
             // String generation ops: must be < 100µs per iter
-            n if n.starts_with("emit_") => assert!(
-                ns < 100_000,
-                "{} too slow: {}ns/iter (limit 100µs)", n, ns
-            ),
+            n if n.starts_with("emit_") => {
+                assert!(ns < 100_000, "{} too slow: {}ns/iter (limit 100µs)", n, ns)
+            }
             // Scan ops: must be < 5ms per iter (file I/O)
-            n if n.starts_with("lifecycle_scan") || n.starts_with("education_scan") => assert!(
-                ns < 5_000_000,
-                "{} too slow: {}ns/iter (limit 5ms)", n, ns
-            ),
+            n if n.starts_with("lifecycle_scan") || n.starts_with("education_scan") => {
+                assert!(ns < 5_000_000, "{} too slow: {}ns/iter (limit 5ms)", n, ns)
+            }
             // BFS planning: must be < 50ms per iter (full lifecycle domain BFS)
             n if n.starts_with("bfs_plan") => assert!(
                 ns < 50_000_000,
-                "{} too slow: {}ns/iter (limit 50ms)", n, ns
+                "{} too slow: {}ns/iter (limit 50ms)",
+                n,
+                ns
             ),
             // Build broker: pure in-memory, < 10µs
-            n if n.starts_with("build_broker") => assert!(
-                ns < 10_000,
-                "{} too slow: {}ns/iter (limit 10µs)", n, ns
-            ),
+            n if n.starts_with("build_broker") => {
+                assert!(ns < 10_000, "{} too slow: {}ns/iter (limit 10µs)", n, ns)
+            }
             // bounds_check_work_unit: O(1) comparison, < 10µs
             "bounds_check_work_unit" => assert!(
                 ns < 10_000,
-                "bounds_check_work_unit too slow: {}ns/iter (limit 10µs)", ns
+                "bounds_check_work_unit too slow: {}ns/iter (limit 10µs)",
+                ns
             ),
             // bounds_check_lifecycle_domain: real parse + check, < 20ms
             "bounds_check_lifecycle_domain" => assert!(
                 ns < 20_000_000,
-                "bounds_check_lifecycle_domain too slow: {}ms/iter (limit 20ms)", ns / 1_000_000
+                "bounds_check_lifecycle_domain too slow: {}ms/iter (limit 20ms)",
+                ns / 1_000_000
             ),
             // Render ops: must be < 100µs
-            n if n.starts_with("render_") => assert!(
-                ns < 100_000,
-                "{} too slow: {}ns/iter (limit 100µs)", n, ns
-            ),
+            n if n.starts_with("render_") => {
+                assert!(ns < 100_000, "{} too slow: {}ns/iter (limit 100µs)", n, ns)
+            }
             _ => {}
         }
     }
 
-    println!("\nAll {} operations within per-operation contracts.", samples.len());
-    println!("Flywheel is GREEN: {}ms total wall clock.", wall_elapsed.as_millis());
+    println!(
+        "\nAll {} operations within per-operation contracts.",
+        samples.len()
+    );
+    println!(
+        "Flywheel is GREEN: {}ms total wall clock.",
+        wall_elapsed.as_millis()
+    );
 }

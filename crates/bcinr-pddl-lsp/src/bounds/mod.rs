@@ -71,7 +71,10 @@ impl BoundViolation {
     pub fn message(&self) -> String {
         format!(
             "{} in '{}': {} (limit {}). Split or decompose.",
-            self.diagnostic_code(), self.name, self.actual, self.limit,
+            self.diagnostic_code(),
+            self.name,
+            self.actual,
+            self.limit,
         )
     }
 }
@@ -120,7 +123,12 @@ impl BoundReport {
         } else {
             BoundReportStatus::Refused
         };
-        Self { status, checks_run, violations, missing_checks: vec![] }
+        Self {
+            status,
+            checks_run,
+            violations,
+            missing_checks: vec![],
+        }
     }
 
     pub fn andon(reason: &str) -> Self {
@@ -148,7 +156,11 @@ pub fn check_work_unit(name: &str, task_count: usize) -> Option<BoundViolation> 
 }
 
 /// Check concurrent build count against MAX_HEAVY_SLOTS.
-pub fn check_build_concurrency(name: &str, concurrent_count: usize, max_slots: usize) -> Option<BoundViolation> {
+pub fn check_build_concurrency(
+    name: &str,
+    concurrent_count: usize,
+    max_slots: usize,
+) -> Option<BoundViolation> {
     if concurrent_count > max_slots {
         Some(BoundViolation {
             kind: BoundKind::BuildConcurrency,
@@ -271,11 +283,17 @@ pub fn check_domain_text(text: &str) -> BoundReport {
         Ok(domain) => check_domain(&domain),
         Err(Pddl8Error::BoundExceeded { what, limit, got }) => {
             // Parser enforced the bound — this IS a check result, not a stub.
-            let kind = if what.contains("precondition") { BoundKind::ActionPreconditions }
-                else if what.contains("effect") { BoundKind::ActionEffects }
-                else if what.contains("param") { BoundKind::ActionParameters }
-                else if what.contains("goal") { BoundKind::GoalAtoms }
-                else { BoundKind::ActionPreconditions };
+            let kind = if what.contains("precondition") {
+                BoundKind::ActionPreconditions
+            } else if what.contains("effect") {
+                BoundKind::ActionEffects
+            } else if what.contains("param") {
+                BoundKind::ActionParameters
+            } else if what.contains("goal") {
+                BoundKind::GoalAtoms
+            } else {
+                BoundKind::ActionPreconditions
+            };
             BoundReport::finalize(
                 vec![format!("parser_bound_check:{what}")],
                 vec![BoundViolation {

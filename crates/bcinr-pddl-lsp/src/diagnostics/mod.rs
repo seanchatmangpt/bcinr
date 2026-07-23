@@ -1,15 +1,21 @@
 //! Diagnostics — lifecycle, bounds, planner, process violations → LSP diagnostic codes.
 
-use lsp_types_max::{Diagnostic, DiagnosticSeverity, NumberOrString, Position, Range};
 use crate::bounds::{BoundReport, BoundViolation};
 use crate::build_broker::{BrokerDenial, DirectCommandViolation};
 use crate::lifecycle::{LifecycleStage, ProjectLifecycle};
+use lsp_types_max::{Diagnostic, DiagnosticSeverity, NumberOrString, Position, Range};
 
 fn make_diag(code: &str, message: String, severity: DiagnosticSeverity) -> Diagnostic {
     Diagnostic {
         range: Range {
-            start: Position { line: 0, character: 0 },
-            end: Position { line: 0, character: 0 },
+            start: Position {
+                line: 0,
+                character: 0,
+            },
+            end: Position {
+                line: 0,
+                character: 0,
+            },
         },
         severity: Some(severity),
         code: Some(NumberOrString::String(code.to_string())),
@@ -133,7 +139,10 @@ pub fn planner_error_diagnostic(code: &str, msg: &str) -> Diagnostic {
 pub fn broker_denial_diagnostic(denial: &BrokerDenial) -> Diagnostic {
     make_diag(
         "BUILD_SLOT_DENIED",
-        format!("Build slot denied for '{}': {}", denial.command, denial.reason),
+        format!(
+            "Build slot denied for '{}': {}",
+            denial.command, denial.reason
+        ),
         DiagnosticSeverity::ERROR,
     )
 }

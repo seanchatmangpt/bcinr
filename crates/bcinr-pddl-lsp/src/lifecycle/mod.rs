@@ -3,8 +3,8 @@
 //! Scans a workspace root and extracts lifecycle facts from files on disk.
 //! Produces a `ProjectLifecycle` value that all other modules consume.
 
-use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum LifecycleStage {
@@ -82,7 +82,9 @@ impl ProjectLifecycle {
 
     /// The earliest missing stage — the lifecycle blocker.
     pub fn next_missing(&self) -> Option<&LifecycleStage> {
-        LifecycleStage::all().iter().find(|s| !self.true_stages.contains(s))
+        LifecycleStage::all()
+            .iter()
+            .find(|s| !self.true_stages.contains(s))
     }
 
     /// PDDL8 init atoms: all true stages as `stage(project)` facts.
@@ -221,7 +223,10 @@ pub fn scan(root: &Path) -> ProjectLifecycle {
     }
 
     // published: receipt with goal_reached=true
-    if let Some(p) = find_first(root, &[".bcinr/receipts/latest.json", "receipts/latest.json"]) {
+    if let Some(p) = find_first(
+        root,
+        &[".bcinr/receipts/latest.json", "receipts/latest.json"],
+    ) {
         if file_contains(&p, "\"goal_reached\": true") {
             true_stages.push(LifecycleStage::Published);
             evidence.push(LifecycleEvidence {
@@ -238,7 +243,13 @@ pub fn scan(root: &Path) -> ProjectLifecycle {
         .cloned()
         .collect();
 
-    ProjectLifecycle { project_name, root: root.to_path_buf(), true_stages, evidence, missing }
+    ProjectLifecycle {
+        project_name,
+        root: root.to_path_buf(),
+        true_stages,
+        evidence,
+        missing,
+    }
 }
 
 fn exists_any(root: &Path, names: &[&str]) -> bool {
@@ -248,7 +259,11 @@ fn exists_any(root: &Path, names: &[&str]) -> bool {
 fn find_first(root: &Path, names: &[&str]) -> Option<PathBuf> {
     names.iter().find_map(|n| {
         let p = root.join(n);
-        if p.exists() { Some(p) } else { None }
+        if p.exists() {
+            Some(p)
+        } else {
+            None
+        }
     })
 }
 
@@ -260,7 +275,9 @@ fn file_contains(path: &Path, needle: &str) -> bool {
 
 fn find_adr(root: &Path) -> Option<PathBuf> {
     let adr_dir = root.join("docs/adr");
-    if !adr_dir.is_dir() { return None; }
+    if !adr_dir.is_dir() {
+        return None;
+    }
     walkdir::WalkDir::new(&adr_dir)
         .max_depth(2)
         .into_iter()
@@ -288,7 +305,9 @@ fn has_source_files(root: &Path) -> bool {
 
 fn has_projected_docs(root: &Path) -> bool {
     let docs = root.join("docs");
-    if !docs.is_dir() { return false; }
+    if !docs.is_dir() {
+        return false;
+    }
     walkdir::WalkDir::new(&docs)
         .max_depth(2)
         .into_iter()
@@ -299,5 +318,6 @@ fn has_projected_docs(root: &Path) -> bool {
                 && name != "prd.md"
                 && name != "ard.md"
         })
-        .count() >= 1
+        .count()
+        >= 1
 }

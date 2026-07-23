@@ -67,23 +67,33 @@ pub fn plan(projection: &Pddl8Projection) -> Result<PlanCandidate, PlannerError>
     let gp = GroundProblem::build(&domain, &problem, None)
         .map_err(|e| PlannerError::GroundingError(format!("{e:?}")))?;
 
-    let tape = gp.find_plan()
-        .map_err(|_| PlannerError::NoAdmittedPlan)?;
+    let tape = gp.find_plan().map_err(|_| PlannerError::NoAdmittedPlan)?;
 
     let plan_steps: Vec<String> = tape.ops.iter().map(|op| op.label.clone()).collect();
 
     let initial_state: BTreeSet<Pddl8GroundAtom> = problem
         .init
         .iter()
-        .map(|a| Pddl8GroundAtom { pred: a.pred.clone(), args: a.args.clone() })
+        .map(|a| Pddl8GroundAtom {
+            pred: a.pred.clone(),
+            args: a.args.clone(),
+        })
         .collect();
     let goal: Vec<Pddl8GroundAtom> = problem
         .goal
         .iter()
-        .map(|a| Pddl8GroundAtom { pred: a.pred.clone(), args: a.args.clone() })
+        .map(|a| Pddl8GroundAtom {
+            pred: a.pred.clone(),
+            args: a.args.clone(),
+        })
         .collect();
 
-    Ok(PlanCandidate { plan_steps, tape, initial_state, goal })
+    Ok(PlanCandidate {
+        plan_steps,
+        tape,
+        initial_state,
+        goal,
+    })
 }
 
 /// Phase 2: execute a candidate tape under Prolog8 admission → receipt + OCEL.

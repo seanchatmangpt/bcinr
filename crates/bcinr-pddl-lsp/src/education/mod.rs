@@ -150,7 +150,10 @@ fn dir_has_md(path: &Path) -> bool {
         return false;
     }
     fs::read_dir(path)
-        .map(|rd| rd.flatten().any(|e| e.path().extension().map_or(false, |x| x == "md")))
+        .map(|rd| {
+            rd.flatten()
+                .any(|e| e.path().extension().map_or(false, |x| x == "md"))
+        })
         .unwrap_or(false)
 }
 
@@ -201,7 +204,9 @@ fn walk_find_json_with(root: &Path, key: &str, value: &str) -> bool {
             read_file_opt(e.path())
                 .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
                 .map_or(false, |v| {
-                    v.get(key).and_then(|x| x.as_str()).map_or(false, |s| s == value)
+                    v.get(key)
+                        .and_then(|x| x.as_str())
+                        .map_or(false, |s| s == value)
                 })
         })
 }
@@ -228,7 +233,11 @@ pub fn scan(root: &Path, subject: &str) -> EducationWorkspace {
     // --- career ---
     let interviews_path = root.join("career/interviews.json");
     let interviews_exists = file_exists(&interviews_path);
-    mark(EducationStage::CareerPipelineExists, "career/interviews.json", interviews_exists);
+    mark(
+        EducationStage::CareerPipelineExists,
+        "career/interviews.json",
+        interviews_exists,
+    );
 
     let interviews_json: Option<serde_json::Value> = interviews_path
         .exists()
@@ -241,81 +250,161 @@ pub fn scan(root: &Path, subject: &str) -> EducationWorkspace {
             .and_then(|s| s.as_str())
             .map_or(false, |s| s == "requested" || s == "received")
     });
-    mark(EducationStage::InterviewRequestReceived, "career/interviews.json[status]", request_received);
+    mark(
+        EducationStage::InterviewRequestReceived,
+        "career/interviews.json[status]",
+        request_received,
+    );
 
     let slot_selected = interviews_json.as_ref().map_or(false, |v| {
-        v.get("slot_selected").and_then(|b| b.as_bool()).unwrap_or(false)
+        v.get("slot_selected")
+            .and_then(|b| b.as_bool())
+            .unwrap_or(false)
     });
-    mark(EducationStage::InterviewSlotSelected, "career/interviews.json[slot_selected]", slot_selected);
+    mark(
+        EducationStage::InterviewSlotSelected,
+        "career/interviews.json[slot_selected]",
+        slot_selected,
+    );
 
     let confirmed = interviews_json.as_ref().map_or(false, |v| {
-        v.get("confirmed").and_then(|b| b.as_bool()).unwrap_or(false)
+        v.get("confirmed")
+            .and_then(|b| b.as_bool())
+            .unwrap_or(false)
     });
-    mark(EducationStage::InterviewConfirmed, "career/interviews.json[confirmed]", confirmed);
+    mark(
+        EducationStage::InterviewConfirmed,
+        "career/interviews.json[confirmed]",
+        confirmed,
+    );
 
     let prep_path = root.join("career/interview-prep.md");
-    let prep_complete = prep_path.exists()
-        && read_file_opt(&prep_path).map_or(false, |c| c.contains("ADMITTED"));
-    mark(EducationStage::InterviewPrepComplete, "career/interview-prep.md[ADMITTED]", prep_complete);
+    let prep_complete =
+        prep_path.exists() && read_file_opt(&prep_path).map_or(false, |c| c.contains("ADMITTED"));
+    mark(
+        EducationStage::InterviewPrepComplete,
+        "career/interview-prep.md[ADMITTED]",
+        prep_complete,
+    );
 
     // --- linkedin ---
     let posts_dir = root.join("linkedin/posts");
     let linkedin_topic = dir_has_md(&posts_dir);
-    mark(EducationStage::LinkedInTopicSelected, "linkedin/posts/*.md", linkedin_topic);
+    mark(
+        EducationStage::LinkedInTopicSelected,
+        "linkedin/posts/*.md",
+        linkedin_topic,
+    );
 
     let linkedin_draft = any_file_content_longer_than(&posts_dir, 50);
-    mark(EducationStage::LinkedInDraftExists, "linkedin/posts/*.md[len>50]", linkedin_draft);
+    mark(
+        EducationStage::LinkedInDraftExists,
+        "linkedin/posts/*.md[len>50]",
+        linkedin_draft,
+    );
 
     let linkedin_reviewed = any_file_in_dir_contains(&posts_dir, "REVIEWED");
-    mark(EducationStage::LinkedInReviewed, "linkedin/posts/*.md[REVIEWED]", linkedin_reviewed);
+    mark(
+        EducationStage::LinkedInReviewed,
+        "linkedin/posts/*.md[REVIEWED]",
+        linkedin_reviewed,
+    );
 
     let li_post_published = any_file_in_dir_contains(&posts_dir, "STATUS: PUBLISHED");
     let li_receipt = file_exists(&root.join(".bcinr/receipts/linkedin-post-001.json"));
-    mark(EducationStage::LinkedInPublished, ".bcinr/receipts/linkedin-post-001.json", li_post_published && li_receipt);
+    mark(
+        EducationStage::LinkedInPublished,
+        ".bcinr/receipts/linkedin-post-001.json",
+        li_post_published && li_receipt,
+    );
 
     // --- newsletter ---
     let newsletter_dir = root.join("newsletter");
     let newsletter_restarted = newsletter_dir.is_dir();
-    mark(EducationStage::NewsletterRestarted, "newsletter/", newsletter_restarted);
+    mark(
+        EducationStage::NewsletterRestarted,
+        "newsletter/",
+        newsletter_restarted,
+    );
 
     let issues_dir = root.join("newsletter/issues");
     let newsletter_drafted = dir_has_md(&issues_dir);
-    mark(EducationStage::NewsletterIssueDrafted, "newsletter/issues/*.md", newsletter_drafted);
+    mark(
+        EducationStage::NewsletterIssueDrafted,
+        "newsletter/issues/*.md",
+        newsletter_drafted,
+    );
 
     let newsletter_reviewed = any_file_in_dir_contains(&issues_dir, "REVIEWED");
-    mark(EducationStage::NewsletterIssueReviewed, "newsletter/issues/*.md[REVIEWED]", newsletter_reviewed);
+    mark(
+        EducationStage::NewsletterIssueReviewed,
+        "newsletter/issues/*.md[REVIEWED]",
+        newsletter_reviewed,
+    );
 
     let nl_published = any_file_in_dir_contains(&issues_dir, "STATUS: PUBLISHED");
     let nl_receipt = file_exists(&root.join(".bcinr/receipts/newsletter-001.json"));
-    mark(EducationStage::NewsletterIssuePublished, ".bcinr/receipts/newsletter-001.json", nl_published && nl_receipt);
+    mark(
+        EducationStage::NewsletterIssuePublished,
+        ".bcinr/receipts/newsletter-001.json",
+        nl_published && nl_receipt,
+    );
 
     // --- youtube ---
     let yt_videos_dir = root.join("youtube/videos");
     let yt_topic = dir_has_subdirs(&yt_videos_dir);
-    mark(EducationStage::YouTubeTopicSelected, "youtube/videos/*/", yt_topic);
+    mark(
+        EducationStage::YouTubeTopicSelected,
+        "youtube/videos/*/",
+        yt_topic,
+    );
 
     let yt_root = root.join("youtube");
     let yt_outline = walk_find_file(&yt_root, "outline.md");
-    mark(EducationStage::YouTubeOutlineExists, "youtube/**/outline.md", yt_outline);
+    mark(
+        EducationStage::YouTubeOutlineExists,
+        "youtube/**/outline.md",
+        yt_outline,
+    );
 
     let yt_script = walk_find_file(&yt_root, "script.md");
-    mark(EducationStage::YouTubeScriptExists, "youtube/**/script.md", yt_script);
+    mark(
+        EducationStage::YouTubeScriptExists,
+        "youtube/**/script.md",
+        yt_script,
+    );
 
     let yt_recorded = walk_find_json_with(&yt_root, "status", "recorded")
         || walk_find_json_with(&yt_root, "status", "published");
-    mark(EducationStage::YouTubeRecorded, "youtube/**/recording.json[status=recorded|published]", yt_recorded);
+    mark(
+        EducationStage::YouTubeRecorded,
+        "youtube/**/recording.json[status=recorded|published]",
+        yt_recorded,
+    );
 
     let yt_pub_json = walk_find_json_with(&yt_root, "status", "published");
     let yt_receipt = file_exists(&root.join(".bcinr/receipts/youtube-001.json"));
-    mark(EducationStage::YouTubePublished, ".bcinr/receipts/youtube-001.json", yt_pub_json && yt_receipt);
+    mark(
+        EducationStage::YouTubePublished,
+        ".bcinr/receipts/youtube-001.json",
+        yt_pub_json && yt_receipt,
+    );
 
     // --- rust lessons ---
     let rust_lessons_dir = root.join("lessons/rust");
     let rust_lesson_selected = dir_has_md(&rust_lessons_dir);
-    mark(EducationStage::RustLessonSelected, "lessons/rust/*.md", rust_lesson_selected);
+    mark(
+        EducationStage::RustLessonSelected,
+        "lessons/rust/*.md",
+        rust_lesson_selected,
+    );
 
     let rust_example = file_exists(&root.join("lessons/rust/examples/src/lib.rs"));
-    mark(EducationStage::RustExampleExists, "lessons/rust/examples/src/lib.rs", rust_example);
+    mark(
+        EducationStage::RustExampleExists,
+        "lessons/rust/examples/src/lib.rs",
+        rust_example,
+    );
 
     let test_report_path = root.join(".bcinr/test-report.json");
     let rust_tests_passed = test_report_path.exists() && {
@@ -324,14 +413,25 @@ pub fn scan(root: &Path, subject: &str) -> EducationWorkspace {
             .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
             .map_or(false, |v| {
                 let by_bool = v.get("passed").and_then(|b| b.as_bool()).unwrap_or(false);
-                let by_str = v.get("status").and_then(|s| s.as_str()).map_or(false, |s| s == "passed");
+                let by_str = v
+                    .get("status")
+                    .and_then(|s| s.as_str())
+                    .map_or(false, |s| s == "passed");
                 by_bool || by_str
             })
     };
-    mark(EducationStage::RustExampleTestsPassed, ".bcinr/test-report.json[passed=true]", rust_tests_passed);
+    mark(
+        EducationStage::RustExampleTestsPassed,
+        ".bcinr/test-report.json[passed=true]",
+        rust_tests_passed,
+    );
 
     let rust_lesson_published = any_file_in_dir_contains(&rust_lessons_dir, "STATUS: PUBLISHED");
-    mark(EducationStage::RustLessonPublished, "lessons/rust/*.md[STATUS: PUBLISHED]", rust_lesson_published);
+    mark(
+        EducationStage::RustLessonPublished,
+        "lessons/rust/*.md[STATUS: PUBLISHED]",
+        rust_lesson_published,
+    );
 
     // --- education week ---
     let ew_receipt_path = root.join(".bcinr/receipts/education-week.json");
@@ -340,16 +440,29 @@ pub fn scan(root: &Path, subject: &str) -> EducationWorkspace {
             .ok()
             .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
             .map_or(false, |v| {
-                v.get("goal_reached").and_then(|b| b.as_bool()).unwrap_or(false)
+                v.get("goal_reached")
+                    .and_then(|b| b.as_bool())
+                    .unwrap_or(false)
             })
     };
-    mark(EducationStage::EducationWeekReceipTED, ".bcinr/receipts/education-week.json[goal_reached=true]", ew_receipted);
+    mark(
+        EducationStage::EducationWeekReceipTED,
+        ".bcinr/receipts/education-week.json[goal_reached=true]",
+        ew_receipted,
+    );
 
     // published = same as receipted for now
-    mark(EducationStage::EducationWeekPublished, ".bcinr/receipts/education-week.json[goal_reached=true]", ew_receipted);
+    mark(
+        EducationStage::EducationWeekPublished,
+        ".bcinr/receipts/education-week.json[goal_reached=true]",
+        ew_receipted,
+    );
 
     let all = EducationStage::all();
-    let missing: Vec<EducationStage> = all.into_iter().filter(|s| !true_stages.contains(s)).collect();
+    let missing: Vec<EducationStage> = all
+        .into_iter()
+        .filter(|s| !true_stages.contains(s))
+        .collect();
 
     EducationWorkspace {
         subject: subject.to_string(),
@@ -576,7 +689,11 @@ pub fn emit_education_problem(workspace: &EducationWorkspace) -> String {
         inits.push(format!("({} {})", stage.predicate_name(), subj));
     }
 
-    let init_str = inits.iter().map(|s| format!("    {}", s)).collect::<Vec<_>>().join("\n");
+    let init_str = inits
+        .iter()
+        .map(|s| format!("    {}", s))
+        .collect::<Vec<_>>()
+        .join("\n");
 
     format!(
         r#"(define (problem education-{subj})
@@ -593,7 +710,13 @@ pub fn emit_education_problem(workspace: &EducationWorkspace) -> String {
 
 fn sanitize_subject(s: &str) -> String {
     s.chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect()
 }
 
@@ -642,11 +765,18 @@ pub fn education_diagnostics(workspace: &EducationWorkspace) -> Vec<(String, Str
                 // Check if post file has STATUS: PUBLISHED but no receipt
                 let posts_dir = workspace.root.join("linkedin/posts");
                 let has_published = any_file_in_dir_contains(&posts_dir, "STATUS: PUBLISHED");
-                let has_receipt = file_exists(&workspace.root.join(".bcinr/receipts/linkedin-post-001.json"));
+                let has_receipt = file_exists(
+                    &workspace
+                        .root
+                        .join(".bcinr/receipts/linkedin-post-001.json"),
+                );
                 if has_published && !has_receipt {
                     ("LINKEDIN_RECEIPT_MISSING", "LinkedIn post marked STATUS: PUBLISHED but .bcinr/receipts/linkedin-post-001.json missing.")
                 } else {
-                    ("LINKEDIN_NOT_PUBLISHED", "LinkedIn post not published or receipt missing.")
+                    (
+                        "LINKEDIN_NOT_PUBLISHED",
+                        "LinkedIn post not published or receipt missing.",
+                    )
                 }
             }
             EducationStage::NewsletterRestarted => (
@@ -826,7 +956,14 @@ pub fn render_education_gate(workspace: &EducationWorkspace) -> String {
         })
         .to_string()
     } else {
-        let lanes = ["career", "linkedin", "newsletter", "youtube", "rust", "education"];
+        let lanes = [
+            "career",
+            "linkedin",
+            "newsletter",
+            "youtube",
+            "rust",
+            "education",
+        ];
         let mut lane_summaries = serde_json::Map::new();
         for lane in &lanes {
             let all_for_lane: Vec<_> = EducationStage::all()

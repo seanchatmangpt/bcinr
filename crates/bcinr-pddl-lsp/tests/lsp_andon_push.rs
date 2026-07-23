@@ -74,7 +74,11 @@ fn empty_bound_report_pushes_andon() {
 fn stub_passing_check_is_detected_as_andon() {
     // finalize with empty checks_run → status Andon, NOT Pass
     let report = BoundReport::finalize(vec![], vec![]);
-    assert_eq!(report.status, BoundReportStatus::Andon, "empty checks_run must be ANDON");
+    assert_eq!(
+        report.status,
+        BoundReportStatus::Andon,
+        "empty checks_run must be ANDON"
+    );
     // counterfactual_check looks for Pass+empty; Andon+empty is already caught by rule 1
     // derive_events will emit BOUND_CHECKS_NOT_EXECUTED for Andon status
     let dir = TempDir::new().unwrap();
@@ -86,8 +90,13 @@ fn stub_passing_check_is_detected_as_andon() {
         broker: BuildBrokerState::default(),
     };
     let events = andon_bus::derive_events(&analysis);
-    let andon_ev = events.iter().find(|e| e.code == "BOUND_CHECKS_NOT_EXECUTED");
-    assert!(andon_ev.is_some(), "BOUND_CHECKS_NOT_EXECUTED must be emitted for Andon status");
+    let andon_ev = events
+        .iter()
+        .find(|e| e.code == "BOUND_CHECKS_NOT_EXECUTED");
+    assert!(
+        andon_ev.is_some(),
+        "BOUND_CHECKS_NOT_EXECUTED must be emitted for Andon status"
+    );
 }
 
 // ── test 3 ───────────────────────────────────────────────────────────────────
@@ -95,10 +104,20 @@ fn stub_passing_check_is_detected_as_andon() {
 #[test]
 fn real_check_passes_correctly() {
     let report = bounds::check_lifecycle_domain();
-    assert_eq!(report.status, BoundReportStatus::Pass, "lifecycle domain check must pass");
-    assert!(!report.checks_run.is_empty(), "checks_run must be non-empty for a real Pass");
+    assert_eq!(
+        report.status,
+        BoundReportStatus::Pass,
+        "lifecycle domain check must pass"
+    );
+    assert!(
+        !report.checks_run.is_empty(),
+        "checks_run must be non-empty for a real Pass"
+    );
     let ev = andon_bus::counterfactual_check(&report);
-    assert!(ev.is_none(), "counterfactual_check must return None when checks actually ran");
+    assert!(
+        ev.is_none(),
+        "counterfactual_check must return None when checks actually ran"
+    );
 }
 
 // ── test 4 ───────────────────────────────────────────────────────────────────
@@ -123,7 +142,9 @@ fn need9_pushes_refusal_event() {
         broker: BuildBrokerState::default(),
     };
     let events = andon_bus::derive_events(&analysis);
-    let ev = events.iter().find(|e| e.code == "WORK_UNIT_NEED9")
+    let ev = events
+        .iter()
+        .find(|e| e.code == "WORK_UNIT_NEED9")
         .expect("WORK_UNIT_NEED9 event must be present");
     assert_eq!(ev.severity, AndonSeverity::Refuse);
     assert!(!ev.admission_allowed);
@@ -145,7 +166,9 @@ fn direct_heavy_command_pushes_refusal() {
         broker,
     };
     let events = andon_bus::derive_events(&analysis);
-    let ev = events.iter().find(|e| e.code == "BUILD_SLOT_DENIED")
+    let ev = events
+        .iter()
+        .find(|e| e.code == "BUILD_SLOT_DENIED")
         .expect("BUILD_SLOT_DENIED event must be present");
     assert!(!ev.blocking, "BUILD_SLOT_DENIED is not blocking");
     assert!(!ev.admission_allowed);
@@ -171,7 +194,9 @@ fn missing_receipt_pushes_stop() {
         broker: BuildBrokerState::default(),
     };
     let events = andon_bus::derive_events(&analysis);
-    let ev = events.iter().find(|e| e.code == "GOAL_REACHED_FALSE")
+    let ev = events
+        .iter()
+        .find(|e| e.code == "GOAL_REACHED_FALSE")
         .expect("GOAL_REACHED_FALSE event must be present");
     assert_eq!(ev.severity, AndonSeverity::Refuse);
 }
@@ -196,11 +221,16 @@ fn goal_reached_false_pushes_refusal() {
         broker: BuildBrokerState::default(),
     };
     let events = andon_bus::derive_events(&analysis);
-    let ev = events.iter().find(|e| e.code == "GOAL_REACHED_FALSE")
+    let ev = events
+        .iter()
+        .find(|e| e.code == "GOAL_REACHED_FALSE")
         .expect("GOAL_REACHED_FALSE event must be present");
     assert!(!ev.admission_allowed);
     let cmd = ev.required_command.as_deref().unwrap_or("");
-    assert!(cmd.contains("verifyReceipt"), "required_command must reference verifyReceipt, got: {cmd}");
+    assert!(
+        cmd.contains("verifyReceipt"),
+        "required_command must reference verifyReceipt, got: {cmd}"
+    );
 }
 
 // ── test 8 ───────────────────────────────────────────────────────────────────
@@ -246,8 +276,14 @@ fn andon_event_disables_admission() {
         broker: BuildBrokerState::default(),
     };
     let events = andon_bus::derive_events(&analysis);
-    let ev = events.iter().find(|e| e.code == "BOUND_CHECKS_NOT_EXECUTED").unwrap();
-    assert!(!ev.admission_allowed, "BOUND_CHECKS_NOT_EXECUTED must disable admission");
+    let ev = events
+        .iter()
+        .find(|e| e.code == "BOUND_CHECKS_NOT_EXECUTED")
+        .unwrap();
+    assert!(
+        !ev.admission_allowed,
+        "BOUND_CHECKS_NOT_EXECUTED must disable admission"
+    );
 
     // WORK_UNIT_NEED9
     let violation = BoundViolation {
@@ -265,8 +301,14 @@ fn andon_event_disables_admission() {
         broker: BuildBrokerState::default(),
     };
     let events2 = andon_bus::derive_events(&analysis2);
-    let ev2 = events2.iter().find(|e| e.code == "WORK_UNIT_NEED9").unwrap();
-    assert!(!ev2.admission_allowed, "WORK_UNIT_NEED9 must disable admission");
+    let ev2 = events2
+        .iter()
+        .find(|e| e.code == "WORK_UNIT_NEED9")
+        .unwrap();
+    assert!(
+        !ev2.admission_allowed,
+        "WORK_UNIT_NEED9 must disable admission"
+    );
 
     // GOAL_REACHED_FALSE
     let refused_gate = PublishGate {
@@ -284,8 +326,14 @@ fn andon_event_disables_admission() {
         broker: BuildBrokerState::default(),
     };
     let events3 = andon_bus::derive_events(&analysis3);
-    let ev3 = events3.iter().find(|e| e.code == "GOAL_REACHED_FALSE").unwrap();
-    assert!(!ev3.admission_allowed, "GOAL_REACHED_FALSE must disable admission");
+    let ev3 = events3
+        .iter()
+        .find(|e| e.code == "GOAL_REACHED_FALSE")
+        .unwrap();
+    assert!(
+        !ev3.admission_allowed,
+        "GOAL_REACHED_FALSE must disable admission"
+    );
 }
 
 // ── test 10 ──────────────────────────────────────────────────────────────────
@@ -296,7 +344,9 @@ fn virtual_truth_doc_is_linked_from_andon() {
     let analysis = empty_analysis(&dir); // uses BoundReport::default() → Andon
     let events = andon_bus::derive_events(&analysis);
 
-    let ev = events.iter().find(|e| e.code == "BOUND_CHECKS_NOT_EXECUTED")
+    let ev = events
+        .iter()
+        .find(|e| e.code == "BOUND_CHECKS_NOT_EXECUTED")
         .expect("BOUND_CHECKS_NOT_EXECUTED must be present");
     assert_eq!(
         ev.virtual_doc_uri.as_deref(),
@@ -305,7 +355,10 @@ fn virtual_truth_doc_is_linked_from_andon() {
     );
 
     let andon_doc = virtual_docs::render_truth_andon(&events);
-    assert!(andon_doc.contains("andon_count"), "render_truth_andon must contain andon_count");
+    assert!(
+        andon_doc.contains("andon_count"),
+        "render_truth_andon must contain andon_count"
+    );
 
     let table_doc = virtual_docs::render_truth_table(&events);
     assert!(

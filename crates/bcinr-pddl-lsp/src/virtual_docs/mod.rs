@@ -1,12 +1,12 @@
 //! Virtual document registry for bcinr-pddl:// URIs.
 
-use serde_json::json;
 use crate::andon_bus::{AndonEvent, AndonSeverity};
-use crate::build_broker::BuildBrokerState;
 use crate::bounds::BoundReport;
+use crate::build_broker::BuildBrokerState;
 use crate::lifecycle::ProjectLifecycle;
 use crate::planner_client::{PlanCandidate, PlanResult};
 use crate::publish_gate::PublishGate;
+use serde_json::json;
 
 // Project map URIs
 pub const URI_LIFECYCLE: &str = "bcinr-pddl://project/lifecycle";
@@ -41,7 +41,8 @@ pub fn render_lifecycle(lc: &ProjectLifecycle) -> String {
         "next_missing": lc.next_missing().map(|s| s.predicate_name()),
         "stage_count": lc.true_stages.len(),
         "total_stages": crate::lifecycle::LifecycleStage::all().len(),
-    })).unwrap_or_default()
+    }))
+    .unwrap_or_default()
 }
 
 pub fn render_status(lc: &ProjectLifecycle, gate: &PublishGate) -> String {
@@ -53,15 +54,22 @@ pub fn render_status(lc: &ProjectLifecycle, gate: &PublishGate) -> String {
         "publish_gate": gate.status_label(),
         "admitted": gate.admitted,
         "goal_reached": gate.goal_reached,
-    })).unwrap_or_default()
+    }))
+    .unwrap_or_default()
 }
 
 pub fn render_evidence(lc: &ProjectLifecycle) -> String {
-    let evidence: Vec<_> = lc.evidence.iter().map(|e| json!({
-        "stage": e.stage.predicate_name(),
-        "source": e.source_path.as_ref().map(|p| p.to_string_lossy().to_string()),
-        "note": e.note,
-    })).collect();
+    let evidence: Vec<_> = lc
+        .evidence
+        .iter()
+        .map(|e| {
+            json!({
+                "stage": e.stage.predicate_name(),
+                "source": e.source_path.as_ref().map(|p| p.to_string_lossy().to_string()),
+                "note": e.note,
+            })
+        })
+        .collect();
     serde_json::to_string_pretty(&json!({ "project": lc.project_name, "evidence": evidence }))
         .unwrap_or_default()
 }
@@ -74,23 +82,31 @@ pub fn render_next_step(lc: &ProjectLifecycle, gate: &PublishGate) -> String {
         "publish_gate": gate.status_label(),
         "blockers": gate.blockers,
         "instruction": next.map(|s| format!("Advance lifecycle to: {s}")),
-    })).unwrap_or_default()
+    }))
+    .unwrap_or_default()
 }
 
 pub fn render_bounds_report(report: &BoundReport) -> String {
-    let violations: Vec<_> = report.violations.iter().map(|v| json!({
-        "code": v.diagnostic_code(),
-        "kind": format!("{:?}", v.kind),
-        "name": v.name,
-        "actual": v.actual,
-        "limit": v.limit,
-        "message": v.message(),
-    })).collect();
+    let violations: Vec<_> = report
+        .violations
+        .iter()
+        .map(|v| {
+            json!({
+                "code": v.diagnostic_code(),
+                "kind": format!("{:?}", v.kind),
+                "name": v.name,
+                "actual": v.actual,
+                "limit": v.limit,
+                "message": v.message(),
+            })
+        })
+        .collect();
     serde_json::to_string_pretty(&json!({
         "violation_count": violations.len(),
         "violations": violations,
         "status": if violations.is_empty() { "OK" } else { "NEED9" },
-    })).unwrap_or_default()
+    }))
+    .unwrap_or_default()
 }
 
 pub fn render_plan_candidate(candidate: &PlanCandidate) -> String {
@@ -99,7 +115,8 @@ pub fn render_plan_candidate(candidate: &PlanCandidate) -> String {
         "plan_steps": candidate.plan_steps,
         "step_count": candidate.plan_steps.len(),
         "note": "Run bcinrPddl.executeTape to admit",
-    })).unwrap_or_default()
+    }))
+    .unwrap_or_default()
 }
 
 pub fn render_plan(result: &PlanResult) -> String {
@@ -109,22 +126,31 @@ pub fn render_plan(result: &PlanResult) -> String {
         "step_count": result.plan_steps.len(),
         "goal_reached": result.log.goal_reached,
         "chain_hash": result.receipt.chain_hash,
-    })).unwrap_or_default()
+    }))
+    .unwrap_or_default()
 }
 
 pub fn render_log(result: &PlanResult) -> String {
-    let steps: Vec<_> = result.log.steps.iter().map(|s| json!({
-        "index": s.op_index,
-        "label": s.label,
-        "admitted": s.admitted,
-        "epoch_after": s.epoch_after,
-        "receipt_hash": s.receipt_hash,
-    })).collect();
+    let steps: Vec<_> = result
+        .log
+        .steps
+        .iter()
+        .map(|s| {
+            json!({
+                "index": s.op_index,
+                "label": s.label,
+                "admitted": s.admitted,
+                "epoch_after": s.epoch_after,
+                "receipt_hash": s.receipt_hash,
+            })
+        })
+        .collect();
     serde_json::to_string_pretty(&json!({
         "steps": steps,
         "goal_reached": result.log.goal_reached,
         "chain_hash": result.log.chain_hash,
-    })).unwrap_or_default()
+    }))
+    .unwrap_or_default()
 }
 
 pub fn render_receipt(result: &PlanResult) -> String {
@@ -135,7 +161,8 @@ pub fn render_receipt(result: &PlanResult) -> String {
         "chain_hash": result.receipt.chain_hash,
         "goal_reached": result.receipt.goal_reached,
         "step_count": result.receipt.step_count,
-    })).unwrap_or_default()
+    }))
+    .unwrap_or_default()
 }
 
 pub fn render_ocel(result: &PlanResult) -> String {
@@ -150,7 +177,8 @@ pub fn render_ocel(result: &PlanResult) -> String {
                 "value": a.value.to_string(),
             })).collect::<Vec<_>>(),
         })).collect::<Vec<_>>(),
-    })).unwrap_or_default()
+    }))
+    .unwrap_or_default()
 }
 
 pub fn render_publish_gate(gate: &PublishGate) -> String {
@@ -160,7 +188,8 @@ pub fn render_publish_gate(gate: &PublishGate) -> String {
         "admitted": gate.is_admitted(),
         "goal_reached": gate.goal_reached,
         "receipt_hash": gate.receipt_hash,
-    })).unwrap_or_default()
+    }))
+    .unwrap_or_default()
 }
 
 pub fn render_build_broker(state: &BuildBrokerState) -> String {
@@ -172,7 +201,8 @@ pub fn render_build_broker(state: &BuildBrokerState) -> String {
         "denial_count": state.denial_count,
         "last_ocel_event": state.last_ocel_event,
         "can_acquire": state.can_acquire(),
-    })).unwrap_or_default()
+    }))
+    .unwrap_or_default()
 }
 
 // ── Truth-table virtual docs ──────────────────────────────────────────────────
@@ -182,57 +212,78 @@ pub const URI_TRUTH_COUNTERFACTUALS: &str = "bcinr-pddl://truth/counterfactuals"
 pub const URI_TRUTH_ANDON: &str = "bcinr-pddl://truth/andon";
 
 pub fn render_truth_table(events: &[AndonEvent]) -> String {
-    let rows: Vec<_> = events.iter().map(|e| {
-        let status = match e.severity {
-            AndonSeverity::Stop | AndonSeverity::Refuse => "ANDON",
-            AndonSeverity::Warning => "WARN",
-            AndonSeverity::Info => "INFO",
-        };
-        json!({
-            "id": e.id,
-            "code": e.code,
-            "severity": format!("{:?}", e.severity),
-            "blocking": e.blocking,
-            "admission_allowed": e.admission_allowed,
-            "status": status,
+    let rows: Vec<_> = events
+        .iter()
+        .map(|e| {
+            let status = match e.severity {
+                AndonSeverity::Stop | AndonSeverity::Refuse => "ANDON",
+                AndonSeverity::Warning => "WARN",
+                AndonSeverity::Info => "INFO",
+            };
+            json!({
+                "id": e.id,
+                "code": e.code,
+                "severity": format!("{:?}", e.severity),
+                "blocking": e.blocking,
+                "admission_allowed": e.admission_allowed,
+                "status": status,
+            })
         })
-    }).collect();
+        .collect();
     serde_json::to_string_pretty(&rows).unwrap_or_default()
 }
 
 pub fn render_truth_counterfactuals(events: &[AndonEvent]) -> String {
-    let filtered: Vec<_> = events.iter().filter(|e| {
-        e.code.contains("COUNTERFACTUAL")
-            || matches!(e.severity, AndonSeverity::Refuse)
-    }).map(|e| json!({
-        "id": e.id,
-        "code": e.code,
-        "severity": format!("{:?}", e.severity),
-        "message": e.message,
-        "admission_allowed": e.admission_allowed,
-    })).collect();
+    let filtered: Vec<_> = events
+        .iter()
+        .filter(|e| {
+            e.code.contains("COUNTERFACTUAL") || matches!(e.severity, AndonSeverity::Refuse)
+        })
+        .map(|e| {
+            json!({
+                "id": e.id,
+                "code": e.code,
+                "severity": format!("{:?}", e.severity),
+                "message": e.message,
+                "admission_allowed": e.admission_allowed,
+            })
+        })
+        .collect();
     serde_json::to_string_pretty(&filtered).unwrap_or_default()
 }
 
 pub fn render_truth_andon(events: &[AndonEvent]) -> String {
-    let andon_count = events.iter().filter(|e| matches!(e.severity, AndonSeverity::Stop)).count();
+    let andon_count = events
+        .iter()
+        .filter(|e| matches!(e.severity, AndonSeverity::Stop))
+        .count();
     let stop_count = andon_count;
-    let refuse_count = events.iter().filter(|e| matches!(e.severity, AndonSeverity::Refuse)).count();
-    let blocking: Vec<_> = events.iter().filter(|e| e.blocking).map(|e| json!({
-        "id": e.id,
-        "code": e.code,
-        "severity": format!("{:?}", e.severity),
-        "message": e.message,
-        "next_lawful_step": e.next_lawful_step,
-        "admission_allowed": e.admission_allowed,
-    })).collect();
+    let refuse_count = events
+        .iter()
+        .filter(|e| matches!(e.severity, AndonSeverity::Refuse))
+        .count();
+    let blocking: Vec<_> = events
+        .iter()
+        .filter(|e| e.blocking)
+        .map(|e| {
+            json!({
+                "id": e.id,
+                "code": e.code,
+                "severity": format!("{:?}", e.severity),
+                "message": e.message,
+                "next_lawful_step": e.next_lawful_step,
+                "admission_allowed": e.admission_allowed,
+            })
+        })
+        .collect();
     serde_json::to_string_pretty(&json!({
         "andon_count": andon_count,
         "stop_count": stop_count,
         "refuse_count": refuse_count,
         "blocking_event_count": blocking.len(),
         "events": blocking,
-    })).unwrap_or_default()
+    }))
+    .unwrap_or_default()
 }
 
 pub fn render_agent_assignments(lc: &ProjectLifecycle, gate: &PublishGate) -> String {

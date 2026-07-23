@@ -14,7 +14,10 @@ use std::path::PathBuf;
 fn bcinr_root() -> PathBuf {
     // Go up from crates/bcinr-pddl-lsp to the bcinr workspace root
     let manifest = env!("CARGO_MANIFEST_DIR");
-    PathBuf::from(manifest).join("../..").canonicalize().unwrap()
+    PathBuf::from(manifest)
+        .join("../..")
+        .canonicalize()
+        .unwrap()
 }
 
 #[test]
@@ -37,8 +40,10 @@ fn q1_current_lifecycle_status() {
 
     // bcinr has docs/thesis/ but not docs/prd.md — lifecycle is early stage
     // At minimum it has source files
-    assert!(!lc.true_stages.is_empty() || lc.root.exists(),
-        "scanner must produce some result for bcinr workspace");
+    assert!(
+        !lc.true_stages.is_empty() || lc.root.exists(),
+        "scanner must produce some result for bcinr workspace"
+    );
 }
 
 #[test]
@@ -90,12 +95,18 @@ fn q4_receipt_status() {
         println!("Receipt: present");
         println!("goal_reached: {goal_reached}");
         if goal_reached {
-            assert!(lc.has(&LifecycleStage::Published), "published must be true when receipt has goal_reached=true");
+            assert!(
+                lc.has(&LifecycleStage::Published),
+                "published must be true when receipt has goal_reached=true"
+            );
         }
     } else {
         println!("Receipt: absent (.bcinr/receipts/latest.json not found)");
         println!("Note: run bcinrPddl.executeTape to admit and emit receipt");
-        assert!(!lc.has(&LifecycleStage::Published), "published must be false when no receipt");
+        assert!(
+            !lc.has(&LifecycleStage::Published),
+            "published must be false when no receipt"
+        );
     }
 }
 

@@ -131,9 +131,15 @@ pub fn is_heavy_command(cmd: &str) -> bool {
 /// Check for direct heavy command execution (bypassing broker).
 /// Returns Some(diagnostic) if the command should be blocked.
 pub fn check_direct_command(cmd: &str, state: &BuildBrokerState) -> Option<DirectCommandViolation> {
-    if !is_heavy_command(cmd) { return None; }
-    if state.slot_status == BrokerSlotStatus::Acquired { return None; }
-    Some(DirectCommandViolation { command: cmd.to_string() })
+    if !is_heavy_command(cmd) {
+        return None;
+    }
+    if state.slot_status == BrokerSlotStatus::Acquired {
+        return None;
+    }
+    Some(DirectCommandViolation {
+        command: cmd.to_string(),
+    })
 }
 
 #[derive(Debug, Clone)]

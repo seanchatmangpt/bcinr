@@ -5,21 +5,22 @@
 //!   diagnostics published per-workspace-root
 //!   custom commands via workspace/executeCommand
 
-use std::path::PathBuf;
-use std::sync::Arc;
 use dashmap::DashMap;
 use lsp_max::{Client, LanguageServer};
 use lsp_types_max::*;
-use tokio::sync::Mutex;
+use std::path::PathBuf;
+use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
+use tokio::sync::Mutex;
 
-use lsp_max_andon::core::InvariantRegistry;
-use lsp_max_andon::andon::{AndonBus, AndonEvent};
 use lsp_max_andon::analysis::AnalysisPipeline;
-use lsp_max_andon::lsp::{LspPushAdapter, LspMaxAndonRaised};
+use lsp_max_andon::andon::{AndonBus, AndonEvent};
+use lsp_max_andon::core::InvariantRegistry;
+use lsp_max_andon::lsp::{LspMaxAndonRaised, LspPushAdapter};
 use lsp_max_andon::patterns::{
-    build_empty_registry_invariant, build_required_artifact_invariant, build_marker_admission,
-    build_need_n_invariant, build_non_empty_check_set, build_brokered_command, build_receipt_required,
+    build_brokered_command, build_empty_registry_invariant, build_marker_admission,
+    build_need_n_invariant, build_non_empty_check_set, build_receipt_required,
+    build_required_artifact_invariant,
 };
 
 fn uri_to_path(uri: &Uri) -> Option<PathBuf> {
@@ -32,15 +33,8 @@ fn uri_to_path(uri: &Uri) -> Option<PathBuf> {
 }
 
 use crate::{
-    bounds,
-    build_broker,
-    code_actions,
-    diagnostics as diag_mod,
-    lifecycle,
-    planner_client,
-    projection,
-    publish_gate,
-    virtual_docs,
+    bounds, build_broker, code_actions, diagnostics as diag_mod, lifecycle, planner_client,
+    projection, publish_gate, virtual_docs,
 };
 
 /// Cached projection state for a workspace root.
@@ -94,7 +88,9 @@ impl PddlLspBackend {
     }
 
     async fn root(&self) -> PathBuf {
-        self.workspace_root.lock().await
+        self.workspace_root
+            .lock()
+            .await
             .clone()
             .unwrap_or_else(|| PathBuf::from("."))
     }
@@ -146,40 +142,54 @@ impl PddlLspBackend {
             self.push_andon(event).await;
         }
 
-        self.client.publish_diagnostics(trigger_uri, all_diags, None).await;
+        self.client
+            .publish_diagnostics(trigger_uri, all_diags, None)
+            .await;
 
         let gate_label = {
             let cache = self.plan_cache.lock().await;
-            cache.as_ref().map(|c| c.gate.status_label().to_string()).unwrap_or_default()
+            cache
+                .as_ref()
+                .map(|c| c.gate.status_label().to_string())
+                .unwrap_or_default()
         };
-        self.client.log_message(
-            MessageType::INFO,
-            format!(
-                "bcinr-pddl-lsp CANDIDATE: project '{}' gate={} next={:?}",
-                root.display(),
-                gate_label,
-                lc.next_missing().map(|s| s.predicate_name())
-            ),
-        )
-        .await;
+        self.client
+            .log_message(
+                MessageType::INFO,
+                format!(
+                    "bcinr-pddl-lsp CANDIDATE: project '{}' gate={} next={:?}",
+                    root.display(),
+                    gate_label,
+                    lc.next_missing().map(|s| s.predicate_name())
+                ),
+            )
+            .await;
     }
 
     async fn push_andon(&self, event: AndonEvent) {
-        let _ = self.client.send_notification::<LspMaxAndonRaised>(event.clone()).await;
+        let _ = self
+            .client
+            .send_notification::<LspMaxAndonRaised>(event.clone())
+            .await;
 
         if event.requires_ack {
-            let _ = self.client.show_message_request(
-                MessageType::ERROR,
-                event.message.clone(),
-                Some(vec![MessageActionItem {
-                    title: "Acknowledge".to_string(),
-                    properties: std::collections::HashMap::new(),
-                }]),
-            ).await;
+            let _ = self
+                .client
+                .show_message_request(
+                    MessageType::ERROR,
+                    event.message.clone(),
+                    Some(vec![MessageActionItem {
+                        title: "Acknowledge".to_string(),
+                        properties: std::collections::HashMap::new(),
+                    }]),
+                )
+                .await;
         } else if event.blocking {
-            self.client.show_message(MessageType::ERROR, event.message.clone()).await;
+            self.client
+                .show_message(MessageType::ERROR, event.message.clone())
+                .await;
         }
-        
+
         let mut bus = self.andon_bus.lock().unwrap();
         bus.push(event);
     }
@@ -197,20 +207,24 @@ impl PddlLspBackend {
             match cache.as_ref() {
                 Some(c) => (c.candidate.clone(), c.projection.clone()),
                 None => {
-                    self.client.log_message(
-                        MessageType::WARNING,
-                        "bcinr-pddl-lsp: no candidate plan cached — run project first",
-                    ).await;
+                    self.client
+                        .log_message(
+                            MessageType::WARNING,
+                            "bcinr-pddl-lsp: no candidate plan cached — run project first",
+                        )
+                        .await;
                     return;
                 }
             }
         };
 
         let Some(candidate) = candidate else {
-            self.client.log_message(
-                MessageType::WARNING,
-                "bcinr-pddl-lsp: candidate plan is empty — nothing to execute",
-            ).await;
+            self.client
+                .log_message(
+                    MessageType::WARNING,
+                    "bcinr-pddl-lsp: candidate plan is empty — nothing to execute",
+                )
+                .await;
             return;
         };
 
@@ -228,18 +242,24 @@ impl PddlLspBackend {
                         c.gate = gate;
                     }
                 }
-                self.client.log_message(
-                    MessageType::INFO,
-                    format!("bcinr-pddl-lsp ADMITTED: gate={gate_label}"),
-                ).await;
+                self.client
+                    .log_message(
+                        MessageType::INFO,
+                        format!("bcinr-pddl-lsp ADMITTED: gate={gate_label}"),
+                    )
+                    .await;
                 let all_diags = diag_mod::lifecycle_diagnostics(&lc);
-                self.client.publish_diagnostics(trigger_uri, all_diags, None).await;
+                self.client
+                    .publish_diagnostics(trigger_uri, all_diags, None)
+                    .await;
             }
             Err(e) => {
-                self.client.log_message(
-                    MessageType::ERROR,
-                    format!("bcinr-pddl-lsp executeTape FAILED: {e}"),
-                ).await;
+                self.client
+                    .log_message(
+                        MessageType::ERROR,
+                        format!("bcinr-pddl-lsp executeTape FAILED: {e}"),
+                    )
+                    .await;
             }
         }
     }
@@ -254,32 +274,35 @@ impl PddlLspBackend {
         Some(match uri_str {
             virtual_docs::URI_LIFECYCLE => virtual_docs::render_lifecycle(&lc),
             virtual_docs::URI_STATUS => {
-                let gate = cache.as_ref()
+                let gate = cache
+                    .as_ref()
                     .map(|c| c.gate.clone())
                     .unwrap_or_else(|| publish_gate::from_lifecycle(&lc));
                 virtual_docs::render_status(&lc, &gate)
             }
             virtual_docs::URI_EVIDENCE => virtual_docs::render_evidence(&lc),
             virtual_docs::URI_NEXT_STEP => {
-                let gate = cache.as_ref()
+                let gate = cache
+                    .as_ref()
                     .map(|c| c.gate.clone())
                     .unwrap_or_else(|| publish_gate::from_lifecycle(&lc));
                 virtual_docs::render_next_step(&lc, &gate)
             }
             virtual_docs::URI_BOUNDS_REPORT => {
-                let report = cache.as_ref()
+                let report = cache
+                    .as_ref()
                     .map(|c| c.bounds_report.clone())
                     .unwrap_or_default();
                 virtual_docs::render_bounds_report(&report)
             }
-            virtual_docs::URI_DOMAIN => {
-                cache.as_ref().map(|c| c.projection.domain_text.clone())
-                    .unwrap_or_else(projection::emit_domain)
-            }
-            virtual_docs::URI_PROBLEM => {
-                cache.as_ref().map(|c| c.projection.problem_text.clone())
-                    .unwrap_or_else(|| projection::emit_problem(&lc))
-            }
+            virtual_docs::URI_DOMAIN => cache
+                .as_ref()
+                .map(|c| c.projection.domain_text.clone())
+                .unwrap_or_else(projection::emit_domain),
+            virtual_docs::URI_PROBLEM => cache
+                .as_ref()
+                .map(|c| c.projection.problem_text.clone())
+                .unwrap_or_else(|| projection::emit_problem(&lc)),
             virtual_docs::URI_PLAN | virtual_docs::URI_TAPE => {
                 if let Some(result) = cache.as_ref().and_then(|c| c.admission.as_ref()) {
                     virtual_docs::render_plan(result)
@@ -289,30 +312,32 @@ impl PddlLspBackend {
                     r#"{"status":"NO_PLAN"}"#.into()
                 }
             }
-            virtual_docs::URI_LOG => {
-                cache.as_ref().and_then(|c| c.admission.as_ref())
-                    .map(virtual_docs::render_log)
-                    .unwrap_or_else(|| r#"{"status":"CANDIDATE"}"#.into())
-            }
-            virtual_docs::URI_RECEIPT => {
-                cache.as_ref().and_then(|c| c.admission.as_ref())
-                    .map(virtual_docs::render_receipt)
-                    .unwrap_or_else(|| r#"{"status":"CANDIDATE"}"#.into())
-            }
-            virtual_docs::URI_OCEL => {
-                cache.as_ref().and_then(|c| c.admission.as_ref())
-                    .map(virtual_docs::render_ocel)
-                    .unwrap_or_else(|| r#"{"status":"CANDIDATE"}"#.into())
-            }
+            virtual_docs::URI_LOG => cache
+                .as_ref()
+                .and_then(|c| c.admission.as_ref())
+                .map(virtual_docs::render_log)
+                .unwrap_or_else(|| r#"{"status":"CANDIDATE"}"#.into()),
+            virtual_docs::URI_RECEIPT => cache
+                .as_ref()
+                .and_then(|c| c.admission.as_ref())
+                .map(virtual_docs::render_receipt)
+                .unwrap_or_else(|| r#"{"status":"CANDIDATE"}"#.into()),
+            virtual_docs::URI_OCEL => cache
+                .as_ref()
+                .and_then(|c| c.admission.as_ref())
+                .map(virtual_docs::render_ocel)
+                .unwrap_or_else(|| r#"{"status":"CANDIDATE"}"#.into()),
             virtual_docs::URI_PUBLISH_GATE => {
-                let gate = cache.as_ref()
+                let gate = cache
+                    .as_ref()
                     .map(|c| c.gate.clone())
                     .unwrap_or_else(|| publish_gate::from_lifecycle(&lc));
                 virtual_docs::render_publish_gate(&gate)
             }
             virtual_docs::URI_BUILD_BROKER => virtual_docs::render_build_broker(&broker),
             virtual_docs::URI_AGENT_ASSIGNMENTS => {
-                let gate = cache.as_ref()
+                let gate = cache
+                    .as_ref()
                     .map(|c| c.gate.clone())
                     .unwrap_or_else(|| publish_gate::from_lifecycle(&lc));
                 virtual_docs::render_agent_assignments(&lc, &gate)
@@ -324,7 +349,10 @@ impl PddlLspBackend {
 
 #[lsp_max::async_trait]
 impl LanguageServer for PddlLspBackend {
-    async fn initialize(&self, params: InitializeParams) -> lsp_max::jsonrpc::Result<InitializeResult> {
+    async fn initialize(
+        &self,
+        params: InitializeParams,
+    ) -> lsp_max::jsonrpc::Result<InitializeResult> {
         // Detect workspace root
         if let Some(uri) = params.root_uri {
             if let Some(path) = uri_to_path(&uri) {
@@ -387,7 +415,10 @@ impl LanguageServer for PddlLspBackend {
 
     async fn initialized(&self, _: InitializedParams) {
         self.client
-            .log_message(MessageType::INFO, "bcinr-pddl-lsp CANDIDATE — lifecycle scanner OPEN")
+            .log_message(
+                MessageType::INFO,
+                "bcinr-pddl-lsp CANDIDATE — lifecycle scanner OPEN",
+            )
             .await;
     }
 
@@ -432,7 +463,11 @@ impl LanguageServer for PddlLspBackend {
     }
 
     async fn hover(&self, params: HoverParams) -> lsp_max::jsonrpc::Result<Option<Hover>> {
-        let uri_str = params.text_document_position_params.text_document.uri.to_string();
+        let uri_str = params
+            .text_document_position_params
+            .text_document
+            .uri
+            .to_string();
 
         // If hovering on a bcinr-pddl:// virtual document, render it
         if uri_str.starts_with("bcinr-pddl://") {
@@ -459,9 +494,9 @@ impl LanguageServer for PddlLspBackend {
             "bcinrPddl.refreshLifecycle" | "bcinrPddl.runPlan" | "bcinrPddl.generateProjection" => {
                 let root = self.root().await;
                 let uri_str = format!("file://{}", root.to_string_lossy());
-                let uri: Uri = uri_str.parse().unwrap_or_else(|_| {
-                    "file:///workspace".parse().unwrap()
-                });
+                let uri: Uri = uri_str
+                    .parse()
+                    .unwrap_or_else(|_| "file:///workspace".parse().unwrap());
                 self.project_and_cache(uri).await;
                 Ok(Some(serde_json::json!({"status": "CANDIDATE"})))
             }
@@ -469,62 +504,60 @@ impl LanguageServer for PddlLspBackend {
             "bcinrPddl.executeTape" => {
                 let root = self.root().await;
                 let uri_str = format!("file://{}", root.to_string_lossy());
-                let uri: Uri = uri_str.parse().unwrap_or_else(|_| {
-                    "file:///workspace".parse().unwrap()
-                });
+                let uri: Uri = uri_str
+                    .parse()
+                    .unwrap_or_else(|_| "file:///workspace".parse().unwrap());
                 self.execute_tape_and_admit(uri).await;
                 let gate_label = {
                     let cache = self.plan_cache.lock().await;
-                    cache.as_ref().map(|c| c.gate.status_label().to_string()).unwrap_or_default()
+                    cache
+                        .as_ref()
+                        .map(|c| c.gate.status_label().to_string())
+                        .unwrap_or_default()
                 };
                 Ok(Some(serde_json::json!({"status": gate_label})))
             }
             "bcinrPddl.openVirtualDocument" => {
-                let uri_str = params.arguments
+                let uri_str = params
+                    .arguments
                     .first()
                     .and_then(|v| v.as_str())
                     .unwrap_or(virtual_docs::URI_STATUS);
-                let content = self.render_virtual_doc(uri_str).await
+                let content = self
+                    .render_virtual_doc(uri_str)
+                    .await
                     .unwrap_or_else(|| r#"{"error":"unknown virtual document"}"#.into());
                 Ok(Some(serde_json::json!({ "content": content })))
             }
             "bcinrPddl.explainPublishGate" => {
-                let content = self.render_virtual_doc(virtual_docs::URI_PUBLISH_GATE).await
+                let content = self
+                    .render_virtual_doc(virtual_docs::URI_PUBLISH_GATE)
+                    .await
                     .unwrap_or_default();
                 Ok(Some(serde_json::json!({ "content": content })))
             }
-            "bcinrPddl.splitNeed9" => {
-                Ok(Some(serde_json::json!({
-                    "status": "CANDIDATE",
-                    "message": "Need9: decompose work package into ≤8 tasks. Edit docs/work-units.md."
-                })))
-            }
-            "bcinrPddl.createPrd" => {
-                Ok(Some(serde_json::json!({
-                    "status": "CANDIDATE",
-                    "template": "# PRD\n\n## Status: CANDIDATE\n\n## Intent\n\n## Goals\n\n## Non-Goals\n"
-                })))
-            }
-            "bcinrPddl.createArd" | "bcinrPddl.deriveArd" => {
-                Ok(Some(serde_json::json!({
-                    "status": "CANDIDATE",
-                    "template": "# ARD\n\n## Status: CANDIDATE\n\n## Architecture Thesis\n\n## Modules\n"
-                })))
-            }
-            "bcinrPddl.createAdr" => {
-                Ok(Some(serde_json::json!({
-                    "status": "CANDIDATE",
-                    "template": "# ADR-001: Title\n\n## Status: CANDIDATE\n\n## Context\n\n## Decision\n\n## Consequences\n",
-                    "path": "docs/adr/001-title.md"
-                })))
-            }
-            "bcinrPddl.generateWorkUnits" => {
-                Ok(Some(serde_json::json!({
-                    "status": "CANDIDATE",
-                    "template": "# Work Units\n\n## Unit 1: Name (≤8 tasks)\n\n- [ ] Task 1\n- [ ] Task 2\n",
-                    "path": "docs/work-units.md"
-                })))
-            }
+            "bcinrPddl.splitNeed9" => Ok(Some(serde_json::json!({
+                "status": "CANDIDATE",
+                "message": "Need9: decompose work package into ≤8 tasks. Edit docs/work-units.md."
+            }))),
+            "bcinrPddl.createPrd" => Ok(Some(serde_json::json!({
+                "status": "CANDIDATE",
+                "template": "# PRD\n\n## Status: CANDIDATE\n\n## Intent\n\n## Goals\n\n## Non-Goals\n"
+            }))),
+            "bcinrPddl.createArd" | "bcinrPddl.deriveArd" => Ok(Some(serde_json::json!({
+                "status": "CANDIDATE",
+                "template": "# ARD\n\n## Status: CANDIDATE\n\n## Architecture Thesis\n\n## Modules\n"
+            }))),
+            "bcinrPddl.createAdr" => Ok(Some(serde_json::json!({
+                "status": "CANDIDATE",
+                "template": "# ADR-001: Title\n\n## Status: CANDIDATE\n\n## Context\n\n## Decision\n\n## Consequences\n",
+                "path": "docs/adr/001-title.md"
+            }))),
+            "bcinrPddl.generateWorkUnits" => Ok(Some(serde_json::json!({
+                "status": "CANDIDATE",
+                "template": "# Work Units\n\n## Unit 1: Name (≤8 tasks)\n\n- [ ] Task 1\n- [ ] Task 2\n",
+                "path": "docs/work-units.md"
+            }))),
             "bcinrPddl.verifyReceipt" => {
                 let root = self.root().await;
                 let receipt_path = root.join(".bcinr/receipts/latest.json");
@@ -544,15 +577,25 @@ impl LanguageServer for PddlLspBackend {
                         }))),
                     }
                 } else {
-                    Ok(Some(serde_json::json!({"status": "CANDIDATE", "error": "no receipt found"})))
+                    Ok(Some(
+                        serde_json::json!({"status": "CANDIDATE", "error": "no receipt found"}),
+                    ))
                 }
             }
             "bcinrPddl.requestBuildSlot" => {
-                let cmd = params.arguments.first().and_then(|v| v.as_str()).unwrap_or("build");
+                let cmd = params
+                    .arguments
+                    .first()
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("build");
                 let mut broker = self.broker.lock().await;
                 match broker.request_slot(cmd) {
-                    Ok(()) => Ok(Some(serde_json::json!({"status": "AVAILABLE", "command": cmd}))),
-                    Err(e) => Ok(Some(serde_json::json!({"status": "BUILD_SLOT_DENIED", "reason": e.reason}))),
+                    Ok(()) => Ok(Some(
+                        serde_json::json!({"status": "AVAILABLE", "command": cmd}),
+                    )),
+                    Err(e) => Ok(Some(
+                        serde_json::json!({"status": "BUILD_SLOT_DENIED", "reason": e.reason}),
+                    )),
                 }
             }
             "bcinrPddl.releaseBuildSlot" => {
@@ -561,7 +604,11 @@ impl LanguageServer for PddlLspBackend {
                 Ok(Some(serde_json::json!({"status": "RELEASED"})))
             }
             "bcinrPddl.wrapHeavyCommand" => {
-                let cmd = params.arguments.first().and_then(|v| v.as_str()).unwrap_or("");
+                let cmd = params
+                    .arguments
+                    .first()
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
                 if build_broker::is_heavy_command(cmd) {
                     Ok(Some(serde_json::json!({
                         "status": "CANDIDATE",
@@ -569,13 +616,19 @@ impl LanguageServer for PddlLspBackend {
                         "note": "Route heavy commands through the build broker to advance lifecycle."
                     })))
                 } else {
-                    Ok(Some(serde_json::json!({"status": "OK", "note": "Not a heavy command — no broker needed"})))
+                    Ok(Some(
+                        serde_json::json!({"status": "OK", "note": "Not a heavy command — no broker needed"}),
+                    ))
                 }
             }
             "bcinrPddl.emitOcelSnapshot" => {
-                let content = self.render_virtual_doc(virtual_docs::URI_OCEL).await
+                let content = self
+                    .render_virtual_doc(virtual_docs::URI_OCEL)
+                    .await
                     .unwrap_or_else(|| r#"{"status":"CANDIDATE"}"#.into());
-                Ok(Some(serde_json::json!({"status": "CANDIDATE", "ocel": content})))
+                Ok(Some(
+                    serde_json::json!({"status": "CANDIDATE", "ocel": content}),
+                ))
             }
             _ => Ok(None),
         }
