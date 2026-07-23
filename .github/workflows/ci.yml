@@ -10,6 +10,10 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # Temporary, branch-bounded actuation rail. It becomes a no-op after the
   # semantic migration commits and is removed before merge.
