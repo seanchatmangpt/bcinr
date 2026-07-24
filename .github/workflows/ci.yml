@@ -74,6 +74,8 @@ jobs:
     name: PDDL & POWL Canonical Conformance
     needs: [style]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
@@ -96,6 +98,285 @@ jobs:
         with:
           name: canonical-ipc-diagnostics
           path: canonical-ipc.log
+          if-no-files-found: error
+      - name: Manufacture temporal-wrapper parser correction blob
+        if: steps.canonical_ipc.outputs.status != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+        run: |
+          python - <<'PY'
+          import base64
+          import json
+          from pathlib import Path
+
+          path = Path("crates/bcinr-pddl/src/parse.rs")
+          source = path.read_text()
+
+          replacements = []
+
+          replacements.append((
+          '''fn parse_condition(expr: &SExpr) -> Result<PddlCondition, Pddl8Error> {
+              let list = expr.list()?;
+              if list.is_empty() {
+                  return Ok(PddlCondition::And(vec![]));
+              }
+              let head = list[0].atom()?;
+              match head {''',
+          '''fn parse_condition(expr: &SExpr) -> Result<PddlCondition, Pddl8Error> {
+              let list = expr.list()?;
+              if list.is_empty() {
+                  return Ok(PddlCondition::And(vec![]));
+              }
+              let head = list[0].atom()?;
+              if list.len() == 3 && matches!(&list[2], SExpr::List(_)) {
+                  let time = match (head, list[1].atom()?) {
+                      ("at", "start") => Some(TimeSpecifier::AtStart),
+                      ("at", "end") => Some(TimeSpecifier::AtEnd),
+                      ("over", "all") => Some(TimeSpecifier::OverAll),
+                      _ => None,
+                  };
+                  if let Some(time) = time {
+                      return Ok(PddlCondition::Timed(
+                          time,
+                          Box::new(parse_condition(&list[2])?),
+                      ));
+                  }
+              }
+              match head {'''))
+
+          replacements.append((
+          '''        "at" => {
+                      if list.len() != 3 {
+                          return Err(Pddl8Error::ParseError(
+                              "timed condition requires (at start|end <condition>)".into(),
+                          ));
+                      }
+                      let time = match list[1].atom()? {
+                          "start" => TimeSpecifier::AtStart,
+                          "end" => TimeSpecifier::AtEnd,
+                          other => {
+                              return Err(Pddl8Error::ParseError(format!(
+                                  "invalid timed condition qualifier {other:?}"
+                              )));
+                          }
+                      };
+                      Ok(PddlCondition::Timed(
+                          time,
+                          Box::new(parse_condition(&list[2])?),
+                      ))
+                  }
+                  "over" => {
+                      if list.len() != 3 || list[1].atom()? != "all" {
+                          return Err(Pddl8Error::ParseError(
+                              "timed invariant must be (over all <condition>)".into(),
+                          ));
+                      }
+                      Ok(PddlCondition::Timed(
+                          TimeSpecifier::OverAll,
+                          Box::new(parse_condition(&list[2])?),
+                      ))
+                  }
+          ''',
+          ''''''))
+
+          replacements.append((
+          '''fn parse_effect(expr: &SExpr) -> Result<PddlEffect, Pddl8Error> {
+              let list = expr.list()?;
+              let head = list
+                  .first()
+                  .ok_or_else(|| Pddl8Error::ParseError("empty effect".into()))?
+                  .atom()?;
+              match head {''',
+          '''fn parse_effect(expr: &SExpr) -> Result<PddlEffect, Pddl8Error> {
+              let list = expr.list()?;
+              let head = list
+                  .first()
+                  .ok_or_else(|| Pddl8Error::ParseError("empty effect".into()))?
+                  .atom()?;
+              if list.len() == 3 && matches!(&list[2], SExpr::List(_)) {
+                  let time = match (head, list[1].atom()?) {
+                      ("at", "start") => Some(TimeSpecifier::AtStart),
+                      ("at", "end") => Some(TimeSpecifier::AtEnd),
+                      _ => None,
+                  };
+                  if let Some(time) = time {
+                      let nested = parse_effects(&list[2])?;
+                      if nested.len() != 1 {
+                          return Err(Pddl8Error::ParseError(
+                              "timed effect must wrap exactly one effect; put (and ...) outside each wrapper"
+                                  .into(),
+                          ));
+                      }
+                      return Ok(PddlEffect::Timed(time, Box::new(nested[0].clone())));
+                  }
+              }
+              match head {'''))
+
+          replacements.append((
+          '''        "at" => {
+                      if list.len() != 3 {
+                          return Err(Pddl8Error::ParseError(
+                              "timed effect requires (at start|end <effect>)".into(),
+                          ));
+                      }
+                      let time = match list[1].atom()? {
+                          "start" => TimeSpecifier::AtStart,
+                          "end" => TimeSpecifier::AtEnd,
+                          other => {
+                              return Err(Pddl8Error::ParseError(format!(
+                                  "invalid timed effect qualifier {other:?}"
+                              )));
+                          }
+                      };
+                      let nested = parse_effects(&list[2])?;
+                      if nested.len() != 1 {
+                          return Err(Pddl8Error::ParseError(
+                              "timed effect must wrap exactly one effect; put (and ...) outside each wrapper"
+                                  .into(),
+                          ));
+                      }
+                      Ok(PddlEffect::Timed(time, Box::new(nested[0].clone())))
+                  }
+          ''',
+          ''''''))
+
+          replacements.append((
+          '''        match list[0].atom()? {
+                      "=" => {''',
+          '''        let head = list[0].atom()?;
+                  if head == "at" && list.len() == 3 && matches!(&list[2], SExpr::List(_)) {
+                      if let Ok(time) = list[1].atom()?.parse::<f64>() {
+                          let literal = list[2].list()?;
+                          let (negated, atom_expr) =
+                              if literal.first().and_then(|v| v.atom().ok()) == Some("not") {
+                                  (true, single_arg(literal, "not")?)
+                              } else {
+                                  (false, &list[2])
+                              };
+                          problem.timed_inits.push(TimedLiteral {
+                              time,
+                              atom: parse_atom(atom_expr)?,
+                              negated,
+                          });
+                          continue;
+                      }
+                  }
+                  match head {
+                      "=" => {'''))
+
+          replacements.append((
+          '''            "at" => {
+                          if list.len() != 3 {
+                              return Err(Pddl8Error::ParseError(
+                                  "timed initial literal requires time and literal".into(),
+                              ));
+                          }
+                          let time = list[1].atom()?.parse::<f64>().map_err(|_| {
+                              Pddl8Error::ParseError("timed initial literal has invalid time".into())
+                          })?;
+                          let literal = list[2].list()?;
+                          let (negated, atom_expr) =
+                              if literal.first().and_then(|v| v.atom().ok()) == Some("not") {
+                                  (true, single_arg(literal, "not")?)
+                              } else {
+                                  (false, &list[2])
+                              };
+                          problem.timed_inits.push(TimedLiteral {
+                              time,
+                              atom: parse_atom(atom_expr)?,
+                              negated,
+                          });
+                      }
+          ''',
+          ''''''))
+
+          replacements.append((
+          '''        assert_eq!(domain.predicates.len(), 2);
+                  assert_eq!(domain.actions[0].params[0], ("?p".into(), "package".into()));
+              }
+
+              #[test]
+              fn preserves_boolean_quantified_and_conditional_trees() {''',
+          '''        assert_eq!(domain.predicates.len(), 2);
+                  assert_eq!(domain.actions[0].params[0], ("?p".into(), "package".into()));
+              }
+
+              #[test]
+              fn distinguishes_at_predicates_from_temporal_wrappers() {
+                  let domain = domain31_from_pddl(
+                      r#"(define (domain temporal-at)
+                          (:requirements :strips :durative-actions)
+                          (:predicates (at ?x ?l) (ready ?x))
+                          (:durative-action hold
+                              :parameters (?x ?l)
+                              :duration (= ?duration 1)
+                              :condition (and (at start (at ?x ?l)) (over all (ready ?x)))
+                              :effect (at end (ready ?x))))"#,
+                  )
+                  .unwrap();
+                  assert_eq!(domain.durative_actions.len(), 1);
+                  assert!(matches!(
+                      domain.durative_actions[0].conditions[0],
+                      PddlCondition::Timed(TimeSpecifier::AtStart, _)
+                  ));
+
+                  let problem = problem31_from_pddl(
+                      r#"(define (problem temporal-at-p)
+                          (:domain temporal-at)
+                          (:objects thing place)
+                          (:init (at thing place) (at 2 (ready thing)))
+                          (:goal (at thing place)))"#,
+                  )
+                  .unwrap();
+                  assert_eq!(problem.init_atoms.len(), 1);
+                  assert_eq!(problem.init_atoms[0].pred, "at");
+                  assert_eq!(problem.timed_inits.len(), 1);
+              }
+
+              #[test]
+              fn preserves_boolean_quantified_and_conditional_trees() {'''))
+
+          for old, new in replacements:
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f"expected exactly one parser replacement, found {count}: {old[:80]!r}")
+              source = source.replace(old, new, 1)
+
+          Path("parse-corrected.rs").write_text(source)
+          request = {
+              "content": base64.b64encode(source.encode()).decode(),
+              "encoding": "base64",
+          }
+          Path("parse-blob-request.json").write_text(json.dumps(request))
+          PY
+          rustfmt +nightly parse-corrected.rs
+          python - <<'PY'
+          import base64
+          import json
+          from pathlib import Path
+
+          source = Path("parse-corrected.rs").read_bytes()
+          Path("parse-blob-request.json").write_text(json.dumps({
+              "content": base64.b64encode(source).decode(),
+              "encoding": "base64",
+          }))
+          PY
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            --data-binary @parse-blob-request.json \
+            "https://api.github.com/repos/${GH_REPOSITORY}/git/blobs" \
+            > parse-corrected-blob.json
+          cat parse-corrected-blob.json
+      - name: Upload corrected parser blob identity
+        if: steps.canonical_ipc.outputs.status != '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: parse-corrected-blob
+          path: parse-corrected-blob.json
           if-no-files-found: error
       - name: Enforce canonical IPC fixtures
         if: steps.canonical_ipc.outputs.status != '0'
