@@ -42,11 +42,15 @@ pub mod mfw;
 pub mod parse;
 pub mod powl_bridge;
 #[cfg(feature = "mfw-planner")]
+pub mod prelude;
+#[cfg(feature = "mfw-planner")]
 pub mod production;
 pub mod production_capability;
 pub mod schedule_analysis;
 pub mod search;
 mod sexpr;
+#[cfg(feature = "mfw-planner")]
+pub mod task;
 pub use capability::{
     admit_planning_task, AdmittedPlanningTask, CapabilityProfile, DefaultCapabilityProfile,
     GroundedPlanningEpoch, PddlFeature, SemanticSupport, ALL_PDDL_FEATURES,
@@ -100,6 +104,8 @@ pub use search::{
     ExactBfsRail, ExactSearchRail, ExactStepOutcome, ExploitSearchRail, ExploitStepOutcome,
     FairRailScheduler, MfwPortfolio, PortfolioOutcome, QLensRail, RailSelection,
 };
+#[cfg(feature = "mfw-planner")]
+pub use task::{execute_cognitive_task, OwnedPddlTask, PddlTask};
 
 // Re-export canonical types from wasm4pm-compat so callers only need one import.
 pub use wasm4pm_compat::ocel::{OCELEvent, OCEL};
