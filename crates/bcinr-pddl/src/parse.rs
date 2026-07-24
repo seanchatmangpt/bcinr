@@ -110,10 +110,14 @@ pub fn domain31_from_pddl(text: &str) -> Result<Pddl31Domain, Pddl8Error> {
                 domain.functions = parse_functions(&section.list()?[1..])?;
             }
             ":action" => domain.actions.push(parse_action(section)?),
-            ":durative-action" => domain.durative_actions.push(parse_durative_action(section)?),
+            ":durative-action" => domain
+                .durative_actions
+                .push(parse_durative_action(section)?),
             ":derived" => domain.derived.push(parse_derived(section)?),
             ":constraints" => {
-                domain.constraints.extend(parse_domain_constraints(section)?);
+                domain
+                    .constraints
+                    .extend(parse_domain_constraints(section)?);
             }
             ":process" => domain.processes.push(parse_process(section)?),
             ":event" => domain.events.push(parse_event(section)?),
@@ -193,7 +197,9 @@ pub fn problem31_from_pddl(text: &str) -> Result<Pddl31Problem, Pddl8Error> {
 fn define_items<'a>(root: &'a SExpr, kind: &str) -> Result<&'a [SExpr], Pddl8Error> {
     let items = root.list()?;
     if items.first().and_then(|item| item.atom().ok()) != Some("define") {
-        return Err(Pddl8Error::ParseError("document must start with (define ...)".into()));
+        return Err(Pddl8Error::ParseError(
+            "document must start with (define ...)".into(),
+        ));
     }
     let declaration = items
         .get(1)
@@ -708,9 +714,7 @@ fn parse_numeric(expr: &SExpr) -> Result<NumericExpr, Pddl8Error> {
                         rhs: Box::new(parse_numeric(&list[2])?),
                     })
                 }
-                "-" if list.len() == 2 => {
-                    Ok(NumericExpr::Neg(Box::new(parse_numeric(&list[1])?)))
-                }
+                "-" if list.len() == 2 => Ok(NumericExpr::Neg(Box::new(parse_numeric(&list[1])?))),
                 _ => Ok(NumericExpr::FunctionTerm(
                     head.to_string(),
                     list[1..]
@@ -914,13 +918,12 @@ fn parse_init(section: &SExpr, problem: &mut Pddl31Problem) -> Result<(), Pddl8E
                     Pddl8Error::ParseError("timed initial literal has invalid time".into())
                 })?;
                 let literal = list[2].list()?;
-                let (negated, atom_expr) = if literal.first().and_then(|v| v.atom().ok())
-                    == Some("not")
-                {
-                    (true, single_arg(literal, "not")?)
-                } else {
-                    (false, &list[2])
-                };
+                let (negated, atom_expr) =
+                    if literal.first().and_then(|v| v.atom().ok()) == Some("not") {
+                        (true, single_arg(literal, "not")?)
+                    } else {
+                        (false, &list[2])
+                    };
                 problem.timed_inits.push(TimedLiteral {
                     time,
                     atom: parse_atom(atom_expr)?,
@@ -1013,9 +1016,10 @@ fn parse_metric_expr(expr: &SExpr) -> Result<MetricExpr, Pddl8Error> {
 }
 
 fn parse_domain_constraints(section: &SExpr) -> Result<Vec<PddlConstraint>, Pddl8Error> {
-    let expr = section.list()?.get(1).ok_or_else(|| {
-        Pddl8Error::ParseError("missing domain :constraints expression".into())
-    })?;
+    let expr = section
+        .list()?
+        .get(1)
+        .ok_or_else(|| Pddl8Error::ParseError("missing domain :constraints expression".into()))?;
     let constraints = parse_trajectory_many(expr)?;
     Ok(constraints
         .into_iter()
@@ -1073,9 +1077,9 @@ fn parse_trajectory(expr: &SExpr) -> Result<TrajectoryConstraint, Pddl8Error> {
                 .map(parse_trajectory)
                 .collect::<Result<Vec<_>, _>>()?,
         )),
-        "always" => Ok(TrajectoryConstraint::Always(Box::new(parse_condition(single_arg(
-            list, "always",
-        )?)?))),
+        "always" => Ok(TrajectoryConstraint::Always(Box::new(parse_condition(
+            single_arg(list, "always")?,
+        )?))),
         "sometime" => Ok(TrajectoryConstraint::Sometime(Box::new(parse_condition(
             single_arg(list, "sometime")?,
         )?))),
