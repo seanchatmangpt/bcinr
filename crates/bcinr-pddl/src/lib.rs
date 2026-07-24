@@ -60,9 +60,8 @@ pub use consequence::{
 };
 pub use dfcm_crown::{run_dfcm_crown_suite, DfcmBenchReceipt};
 pub use ground_v2::{
-    ExactClassicalCapabilityProfile, ExactClassicalError, ExactClassicalProblem,
-    ExactGroundAction, EXACT_MAX_GROUND_ACTIONS, EXACT_MAX_PLAN_DEPTH,
-    EXACT_MAX_SEARCH_STATES,
+    ExactClassicalCapabilityProfile, ExactClassicalError, ExactClassicalProblem, ExactGroundAction,
+    EXACT_MAX_GROUND_ACTIONS, EXACT_MAX_PLAN_DEPTH, EXACT_MAX_SEARCH_STATES,
 };
 pub use llm_bridge::{
     admit_candidate_domain, admit_candidate_problem, manufacture_world, AdmittedDomain,

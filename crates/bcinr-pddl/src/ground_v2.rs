@@ -50,14 +50,19 @@ pub enum ExactClassicalError {
 impl std::fmt::Display for ExactClassicalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::DurativeActionsUnsupported => write!(f, "durative actions require the temporal rail"),
+            Self::DurativeActionsUnsupported => {
+                write!(f, "durative actions require the temporal rail")
+            }
             Self::TimedInitialLiteralsUnsupported => {
                 write!(f, "timed initial literals require the temporal rail")
             }
             Self::ProcessesUnsupported => write!(f, "PDDL+ processes require the hybrid rail"),
             Self::EventsUnsupported => write!(f, "PDDL+ events require the hybrid rail"),
             Self::DerivedPredicatesUnsupported => {
-                write!(f, "derived predicates are not admitted by the exact classical rail")
+                write!(
+                    f,
+                    "derived predicates are not admitted by the exact classical rail"
+                )
             }
             Self::TrajectoryConstraintsUnsupported => {
                 write!(f, "trajectory constraints require a trace-monitoring rail")
@@ -239,12 +244,7 @@ impl ExactClassicalProblem {
             facts: self.initial_facts.clone(),
             functions: self.initial_functions.clone(),
         };
-        if eval_condition(
-            &self.goal,
-            &initial,
-            &self.objects,
-            &self.type_index,
-        ) {
+        if eval_condition(&self.goal, &initial, &self.objects, &self.type_index) {
             return Ok(Pddl8Tape { ops: Vec::new() });
         }
 
@@ -261,7 +261,8 @@ impl ExactClassicalProblem {
                 continue;
             }
             for (action_index, action) in self.actions.iter().enumerate() {
-                let Some(next) = apply_action(action, &state, &self.objects, &self.type_index)? else {
+                let Some(next) = apply_action(action, &state, &self.objects, &self.type_index)?
+                else {
                     continue;
                 };
                 let key = state_key(&next);
@@ -360,9 +361,7 @@ fn validate_condition(condition: &PddlCondition) -> Result<(), ExactClassicalErr
 fn validate_effect(effect: &PddlEffect) -> Result<(), ExactClassicalError> {
     match effect {
         PddlEffect::Timed(_, _) => Err(ExactClassicalError::TimedEffectUnsupported),
-        PddlEffect::Add(atom)
-            if atom.pred == crate::parse::CONTINUOUS_EFFECT_SENTINEL_PRED =>
-        {
+        PddlEffect::Add(atom) if atom.pred == crate::parse::CONTINUOUS_EFFECT_SENTINEL_PRED => {
             Err(ExactClassicalError::ContinuousEffectUnsupported)
         }
         PddlEffect::Add(atom) if atom.pred == crate::parse::OBJECT_FLUENT_SENTINEL_PRED => {
@@ -397,32 +396,38 @@ fn ground_action_schema(
     if candidates.iter().any(Vec::is_empty) {
         return Ok(());
     }
-    enumerate_bindings(&schema.params, &candidates, 0, &mut BTreeMap::new(), &mut |binding| {
-        let args = schema
-            .params
-            .iter()
-            .map(|(parameter, _)| binding[parameter].clone())
-            .collect::<Vec<_>>();
-        let label = if args.is_empty() {
-            schema.name.clone()
-        } else {
-            format!("{}({})", schema.name, args.join(","))
-        };
-        let condition = subst_condition(&schema.precondition, binding);
-        let effects = schema
-            .effect
-            .iter()
-            .map(|effect| subst_effect(effect, binding))
-            .collect::<Vec<_>>();
-        out.push(ExactGroundAction {
-            schema_name: schema.name.clone(),
-            label: label.clone(),
-            args,
-            legacy_action: legacy_action(&schema.name, &label, &condition, &effects),
-            condition,
-            effects,
-        });
-    });
+    enumerate_bindings(
+        &schema.params,
+        &candidates,
+        0,
+        &mut BTreeMap::new(),
+        &mut |binding| {
+            let args = schema
+                .params
+                .iter()
+                .map(|(parameter, _)| binding[parameter].clone())
+                .collect::<Vec<_>>();
+            let label = if args.is_empty() {
+                schema.name.clone()
+            } else {
+                format!("{}({})", schema.name, args.join(","))
+            };
+            let condition = subst_condition(&schema.precondition, binding);
+            let effects = schema
+                .effect
+                .iter()
+                .map(|effect| subst_effect(effect, binding))
+                .collect::<Vec<_>>();
+            out.push(ExactGroundAction {
+                schema_name: schema.name.clone(),
+                label: label.clone(),
+                args,
+                legacy_action: legacy_action(&schema.name, &label, &condition, &effects),
+                condition,
+                effects,
+            });
+        },
+    );
     Ok(())
 }
 
@@ -603,22 +608,12 @@ fn eval_condition(
             !eval_condition(left, state, objects, type_index)
                 || eval_condition(right, state, objects, type_index)
         }
-        PddlCondition::Forall { vars, body } => eval_quantified(
-            vars,
-            body,
-            state,
-            objects,
-            type_index,
-            true,
-        ),
-        PddlCondition::Exists { vars, body } => eval_quantified(
-            vars,
-            body,
-            state,
-            objects,
-            type_index,
-            false,
-        ),
+        PddlCondition::Forall { vars, body } => {
+            eval_quantified(vars, body, state, objects, type_index, true)
+        }
+        PddlCondition::Exists { vars, body } => {
+            eval_quantified(vars, body, state, objects, type_index, false)
+        }
         PddlCondition::Compare(left, operator, right) => {
             let left = eval_numeric(left, state);
             let right = eval_numeric(right, state);
@@ -783,10 +778,7 @@ fn subst_atom(atom: &Pddl8Atom, binding: &BTreeMap<String, String>) -> Pddl8Atom
     }
 }
 
-fn subst_function(
-    function: &PddlFunction,
-    binding: &BTreeMap<String, String>,
-) -> PddlFunction {
+fn subst_function(function: &PddlFunction, binding: &BTreeMap<String, String>) -> PddlFunction {
     PddlFunction {
         name: function.name.clone(),
         params: function
@@ -797,10 +789,7 @@ fn subst_function(
     }
 }
 
-fn subst_numeric(
-    expression: &NumericExpr,
-    binding: &BTreeMap<String, String>,
-) -> NumericExpr {
+fn subst_numeric(expression: &NumericExpr, binding: &BTreeMap<String, String>) -> NumericExpr {
     match expression {
         NumericExpr::Number(value) => NumericExpr::Number(*value),
         NumericExpr::FunctionTerm(name, args) => NumericExpr::FunctionTerm(
@@ -818,15 +807,10 @@ fn subst_numeric(
     }
 }
 
-fn subst_condition(
-    condition: &PddlCondition,
-    binding: &BTreeMap<String, String>,
-) -> PddlCondition {
+fn subst_condition(condition: &PddlCondition, binding: &BTreeMap<String, String>) -> PddlCondition {
     match condition {
         PddlCondition::Atom(atom) => PddlCondition::Atom(subst_atom(atom, binding)),
-        PddlCondition::Not(inner) => {
-            PddlCondition::Not(Box::new(subst_condition(inner, binding)))
-        }
+        PddlCondition::Not(inner) => PddlCondition::Not(Box::new(subst_condition(inner, binding))),
         PddlCondition::And(parts) => PddlCondition::And(
             parts
                 .iter()
@@ -851,10 +835,9 @@ fn subst_condition(
             Box::new(subst_condition(left, binding)),
             Box::new(subst_condition(right, binding)),
         ),
-        PddlCondition::Timed(specifier, inner) => PddlCondition::Timed(
-            *specifier,
-            Box::new(subst_condition(inner, binding)),
-        ),
+        PddlCondition::Timed(specifier, inner) => {
+            PddlCondition::Timed(*specifier, Box::new(subst_condition(inner, binding)))
+        }
         PddlCondition::Compare(left, operator, right) => PddlCondition::Compare(
             subst_numeric(left, binding),
             *operator,
@@ -976,10 +959,12 @@ mod tests {
             (:action consume :parameters () :precondition (>= (fuel) 2) \
               :effect (and (decrease (fuel) 2) (done))))";
         let enough = "(define (problem p) (:domain d) (:init (= (fuel) 2)) (:goal (done)))";
-        let insufficient =
-            "(define (problem p) (:domain d) (:init (= (fuel) 1)) (:goal (done)))";
+        let insufficient = "(define (problem p) (:domain d) (:init (= (fuel) 1)) (:goal (done)))";
         assert_eq!(solve(domain, enough).unwrap().ops.len(), 1);
-        assert_eq!(solve(domain, insufficient), Err(ExactClassicalError::NoPlan));
+        assert_eq!(
+            solve(domain, insufficient),
+            Err(ExactClassicalError::NoPlan)
+        );
     }
 
     #[test]
@@ -990,10 +975,8 @@ mod tests {
                :condition () :effect (at end (done))))",
         )
         .unwrap();
-        let problem = problem31_from_pddl(
-            "(define (problem p) (:domain d) (:init) (:goal (done)))",
-        )
-        .unwrap();
+        let problem =
+            problem31_from_pddl("(define (problem p) (:domain d) (:init) (:goal (done)))").unwrap();
         assert_eq!(
             ExactClassicalProblem::build(&domain, &problem, 10).unwrap_err(),
             ExactClassicalError::DurativeActionsUnsupported
