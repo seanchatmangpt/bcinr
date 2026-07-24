@@ -65,7 +65,6 @@ required-features = ["mfw-planner"]
 [[test]]
 name = "indexed_grounding"
 path = "tests/indexed_grounding.rs"
-divan = "0.1"
 
 [[bench]]
 name = "pddl_80_20"
