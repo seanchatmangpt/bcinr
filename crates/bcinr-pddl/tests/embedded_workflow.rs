@@ -67,7 +67,9 @@ fn rust_application_projects_state_plans_and_binds_typed_commands() {
         order_id: "42".to_string(),
         payment_authorized: true,
     };
-    let mut workflow = EmbeddedWorkflow::new(ORDER_DOMAIN);
+    let mut workflow = EmbeddedWorkflow::new(ORDER_DOMAIN).unwrap();
+    assert_eq!(workflow.domain_name(), "order-service");
+    assert_eq!(workflow.domain_source_root().len(), 64);
 
     let verified = workflow.plan(&state).unwrap();
     assert_eq!(
