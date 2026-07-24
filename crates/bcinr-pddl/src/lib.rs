@@ -33,6 +33,8 @@ pub mod consequence;
 pub mod dfcm_crown;
 #[cfg(feature = "mfw-planner")]
 pub mod downstream;
+#[cfg(feature = "mfw-planner")]
+pub mod embedded;
 pub mod error;
 pub mod execute;
 pub mod ground;
@@ -78,6 +80,11 @@ pub use downstream::{
     execute_cognitive_pddl, CognitiveExecutionStanding, CognitivePddlConfig, CognitivePddlError,
     CognitivePddlExecution, CognitivePddlExecutionSummary, CognitivePddlRuntime,
     ExactCognitiveBounds, PddlPowlBatch, PddlPowlExecutionSummary,
+};
+#[cfg(feature = "mfw-planner")]
+pub use embedded::{
+    ActionInvocation, ActionLabelError, EmbeddedWorkflow, EmbeddedWorkflowError,
+    TypedWorkflowBatch, TypedWorkflowPlan, VerifiedWorkflowPlan, WorkflowBatch, WorkflowProblem,
 };
 pub use ground_v2::{
     ExactClassicalCapabilityProfile, ExactClassicalError, ExactClassicalProblem, ExactGroundAction,
