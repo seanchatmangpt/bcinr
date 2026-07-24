@@ -69,7 +69,11 @@ pub use consequence::{
 };
 pub use dfcm_crown::{run_dfcm_crown_suite, DfcmBenchReceipt};
 #[cfg(feature = "mfw-planner")]
-pub use downstream::{PddlPowlBatch, PddlPowlExecutionSummary};
+pub use downstream::{
+    execute_cognitive_pddl, CognitiveExecutionStanding, CognitivePddlConfig, CognitivePddlError,
+    CognitivePddlExecution, CognitivePddlRuntime, ExactCognitiveBounds, PddlPowlBatch,
+    PddlPowlExecutionSummary,
+};
 pub use ground_v2::{
     ExactClassicalCapabilityProfile, ExactClassicalError, ExactClassicalProblem, ExactGroundAction,
     EXACT_MAX_GROUND_ACTIONS, EXACT_MAX_PLAN_DEPTH, EXACT_MAX_SEARCH_STATES,
