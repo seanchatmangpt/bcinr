@@ -23,11 +23,11 @@ let verified = workflow.plan_pddl(problem_pddl)?;
 let typed: TypedWorkflowPlan<ApplicationCommand> =
     verified.bind::<ApplicationCommand>()?;
 
-println!("standing: {:?}", typed.standing);
-println!("receipt: {}", typed.execution_root);
+println!("standing: {:?}", typed.standing());
+println!("receipt: {}", typed.execution_root());
 
 for batch in typed.batches() {
-    application_broker.admit(batch, &typed.execution_root)?;
+    application_broker.admit(batch, typed.execution_root())?;
 }
 ```
 
