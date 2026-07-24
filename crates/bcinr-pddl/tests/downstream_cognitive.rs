@@ -20,7 +20,10 @@ fn external_consumer_gets_witnessed_parallel_strips_execution() {
         execution.standing(),
         CognitiveExecutionStanding::WitnessedConcurrentStrips
     );
-    assert!(matches!(execution, CognitivePddlExecution::Concurrent(_)));
+    assert!(matches!(
+        &execution,
+        CognitivePddlExecution::Concurrent(_)
+    ));
     assert!(execution
         .batches()
         .unwrap()
@@ -47,7 +50,7 @@ fn external_consumer_gets_exact_sequential_adl_execution() {
         CognitiveExecutionStanding::ExactSequentialClassical
     );
     assert!(matches!(
-        execution,
+        &execution,
         CognitivePddlExecution::ExactSequential { .. }
     ));
     assert!(execution
