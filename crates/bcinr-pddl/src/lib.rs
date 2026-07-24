@@ -46,6 +46,8 @@ pub mod powl_bridge;
 #[cfg(feature = "mfw-planner")]
 pub mod prelude;
 #[cfg(feature = "mfw-planner")]
+pub mod problem_builder;
+#[cfg(feature = "mfw-planner")]
 pub mod production;
 pub mod production_capability;
 pub mod schedule_analysis;
@@ -97,6 +99,11 @@ pub use llm_bridge::{
 pub use mfw::{
     q_lens, FrontierBoxes, FrontierMeasure, MassVector, PositiveDistribution, PositiveMass,
     QLensError, QValue, WeightedDistribution,
+};
+#[cfg(feature = "mfw-planner")]
+pub use problem_builder::{
+    PddlAtomBuilder, PddlBuildError, PddlObjectBuilder, PddlProblemDocument,
+    StripsProblemBuilder,
 };
 #[cfg(feature = "mfw-planner")]
 pub use production::{
