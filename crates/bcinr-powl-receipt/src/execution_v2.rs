@@ -6,9 +6,7 @@
 //! concurrency guards and compares every committed field.
 
 use bcinr_powl::scheduler::StableMaximalSelector;
-use bcinr_powl::scheduler_v2::{
-    scheduler_tick_v2, PowlV2RunState, PowlV2TickOutcome,
-};
+use bcinr_powl::scheduler_v2::{scheduler_tick_v2, PowlV2RunState, PowlV2TickOutcome};
 use bcinr_powl::tape::v2::{ConcurrencyGuardTable, PowlTape};
 use serde::{Deserialize, Serialize};
 
@@ -42,7 +40,10 @@ impl std::fmt::Display for PowlV2ReceiptError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Deadlock { remaining_mask } => {
-                write!(f, "POWL v2 execution deadlocked with mask {remaining_mask:#x}")
+                write!(
+                    f,
+                    "POWL v2 execution deadlocked with mask {remaining_mask:#x}"
+                )
             }
             Self::TickBoundExceeded {
                 limit,
@@ -150,12 +151,7 @@ pub fn digest_tape(tape: &PowlTape) -> String {
         hasher.update(&op.pred_mask.to_le_bytes());
         hasher.update(&op.succ_mask.to_le_bytes());
         hasher.update(&op.ctrl.to_le_bytes());
-        hasher.update(&[
-            op.op_kind as u8,
-            op.choice_group,
-            op.depth,
-            op.fan_out,
-        ]);
+        hasher.update(&[op.op_kind as u8, op.choice_group, op.depth, op.fan_out]);
     }
     hasher.update(&tape.label_slab.len.to_le_bytes());
     hasher.update(&tape.label_slab.data[..tape.label_slab.len as usize]);
