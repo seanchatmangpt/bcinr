@@ -14,19 +14,22 @@
 
 use std::collections::BTreeSet;
 
-use bcinr_mfw_ir::{EpochBounds, PowlNodeId};
+use bcinr_mfw_ir::{EpochBounds, PlannerFailure, PowlNodeId, UnsupportedFeature};
 use bcinr_powl::compiler::v2::{compile_powl_v2, CompileErrorV2, CompiledPowlV2};
 use bcinr_powl_receipt::execution_v2::{
     execute_and_seal_v2, verify_execution_v2, PowlV2ExecutionReceipt, PowlV2ReceiptError,
 };
 use wasm4pm_compat::pddl::{Pddl8GroundAction, Pddl8GroundAtom};
 
+use crate::capability::{CapabilityProfile, SemanticSupport};
 use crate::causal_v2::PddlCausalAnalyzerV2;
 use crate::concurrency::PddlConcurrencyAnalyzer;
 use crate::consequence::GoalReachabilityHorizon;
 use crate::mfw::planner::{MfwPlanError, MfwPlanner, PlannedWorkflow};
 use crate::mfw::{QLensError, QValue};
+use crate::parse::{domain31_from_pddl, problem31_from_pddl};
 use crate::production_capability::ProductionCapabilityProfile;
+use crate::semantic_features::content_features;
 
 /// Production PDDL → causal/concurrency → POWL composition rail.
 pub type ProductionMfwPlanner = MfwPlanner<
@@ -283,7 +286,7 @@ impl PddlPowlRuntime {
         let planner = ProductionMfwPlanner::new(
             GoalReachabilityHorizon,
             bcinr_powl::projection::PowlProjector,
-            config.bounds.clone(),
+            config.bounds,
             config.exploit_q,
             config.max_gap,
             config.max_search_ticks,
@@ -297,6 +300,7 @@ impl PddlPowlRuntime {
         domain_pddl: &str,
         problem_pddl: &str,
     ) -> Result<PddlPowlPlan, PddlPowlError> {
+        admit_concurrent_content(domain_pddl, problem_pddl)?;
         let workflow =
             self.planner
                 .plan(domain_pddl, problem_pddl, &ProductionCapabilityProfile)?;
@@ -331,6 +335,43 @@ pub fn execute_pddl_to_powl(
     problem_pddl: &str,
 ) -> Result<PddlPowlExecution, PddlPowlError> {
     PddlPowlRuntime::default().execute(domain_pddl, problem_pddl)
+}
+
+fn admit_concurrent_content(domain_pddl: &str, problem_pddl: &str) -> Result<(), PddlPowlError> {
+    let domain = domain31_from_pddl(domain_pddl)
+        .map_err(|error| PddlPowlError::Plan(MfwPlanError::Parse(error)))?;
+    let problem = problem31_from_pddl(problem_pddl)
+        .map_err(|error| PddlPowlError::Plan(MfwPlanError::Parse(error)))?;
+
+    if !domain.processes.is_empty() || !domain.events.is_empty() {
+        return Err(unsupported_content(
+            "PDDL+",
+            "PDDL+ process/event blocks have no admitted concurrent execution rail",
+        ));
+    }
+
+    for feature in content_features(&domain, &problem) {
+        if ProductionCapabilityProfile.support(feature) == SemanticSupport::Unsupported {
+            return Err(unsupported_content(
+                &format!("{feature:?}"),
+                &format!(
+                    "parsed task content uses PddlFeature::{feature:?}, which the concurrent \
+                     ProductionCapabilityProfile marks Unsupported regardless of omitted \
+                     :requirements declarations"
+                ),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn unsupported_content(feature_name: &str, context: &str) -> PddlPowlError {
+    PddlPowlError::Plan(MfwPlanError::Admission(PlannerFailure::Unsupported(
+        UnsupportedFeature {
+            feature_name: feature_name.to_string(),
+            context: context.to_string(),
+        },
+    )))
 }
 
 fn replay_pddl_trace(
@@ -589,6 +630,20 @@ mod tests {
         assert!(matches!(
             execution.verify(),
             Err(PddlPowlError::StateReceiptMismatch)
+        ));
+    }
+
+    #[test]
+    fn undeclared_rich_semantics_are_refused_before_concurrent_grounding() {
+        let error = execute_pddl_to_powl(
+            "(define (domain d) (:requirements :strips) (:predicates (locked) (done)) \
+             (:action finish :parameters () :precondition (not (locked)) :effect (done)))",
+            "(define (problem p) (:domain d) (:init) (:goal (done)))",
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            PddlPowlError::Plan(MfwPlanError::Admission(PlannerFailure::Unsupported(_)))
         ));
     }
 }
