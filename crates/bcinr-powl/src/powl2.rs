@@ -66,10 +66,9 @@ impl std::fmt::Display for Powl2Error {
             Self::InvalidEdge { from, to, len } => {
                 write!(f, "POWL 2.0 edge {from}->{to} is outside 0..{len}")
             }
-            Self::InvalidChoiceEndpoint { endpoint, len } => write!(
-                f,
-                "POWL 2.0 choice endpoint {endpoint} is outside 0..{len}"
-            ),
+            Self::InvalidChoiceEndpoint { endpoint, len } => {
+                write!(f, "POWL 2.0 choice endpoint {endpoint} is outside 0..{len}")
+            }
             Self::PartialOrderCycle => write!(f, "POWL 2.0 partial order contains a cycle"),
             Self::ChoiceNodeOffStartEndPath { node } => write!(
                 f,
@@ -118,12 +117,7 @@ impl Powl2ChoicePolicy for LowestIndexPolicy {
         successors.iter().copied().min().unwrap_or(usize::MAX)
     }
 
-    fn select_redo(
-        &mut self,
-        _loop_depth: usize,
-        _completed_redos: u8,
-        _max_redos: u8,
-    ) -> bool {
+    fn select_redo(&mut self, _loop_depth: usize, _completed_redos: u8, _max_redos: u8) -> bool {
         false
     }
 }
@@ -263,9 +257,7 @@ impl<P: Powl2ChoicePolicy> Compiler<'_, P> {
                 let mut segment = self.compile(body, depth + 1)?;
                 let mut completed_redos = 0u8;
                 while completed_redos < *max_redos
-                    && self
-                        .policy
-                        .select_redo(depth, completed_redos, *max_redos)
+                    && self.policy.select_redo(depth, completed_redos, *max_redos)
                 {
                     let redo_segment = self.compile(redo, depth + 1)?;
                     wire(&mut self.tape, segment.exits, redo_segment.entries);
@@ -343,9 +335,7 @@ impl<P: Powl2ChoicePolicy> Compiler<'_, P> {
                 .collect::<Vec<_>>();
             successors.sort_unstable();
             successors.dedup();
-            let selected = self
-                .policy
-                .select_successor(depth, current, &successors);
+            let selected = self.policy.select_successor(depth, current, &successors);
             if !successors.contains(&selected) {
                 return Err(Powl2Error::ChoicePolicyReturnedInvalidSuccessor {
                     from: current,
@@ -613,12 +603,7 @@ mod tests {
             successors[0]
         }
 
-        fn select_redo(
-            &mut self,
-            _loop_depth: usize,
-            completed_redos: u8,
-            _max_redos: u8,
-        ) -> bool {
+        fn select_redo(&mut self, _loop_depth: usize, completed_redos: u8, _max_redos: u8) -> bool {
             completed_redos == 0
         }
     }
