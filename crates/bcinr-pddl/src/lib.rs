@@ -41,13 +41,19 @@ pub mod ground;
 pub mod ground_v2;
 pub mod llm_bridge;
 pub mod mfw;
+// The parser deliberately mirrors the canonical external predicate declaration
+// tuple so admission does not introduce a second shadow AST.
+#[allow(clippy::type_complexity)]
 pub mod parse;
 pub mod powl_bridge;
 #[cfg(feature = "mfw-planner")]
 pub mod prelude;
 #[cfg(feature = "mfw-planner")]
 pub mod problem_builder;
+// These explicit lifetimes document that returned ground-action references are
+// borrowed from one admitted workflow epoch and cannot outlive its receipt.
 #[cfg(feature = "mfw-planner")]
+#[allow(clippy::needless_lifetimes)]
 pub mod production;
 pub mod production_capability;
 pub mod schedule_analysis;
