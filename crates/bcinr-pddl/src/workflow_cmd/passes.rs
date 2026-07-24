@@ -1,15 +1,13 @@
-//! Lower-level compiler-pass composition for custom CMD pipelines.
-//!
-//! `WorkflowApplication` intentionally calls its fixed production stages directly
-//! instead of building the facade from a `PlanPass::then` chain. The facade owns a
-//! mutable `EmbeddedWorkflow`, preserves stage-specific refusal types, and exposes
-//! one stable application path; adapting those stages into generic pass inputs now
-//! would duplicate root manufacture or erase diagnostics. `PlanPass`, `Then`, and
-//! `SemanticRail` remain the SDK surface for consumers that construct alternative
-//! domain-neutral pipelines. A future facade migration must replace the direct path,
-//! not run both paths, and must preserve root continuity plus refusal identity.
-
-/// Compiler-style plan/process transformation.
+/// Compiler-style plan/process transformation for custom CMD pipelines.
+///
+/// `WorkflowApplication` intentionally calls its fixed production stages directly
+/// instead of building the facade from a `PlanPass::then` chain. The facade owns a
+/// mutable `EmbeddedWorkflow`, preserves stage-specific refusal types, and exposes
+/// one stable application path; adapting those stages into generic pass inputs now
+/// would duplicate root manufacture or erase diagnostics. `PlanPass`, `Then`, and
+/// `SemanticRail` remain the SDK surface for consumers that construct alternative
+/// domain-neutral pipelines. A future facade migration must replace the direct path,
+/// not run both paths, and must preserve root continuity plus refusal identity.
 pub trait PlanPass<I> {
     type Output;
     type Witness;
