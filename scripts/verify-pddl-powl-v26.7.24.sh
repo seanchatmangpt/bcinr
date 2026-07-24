@@ -23,15 +23,18 @@ cargo test -p bcinr-pddl --features mfw-planner --lib production_capability
 printf '\n==> PDDL to POWL execution rails\n'
 cargo test -p bcinr-pddl --features mfw-planner --lib cognitive
 cargo test -p bcinr-pddl --features mfw-planner --lib downstream
+cargo test -p bcinr-pddl --features mfw-planner --lib embedded
 cargo test -p bcinr-pddl --features mfw-planner --lib production
 cargo test -p bcinr-pddl --features mfw-planner --test undeclared_semantics
 
 printf '\n==> External downstream API\n'
 cargo test -p bcinr-pddl --features mfw-planner --test downstream_pddl_powl
 cargo test -p bcinr-pddl --features mfw-planner --test downstream_cognitive
+cargo test -p bcinr-pddl --features mfw-planner --test embedded_workflow
 
 printf '\n==> Compile every downstream surface\n'
 cargo check -p bcinr-pddl --features mfw-planner --all-targets
 cargo run -p bcinr-pddl --features mfw-planner --example pddl_to_powl
+cargo run -p bcinr-pddl --features mfw-planner --example embedded_workflow
 
 printf '\nPDDL_TO_POWL_V26_7_24=ALIVE\n'
