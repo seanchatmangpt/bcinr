@@ -7,9 +7,11 @@ cd "$repo_root"
 printf '\n==> Source formatting\n'
 cargo fmt --all -- --check
 
-printf '\n==> POWL v2 compiler and scheduler\n'
+printf '\n==> POWL v2 compiler, process toolkit, and scheduler\n'
 cargo test -p bcinr-powl --lib powl2
+cargo test -p bcinr-powl --lib process_toolkit
 cargo test -p bcinr-powl --lib scheduler_v2
+cargo test -p bcinr-powl --test process_toolkit_chicago
 
 printf '\n==> POWL v2 receipt and replay\n'
 cargo test -p bcinr-powl-receipt --lib execution_v2
