@@ -299,7 +299,7 @@ fn eliminate_silent_inner(model: &Powl2Model) -> Result<Powl2Model, ProcessRewri
             let mut retained = Vec::new();
             for child in children {
                 let rewritten = eliminate_silent_inner(child)?;
-                if !matches!(rewritten, Powl2Model::Silent) {
+                if !matches!(&rewritten, Powl2Model::Silent) {
                     retained.push(rewritten);
                 }
             }
@@ -354,7 +354,7 @@ fn project_partial_order_without_silent(
     let mut remap = vec![None; node_count];
     let mut retained = Vec::with_capacity(node_count);
     for (old_index, child) in children.into_iter().enumerate() {
-        if matches!(child, Powl2Model::Silent) {
+        if matches!(&child, Powl2Model::Silent) {
             continue;
         }
         remap[old_index] = Some(retained.len());
@@ -666,7 +666,7 @@ mod tests {
         let Powl2Model::PartialOrder { edges, .. } = &children[0] else {
             panic!("nested partial order should remain explicit");
         };
-        assert_eq!(edges, &vec![(0, 1), (1, 2)]);
+        assert_eq!(edges.as_slice(), &[(0, 1), (1, 2)]);
         assert_eq!(witness.target, ProcessNodeRef::root());
         assert_ne!(witness.before, witness.after);
         validate_powl2(&rewritten).unwrap();
