@@ -2,77 +2,83 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
 
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0
 
 jobs:
-  # 1. Lint & Format
   style:
     name: Format & Clippy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - name: Check formatting
         run: cargo fmt --all -- --check
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Clippy all production surfaces
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-  # 2. Security Audit
-  security:
-    name: Security & Audit
+  canonical:
+    name: PDDL & POWL Canonical Conformance
+    needs: [style]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
-      - name: Install cargo-audit & cargo-deny
-        run: cargo install cargo-audit cargo-deny --locked || true
-      - name: Security audit
-        run: cargo audit
-      - name: License & Dependency Check
-        run: cargo deny check
+      - name: Canonical IPC PDDL fixtures
+        run: cargo test -p bcinr-pddl --all-features --test canonical_ipc
+      - name: POWL 2.0 model, compiler, and scheduler
+        run: cargo test -p bcinr-powl --all-features powl2
+      - name: Planner-output POWL v2 execution bridge
+        run: cargo test -p bcinr-powl --all-features scheduler_v2
+      - name: Production cognitive composition rail
+        run: cargo test -p bcinr-pddl --all-features production
 
-  # 3. Test Matrix
   test:
-    name: Test (${{ matrix.os }} / ${{ matrix.rust }})
+    name: Test (${{ matrix.os }} / nightly)
     needs: [style]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        rust: [stable, beta]
-        include:
-          - os: ubuntu-latest
-            rust: nightly
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.rust }}
+      - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
-      - name: Install cargo-make
-        run: cargo install cargo-make || true
-      - name: Run CI Task
-        run: cargo make ci
+      - name: Run workspace tests
+        run: cargo test --workspace --all-features --all-targets --no-fail-fast
         shell: bash
 
-  # 4. Documentation
+  security:
+    name: Security & Dependency Policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install security tools
+        run: cargo install cargo-audit cargo-deny --locked
+      - name: Security audit
+        run: cargo audit
+      - name: License and source policy
+        run: cargo deny check
+
   doc:
     name: Documentation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
       - name: Build docs
         run: cargo doc --workspace --no-deps --all-features
