@@ -72,7 +72,10 @@ pub use mfw::{
     QLensError, QValue, WeightedDistribution,
 };
 #[cfg(feature = "mfw-planner")]
-pub use production::ProductionMfwPlanner;
+pub use production::{
+    execute_pddl_to_powl, PddlPowlConfig, PddlPowlError, PddlPowlExecution, PddlPowlPlan,
+    PddlPowlRuntime, PddlPowlStateReceipt, ProductionMfwPlanner,
+};
 pub use production_capability::ProductionCapabilityProfile;
 pub use schedule_analysis::{
     analyze_schedule, analyze_schedule_instrumented, AnalysisSubstageNs, CapacityDelta,
