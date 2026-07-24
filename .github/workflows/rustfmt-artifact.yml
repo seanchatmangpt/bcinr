@@ -1,31 +1,34 @@
-name: Rustfmt Artifact
+name: Rustfmt Manufacture
 
 on:
   push:
     branches:
       - agent/v26.7.24-production-pddl-powl-v2
-  pull_request:
-    branches:
-      - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   rustfmt:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: agent/v26.7.24-production-pddl-powl-v2
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt
-      - name: Manufacture rustfmt patch
+      - name: Manufacture canonical formatting
         run: |
+          set -euo pipefail
           cargo fmt --all
-          git diff --binary > rustfmt.patch
-          test -s rustfmt.patch || printf 'NO_CHANGES\n' > rustfmt.patch
-      - uses: actions/upload-artifact@v4
-        with:
-          name: rustfmt-patch
-          path: rustfmt.patch
-          if-no-files-found: error
+          if git diff --quiet; then
+            echo 'rustfmt: no changes'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add --update
+          git commit -m 'style: apply rustfmt'
+          git push origin HEAD:agent/v26.7.24-production-pddl-powl-v2
