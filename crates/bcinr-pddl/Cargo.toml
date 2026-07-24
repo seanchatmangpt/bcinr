@@ -58,6 +58,10 @@ required-features = ["dhat-heap"]
 name = "pddl_to_powl"
 required-features = ["mfw-planner"]
 
+[[example]]
+name = "embedded_workflow"
+required-features = ["mfw-planner"]
+
 [[test]]
 name = "indexed_grounding"
 path = "tests/indexed_grounding.rs"
