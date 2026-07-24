@@ -24,6 +24,7 @@ pub mod dispatcher;
 pub mod enterprise;
 pub mod model;
 pub mod powl2;
+pub mod process_rewrite;
 pub mod process_toolkit;
 pub mod projection;
 pub mod receipt_worker;
