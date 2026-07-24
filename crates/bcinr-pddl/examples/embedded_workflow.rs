@@ -21,9 +21,8 @@ struct Order {
 
 impl WorkflowProblem for Order {
     fn to_pddl_problem(&self) -> Cow<'_, str> {
-        let mut problem =
-            StripsProblemBuilder::new(format!("order-{}", self.id), "fulfillment")
-                .expect("application identifiers must be valid PDDL symbols");
+        let mut problem = StripsProblemBuilder::new(format!("order-{}", self.id), "fulfillment")
+            .expect("application identifiers must be valid PDDL symbols");
         if self.paid {
             problem
                 .add_nullary_fact("paid")
@@ -71,7 +70,9 @@ fn main() {
     // Application state is projected into a canonical problem, planned,
     // executed through POWL, and receipt-verified before any command reaches
     // application code.
-    let verified = fulfillment.plan(&order).expect("workflow should be admitted");
+    let verified = fulfillment
+        .plan(&order)
+        .expect("workflow should be admitted");
     let commands = verified
         .bind::<Command>()
         .expect("every planner action must have a Rust binding");
