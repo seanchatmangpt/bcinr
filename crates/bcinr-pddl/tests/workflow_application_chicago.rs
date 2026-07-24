@@ -157,6 +157,20 @@ chicago_tdd_tools::test!(
                 SearchPolicyRoot::hash(b"deterministic-first-valid:v1"),
             )
             .expect("application should compile verified native commands");
+        assert_eq!(prepared.artifact_ref().root(), prepared.artifact_root());
+        assert_eq!(
+            prepared.compilation_witness().request_root,
+            prepared.envelope().request().request_root()
+        );
+        assert_eq!(
+            prepared.compilation_witness().execution_root,
+            prepared.envelope().execution_root()
+        );
+        assert_eq!(
+            prepared.compilation_witness().artifact_root,
+            prepared.artifact_root()
+        );
+
         let authorized = prepared
             .authorize_and_propose(
                 &PermitTenant,
@@ -166,6 +180,19 @@ chicago_tdd_tools::test!(
             .expect("policy should admit the compiled commands");
         assert_eq!(authorized.evidence(), &"tenant-admitted");
         assert_eq!(authorized.proposal().commands().len(), 2);
+        assert_eq!(authorized.artifact_ref().root(), authorized.artifact_root());
+        assert_eq!(
+            authorized.authorization_witness().prepared_root,
+            prepared.artifact_root()
+        );
+        assert_eq!(
+            authorized.authorization_witness().dispatch_root,
+            authorized.proposal().root()
+        );
+        assert_eq!(
+            authorized.authorization_witness().artifact_root,
+            authorized.artifact_root()
+        );
 
         let task_batches = TaskGroupAdapter
             .project(authorized.proposal())
