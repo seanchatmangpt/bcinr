@@ -8,15 +8,13 @@
 
 use std::borrow::Cow;
 
-use serde::{Deserialize, Serialize};
-
 use crate::embedded::WorkflowProblem;
 
 /// A validated positive PDDL atom.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PddlAtomBuilder {
-    pub predicate: String,
-    pub arguments: Vec<String>,
+    predicate: String,
+    arguments: Vec<String>,
 }
 
 impl PddlAtomBuilder {
@@ -47,6 +45,14 @@ impl PddlAtomBuilder {
         Self::new(predicate, std::iter::empty::<String>())
     }
 
+    pub fn predicate(&self) -> &str {
+        &self.predicate
+    }
+
+    pub fn arguments(&self) -> &[String] {
+        &self.arguments
+    }
+
     pub fn render(&self) -> String {
         if self.arguments.is_empty() {
             format!("({})", self.predicate)
@@ -57,10 +63,10 @@ impl PddlAtomBuilder {
 }
 
 /// One validated object declaration.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PddlObjectBuilder {
-    pub name: String,
-    pub type_name: Option<String>,
+    name: String,
+    type_name: Option<String>,
 }
 
 impl PddlObjectBuilder {
@@ -87,6 +93,14 @@ impl PddlObjectBuilder {
         })
     }
 
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn type_name(&self) -> Option<&str> {
+        self.type_name.as_deref()
+    }
+
     fn render(&self) -> String {
         match &self.type_name {
             Some(type_name) => format!("{} - {}", self.name, type_name),
@@ -96,7 +110,10 @@ impl PddlObjectBuilder {
 }
 
 /// Validated, deterministic PDDL problem document.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// The inner document is private so values with this type can only be produced
+/// by the validating builder in this module.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PddlProblemDocument {
     pddl: String,
 }
