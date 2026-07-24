@@ -2,7 +2,7 @@
 
 use bcinr_powl::process_rewrite::{
     apply_process_patch, find_activities, map_activity_labels, prepare_process_patch,
-    ProcessRewriteError,
+    ProcessRewriteError, ProcessRewriteLaw,
 };
 use bcinr_powl::process_toolkit::{activity, process_digest, sequence, ProcessNodeRef};
 
@@ -18,6 +18,7 @@ chicago_tdd_tools::test!(optimistic_patch_replaces_only_the_observed_target, {
         apply_process_patch(&process, &patch).expect("unchanged target should accept patch");
 
     assert_eq!(find_activities(&rewritten, "dispatch-v2").unwrap().len(), 1);
+    assert_eq!(witness.law, ProcessRewriteLaw::ExactNodeReplacement);
     assert_eq!(witness.before, process_digest(&process));
     assert_eq!(witness.after, process_digest(&rewritten));
     assert_ne!(witness.before, witness.after);
@@ -50,5 +51,6 @@ chicago_tdd_tools::test!(activity_mapping_changes_vocabulary_not_geometry, {
         find_activities(&mapped, "command::dispatch").unwrap().len(),
         1
     );
+    assert_eq!(witness.law, ProcessRewriteLaw::ActivityRelabel);
     assert_ne!(witness.before, witness.after);
 });
