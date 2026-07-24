@@ -1,3 +1,25 @@
+/// Application state capable of manufacturing a planning problem for an exact goal.
+pub trait GoalDirectedWorkflowProblem<G> {
+    fn to_pddl_problem_for_goal<'a>(
+        &'a self,
+        goal: &'a G,
+    ) -> std::borrow::Cow<'a, str>;
+}
+
+struct GoalDirectedProblem<'a, O, G> {
+    observation: &'a O,
+    goal: &'a G,
+}
+
+impl<O, G> WorkflowProblem for GoalDirectedProblem<'_, O, G>
+where
+    O: GoalDirectedWorkflowProblem<G>,
+{
+    fn to_pddl_problem(&self) -> std::borrow::Cow<'_, str> {
+        self.observation.to_pddl_problem_for_goal(self.goal)
+    }
+}
+
 /// Compiled application work: verified process metadata plus native Rust commands.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PreparedWorkflow<C> {
@@ -110,7 +132,12 @@ impl<B: ActionBinding> WorkflowApplication<B> {
         (self.workflow, self.bindings)
     }
 
-    /// Compile current application state into verified native commands.
+    /// Compile from an explicitly supplied problem document.
+    ///
+    /// This lower-level path is useful for existing PDDL integrations. The caller
+    /// is responsible for ensuring the supplied problem corresponds to the
+    /// receipted observation and goal. New applications should prefer
+    /// [`Self::compile_goal_directed`].
     pub fn compile<P, O, G>(
         &mut self,
         problem: &P,
@@ -126,12 +153,46 @@ impl<B: ActionBinding> WorkflowApplication<B> {
             .workflow
             .plan(problem)
             .map_err(WorkflowApplicationError::Planning)?;
+        self.finish_compilation(verified, observation.root(), goal.root(), bounds, search_policy_root)
+    }
+
+    /// Compile a planning problem manufactured from the exact observation value
+    /// and goal value whose roots enter the plan envelope.
+    pub fn compile_goal_directed<O, G>(
+        &mut self,
+        observation: &ObservationSnapshot<O>,
+        goal: &GoalEnvelope<G>,
+        bounds: PlanningBounds,
+        search_policy_root: SearchPolicyRoot,
+    ) -> Result<PreparedWorkflow<B::Command>, WorkflowApplicationError<B::Error>>
+    where
+        O: GoalDirectedWorkflowProblem<G>,
+    {
+        let problem = GoalDirectedProblem {
+            observation: observation.value(),
+            goal: goal.goal(),
+        };
+        let verified = self
+            .workflow
+            .plan(&problem)
+            .map_err(WorkflowApplicationError::Planning)?;
+        self.finish_compilation(verified, observation.root(), goal.root(), bounds, search_policy_root)
+    }
+
+    fn finish_compilation(
+        &self,
+        verified: VerifiedWorkflowPlan,
+        observation_root: ObservationRoot,
+        goal_root: GoalRoot,
+        bounds: PlanningBounds,
+        search_policy_root: SearchPolicyRoot,
+    ) -> Result<PreparedWorkflow<B::Command>, WorkflowApplicationError<B::Error>> {
         let envelope = self
             .workflow
             .manufacture_plan_envelope(
                 &verified,
-                observation.root(),
-                goal.root(),
+                observation_root,
+                goal_root,
                 bounds,
                 search_policy_root,
             )
