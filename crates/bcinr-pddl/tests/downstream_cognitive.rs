@@ -1,8 +1,6 @@
 #![cfg(feature = "mfw-planner")]
 
-use bcinr_pddl::{
-    execute_cognitive_pddl, CognitiveExecutionStanding, CognitivePddlExecution,
-};
+use bcinr_pddl::{execute_cognitive_pddl, CognitiveExecutionStanding, CognitivePddlExecution};
 
 #[test]
 fn external_consumer_gets_witnessed_parallel_strips_execution() {
@@ -20,10 +18,7 @@ fn external_consumer_gets_witnessed_parallel_strips_execution() {
         execution.standing(),
         CognitiveExecutionStanding::WitnessedConcurrentStrips
     );
-    assert!(matches!(
-        &execution,
-        CognitivePddlExecution::Concurrent(_)
-    ));
+    assert!(matches!(&execution, CognitivePddlExecution::Concurrent(_)));
     assert!(execution
         .batches()
         .unwrap()
