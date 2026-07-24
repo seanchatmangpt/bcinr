@@ -576,6 +576,35 @@ fn parse_atom(expr: &SExpr) -> Result<Pddl8Atom, Pddl8Error> {
     Ok(Pddl8Atom { pred, args })
 }
 
+fn is_temporal_condition(list: &[SExpr]) -> bool {
+    if list.len() != 3 || !matches!(&list[2], SExpr::List(_)) {
+        return false;
+    }
+    matches!(
+        (list[0].atom().ok(), list[1].atom().ok()),
+        (Some("at"), Some("start" | "end")) | (Some("over"), Some("all"))
+    )
+}
+
+fn is_temporal_effect(list: &[SExpr]) -> bool {
+    list.len() == 3
+        && matches!(&list[2], SExpr::List(_))
+        && matches!(
+            (list[0].atom().ok(), list[1].atom().ok()),
+            (Some("at"), Some("start" | "end"))
+        )
+}
+
+fn is_timed_initial_literal(list: &[SExpr]) -> bool {
+    list.len() == 3
+        && matches!(&list[2], SExpr::List(_))
+        && list[1]
+            .atom()
+            .ok()
+            .and_then(|value| value.parse::<f64>().ok())
+            .is_some()
+}
+
 fn parse_condition(expr: &SExpr) -> Result<PddlCondition, Pddl8Error> {
     let list = expr.list()?;
     if list.is_empty() {
@@ -621,7 +650,7 @@ fn parse_condition(expr: &SExpr) -> Result<PddlCondition, Pddl8Error> {
                 Ok(PddlCondition::Exists { vars, body })
             }
         }
-        "at" => {
+        "at" if is_temporal_condition(list) => {
             if list.len() != 3 {
                 return Err(Pddl8Error::ParseError(
                     "timed condition requires (at start|end <condition>)".into(),
@@ -641,7 +670,7 @@ fn parse_condition(expr: &SExpr) -> Result<PddlCondition, Pddl8Error> {
                 Box::new(parse_condition(&list[2])?),
             ))
         }
-        "over" => {
+        "over" if is_temporal_condition(list) => {
             if list.len() != 3 || list[1].atom()? != "all" {
                 return Err(Pddl8Error::ParseError(
                     "timed invariant must be (over all <condition>)".into(),
@@ -812,7 +841,7 @@ fn parse_effect(expr: &SExpr) -> Result<PddlEffect, Pddl8Error> {
                 effects: parse_effects(&list[2])?,
             })
         }
-        "at" => {
+        "at" if is_temporal_effect(list) => {
             if list.len() != 3 {
                 return Err(Pddl8Error::ParseError(
                     "timed effect requires (at start|end <effect>)".into(),
@@ -908,7 +937,7 @@ fn parse_init(section: &SExpr, problem: &mut Pddl31Problem) -> Result<(), Pddl8E
                 })?;
                 problem.init_fn_values.push((function, value));
             }
-            "at" => {
+            "at" if is_timed_initial_literal(list) => {
                 if list.len() != 3 {
                     return Err(Pddl8Error::ParseError(
                         "timed initial literal requires time and literal".into(),
@@ -1252,6 +1281,39 @@ mod tests {
         .unwrap();
         assert_eq!(domain.name, "d");
         assert_eq!(domain.actions[0].name, "a");
+    }
+
+    #[test]
+    fn distinguishes_at_predicates_from_temporal_wrappers() {
+        let domain = domain31_from_pddl(
+            r#"(define (domain temporal-at)
+                (:requirements :strips :durative-actions)
+                (:predicates (at ?x ?l) (ready ?x))
+                (:durative-action hold
+                    :parameters (?x ?l)
+                    :duration (= ?duration 1)
+                    :condition (and (at start (at ?x ?l)) (over all (ready ?x)))
+                    :effect (at end (ready ?x))))"#,
+        )
+        .unwrap();
+        assert_eq!(domain.durative_actions.len(), 1);
+        assert!(matches!(
+            domain.durative_actions[0].conditions[0],
+            PddlCondition::Timed(TimeSpecifier::AtStart, _)
+        ));
+
+        let problem = problem31_from_pddl(
+            r#"(define (problem temporal-at-p)
+                (:domain temporal-at)
+                (:objects thing place)
+                (:init (at thing place) (at 2 (ready thing)))
+                (:goal (at thing place)))"#,
+        )
+        .unwrap();
+        assert_eq!(problem.init_atoms.len(), 1);
+        assert_eq!(problem.init_atoms[0].pred, "at");
+        assert_eq!(problem.timed_inits.len(), 1);
+        assert!(matches!(problem.goal, PddlCondition::Atom(ref atom) if atom.pred == "at"));
     }
 
     #[test]
