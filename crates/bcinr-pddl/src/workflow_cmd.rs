@@ -14,8 +14,8 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ActionInvocation, CognitiveExecutionStanding, EmbeddedWorkflow, TypedWorkflowPlan,
-    VerifiedWorkflowPlan,
+    ActionInvocation, CognitiveExecutionStanding, EmbeddedWorkflow, EmbeddedWorkflowError,
+    TypedWorkflowPlan, VerifiedWorkflowPlan, WorkflowProblem,
 };
 
 include!("workflow_cmd/identity_domain.rs");
@@ -27,3 +27,6 @@ include!("workflow_cmd/cursor.rs");
 include!("workflow_cmd/receipts.rs");
 include!("workflow_cmd/residual.rs");
 include!("workflow_cmd/passes.rs");
+include!("workflow_cmd/application.rs");
+include!("workflow_cmd/adapters.rs");
+include!("workflow_cmd/testkit.rs");
