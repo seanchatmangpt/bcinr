@@ -2,6 +2,7 @@
 
 #![cfg(feature = "mfw-planner")]
 
+pub use crate::workflow_cmd::*;
 pub use crate::{
     execute_cognitive_pddl, execute_cognitive_task, ActionInvocation, ActionLabelError,
     CognitiveExecutionStanding, CognitivePddlConfig, CognitivePddlError, CognitivePddlExecution,
@@ -10,4 +11,3 @@ pub use crate::{
     PddlPowlBatch, PddlProblemDocument, PddlTask, StripsProblemBuilder, TypedWorkflowBatch,
     TypedWorkflowPlan, VerifiedWorkflowPlan, WorkflowBatch, WorkflowProblem,
 };
-pub use crate::workflow_cmd::*;
