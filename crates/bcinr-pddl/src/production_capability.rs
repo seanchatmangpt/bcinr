@@ -65,10 +65,8 @@ mod tests {
              (:action finish :parameters () :precondition (not (locked)) :effect (done)))",
         )
         .unwrap();
-        let problem = problem31_from_pddl(
-            "(define (problem p) (:domain d) (:init) (:goal (done)))",
-        )
-        .unwrap();
+        let problem =
+            problem31_from_pddl("(define (problem p) (:domain d) (:init) (:goal (done)))").unwrap();
         assert!(matches!(
             admit_planning_task(&domain, &problem, &ProductionCapabilityProfile),
             PlannerOutcome::Unsupported(_)
@@ -82,10 +80,9 @@ mod tests {
              (:action a :parameters () :precondition () :effect (when (p) (q))))",
         )
         .unwrap();
-        let problem = problem31_from_pddl(
-            "(define (problem p) (:domain d) (:init (p)) (:goal (q)))",
-        )
-        .unwrap();
+        let problem =
+            problem31_from_pddl("(define (problem p) (:domain d) (:init (p)) (:goal (q)))")
+                .unwrap();
         assert!(matches!(
             admit_planning_task(&domain, &problem, &ProductionCapabilityProfile),
             PlannerOutcome::Unsupported(_)
