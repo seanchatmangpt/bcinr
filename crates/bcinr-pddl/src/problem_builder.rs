@@ -7,6 +7,7 @@
 #![cfg(feature = "mfw-planner")]
 
 use std::borrow::Cow;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::embedded::WorkflowProblem;
 
@@ -100,16 +101,9 @@ impl PddlObjectBuilder {
     pub fn type_name(&self) -> Option<&str> {
         self.type_name.as_deref()
     }
-
-    fn render(&self) -> String {
-        match &self.type_name {
-            Some(type_name) => format!("{} - {}", self.name, type_name),
-            None => self.name.clone(),
-        }
-    }
 }
 
-/// Validated, deterministic PDDL problem document.
+/// Validated, canonical PDDL problem document.
 ///
 /// The inner document is private so values with this type can only be produced
 /// by the validating builder in this module.
@@ -141,6 +135,9 @@ impl WorkflowProblem for PddlProblemDocument {
 }
 
 /// Builder for the common positive STRIPS/typing application boundary.
+///
+/// Objects, facts, and goals are sorted and deduplicated during `build`, so
+/// equivalent insertion orders manufacture the same problem document.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StripsProblemBuilder {
     problem_name: String,
@@ -230,28 +227,53 @@ impl StripsProblemBuilder {
             return Err(PddlBuildError::MissingGoal);
         }
 
-        let objects = if self.objects.is_empty() {
+        let mut objects_by_name = BTreeMap::<String, Option<String>>::new();
+        for object in self.objects {
+            match objects_by_name.get(&object.name) {
+                Some(existing) if existing != &object.type_name => {
+                    return Err(PddlBuildError::ConflictingObjectType {
+                        name: object.name,
+                        first_type: existing.clone(),
+                        second_type: object.type_name,
+                    });
+                }
+                Some(_) => {}
+                None => {
+                    objects_by_name.insert(object.name, object.type_name);
+                }
+            }
+        }
+
+        let objects = if objects_by_name.is_empty() {
             String::new()
         } else {
             format!(
                 "\n  (:objects {})",
-                self.objects
-                    .iter()
-                    .map(PddlObjectBuilder::render)
+                objects_by_name
+                    .into_iter()
+                    .map(|(name, type_name)| match type_name {
+                        Some(type_name) => format!("{name} - {type_name}"),
+                        None => name,
+                    })
                     .collect::<Vec<_>>()
                     .join(" ")
             )
         };
+
         let initial = self
             .initial_facts
-            .iter()
-            .map(PddlAtomBuilder::render)
+            .into_iter()
+            .map(|atom| atom.render())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
             .collect::<Vec<_>>()
             .join(" ");
         let goals = self
             .goals
-            .iter()
-            .map(PddlAtomBuilder::render)
+            .into_iter()
+            .map(|atom| atom.render())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
             .collect::<Vec<_>>();
         let goal = if goals.len() == 1 {
             goals[0].clone()
@@ -273,6 +295,11 @@ pub enum PddlBuildError {
         kind: &'static str,
         value: String,
     },
+    ConflictingObjectType {
+        name: String,
+        first_type: Option<String>,
+        second_type: Option<String>,
+    },
     MissingGoal,
 }
 
@@ -282,6 +309,14 @@ impl std::fmt::Display for PddlBuildError {
             Self::InvalidSymbol { kind, value } => write!(
                 f,
                 "invalid PDDL {kind} {value:?}: expected an ASCII letter followed by letters, digits, '-' or '_'"
+            ),
+            Self::ConflictingObjectType {
+                name,
+                first_type,
+                second_type,
+            } => write!(
+                f,
+                "PDDL object {name:?} was declared with conflicting types {first_type:?} and {second_type:?}"
             ),
             Self::MissingGoal => write!(f, "a PDDL problem requires at least one goal atom"),
         }
@@ -314,9 +349,11 @@ mod tests {
     use crate::{CognitiveExecutionStanding, EmbeddedWorkflow};
 
     #[test]
-    fn builder_renders_deterministic_typed_problem() {
+    fn builder_renders_canonical_typed_problem() {
         let mut builder = StripsProblemBuilder::new("order-42", "fulfillment").unwrap();
         builder
+            .add_goal("notified", ["order-42"])
+            .unwrap()
             .add_typed_object("order-42", "order")
             .unwrap()
             .add_fact("paid", ["order-42"])
@@ -328,8 +365,24 @@ mod tests {
         let document = builder.build().unwrap();
         assert_eq!(
             document.as_str(),
-            "(define (problem order-42)\n  (:domain fulfillment)\n  (:objects order-42 - order)\n  (:init (paid order-42))\n  (:goal (and (reserved order-42) (notified order-42))))"
+            "(define (problem order-42)\n  (:domain fulfillment)\n  (:objects order-42 - order)\n  (:init (paid order-42))\n  (:goal (and (notified order-42) (reserved order-42))))"
         );
+    }
+
+    #[test]
+    fn equivalent_insertion_orders_have_identical_documents() {
+        let mut left = StripsProblemBuilder::new("job-1", "jobs").unwrap();
+        left.add_nullary_goal("done")
+            .unwrap()
+            .add_nullary_fact("ready")
+            .unwrap();
+        let mut right = StripsProblemBuilder::new("job-1", "jobs").unwrap();
+        right
+            .add_nullary_fact("ready")
+            .unwrap()
+            .add_nullary_goal("done")
+            .unwrap();
+        assert_eq!(left.build().unwrap(), right.build().unwrap());
     }
 
     #[test]
@@ -345,7 +398,8 @@ mod tests {
             "(define (domain jobs) (:requirements :strips) \
              (:predicates (ready) (done)) \
              (:action finish :parameters () :precondition (ready) :effect (done)))",
-        );
+        )
+        .unwrap();
         let plan = workflow.plan(&problem).unwrap();
         assert_eq!(
             plan.standing(),
@@ -354,11 +408,24 @@ mod tests {
     }
 
     #[test]
-    fn builder_refuses_ambiguous_symbols_and_missing_goal() {
+    fn builder_refuses_ambiguous_symbols_missing_goal_and_conflicting_types() {
         assert!(StripsProblemBuilder::new("42-order", "fulfillment").is_err());
         assert!(StripsProblemBuilder::new("order-42", "fulfillment")
             .unwrap()
             .build()
             .is_err());
+
+        let mut conflicting = StripsProblemBuilder::new("order-42", "fulfillment").unwrap();
+        conflicting
+            .add_typed_object("order-42", "order")
+            .unwrap()
+            .add_typed_object("order-42", "shipment")
+            .unwrap()
+            .add_nullary_goal("done")
+            .unwrap();
+        assert!(matches!(
+            conflicting.build(),
+            Err(PddlBuildError::ConflictingObjectType { .. })
+        ));
     }
 }
