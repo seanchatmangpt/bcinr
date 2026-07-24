@@ -36,10 +36,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Canonical IPC PDDL fixtures
         run: cargo test -p bcinr-pddl --all-features --test canonical_ipc
+      - name: Exact classical PDDL semantics
+        run: cargo test -p bcinr-pddl --all-features ground_v2
       - name: POWL 2.0 model, compiler, and scheduler
         run: cargo test -p bcinr-powl --all-features powl2
       - name: Planner-output POWL v2 execution bridge
         run: cargo test -p bcinr-powl --all-features scheduler_v2
+      - name: POWL v2 execution receipt and replay
+        run: cargo test -p bcinr-powl-receipt --all-features execution_v2
       - name: Production cognitive composition rail
         run: cargo test -p bcinr-pddl --all-features production
 
