@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/v26.7.24-production-pddl-powl-v2
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
