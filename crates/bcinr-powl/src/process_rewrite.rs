@@ -69,6 +69,7 @@ pub fn prepare_process_patch(
     target: ProcessNodeRef,
     replacement: Powl2Model,
 ) -> Result<ProcessPatch, ProcessRewriteError> {
+    validate_powl2(model).map_err(ProcessToolkitError::InvalidModel)?;
     validate_powl2(&replacement).map_err(ProcessToolkitError::InvalidModel)?;
     let expected_target = process_digest(process_node(model, &target)?);
     Ok(ProcessPatch {
@@ -83,6 +84,7 @@ pub fn apply_process_patch(
     model: &Powl2Model,
     patch: &ProcessPatch,
 ) -> Result<(Powl2Model, ProcessRewriteWitness), ProcessRewriteError> {
+    validate_powl2(model).map_err(ProcessToolkitError::InvalidModel)?;
     let actual = process_digest(process_node(model, &patch.target)?);
     if actual != patch.expected_target {
         return Err(ProcessRewriteError::StaleTarget {
@@ -153,16 +155,20 @@ fn replace_at(
             let mut children = children.clone();
             let child = children
                 .get(index)
+                .cloned()
                 .ok_or_else(|| ProcessToolkitError::InvalidNode(target.clone()))?;
-            children[index] = replace_at(child, tail, target, replacement)?;
+            let rewritten_child = replace_at(&child, tail, target, replacement)?;
+            children[index] = rewritten_child;
             Ok(Powl2Model::Sequence(children))
         }
         Powl2Model::PartialOrder { children, edges } => {
             let mut children = children.clone();
             let child = children
                 .get(index)
+                .cloned()
                 .ok_or_else(|| ProcessToolkitError::InvalidNode(target.clone()))?;
-            children[index] = replace_at(child, tail, target, replacement)?;
+            let rewritten_child = replace_at(&child, tail, target, replacement)?;
+            children[index] = rewritten_child;
             Ok(Powl2Model::PartialOrder {
                 children,
                 edges: edges.clone(),
@@ -177,8 +183,10 @@ fn replace_at(
             let mut children = children.clone();
             let child = children
                 .get(index)
+                .cloned()
                 .ok_or_else(|| ProcessToolkitError::InvalidNode(target.clone()))?;
-            children[index] = replace_at(child, tail, target, replacement)?;
+            let rewritten_child = replace_at(&child, tail, target, replacement)?;
+            children[index] = rewritten_child;
             Ok(Powl2Model::ChoiceGraph {
                 children,
                 edges: edges.clone(),
