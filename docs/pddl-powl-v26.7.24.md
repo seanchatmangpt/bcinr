@@ -18,11 +18,12 @@ Enable the `mfw-planner` feature and use the narrow prelude.
 ```rust
 use bcinr_pddl::prelude::*;
 
-let mut workflow = EmbeddedWorkflow::new(domain_pddl);
+let mut workflow = EmbeddedWorkflow::new(domain_pddl)?;
 let verified = workflow.plan_pddl(problem_pddl)?;
 let typed: TypedWorkflowPlan<ApplicationCommand> =
     verified.bind::<ApplicationCommand>()?;
 
+println!("domain root: {}", workflow.domain_source_root());
 println!("standing: {:?}", typed.standing());
 println!("receipt: {}", typed.execution_root());
 
@@ -31,11 +32,16 @@ for batch in typed.batches() {
 }
 ```
 
-`EmbeddedWorkflow` keeps the stable domain and cache-preserving planning runtime inside the Rust application. `VerifiedWorkflowPlan` is manufactured only after the selected semantic rail and POWL execution verify. `ActionInvocation` normalizes planner labels before `TryFrom<ActionInvocation>` or `map_actions` converts them to native commands.
+`EmbeddedWorkflow` validates and installs the stable domain, exposes its name and BLAKE3 source root, and keeps a cache-preserving planning runtime inside the Rust application. `VerifiedWorkflowPlan` is manufactured only after the selected semantic rail and POWL execution verify. `ActionInvocation` normalizes planner labels before `TryFrom<ActionInvocation>` or `map_actions` converts them to native commands.
 
-Application state can implement `WorkflowProblem` directly. Common positive STRIPS/typing problems can use `StripsProblemBuilder` and its validated `PddlProblemDocument` output instead of hand-concatenating PDDL.
+Application state can implement `WorkflowProblem` directly. Common positive STRIPS/typing problems can use `plan_strips`, `strips_problem`, or `StripsProblemBuilder`. The builder validates symbols, rejects conflicting object types, and canonicalizes object, fact, and goal ordering.
 
-See [`embedded-planning-paradigm.md`](embedded-planning-paradigm.md) for the architectural rationale, phase change, application patterns, delivered utilities, and remaining roadmap.
+Standing-bearing workflow and batch types have private constructors and are not generically deserializable. A serialized shape does not recreate verification standing across a trust boundary.
+
+See:
+
+- [`embedded-planning-quickstart.md`](embedded-planning-quickstart.md) for application integration, typed binding, broker handoff, errors, and cross-process trust;
+- [`embedded-planning-paradigm.md`](embedded-planning-paradigm.md) for the architectural rationale, phase change, application patterns, and roadmap.
 
 ## Lower-level downstream API
 
@@ -58,7 +64,7 @@ for batch in execution.batches()? {
 }
 ```
 
-`execute_cognitive_pddl(domain, problem)` is the equivalent two-argument convenience function. `CognitivePddlRuntime` preserves the exact-match planning cache across calls. `OwnedPddlTask` is serializable for queues and connector boundaries.
+`execute_cognitive_pddl(domain, problem)` is the equivalent two-argument convenience function. `CognitivePddlRuntime` preserves the exact-match planning cache across calls. `OwnedPddlTask` is serializable for queues and connector boundaries; receiving code must still execute and verify it.
 
 ## Routing law
 
@@ -101,7 +107,7 @@ Run the focused release rail from the repository root:
 bash scripts/verify-pddl-powl-v26.7.24.sh
 ```
 
-The script checks the POWL 2.0 compiler/scheduler, receipt replay, exact classical PDDL rail, concurrent PDDL state execution, embedded application facade, deterministic problem builder, external-consumer APIs, all feature-gated targets, and both runnable examples. Its final successful line is:
+The script checks the POWL 2.0 compiler/scheduler, receipt replay, exact classical PDDL rail, concurrent PDDL state execution, embedded application facade, canonical problem builder, external-consumer APIs, all feature-gated targets, and both runnable examples. Its final successful line is:
 
 ```text
 PDDL_TO_POWL_V26_7_24=ALIVE
