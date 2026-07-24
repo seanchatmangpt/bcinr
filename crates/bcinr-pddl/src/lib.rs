@@ -36,6 +36,8 @@ pub mod llm_bridge;
 pub mod mfw;
 pub mod parse;
 pub mod powl_bridge;
+#[cfg(feature = "mfw-planner")]
+pub mod production;
 pub mod schedule_analysis;
 pub mod search;
 mod sexpr;
@@ -63,6 +65,8 @@ pub use mfw::{
     q_lens, FrontierBoxes, FrontierMeasure, MassVector, PositiveDistribution, PositiveMass,
     QLensError, QValue, WeightedDistribution,
 };
+#[cfg(feature = "mfw-planner")]
+pub use production::ProductionMfwPlanner;
 pub use schedule_analysis::{
     analyze_schedule, analyze_schedule_instrumented, AnalysisSubstageNs, CapacityDelta,
     ScheduleAnalysis64,
