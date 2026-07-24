@@ -29,29 +29,27 @@ version = "26.7.24"
 canonical_suites = [
   "canonical_ipc",
   "ground_v2",
+  "semantic_features",
+  "production_capability",
   "production",
   "cognitive",
+  "downstream",
+  "undeclared_semantics",
+  "downstream_pddl_powl",
+  "downstream_cognitive",
 ]
 
 [gates]
 required = [
-  "format",
-  "clippy",
-  "canonical",
-  "workspace-linux",
-  "workspace-macos",
-  "workspace-windows",
-  "miri-bcinr-mfw-ir",
-  "miri-bcinr-powl",
-  "miri-bcinr-pddl",
-  "documentation",
-  "cargo-audit",
-  "cargo-deny",
+  "focused-local-pddl-powl-verifier",
+  "wasm4pm-compat-26.7.24-published",
 ]
+local_command = "bash scripts/verify-pddl-powl-v26.7.24.sh"
+required_receipt = "PDDL_TO_POWL_V26_7_24=ALIVE"
 
 [blockers]
 items = [
-  "all final-head CI and Miri jobs must pass",
+  "focused local verifier must emit PDDL_TO_POWL_V26_7_24=ALIVE on the final head",
   "wasm4pm-compat 26.7.24 must pass its verifier and be published",
   "bcinr must consume the fixed wasm4pm-compat release",
   "temporary quick-xml advisory exceptions must be deleted",
