@@ -1372,3 +1372,55 @@ The affected implementation is quarantined until independently reconstructed or 
 ]
 
 The next useful artifact is an accompanying `bcinr-cheat-scanner` rule specification that turns each constitutional prohibition into a named AST, generated-source, and object-code gate.
+
+---
+
+# 34. Hosted and cross-environment startup protocol
+
+Hosted ChatGPT agents and agents operating across a GitHub connector, ephemeral
+shell, or CI-observation boundary must read `CHATGPT-CLOUD-AGENTS.md` after this
+constitution and before substantial repository work. That addendum governs
+environment and evidence mechanics only. It cannot weaken any mathematical,
+runtime, gate, ownership, or standing rule above.
+
+Before beginning implementation, the agent must:
+
+1. resolve the current default branch, requested target ref, and every applicable
+   path-specific `AGENTS.md`;
+2. inspect current source, manifests, tests, gate definitions, generated
+   ownership, planning documents, and evidence artifacts relevant to the task;
+3. classify the real operating mode as local checkout, GitHub connector only,
+   hybrid, or CI observation;
+4. distinguish observed source, executed commands, changed artifacts,
+   independently verified facts, inferred conclusions, and blocked boundaries;
+5. identify the highest-priority unfinished item that is actionable in the
+   available mode;
+6. verify that the item's assumptions still match current source and that the
+   required constitutional workstream ownership is available;
+7. name the first concrete contracts, authoritative roots, oracle surfaces,
+   mutants, scanners, gates, or evidence artifacts involved;
+8. begin useful work without asking the user to restate context already present
+   in repository files.
+
+The first substantive response must demonstrate this orientation rather than
+merely summarize instruction documents. It must state the applicable instruction
+hierarchy, real execution boundaries, and evidence required before the selected
+item can receive its requested standing. It must begin the work in the same
+response.
+
+A blocked highest-ranked item is a truthful result. When another item is
+independently actionable, select the next lawful checkpoint and record why the
+higher item remains blocked. Never manufacture an execution path or standing to
+avoid a blocker.
+
+Do not rely on remembered repository details. Do not claim a command, gate,
+proof, mutation kill, object-code property, receipt, replay, or CI boundary
+passed unless it was actually executed or inspected for the exact commit and
+exact command. Connector fetches are not `cat`, connector searches are not
+`grep`, connector commits are not local working-tree edits, and remote metadata
+is not `git status`.
+
+Stay within the selected ticket's scope and exclusive write ownership. Never
+hand-edit generated output. Use a dedicated branch, run the narrowest relevant
+validation available, open a draft pull request when permitted, and do not merge
+without explicit authorization.
