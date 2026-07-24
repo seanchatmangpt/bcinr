@@ -62,12 +62,13 @@ impl TryFrom<ActionInvocation> for Command {
 }
 
 fn main() {
-    // The stable planning domain lives inside the service instead of behind a
-    // planner daemon, workflow SaaS API, or BPMN deployment boundary.
-    let mut fulfillment = EmbeddedWorkflow::new(DOMAIN);
+    // The stable planning domain is validated and installed inside the service
+    // instead of behind a planner daemon, workflow SaaS API, or BPMN boundary.
+    let mut fulfillment =
+        EmbeddedWorkflow::new(DOMAIN).expect("embedded planning domain must parse");
     let order = Order { id: 42, paid: true };
 
-    // Application state is projected into a validated problem, planned,
+    // Application state is projected into a canonical problem, planned,
     // executed through POWL, and receipt-verified before any command reaches
     // application code.
     let verified = fulfillment.plan(&order).expect("workflow should be admitted");
@@ -75,6 +76,7 @@ fn main() {
         .bind::<Command>()
         .expect("every planner action must have a Rust binding");
 
+    println!("domain root: {}", fulfillment.domain_source_root());
     println!("standing: {:?}", commands.standing());
     println!("execution root: {}", commands.execution_root());
     for batch in commands.batches() {
