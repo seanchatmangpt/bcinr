@@ -146,6 +146,14 @@ impl<C> OutboxRecord<C> {
         self.dispatch_root
     }
 
+    pub const fn plan_root(&self) -> PlanRoot {
+        self.plan_root
+    }
+
+    pub const fn execution_root(&self) -> ExecutionRoot {
+        self.execution_root
+    }
+
     pub const fn tick(&self) -> u32 {
         self.tick
     }
