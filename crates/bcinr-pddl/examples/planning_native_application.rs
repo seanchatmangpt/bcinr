@@ -24,12 +24,27 @@ struct ReleaseState {
     built: bool,
 }
 
-impl WorkflowProblem for ReleaseState {
-    fn to_pddl_problem(&self) -> Cow<'_, str> {
+fn render_goal(goal: &GoalExpr<String, i64>) -> String {
+    match goal {
+        GoalExpr::Atom(atom) => format!("({atom})"),
+        GoalExpr::All(goals) => format!(
+            "(and {})",
+            goals.iter().map(render_goal).collect::<Vec<_>>().join(" ")
+        ),
+        _ => "(and (deployed) (announced))".to_string(),
+    }
+}
+
+impl GoalDirectedWorkflowProblem<GoalExpr<String, i64>> for ReleaseState {
+    fn to_pddl_problem_for_goal<'a>(
+        &'a self,
+        goal: &'a GoalExpr<String, i64>,
+    ) -> Cow<'a, str> {
         let built = if self.built { "(built)" } else { "" };
         Cow::Owned(format!(
-            "(define (problem release-{version}) (:domain deployment) (:init {built}) (:goal (and (deployed) (announced))))",
+            "(define (problem release-{version}) (:domain deployment) (:init {built}) (:goal {goal}))",
             version = self.version,
+            goal = render_goal(goal),
         ))
     }
 }
@@ -94,7 +109,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let observation = ObservationSnapshot::manufacture(
         LogicalTime(1),
         SourceVersion("release-store:1".to_string()),
-        state.clone(),
+        state,
     )?;
     let goal = GoalEnvelope::manufacture(
         GoalExpr::<String, i64>::All(vec![
@@ -105,8 +120,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         None,
         GoalPolicy::Hard,
     )?;
-    let prepared = application.compile(
-        &state,
+    let prepared = application.compile_goal_directed(
         &observation,
         &goal,
         PlanningBounds::interactive(),
