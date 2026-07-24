@@ -19,10 +19,7 @@ pub struct PddlAtomBuilder {
 }
 
 impl PddlAtomBuilder {
-    pub fn new<I, S>(
-        predicate: impl Into<String>,
-        arguments: I,
-    ) -> Result<Self, PddlBuildError>
+    pub fn new<I, S>(predicate: impl Into<String>, arguments: I) -> Result<Self, PddlBuildError>
     where
         I: IntoIterator<Item = S>,
         S: Into<String>,
@@ -175,7 +172,8 @@ impl StripsProblemBuilder {
         name: impl Into<String>,
         type_name: impl Into<String>,
     ) -> Result<&mut Self, PddlBuildError> {
-        self.objects.push(PddlObjectBuilder::typed(name, type_name)?);
+        self.objects
+            .push(PddlObjectBuilder::typed(name, type_name)?);
         Ok(self)
     }
 
@@ -197,7 +195,8 @@ impl StripsProblemBuilder {
         &mut self,
         predicate: impl Into<String>,
     ) -> Result<&mut Self, PddlBuildError> {
-        self.initial_facts.push(PddlAtomBuilder::nullary(predicate)?);
+        self.initial_facts
+            .push(PddlAtomBuilder::nullary(predicate)?);
         Ok(self)
     }
 
