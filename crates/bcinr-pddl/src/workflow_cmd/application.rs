@@ -24,6 +24,7 @@ impl<C> PreparedWorkflow<C> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthorizedWorkflow<C, E> {
     evidence: E,
+    policy_root: PolicySetRoot,
     proposal: DispatchProposal<C>,
 }
 
@@ -32,12 +33,16 @@ impl<C, E> AuthorizedWorkflow<C, E> {
         &self.evidence
     }
 
+    pub const fn policy_root(&self) -> PolicySetRoot {
+        self.policy_root
+    }
+
     pub const fn proposal(&self) -> &DispatchProposal<C> {
         &self.proposal
     }
 
-    pub fn into_parts(self) -> (E, DispatchProposal<C>) {
-        (self.evidence, self.proposal)
+    pub fn into_parts(self) -> (E, PolicySetRoot, DispatchProposal<C>) {
+        (self.evidence, self.policy_root, self.proposal)
     }
 }
 
@@ -165,14 +170,19 @@ where
                 return Err(AuthorizationProposalError::Policy(refusal));
             }
         };
+        let policy_root = policy.root();
         let proposal = DispatchProposal::from_typed_plan(
             &self.typed_plan,
             &self.envelope,
             self.binding_root,
-            Some(policy.root()),
+            Some(policy_root),
             idempotency,
         )
         .map_err(AuthorizationProposalError::Dispatch)?;
-        Ok(AuthorizedWorkflow { evidence, proposal })
+        Ok(AuthorizedWorkflow {
+            evidence,
+            policy_root,
+            proposal,
+        })
     }
 }
