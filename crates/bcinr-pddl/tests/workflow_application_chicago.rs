@@ -30,12 +30,27 @@ struct OrderState {
     paid: bool,
 }
 
-impl WorkflowProblem for OrderState {
-    fn to_pddl_problem(&self) -> Cow<'_, str> {
+fn render_goal(goal: &GoalExpr<String, i64>) -> String {
+    match goal {
+        GoalExpr::Atom(atom) => format!("({atom})"),
+        GoalExpr::All(goals) => format!(
+            "(and {})",
+            goals.iter().map(render_goal).collect::<Vec<_>>().join(" ")
+        ),
+        other => panic!("test fixture does not admit goal constructor: {other:?}"),
+    }
+}
+
+impl GoalDirectedWorkflowProblem<GoalExpr<String, i64>> for OrderState {
+    fn to_pddl_problem_for_goal<'a>(
+        &'a self,
+        goal: &'a GoalExpr<String, i64>,
+    ) -> Cow<'a, str> {
         let paid = if self.paid { "(paid)" } else { "" };
         Cow::Owned(format!(
-            "(define (problem order-{id}) (:domain fulfillment-app) (:init {paid}) (:goal (and (reserved) (notified))))",
+            "(define (problem order-{id}) (:domain fulfillment-app) (:init {paid}) (:goal {goal}))",
             id = self.order_id,
+            goal = render_goal(goal),
         ))
     }
 }
@@ -73,27 +88,41 @@ impl ActionBinding for CommandBinding {
 #[derive(Debug, Clone, Copy)]
 struct PermitTenant;
 
+#[derive(Debug)]
+struct TenantContext {
+    tenant: &'static str,
+}
+
 impl PolicyIdentity for PermitTenant {
     fn root(&self) -> PolicySetRoot {
         PolicySetRoot::hash(b"permit-tenant:acme:v1")
     }
 }
 
-impl Policy<TypedWorkflowPlan<Command>, &'static str> for PermitTenant {
+impl Policy<TypedWorkflowPlan<Command>, TenantContext> for PermitTenant {
     type Evidence = &'static str;
     type Refusal = &'static str;
 
     fn evaluate(
         &self,
         _input: &TypedWorkflowPlan<Command>,
-        tenant: &&'static str,
+        context: &TenantContext,
     ) -> PolicyDecision<Self::Evidence, Self::Refusal> {
-        if *tenant == "acme" {
+        if context.tenant == "acme" {
             PolicyDecision::Admit("tenant-admitted")
         } else {
             PolicyDecision::Refuse("tenant-refused")
         }
     }
+}
+
+fn observation(state: OrderState) -> ObservationSnapshot<OrderState> {
+    ObservationSnapshot::manufacture(
+        LogicalTime(10),
+        SourceVersion(format!("orders:{}:v7", state.order_id)),
+        state,
+    )
+    .expect("observation should canonicalize")
 }
 
 chicago_tdd_tools::test!(
@@ -108,16 +137,10 @@ chicago_tdd_tools::test!(
                 .coverage(["reserve-inventory", "notify-customer"]),
         );
 
-        let state = OrderState {
+        let observation = observation(OrderState {
             order_id: 42,
             paid: true,
-        };
-        let observation = ObservationSnapshot::manufacture(
-            LogicalTime(10),
-            SourceVersion("orders:42:v7".to_string()),
-            state.clone(),
-        )
-        .expect("observation should canonicalize");
+        });
         let goal = GoalEnvelope::manufacture(
             GoalExpr::<String, i64>::All(vec![
                 GoalExpr::Atom("reserved".to_string()),
@@ -130,8 +153,7 @@ chicago_tdd_tools::test!(
         .expect("goal should canonicalize");
 
         let prepared = application
-            .compile(
-                &state,
+            .compile_goal_directed(
                 &observation,
                 &goal,
                 PlanningBounds::interactive(),
@@ -141,7 +163,7 @@ chicago_tdd_tools::test!(
         let authorized = prepared
             .authorize_and_propose(
                 &PermitTenant,
-                &"acme",
+                &TenantContext { tenant: "acme" },
                 IdempotencyKey::new("order-42:generation-0").expect("idempotency key"),
             )
             .expect("policy should admit the compiled commands");
@@ -151,17 +173,19 @@ chicago_tdd_tools::test!(
         let task_batches = TaskGroupAdapter
             .project(authorized.proposal())
             .expect("task projection should be deterministic");
-        let task_commands = task_batches
-            .iter()
-            .map(|batch| batch.commands().len())
-            .sum::<usize>();
-        assert_eq!(task_commands, 2);
+        assert_eq!(
+            task_batches
+                .iter()
+                .map(|batch| batch.commands().len())
+                .sum::<usize>(),
+            2
+        );
         assert!(task_batches
             .iter()
             .all(|batch| batch.dispatch_root() == authorized.proposal().root()));
 
-        let outbox = OutboxAdapter::new("orders.fulfillment").expect("outbox destination");
-        let records = outbox
+        let records = OutboxAdapter::new("orders.fulfillment")
+            .expect("outbox destination")
             .project(authorized.proposal())
             .expect("outbox projection should succeed");
         assert_eq!(records.len(), 2);
@@ -199,16 +223,10 @@ chicago_tdd_tools::test!(policy_refusal_never_manufactures_dispatch_authority, {
     let workflow = EmbeddedWorkflow::new(DOMAIN).expect("resident domain should install");
     let mut application =
         WorkflowApplication::new(workflow, CommandBinding).expect("binding schema");
-    let state = OrderState {
+    let observation = observation(OrderState {
         order_id: 9,
         paid: true,
-    };
-    let observation = ObservationSnapshot::manufacture(
-        LogicalTime(1),
-        SourceVersion("orders:9:v1".to_string()),
-        state.clone(),
-    )
-    .expect("observation");
+    });
     let goal = GoalEnvelope::manufacture(
         GoalExpr::<String, i64>::Atom("reserved".to_string()),
         GoalPriority(1),
@@ -217,8 +235,7 @@ chicago_tdd_tools::test!(policy_refusal_never_manufactures_dispatch_authority, {
     )
     .expect("goal");
     let prepared = application
-        .compile(
-            &state,
+        .compile_goal_directed(
             &observation,
             &goal,
             PlanningBounds::interactive(),
@@ -228,7 +245,9 @@ chicago_tdd_tools::test!(policy_refusal_never_manufactures_dispatch_authority, {
     assert!(matches!(
         prepared.authorize_and_propose(
             &PermitTenant,
-            &"other-tenant",
+            &TenantContext {
+                tenant: "other-tenant"
+            },
             IdempotencyKey::new("order-9:generation-0").unwrap(),
         ),
         Err(AuthorizationProposalError::Policy("tenant-refused"))
