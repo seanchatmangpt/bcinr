@@ -75,10 +75,10 @@ fn main() {
         .bind::<Command>()
         .expect("every planner action must have a Rust binding");
 
-    println!("standing: {:?}", commands.standing);
-    println!("execution root: {}", commands.execution_root);
+    println!("standing: {:?}", commands.standing());
+    println!("execution root: {}", commands.execution_root());
     for batch in commands.batches() {
-        println!("tick {}: {:?}", batch.tick, batch.actions);
+        println!("tick {}: {:?}", batch.tick(), batch.actions());
         // The host application chooses how to actuate this batch: transaction,
         // queue, actor mailbox, async task group, saga, or command broker.
     }
