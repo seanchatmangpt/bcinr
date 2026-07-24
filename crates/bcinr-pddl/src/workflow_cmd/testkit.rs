@@ -82,7 +82,7 @@ impl fmt::Display for ScenarioExecutionError {
 
 impl std::error::Error for ScenarioExecutionError {}
 
-/// Complete the cursor's current ready tick using deterministic effect evidence.
+/// Complete the cursor's current admitted tick using deterministic effect evidence.
 ///
 /// This helper drives real public behavior through the broker/cursor boundary,
 /// while keeping all external effects simulated and inspectable.
@@ -94,7 +94,21 @@ pub fn complete_ready_tick<C>(
 where
     C: Serialize,
 {
-    let ready = cursor.next_ready();
+    let Some(tick) = cursor.next_tick() else {
+        return Ok(Vec::new());
+    };
+    let ready = cursor
+        .commands()
+        .iter()
+        .filter(|command| {
+            command.tick == tick
+                && matches!(
+                    command.progress,
+                    CommandProgress::Admitted { .. } | CommandProgress::Attempted { .. }
+                )
+        })
+        .map(|command| (command.tick, command.command_index))
+        .collect::<Vec<_>>();
     let mut observations = Vec::with_capacity(ready.len());
     for (tick, command_index) in ready {
         let command = proposal
