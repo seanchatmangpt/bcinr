@@ -21,14 +21,25 @@ struct Order {
 
 impl WorkflowProblem for Order {
     fn to_pddl_problem(&self) -> Cow<'_, str> {
-        Cow::Owned(format!(
-            "(define (problem order-{id})
-              (:domain fulfillment)
-              (:init {paid})
-              (:goal (and (reserved) (customer-notified))))",
-            id = self.id,
-            paid = if self.paid { "(paid)" } else { "" },
-        ))
+        let mut problem =
+            StripsProblemBuilder::new(format!("order-{}", self.id), "fulfillment")
+                .expect("application identifiers must be valid PDDL symbols");
+        if self.paid {
+            problem
+                .add_nullary_fact("paid")
+                .expect("domain predicates are compile-time constants");
+        }
+        problem
+            .add_nullary_goal("reserved")
+            .expect("domain predicates are compile-time constants")
+            .add_nullary_goal("customer-notified")
+            .expect("domain predicates are compile-time constants");
+        Cow::Owned(
+            problem
+                .build()
+                .expect("the application always supplies a goal")
+                .into_string(),
+        )
     }
 }
 
@@ -56,8 +67,9 @@ fn main() {
     let mut fulfillment = EmbeddedWorkflow::new(DOMAIN);
     let order = Order { id: 42, paid: true };
 
-    // Application state is projected into a problem, planned, executed through
-    // POWL, and receipt-verified before any command reaches application code.
+    // Application state is projected into a validated problem, planned,
+    // executed through POWL, and receipt-verified before any command reaches
+    // application code.
     let verified = fulfillment.plan(&order).expect("workflow should be admitted");
     let commands = verified
         .bind::<Command>()
