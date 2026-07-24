@@ -177,14 +177,33 @@ impl std::fmt::Display for ActionLabelError {
 impl std::error::Error for ActionLabelError {}
 
 /// One verified scheduler tick expressed as application-level invocations.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// Construction is private to the verified-plan boundary. Serialization is
+/// one-way until a durable replay envelope can re-establish standing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct WorkflowBatch {
-    pub tick: u32,
-    pub fired_mask: u64,
-    pub actions: Vec<ActionInvocation>,
+    tick: u32,
+    fired_mask: u64,
+    actions: Vec<ActionInvocation>,
 }
 
 impl WorkflowBatch {
+    pub fn tick(&self) -> u32 {
+        self.tick
+    }
+
+    pub fn fired_mask(&self) -> u64 {
+        self.fired_mask
+    }
+
+    pub fn actions(&self) -> &[ActionInvocation] {
+        &self.actions
+    }
+
+    pub fn into_actions(self) -> Vec<ActionInvocation> {
+        self.actions
+    }
+
     /// Whether this tick contains more than one independently admitted action.
     pub fn is_parallel(&self) -> bool {
         self.actions.len() > 1
@@ -333,14 +352,25 @@ impl VerifiedWorkflowPlan {
 }
 
 /// A verified workflow whose actions have been converted to host application types.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// Fields are private and this type is not deserializable: receiving a JSON
+/// object with the same shape is not sufficient to recreate verified standing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct TypedWorkflowPlan<A> {
-    pub standing: CognitiveExecutionStanding,
-    pub execution_root: String,
-    pub batches: Vec<TypedWorkflowBatch<A>>,
+    standing: CognitiveExecutionStanding,
+    execution_root: String,
+    batches: Vec<TypedWorkflowBatch<A>>,
 }
 
 impl<A> TypedWorkflowPlan<A> {
+    pub fn standing(&self) -> CognitiveExecutionStanding {
+        self.standing
+    }
+
+    pub fn execution_root(&self) -> &str {
+        &self.execution_root
+    }
+
     pub fn batches(&self) -> &[TypedWorkflowBatch<A>] {
         &self.batches
     }
@@ -352,14 +382,30 @@ impl<A> TypedWorkflowPlan<A> {
 
 /// One application-ready batch. Actions within a batch may execute concurrently;
 /// batches retain their admitted tick order.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct TypedWorkflowBatch<A> {
-    pub tick: u32,
-    pub fired_mask: u64,
-    pub actions: Vec<A>,
+    tick: u32,
+    fired_mask: u64,
+    actions: Vec<A>,
 }
 
 impl<A> TypedWorkflowBatch<A> {
+    pub fn tick(&self) -> u32 {
+        self.tick
+    }
+
+    pub fn fired_mask(&self) -> u64 {
+        self.fired_mask
+    }
+
+    pub fn actions(&self) -> &[A] {
+        &self.actions
+    }
+
+    pub fn into_actions(self) -> Vec<A> {
+        self.actions
+    }
+
     pub fn is_parallel(&self) -> bool {
         self.actions.len() > 1
     }
@@ -476,6 +522,6 @@ mod tests {
         assert!(!plan.execution_root().is_empty());
 
         let typed = plan.bind::<Command>().unwrap();
-        assert_eq!(typed.batches[0].actions, vec![Command::Finish]);
+        assert_eq!(typed.batches()[0].actions(), &[Command::Finish]);
     }
 }
