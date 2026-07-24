@@ -452,6 +452,28 @@ fn enumerate_bindings<F>(
     }
 }
 
+fn enumerate_bindings_result<F>(
+    variables: &[(String, String)],
+    candidates: &[Vec<String>],
+    index: usize,
+    binding: &mut BTreeMap<String, String>,
+    callback: &mut F,
+) -> Result<(), ExactClassicalError>
+where
+    F: FnMut(&BTreeMap<String, String>) -> Result<(), ExactClassicalError>,
+{
+    if index == variables.len() {
+        return callback(binding);
+    }
+    let variable = &variables[index].0;
+    for object in &candidates[index] {
+        binding.insert(variable.clone(), object.clone());
+        enumerate_bindings_result(variables, candidates, index + 1, binding, callback)?;
+        binding.remove(variable);
+    }
+    Ok(())
+}
+
 fn apply_action(
     action: &ExactGroundAction,
     state: &ExactState,
@@ -542,16 +564,19 @@ fn collect_effect(
                         .collect::<Vec<_>>()
                 })
                 .collect::<Vec<_>>();
-            enumerate_bindings(vars, &candidates, 0, &mut BTreeMap::new(), &mut |binding| {
-                for nested in effects {
-                    let grounded = subst_effect(nested, binding);
-                    // Scope validation has already removed every error except
-                    // numeric conflicts/division, which are handled after this
-                    // enumeration. Collection errors are impossible here.
-                    collect_effect(&grounded, state, objects, type_index, delta)
-                        .expect("validated quantified effect");
-                }
-            });
+            enumerate_bindings_result(
+                vars,
+                &candidates,
+                0,
+                &mut BTreeMap::new(),
+                &mut |binding| {
+                    for nested in effects {
+                        let grounded = subst_effect(nested, binding);
+                        collect_effect(&grounded, state, objects, type_index, delta)?;
+                    }
+                    Ok(())
+                },
+            )?;
         }
         PddlEffect::Timed(_, _) => return Err(ExactClassicalError::TimedEffectUnsupported),
     }
@@ -912,7 +937,10 @@ mod tests {
         let open = "(define (problem p) (:domain d) (:init) (:goal (done)))";
         let locked = "(define (problem p) (:domain d) (:init (locked)) (:goal (done)))";
         assert_eq!(solve(domain, open).unwrap().ops.len(), 1);
-        assert_eq!(solve(domain, locked), Err(ExactClassicalError::NoPlan));
+        assert!(matches!(
+            solve(domain, locked),
+            Err(ExactClassicalError::NoPlan)
+        ));
     }
 
     #[test]
@@ -949,7 +977,10 @@ mod tests {
             (:action act :parameters () :precondition () \
               :effect (and (acted) (when (enabled) (done)))))";
         let problem = "(define (problem p) (:domain d) (:init) (:goal (done)))";
-        assert_eq!(solve(domain, problem), Err(ExactClassicalError::NoPlan));
+        assert!(matches!(
+            solve(domain, problem),
+            Err(ExactClassicalError::NoPlan)
+        ));
     }
 
     #[test]
