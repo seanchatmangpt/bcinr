@@ -31,6 +31,8 @@ pub mod cognitive;
 pub mod concurrency;
 pub mod consequence;
 pub mod dfcm_crown;
+#[cfg(feature = "mfw-planner")]
+pub mod downstream;
 pub mod error;
 pub mod execute;
 pub mod ground;
@@ -66,6 +68,8 @@ pub use consequence::{
     ResidualObligation, Residualizer, StandingConsequenceCache,
 };
 pub use dfcm_crown::{run_dfcm_crown_suite, DfcmBenchReceipt};
+#[cfg(feature = "mfw-planner")]
+pub use downstream::{PddlPowlBatch, PddlPowlExecutionSummary};
 pub use ground_v2::{
     ExactClassicalCapabilityProfile, ExactClassicalError, ExactClassicalProblem, ExactGroundAction,
     EXACT_MAX_GROUND_ACTIONS, EXACT_MAX_PLAN_DEPTH, EXACT_MAX_SEARCH_STATES,
