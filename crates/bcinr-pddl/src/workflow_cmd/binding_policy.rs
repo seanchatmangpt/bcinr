@@ -142,7 +142,11 @@ where
     Q: PolicyIdentity,
 {
     pub fn new(first: P, second: Q) -> Self {
-        let root = PolicySetRoot::hash_parts(&[first.root().as_bytes(), second.root().as_bytes()]);
+        let root = PolicySetRoot::hash_parts(&[
+            b"all",
+            first.root().as_bytes(),
+            second.root().as_bytes(),
+        ]);
         Self {
             first,
             second,
@@ -187,6 +191,121 @@ where
             PolicyDecision::Refuse(refusal) => {
                 PolicyDecision::Refuse(AllPolicyRefusal::Second(refusal))
             }
+        }
+    }
+}
+
+/// Deterministic disjunction. The second policy is evaluated only when the first refuses.
+#[derive(Debug, Clone)]
+pub struct AnyPolicy<P, Q> {
+    first: P,
+    second: Q,
+    root: PolicySetRoot,
+}
+
+impl<P, Q> AnyPolicy<P, Q>
+where
+    P: PolicyIdentity,
+    Q: PolicyIdentity,
+{
+    pub fn new(first: P, second: Q) -> Self {
+        let root = PolicySetRoot::hash_parts(&[
+            b"any",
+            first.root().as_bytes(),
+            second.root().as_bytes(),
+        ]);
+        Self {
+            first,
+            second,
+            root,
+        }
+    }
+}
+
+impl<P, Q> PolicyIdentity for AnyPolicy<P, Q> {
+    fn root(&self) -> PolicySetRoot {
+        self.root
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AnyPolicyEvidence<E1, E2> {
+    First(E1),
+    Second(E2),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AnyPolicyRefusal<R1, R2> {
+    pub first: R1,
+    pub second: R2,
+}
+
+impl<Input, Context, P, Q> Policy<Input, Context> for AnyPolicy<P, Q>
+where
+    P: Policy<Input, Context>,
+    Q: Policy<Input, Context>,
+{
+    type Evidence = AnyPolicyEvidence<P::Evidence, Q::Evidence>;
+    type Refusal = AnyPolicyRefusal<P::Refusal, Q::Refusal>;
+
+    fn evaluate(
+        &self,
+        input: &Input,
+        context: &Context,
+    ) -> PolicyDecision<Self::Evidence, Self::Refusal> {
+        let first_refusal = match self.first.evaluate(input, context) {
+            PolicyDecision::Admit(evidence) => {
+                return PolicyDecision::Admit(AnyPolicyEvidence::First(evidence));
+            }
+            PolicyDecision::Refuse(refusal) => refusal,
+        };
+        match self.second.evaluate(input, context) {
+            PolicyDecision::Admit(evidence) => {
+                PolicyDecision::Admit(AnyPolicyEvidence::Second(evidence))
+            }
+            PolicyDecision::Refuse(second) => PolicyDecision::Refuse(AnyPolicyRefusal {
+                first: first_refusal,
+                second,
+            }),
+        }
+    }
+}
+
+/// Logical negation. Original refusal becomes evidence; original evidence becomes refusal.
+#[derive(Debug, Clone)]
+pub struct NotPolicy<P> {
+    inner: P,
+    root: PolicySetRoot,
+}
+
+impl<P: PolicyIdentity> NotPolicy<P> {
+    pub fn new(inner: P) -> Self {
+        let root = PolicySetRoot::hash_parts(&[b"not", inner.root().as_bytes()]);
+        Self { inner, root }
+    }
+}
+
+impl<P> PolicyIdentity for NotPolicy<P> {
+    fn root(&self) -> PolicySetRoot {
+        self.root
+    }
+}
+
+impl<Input, Context, P> Policy<Input, Context> for NotPolicy<P>
+where
+    P: Policy<Input, Context>,
+{
+    type Evidence = P::Refusal;
+    type Refusal = P::Evidence;
+
+    fn evaluate(
+        &self,
+        input: &Input,
+        context: &Context,
+    ) -> PolicyDecision<Self::Evidence, Self::Refusal> {
+        match self.inner.evaluate(input, context) {
+            PolicyDecision::Admit(evidence) => PolicyDecision::Refuse(evidence),
+            PolicyDecision::Refuse(refusal) => PolicyDecision::Admit(refusal),
         }
     }
 }
