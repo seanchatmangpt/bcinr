@@ -10,3 +10,4 @@ pub use crate::{
     PddlPowlBatch, PddlProblemDocument, PddlTask, StripsProblemBuilder, TypedWorkflowBatch,
     TypedWorkflowPlan, VerifiedWorkflowPlan, WorkflowBatch, WorkflowProblem,
 };
+pub use crate::workflow_cmd::*;
