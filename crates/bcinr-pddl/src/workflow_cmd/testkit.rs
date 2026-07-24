@@ -1,8 +1,8 @@
 /// Deterministic effect evidence manufactured by the testkit observer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EffectObservationRecord {
-    pub dispatch_root: DispatchRoot,
     pub plan_root: PlanRoot,
+    pub execution_root: ExecutionRoot,
     pub tick: u32,
     pub command_index: u32,
     pub effect_root: EffectRoot,
@@ -56,11 +56,8 @@ where
             &encoded,
         ]);
         let observation = EffectObservationRecord {
-            dispatch_root: DispatchRoot::hash_parts(&[
-                command.plan_root().as_bytes(),
-                command.execution_root().as_bytes(),
-            ]),
             plan_root: command.plan_root(),
+            execution_root: command.execution_root(),
             tick: command.tick(),
             command_index: command.command_index(),
             effect_root,
