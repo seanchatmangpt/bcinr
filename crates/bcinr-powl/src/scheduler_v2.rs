@@ -214,21 +214,11 @@ mod tests {
         let mut selector = StableMaximalSelector;
 
         assert_eq!(
-            scheduler_tick_v2(
-                &compiled.tape,
-                &mut state,
-                &mut selector,
-                &compiled.guards,
-            ),
+            scheduler_tick_v2(&compiled.tape, &mut state, &mut selector, &compiled.guards,),
             PowlV2TickOutcome::Fired(0b011)
         );
         assert_eq!(
-            scheduler_tick_v2(
-                &compiled.tape,
-                &mut state,
-                &mut selector,
-                &compiled.guards,
-            ),
+            scheduler_tick_v2(&compiled.tape, &mut state, &mut selector, &compiled.guards,),
             PowlV2TickOutcome::Fired(0b100)
         );
         assert!(state.is_complete(&compiled.tape));
