@@ -47,8 +47,28 @@ jobs:
       - name: Enforce formatting
         if: steps.formatting.outputs.status != '0'
         run: exit 1
-      - name: Clippy all production surfaces
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Capture Clippy diagnostics
+        id: clippy
+        shell: bash
+        env:
+          CARGO_TERM_COLOR: never
+        run: |
+          set +e
+          cargo clippy --workspace --all-targets --all-features -- -D warnings > clippy.log 2>&1
+          status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          cat clippy.log
+          exit 0
+      - name: Upload Clippy refusal
+        if: steps.clippy.outputs.status != '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: clippy-diagnostics
+          path: clippy.log
+          if-no-files-found: error
+      - name: Enforce Clippy
+        if: steps.clippy.outputs.status != '0'
+        run: exit 1
 
   canonical:
     name: PDDL & POWL Canonical Conformance
