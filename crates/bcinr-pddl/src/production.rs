@@ -77,9 +77,15 @@ pub enum PddlPowlError {
     Plan(MfwPlanError),
     Compile(CompileErrorV2),
     PowlExecution(PowlV2ReceiptError),
-    MissingProvenance { node: u64 },
-    MissingOccurrence { occurrence: u32 },
-    ActionIndexOutOfRange { action_index: u64 },
+    MissingProvenance {
+        node: u64,
+    },
+    MissingOccurrence {
+        occurrence: u32,
+    },
+    ActionIndexOutOfRange {
+        action_index: u64,
+    },
     PreconditionFailed {
         tick: u32,
         action: String,
@@ -106,10 +112,16 @@ impl std::fmt::Display for PddlPowlError {
                 write!(f, "POWL node {node} has no source-action provenance")
             }
             Self::MissingOccurrence { occurrence } => {
-                write!(f, "POWL provenance references missing occurrence {occurrence}")
+                write!(
+                    f,
+                    "POWL provenance references missing occurrence {occurrence}"
+                )
             }
             Self::ActionIndexOutOfRange { action_index } => {
-                write!(f, "occurrence references action index {action_index} outside the epoch")
+                write!(
+                    f,
+                    "occurrence references action index {action_index} outside the epoch"
+                )
             }
             Self::PreconditionFailed { tick, action, atom } => write!(
                 f,
@@ -124,7 +136,10 @@ impl std::fmt::Display for PddlPowlError {
                 f,
                 "POWL tick {tick} batched interfering actions {left:?} and {right:?} on {atom:?}"
             ),
-            Self::GoalNotReached => write!(f, "POWL execution completed without satisfying the PDDL goal"),
+            Self::GoalNotReached => write!(
+                f,
+                "POWL execution completed without satisfying the PDDL goal"
+            ),
             Self::ParallelReplayMismatch => write!(
                 f,
                 "POWL parallel replay final state differs from the validated PDDL plan"
@@ -241,7 +256,10 @@ impl PddlPowlExecution {
 
     /// Deterministic labels for every fact true after execution.
     pub fn final_state_labels(&self) -> Vec<String> {
-        self.final_state.iter().map(Pddl8GroundAtom::label).collect()
+        self.final_state
+            .iter()
+            .map(Pddl8GroundAtom::label)
+            .collect()
     }
 
     /// Query one concrete final-state atom without exposing collection internals.
@@ -279,9 +297,9 @@ impl PddlPowlRuntime {
         domain_pddl: &str,
         problem_pddl: &str,
     ) -> Result<PddlPowlPlan, PddlPowlError> {
-        let workflow = self
-            .planner
-            .plan(domain_pddl, problem_pddl, &ProductionCapabilityProfile)?;
+        let workflow =
+            self.planner
+                .plan(domain_pddl, problem_pddl, &ProductionCapabilityProfile)?;
         let compiled = compile_powl_v2(&workflow.powl_model)?;
         Ok(PddlPowlPlan {
             workflow,
@@ -566,8 +584,7 @@ mod tests {
 
     #[test]
     fn tampered_state_receipt_is_refused() {
-        let mut execution =
-            execute_pddl_to_powl(INDEPENDENT_DOMAIN, INDEPENDENT_PROBLEM).unwrap();
+        let mut execution = execute_pddl_to_powl(INDEPENDENT_DOMAIN, INDEPENDENT_PROBLEM).unwrap();
         execution.state_receipt.final_state_root.push('0');
         assert!(matches!(
             execution.verify(),

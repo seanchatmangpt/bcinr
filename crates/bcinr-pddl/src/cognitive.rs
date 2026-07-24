@@ -13,9 +13,7 @@
 #![cfg(feature = "mfw-planner")]
 
 use bcinr_mfw_ir::PlannerFailure;
-use bcinr_powl::powl2::{
-    compile_powl2, CompiledPowl2, LowestIndexPolicy, Powl2Error, Powl2Model,
-};
+use bcinr_powl::powl2::{compile_powl2, CompiledPowl2, LowestIndexPolicy, Powl2Error, Powl2Model};
 use bcinr_powl::tape::v2::ConcurrencyGuardTable;
 use bcinr_powl_receipt::execution_v2::{
     execute_and_seal_v2, PowlV2ExecutionReceipt, PowlV2ReceiptError,
@@ -116,12 +114,9 @@ pub fn plan_exact_cognitive_workflow_bounded(
     };
     let powl = compile_powl2(&model, &mut LowestIndexPolicy).map_err(ExactCognitiveError::Powl)?;
     let max_ticks = u32::from(powl.tape.len).saturating_add(1);
-    let execution_receipt = execute_and_seal_v2(
-        &powl.tape,
-        &ConcurrencyGuardTable::empty(),
-        max_ticks,
-    )
-    .map_err(ExactCognitiveError::Receipt)?;
+    let execution_receipt =
+        execute_and_seal_v2(&powl.tape, &ConcurrencyGuardTable::empty(), max_ticks)
+            .map_err(ExactCognitiveError::Receipt)?;
 
     Ok(ExactCognitiveWorkflow {
         admitted,
@@ -187,8 +182,7 @@ mod tests {
             :condition ()
             :effect (at end (done))))
         "#;
-        let problem =
-            "(define (problem p) (:domain temporal) (:init) (:goal (done)))";
+        let problem = "(define (problem p) (:domain temporal) (:init) (:goal (done)))";
         assert!(matches!(
             plan_exact_cognitive_workflow(domain, problem),
             Err(ExactCognitiveError::Admission(_))

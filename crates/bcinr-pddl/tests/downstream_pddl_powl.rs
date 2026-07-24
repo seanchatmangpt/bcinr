@@ -49,6 +49,9 @@ fn reusable_runtime_preserves_configuration_and_emits_independent_receipts() {
 
     first.verify().unwrap();
     second.verify().unwrap();
-    assert_eq!(first.state_receipt.chain_root, second.state_receipt.chain_root);
+    assert_eq!(
+        first.state_receipt.chain_root,
+        second.state_receipt.chain_root
+    );
     assert!(second.workflow.cache_hit);
 }
