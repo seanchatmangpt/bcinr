@@ -24,6 +24,7 @@ printf '\n==> PDDL to POWL execution rails\n'
 cargo test -p bcinr-pddl --features mfw-planner --lib cognitive
 cargo test -p bcinr-pddl --features mfw-planner --lib downstream
 cargo test -p bcinr-pddl --features mfw-planner --lib embedded
+cargo test -p bcinr-pddl --features mfw-planner --lib problem_builder
 cargo test -p bcinr-pddl --features mfw-planner --lib production
 cargo test -p bcinr-pddl --features mfw-planner --test undeclared_semantics
 
