@@ -145,19 +145,10 @@ impl Default for ExactCognitiveBounds {
 }
 
 /// Unified downstream routing configuration.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct CognitivePddlConfig {
     pub concurrent: PddlPowlConfig,
     pub exact: ExactCognitiveBounds,
-}
-
-impl Default for CognitivePddlConfig {
-    fn default() -> Self {
-        Self {
-            concurrent: PddlPowlConfig::default(),
-            exact: ExactCognitiveBounds::default(),
-        }
-    }
 }
 
 /// Errors from the unified downstream boundary.
@@ -183,11 +174,14 @@ impl std::fmt::Display for CognitivePddlError {
 impl std::error::Error for CognitivePddlError {}
 
 /// One completed execution, preserving which semantic rail earned standing.
+///
+/// Both heavyweight rail artifacts are boxed so this application-facing handle
+/// remains stack-small even as receipt and replay evidence grows.
 #[derive(Debug)]
 pub enum CognitivePddlExecution {
-    Concurrent(PddlPowlExecution),
+    Concurrent(Box<PddlPowlExecution>),
     ExactSequential {
-        workflow: ExactCognitiveWorkflow,
+        workflow: Box<ExactCognitiveWorkflow>,
         domain_pddl: String,
         problem_pddl: String,
         bounds: ExactCognitiveBounds,
@@ -266,12 +260,7 @@ impl CognitivePddlExecution {
                 execution.batches().map_err(CognitivePddlError::Concurrent)
             }
             Self::ExactSequential { workflow, .. } => {
-                let activity_slots = workflow
-                    .powl
-                    .activity_slots
-                    .iter()
-                    .copied()
-                    .collect::<Vec<_>>();
+                let activity_slots = workflow.powl.activity_slots.to_vec();
                 Ok(workflow
                     .execution_receipt
                     .fired_masks
@@ -357,7 +346,7 @@ impl CognitivePddlRuntime {
         problem_pddl: &str,
     ) -> Result<CognitivePddlExecution, CognitivePddlError> {
         match self.concurrent.execute(domain_pddl, problem_pddl) {
-            Ok(execution) => Ok(CognitivePddlExecution::Concurrent(execution)),
+            Ok(execution) => Ok(CognitivePddlExecution::Concurrent(Box::new(execution))),
             Err(PddlPowlError::Plan(MfwPlanError::Admission(PlannerFailure::Unsupported(_)))) => {
                 let bounds = self.config.exact;
                 let workflow = plan_exact_cognitive_workflow_bounded(
@@ -370,7 +359,7 @@ impl CognitivePddlRuntime {
                 .map_err(CognitivePddlError::Exact)?;
                 let semantic_root = exact_semantic_root(&workflow);
                 Ok(CognitivePddlExecution::ExactSequential {
-                    workflow,
+                    workflow: Box::new(workflow),
                     domain_pddl: domain_pddl.to_string(),
                     problem_pddl: problem_pddl.to_string(),
                     bounds,
