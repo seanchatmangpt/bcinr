@@ -97,6 +97,17 @@ fn typed_logistics_requires_load_drive_unload_in_that_order() {
 fn logistics_execution_and_receipt_are_deterministic() {
     let (first_tape, first) = execute(LOGISTICS_DOMAIN, LOGISTICS_PROBLEM, "ipc-logistics-1");
     let (second_tape, second) = execute(LOGISTICS_DOMAIN, LOGISTICS_PROBLEM, "ipc-logistics-1");
+    let first_labels = first_tape
+        .ops
+        .iter()
+        .map(|op| op.action.label.as_str())
+        .collect::<Vec<_>>();
+    let second_labels = second_tape
+        .ops
+        .iter()
+        .map(|op| op.action.label.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(first_labels, second_labels);
     assert_eq!(first_tape.ops.len(), 3);
     assert!(first.goal_reached);
     assert_eq!(first.plan_root, second.plan_root);
