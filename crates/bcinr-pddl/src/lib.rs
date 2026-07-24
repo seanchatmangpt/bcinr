@@ -26,6 +26,8 @@ pub mod capability;
 pub mod capability_router;
 pub mod causal;
 pub mod causal_v2;
+#[cfg(feature = "mfw-planner")]
+pub mod cognitive;
 pub mod concurrency;
 pub mod consequence;
 pub mod dfcm_crown;
@@ -52,6 +54,11 @@ pub use capability_router::{
 };
 pub use causal::{CausalAnalysisError, PddlCausalAnalyzer};
 pub use causal_v2::PddlCausalAnalyzerV2;
+#[cfg(feature = "mfw-planner")]
+pub use cognitive::{
+    plan_exact_cognitive_workflow, plan_exact_cognitive_workflow_bounded,
+    CognitiveProjectionStanding, ExactCognitiveError, ExactCognitiveWorkflow,
+};
 pub use concurrency::{ConcurrencyAnalysisError, PddlConcurrencyAnalyzer};
 pub use consequence::{
     plan_with_standing_cache, ConsequenceHorizon, ExactStateKey, GoalReachabilityHorizon,
