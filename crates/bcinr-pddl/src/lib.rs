@@ -102,8 +102,7 @@ pub use mfw::{
 };
 #[cfg(feature = "mfw-planner")]
 pub use problem_builder::{
-    PddlAtomBuilder, PddlBuildError, PddlObjectBuilder, PddlProblemDocument,
-    StripsProblemBuilder,
+    PddlAtomBuilder, PddlBuildError, PddlObjectBuilder, PddlProblemDocument, StripsProblemBuilder,
 };
 #[cfg(feature = "mfw-planner")]
 pub use production::{
