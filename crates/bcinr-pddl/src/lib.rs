@@ -62,6 +62,8 @@ mod semantic_features;
 mod sexpr;
 #[cfg(feature = "mfw-planner")]
 pub mod task;
+#[cfg(feature = "mfw-planner")]
+pub mod workflow_cmd;
 pub use capability::{
     admit_planning_task, AdmittedPlanningTask, CapabilityProfile, DefaultCapabilityProfile,
     GroundedPlanningEpoch, PddlFeature, SemanticSupport, ALL_PDDL_FEATURES,
@@ -126,6 +128,8 @@ pub use search::{
 };
 #[cfg(feature = "mfw-planner")]
 pub use task::{execute_cognitive_task, OwnedPddlTask, PddlTask};
+#[cfg(feature = "mfw-planner")]
+pub use workflow_cmd::*;
 
 // Re-export canonical types from wasm4pm-compat so callers only need one import.
 pub use wasm4pm_compat::ocel::{OCELEvent, OCEL};
