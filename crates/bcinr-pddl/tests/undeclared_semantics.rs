@@ -1,8 +1,6 @@
 #![cfg(feature = "mfw-planner")]
 
-use bcinr_pddl::{
-    execute_cognitive_pddl, execute_pddl_to_powl, CognitiveExecutionStanding,
-};
+use bcinr_pddl::{execute_cognitive_pddl, execute_pddl_to_powl, CognitiveExecutionStanding};
 
 #[test]
 fn undeclared_negative_precondition_cannot_enter_the_concurrent_strips_rail() {
@@ -27,8 +25,7 @@ fn undeclared_numeric_condition_cannot_be_flattened_by_the_concurrent_rail() {
         (:predicates (done)) (:functions (fuel)) \
         (:action finish :parameters () :precondition (>= (fuel) 1) \
           :effect (and (decrease (fuel) 1) (done))))";
-    let problem =
-        "(define (problem p) (:domain d) (:init (= (fuel) 1)) (:goal (done)))";
+    let problem = "(define (problem p) (:domain d) (:init (= (fuel) 1)) (:goal (done)))";
 
     assert!(execute_pddl_to_powl(domain, problem).is_err());
 
