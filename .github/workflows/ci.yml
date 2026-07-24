@@ -78,8 +78,28 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
-      - name: Canonical IPC PDDL fixtures
-        run: cargo test -p bcinr-pddl --all-features --test canonical_ipc
+      - name: Capture canonical IPC diagnostics
+        id: canonical_ipc
+        shell: bash
+        env:
+          CARGO_TERM_COLOR: never
+        run: |
+          set +e
+          cargo test -p bcinr-pddl --all-features --test canonical_ipc > canonical-ipc.log 2>&1
+          status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          cat canonical-ipc.log
+          exit 0
+      - name: Upload canonical IPC refusal
+        if: steps.canonical_ipc.outputs.status != '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: canonical-ipc-diagnostics
+          path: canonical-ipc.log
+          if-no-files-found: error
+      - name: Enforce canonical IPC fixtures
+        if: steps.canonical_ipc.outputs.status != '0'
+        run: exit 1
       - name: Exact classical PDDL semantics
         run: cargo test -p bcinr-pddl --all-features ground_v2
       - name: POWL 2.0 model, compiler, and scheduler
