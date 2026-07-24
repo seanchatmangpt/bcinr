@@ -12,8 +12,9 @@ use std::borrow::Cow;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    CognitiveExecutionStanding, CognitivePddlConfig, CognitivePddlError,
-    CognitivePddlExecution, CognitivePddlExecutionSummary, CognitivePddlRuntime,
+    domain31_from_pddl, CognitiveExecutionStanding, CognitivePddlConfig, CognitivePddlError,
+    CognitivePddlExecution, CognitivePddlExecutionSummary, CognitivePddlRuntime, Pddl8Error,
+    PddlBuildError, StripsProblemBuilder,
 };
 
 /// Application-owned source of a PDDL problem document.
@@ -214,6 +215,7 @@ impl WorkflowBatch {
 #[derive(Debug)]
 pub enum EmbeddedWorkflowError {
     Planning(CognitivePddlError),
+    ProblemBuild(PddlBuildError),
     InvalidActionLabel(ActionLabelError),
 }
 
@@ -221,6 +223,7 @@ impl std::fmt::Display for EmbeddedWorkflowError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Planning(error) => write!(f, "embedded workflow planning failed: {error}"),
+            Self::ProblemBuild(error) => write!(f, "embedded workflow problem build failed: {error}"),
             Self::InvalidActionLabel(error) => write!(f, "embedded workflow binding failed: {error}"),
         }
     }
@@ -230,6 +233,7 @@ impl std::error::Error for EmbeddedWorkflowError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Planning(error) => Some(error),
+            Self::ProblemBuild(error) => Some(error),
             Self::InvalidActionLabel(error) => Some(error),
         }
     }
@@ -238,6 +242,12 @@ impl std::error::Error for EmbeddedWorkflowError {
 impl From<CognitivePddlError> for EmbeddedWorkflowError {
     fn from(error: CognitivePddlError) -> Self {
         Self::Planning(error)
+    }
+}
+
+impl From<PddlBuildError> for EmbeddedWorkflowError {
+    fn from(error: PddlBuildError) -> Self {
+        Self::ProblemBuild(error)
     }
 }
 
@@ -413,31 +423,73 @@ impl<A> TypedWorkflowBatch<A> {
 
 /// Domain-scoped planning runtime embedded directly in a Rust application.
 ///
-/// Keep one instance beside a service, actor, aggregate, or workflow supervisor.
-/// The PDDL domain is loaded once; repeated problem instances reuse the standing
-/// cache inside [`CognitivePddlRuntime`].
+/// Construction parses the domain once to fail fast and captures source
+/// identity. Repeated problem instances reuse the standing cache inside
+/// [`CognitivePddlRuntime`]. Planning rails may still perform their own parsing
+/// as part of receipt-producing semantic admission.
 pub struct EmbeddedWorkflow {
     domain_pddl: String,
+    domain_name: String,
+    domain_source_root: String,
     runtime: CognitivePddlRuntime,
 }
 
 impl EmbeddedWorkflow {
-    pub fn new(domain_pddl: impl Into<String>) -> Self {
+    /// Validate and install one resident planning domain.
+    pub fn new(domain_pddl: impl Into<String>) -> Result<Self, Pddl8Error> {
         Self::with_config(domain_pddl, CognitivePddlConfig::default())
     }
 
+    /// Validate and install one resident planning domain with explicit bounds.
     pub fn with_config(
         domain_pddl: impl Into<String>,
         config: CognitivePddlConfig,
-    ) -> Self {
-        Self {
-            domain_pddl: domain_pddl.into(),
+    ) -> Result<Self, Pddl8Error> {
+        let domain_pddl = domain_pddl.into();
+        let domain = domain31_from_pddl(&domain_pddl)?;
+        let domain_source_root = blake3::hash(domain_pddl.as_bytes()).to_hex().to_string();
+        Ok(Self {
+            domain_pddl,
+            domain_name: domain.name,
+            domain_source_root,
             runtime: CognitivePddlRuntime::new(config),
-        }
+        })
     }
 
     pub fn domain_pddl(&self) -> &str {
         &self.domain_pddl
+    }
+
+    pub fn domain_name(&self) -> &str {
+        &self.domain_name
+    }
+
+    /// BLAKE3 root of the exact installed domain source.
+    pub fn domain_source_root(&self) -> &str {
+        &self.domain_source_root
+    }
+
+    /// Start a validated positive STRIPS/typing problem for this domain.
+    pub fn strips_problem(
+        &self,
+        problem_name: impl Into<String>,
+    ) -> Result<StripsProblemBuilder, PddlBuildError> {
+        StripsProblemBuilder::new(problem_name, self.domain_name.clone())
+    }
+
+    /// Configure, build, and plan a common positive STRIPS/typing problem.
+    pub fn plan_strips<F>(
+        &mut self,
+        problem_name: impl Into<String>,
+        configure: F,
+    ) -> Result<VerifiedWorkflowPlan, EmbeddedWorkflowError>
+    where
+        F: FnOnce(&mut StripsProblemBuilder) -> Result<(), PddlBuildError>,
+    {
+        let mut problem = self.strips_problem(problem_name)?;
+        configure(&mut problem)?;
+        let problem = problem.build()?;
+        self.plan(&problem)
     }
 
     /// Plan from any application value that can project itself into PDDL.
@@ -489,6 +541,10 @@ mod tests {
         }
     }
 
+    const JOB_DOMAIN: &str = "(define (domain jobs) (:requirements :strips) \
+        (:predicates (ready) (done)) \
+        (:action finish :parameters () :precondition (ready) :effect (done)))";
+
     #[test]
     fn parses_common_action_label_forms() {
         assert_eq!(
@@ -509,11 +565,10 @@ mod tests {
 
     #[test]
     fn embedded_runtime_manufactures_verified_typed_work() {
-        let mut workflow = EmbeddedWorkflow::new(
-            "(define (domain jobs) (:requirements :strips) \
-             (:predicates (ready) (done)) \
-             (:action finish :parameters () :precondition (ready) :effect (done)))",
-        );
+        let mut workflow = EmbeddedWorkflow::new(JOB_DOMAIN).unwrap();
+        assert_eq!(workflow.domain_name(), "jobs");
+        assert_eq!(workflow.domain_source_root().len(), 64);
+
         let plan = workflow.plan(&JobState).unwrap();
         assert_eq!(
             plan.standing(),
@@ -523,5 +578,27 @@ mod tests {
 
         let typed = plan.bind::<Command>().unwrap();
         assert_eq!(typed.batches()[0].actions(), &[Command::Finish]);
+    }
+
+    #[test]
+    fn plan_strips_eliminates_domain_name_duplication() {
+        let mut workflow = EmbeddedWorkflow::new(JOB_DOMAIN).unwrap();
+        let plan = workflow
+            .plan_strips("job-2", |problem| {
+                problem
+                    .add_nullary_fact("ready")?
+                    .add_nullary_goal("done")?;
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(
+            plan.standing(),
+            CognitiveExecutionStanding::WitnessedConcurrentStrips
+        );
+    }
+
+    #[test]
+    fn invalid_domain_is_refused_at_construction() {
+        assert!(EmbeddedWorkflow::new("(define (domain broken)").is_err());
     }
 }
