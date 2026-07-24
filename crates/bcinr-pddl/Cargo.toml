@@ -54,6 +54,10 @@ path = "tests/vision2030.rs"
 name = "dfcm_alloc_profile"
 required-features = ["dhat-heap"]
 
+[[example]]
+name = "pddl_to_powl"
+required-features = ["mfw-planner"]
+
 [[test]]
 name = "indexed_grounding"
 path = "tests/indexed_grounding.rs"
