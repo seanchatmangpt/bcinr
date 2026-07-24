@@ -98,10 +98,7 @@ pub(crate) fn content_features(
     features
 }
 
-fn collect_condition_features(
-    condition: &PddlCondition,
-    features: &mut BTreeSet<PddlFeature>,
-) {
+fn collect_condition_features(condition: &PddlCondition, features: &mut BTreeSet<PddlFeature>) {
     match condition {
         PddlCondition::Atom(atom) => {
             if atom.pred == "=" {
