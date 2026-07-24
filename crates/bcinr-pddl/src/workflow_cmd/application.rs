@@ -230,9 +230,10 @@ where
             .workflow
             .plan(input.problem)
             .map_err(PlanningPassRefusal::Planning)?;
-        let execution_root = verified.execution_root().parse().map_err(|error| {
-            PlanningPassRefusal::Envelope(PlanEnvelopeError::ExecutionRoot(error))
-        })?;
+        let execution_root: ExecutionRoot = verified
+            .execution_root()
+            .parse()
+            .map_err(|error| PlanningPassRefusal::Envelope(PlanEnvelopeError::ExecutionRoot(error)))?;
         let output_root = PassRoot::hash_parts(&[b"execution", execution_root.as_bytes()]);
         Ok(PassOutput {
             value: PlannedCompilation {
@@ -328,10 +329,8 @@ where
     }
 }
 
-type WorkflowPipelineRefusal<E> = PassChainRefusal<
-    PassChainRefusal<PlanningPassRefusal, std::convert::Infallible>,
-    E,
->;
+type WorkflowPipelineRefusal<E> =
+    PassChainRefusal<PassChainRefusal<PlanningPassRefusal, std::convert::Infallible>, E>;
 
 fn map_pipeline_refusal<E>(error: WorkflowPipelineRefusal<E>) -> WorkflowApplicationError<E> {
     match error {
@@ -462,12 +461,16 @@ impl<B: ActionBinding> WorkflowApplication<B> {
             bounds,
             search_policy_root,
         };
-        PlanWorkflowPass
-            .then(ManufactureEnvelopePass)
-            .then(BindCommandsPass)
-            .apply(input)
-            .map(|output| output.value)
-            .map_err(map_pipeline_refusal)
+        Then {
+            first: Then {
+                first: PlanWorkflowPass,
+                second: ManufactureEnvelopePass,
+            },
+            second: BindCommandsPass,
+        }
+        .apply(input)
+        .map(|output| output.value)
+        .map_err(map_pipeline_refusal)
     }
 }
 
