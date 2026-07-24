@@ -1,0 +1,97 @@
+name: Semantic Admission Manufacture
+
+on:
+  push:
+    branches:
+      - agent/v26.7.24-production-pddl-powl-v2
+
+permissions:
+  contents: write
+
+jobs:
+  manufacture:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/v26.7.24-production-pddl-powl-v2
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - name: Install content-derived admission gate
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('crates/bcinr-pddl/src/capability.rs')
+          text = path.read_text()
+
+          import_anchor = 'use crate::ground::GroundProblem;\n'
+          import_line = 'use crate::semantic_features::content_features;\n'
+          if import_line not in text:
+              if import_anchor not in text:
+                  raise SystemExit('capability import anchor missing')
+              text = text.replace(import_anchor, import_anchor + import_line, 1)
+
+          requirement_anchor = '''    for req in &domain.requirements {
+          '''
+          pddl_plus_gate = '''    if !domain.processes.is_empty() || !domain.events.is_empty() {
+              return PlannerOutcome::Unsupported(UnsupportedFeature {
+                  feature_name: "PDDL+".to_string(),
+                  context: "PDDL+ process/event blocks have no admitted production execution rail"
+                      .to_string(),
+              });
+          }
+
+              for req in &domain.requirements {
+          '''
+          if 'feature_name: "PDDL+".to_string()' not in text:
+              if requirement_anchor not in text:
+                  raise SystemExit('declared requirement loop anchor missing')
+              text = text.replace(requirement_anchor, pddl_plus_gate, 1)
+
+          content_anchor = '''    // Content-based gate: the loop above only refuses a domain that
+          '''
+          content_gate = '''    // Declared requirements are not authoritative when task content uses
+              // richer constructs without naming them. Derive the actual feature set
+              // from the admitted AST and apply the same capability profile.
+              for feature in content_features(domain, problem) {
+                  if profile.support(feature) == SemanticSupport::Unsupported {
+                      return PlannerOutcome::Unsupported(UnsupportedFeature {
+                          feature_name: format!("{feature:?}"),
+                          context: format!(
+                              "parsed task content uses PddlFeature::{feature:?}, which the given \\
+                               CapabilityProfile marks Unsupported, regardless of omitted \\
+                               :requirements declarations"
+                          ),
+                      });
+                  }
+              }
+
+              // Content-based gate: the loop above only refuses a domain that
+          '''
+          if 'parsed task content uses PddlFeature' not in text:
+              if content_anchor not in text:
+                  raise SystemExit('content gate anchor missing')
+              text = text.replace(content_anchor, content_gate, 1)
+
+          path.write_text(text)
+          PY
+          cargo fmt --all
+          git rm .github/workflows/semantic-admission-manufacture.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add crates/bcinr-pddl/src/capability.rs crates/bcinr-pddl/src/semantic_features.rs crates/bcinr-pddl/src/lib.rs
+          git commit -m 'fix(pddl): gate undeclared semantic features by content'
+          for attempt in 1 2 3; do
+            if git pull --rebase origin agent/v26.7.24-production-pddl-powl-v2 && \
+               git push origin HEAD:agent/v26.7.24-production-pddl-powl-v2; then
+              exit 0
+            fi
+            git rebase --abort || true
+            sleep $((attempt * 2))
+          done
+          exit 1
