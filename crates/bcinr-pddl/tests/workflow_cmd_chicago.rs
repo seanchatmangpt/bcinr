@@ -137,13 +137,15 @@ struct ApplicationContext {
     tenant: &'static str,
 }
 
-fn arrange_compiled_workflow() -> (
-    EmbeddedWorkflow,
-    OrderState,
-    ObservationSnapshot<OrderState>,
-    GoalEnvelope<GoalExpr<String, i64>>,
-    BindingRegistry<FulfillmentBinding>,
-) {
+struct CompiledWorkflowFixture {
+    workflow: EmbeddedWorkflow,
+    state: OrderState,
+    observation: ObservationSnapshot<OrderState>,
+    goal: GoalEnvelope<GoalExpr<String, i64>>,
+    binding: BindingRegistry<FulfillmentBinding>,
+}
+
+fn arrange_compiled_workflow() -> CompiledWorkflowFixture {
     let workflow = EmbeddedWorkflow::new(DOMAIN).expect("domain should install");
     let state = OrderState {
         order_id: 42,
@@ -166,18 +168,27 @@ fn arrange_compiled_workflow() -> (
     )
     .expect("goal should canonicalize");
     let binding = BindingRegistry::new(FulfillmentBinding).expect("binding schema should validate");
-    (workflow, state, observation, goal, binding)
+    CompiledWorkflowFixture {
+        workflow,
+        state,
+        observation,
+        goal,
+        binding,
+    }
 }
 
 chicago_tdd_tools::test!(
     application_compiles_control_flow_and_advances_only_after_observed_effects,
     {
-        // Arrange: install the real domain and application collaborators.
-        let (mut workflow, state, observation, goal, binding) = arrange_compiled_workflow();
+        let CompiledWorkflowFixture {
+            mut workflow,
+            state,
+            observation,
+            goal,
+            binding,
+        } = arrange_compiled_workflow();
         let coverage = binding.coverage(["reserve-inventory", "notify-customer"]);
         assert!(coverage.is_complete());
-
-        // Act: plan, verify, bind, authorize, propose, admit, and observe effects.
         let verified = workflow
             .plan(&state)
             .expect("planning should earn standing");
@@ -193,7 +204,6 @@ chicago_tdd_tools::test!(
                 SearchPolicyRoot::hash(b"first-valid-deterministic-v1"),
             )
             .expect("verified roots should form a plan envelope");
-
         let policies = AllPolicy::new(
             TenantPolicy {
                 allowed_tenant: "acme",
@@ -206,7 +216,6 @@ chicago_tdd_tools::test!(
             PolicyDecision::Refuse(refusal) => panic!("policy refused valid work: {refusal:?}"),
         };
         assert_eq!(evidence, ("tenant-admitted", 2));
-
         let proposal = DispatchProposal::from_typed_plan(
             &typed,
             &envelope,
@@ -237,8 +246,6 @@ chicago_tdd_tools::test!(
                 )
                 .expect("admitted commands should accept observed effects");
         }
-
-        // Assert: real state changes at every boundary remain visible and distinct.
         assert_eq!(
             typed.standing(),
             CognitiveExecutionStanding::WitnessedConcurrentStrips
@@ -254,8 +261,13 @@ chicago_tdd_tools::test!(
 );
 
 chicago_tdd_tools::test!(transport_replay_restores_only_matching_trusted_evidence, {
-    // Arrange: manufacture a real verified plan and erase its standing for transport.
-    let (mut workflow, state, observation, goal, _binding) = arrange_compiled_workflow();
+    let CompiledWorkflowFixture {
+        mut workflow,
+        state,
+        observation,
+        goal,
+        binding: _binding,
+    } = arrange_compiled_workflow();
     let verified = workflow.plan(&state).expect("planning should succeed");
     let trusted = workflow
         .manufacture_plan_envelope(
@@ -268,15 +280,11 @@ chicago_tdd_tools::test!(transport_replay_restores_only_matching_trusted_evidenc
         .expect("trusted plan envelope");
     let json =
         serde_json::to_string(&trusted.erase_for_transport()).expect("transport should serialize");
-
-    // Act: deserialize as explicitly untrusted data and replay against evidence.
     let transported: UntrustedPlanEnvelope =
         serde_json::from_str(&json).expect("transport shape should deserialize");
     let restored = transported
         .verify_against(&trusted)
         .expect("complete matching evidence should restore standing");
-
-    // Assert: the restored plan is exact, while tampered data is refused.
     assert_eq!(restored, trusted);
     let mut tampered = trusted.erase_for_transport();
     tampered.claimed_plan_root = PlanRoot::hash(b"forged-plan");
@@ -289,8 +297,13 @@ chicago_tdd_tools::test!(transport_replay_restores_only_matching_trusted_evidenc
 chicago_tdd_tools::test!(
     receipt_chain_connects_decision_dispatch_effect_and_cursor,
     {
-        // Arrange: compile and broker a real application plan.
-        let (mut workflow, state, observation, goal, binding) = arrange_compiled_workflow();
+        let CompiledWorkflowFixture {
+            mut workflow,
+            state,
+            observation,
+            goal,
+            binding,
+        } = arrange_compiled_workflow();
         let verified = workflow.plan(&state).expect("planning should succeed");
         let typed = binding
             .bind_plan(&verified)
@@ -325,8 +338,6 @@ chicago_tdd_tools::test!(
                 .record_effect(tick, command_index, effect_root)
                 .expect("effect should advance command state");
         }
-
-        // Act: append the cross-boundary receipt ancestry.
         let mut receipts = WorkflowReceiptChain::default();
         receipts.append(ReceiptSubject::Observation(observation.root()));
         receipts.append(ReceiptSubject::Goal(goal.root()));
@@ -337,8 +348,6 @@ chicago_tdd_tools::test!(
         receipts.append(ReceiptSubject::Dispatch(proposal.root()));
         receipts.append(ReceiptSubject::Effect(effect_root));
         receipts.append(ReceiptSubject::Cursor(cursor.root()));
-
-        // Assert: every receipt has one deterministic parent and the chain replays.
         receipts.verify().expect("receipt ancestry should replay");
         assert_eq!(receipts.records().len(), 9);
         assert!(receipts.root().is_some());
@@ -352,11 +361,8 @@ chicago_tdd_tools::test!(
 chicago_tdd_tools::test!(
     residual_reconciliation_preserves_only_unchanged_observations,
     {
-        // Arrange: identify the original plan and observation.
         let original_observation = ObservationRoot::hash(b"state-v1");
         let original_plan = PlanRoot::hash(b"plan-v1");
-
-        // Act: reconcile unchanged, changed, satisfied, and over-bound cases.
         let keep = reconcile_residual(&ResidualRequest {
             original_plan,
             original_observation,
@@ -393,8 +399,6 @@ chicago_tdd_tools::test!(
             generation: 4,
             max_generations: 4,
         });
-
-        // Assert: no stale suffix is silently represented as valid.
         assert_eq!(keep, ReplanDecision::KeepSuffix { from_tick: Some(3) });
         assert!(matches!(replace, ReplanDecision::ReplaceRequired { .. }));
         assert_eq!(satisfied, ReplanDecision::GoalAlreadySatisfied);
@@ -408,8 +412,13 @@ chicago_tdd_tools::test!(
 );
 
 chicago_tdd_tools::test!(binding_broker_and_cursor_refuse_boundary_confusion, {
-    // Arrange: create an incomplete binding catalog and one real dispatch proposal.
-    let (mut workflow, state, observation, goal, binding) = arrange_compiled_workflow();
+    let CompiledWorkflowFixture {
+        mut workflow,
+        state,
+        observation,
+        goal,
+        binding,
+    } = arrange_compiled_workflow();
     let coverage = binding.coverage(["reserve-inventory", "notify-customer", "charge-payment"]);
     let verified = workflow.plan(&state).expect("planning should succeed");
     let typed = binding
@@ -447,11 +456,7 @@ chicago_tdd_tools::test!(binding_broker_and_cursor_refuse_boundary_confusion, {
         .admit_batch(&second_proposal)
         .expect("second distinct proposal should be admitted");
     let mut cursor = WorkflowCursor::from_proposal(&proposal);
-
-    // Act: try to use evidence from the wrong dispatch root.
     let cursor_result = cursor.record_admission(&wrong_admission);
-
-    // Assert: missing bindings, duplicate submissions, and root mismatch stay distinct.
     assert_eq!(coverage.missing_bindings, vec!["charge-payment"]);
     assert!(matches!(
         duplicate,
