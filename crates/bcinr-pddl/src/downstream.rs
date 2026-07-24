@@ -17,9 +17,7 @@ use serde::{Deserialize, Serialize};
 use crate::cognitive::{
     plan_exact_cognitive_workflow_bounded, ExactCognitiveError, ExactCognitiveWorkflow,
 };
-use crate::ground_v2::{
-    EXACT_MAX_GROUND_ACTIONS, EXACT_MAX_PLAN_DEPTH, EXACT_MAX_SEARCH_STATES,
-};
+use crate::ground_v2::{EXACT_MAX_GROUND_ACTIONS, EXACT_MAX_PLAN_DEPTH, EXACT_MAX_SEARCH_STATES};
 use crate::mfw::planner::MfwPlanError;
 use crate::{PddlPowlConfig, PddlPowlError, PddlPowlExecution, PddlPowlRuntime};
 
@@ -208,7 +206,9 @@ impl CognitivePddlExecution {
     /// Replay the same semantic rail and verify its POWL execution receipt.
     pub fn verify(&self) -> Result<(), CognitivePddlError> {
         match self {
-            Self::Concurrent(execution) => execution.verify().map_err(CognitivePddlError::Concurrent),
+            Self::Concurrent(execution) => {
+                execution.verify().map_err(CognitivePddlError::Concurrent)
+            }
             Self::ExactSequential {
                 workflow,
                 domain_pddl,
@@ -262,11 +262,16 @@ impl CognitivePddlExecution {
     /// Scheduler ticks with silent transitions filtered from the action list.
     pub fn batches(&self) -> Result<Vec<PddlPowlBatch>, CognitivePddlError> {
         match self {
-            Self::Concurrent(execution) => execution
-                .batches()
-                .map_err(CognitivePddlError::Concurrent),
+            Self::Concurrent(execution) => {
+                execution.batches().map_err(CognitivePddlError::Concurrent)
+            }
             Self::ExactSequential { workflow, .. } => {
-                let activity_slots = workflow.powl.activity_slots.iter().copied().collect::<Vec<_>>();
+                let activity_slots = workflow
+                    .powl
+                    .activity_slots
+                    .iter()
+                    .copied()
+                    .collect::<Vec<_>>();
                 Ok(workflow
                     .execution_receipt
                     .fired_masks
@@ -277,7 +282,9 @@ impl CognitivePddlExecution {
                         let actions = activity_slots
                             .iter()
                             .filter(|(slot, _)| fired_mask & (1u64 << *slot) != 0)
-                            .map(|(_, offset)| workflow.powl.tape.label_slab.get(*offset).to_string())
+                            .map(|(_, offset)| {
+                                workflow.powl.tape.label_slab.get(*offset).to_string()
+                            })
                             .collect();
                         PddlPowlBatch {
                             tick: tick as u32,
@@ -351,9 +358,7 @@ impl CognitivePddlRuntime {
     ) -> Result<CognitivePddlExecution, CognitivePddlError> {
         match self.concurrent.execute(domain_pddl, problem_pddl) {
             Ok(execution) => Ok(CognitivePddlExecution::Concurrent(execution)),
-            Err(PddlPowlError::Plan(MfwPlanError::Admission(
-                PlannerFailure::Unsupported(_),
-            ))) => {
+            Err(PddlPowlError::Plan(MfwPlanError::Admission(PlannerFailure::Unsupported(_)))) => {
                 let bounds = self.config.exact;
                 let workflow = plan_exact_cognitive_workflow_bounded(
                     domain_pddl,
@@ -451,8 +456,8 @@ mod tests {
             "(define (domain d) (:requirements :adl :typing) (:types item) \
              (:predicates (ready ?x - item) (done ?x - item)) \
              (:action finish-all :parameters () \
-              :precondition (forall (?x - item) (ready ?x)) \
-              :effect (forall (?x - item) (when (ready ?x) (done ?x)))))",
+               :precondition (forall (?x - item) (ready ?x)) \
+               :effect (forall (?x - item) (when (ready ?x) (done ?x)))))",
             "(define (problem p) (:domain d) (:objects a b - item) \
              (:init (ready a) (ready b)) (:goal (and (done a) (done b))))",
         )
