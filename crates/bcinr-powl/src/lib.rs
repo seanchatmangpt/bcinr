@@ -8,8 +8,9 @@
 //!   unlocking compile-time topology encoding in [`const_scheduler`] and
 //!   512-op wide tapes in [`scheduler_wide`].
 //!
-//! The planner-output POWL v2 tape is executable directly through
-//! [`scheduler_v2`]; no legacy-tape projection is required.
+//! The recursive POWL 2.0 model is defined in [`powl2`]. Both hand-authored
+//! POWL 2.0 and planner-output POWL v2 compile to an executable v2 tape;
+//! neither requires conversion through the legacy scheduler representation.
 #![feature(adt_const_params)]
 #![feature(generic_const_exprs)]
 #![allow(incomplete_features)] // generic_const_exprs is still being stabilised
@@ -22,6 +23,7 @@ pub mod const_scheduler;
 pub mod dispatcher;
 pub mod enterprise;
 pub mod model;
+pub mod powl2;
 pub mod projection;
 pub mod receipt_worker;
 pub mod scheduler;
