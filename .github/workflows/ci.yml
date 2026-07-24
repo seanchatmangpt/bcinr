@@ -19,8 +19,6 @@ jobs:
   style:
     name: Format & Clippy
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
@@ -67,60 +65,6 @@ jobs:
         with:
           name: clippy-diagnostics
           path: clippy.log
-          if-no-files-found: error
-      - name: Upload refused source snapshot
-        if: steps.clippy.outputs.status != '0'
-        uses: actions/upload-artifact@v4
-        with:
-          name: clippy-source-snapshot
-          path: |
-            crates/bcinr-pddl/src/ground_v2.rs
-          if-no-files-found: error
-      - name: Manufacture corrected source blob
-        if: steps.clippy.outputs.status != '0'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPOSITORY: ${{ github.repository }}
-        run: |
-          python - <<'PY'
-          import base64
-          import json
-          from pathlib import Path
-
-          path = Path("crates/bcinr-pddl/src/ground_v2.rs")
-          source = path.read_text()
-          old = '''        assert_eq!(
-                      solve(domain, insufficient),
-                      Err(ExactClassicalError::NoPlan)
-                  );'''
-          new = '''        assert!(matches!(
-                      solve(domain, insufficient),
-                      Err(ExactClassicalError::NoPlan)
-                  ));'''
-          if source.count(old) != 1:
-              raise SystemExit("expected exactly one exact-classical NoPlan assertion")
-          corrected = source.replace(old, new, 1).encode()
-          request = {
-              "content": base64.b64encode(corrected).decode(),
-              "encoding": "base64",
-          }
-          Path("ground-v2-blob-request.json").write_text(json.dumps(request))
-          PY
-          curl --fail-with-body --silent --show-error \
-            --request POST \
-            --header "Accept: application/vnd.github+json" \
-            --header "Authorization: Bearer ${GH_TOKEN}" \
-            --header "X-GitHub-Api-Version: 2022-11-28" \
-            --data-binary @ground-v2-blob-request.json \
-            "https://api.github.com/repos/${GH_REPOSITORY}/git/blobs" \
-            > ground-v2-blob.json
-          cat ground-v2-blob.json
-      - name: Upload corrected blob identity
-        if: steps.clippy.outputs.status != '0'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ground-v2-corrected-blob
-          path: ground-v2-blob.json
           if-no-files-found: error
       - name: Enforce Clippy
         if: steps.clippy.outputs.status != '0'
