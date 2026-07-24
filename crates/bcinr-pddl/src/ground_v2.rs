@@ -992,10 +992,10 @@ mod tests {
         let enough = "(define (problem p) (:domain d) (:init (= (fuel) 2)) (:goal (done)))";
         let insufficient = "(define (problem p) (:domain d) (:init (= (fuel) 1)) (:goal (done)))";
         assert_eq!(solve(domain, enough).unwrap().ops.len(), 1);
-        assert_eq!(
+        assert!(matches!(
             solve(domain, insufficient),
             Err(ExactClassicalError::NoPlan)
-        );
+        ));
     }
 
     #[test]
