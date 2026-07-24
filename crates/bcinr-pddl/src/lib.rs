@@ -48,6 +48,7 @@ pub mod production;
 pub mod production_capability;
 pub mod schedule_analysis;
 pub mod search;
+mod semantic_features;
 mod sexpr;
 #[cfg(feature = "mfw-planner")]
 pub mod task;
