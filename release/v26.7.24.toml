@@ -1,0 +1,58 @@
+version = "26.7.24"
+status = "BUILD_UNKNOWN"
+release_branch = "agent/v26.7.24-production-pddl-powl-v2"
+release_pr = 8
+
+[publish]
+order = [
+  "wasm4pm-compat",
+  "bcinr-powl",
+  "bcinr-powl-receipt",
+  "bcinr-pddl",
+]
+
+[crates.wasm4pm-compat]
+version = "26.7.24"
+source_pr = "seanchatmangpt/wasm4pm-compat#6"
+required_before = ["bcinr-powl", "bcinr-pddl"]
+
+[crates.bcinr-powl]
+version = "26.7.24"
+canonical_suites = ["powl2", "scheduler_v2"]
+
+[crates.bcinr-powl-receipt]
+version = "26.7.24"
+canonical_suites = ["execution_v2"]
+
+[crates.bcinr-pddl]
+version = "26.7.24"
+canonical_suites = [
+  "canonical_ipc",
+  "ground_v2",
+  "production",
+  "cognitive",
+]
+
+[gates]
+required = [
+  "format",
+  "clippy",
+  "canonical",
+  "workspace-linux",
+  "workspace-macos",
+  "workspace-windows",
+  "miri-bcinr-mfw-ir",
+  "miri-bcinr-powl",
+  "miri-bcinr-pddl",
+  "documentation",
+  "cargo-audit",
+  "cargo-deny",
+]
+
+[blockers]
+items = [
+  "all final-head CI and Miri jobs must pass",
+  "wasm4pm-compat 26.7.24 must pass its verifier and be published",
+  "bcinr must consume the fixed wasm4pm-compat release",
+  "temporary quick-xml advisory exceptions must be deleted",
+]
