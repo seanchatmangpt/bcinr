@@ -278,6 +278,10 @@ pub fn antichain_width(
             if !reachability[from][pivot] {
                 continue;
             }
+            // Floyd-Warshall transitive closure: `to` indexes both `reachability[from]`
+            // and `reachability[pivot]` in the same iteration, so an iterator adaptor
+            // over one row cannot express this without a second index anyway.
+            #[allow(clippy::needless_range_loop)]
             for to in 0..node_count {
                 reachability[from][to] |= reachability[pivot][to];
             }

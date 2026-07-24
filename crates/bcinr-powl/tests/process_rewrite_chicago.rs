@@ -42,7 +42,13 @@ chicago_tdd_tools::test!(activity_mapping_changes_vocabulary_not_geometry, {
     let (mapped, witness) =
         map_activity_labels(&process, |label| format!("command::{label}")).unwrap();
 
-    assert_eq!(find_activities(&mapped, "command::validate").unwrap().len(), 1);
-    assert_eq!(find_activities(&mapped, "command::dispatch").unwrap().len(), 1);
+    assert_eq!(
+        find_activities(&mapped, "command::validate").unwrap().len(),
+        1
+    );
+    assert_eq!(
+        find_activities(&mapped, "command::dispatch").unwrap().len(),
+        1
+    );
     assert_ne!(witness.before, witness.after);
 });

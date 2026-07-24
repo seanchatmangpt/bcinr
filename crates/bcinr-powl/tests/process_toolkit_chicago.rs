@@ -67,11 +67,8 @@ chicago_tdd_tools::test!(stable_node_paths_support_inspection_and_visualization,
 });
 
 chicago_tdd_tools::test!(process_diff_reports_vocabulary_and_structure_changes, {
-    let before = partial_order(
-        vec![activity("reserve"), activity("notify")],
-        vec![],
-    )
-    .expect("before process");
+    let before = partial_order(vec![activity("reserve"), activity("notify")], vec![])
+        .expect("before process");
     let after = partial_order(
         vec![activity("reserve"), activity("audit"), activity("notify")],
         vec![(0, 2)],

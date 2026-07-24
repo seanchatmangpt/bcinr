@@ -221,9 +221,12 @@ fn map_labels(model: &Powl2Model, map: &mut impl FnMut(&str) -> String) -> Powl2
     match model {
         Powl2Model::Activity(label) => Powl2Model::Activity(map(label)),
         Powl2Model::Silent => Powl2Model::Silent,
-        Powl2Model::Sequence(children) => {
-            Powl2Model::Sequence(children.iter().map(|child| map_labels(child, map)).collect())
-        }
+        Powl2Model::Sequence(children) => Powl2Model::Sequence(
+            children
+                .iter()
+                .map(|child| map_labels(child, map))
+                .collect(),
+        ),
         Powl2Model::PartialOrder { children, edges } => Powl2Model::PartialOrder {
             children: children
                 .iter()

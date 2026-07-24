@@ -42,10 +42,7 @@ fn render_goal(goal: &GoalExpr<String, i64>) -> String {
 }
 
 impl GoalDirectedWorkflowProblem<GoalExpr<String, i64>> for OrderState {
-    fn to_pddl_problem_for_goal<'a>(
-        &'a self,
-        goal: &'a GoalExpr<String, i64>,
-    ) -> Cow<'a, str> {
+    fn to_pddl_problem_for_goal<'a>(&'a self, goal: &'a GoalExpr<String, i64>) -> Cow<'a, str> {
         let paid = if self.paid { "(paid)" } else { "" };
         Cow::Owned(format!(
             "(define (problem order-{id}) (:domain fulfillment-app) (:init {paid}) (:goal {goal}))",

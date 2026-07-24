@@ -36,10 +36,7 @@ fn render_goal(goal: &GoalExpr<String, i64>) -> String {
 }
 
 impl GoalDirectedWorkflowProblem<GoalExpr<String, i64>> for ReleaseState {
-    fn to_pddl_problem_for_goal<'a>(
-        &'a self,
-        goal: &'a GoalExpr<String, i64>,
-    ) -> Cow<'a, str> {
+    fn to_pddl_problem_for_goal<'a>(&'a self, goal: &'a GoalExpr<String, i64>) -> Cow<'a, str> {
         let built = if self.built { "(built)" } else { "" };
         Cow::Owned(format!(
             "(define (problem release-{version}) (:domain deployment) (:init {built}) (:goal {goal}))",

@@ -143,7 +143,9 @@ where
             commands,
         })
     }
+}
 
+impl<C> DispatchProposal<C> {
     pub const fn root(&self) -> DispatchRoot {
         self.root
     }
@@ -162,6 +164,36 @@ where
 
     pub fn commands(&self) -> &[CommandEnvelope<C>] {
         &self.commands
+    }
+}
+
+impl<C: fmt::Debug> DispatchProposal<C> {
+    /// Human-readable projection over this proposal's existing roots and
+    /// commands. Read-only: it renders data the type already carries so a
+    /// compiled proposal can be audited as easily as reading a branch, not a
+    /// new authority or actuation surface.
+    pub fn explain(&self) -> String {
+        let mut out = format!(
+            "dispatch root: {}\nplan root: {}\nexecution root: {}\nidempotency: {}\ncommands: {}\n",
+            self.root,
+            self.plan_root,
+            self.execution_root,
+            self.idempotency.as_str(),
+            self.commands.len(),
+        );
+        for envelope in &self.commands {
+            out.push_str(&format!(
+                "  tick {} #{}: binding {} policy {} -> {:?}\n",
+                envelope.tick,
+                envelope.command_index,
+                envelope.binding_root,
+                envelope
+                    .policy_root
+                    .map_or_else(|| "none".to_string(), |root| root.to_string()),
+                envelope.command,
+            ));
+        }
+        out
     }
 }
 

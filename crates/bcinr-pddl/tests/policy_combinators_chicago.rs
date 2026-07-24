@@ -17,7 +17,11 @@ impl Policy<(), ()> for Admit {
     type Evidence = &'static str;
     type Refusal = &'static str;
 
-    fn evaluate(&self, _input: &(), _context: &()) -> PolicyDecision<Self::Evidence, Self::Refusal> {
+    fn evaluate(
+        &self,
+        _input: &(),
+        _context: &(),
+    ) -> PolicyDecision<Self::Evidence, Self::Refusal> {
         PolicyDecision::Admit(self.0)
     }
 }
@@ -35,7 +39,11 @@ impl Policy<(), ()> for Refuse {
     type Evidence = &'static str;
     type Refusal = &'static str;
 
-    fn evaluate(&self, _input: &(), _context: &()) -> PolicyDecision<Self::Evidence, Self::Refusal> {
+    fn evaluate(
+        &self,
+        _input: &(),
+        _context: &(),
+    ) -> PolicyDecision<Self::Evidence, Self::Refusal> {
         PolicyDecision::Refuse(self.0)
     }
 }
@@ -67,6 +75,30 @@ chicago_tdd_tools::test!(not_policy_exchanges_evidence_and_refusal, {
     assert_eq!(
         NotPolicy::new(Refuse("was-refused")).evaluate(&(), &()),
         PolicyDecision::Admit("was-refused")
+    );
+});
+
+chicago_tdd_tools::test!(all_policy_admits_only_when_both_admit_and_pairs_evidence, {
+    let policy = AllPolicy::new(Admit("left-admitted"), Admit("right-admitted"));
+    assert_eq!(
+        policy.evaluate(&(), &()),
+        PolicyDecision::Admit(("left-admitted", "right-admitted"))
+    );
+});
+
+chicago_tdd_tools::test!(all_policy_short_circuits_on_first_refusal, {
+    let policy = AllPolicy::new(Refuse("first-refused"), Admit("second-admitted"));
+    assert_eq!(
+        policy.evaluate(&(), &()),
+        PolicyDecision::Refuse(AllPolicyRefusal::First("first-refused"))
+    );
+});
+
+chicago_tdd_tools::test!(all_policy_reports_second_refusal_after_first_admits, {
+    let policy = AllPolicy::new(Admit("first-admitted"), Refuse("second-refused"));
+    assert_eq!(
+        policy.evaluate(&(), &()),
+        PolicyDecision::Refuse(AllPolicyRefusal::Second("second-refused"))
     );
 });
 

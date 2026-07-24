@@ -464,3 +464,146 @@ chicago_tdd_tools::test!(binding_broker_and_cursor_refuse_boundary_confusion, {
     ));
     assert_eq!(cursor_result, Err(CursorError::DispatchRootMismatch));
 });
+
+chicago_tdd_tools::test!(explain_renders_the_plans_own_roots_standing_and_actions, {
+    let CompiledWorkflowFixture {
+        mut workflow,
+        state,
+        observation,
+        goal,
+        binding,
+    } = arrange_compiled_workflow();
+    let verified = workflow.plan(&state).expect("planning should succeed");
+    let plan_explanation = verified.explain();
+    assert!(plan_explanation.contains(verified.execution_root()));
+    assert!(plan_explanation.contains("reserve-inventory"));
+    assert!(plan_explanation.contains("notify-customer"));
+    assert!(plan_explanation.contains("WitnessedConcurrentStrips"));
+
+    let typed = binding
+        .bind_plan(&verified)
+        .expect("binding should succeed");
+    let envelope = workflow
+        .manufacture_plan_envelope(
+            &verified,
+            observation.root(),
+            goal.root(),
+            PlanningBounds::interactive(),
+            SearchPolicyRoot::hash(b"first-valid-deterministic-v1"),
+        )
+        .expect("plan envelope");
+    let policies = TenantPolicy {
+        allowed_tenant: "acme",
+    };
+    let proposal = DispatchProposal::from_typed_plan(
+        &typed,
+        &envelope,
+        binding.schema_root(),
+        Some(policies.root()),
+        IdempotencyKey::new("order-42:explain").expect("idempotency key"),
+    )
+    .expect("proposal");
+    let proposal_explanation = proposal.explain();
+    assert!(proposal_explanation.contains(&proposal.root().to_string()));
+    assert!(proposal_explanation.contains(&binding.schema_root().to_string()));
+    assert!(proposal_explanation.contains(&policies.root().to_string()));
+    assert!(proposal_explanation.contains("order-42:explain"));
+    assert!(
+        proposal_explanation.contains("ReserveInventory")
+            || proposal_explanation.contains("NotifyCustomer")
+    );
+});
+
+chicago_tdd_tools::test!(
+    cursor_advances_through_attempt_and_effect_and_refuses_invalid_transitions_and_resupersession,
+    {
+        let CompiledWorkflowFixture {
+            mut workflow,
+            state,
+            observation,
+            goal,
+            binding,
+        } = arrange_compiled_workflow();
+        let verified = workflow.plan(&state).expect("planning should succeed");
+        let typed = binding
+            .bind_plan(&verified)
+            .expect("binding should succeed");
+        let envelope = workflow
+            .manufacture_plan_envelope(
+                &verified,
+                observation.root(),
+                goal.root(),
+                PlanningBounds::interactive(),
+                SearchPolicyRoot::hash(b"first-valid-deterministic-v1"),
+            )
+            .expect("plan envelope");
+        let proposal = DispatchProposal::from_typed_plan(
+            &typed,
+            &envelope,
+            binding.schema_root(),
+            None,
+            IdempotencyKey::new("order-42:attempt-and-supersede").expect("idempotency key"),
+        )
+        .expect("proposal");
+        let mut broker = RecordingBroker::default();
+        let admission = broker.admit_batch(&proposal).expect("broker admission");
+        let mut cursor = WorkflowCursor::from_proposal(&proposal);
+        let ready = cursor.next_ready();
+
+        // A command cannot be attempted before it is admitted.
+        let (first_tick, first_index) = ready[0];
+        assert_eq!(
+            cursor.record_attempt(first_tick, first_index, 1),
+            Err(CursorError::InvalidTransition)
+        );
+
+        cursor
+            .record_admission(&admission)
+            .expect("cursor admission");
+        for &(tick, command_index) in &ready {
+            cursor
+                .record_attempt(tick, command_index, 1)
+                .expect("admitted commands should accept an attempt");
+        }
+        assert!(cursor
+            .commands()
+            .iter()
+            .all(|command| matches!(command.progress, CommandProgress::Attempted { attempt: 1 })));
+
+        // Attempting again before an effect is observed is not a valid transition.
+        assert_eq!(
+            cursor.record_attempt(first_tick, first_index, 2),
+            Err(CursorError::InvalidTransition)
+        );
+        // Attempting a command that does not exist on this cursor is refused, not panicked.
+        assert_eq!(
+            cursor.record_attempt(999, 999, 1),
+            Err(CursorError::CommandNotFound {
+                tick: 999,
+                command_index: 999,
+            })
+        );
+
+        for &(tick, command_index) in &ready {
+            cursor
+                .record_effect(
+                    tick,
+                    command_index,
+                    EffectRoot::hash_parts(&[b"attempted-then-observed", &tick.to_le_bytes()]),
+                )
+                .expect("attempted commands should accept observed effects");
+        }
+        assert!(cursor.next_tick().is_none());
+
+        let replacement_plan = PlanRoot::hash(b"order-42:replacement-plan");
+        cursor
+            .supersede(replacement_plan)
+            .expect("an un-superseded cursor should accept supersession");
+        assert_eq!(cursor.superseded_by(), Some(replacement_plan));
+        assert_eq!(cursor.generation(), 1);
+        assert_eq!(
+            cursor.supersede(PlanRoot::hash(b"order-42:second-replacement")),
+            Err(CursorError::PlanAlreadySuperseded)
+        );
+    }
+);

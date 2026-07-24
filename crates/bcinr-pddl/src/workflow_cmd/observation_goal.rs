@@ -34,7 +34,9 @@ impl<O: Serialize> ObservationSnapshot<O> {
             value,
         })
     }
+}
 
+impl<O> ObservationSnapshot<O> {
     pub const fn root(&self) -> ObservationRoot {
         self.root
     }
@@ -117,7 +119,9 @@ impl<G: Serialize> GoalEnvelope<G> {
             root,
         })
     }
+}
 
+impl<G> GoalEnvelope<G> {
     pub const fn root(&self) -> GoalRoot {
         self.root
     }

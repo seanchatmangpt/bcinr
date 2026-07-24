@@ -322,6 +322,32 @@ impl VerifiedWorkflowPlan {
         self.execution.summary()
     }
 
+    /// Human-readable projection over this plan's existing roots and batches.
+    ///
+    /// This is a read-only view, not a new subsystem: every fact it prints
+    /// (standing, execution root, tick order, action labels) is already carried
+    /// by `self`. It exists so a compiled plan can be audited by reading text,
+    /// the same way a hand-authored if/else chain can be read directly.
+    pub fn explain(&self) -> String {
+        let mut out = format!(
+            "standing: {:?}\nexecution root: {}\nbatches: {}\n",
+            self.standing(),
+            self.execution_root(),
+            self.batches.len(),
+        );
+        for batch in &self.batches {
+            out.push_str(&format!(
+                "  tick {} ({} action(s)):\n",
+                batch.tick,
+                batch.actions.len()
+            ));
+            for action in &batch.actions {
+                out.push_str(&format!("    - {}\n", action.label));
+            }
+        }
+        out
+    }
+
     pub fn into_execution(self) -> CognitivePddlExecution {
         self.execution
     }
