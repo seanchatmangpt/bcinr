@@ -82,6 +82,6 @@ fn rust_application_projects_state_plans_and_binds_typed_commands() {
         .iter()
         .find(|batch| batch.is_parallel())
         .expect("independent application work should share one admitted tick");
-    assert!(parallel.actions.contains(&OrderCommand::ReserveInventory));
-    assert!(parallel.actions.contains(&OrderCommand::SendConfirmation));
+    assert!(parallel.actions().contains(&OrderCommand::ReserveInventory));
+    assert!(parallel.actions().contains(&OrderCommand::SendConfirmation));
 }
