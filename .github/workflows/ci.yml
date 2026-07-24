@@ -66,6 +66,14 @@ jobs:
           name: clippy-diagnostics
           path: clippy.log
           if-no-files-found: error
+      - name: Upload refused source snapshot
+        if: steps.clippy.outputs.status != '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: clippy-source-snapshot
+          path: |
+            crates/bcinr-pddl/src/ground_v2.rs
+          if-no-files-found: error
       - name: Enforce Clippy
         if: steps.clippy.outputs.status != '0'
         run: exit 1
