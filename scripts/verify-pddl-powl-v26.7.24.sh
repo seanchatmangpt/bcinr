@@ -26,12 +26,14 @@ cargo test -p bcinr-pddl --features mfw-planner --lib downstream
 cargo test -p bcinr-pddl --features mfw-planner --lib embedded
 cargo test -p bcinr-pddl --features mfw-planner --lib problem_builder
 cargo test -p bcinr-pddl --features mfw-planner --lib production
+cargo test -p bcinr-pddl --features mfw-planner --lib workflow_cmd
 cargo test -p bcinr-pddl --features mfw-planner --test undeclared_semantics
 
-printf '\n==> External downstream API\n'
+printf '\n==> External downstream API and Chicago TDD behavior\n'
 cargo test -p bcinr-pddl --features mfw-planner --test downstream_pddl_powl
 cargo test -p bcinr-pddl --features mfw-planner --test downstream_cognitive
 cargo test -p bcinr-pddl --features mfw-planner --test embedded_workflow
+cargo test -p bcinr-pddl --features mfw-planner --test workflow_cmd_chicago
 
 printf '\n==> Compile every downstream surface\n'
 cargo check -p bcinr-pddl --features mfw-planner --all-targets
