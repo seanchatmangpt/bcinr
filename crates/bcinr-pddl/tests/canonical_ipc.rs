@@ -15,10 +15,7 @@ fn execute(
     domain_text: &str,
     problem_text: &str,
     case_id: &str,
-) -> (
-    bcinr_pddl::Pddl8Tape,
-    bcinr_pddl::Pddl8ExecutionReceipt,
-) {
+) -> (bcinr_pddl::Pddl8Tape, bcinr_pddl::Pddl8ExecutionReceipt) {
     let domain = domain_from_pddl(domain_text).unwrap();
     let problem = problem_from_pddl(problem_text).unwrap();
     let grounded = GroundProblem::build(&domain, &problem, None).unwrap();
