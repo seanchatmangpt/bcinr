@@ -1,4 +1,4 @@
-use bcinr_pddl::PddlPowlRuntime;
+use bcinr_pddl::execute_cognitive_pddl;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let domain = "(define (domain demo)
@@ -11,13 +11,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       (:init (ready))
       (:goal (and (left) (right))))";
 
-    let mut runtime = PddlPowlRuntime::default();
-    let execution = runtime.execute(domain, problem)?;
+    let execution = execute_cognitive_pddl(domain, problem)?;
     execution.verify()?;
 
-    for (tick, actions) in execution.execution_batches()?.iter().enumerate() {
-        println!("tick {tick}: {}", actions.join(", "));
+    println!("standing: {:?}", execution.standing());
+    for batch in execution.batches()? {
+        if !batch.actions.is_empty() {
+            println!("tick {}: {}", batch.tick, batch.actions.join(", "));
+        }
     }
-    println!("receipt: {}", execution.state_receipt.chain_root);
+    println!("receipt: {}", execution.execution_root());
     Ok(())
 }
