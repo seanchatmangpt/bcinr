@@ -4,9 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    CognitivePddlError, CognitivePddlExecution, CognitivePddlRuntime,
-};
+use crate::{CognitivePddlError, CognitivePddlExecution, CognitivePddlRuntime};
 
 /// Borrowed PDDL domain/problem pair for zero-copy request routing.
 #[derive(Debug, Clone, Copy)]
