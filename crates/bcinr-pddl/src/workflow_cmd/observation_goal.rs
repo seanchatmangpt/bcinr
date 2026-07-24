@@ -192,8 +192,19 @@ pub struct DispatchAdmitted;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EffectObserved;
 
-/// Standing-bearing value. Construction is intentionally narrow; transport
-/// erases standing and transitions manufacture a new root.
+/// Generic standing-bearing value for custom compiler rails and transport boundaries.
+///
+/// The high-level `WorkflowApplication` intentionally returns the named
+/// `PreparedWorkflow` and `AuthorizedWorkflow` aggregates instead of wrapping
+/// them in this typestate ladder. Those facade types carry several domain-specific
+/// roots and preserve stage-specific accessors and refusals. `Artifact<T, S>` is
+/// the lower-level primitive used by custom `SemanticRail` implementations and by
+/// explicit standing erasure through `erase_for_transport`; it is not a parallel
+/// constructor for facade standing. Any future integration must replace the named
+/// facade transitions rather than manufacture duplicate standing paths.
+///
+/// Construction is intentionally narrow; transport erases standing and lawful
+/// transitions manufacture a new root.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Artifact<T, S> {
     value: T,
