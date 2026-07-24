@@ -69,7 +69,9 @@ impl ActionInvocation {
         }
 
         let (name, arguments) = if trimmed.starts_with('(') {
-            let Some(inner) = trimmed.strip_prefix('(').and_then(|value| value.strip_suffix(')'))
+            let Some(inner) = trimmed
+                .strip_prefix('(')
+                .and_then(|value| value.strip_suffix(')'))
             else {
                 return Err(ActionLabelError::new(
                     label,
@@ -147,10 +149,7 @@ fn split_whitespace_invocation(
     let Some(name) = parts.next() else {
         return Err(ActionLabelError::new(original, "action name is empty"));
     };
-    Ok((
-        name.to_string(),
-        parts.map(ToString::to_string).collect(),
-    ))
+    Ok((name.to_string(), parts.map(ToString::to_string).collect()))
 }
 
 /// Refusal to convert a planner label into an application invocation.
@@ -171,7 +170,11 @@ impl ActionLabelError {
 
 impl std::fmt::Display for ActionLabelError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "invalid workflow action label {:?}: {}", self.label, self.reason)
+        write!(
+            f,
+            "invalid workflow action label {:?}: {}",
+            self.label, self.reason
+        )
     }
 }
 
@@ -223,8 +226,12 @@ impl std::fmt::Display for EmbeddedWorkflowError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Planning(error) => write!(f, "embedded workflow planning failed: {error}"),
-            Self::ProblemBuild(error) => write!(f, "embedded workflow problem build failed: {error}"),
-            Self::InvalidActionLabel(error) => write!(f, "embedded workflow binding failed: {error}"),
+            Self::ProblemBuild(error) => {
+                write!(f, "embedded workflow problem build failed: {error}")
+            }
+            Self::InvalidActionLabel(error) => {
+                write!(f, "embedded workflow binding failed: {error}")
+            }
         }
     }
 }
@@ -323,9 +330,7 @@ impl VerifiedWorkflowPlan {
     ///
     /// This is a pure binding step. It never calls handlers and never mutates
     /// application state.
-    pub fn bind<A>(
-        &self,
-    ) -> Result<TypedWorkflowPlan<A>, <A as TryFrom<ActionInvocation>>::Error>
+    pub fn bind<A>(&self) -> Result<TypedWorkflowPlan<A>, <A as TryFrom<ActionInvocation>>::Error>
     where
         A: TryFrom<ActionInvocation>,
     {
@@ -535,9 +540,7 @@ mod tests {
 
     impl WorkflowProblem for JobState {
         fn to_pddl_problem(&self) -> Cow<'_, str> {
-            Cow::Borrowed(
-                "(define (problem job) (:domain jobs) (:init (ready)) (:goal (done)))",
-            )
+            Cow::Borrowed("(define (problem job) (:domain jobs) (:init (ready)) (:goal (done)))")
         }
     }
 
