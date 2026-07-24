@@ -8,8 +8,8 @@
 //!   unlocking compile-time topology encoding in [`const_scheduler`] and
 //!   512-op wide tapes in [`scheduler_wide`].
 //!
-//! The former `const { assert! }` blocker in `dispatcher.rs` has been resolved
-//! by moving the bound to an `impl`-level `const _OPS_BOUND` item.
+//! The planner-output POWL v2 tape is executable directly through
+//! [`scheduler_v2`]; no legacy-tape projection is required.
 #![feature(adt_const_params)]
 #![feature(generic_const_exprs)]
 #![allow(incomplete_features)] // generic_const_exprs is still being stabilised
@@ -25,6 +25,7 @@ pub mod model;
 pub mod projection;
 pub mod receipt_worker;
 pub mod scheduler;
+pub mod scheduler_v2;
 pub mod scheduler_wide;
 pub mod scheduler_wired;
 pub mod tape;
