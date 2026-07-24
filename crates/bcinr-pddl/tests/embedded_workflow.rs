@@ -2,9 +2,7 @@
 
 use std::borrow::Cow;
 
-use bcinr_pddl::{
-    ActionInvocation, CognitiveExecutionStanding, EmbeddedWorkflow, WorkflowProblem,
-};
+use bcinr_pddl::{ActionInvocation, CognitiveExecutionStanding, EmbeddedWorkflow, WorkflowProblem};
 
 const ORDER_DOMAIN: &str = "(define (domain order-service)
   (:requirements :strips)
