@@ -62,6 +62,10 @@ required-features = ["mfw-planner"]
 name = "embedded_workflow"
 required-features = ["mfw-planner"]
 
+[[example]]
+name = "planning_native_application"
+required-features = ["mfw-planner"]
+
 [[test]]
 name = "indexed_grounding"
 path = "tests/indexed_grounding.rs"
