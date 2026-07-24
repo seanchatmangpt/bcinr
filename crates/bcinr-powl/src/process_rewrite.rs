@@ -1,7 +1,7 @@
 //! Safe, deterministic rewrite operations over the recursive POWL process IR.
 //!
-//! Rewrites produce before/after identities and never select choices, execute
-//! activities, or claim semantic equivalence beyond the declared operation.
+//! Rewrites produce before/after identities, declare the semantic law they claim,
+//! and never select choices, execute activities, or manufacture actuation authority.
 
 use std::collections::VecDeque;
 use std::fmt;
@@ -14,9 +14,28 @@ use crate::process_toolkit::{
     ProcessNodeRef, ProcessToolkitError,
 };
 
+/// Declared meaning of a rewrite witness.
+///
+/// The enum names the exact claim made by a transformation. A witness proves
+/// identity transition under that law; it does not grant execution authority.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProcessRewriteLaw {
+    /// One selected node was structurally replaced. No equivalence is claimed.
+    ExactNodeReplacement,
+    /// Activity vocabulary changed while recursive geometry remained fixed.
+    ActivityRelabel,
+    /// Only transitively implied partial-order edges were removed.
+    TransitiveReduction,
+    /// Redundant silent nodes were removed under explicit boundary rules.
+    SilentNodeElimination,
+    /// The process was projected onto an explicit activity predicate.
+    ActivitySlice,
+}
+
 /// Evidence for one exact structural rewrite.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProcessRewriteWitness {
+    pub law: ProcessRewriteLaw,
     pub target: ProcessNodeRef,
     pub before: Digest,
     pub target_before: Digest,
@@ -124,6 +143,7 @@ pub fn replace_process_node(
     Ok((
         rewritten,
         ProcessRewriteWitness {
+            law: ProcessRewriteLaw::ExactNodeReplacement,
             target: target.clone(),
             before,
             target_before,
@@ -145,6 +165,7 @@ pub fn map_activity_labels(
     Ok((
         rewritten,
         ProcessRewriteWitness {
+            law: ProcessRewriteLaw::ActivityRelabel,
             target: ProcessNodeRef::root(),
             before,
             target_before: before,
@@ -157,11 +178,15 @@ pub fn map_activity_labels(
 ///
 /// Choice-graph edges are intentionally untouched: removing a direct choice edge
 /// can change the paths available to a selection policy even when reachability is
-/// unchanged. The returned witness binds the exact input and output identities.
+/// unchanged.
 pub fn reduce_transitive_process_edges(
     model: &Powl2Model,
 ) -> Result<(Powl2Model, ProcessRewriteWitness), ProcessRewriteError> {
-    witnessed_root_rewrite(model, reduce_transitive_edges_inner)
+    witnessed_root_rewrite(
+        model,
+        ProcessRewriteLaw::TransitiveReduction,
+        reduce_transitive_edges_inner,
+    )
 }
 
 /// Eliminate redundant silent nodes while preserving explicit choice and loop boundaries.
@@ -173,7 +198,11 @@ pub fn reduce_transitive_process_edges(
 pub fn eliminate_redundant_silent_nodes(
     model: &Powl2Model,
 ) -> Result<(Powl2Model, ProcessRewriteWitness), ProcessRewriteError> {
-    witnessed_root_rewrite(model, eliminate_silent_inner)
+    witnessed_root_rewrite(
+        model,
+        ProcessRewriteLaw::SilentNodeElimination,
+        eliminate_silent_inner,
+    )
 }
 
 /// Project a process onto selected activities and return exact selection evidence.
@@ -203,6 +232,7 @@ pub fn slice_process_activities(
         rewritten,
         ProcessSliceWitness {
             rewrite: ProcessRewriteWitness {
+                law: ProcessRewriteLaw::ActivitySlice,
                 target: ProcessNodeRef::root(),
                 before,
                 target_before: before,
@@ -216,8 +246,8 @@ pub fn slice_process_activities(
 
 /// Diff two validated process graphs without manufacturing new standing.
 ///
-/// `ProcessDiff` already carries the exact before/after digests. Validation here
-/// prevents malformed process values from entering a comparison receipt.
+/// `ProcessDiff` carries the exact before/after digests. Validation here prevents
+/// malformed process values from entering a comparison receipt.
 pub fn diff_validated_processes(
     before: &Powl2Model,
     after: &Powl2Model,
@@ -229,6 +259,7 @@ pub fn diff_validated_processes(
 
 fn witnessed_root_rewrite(
     model: &Powl2Model,
+    law: ProcessRewriteLaw,
     rewrite: impl FnOnce(&Powl2Model) -> Result<Powl2Model, ProcessRewriteError>,
 ) -> Result<(Powl2Model, ProcessRewriteWitness), ProcessRewriteError> {
     validate_powl2(model).map_err(ProcessToolkitError::InvalidModel)?;
@@ -239,6 +270,7 @@ fn witnessed_root_rewrite(
     Ok((
         rewritten,
         ProcessRewriteWitness {
+            law,
             target: ProcessNodeRef::root(),
             before,
             target_before: before,
@@ -430,29 +462,23 @@ fn project_activity_slice(
         }
         Powl2Model::Silent => Ok(Powl2Model::Silent),
         Powl2Model::Sequence(children) => {
-            let mut projected = Vec::with_capacity(children.len());
-            for (index, child) in children.iter().enumerate() {
-                projected.push(project_activity_slice(
-                    child,
-                    &node.child(index)?,
-                    retain,
-                    retained_activities,
-                    removed_activities,
-                )?);
-            }
+            let projected = project_children(
+                children,
+                node,
+                retain,
+                retained_activities,
+                removed_activities,
+            )?;
             Ok(Powl2Model::Sequence(projected))
         }
         Powl2Model::PartialOrder { children, edges } => {
-            let mut projected = Vec::with_capacity(children.len());
-            for (index, child) in children.iter().enumerate() {
-                projected.push(project_activity_slice(
-                    child,
-                    &node.child(index)?,
-                    retain,
-                    retained_activities,
-                    removed_activities,
-                )?);
-            }
+            let projected = project_children(
+                children,
+                node,
+                retain,
+                retained_activities,
+                removed_activities,
+            )?;
             Ok(Powl2Model::PartialOrder {
                 children: projected,
                 edges: edges.clone(),
@@ -464,16 +490,13 @@ fn project_activity_slice(
             start,
             end,
         } => {
-            let mut projected = Vec::with_capacity(children.len());
-            for (index, child) in children.iter().enumerate() {
-                projected.push(project_activity_slice(
-                    child,
-                    &node.child(index)?,
-                    retain,
-                    retained_activities,
-                    removed_activities,
-                )?);
-            }
+            let projected = project_children(
+                children,
+                node,
+                retain,
+                retained_activities,
+                removed_activities,
+            )?;
             Ok(Powl2Model::ChoiceGraph {
                 children: projected,
                 edges: edges.clone(),
@@ -505,6 +528,28 @@ fn project_activity_slice(
     }
 }
 
+fn project_children(
+    children: &[Powl2Model],
+    node: &ProcessNodeRef,
+    retain: &mut impl FnMut(&str) -> bool,
+    retained_activities: &mut Vec<ProcessNodeRef>,
+    removed_activities: &mut Vec<ProcessNodeRef>,
+) -> Result<Vec<Powl2Model>, ProcessRewriteError> {
+    children
+        .iter()
+        .enumerate()
+        .map(|(index, child)| {
+            project_activity_slice(
+                child,
+                &node.child(index)?,
+                retain,
+                retained_activities,
+                removed_activities,
+            )
+        })
+        .collect()
+}
+
 fn replace_at(
     model: &Powl2Model,
     path: &[u16],
@@ -522,8 +567,7 @@ fn replace_at(
                 .get(index)
                 .cloned()
                 .ok_or_else(|| ProcessToolkitError::InvalidNode(target.clone()))?;
-            let rewritten_child = replace_at(&child, tail, target, replacement)?;
-            children[index] = rewritten_child;
+            children[index] = replace_at(&child, tail, target, replacement)?;
             Ok(Powl2Model::Sequence(children))
         }
         Powl2Model::PartialOrder { children, edges } => {
@@ -532,8 +576,7 @@ fn replace_at(
                 .get(index)
                 .cloned()
                 .ok_or_else(|| ProcessToolkitError::InvalidNode(target.clone()))?;
-            let rewritten_child = replace_at(&child, tail, target, replacement)?;
-            children[index] = rewritten_child;
+            children[index] = replace_at(&child, tail, target, replacement)?;
             Ok(Powl2Model::PartialOrder {
                 children,
                 edges: edges.clone(),
@@ -550,8 +593,7 @@ fn replace_at(
                 .get(index)
                 .cloned()
                 .ok_or_else(|| ProcessToolkitError::InvalidNode(target.clone()))?;
-            let rewritten_child = replace_at(&child, tail, target, replacement)?;
-            children[index] = rewritten_child;
+            children[index] = replace_at(&child, tail, target, replacement)?;
             Ok(Powl2Model::ChoiceGraph {
                 children,
                 edges: edges.clone(),
@@ -648,6 +690,7 @@ mod tests {
         let (mapped, witness) =
             map_activity_labels(&original, |label| format!("cmd::{label}")).unwrap();
         assert_eq!(find_activities(&mapped, "cmd::a").unwrap().len(), 1);
+        assert_eq!(witness.law, ProcessRewriteLaw::ActivityRelabel);
         assert_ne!(witness.before, witness.after);
     }
 
@@ -667,6 +710,7 @@ mod tests {
             panic!("nested partial order should remain explicit");
         };
         assert_eq!(edges.as_slice(), &[(0, 1), (1, 2)]);
+        assert_eq!(witness.law, ProcessRewriteLaw::TransitiveReduction);
         assert_eq!(witness.target, ProcessNodeRef::root());
         assert_ne!(witness.before, witness.after);
         validate_powl2(&rewritten).unwrap();
@@ -687,6 +731,7 @@ mod tests {
                 edges: vec![(0, 1)],
             }
         );
+        assert_eq!(witness.law, ProcessRewriteLaw::SilentNodeElimination);
         assert_ne!(witness.before, witness.after);
         validate_powl2(&rewritten).unwrap();
     }
@@ -696,7 +741,11 @@ mod tests {
         let original = sequence(vec![activity("a"), activity("drop"), activity("c")]).unwrap();
         let (sliced, witness) =
             slice_process_activities(&original, |label| label != "drop").unwrap();
-        assert_eq!(sliced, sequence(vec![activity("a"), activity("c")]).unwrap());
+        assert_eq!(
+            sliced,
+            sequence(vec![activity("a"), activity("c")]).unwrap()
+        );
+        assert_eq!(witness.rewrite.law, ProcessRewriteLaw::ActivitySlice);
         assert_eq!(witness.retained_activities.len(), 2);
         assert_eq!(witness.removed_activities.len(), 1);
         assert_eq!(witness.removed_activities[0].stable_id(), "n_1");
@@ -714,8 +763,7 @@ mod tests {
             start: 0,
             end: 2,
         };
-        let (sliced, _) =
-            slice_process_activities(&original, |label| label != "drop").unwrap();
+        let (sliced, _) = slice_process_activities(&original, |label| label != "drop").unwrap();
         assert_eq!(
             sliced,
             Powl2Model::ChoiceGraph {
