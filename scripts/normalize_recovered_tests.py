@@ -6,15 +6,20 @@ from pathlib import Path
 
 def add_test_lint_boundary(path: Path, lints: tuple[str, ...], rationale: str) -> None:
     source = path.read_text()
-    marker = "#[cfg(test)]\nmod tests {"
-    if marker not in source:
+    markers = (
+        "#[cfg(test)]\nmod tests {",
+        "#[cfg(test)]\npub mod tests {",
+    )
+    marker = next((candidate for candidate in markers if candidate in source), None)
+    if marker is None:
         raise RuntimeError(f"{path}: test module marker missing")
+    module_declaration = marker.split("\n", 1)[1]
     lint_list = ", ".join(f"clippy::{lint}" for lint in lints)
     replacement = (
         "#[cfg(test)]\n"
         f"// {rationale}\n"
         f"#[allow({lint_list})]\n"
-        "mod tests {"
+        f"{module_declaration}"
     )
     path.write_text(source.replace(marker, replacement, 1))
 
