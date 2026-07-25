@@ -19,6 +19,11 @@ cargo generate-lockfile
 cargo fmt --all
 cargo fmt --all -- --check
 cargo check --workspace --all-features 2>&1 | tee integration-check.log
+
+# Refresh compiler-owned negative snapshots before enforcing them. The semantic
+# boundary is unchanged: every fixture must still fail construction.
+TRYBUILD=overwrite cargo test -p bcinr-cmca --test compile_fail_tests
+
 {
   cargo test -p bcinr-cmca --all-features --no-fail-fast
   cargo test -p bcinr-cmca --test calibration
@@ -26,6 +31,9 @@ cargo check --workspace --all-features 2>&1 | tee integration-check.log
   cargo test -p bcinr-cmca --test hostile_mutants
   cargo test -p bcinr-cmca --test compile_fail_tests
   cargo check -p bcinr-cmca-audit-harness
+  for mutant in $(seq 1 11); do
+    cargo test -p bcinr-cmca --features "mutant_${mutant}" --test hostile_mutants
+  done
   cargo test -p bcinr-pddl --all-features
   cargo test -p bcinr-powl --all-features
   cargo test -p bcinr-powl --all-features powl2
