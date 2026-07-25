@@ -1,0 +1,99 @@
+name: Complete Semantic Integration V2
+
+on:
+  push:
+    branches:
+      - agent/semantic-three-way-integration-v26.7.24
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: complete-semantic-integration-v2
+  cancel-in-progress: true
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/semantic-three-way-integration-v26.7.24
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Verify exact merge graph
+        run: |
+          set -euxo pipefail
+          git merge-base --is-ancestor 12419cdac43c953fb1190c5ccbadb4a68e6b6337 HEAD
+          test "$(git rev-parse 12419cdac43c953fb1190c5ccbadb4a68e6b6337^1)" = 22945aff08f0d0194febec924c93c5f6a192a942
+          test "$(git rev-parse 12419cdac43c953fb1190c5ccbadb4a68e6b6337^2)" = 8e80292a425207636628c6a489bb9a11c6092208
+          test "$(git merge-base 22945aff08f0d0194febec924c93c5f6a192a942 8e80292a425207636628c6a489bb9a11c6092208)" = 3338f59ae5fd11f0f5e05115e2981f6daa8caef2
+
+      - name: Apply semantic integration
+        run: python3 scripts/complete_semantic_integration.py
+
+      - name: Regenerate lockfile and format
+        run: |
+          set -euxo pipefail
+          cargo generate-lockfile
+          cargo fmt --all
+
+      - name: Validate integration ladder
+        id: validate
+        shell: bash
+        run: |
+          set +e
+          {
+            set -euxo pipefail
+            cargo fmt --all -- --check
+            cargo check --workspace --all-features
+            cargo test -p bcinr-cmca --all-features --no-fail-fast
+            cargo test -p bcinr-cmca --test calibration
+            cargo test -p bcinr-cmca --test differential
+            cargo test -p bcinr-cmca --test hostile_mutants
+            cargo test -p bcinr-cmca --test compile_fail_tests
+            cargo check -p bcinr-cmca-audit-harness
+            cargo test -p bcinr-pddl --all-features
+            cargo test -p bcinr-powl --all-features
+            cargo test -p bcinr-powl --all-features powl2
+            cargo test -p bcinr-powl --all-features scheduler_v2
+            cargo test -p bcinr-powl-receipt --all-features
+            cargo test -p bcinr-powl-receipt --all-features execution_v2
+            cargo test --workspace --all-features --all-targets --no-fail-fast
+          } > integration-validation.log 2>&1
+          status=$?
+          cat integration-validation.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload validation receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semantic-integration-validation
+          path: integration-validation.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Enforce validation
+        if: steps.validate.outputs.status != '0'
+        run: exit 1
+
+      - name: Commit completed integration
+        if: steps.validate.outputs.status == '0'
+        run: |
+          set -euxo pipefail
+          git config user.name 'OpenAI Integration Agent'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check -- ':!crates/bcinr-cmca/quarantine/legacy-generator/generator.py'
+          git commit -m 'merge: complete semantic recovery integration'
+          git push origin HEAD:agent/semantic-three-way-integration-v26.7.24
