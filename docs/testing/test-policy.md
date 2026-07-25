@@ -19,7 +19,7 @@ The six rejected targets were:
 |---|---|---|
 | `bcinr/tests/e2e_main.rs` | 60 recursive Cargo subprocess tests exceeded five seconds and frequently accepted nonzero exit codes as success | Removed. Formatting, Clippy, compilation, and tool behavior are owned by their direct CI or crate tests. |
 | `bcinr-mcp/tests/adversarial.rs` | Eleven tests repeatedly spawned the same MCP server and exceeded five seconds | Collapsed into one shared-session transport and admission proof; megabyte-scale fuzz repetition was trimmed. |
-| `bcinr-mcp/tests/integration_tests.rs` | Parsed `src/main.rs` text instead of testing the live MCP surface and exited 101 | Removed. Live `tools/list` coverage in the adversarial contract is authoritative. |
+| `bcinr-mcp/tests/integration_tests.rs` | Parsed `src/main.rs` text instead of testing behavior and exited 101 | Replaced with a direct BRCE manufacture lifecycle proof. |
 | `bcinr-cmca/tests/compile_fail_tests.rs` | UI diagnostics exited 101 under the all-features audit | Retained as a specialized compile-fail rail, not part of PR execution. |
 | `bcinr-powl/tests/compile_fail_tests.rs` | UI diagnostics exited 101 under the all-features audit | Retained as a specialized compile-fail rail, not part of PR execution. |
 | `bcinr-cmca/tests/hostile_mutants.rs` | Mutually exclusive mutation features were activated together by `--all-features` | Retained for one-mutant-at-a-time invocation; never treated as an all-features runtime suite. |
@@ -39,6 +39,23 @@ The runtime proof covers both sides of the authority boundary in one domain init
 - a paid observation produces the complete generated command set;
 - generated action coverage is complete;
 - durable and local execution routing remain exact.
+
+## Specialized invocation
+
+Compile-fail diagnostics run by target without the workspace all-features combination:
+
+```bash
+cargo test -p bcinr-cmca --test compile_fail_tests
+cargo test -p bcinr-powl --test compile_fail_tests
+```
+
+CMCA mutation tests run one mutant at a time:
+
+```bash
+cargo test -p bcinr-cmca --test hostile_mutants --features mutant_1
+```
+
+Replace `mutant_1` with the mutant being evaluated. Activating all mutant features simultaneously is not a lawful test configuration.
 
 ## Test design rules
 
