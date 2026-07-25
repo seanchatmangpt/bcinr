@@ -4,10 +4,6 @@ on:
   pull_request:
     branches: [main, master]
 
-concurrency:
-  group: test-audit-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
-
 env:
   CARGO_TERM_COLOR: never
   CARGO_INCREMENTAL: 0
