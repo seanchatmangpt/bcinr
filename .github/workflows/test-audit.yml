@@ -10,9 +10,11 @@ env:
 
 jobs:
   audit:
-    name: Inventory and time all test binaries
+    name: Measure test binaries
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      report: ${{ steps.classify.outputs.report }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
@@ -53,6 +55,7 @@ jobs:
             2> cargo-test-build.stderr
 
       - name: Classify compiled test binaries
+        id: classify
         shell: bash
         run: |
           set -euo pipefail
@@ -62,15 +65,7 @@ jobs:
           import subprocess
           import time
 
-          BUDGET_SECONDS = 5
-
-          def text(value):
-              if value is None:
-                  return ''
-              if isinstance(value, bytes):
-                  return value.decode(errors='replace')
-              return value
-
+          budget_seconds = 5
           records = {}
           with open('cargo-test-build.jsonl', encoding='utf-8') as stream:
               for line in stream:
@@ -83,15 +78,13 @@ jobs:
                   profile = event.get('profile') or {}
                   executable = event.get('executable')
                   target = event.get('target') or {}
-                  if not profile.get('test') or not executable:
-                      continue
-                  executable = os.path.realpath(executable)
-                  records[executable] = {
-                      'package': (event.get('package_id') or '').split(' ')[0],
-                      'target': target.get('name', ''),
-                      'kind': ','.join(target.get('kind') or []),
-                      'src_path': target.get('src_path', ''),
-                  }
+                  if profile.get('test') and executable:
+                      records[os.path.realpath(executable)] = {
+                          'package': (event.get('package_id') or '').split(' ')[0],
+                          'target': target.get('name', ''),
+                          'kind': ','.join(target.get('kind') or []),
+                          'src_path': target.get('src_path', ''),
+                      }
 
           rows = []
           for executable, metadata in sorted(
@@ -104,14 +97,10 @@ jobs:
                       stdout=subprocess.PIPE,
                       stderr=subprocess.STDOUT,
                       text=True,
-                      timeout=BUDGET_SECONDS,
+                      timeout=budget_seconds,
                       check=False,
                   )
-                  tests = [
-                      line
-                      for line in listing.stdout.splitlines()
-                      if line.endswith(': test')
-                  ]
+                  tests = [line for line in listing.stdout.splitlines() if line.endswith(': test')]
                   list_status = str(listing.returncode)
               except subprocess.TimeoutExpired:
                   tests = []
@@ -124,16 +113,14 @@ jobs:
               try:
                   run = subprocess.run(
                       [executable, '--test-threads=1'],
-                      stdout=subprocess.PIPE,
-                      stderr=subprocess.STDOUT,
-                      text=True,
-                      timeout=BUDGET_SECONDS,
+                      stdout=subprocess.DEVNULL,
+                      stderr=subprocess.DEVNULL,
+                      timeout=budget_seconds,
                       check=False,
                   )
                   status = str(run.returncode)
-              except subprocess.TimeoutExpired as exc:
+              except subprocess.TimeoutExpired:
                   status = 'TIMEOUT_5S'
-                  _ = text(exc.stdout) + text(exc.stderr)
               except OSError as exc:
                   status = f'OS_ERROR_{exc.errno}'
               elapsed_ms = (time.monotonic_ns() - started) // 1_000_000
@@ -144,43 +131,40 @@ jobs:
                   'list_status': list_status,
                   'elapsed_ms': elapsed_ms,
                   'status': status,
-                  'budget_class': (
-                      'fast'
-                      if status == '0' and elapsed_ms <= BUDGET_SECONDS * 1000
-                      else 'trim'
-                  ),
+                  'tier': 'fast' if status == '0' and elapsed_ms <= 5000 else 'trim',
               })
 
           columns = [
-              'package',
-              'target',
-              'kind',
-              'src_path',
-              'test_count',
-              'list_status',
-              'elapsed_ms',
-              'status',
-              'budget_class',
+              'package', 'target', 'kind', 'src_path', 'test_count',
+              'list_status', 'elapsed_ms', 'status', 'tier',
           ]
-          with open('test-runtime.tsv', 'w', encoding='utf-8') as out:
-              out.write('\t'.join(columns) + '\n')
-              for row in sorted(rows, key=lambda row: row['elapsed_ms'], reverse=True):
-                  out.write('\t'.join(str(row[column]) for column in columns) + '\n')
+          rows.sort(key=lambda row: row['elapsed_ms'], reverse=True)
+          fast = sum(row['tier'] == 'fast' for row in rows)
 
-          fast = sum(row['budget_class'] == 'fast' for row in rows)
-          trimmed = len(rows) - fast
-          with open('test-audit-summary.txt', 'w', encoding='utf-8') as out:
-              out.write(f'compiled_test_binaries={len(rows)}\n')
-              out.write(f'within_5s_budget={fast}\n')
-              out.write(f'failed_or_over_budget={trimmed}\n')
+          report = []
+          report.append('=== TEST_AUDIT_SUMMARY ===')
+          report.append(f'compiled_test_binaries={len(rows)}')
+          report.append(f'within_5s_budget={fast}')
+          report.append(f'failed_or_over_budget={len(rows) - fast}')
+          report.append('=== TEST_RUNTIME_TSV ===')
+          report.append('\t'.join(columns))
+          report.extend('\t'.join(str(row[column]) for column in columns) for row in rows)
+          report.append('=== TEST_SOURCE_INVENTORY_TSV ===')
+          report.extend(open('test-source-inventory.tsv', encoding='utf-8').read().splitlines())
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
+              out.write('report<<TEST_AUDIT_EOF\n')
+              out.write('\n'.join(report))
+              out.write('\nTEST_AUDIT_EOF\n')
           PY
 
-      - name: Emit audit evidence
+  report:
+    name: Test audit receipt
+    needs: audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Emit receipt
         shell: bash
-        run: |
-          echo '=== TEST_AUDIT_SUMMARY ==='
-          cat test-audit-summary.txt
-          echo '=== TEST_RUNTIME_TSV ==='
-          cat test-runtime.tsv
-          echo '=== TEST_SOURCE_INVENTORY_TSV ==='
-          cat test-source-inventory.tsv
+        env:
+          TEST_AUDIT_REPORT: ${{ needs.audit.outputs.report }}
+        run: printf '%s\n' "$TEST_AUDIT_REPORT"
