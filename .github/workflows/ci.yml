@@ -28,8 +28,15 @@ jobs:
         with:
           shared-key: ci-ubuntu-nightly
           cache-on-failure: true
-      - name: Format
-        run: cargo fmt --all -- --check
+      - name: Produce rustfmt output
+        run: cargo fmt --all
+      - name: Upload rustfmt output
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustfmt-output
+          path: crates/bcinr-pddl/tests/embedded_workflow_generated.rs
+      - name: Verify formatting
+        run: git diff --exit-code
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - name: Workspace tests
