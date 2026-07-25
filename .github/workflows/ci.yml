@@ -32,14 +32,23 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-      - name: Critical behavioral proof (5s max)
+      - name: Build PR proof
         run: >-
-          timeout --signal=KILL 5s
           cargo test
           -p bcinr-pddl
           --test embedded_workflow_generated
           --all-features
-          -- --test-threads=1
+          --no-run
+      - name: Run PR proof (5s budget)
+        shell: bash
+        run: |
+          test_bin="$(find target/debug/deps -maxdepth 1 -type f -name 'embedded_workflow_generated-*' -perm -111 | head -n 1)"
+          test -n "$test_bin"
+          start_ns="$(date +%s%N)"
+          "$test_bin" --test-threads=1
+          elapsed_ms="$(( ($(date +%s%N) - start_ns) / 1000000 ))"
+          echo "test execution: ${elapsed_ms}ms"
+          test "$elapsed_ms" -le 5000
 
   portable:
     name: Portable (${{ matrix.os }})
