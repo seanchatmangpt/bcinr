@@ -39,16 +39,23 @@ jobs:
           --test embedded_workflow_generated
           --all-features
           --no-run
-      - name: Run PR proof (5s budget)
+      - name: Run PR proof (hard 5s budget)
         shell: bash
         run: |
           test_bin="$(find target/debug/deps -maxdepth 1 -type f -name 'embedded_workflow_generated-*' -perm -111 | head -n 1)"
           test -n "$test_bin"
-          start_ns="$(date +%s%N)"
-          "$test_bin" --test-threads=1
-          elapsed_ms="$(( ($(date +%s%N) - start_ns) / 1000000 ))"
-          echo "test execution: ${elapsed_ms}ms"
-          test "$elapsed_ms" -le 5000
+
+          set +e
+          timeout --signal=TERM --kill-after=1s 5s "$test_bin" --test-threads=1
+          status=$?
+          set -e
+
+          if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
+            echo "::error::PR test execution exceeded the hard 5-second wall-clock budget"
+            exit 1
+          fi
+
+          exit "$status"
 
   portable:
     name: Portable (${{ matrix.os }})
