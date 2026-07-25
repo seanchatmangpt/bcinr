@@ -36,7 +36,7 @@ jobs:
                 printf '%s\t%s\t%s\t%s\t%s\n' "$path" "$rust_tests" "$chicago_tests" "$ignored" "$proptest_blocks"
               fi
             done < <(find . -type f -name '*.rs' -not -path './target/*' -not -path './.git/*' | sort)
-          } | tee test-source-inventory.tsv
+          } > test-source-inventory.tsv
 
       - name: Build every unit and integration test target
         shell: bash
@@ -49,16 +49,16 @@ jobs:
             --tests \
             --no-run \
             --message-format=json-render-diagnostics \
-            > cargo-test-build.jsonl
+            > cargo-test-build.jsonl \
+            2> cargo-test-build.stderr
 
-      - name: Enumerate and time every compiled test binary
+      - name: Classify compiled test binaries
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import json
           import os
-          import pathlib
           import subprocess
           import time
 
@@ -94,7 +94,6 @@ jobs:
                   }
 
           rows = []
-          pathlib.Path('test-logs').mkdir(exist_ok=True)
           for executable, metadata in sorted(
               records.items(),
               key=lambda item: (item[1]['package'], item[1]['target'], item[0]),
@@ -132,25 +131,14 @@ jobs:
                       check=False,
                   )
                   status = str(run.returncode)
-                  output = run.stdout
               except subprocess.TimeoutExpired as exc:
                   status = 'TIMEOUT_5S'
-                  output = text(exc.stdout) + text(exc.stderr)
+                  _ = text(exc.stdout) + text(exc.stderr)
               except OSError as exc:
                   status = f'OS_ERROR_{exc.errno}'
-                  output = str(exc)
               elapsed_ms = (time.monotonic_ns() - started) // 1_000_000
 
-              log_name = (
-                  f"{metadata['package']}__{metadata['target']}.log"
-                  .replace('/', '_')
-              )
-              pathlib.Path('test-logs', log_name).write_text(
-                  output,
-                  encoding='utf-8',
-              )
-
-              row = {
+              rows.append({
                   **metadata,
                   'test_count': len(tests),
                   'list_status': list_status,
@@ -161,14 +149,7 @@ jobs:
                       if status == '0' and elapsed_ms <= BUDGET_SECONDS * 1000
                       else 'trim'
                   ),
-                  'executable': executable,
-              }
-              rows.append(row)
-              print(
-                  f"{row['package']}\t{row['target']}\t{row['test_count']}\t"
-                  f"{row['elapsed_ms']}\t{row['status']}\t{row['budget_class']}",
-                  flush=True,
-              )
+              })
 
           columns = [
               'package',
@@ -180,43 +161,26 @@ jobs:
               'elapsed_ms',
               'status',
               'budget_class',
-              'executable',
           ]
           with open('test-runtime.tsv', 'w', encoding='utf-8') as out:
               out.write('\t'.join(columns) + '\n')
-              for row in rows:
+              for row in sorted(rows, key=lambda row: row['elapsed_ms'], reverse=True):
                   out.write('\t'.join(str(row[column]) for column in columns) + '\n')
 
-          fast = [row for row in rows if row['budget_class'] == 'fast']
-          trimmed = [row for row in rows if row['budget_class'] == 'trim']
-          with open('test-audit-summary.md', 'w', encoding='utf-8') as out:
-              out.write('# Workspace test audit\n\n')
-              out.write(f'- Compiled test binaries: {len(rows)}\n')
-              out.write(f'- Within 5-second budget: {len(fast)}\n')
-              out.write(f'- Failed or over budget: {len(trimmed)}\n\n')
-              out.write('| Package | Target | Tests | Runtime ms | Status | Tier |\n')
-              out.write('|---|---|---:|---:|---|---|\n')
-              for row in sorted(
-                  rows,
-                  key=lambda row: row['elapsed_ms'],
-                  reverse=True,
-              ):
-                  out.write(
-                      f"| {row['package']} | {row['target']} | "
-                      f"{row['test_count']} | {row['elapsed_ms']} | "
-                      f"{row['status']} | {row['budget_class']} |\n"
-                  )
+          fast = sum(row['budget_class'] == 'fast' for row in rows)
+          trimmed = len(rows) - fast
+          with open('test-audit-summary.txt', 'w', encoding='utf-8') as out:
+              out.write(f'compiled_test_binaries={len(rows)}\n')
+              out.write(f'within_5s_budget={fast}\n')
+              out.write(f'failed_or_over_budget={trimmed}\n')
           PY
 
-      - name: Upload compact audit evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: workspace-test-audit
-          path: |
-            test-source-inventory.tsv
-            test-runtime.tsv
-            test-audit-summary.md
-          if-no-files-found: warn
-          retention-days: 7
-          compression-level: 9
+      - name: Emit audit evidence
+        shell: bash
+        run: |
+          echo '=== TEST_AUDIT_SUMMARY ==='
+          cat test-audit-summary.txt
+          echo '=== TEST_RUNTIME_TSV ==='
+          cat test-runtime.tsv
+          echo '=== TEST_SOURCE_INVENTORY_TSV ==='
+          cat test-source-inventory.tsv
