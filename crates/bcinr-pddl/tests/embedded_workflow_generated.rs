@@ -136,7 +136,12 @@ mod generated_binding_proof {
             EmbeddedWorkflow::new(DOMAIN).expect("embedded planning domain must parse");
 
         assert!(
-            workflow.plan(&Order { id: 43, paid: false }).is_err(),
+            workflow
+                .plan(&Order {
+                    id: 43,
+                    paid: false,
+                })
+                .is_err(),
             "an unpaid order must not manufacture executable commands"
         );
 
