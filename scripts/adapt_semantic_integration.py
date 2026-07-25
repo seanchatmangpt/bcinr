@@ -41,6 +41,19 @@ for rel in [
     )
     path.write_text(source)
 
+full_mapek = Path("crates/bcinr-powl/src/full_mapek_loop.rs")
+source = full_mapek.read_text()
+source = source.replace("            _terminal_state,", "            terminal_state,")
+source = source.replace(
+    "        let term_res = terminal_convergence(&actual_term_input, terminal_state);",
+    "        let _term_res = terminal_convergence(&actual_term_input, terminal_state);",
+)
+source = source.replace(
+    "        let mut terminal_state = PersistentControlState::default();\n        let mut oracle_terminal_state = terminal_state.clone();",
+    "        let terminal_state = PersistentControlState::default();\n        let mut oracle_terminal_state = terminal_state.clone();",
+)
+full_mapek.write_text(source)
+
 causal_buffer = Path("crates/bcinr-powl-receipt/src/causal_buffer_integration.rs")
 source = causal_buffer.read_text()
 source = source.replace(
