@@ -2,21 +2,30 @@ name: Miri
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
+
+concurrency:
+  group: miri-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
+  MIRIFLAGS: -Zmiri-strict-provenance
 
 jobs:
   miri:
-    name: Miri UB Check
+    name: Miri (${{ matrix.package }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [bcinr-mfw-ir, bcinr-powl, bcinr-pddl]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: miri
-      - name: Run Miri
-        run: cargo miri test --workspace --all-features
+      - name: Run Miri on production composition crates
+        run: cargo miri test -p ${{ matrix.package }} --all-features

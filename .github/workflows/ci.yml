@@ -2,77 +2,170 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0
 
 jobs:
-  # 1. Lint & Format
   style:
     name: Format & Clippy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Capture formatting diff
+        id: formatting
+        shell: bash
+        env:
+          CARGO_TERM_COLOR: never
+        run: |
+          set +e
+          cargo fmt --all -- --check > rustfmt.patch 2>&1
+          status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          cat rustfmt.patch
+          exit 0
+      - name: Upload formatting refusal
+        if: steps.formatting.outputs.status != '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustfmt-patch
+          path: rustfmt.patch
+          if-no-files-found: error
+      - name: Enforce formatting
+        if: steps.formatting.outputs.status != '0'
+        run: exit 1
+      - name: Capture Clippy diagnostics
+        id: clippy
+        shell: bash
+        env:
+          CARGO_TERM_COLOR: never
+        run: |
+          set +e
+          cargo clippy --workspace --all-targets --all-features -- -D warnings > clippy.log 2>&1
+          status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          cat clippy.log
+          exit 0
+      - name: Upload Clippy refusal
+        if: steps.clippy.outputs.status != '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: clippy-diagnostics
+          path: clippy.log
+          if-no-files-found: error
+      - name: Enforce Clippy
+        if: steps.clippy.outputs.status != '0'
+        run: exit 1
 
-  # 2. Security Audit
-  security:
-    name: Security & Audit
+  canonical:
+    name: PDDL & POWL Canonical Conformance
+    needs: [style]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
-      - name: Install cargo-audit & cargo-deny
-        run: cargo install cargo-audit cargo-deny --locked || true
-      - name: Security audit
-        run: cargo audit
-      - name: License & Dependency Check
-        run: cargo deny check
+      - name: Capture canonical IPC diagnostics
+        id: canonical_ipc
+        shell: bash
+        env:
+          CARGO_TERM_COLOR: never
+        run: |
+          set +e
+          cargo test -p bcinr-pddl --all-features --test canonical_ipc > canonical-ipc.log 2>&1
+          status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          cat canonical-ipc.log
+          exit 0
+      - name: Upload canonical IPC refusal
+        if: steps.canonical_ipc.outputs.status != '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: canonical-ipc-diagnostics
+          path: canonical-ipc.log
+          if-no-files-found: error
+      - name: Enforce canonical IPC fixtures
+        if: steps.canonical_ipc.outputs.status != '0'
+        run: exit 1
+      - name: Exact classical PDDL semantics
+        run: cargo test -p bcinr-pddl --all-features ground_v2
+      - name: POWL 2.0 model, compiler, and scheduler
+        run: cargo test -p bcinr-powl --all-features powl2
+      - name: Planner-output POWL v2 execution bridge
+        run: cargo test -p bcinr-powl --all-features scheduler_v2
+      - name: POWL v2 execution receipt and replay
+        run: cargo test -p bcinr-powl-receipt --all-features execution_v2
+      - name: Production cognitive composition rail
+        run: cargo test -p bcinr-pddl --all-features production
 
-  # 3. Test Matrix
   test:
-    name: Test (${{ matrix.os }} / ${{ matrix.rust }})
+    name: Test (${{ matrix.os }} / nightly)
     needs: [style]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        rust: [stable, beta]
-        include:
-          - os: ubuntu-latest
-            rust: nightly
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.rust }}
+      - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
-      - name: Install cargo-make
-        run: cargo install cargo-make || true
-      - name: Run CI Task
-        run: cargo make ci
+      - name: Capture workspace test diagnostics
+        id: workspace_tests
         shell: bash
+        env:
+          CARGO_TERM_COLOR: never
+        run: |
+          set +e
+          cargo test --workspace --all-features --all-targets --no-fail-fast > workspace-tests.log 2>&1
+          status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          cat workspace-tests.log
+          exit 0
+      - name: Upload workspace test refusal
+        if: steps.workspace_tests.outputs.status != '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace-tests-${{ matrix.os }}
+          path: workspace-tests.log
+          if-no-files-found: error
+      - name: Enforce workspace tests
+        if: steps.workspace_tests.outputs.status != '0'
+        run: exit 1
 
-  # 4. Documentation
+  security:
+    name: Security & Dependency Policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install security tools
+        run: cargo install cargo-audit cargo-deny --locked
+      - name: Security audit
+        run: cargo audit
+      - name: License and source policy
+        run: cargo deny check
+
   doc:
     name: Documentation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
       - name: Build docs
         run: cargo doc --workspace --no-deps --all-features

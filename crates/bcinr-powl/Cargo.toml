@@ -1,8 +1,8 @@
 [package]
 name = "bcinr-powl"
-version = "26.6.25"
+version = "26.7.24"
 edition = "2021"
-description = "Partially Ordered Workflow Language runtime with branchless scheduler and cryptographic proof of execution"
+description = "POWL 2.0 model, compiler, concurrency guards, executable scheduler, and cryptographic execution evidence"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/seanchatmangpt/bcinr"
 readme = "../../README.md"
@@ -11,13 +11,10 @@ categories = ["algorithms", "data-structures"]
 
 [dependencies]
 bcinr-logic = { version = "26.6.24", path = "../bcinr-logic" }
-# Shared IR types/trait contracts for the multifractal-workflow (MFW)
-# planner: EventSet, CausalPlan, ExecutableConcurrencyComplex, the
-# PowlProjector contract. bcinr-mfw-ir has zero path-dependency back onto
-# bcinr-powl (see its Cargo.toml) so this is a one-way edge, no cycle.
+# Shared IR types/trait contracts for multifractal planning. This edge is one-way.
 bcinr-mfw-ir = { version = "26.6.26", path = "../bcinr-mfw-ir" }
 blake3 = "1"
-wasm4pm-compat = "26.6.26"
+wasm4pm-compat = "26.6.29"
 serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
 

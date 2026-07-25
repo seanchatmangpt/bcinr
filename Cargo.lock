@@ -281,7 +281,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-pddl"
-version = "26.6.26"
+version = "26.7.24"
 dependencies = [
  "bcinr-mfw-ir",
  "bcinr-powl",
@@ -290,7 +290,6 @@ dependencies = [
  "chicago-tdd-tools",
  "chrono",
  "divan",
- "pddl",
  "prolog8",
  "proptest",
  "serde",
@@ -300,7 +299,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-powl"
-version = "26.6.25"
+version = "26.7.24"
 dependencies = [
  "bcinr-logic",
  "bcinr-mfw-ir",
@@ -316,7 +315,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-powl-receipt"
-version = "26.6.24"
+version = "26.7.24"
 dependencies = [
  "bcinr-logic",
  "bcinr-mfw-ir",
@@ -2049,26 +2048,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72ef4a56884ca558e5ddb05a1d1e7e1bfd9a68d9ed024c21704cc98872dae1bb"
 
 [[package]]
-name = "nom"
-version = "8.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df9761775871bdef83bee530e60050f7e54b1105350d6884eb0fb4f46c2f9405"
-dependencies = [
- "memchr",
-]
-
-[[package]]
-name = "nom_locate"
-version = "5.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b577e2d69827c4740cba2b52efaad1c4cc7c73042860b199710b3575c68438d"
-dependencies = [
- "bytecount",
- "memchr",
- "nom",
-]
-
-[[package]]
 name = "nu-ansi-term"
 version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2274,17 +2253,6 @@ name = "pastey"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2ee67f1008b1ba2321834326597b8e186293b049a023cdef258527550b9935b4"
-
-[[package]]
-name = "pddl"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c929cf4ccd605923dbccb45e9991a9443ee476fa113b6d7c742239a046f1cde7"
-dependencies = [
- "nom",
- "nom_locate",
- "thiserror 2.0.18",
-]
 
 [[package]]
 name = "percent-encoding"

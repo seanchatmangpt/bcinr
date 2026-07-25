@@ -1072,12 +1072,15 @@ mod tests {
         // scan (mirroring undeclared_when_effect_is_refused_.../
         // continuous_effect_is_refused_.../ above) must catch it too.
         let domain = domain31_from_pddl(
-            "(define (domain d) (:requirements :strips) (:constants obj1) (:predicates (p)) \
-             (:functions (loc)) \
-             (:action a :parameters () :precondition (p) :effect (assign (loc) obj1)))",
+            "(define (domain d) (:requirements :strips :typing) (:types obj) \
+             (:predicates (p)) (:functions (loc)) \
+             (:action a :parameters (?o - obj) :precondition (p) :effect (assign (loc) ?o)))",
         )
         .unwrap();
-        let problem = problem31_from_pddl(STRIPS_PROBLEM).unwrap();
+        let problem = problem31_from_pddl(
+            "(define (problem pr) (:domain d) (:objects o1 - obj) (:init (p)) (:goal (p)))",
+        )
+        .unwrap();
         let outcome = admit_planning_task(&domain, &problem, &DefaultCapabilityProfile);
         match outcome {
             PlannerOutcome::Unsupported(u) => assert_eq!(u.feature_name, "object-fluents"),
@@ -1194,7 +1197,7 @@ mod tests {
         )
         .unwrap();
         let problem = problem31_from_pddl(
-            "(define (problem pr) (:domain d) (:objects o1 - obj) (:init) (:goal (p o1))))",
+            "(define (problem pr) (:domain d) (:objects o1 - obj) (:init) (:goal (p o1)))",
         )
         .unwrap();
         let outcome = admit_planning_task(&domain, &problem, &DefaultCapabilityProfile);

@@ -1,26 +1,15 @@
-//! bcinr-powl-receipt — OCEL event emission and causal receipt generation for bcinr-powl.
+//! bcinr-powl-receipt — execution, projection, planning, and replay evidence.
 //!
-//! # Two receipt families
-//!
-//! The original family (`causal_receipt`, `replay`, `conformance`,
-//! `denial`, `ocel_emit`, `pm_bridge`, `intern`) attests to
-//! execution/replay conformance of an **already-compiled** POWL tape —
-//! untouched by this phase.
-//!
-//! The new family ([`chain`], [`projection`], [`execution`], [`planning`])
-//! attests to something this crate had zero concept of before: that a
-//! PDDL-to-POWL **projection** (the compilation step itself) preserved
-//! source semantics, that a single scheduler tick's firing decision is
-//! attested ([`execution::ExecutionReceipt`]), and that a whole planning
-//! epoch's evidence bundles into one chained receipt
-//! ([`planning::PlanningReceipt`]). See each module's doc comment for
-//! exactly what is real versus what is a stated scope boundary.
+//! The legacy receipt family remains available for legacy POWL tapes. The
+//! production POWL v2 rail uses [`execution_v2`] to commit to the compiled
+//! tape, concurrency guards, every fired set, final state, and replay chain.
 
 pub mod causal_receipt;
 pub mod chain;
 pub mod conformance;
 pub mod denial;
 pub mod execution;
+pub mod execution_v2;
 pub mod intern;
 pub mod ocel_emit;
 pub mod planning;
