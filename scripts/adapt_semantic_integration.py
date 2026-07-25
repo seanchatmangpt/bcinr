@@ -2,6 +2,16 @@
 """Adapt recovery-only modules to the current production APIs."""
 
 from pathlib import Path
+import re
+
+
+def replace_exact(path: Path, old: str, new: str, *, expected: int = 1) -> None:
+    source = path.read_text()
+    count = source.count(old)
+    if count != expected:
+        raise RuntimeError(f"{path}: expected {expected} copies, found {count}")
+    path.write_text(source.replace(old, new, expected))
+
 
 mask = Path("crates/bcinr-logic/src/mask.rs")
 text = mask.read_text()
@@ -51,8 +61,9 @@ source = source.replace(
 )
 source = source.replace(
     "        let mut terminal_state = PersistentControlState::default();\n        let mut oracle_terminal_state = terminal_state.clone();",
-    "        let terminal_state = PersistentControlState::default();\n        let mut oracle_terminal_state = terminal_state.clone();",
+    "        let terminal_state = PersistentControlState::default();\n        let mut oracle_terminal_state = terminal_state;",
 )
+source = source.replace("terminal_state.clone()", "terminal_state")
 full_mapek.write_text(source)
 
 causal_buffer = Path("crates/bcinr-powl-receipt/src/causal_buffer_integration.rs")
@@ -84,15 +95,16 @@ for rel in [
     path.write_text(source)
 
 ocel = Path("crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs")
-source = ocel.read_text()
-old = """        let mut next = Self::default();
+replace_exact(
+    ocel,
+    """        let mut next = Self::default();
         next.instruction_id = select_u64(m, a.instruction_id, b.instruction_id);
         next.fired_mask = select_u64(m, a.fired_mask, b.fired_mask);
         next.denial = select_u64(m, a.denial, b.denial);
 
         for i in 0..8 {
-"""
-new = """        let mut next = Self {
+""",
+    """        let mut next = Self {
             instruction_id: select_u64(m, a.instruction_id, b.instruction_id),
             fired_mask: select_u64(m, a.fired_mask, b.fired_mask),
             denial: select_u64(m, a.denial, b.denial),
@@ -103,24 +115,22 @@ new = """        let mut next = Self {
         };
 
         for i in 0..8 {
-"""
-if old not in source:
-    raise RuntimeError("AutoSelect OCEL initializer shape changed")
-source = source.replace(old, new, 1)
-source = source.replace(
+""",
+)
+replace_exact(
+    ocel,
     """        next.ts_ns = select_u64(m, a.ts_ns, b.ts_ns);
         next.activity_idx = select_u64(m, a.activity_idx as u64, b.activity_idx as u64) as u16;
         next.node_kind = select_u64(m, a.node_kind as u64, b.node_kind as u64) as u8;
 
 """,
     "",
-    1,
 )
-ocel.write_text(source)
 
 terminal = Path("crates/bcinr-logic/src/autonomic/auto_select_terminal_convergence.rs")
-source = terminal.read_text()
-old = """#[repr(C)]
+replace_exact(
+    terminal,
+    """#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PersistentControlState {
     pub epoch_clock: u64,
@@ -137,74 +147,136 @@ impl Default for PersistentControlState {
         }
     }
 }
-"""
-new = """#[repr(C)]
+""",
+    """#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct PersistentControlState {
     pub epoch_clock: u64,
     pub mass: u64,
     pub _pad: [u64; 30],
 }
-"""
-if old not in source:
-    raise RuntimeError("AutoSelect terminal Default shape changed")
-terminal.write_text(source.replace(old, new, 1))
+""",
+)
 
 pipeline = Path("crates/bcinr-powl/src/auto_select_pipeline.rs")
-source = pipeline.read_text()
-mutant_initializer = """        let mut auto_input = CanonicalAutoSelectInput8::default();
+replace_exact(
+    pipeline,
+    """        let mut auto_input = CanonicalAutoSelectInput8::default();
         auto_input.q_lens = input.q_lens;
         auto_input.add_mask = input.add_mask;
         auto_input.del_mask = input.del_mask;
         auto_input.admitted_mask = 0xFF; // Bypass!
-"""
-mutant_structured = """        let auto_input = CanonicalAutoSelectInput8 {
+""",
+    """        let auto_input = CanonicalAutoSelectInput8 {
             q_lens: input.q_lens,
             add_mask: input.add_mask,
             del_mask: input.del_mask,
             admitted_mask: 0xFF, // Bypass!
             ..CanonicalAutoSelectInput8::default()
         };
-"""
-if source.count(mutant_initializer) != 1:
-    raise RuntimeError("AutoSelect mutant initializer shape changed")
-source = source.replace(mutant_initializer, mutant_structured, 1)
-production_initializer = """    let mut auto_input = CanonicalAutoSelectInput8::default();
+""",
+)
+replace_exact(
+    pipeline,
+    """    let mut auto_input = CanonicalAutoSelectInput8::default();
     auto_input.q_lens = input.q_lens;
     auto_input.add_mask = input.add_mask;
     auto_input.del_mask = input.del_mask;
-"""
-production_structured = """    let mut auto_input = CanonicalAutoSelectInput8 {
+""",
+    """    let mut auto_input = CanonicalAutoSelectInput8 {
         q_lens: input.q_lens,
         add_mask: input.add_mask,
         del_mask: input.del_mask,
         ..CanonicalAutoSelectInput8::default()
     };
-"""
-if source.count(production_initializer) != 1:
-    raise RuntimeError("AutoSelect production initializer shape changed")
-source = source.replace(production_initializer, production_structured, 1)
-oracle_initializer = """        let mut auto_input = CanonicalAutoSelectInput8::default();
+""",
+)
+replace_exact(
+    pipeline,
+    """        let mut auto_input = CanonicalAutoSelectInput8::default();
         auto_input.q_lens = input.q_lens;
         auto_input.add_mask = input.add_mask;
         auto_input.del_mask = input.del_mask;
-"""
-oracle_structured = """        let mut auto_input = CanonicalAutoSelectInput8 {
+""",
+    """        let mut auto_input = CanonicalAutoSelectInput8 {
             q_lens: input.q_lens,
             add_mask: input.add_mask,
             del_mask: input.del_mask,
             ..CanonicalAutoSelectInput8::default()
         };
-"""
-if source.count(oracle_initializer) != 1:
-    raise RuntimeError("AutoSelect oracle initializer shape changed")
-source = source.replace(oracle_initializer, oracle_structured, 1)
-pipeline.write_text(source)
+""",
+)
+
+# Normalize the repeated fully-admitted capability fixture across recovered tests.
+capability_pattern = re.compile(
+    r"(?m)^(?P<i>\s*)let mut cand = ToolCapabilityMatrix::default\(\);\n"
+    r"(?P=i)cand\.exact_mask = 0b11;\n"
+    r"(?P=i)cand\.authority_exact = 0b01;\n"
+    r"(?P=i)cand\.timing_score = 255;\n"
+    r"(?P=i)cand\.cost_score = 255;\n"
+    r"(?P=i)cand\.reliability_score = 255;\n"
+    r"(?P=i)cand\.evidence_exact = 255;\n"
+    r"(?P=i)cand\.downstream_exact = 255;\n"
+    r"(?P=i)cand\.lossless_mask = 255;"
+)
+fixture_count = 0
+for rel in [
+    "crates/bcinr-powl/src/auto_select_pipeline.rs",
+    "crates/bcinr-powl/src/full_mapek_loop.rs",
+    "crates/bcinr-powl/src/mapek_loop.rs",
+]:
+    path = Path(rel)
+    source = path.read_text()
+
+    def capability_replacement(match: re.Match[str]) -> str:
+        indent = match.group("i")
+        return (
+            f"{indent}let cand = ToolCapabilityMatrix {{\n"
+            f"{indent}    exact_mask: 0b11,\n"
+            f"{indent}    authority_exact: 0b01,\n"
+            f"{indent}    timing_score: 255,\n"
+            f"{indent}    cost_score: 255,\n"
+            f"{indent}    reliability_score: 255,\n"
+            f"{indent}    evidence_exact: 255,\n"
+            f"{indent}    downstream_exact: 255,\n"
+            f"{indent}    lossless_mask: 255,\n"
+            f"{indent}    ..ToolCapabilityMatrix::default()\n"
+            f"{indent}}};"
+        )
+
+    source, count = capability_pattern.subn(capability_replacement, source)
+    fixture_count += count
+    path.write_text(source)
+if fixture_count != 5:
+    raise RuntimeError(f"expected 5 capability fixtures, normalized {fixture_count}")
+
+final_integration = Path("crates/bcinr-powl/src/auto_select_final_integration.rs")
+replace_exact(
+    final_integration,
+    """        let mut input = FullMapekInput::default();
+        input.policy_valid = true;
+""",
+    """        let input = FullMapekInput {
+            policy_valid: true,
+            ..FullMapekInput::default()
+        };
+""",
+)
+
+differential = Path("crates/bcinr-cmca/tests/differential.rs")
+source = differential.read_text()
+for terminal_value in range(2, 8):
+    source = source.replace(
+        f"if v == {terminal_value} {{ -1 }} else {{ v as i32 }}",
+        f"if v == {terminal_value} {{ -1 }} else {{ v }}",
+    )
+differential.write_text(source)
 
 fixed = Path("crates/bcinr-cmca/src/fixed.rs")
 source = fixed.read_text()
+compatibility_blocks = ""
 if "pub const fn from_bits(bits: u32)" not in source:
-    source += """
+    compatibility_blocks += """
 
 impl NonNegativeFixed {
     /// Compatibility constructor retained for production generated profiles.
@@ -216,7 +288,7 @@ impl NonNegativeFixed {
 }
 """
 if "pub const fn from_bits(bits: i32)" not in source:
-    source += """
+    compatibility_blocks += """
 
 impl SignedFixed {
     /// Compatibility constructor retained for production generated profiles.
@@ -227,6 +299,11 @@ impl SignedFixed {
     }
 }
 """
+if compatibility_blocks:
+    test_marker = "\n#[cfg(test)]\nmod tests {"
+    if test_marker not in source:
+        raise RuntimeError("fixed.rs test module marker missing")
+    source = source.replace(test_marker, compatibility_blocks + test_marker, 1)
 fixed.write_text(source)
 
 harness = Path("tools/bcinr-cmca-audit-harness/src/main.rs")
