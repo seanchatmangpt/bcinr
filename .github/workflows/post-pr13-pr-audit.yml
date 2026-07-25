@@ -26,6 +26,7 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - name: Execute receipted audit script
+        id: audit
         shell: bash
         run: |
           set -euo pipefail
@@ -42,4 +43,21 @@ jobs:
               raise SystemExit('publisher insertion point missing')
           path.write_text(text.replace(needle, replacement, 1))
           PY
-          bash /tmp/post-pr13-audit.sh
+          set +e
+          bash /tmp/post-pr13-audit.sh > post-pr13-audit.log 2>&1
+          status=$?
+          set -e
+          cat post-pr13-audit.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload audit receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: post-pr13-audit-diagnostics
+          path: post-pr13-audit.log
+          if-no-files-found: error
+          retention-days: 7
+      - name: Enforce audit
+        if: steps.audit.outputs.status != '0'
+        run: exit 1
