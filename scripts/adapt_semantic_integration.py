@@ -44,9 +44,10 @@ for rel in [
 full_mapek = Path("crates/bcinr-powl/src/full_mapek_loop.rs")
 source = full_mapek.read_text()
 source = source.replace("            _terminal_state,", "            terminal_state,")
+source = source.replace("let _term_res = terminal_convergence", "let term_res = terminal_convergence")
 source = source.replace(
-    "        let term_res = terminal_convergence(&actual_term_input, terminal_state);",
-    "        let _term_res = terminal_convergence(&actual_term_input, terminal_state);",
+    "        let term_res = terminal_convergence(&actual_term_input, terminal_state);\n        // Force mutation without checking mask",
+    "        let _term_res = terminal_convergence(&actual_term_input, terminal_state);\n        // Force mutation without checking mask",
 )
 source = source.replace(
     "        let mut terminal_state = PersistentControlState::default();\n        let mut oracle_terminal_state = terminal_state.clone();",
