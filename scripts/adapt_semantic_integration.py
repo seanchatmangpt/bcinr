@@ -84,3 +84,36 @@ source = source.replace(
     "use bcinr_cmca::generated_artifact::case_studies::{",
 )
 harness.write_text(source)
+
+# Cargo's --all-features must exercise the lawful production implementation, not
+# eleven mutually incompatible intentional corruptions at once. A build script
+# maps exactly one selected mutant feature to an internal cfg. Zero or multiple
+# mutant features select the baseline; dedicated single-mutant commands retain
+# the original mutation-testing behavior.
+cmca = Path("crates/bcinr-cmca")
+build_rs = cmca / "build.rs"
+build_rs.write_text(
+    """fn main() {
+    let mut selected = Vec::new();
+    for index in 1..=11 {
+        println!("cargo::rustc-check-cfg=cfg(active_mutant_{index})");
+        if std::env::var_os(format!("CARGO_FEATURE_MUTANT_{index}")).is_some() {
+            selected.push(index);
+        }
+    }
+    if let [index] = selected.as_slice() {
+        println!("cargo::rustc-cfg=active_mutant_{index}");
+    }
+}
+"""
+)
+for path in cmca.rglob("*.rs"):
+    if path == build_rs:
+        continue
+    source = path.read_text()
+    for index in range(1, 12):
+        source = source.replace(
+            f'feature = "mutant_{index}"',
+            f"active_mutant_{index}",
+        )
+    path.write_text(source)
