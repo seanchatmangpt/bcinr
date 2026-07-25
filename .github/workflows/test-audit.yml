@@ -94,7 +94,6 @@ jobs:
                   }
 
           rows = []
-          listings = []
           pathlib.Path('test-logs').mkdir(exist_ok=True)
           for executable, metadata in sorted(
               records.items(),
@@ -109,22 +108,18 @@ jobs:
                       timeout=BUDGET_SECONDS,
                       check=False,
                   )
-                  listing_output = listing.stdout
                   tests = [
                       line
-                      for line in listing_output.splitlines()
+                      for line in listing.stdout.splitlines()
                       if line.endswith(': test')
                   ]
                   list_status = str(listing.returncode)
-              except subprocess.TimeoutExpired as exc:
-                  listing_output = text(exc.stdout) + text(exc.stderr)
+              except subprocess.TimeoutExpired:
                   tests = []
                   list_status = 'LIST_TIMEOUT_5S'
               except OSError as exc:
-                  listing_output = str(exc)
                   tests = []
                   list_status = f'LIST_OS_ERROR_{exc.errno}'
-              listings.append((metadata, listing_output))
 
               started = time.monotonic_ns()
               try:
@@ -192,15 +187,6 @@ jobs:
               for row in rows:
                   out.write('\t'.join(str(row[column]) for column in columns) + '\n')
 
-          with open('test-list.txt', 'w', encoding='utf-8') as out:
-              for metadata, listing_output in listings:
-                  out.write(
-                      f"## {metadata['package']} :: {metadata['target']} :: "
-                      f"{metadata['src_path']}\n"
-                  )
-                  out.write(listing_output)
-                  out.write('\n')
-
           fast = [row for row in rows if row['budget_class'] == 'fast']
           trimmed = [row for row in rows if row['budget_class'] == 'trim']
           with open('test-audit-summary.md', 'w', encoding='utf-8') as out:
@@ -222,7 +208,7 @@ jobs:
                   )
           PY
 
-      - name: Upload audit evidence
+      - name: Upload compact audit evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -230,8 +216,7 @@ jobs:
           path: |
             test-source-inventory.tsv
             test-runtime.tsv
-            test-list.txt
             test-audit-summary.md
-            test-logs/
           if-no-files-found: warn
           retention-days: 7
+          compression-level: 9
