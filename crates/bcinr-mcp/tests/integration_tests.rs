@@ -130,12 +130,7 @@ fn brce_manufacture_lifecycle_has_standing() {
         "policy refusal must identify denial: {denial}"
     );
 
-    let overbound = manufacture_world(
-        OVERBOUND_DOMAIN,
-        OVERBOUND_PROBLEM,
-        "brce-overbound",
-        &[],
-    );
+    let overbound = manufacture_world(OVERBOUND_DOMAIN, OVERBOUND_PROBLEM, "brce-overbound", &[]);
     assert!(!overbound.admitted, "PDDL8 must reject nine-arity input");
     let bound_refusal = overbound.refusal_reason.as_deref().unwrap_or_default();
     assert!(
