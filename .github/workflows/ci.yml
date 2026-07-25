@@ -32,14 +32,22 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-      - name: Build PR proof
+      - name: Compile every test target
+        run: >-
+          cargo test
+          --workspace
+          --all-features
+          --lib
+          --tests
+          --no-run
+      - name: Build PR admission proof
         run: >-
           cargo test
           -p bcinr-pddl
           --test embedded_workflow_generated
           --all-features
           --no-run
-      - name: Run PR proof (hard 5s budget)
+      - name: Run PR admission proof (hard 5s budget)
         shell: bash
         run: |
           test_bin="$(find target/debug/deps -maxdepth 1 -type f -name 'embedded_workflow_generated-*' -perm -111 | head -n 1)"
