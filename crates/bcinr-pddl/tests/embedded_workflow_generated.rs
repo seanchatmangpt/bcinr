@@ -78,12 +78,8 @@ impl TryFrom<ActionInvocation> for Command {
 
 #[cfg(test)]
 mod generated_binding_proof {
-    //! Real end-to-end proof, not a hand-transcribed assertion: the real
-    //! PDDL domain text below is `examples/embedded_workflow.rs`'s own
-    //! `DOMAIN` constant, planned through a real `EmbeddedWorkflow`, and
-    //! bound through the generated `FulfillmentCommandV1Binding`
-    //! above — proving the ontology's action names/arities actually match
-    //! the real domain, not just that the template rendered valid syntax.
+    //! One lifecycle proof covers both admitted and refused inputs while
+    //! parsing the embedded domain only once.
     use super::*;
     use std::borrow::Cow;
 
@@ -128,7 +124,7 @@ mod generated_binding_proof {
         }
     }
 
-    chicago_tdd_tools::test!(generated_binding_matches_the_real_domains_actual_actions, {
+    chicago_tdd_tools::test!(generated_binding_enforces_the_workflow_lifecycle, {
         let binding = FulfillmentCommandV1Binding;
         assert_eq!(binding.binding_name(), "fulfillment-command-v1");
         assert_eq!(
@@ -138,8 +134,15 @@ mod generated_binding_proof {
 
         let mut workflow =
             EmbeddedWorkflow::new(DOMAIN).expect("embedded planning domain must parse");
-        let order = Order { id: 42, paid: true };
-        let verified = workflow.plan(&order).expect("workflow should be admitted");
+
+        assert!(
+            workflow.plan(&Order { id: 43, paid: false }).is_err(),
+            "an unpaid order must not manufacture executable commands"
+        );
+
+        let verified = workflow
+            .plan(&Order { id: 42, paid: true })
+            .expect("a paid order should be admitted");
         let registry =
             BindingRegistry::new(binding).expect("generated binding schema should validate");
         let coverage = registry.coverage(
@@ -150,59 +153,30 @@ mod generated_binding_proof {
         );
         assert!(
             coverage.is_complete(),
-            "generated binding's action set must match the real domain's planned actions: {coverage:?}"
+            "generated binding's action set must match planned actions: {coverage:?}"
         );
 
         let commands = verified
             .bind::<Command>()
             .expect("every planner action must have a generated Rust binding");
-        let mut saw_notify = false;
-        let mut saw_reserve = false;
-        let mut command_count = 0;
-
-        for batch in commands.batches() {
-            for command in batch.actions() {
-                command_count += 1;
-                match command {
-                    Command::NotifyCustomer => {
-                        saw_notify = true;
-                        assert_eq!(
-                            default_execution_kind(command),
-                            ExecutionKind::Durable,
-                            "customer notification must retain durable default routing"
-                        );
-                    }
-                    Command::ReserveInventory => {
-                        saw_reserve = true;
-                        assert_eq!(
-                            default_execution_kind(command),
-                            ExecutionKind::Local,
-                            "inventory reservation must retain local default routing"
-                        );
-                    }
-                }
-            }
-        }
+        let mut observed = commands
+            .batches()
+            .iter()
+            .flat_map(|batch| batch.actions())
+            .map(|command| (command, default_execution_kind(command)))
+            .collect::<Vec<_>>();
+        observed.sort_by_key(|(command, _)| match command {
+            Command::NotifyCustomer => 0,
+            Command::ReserveInventory => 1,
+        });
 
         assert_eq!(
-            command_count, 2,
-            "the fulfillment plan must bind two commands"
-        );
-        assert!(saw_notify, "the plan must bind notify-customer");
-        assert!(saw_reserve, "the plan must bind reserve-inventory");
-    });
-
-    chicago_tdd_tools::test!(unpaid_orders_are_refused_before_binding, {
-        let mut workflow =
-            EmbeddedWorkflow::new(DOMAIN).expect("embedded planning domain must parse");
-        let unpaid_order = Order {
-            id: 43,
-            paid: false,
-        };
-
-        assert!(
-            workflow.plan(&unpaid_order).is_err(),
-            "an unpaid order must not manufacture executable commands"
+            observed,
+            vec![
+                (&Command::NotifyCustomer, ExecutionKind::Durable),
+                (&Command::ReserveInventory, ExecutionKind::Local),
+            ],
+            "the admitted plan must manufacture the complete routed command set"
         );
     });
 }
