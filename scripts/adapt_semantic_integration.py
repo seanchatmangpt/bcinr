@@ -96,13 +96,13 @@ build_rs.write_text(
     """fn main() {
     let mut selected = Vec::new();
     for index in 1..=11 {
-        println!("cargo::rustc-check-cfg=cfg(active_mutant_{index})");
+        println!("cargo:rustc-check-cfg=cfg(active_mutant_{index})");
         if std::env::var_os(format!("CARGO_FEATURE_MUTANT_{index}")).is_some() {
             selected.push(index);
         }
     }
     if let [index] = selected.as_slice() {
-        println!("cargo::rustc-cfg=active_mutant_{index}");
+        println!("cargo:rustc-cfg=active_mutant_{index}");
     }
 }
 """
