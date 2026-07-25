@@ -40,6 +40,37 @@ jobs:
       - name: Apply semantic integration
         run: python3 scripts/complete_semantic_integration.py
 
+      - name: Adapt AutoSelect to main mask calculus
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path('crates/bcinr-logic/src/mask.rs')
+          text = path.read_text()
+          if 'pub const fn select_u8(' not in text:
+              text += '''
+
+          /// Branchless conditional select for an all-ones/all-zeros `u8` mask.
+          #[inline(always)]
+          #[must_use = "branchless select result must be observed"]
+          pub const fn select_u8(mask: u8, a: u8, b: u8) -> u8 {
+              (mask & a) | (!mask & b)
+          }
+          '''.replace('          ', '')
+          if 'pub const fn is_zero_mask_u64(' not in text:
+              text += '''
+
+          /// Returns `u64::MAX` when `x == 0`, otherwise zero.
+          #[inline(always)]
+          #[must_use = "branchless zero-test mask must be observed"]
+          pub const fn is_zero_mask_u64(x: u64) -> u64 {
+              let non_zero = (x | x.wrapping_neg()) >> 63;
+              non_zero.wrapping_sub(1)
+          }
+          '''.replace('          ', '')
+          path.write_text(text)
+          PY
+
       - name: Regenerate lockfile and format
         run: |
           set -euxo pipefail
@@ -91,6 +122,11 @@ jobs:
         if: steps.validate.outputs.status == '0'
         run: |
           set -euxo pipefail
+          rm -f .github/workflows/integration-semantic-v2.yml
+          rm -f .github/workflows/integration-materialize.yml
+          rm -f .github/workflows/integration-execute.yml
+          rm -f scripts/complete_semantic_integration.py
+          rm -f scripts/complete-semantic-integration.sh
           git config user.name 'OpenAI Integration Agent'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
