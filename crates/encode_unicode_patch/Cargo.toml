@@ -44,6 +44,9 @@ version = "^1.0.0"
 optional = true
 default-features = false
 
+[dev-dependencies.lazy_static]
+version = "^1.0"
+
 [dev-dependencies.minreq]
 version = "^2.6"
 features = ["https-native"]
@@ -51,9 +54,6 @@ features = ["https-native"]
 [features]
 default = ["std"]
 std = []
-
-[target."cfg(unix)".dev-dependencies.lazy_static]
-version = "^1.0"
 
 [badges.maintenance]
 status = "passively-maintained"
