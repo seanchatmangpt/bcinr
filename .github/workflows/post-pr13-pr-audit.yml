@@ -8,8 +8,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: post-pr13-audit-diagnostic-${{ github.run_id }}
-  cancel-in-progress: false
+  group: post-pr13-audit-diagnostic
+  cancel-in-progress: true
 
 jobs:
   execute:
