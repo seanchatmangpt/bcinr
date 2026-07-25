@@ -123,7 +123,7 @@ fn observation(state: OrderState) -> ObservationSnapshot<OrderState> {
 }
 
 chicago_tdd_tools::test!(
-    application_compiles_projects_and_receipts_one_behavioral_flow,
+    production_application_compiles_projects_and_receipts_one_behavioral_flow,
     {
         let workflow = EmbeddedWorkflow::new(DOMAIN).expect("resident domain should install");
         let mut application = WorkflowApplication::new(workflow, CommandBinding)
@@ -243,37 +243,40 @@ chicago_tdd_tools::test!(
     }
 );
 
-chicago_tdd_tools::test!(policy_refusal_never_manufactures_dispatch_authority, {
-    let workflow = EmbeddedWorkflow::new(DOMAIN).expect("resident domain should install");
-    let mut application =
-        WorkflowApplication::new(workflow, CommandBinding).expect("binding schema");
-    let observation = observation(OrderState {
-        order_id: 9,
-        paid: true,
-    });
-    let goal = GoalEnvelope::manufacture(
-        GoalExpr::<String, i64>::Atom("reserved".to_string()),
-        GoalPriority(1),
-        None,
-        GoalPolicy::Hard,
-    )
-    .expect("goal");
-    let prepared = application
-        .compile_goal_directed(
-            &observation,
-            &goal,
-            PlanningBounds::interactive(),
-            SearchPolicyRoot::hash(b"deterministic-first-valid:v1"),
+chicago_tdd_tools::test!(
+    production_policy_refusal_never_manufactures_dispatch_authority,
+    {
+        let workflow = EmbeddedWorkflow::new(DOMAIN).expect("resident domain should install");
+        let mut application =
+            WorkflowApplication::new(workflow, CommandBinding).expect("binding schema");
+        let observation = observation(OrderState {
+            order_id: 9,
+            paid: true,
+        });
+        let goal = GoalEnvelope::manufacture(
+            GoalExpr::<String, i64>::Atom("reserved".to_string()),
+            GoalPriority(1),
+            None,
+            GoalPolicy::Hard,
         )
-        .expect("planning should succeed before policy");
-    assert!(matches!(
-        prepared.authorize_and_propose(
-            &PermitTenant,
-            &TenantContext {
-                tenant: "other-tenant"
-            },
-            IdempotencyKey::new("order-9:generation-0").unwrap(),
-        ),
-        Err(AuthorizationProposalError::Policy("tenant-refused"))
-    ));
-});
+        .expect("goal");
+        let prepared = application
+            .compile_goal_directed(
+                &observation,
+                &goal,
+                PlanningBounds::interactive(),
+                SearchPolicyRoot::hash(b"deterministic-first-valid:v1"),
+            )
+            .expect("planning should succeed before policy");
+        assert!(matches!(
+            prepared.authorize_and_propose(
+                &PermitTenant,
+                &TenantContext {
+                    tenant: "other-tenant"
+                },
+                IdempotencyKey::new("order-9:generation-0").unwrap(),
+            ),
+            Err(AuthorizationProposalError::Policy("tenant-refused"))
+        ));
+    }
+);
