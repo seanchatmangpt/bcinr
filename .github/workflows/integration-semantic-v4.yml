@@ -10,6 +10,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: complete-semantic-integration-v4
+  cancel-in-progress: true
+
 jobs:
   integrate:
     runs-on: ubuntu-latest
@@ -34,5 +38,6 @@ jobs:
           path: |
             integration-check.log
             integration-tests.log
+            publication-diagnostics.log
           if-no-files-found: ignore
           retention-days: 7
