@@ -41,7 +41,9 @@ jobs:
               raise SystemExit('adapter insertion point missing')
           text = text.replace(
               adapter,
-              adapter + "python3 scripts/normalize_recovered_tests.py\n",
+              adapter
+              + "python3 scripts/normalize_recovered_tests.py\n"
+              + "TRYBUILD=overwrite cargo test -p bcinr-cmca --test compile_fail_tests\n",
               1,
           )
           needle = "git config user.name 'OpenAI Integration Agent'"
