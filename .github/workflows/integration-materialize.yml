@@ -26,10 +26,10 @@ jobs:
           git cat-file -e 22945aff08f0d0194febec924c93c5f6a192a942^{commit}
           git cat-file -e 8e80292a425207636628c6a489bb9a11c6092208^{commit}
       - name: Archive exact checkout
-        run: tar --exclude='./target' -czf ../bcinr-integration-repository.tar.gz .
+        run: tar --exclude='./target' --exclude='./bcinr-integration-repository.tar.gz' -czf bcinr-integration-repository.tar.gz .
       - uses: actions/upload-artifact@v4
         with:
           name: bcinr-integration-repository
-          path: ../bcinr-integration-repository.tar.gz
+          path: bcinr-integration-repository.tar.gz
           if-no-files-found: error
           retention-days: 1
