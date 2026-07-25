@@ -36,6 +36,22 @@ jobs:
           from pathlib import Path
           path = Path('/tmp/post-pr13-audit.sh')
           text = path.read_text()
+          anchor = "python3 scripts/adapt_semantic_integration.py\n"
+          repair = anchor + """python3 - <<'PY_REPAIR'
+          from pathlib import Path
+          differential = Path('crates/bcinr-cmca/tests/differential.rs')
+          source = differential.read_text()
+          for terminal in range(2, 8):
+              source = source.replace(
+                  f"if v == {terminal} {{ -1 }} else {{ v as i32 }}",
+                  f"if v == {terminal} {{ -1 }} else {{ v }}",
+              )
+          differential.write_text(source)
+          PY_REPAIR
+          """
+          if anchor not in text:
+              raise SystemExit('adapter insertion point missing')
+          text = text.replace(anchor, repair, 1)
           needle = "git config user.name 'OpenAI Integration Agent'"
           replacement = "exit 0\n" + needle
           if needle not in text:
