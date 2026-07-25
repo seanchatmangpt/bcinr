@@ -66,6 +66,8 @@ jobs:
           import subprocess
           import time
 
+          BUDGET_SECONDS = 5
+
           def text(value):
               if value is None:
                   return ''
@@ -96,17 +98,37 @@ jobs:
                   }
 
           rows = []
+          listings = []
           pathlib.Path('test-logs').mkdir(exist_ok=True)
-          for executable, metadata in sorted(records.items(), key=lambda item: (item[1]['package'], item[1]['target'], item[0])):
-              listing = subprocess.run(
-                  [executable, '--list', '--format', 'terse'],
-                  stdout=subprocess.PIPE,
-                  stderr=subprocess.STDOUT,
-                  text=True,
-                  timeout=30,
-                  check=False,
-              )
-              tests = [line for line in listing.stdout.splitlines() if line.endswith(': test')]
+          for executable, metadata in sorted(
+              records.items(),
+              key=lambda item: (item[1]['package'], item[1]['target'], item[0]),
+          ):
+              try:
+                  listing = subprocess.run(
+                      [executable, '--list', '--format', 'terse'],
+                      stdout=subprocess.PIPE,
+                      stderr=subprocess.STDOUT,
+                      text=True,
+                      timeout=BUDGET_SECONDS,
+                      check=False,
+                  )
+                  listing_output = listing.stdout
+                  tests = [
+                      line
+                      for line in listing_output.splitlines()
+                      if line.endswith(': test')
+                  ]
+                  list_status = str(listing.returncode)
+              except subprocess.TimeoutExpired as exc:
+                  listing_output = text(exc.stdout) + text(exc.stderr)
+                  tests = []
+                  list_status = 'LIST_TIMEOUT_5S'
+              except OSError as exc:
+                  listing_output = str(exc)
+                  tests = []
+                  list_status = f'LIST_OS_ERROR_{exc.errno}'
+              listings.append((metadata, listing_output))
 
               started = time.monotonic_ns()
               try:
@@ -115,51 +137,93 @@ jobs:
                       stdout=subprocess.PIPE,
                       stderr=subprocess.STDOUT,
                       text=True,
-                      timeout=60,
+                      timeout=BUDGET_SECONDS,
                       check=False,
                   )
                   status = str(run.returncode)
                   output = run.stdout
               except subprocess.TimeoutExpired as exc:
-                  status = 'TIMEOUT_60S'
+                  status = 'TIMEOUT_5S'
                   output = text(exc.stdout) + text(exc.stderr)
               except OSError as exc:
                   status = f'OS_ERROR_{exc.errno}'
                   output = str(exc)
               elapsed_ms = (time.monotonic_ns() - started) // 1_000_000
 
-              log_name = f"{metadata['package']}__{metadata['target']}.log".replace('/', '_')
-              pathlib.Path('test-logs', log_name).write_text(output, encoding='utf-8')
+              log_name = (
+                  f"{metadata['package']}__{metadata['target']}.log"
+                  .replace('/', '_')
+              )
+              pathlib.Path('test-logs', log_name).write_text(
+                  output,
+                  encoding='utf-8',
+              )
 
               row = {
                   **metadata,
                   'test_count': len(tests),
+                  'list_status': list_status,
                   'elapsed_ms': elapsed_ms,
                   'status': status,
+                  'budget_class': (
+                      'fast'
+                      if status == '0' and elapsed_ms <= BUDGET_SECONDS * 1000
+                      else 'trim'
+                  ),
                   'executable': executable,
               }
               rows.append(row)
-              print(f"{row['package']}\t{row['target']}\t{row['test_count']}\t{row['elapsed_ms']}\t{row['status']}", flush=True)
+              print(
+                  f"{row['package']}\t{row['target']}\t{row['test_count']}\t"
+                  f"{row['elapsed_ms']}\t{row['status']}\t{row['budget_class']}",
+                  flush=True,
+              )
 
-          columns = ['package', 'target', 'kind', 'src_path', 'test_count', 'elapsed_ms', 'status', 'executable']
+          columns = [
+              'package',
+              'target',
+              'kind',
+              'src_path',
+              'test_count',
+              'list_status',
+              'elapsed_ms',
+              'status',
+              'budget_class',
+              'executable',
+          ]
           with open('test-runtime.tsv', 'w', encoding='utf-8') as out:
               out.write('\t'.join(columns) + '\n')
               for row in rows:
                   out.write('\t'.join(str(row[column]) for column in columns) + '\n')
 
           with open('test-list.txt', 'w', encoding='utf-8') as out:
-              for executable, metadata in sorted(records.items(), key=lambda item: (item[1]['package'], item[1]['target'], item[0])):
-                  listing = subprocess.run(
-                      [executable, '--list', '--format', 'terse'],
-                      stdout=subprocess.PIPE,
-                      stderr=subprocess.STDOUT,
-                      text=True,
-                      timeout=30,
-                      check=False,
+              for metadata, listing_output in listings:
+                  out.write(
+                      f"## {metadata['package']} :: {metadata['target']} :: "
+                      f"{metadata['src_path']}\n"
                   )
-                  out.write(f"## {metadata['package']} :: {metadata['target']} :: {metadata['src_path']}\n")
-                  out.write(listing.stdout)
+                  out.write(listing_output)
                   out.write('\n')
+
+          fast = [row for row in rows if row['budget_class'] == 'fast']
+          trimmed = [row for row in rows if row['budget_class'] == 'trim']
+          with open('test-audit-summary.md', 'w', encoding='utf-8') as out:
+              out.write('# Workspace test audit\n\n')
+              out.write(f'- Compiled test binaries: {len(rows)}\n')
+              out.write(f'- Within 5-second budget: {len(fast)}\n')
+              out.write(f'- Failed or over budget: {len(trimmed)}\n\n')
+              out.write('| Package | Target | Tests | Runtime ms | Status | Tier |\n')
+              out.write('|---|---|---:|---:|---|---|\n')
+              for row in sorted(
+                  rows,
+                  key=lambda row: row['elapsed_ms'],
+                  reverse=True,
+              ):
+                  out.write(
+                      f"| {row['package']} | {row['target']} | "
+                      f"{row['test_count']} | {row['elapsed_ms']} | "
+                      f"{row['status']} | {row['budget_class']} |\n"
+                  )
           PY
 
       - name: Upload audit evidence
@@ -171,6 +235,7 @@ jobs:
             test-source-inventory.tsv
             test-runtime.tsv
             test-list.txt
+            test-audit-summary.md
             test-logs/
           if-no-files-found: warn
           retention-days: 7
