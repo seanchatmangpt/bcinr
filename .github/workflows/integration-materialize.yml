@@ -1,0 +1,35 @@
+name: Integration Materialize
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - agent/semantic-three-way-integration-v26.7.24
+
+permissions:
+  contents: read
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/semantic-three-way-integration-v26.7.24
+          fetch-depth: 0
+      - name: Verify integration head
+        run: |
+          git status --short
+          git log -1 --format='%H %P %s'
+          git cat-file -e 3338f59ae5fd11f0f5e05115e2981f6daa8caef2^{commit}
+          git cat-file -e 22945aff08f0d0194febec924c93c5f6a192a942^{commit}
+          git cat-file -e 8e80292a425207636628c6a489bb9a11c6092208^{commit}
+      - name: Archive exact checkout
+        run: tar --exclude='./target' -czf ../bcinr-integration-repository.tar.gz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bcinr-integration-repository
+          path: ../bcinr-integration-repository.tar.gz
+          if-no-files-found: error
+          retention-days: 1
