@@ -1,0 +1,145 @@
+name: Complete Semantic Integration V3
+
+on:
+  push:
+    branches:
+      - agent/semantic-three-way-integration-v26.7.24
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/semantic-three-way-integration-v26.7.24
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Verify exact merge graph
+        run: |
+          set -euxo pipefail
+          git merge-base --is-ancestor 12419cdac43c953fb1190c5ccbadb4a68e6b6337 HEAD
+          test "$(git rev-parse 12419cdac43c953fb1190c5ccbadb4a68e6b6337^1)" = 22945aff08f0d0194febec924c93c5f6a192a942
+          test "$(git rev-parse 12419cdac43c953fb1190c5ccbadb4a68e6b6337^2)" = 8e80292a425207636628c6a489bb9a11c6092208
+          test "$(git merge-base 22945aff08f0d0194febec924c93c5f6a192a942 8e80292a425207636628c6a489bb9a11c6092208)" = 3338f59ae5fd11f0f5e05115e2981f6daa8caef2
+
+      - name: Apply semantic integration
+        run: python3 scripts/complete_semantic_integration.py
+
+      - name: Adapt recovery modules to main primitives
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          mask = Path('crates/bcinr-logic/src/mask.rs')
+          text = mask.read_text()
+          if 'pub const fn select_u8(' not in text:
+              text += '''
+
+          /// Branchless conditional select for an all-ones/all-zeros `u8` mask.
+          #[inline(always)]
+          #[must_use = "branchless select result must be observed"]
+          pub const fn select_u8(mask: u8, a: u8, b: u8) -> u8 {
+              (mask & a) | (!mask & b)
+          }
+          '''.replace('          ', '')
+          if 'pub const fn is_zero_mask_u64(' not in text:
+              text += '''
+
+          /// Returns `u64::MAX` when `x == 0`, otherwise zero.
+          #[inline(always)]
+          #[must_use = "branchless zero-test mask must be observed"]
+          pub const fn is_zero_mask_u64(x: u64) -> u64 {
+              let non_zero = (x | x.wrapping_neg()) >> 63;
+              non_zero.wrapping_sub(1)
+          }
+          '''.replace('          ', '')
+          mask.write_text(text)
+
+          for rel in [
+              'crates/bcinr-powl/src/full_mapek_loop.rs',
+              'crates/bcinr-powl/src/mapek_loop.rs',
+          ]:
+              path = Path(rel)
+              source = path.read_text()
+              source = source.replace('    policy_guard::PolicyGuard,\n', '')
+              source = source.replace(
+                  'PolicyGuard::apply_policy_guard(pipeline_res.is_ok, input.policy_valid)',
+                  'pipeline_res.is_ok & (input.policy_valid as u8)',
+              )
+              path.write_text(source)
+          PY
+
+      - name: Regenerate lockfile and format
+        run: |
+          set -euxo pipefail
+          cargo generate-lockfile
+          cargo fmt --all
+
+      - name: Validate integration ladder
+        id: validate
+        shell: bash
+        run: |
+          set +e
+          {
+            set -euxo pipefail
+            cargo fmt --all -- --check
+            cargo check --workspace --all-features
+            cargo test -p bcinr-cmca --all-features --no-fail-fast
+            cargo test -p bcinr-cmca --test calibration
+            cargo test -p bcinr-cmca --test differential
+            cargo test -p bcinr-cmca --test hostile_mutants
+            cargo test -p bcinr-cmca --test compile_fail_tests
+            cargo check -p bcinr-cmca-audit-harness
+            cargo test -p bcinr-pddl --all-features
+            cargo test -p bcinr-powl --all-features
+            cargo test -p bcinr-powl --all-features powl2
+            cargo test -p bcinr-powl --all-features scheduler_v2
+            cargo test -p bcinr-powl-receipt --all-features
+            cargo test -p bcinr-powl-receipt --all-features execution_v2
+            cargo test --workspace --all-features --all-targets --no-fail-fast
+          } > integration-validation.log 2>&1
+          status=$?
+          cat integration-validation.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload validation receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semantic-integration-validation-v3
+          path: integration-validation.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Enforce validation
+        if: steps.validate.outputs.status != '0'
+        run: exit 1
+
+      - name: Commit completed integration
+        if: steps.validate.outputs.status == '0'
+        run: |
+          set -euxo pipefail
+          rm -f .github/workflows/integration-semantic-v2.yml
+          rm -f .github/workflows/integration-semantic-v3.yml
+          rm -f .github/workflows/integration-materialize.yml
+          rm -f .github/workflows/integration-execute.yml
+          rm -f scripts/complete_semantic_integration.py
+          rm -f scripts/complete-semantic-integration.sh
+          git config user.name 'OpenAI Integration Agent'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check -- ':!crates/bcinr-cmca/quarantine/legacy-generator/generator.py'
+          git commit -m 'merge: complete semantic recovery integration'
+          git push origin HEAD:agent/semantic-three-way-integration-v26.7.24
