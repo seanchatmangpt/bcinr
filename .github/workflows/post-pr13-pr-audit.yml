@@ -1,14 +1,14 @@
-name: Post-PR13 Audit Trigger
+name: Post-PR13 Audit Diagnostic
 
 on:
   pull_request:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: post-pr13-semantic-audit
+  group: post-pr13-audit-diagnostic-${{ github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -20,12 +20,11 @@ jobs:
         with:
           ref: agent/post-pr13-semantic-audit
           fetch-depth: 0
-          persist-credentials: true
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Execute receipted audit script
+      - name: Execute non-publishing audit replay
         id: audit
         shell: bash
         run: |
@@ -38,7 +37,7 @@ jobs:
           path = Path('/tmp/post-pr13-audit.sh')
           text = path.read_text()
           needle = "git config user.name 'OpenAI Integration Agent'"
-          replacement = "rm -f .github/workflows/post-pr13-pr-audit.yml\n" + needle
+          replacement = "exit 0\n" + needle
           if needle not in text:
               raise SystemExit('publisher insertion point missing')
           path.write_text(text.replace(needle, replacement, 1))
@@ -58,6 +57,6 @@ jobs:
           path: post-pr13-audit.log
           if-no-files-found: error
           retention-days: 7
-      - name: Enforce audit
+      - name: Enforce diagnostic replay
         if: steps.audit.outputs.status != '0'
         run: exit 1
