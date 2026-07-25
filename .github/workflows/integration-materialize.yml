@@ -21,39 +21,22 @@ jobs:
       - name: Verify integration graph
         run: |
           set -euxo pipefail
-          git status --short
           git log -1 --format='%H %P %s'
           git cat-file -e 3338f59ae5fd11f0f5e05115e2981f6daa8caef2^{commit}
           git cat-file -e 22945aff08f0d0194febec924c93c5f6a192a942^{commit}
           git cat-file -e 8e80292a425207636628c6a489bb9a11c6092208^{commit}
-      - name: Archive integration source and semantic snapshots
+      - name: Archive complete merge basis trees
         run: |
           set -euxo pipefail
-          mkdir -p materialized/head materialized/base materialized/main materialized/recovery
-          git archive HEAD | tar -x -C materialized/head
-          for spec in \
-            'base 3338f59ae5fd11f0f5e05115e2981f6daa8caef2' \
-            'main 22945aff08f0d0194febec924c93c5f6a192a942' \
-            'recovery 8e80292a425207636628c6a489bb9a11c6092208'; do
-            set -- $spec
-            name=$1
-            sha=$2
-            git archive "$sha" -- \
-              AGENTS.md Cargo.toml Cargo.lock .gitignore Makefile.toml \
-              .claude \
-              crates/bcinr-cmca \
-              crates/bcinr-logic/src/autonomic \
-              crates/bcinr-powl \
-              crates/bcinr-powl-receipt \
-              tools/bcinr-cmca-audit-harness \
-              2>/dev/null | tar -x -C "materialized/$name" || true
-          done
-          tar -czf bcinr-materialized.tar.gz materialized
-          ls -lh bcinr-materialized.tar.gz
+          mkdir -p basis/base basis/main
+          git archive 3338f59ae5fd11f0f5e05115e2981f6daa8caef2 | tar -x -C basis/base
+          git archive 22945aff08f0d0194febec924c93c5f6a192a942 | tar -x -C basis/main
+          tar -czf bcinr-merge-basis.tar.gz basis
+          ls -lh bcinr-merge-basis.tar.gz
       - uses: actions/upload-artifact@v4
         with:
-          name: bcinr-semantic-integration-materialized
-          path: bcinr-materialized.tar.gz
+          name: bcinr-complete-merge-basis
+          path: bcinr-merge-basis.tar.gz
           if-no-files-found: error
           retention-days: 1
           compression-level: 0
