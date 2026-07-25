@@ -1,0 +1,35 @@
+name: Execute Semantic Integration
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/semantic-three-way-integration-v26.7.24
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Complete semantic merge, validate, and push
+        run: bash scripts/complete-semantic-integration.sh
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semantic-integration-diagnostics
+          path: |
+            integration-check.log
+            integration-tests.log
+          if-no-files-found: ignore
+          retention-days: 7
