@@ -1,31 +1,44 @@
 name: Miri
 
 on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 9 * * 1"
   push:
     branches: [main, master]
-  pull_request:
-    branches: [main, master]
+    paths:
+      - "crates/bcinr-mfw-ir/**"
+      - "crates/bcinr-pddl/**"
+      - "crates/bcinr-powl/**"
+      - "crates/bcinr-powl-receipt/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/miri.yml"
 
 concurrency:
-  group: miri-${{ github.event.pull_request.number || github.ref }}
+  group: miri-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
   MIRIFLAGS: -Zmiri-strict-provenance
 
 jobs:
   miri:
-    name: Miri (${{ matrix.package }})
+    name: Miri production rail
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        package: [bcinr-mfw-ir, bcinr-powl, bcinr-pddl]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: miri
-      - name: Run Miri on production composition crates
-        run: cargo miri test -p ${{ matrix.package }} --all-features
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: miri-ubuntu-nightly
+          cache-on-failure: true
+      - name: Verify production composition crates
+        run: |
+          cargo miri test -p bcinr-mfw-ir --all-features
+          cargo miri test -p bcinr-powl --all-features
+          cargo miri test -p bcinr-pddl --all-features
