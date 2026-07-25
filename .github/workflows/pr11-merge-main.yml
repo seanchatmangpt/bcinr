@@ -1,4 +1,4 @@
-name: PR11 Merge Main
+name: PR11 ggen Sync
 
 on:
   push:
@@ -9,8 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  merge-main:
-    if: startsWith(github.event.head_commit.message, 'chore(pr11): bootstrap merge-main')
+  ggen-sync:
+    if: startsWith(github.event.head_commit.message, 'chore(pr11): run ggen sync')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout exact PR branch
@@ -20,78 +20,69 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Merge current main and manufacture inventory
+      - name: Download ggen v26.15.2
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL https://github.com/seanchatmangpt/ggen/releases/download/v26.15.2/ggen-x86_64-unknown-linux-gnu.tar.gz | tar xz
+          chmod +x ./ggen
+          ./ggen --version || true
+
+      - name: Run ggen sync
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p docs/recovery
+          {
+            echo '# PR #11 ggen sync evidence'
+            echo
+            echo "- branch: \`${GITHUB_REF_NAME}\`"
+            echo "- input commit: \`${GITHUB_SHA}\`"
+            echo "- ggen release: \`v26.15.2\`"
+            echo
+            echo '## Command'
+            echo
+            echo '```text'
+            echo './ggen sync run'
+            echo '```'
+            echo
+            echo '## Output'
+            echo
+            echo '```text'
+          } > docs/recovery/PR11_GGEN_SYNC.md
+
+          set +e
+          ./ggen sync run 2>&1 | tee /tmp/ggen-sync.log
+          status=${PIPESTATUS[0]}
+          set -e
+
+          cat /tmp/ggen-sync.log >> docs/recovery/PR11_GGEN_SYNC.md
+          {
+            echo '```'
+            echo
+            echo "- exit code: \`${status}\`"
+            echo "- standing: \`REPORTED\`"
+          } >> docs/recovery/PR11_GGEN_SYNC.md
+
+          echo "GGEN_SYNC_EXIT_CODE=${status}" >> "$GITHUB_ENV"
+
+      - name: Commit sync result and evidence
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch --no-tags origin main
-
-          old_head="$(git rev-parse HEAD)"
-          main_head="$(git rev-parse origin/main)"
-          merge_base="$(git merge-base HEAD origin/main)"
-
-          cat > /tmp/pr11_merge_inventory.rs <<'RS'
-          use std::collections::BTreeMap;
-          use std::env;
-          use std::fs;
-          use std::process::{Command, ExitCode};
-
-          fn git(args: &[&str]) -> Result<String, String> {
-              let out = Command::new("git").args(args).output().map_err(|e| e.to_string())?;
-              if !out.status.success() {
-                  return Err(String::from_utf8_lossy(&out.stderr).into_owned());
-              }
-              Ok(String::from_utf8_lossy(&out.stdout).into_owned())
-          }
-
-          fn main() -> ExitCode {
-              let args: Vec<String> = env::args().collect();
-              if args.len() != 5 {
-                  eprintln!("usage: inventory <merge-base> <pr-head> <main-head> <output>");
-                  return ExitCode::from(2);
-              }
-              let mut counts: BTreeMap<String, usize> = BTreeMap::new();
-              let mut rows = Vec::new();
-              match git(&["diff", "--name-status", "-M", &args[1], &args[3]]) {
-                  Ok(text) => {
-                      for line in text.lines() {
-                          let status = line.split_whitespace().next().unwrap_or("UNKNOWN");
-                          *counts.entry(status.chars().next().unwrap_or('?').to_string()).or_default() += 1;
-                          rows.push(line.to_owned());
-                      }
-                  }
-                  Err(e) => {
-                      eprintln!("inventory failed: {e}");
-                      return ExitCode::from(1);
-                  }
-              }
-              let mut report = String::new();
-              report.push_str("# PR #11 merge-main inventory\n\n");
-              report.push_str(&format!("- merge base: `{}`\n- PR head before merge: `{}`\n- main head: `{}`\n", args[1], args[2], args[3]));
-              report.push_str("\n## Main-side change counts since merge base\n\n");
-              for (kind, count) in counts { report.push_str(&format!("- `{kind}`: {count}\n")); }
-              report.push_str("\n## Main-side paths since merge base\n\n```text\n");
-              for row in rows { report.push_str(&row); report.push('\n'); }
-              report.push_str("```\n");
-              if let Err(e) = fs::write(&args[4], report) {
-                  eprintln!("write failed: {e}");
-                  return ExitCode::from(1);
-              }
-              ExitCode::SUCCESS
-          }
-          RS
-          rustc --edition=2021 /tmp/pr11_merge_inventory.rs -o /tmp/pr11_merge_inventory
-          /tmp/pr11_merge_inventory "$merge_base" "$old_head" "$main_head" /tmp/PR11_MERGE_MAIN_INVENTORY.md
-
-          # Preserve the recovery branch version only where both sides conflict;
-          # all non-conflicting main changes are admitted normally.
-          git merge --no-ff -X ours origin/main -m "merge(main): admit current main into PR #11 recovery branch"
-
-          mkdir -p docs/recovery
-          cp /tmp/PR11_MERGE_MAIN_INVENTORY.md docs/recovery/PR11_MERGE_MAIN_INVENTORY.md
+          rm -f ./ggen
           rm -f .github/workflows/pr11-merge-main.yml
-          git add docs/recovery/PR11_MERGE_MAIN_INVENTORY.md .github/workflows/pr11-merge-main.yml
-          git commit --amend --no-edit
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'No filesystem changes to commit.'
+            exit 0
+          fi
+          git commit -m "chore(pr11): record ggen sync result (reported)"
           git push origin HEAD:recovery/cmca-v26.7.17-c2
+
+      - name: Preserve ggen exit status
+        shell: bash
+        run: |
+          test "${GGEN_SYNC_EXIT_CODE}" -eq 0
