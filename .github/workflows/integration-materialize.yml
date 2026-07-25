@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - agent/semantic-three-way-integration-v26.7.24
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read
