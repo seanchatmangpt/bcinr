@@ -3,9 +3,11 @@ name: Test Audit
 on:
   push:
     branches: [ggen-embedded-workflow-pack-demo]
+  pull_request:
+    branches: [main, master]
 
 concurrency:
-  group: test-audit-${{ github.ref }}
+  group: test-audit-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -30,14 +32,14 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo -e "path\trust_tests\tchicago_tests\tignored\tproptest_blocks"
+            printf 'path\trust_tests\tchicago_tests\tignored\tproptest_blocks\n'
             while IFS= read -r path; do
               rust_tests="$(grep -Ec '#\[(tokio::)?test([^]]*)?\]' "$path" || true)"
               chicago_tests="$(grep -Ec 'chicago_tdd_tools::test!' "$path" || true)"
               ignored="$(grep -Ec '#\[ignore([^]]*)?\]' "$path" || true)"
               proptest_blocks="$(grep -Ec 'proptest!' "$path" || true)"
               if [ "$rust_tests" -gt 0 ] || [ "$chicago_tests" -gt 0 ] || [ "$ignored" -gt 0 ] || [ "$proptest_blocks" -gt 0 ]; then
-                echo -e "${path}\t${rust_tests}\t${chicago_tests}\t${ignored}\t${proptest_blocks}"
+                printf '%s\t%s\t%s\t%s\t%s\n' "$path" "$rust_tests" "$chicago_tests" "$ignored" "$proptest_blocks"
               fi
             done < <(find . -type f -name '*.rs' -not -path './target/*' -not -path './.git/*' | sort)
           } | tee test-source-inventory.tsv
@@ -89,6 +91,7 @@ jobs:
                   }
 
           rows = []
+          pathlib.Path('test-logs').mkdir(exist_ok=True)
           for executable, metadata in sorted(records.items(), key=lambda item: (item[1]['package'], item[1]['target'], item[0])):
               listing = subprocess.run(
                   [executable, '--list', '--format', 'terse'],
@@ -99,7 +102,6 @@ jobs:
                   check=False,
               )
               tests = [line for line in listing.stdout.splitlines() if line.endswith(': test')]
-              ignored = [line for line in listing.stdout.splitlines() if ': test' in line and 'ignored' in line]
 
               started = time.monotonic_ns()
               try:
@@ -121,19 +123,17 @@ jobs:
               elapsed_ms = (time.monotonic_ns() - started) // 1_000_000
 
               log_name = f"{metadata['package']}__{metadata['target']}.log".replace('/', '_')
-              pathlib.Path('test-logs').mkdir(exist_ok=True)
               pathlib.Path('test-logs', log_name).write_text(output, encoding='utf-8')
 
               rows.append({
                   **metadata,
                   'test_count': len(tests),
-                  'ignored_count': len(ignored),
                   'elapsed_ms': elapsed_ms,
                   'status': status,
                   'executable': executable,
               })
 
-          columns = ['package', 'target', 'kind', 'src_path', 'test_count', 'ignored_count', 'elapsed_ms', 'status', 'executable']
+          columns = ['package', 'target', 'kind', 'src_path', 'test_count', 'elapsed_ms', 'status', 'executable']
           with open('test-runtime.tsv', 'w', encoding='utf-8') as out:
               out.write('\t'.join(columns) + '\n')
               for row in rows:
@@ -153,9 +153,8 @@ jobs:
                   out.write(listing.stdout)
                   out.write('\n')
 
-          slow = sorted(rows, key=lambda row: row['elapsed_ms'], reverse=True)
           print('package\ttarget\ttests\telapsed_ms\tstatus')
-          for row in slow:
+          for row in sorted(rows, key=lambda row: row['elapsed_ms'], reverse=True):
               print(f"{row['package']}\t{row['target']}\t{row['test_count']}\t{row['elapsed_ms']}\t{row['status']}")
           PY
 
