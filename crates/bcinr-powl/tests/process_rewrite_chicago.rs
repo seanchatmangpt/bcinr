@@ -81,41 +81,50 @@ chicago_tdd_tools::test!(powl2_transitive_reduction_is_recursive_and_witnessed, 
     validate_powl2(&rewritten).unwrap();
 });
 
-chicago_tdd_tools::test!(powl2_silent_elimination_preserves_partial_order_reachability, {
-    let original = partial_order(
-        vec![activity("a"), silent(), activity("b")],
-        vec![(0, 1), (1, 2)],
-    )
-    .unwrap();
-    let (rewritten, witness) = eliminate_redundant_silent_nodes(&original).unwrap();
+chicago_tdd_tools::test!(
+    powl2_silent_elimination_preserves_partial_order_reachability,
+    {
+        let original = partial_order(
+            vec![activity("a"), silent(), activity("b")],
+            vec![(0, 1), (1, 2)],
+        )
+        .unwrap();
+        let (rewritten, witness) = eliminate_redundant_silent_nodes(&original).unwrap();
 
-    assert_eq!(
-        rewritten,
-        Powl2Model::PartialOrder {
-            children: vec![activity("a"), activity("b")],
-            edges: vec![(0, 1)],
-        }
-    );
-    assert_eq!(witness.law, ProcessRewriteLaw::SilentNodeElimination);
-    validate_powl2(&rewritten).unwrap();
-});
+        assert_eq!(
+            rewritten,
+            Powl2Model::PartialOrder {
+                children: vec![activity("a"), activity("b")],
+                edges: vec![(0, 1)],
+            }
+        );
+        assert_eq!(witness.law, ProcessRewriteLaw::SilentNodeElimination);
+        validate_powl2(&rewritten).unwrap();
+    }
+);
 
-chicago_tdd_tools::test!(powl2_activity_slice_carries_exact_selection_and_diff_evidence, {
-    let original = sequence(vec![activity("a"), activity("drop"), activity("c")]).unwrap();
-    let (sliced, witness) =
-        slice_process_activities(&original, |label| label != "drop").unwrap();
+chicago_tdd_tools::test!(
+    powl2_activity_slice_carries_exact_selection_and_diff_evidence,
+    {
+        let original = sequence(vec![activity("a"), activity("drop"), activity("c")]).unwrap();
+        let (sliced, witness) =
+            slice_process_activities(&original, |label| label != "drop").unwrap();
 
-    assert_eq!(sliced, sequence(vec![activity("a"), activity("c")]).unwrap());
-    assert_eq!(witness.rewrite.law, ProcessRewriteLaw::ActivitySlice);
-    assert_eq!(witness.retained_activities.len(), 2);
-    assert_eq!(witness.removed_activities.len(), 1);
-    assert_eq!(witness.removed_activities[0].stable_id(), "n_1");
+        assert_eq!(
+            sliced,
+            sequence(vec![activity("a"), activity("c")]).unwrap()
+        );
+        assert_eq!(witness.rewrite.law, ProcessRewriteLaw::ActivitySlice);
+        assert_eq!(witness.retained_activities.len(), 2);
+        assert_eq!(witness.removed_activities.len(), 1);
+        assert_eq!(witness.removed_activities[0].stable_id(), "n_1");
 
-    let diff = diff_validated_processes(&original, &sliced).unwrap();
-    assert_eq!(diff.before, witness.rewrite.before);
-    assert_eq!(diff.after, witness.rewrite.after);
-    assert_eq!(diff.removed_activities, vec!["drop".to_string()]);
-});
+        let diff = diff_validated_processes(&original, &sliced).unwrap();
+        assert_eq!(diff.before, witness.rewrite.before);
+        assert_eq!(diff.after, witness.rewrite.after);
+        assert_eq!(diff.removed_activities, vec!["drop".to_string()]);
+    }
+);
 
 chicago_tdd_tools::test!(powl2_activity_slice_preserves_choice_vertices, {
     let original = Powl2Model::ChoiceGraph {
