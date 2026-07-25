@@ -40,13 +40,13 @@ jobs:
       - name: Apply semantic integration
         run: python3 scripts/complete_semantic_integration.py
 
-      - name: Adapt AutoSelect to main mask calculus
+      - name: Adapt AutoSelect to main primitives
         run: |
           python3 <<'PY'
           from pathlib import Path
 
-          path = Path('crates/bcinr-logic/src/mask.rs')
-          text = path.read_text()
+          mask = Path('crates/bcinr-logic/src/mask.rs')
+          text = mask.read_text()
           if 'pub const fn select_u8(' not in text:
               text += '''
 
@@ -68,7 +68,20 @@ jobs:
               non_zero.wrapping_sub(1)
           }
           '''.replace('          ', '')
-          path.write_text(text)
+          mask.write_text(text)
+
+          for rel in [
+              'crates/bcinr-powl/src/full_mapek_loop.rs',
+              'crates/bcinr-powl/src/mapek_loop.rs',
+          ]:
+              path = Path(rel)
+              source = path.read_text()
+              source = source.replace('    policy_guard::PolicyGuard,\n', '')
+              source = source.replace(
+                  'PolicyGuard::apply_policy_guard(pipeline_res.is_ok, input.policy_valid)',
+                  'pipeline_res.is_ok & (input.policy_valid as u8)',
+              )
+              path.write_text(source)
           PY
 
       - name: Regenerate lockfile and format
