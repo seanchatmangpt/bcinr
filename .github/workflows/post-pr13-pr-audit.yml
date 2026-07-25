@@ -36,8 +36,8 @@ jobs:
           from pathlib import Path
           path = Path('/tmp/post-pr13-audit.sh')
           text = path.read_text()
-          needle = "          git config user.name 'OpenAI Integration Agent'"
-          replacement = "          rm -f .github/workflows/post-pr13-pr-audit.yml\n" + needle
+          needle = "git config user.name 'OpenAI Integration Agent'"
+          replacement = "rm -f .github/workflows/post-pr13-pr-audit.yml\n" + needle
           if needle not in text:
               raise SystemExit('publisher insertion point missing')
           path.write_text(text.replace(needle, replacement, 1))
