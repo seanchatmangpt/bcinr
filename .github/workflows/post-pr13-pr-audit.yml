@@ -36,80 +36,10 @@ jobs:
           from pathlib import Path
           path = Path('/tmp/post-pr13-audit.sh')
           text = path.read_text()
-          anchor = "python3 scripts/adapt_semantic_integration.py\n"
-          repair = anchor + """python3 - <<'PY_REPAIR'
-          from pathlib import Path
-
-          differential = Path('crates/bcinr-cmca/tests/differential.rs')
-          source = differential.read_text()
-          for terminal in range(2, 8):
-              source = source.replace(
-                  f"if v == {terminal} {{ -1 }} else {{ v as i32 }}",
-                  f"if v == {terminal} {{ -1 }} else {{ v }}",
-              )
-          differential.write_text(source)
-
-          final_integration = Path('crates/bcinr-powl/src/auto_select_final_integration.rs')
-          source = final_integration.read_text()
-          source = source.replace(
-              "        let mut input = FullMapekInput::default();\\n        input.policy_valid = true;",
-              "        let input = FullMapekInput {\\n            policy_valid: true,\\n            ..FullMapekInput::default()\\n        };",
-          )
-          final_integration.write_text(source)
-
-          fixture_old = """        let mut cand = ToolCapabilityMatrix::default();
-                  cand.exact_mask = 0b11;
-                  cand.authority_exact = 0b01;
-                  cand.timing_score = 255;
-                  cand.cost_score = 255;
-                  cand.reliability_score = 255;
-                  cand.evidence_exact = 255;
-                  cand.downstream_exact = 255;
-                  cand.lossless_mask = 255;
-          """
-          fixture_new = """        let cand = ToolCapabilityMatrix {
-                      exact_mask: 0b11,
-                      authority_exact: 0b01,
-                      timing_score: 255,
-                      cost_score: 255,
-                      reliability_score: 255,
-                      evidence_exact: 255,
-                      downstream_exact: 255,
-                      lossless_mask: 255,
-                      ..ToolCapabilityMatrix::default()
-                  };
-          """
-          for rel in [
-              'crates/bcinr-powl/src/auto_select_pipeline.rs',
-              'crates/bcinr-powl/src/full_mapek_loop.rs',
-              'crates/bcinr-powl/src/mapek_loop.rs',
-          ]:
-              fixture = Path(rel)
-              source = fixture.read_text().replace(fixture_old, fixture_new)
-              source = source.replace('terminal_state.clone()', 'terminal_state')
-              fixture.write_text(source)
-
-          fixed = Path('crates/bcinr-cmca/src/fixed.rs')
-          source = fixed.read_text()
-          compat_start = source.rfind('\\n\\nimpl NonNegativeFixed {')
-          marker = '#[cfg(test)]\\nmod tests {'
-          if compat_start < 0 or 'Compatibility constructor retained' not in source[compat_start:]:
-              raise SystemExit('fixed compatibility block missing')
-          compatibility = source[compat_start:].strip()
-          source = source[:compat_start].rstrip() + '\\n'
-          if marker not in source:
-              raise SystemExit('fixed test module marker missing')
-          fixed.write_text(source.replace(marker, compatibility + '\\n\\n' + marker, 1))
-          PY_REPAIR
-          """
-          if anchor not in text:
-              raise SystemExit('adapter insertion point missing')
-          text = text.replace(anchor, repair, 1)
           needle = "git config user.name 'OpenAI Integration Agent'"
-          replacement = "exit 0\n" + needle
           if needle not in text:
               raise SystemExit('publisher insertion point missing')
-          path.write_text(text.replace(needle, replacement, 1))
+          path.write_text(text.replace(needle, "exit 0\n" + needle, 1))
           PY
           set +e
           bash /tmp/post-pr13-audit.sh > post-pr13-audit.log 2>&1
