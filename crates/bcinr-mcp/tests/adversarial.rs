@@ -86,10 +86,9 @@ async fn adversarial_transport_and_admission_contracts_hold() {
                 .unwrap_or(false)
     );
 
-    let invalid_params =
-        error_scenarios::call_tool_invalid_params(&harness, "manufacture_world")
-            .await
-            .expect("invalid parameters must return a response");
+    let invalid_params = error_scenarios::call_tool_invalid_params(&harness, "manufacture_world")
+        .await
+        .expect("invalid parameters must return a response");
     assert!(
         invalid_params.get("error").is_some()
             || invalid_params
@@ -130,7 +129,11 @@ async fn adversarial_transport_and_admission_contracts_hold() {
         .iter()
         .map(|tool| tool.name.as_ref())
         .collect::<Vec<_>>();
-    assert_eq!(names.len(), expected.len(), "tool inventory drifted: {names:?}");
+    assert_eq!(
+        names.len(),
+        expected.len(),
+        "tool inventory drifted: {names:?}"
+    );
     for name in expected {
         assert!(names.contains(&name), "missing MCP tool {name}");
     }
@@ -202,12 +205,10 @@ async fn adversarial_transport_and_admission_contracts_hold() {
     let receipt_text = text_from_content(&manufactured.content).to_owned();
     let receipt: serde_json::Value =
         serde_json::from_str(&receipt_text).expect("receipt must be JSON");
-    assert!(
-        receipt
-            .get("admitted")
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(false)
-    );
+    assert!(receipt
+        .get("admitted")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false));
 
     let intact = session
         .call_tool(
@@ -216,12 +217,10 @@ async fn adversarial_transport_and_admission_contracts_hold() {
         )
         .await
         .expect("intact receipt must be inspectable");
-    assert!(
-        parse_content(&intact.content)
-            .get("chain_valid")
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(false)
-    );
+    assert!(parse_content(&intact.content)
+        .get("chain_valid")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false));
 
     let mut tampered = receipt;
     let chain = tampered["manufacture_chain"]
@@ -237,12 +236,10 @@ async fn adversarial_transport_and_admission_contracts_hold() {
         )
         .await
         .expect("tampered receipt must be handled");
-    assert!(
-        !parse_content(&rejected.content)
-            .get("chain_valid")
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(true)
-    );
+    assert!(!parse_content(&rejected.content)
+        .get("chain_valid")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(true));
 
     let route_input = serde_json::json!({
         "desired_effects": ["edited:f1", "form-filled:f2"],
@@ -271,12 +268,10 @@ async fn adversarial_transport_and_admission_contracts_hold() {
         .await
         .expect("infeasible route must return a refusal");
     let infeasible = parse_content(&infeasible.content);
-    assert!(
-        !infeasible
-            .get("admitted")
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(true)
-    );
+    assert!(!infeasible
+        .get("admitted")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(true));
     assert!(infeasible.get("refusal_reason").is_some());
 
     session.shutdown().await;
