@@ -63,6 +63,26 @@ source = source.replace(
 )
 causal_buffer.write_text(source)
 
+for rel in [
+    "crates/bcinr-cmca/src/allocator.rs",
+    "crates/bcinr-cmca/src/observatory.rs",
+]:
+    path = Path(rel)
+    source = path.read_text()
+    source = source.replace(
+        "#[allow(clippy::too_many_arguments)]\n#[inline(never)]\n#[allow(clippy::too_many_arguments)] // deliberate wide parameter list for a hot, branchless flow-step kernel",
+        "#[inline(never)]\n#[allow(clippy::too_many_arguments)] // deliberate wide parameter list for a hot, branchless flow-step kernel",
+    )
+    source = source.replace(
+        "#[allow(clippy::too_many_arguments)]\n#[inline(never)]\n#[allow(clippy::too_many_arguments)] // deliberate wide parameter list for a hot, branchless kernel",
+        "#[inline(never)]\n#[allow(clippy::too_many_arguments)] // deliberate wide parameter list for a hot, branchless kernel",
+    )
+    source = source.replace(
+        "#[allow(clippy::too_many_arguments)]\n#[inline(never)]\n#[allow(clippy::too_many_arguments)] // deliberate wide parameter list for a hot, branchless measurement kernel",
+        "#[inline(never)]\n#[allow(clippy::too_many_arguments)] // deliberate wide parameter list for a hot, branchless measurement kernel",
+    )
+    path.write_text(source)
+
 ocel = Path("crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs")
 source = ocel.read_text()
 old = """        let mut next = Self::default();
