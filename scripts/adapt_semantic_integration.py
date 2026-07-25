@@ -130,6 +130,42 @@ if old not in source:
     raise RuntimeError("AutoSelect terminal Default shape changed")
 terminal.write_text(source.replace(old, new, 1))
 
+pipeline = Path("crates/bcinr-powl/src/auto_select_pipeline.rs")
+source = pipeline.read_text()
+base_initializer = """    let mut auto_input = CanonicalAutoSelectInput8::default();
+    auto_input.q_lens = input.q_lens;
+    auto_input.add_mask = input.add_mask;
+    auto_input.del_mask = input.del_mask;
+"""
+structured_initializer = """    let mut auto_input = CanonicalAutoSelectInput8 {
+        q_lens: input.q_lens,
+        add_mask: input.add_mask,
+        del_mask: input.del_mask,
+        ..CanonicalAutoSelectInput8::default()
+    };
+"""
+if source.count(base_initializer) != 2:
+    raise RuntimeError("AutoSelect pipeline initializer count changed")
+source = source.replace(base_initializer, structured_initializer)
+mutant_initializer = """        let mut auto_input = CanonicalAutoSelectInput8::default();
+        auto_input.q_lens = input.q_lens;
+        auto_input.add_mask = input.add_mask;
+        auto_input.del_mask = input.del_mask;
+        auto_input.admitted_mask = 0xFF; // Bypass!
+"""
+mutant_structured = """        let auto_input = CanonicalAutoSelectInput8 {
+            q_lens: input.q_lens,
+            add_mask: input.add_mask,
+            del_mask: input.del_mask,
+            admitted_mask: 0xFF, // Bypass!
+            ..CanonicalAutoSelectInput8::default()
+        };
+"""
+if mutant_initializer not in source:
+    raise RuntimeError("AutoSelect mutant initializer shape changed")
+source = source.replace(mutant_initializer, mutant_structured, 1)
+pipeline.write_text(source)
+
 fixed = Path("crates/bcinr-cmca/src/fixed.rs")
 source = fixed.read_text()
 if "pub const fn from_bits(bits: u32)" not in source:
