@@ -184,7 +184,10 @@ mod generated_binding_proof {
             }
         }
 
-        assert_eq!(command_count, 2, "the fulfillment plan must bind two commands");
+        assert_eq!(
+            command_count, 2,
+            "the fulfillment plan must bind two commands"
+        );
         assert!(saw_notify, "the plan must bind notify-customer");
         assert!(saw_reserve, "the plan must bind reserve-inventory");
     });
