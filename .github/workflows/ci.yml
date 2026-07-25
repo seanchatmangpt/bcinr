@@ -29,20 +29,7 @@ jobs:
           shared-key: ci-ubuntu-nightly
           cache-on-failure: true
       - name: Format
-        id: format
-        shell: bash
-        run: |
-          cargo fmt --all
-          git diff --binary > rustfmt.patch
-          test ! -s rustfmt.patch
-      - name: Upload rustfmt patch
-        if: failure() && steps.format.outcome == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: rustfmt-patch
-          path: rustfmt.patch
-          if-no-files-found: error
-          retention-days: 1
+        run: cargo fmt --all -- --check
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - name: Compile every test target
