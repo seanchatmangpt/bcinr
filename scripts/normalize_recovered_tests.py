@@ -74,3 +74,7 @@ add_test_lint_boundary(
     ("field_reassign_with_default",),
     "Receipt fixtures stage prior and candidate weights explicitly to audit masked commit behavior.",
 )
+
+# This is a one-run migration adapter. Remove it from the materialized audited
+# tree after its deterministic transformations have been applied.
+Path(__file__).unlink()
