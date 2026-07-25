@@ -76,3 +76,11 @@ impl SignedFixed {
 }
 """
 fixed.write_text(source)
+
+harness = Path("tools/bcinr-cmca-audit-harness/src/main.rs")
+source = harness.read_text()
+source = source.replace(
+    "use bcinr_cmca::generated::case_studies::{",
+    "use bcinr_cmca::generated_artifact::case_studies::{",
+)
+harness.write_text(source)
