@@ -63,6 +63,73 @@ source = source.replace(
 )
 causal_buffer.write_text(source)
 
+ocel = Path("crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs")
+source = ocel.read_text()
+old = """        let mut next = Self::default();
+        next.instruction_id = select_u64(m, a.instruction_id, b.instruction_id);
+        next.fired_mask = select_u64(m, a.fired_mask, b.fired_mask);
+        next.denial = select_u64(m, a.denial, b.denial);
+
+        for i in 0..8 {
+"""
+new = """        let mut next = Self {
+            instruction_id: select_u64(m, a.instruction_id, b.instruction_id),
+            fired_mask: select_u64(m, a.fired_mask, b.fired_mask),
+            denial: select_u64(m, a.denial, b.denial),
+            ts_ns: select_u64(m, a.ts_ns, b.ts_ns),
+            activity_idx: select_u64(m, a.activity_idx as u64, b.activity_idx as u64) as u16,
+            node_kind: select_u64(m, a.node_kind as u64, b.node_kind as u64) as u8,
+            ..Self::default()
+        };
+
+        for i in 0..8 {
+"""
+if old not in source:
+    raise RuntimeError("AutoSelect OCEL initializer shape changed")
+source = source.replace(old, new, 1)
+source = source.replace(
+    """        next.ts_ns = select_u64(m, a.ts_ns, b.ts_ns);
+        next.activity_idx = select_u64(m, a.activity_idx as u64, b.activity_idx as u64) as u16;
+        next.node_kind = select_u64(m, a.node_kind as u64, b.node_kind as u64) as u8;
+
+""",
+    "",
+    1,
+)
+ocel.write_text(source)
+
+terminal = Path("crates/bcinr-logic/src/autonomic/auto_select_terminal_convergence.rs")
+source = terminal.read_text()
+old = """#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PersistentControlState {
+    pub epoch_clock: u64,
+    pub mass: u64,
+    pub _pad: [u64; 30],
+}
+
+impl Default for PersistentControlState {
+    fn default() -> Self {
+        Self {
+            epoch_clock: 0,
+            mass: 0,
+            _pad: [0; 30],
+        }
+    }
+}
+"""
+new = """#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct PersistentControlState {
+    pub epoch_clock: u64,
+    pub mass: u64,
+    pub _pad: [u64; 30],
+}
+"""
+if old not in source:
+    raise RuntimeError("AutoSelect terminal Default shape changed")
+terminal.write_text(source.replace(old, new, 1))
+
 fixed = Path("crates/bcinr-cmca/src/fixed.rs")
 source = fixed.read_text()
 if "pub const fn from_bits(bits: u32)" not in source:
