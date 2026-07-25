@@ -1,0 +1,172 @@
+name: Test Audit
+
+on:
+  push:
+    branches: [ggen-embedded-workflow-pack-demo]
+
+concurrency:
+  group: test-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: never
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  audit:
+    name: Inventory and time all test binaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: test-audit-ubuntu-nightly
+          cache-on-failure: true
+
+      - name: Inventory test sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo -e "path\trust_tests\tchicago_tests\tignored\tproptest_blocks"
+            while IFS= read -r path; do
+              rust_tests="$(grep -Ec '#\[(tokio::)?test([^]]*)?\]' "$path" || true)"
+              chicago_tests="$(grep -Ec 'chicago_tdd_tools::test!' "$path" || true)"
+              ignored="$(grep -Ec '#\[ignore([^]]*)?\]' "$path" || true)"
+              proptest_blocks="$(grep -Ec 'proptest!' "$path" || true)"
+              if [ "$rust_tests" -gt 0 ] || [ "$chicago_tests" -gt 0 ] || [ "$ignored" -gt 0 ] || [ "$proptest_blocks" -gt 0 ]; then
+                echo -e "${path}\t${rust_tests}\t${chicago_tests}\t${ignored}\t${proptest_blocks}"
+              fi
+            done < <(find . -type f -name '*.rs' -not -path './target/*' -not -path './.git/*' | sort)
+          } | tee test-source-inventory.tsv
+
+      - name: Build every unit and integration test target
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test \
+            --workspace \
+            --all-features \
+            --lib \
+            --tests \
+            --no-run \
+            --message-format=json-render-diagnostics \
+            > cargo-test-build.jsonl
+
+      - name: Enumerate and time every compiled test binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+          import subprocess
+          import time
+
+          records = {}
+          with open('cargo-test-build.jsonl', encoding='utf-8') as stream:
+              for line in stream:
+                  try:
+                      event = json.loads(line)
+                  except json.JSONDecodeError:
+                      continue
+                  if event.get('reason') != 'compiler-artifact':
+                      continue
+                  profile = event.get('profile') or {}
+                  executable = event.get('executable')
+                  target = event.get('target') or {}
+                  if not profile.get('test') or not executable:
+                      continue
+                  executable = os.path.realpath(executable)
+                  records[executable] = {
+                      'package': (event.get('package_id') or '').split(' ')[0],
+                      'target': target.get('name', ''),
+                      'kind': ','.join(target.get('kind') or []),
+                      'src_path': target.get('src_path', ''),
+                  }
+
+          rows = []
+          for executable, metadata in sorted(records.items(), key=lambda item: (item[1]['package'], item[1]['target'], item[0])):
+              listing = subprocess.run(
+                  [executable, '--list', '--format', 'terse'],
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.STDOUT,
+                  text=True,
+                  timeout=30,
+                  check=False,
+              )
+              tests = [line for line in listing.stdout.splitlines() if line.endswith(': test')]
+              ignored = [line for line in listing.stdout.splitlines() if ': test' in line and 'ignored' in line]
+
+              started = time.monotonic_ns()
+              try:
+                  run = subprocess.run(
+                      [executable, '--test-threads=1'],
+                      stdout=subprocess.PIPE,
+                      stderr=subprocess.STDOUT,
+                      text=True,
+                      timeout=60,
+                      check=False,
+                  )
+                  status = str(run.returncode)
+                  output = run.stdout
+              except subprocess.TimeoutExpired as exc:
+                  status = 'TIMEOUT_60S'
+                  output = (exc.stdout or '') + (exc.stderr or '')
+                  if isinstance(output, bytes):
+                      output = output.decode(errors='replace')
+              elapsed_ms = (time.monotonic_ns() - started) // 1_000_000
+
+              log_name = f"{metadata['package']}__{metadata['target']}.log".replace('/', '_')
+              pathlib.Path('test-logs').mkdir(exist_ok=True)
+              pathlib.Path('test-logs', log_name).write_text(output, encoding='utf-8')
+
+              rows.append({
+                  **metadata,
+                  'test_count': len(tests),
+                  'ignored_count': len(ignored),
+                  'elapsed_ms': elapsed_ms,
+                  'status': status,
+                  'executable': executable,
+              })
+
+          columns = ['package', 'target', 'kind', 'src_path', 'test_count', 'ignored_count', 'elapsed_ms', 'status', 'executable']
+          with open('test-runtime.tsv', 'w', encoding='utf-8') as out:
+              out.write('\t'.join(columns) + '\n')
+              for row in rows:
+                  out.write('\t'.join(str(row[column]) for column in columns) + '\n')
+
+          with open('test-list.txt', 'w', encoding='utf-8') as out:
+              for executable, metadata in sorted(records.items(), key=lambda item: (item[1]['package'], item[1]['target'], item[0])):
+                  listing = subprocess.run(
+                      [executable, '--list', '--format', 'terse'],
+                      stdout=subprocess.PIPE,
+                      stderr=subprocess.STDOUT,
+                      text=True,
+                      timeout=30,
+                      check=False,
+                  )
+                  out.write(f"## {metadata['package']} :: {metadata['target']} :: {metadata['src_path']}\n")
+                  out.write(listing.stdout)
+                  out.write('\n')
+
+          slow = sorted(rows, key=lambda row: row['elapsed_ms'], reverse=True)
+          print('package\ttarget\ttests\telapsed_ms\tstatus')
+          for row in slow:
+              print(f"{row['package']}\t{row['target']}\t{row['test_count']}\t{row['elapsed_ms']}\t{row['status']}")
+          PY
+
+      - name: Upload audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace-test-audit
+          path: |
+            test-source-inventory.tsv
+            test-runtime.tsv
+            test-list.txt
+            test-logs/
+          if-no-files-found: error
+          retention-days: 7
