@@ -129,12 +129,19 @@ mod generated_binding_proof {
     }
 
     chicago_tdd_tools::test!(generated_binding_matches_the_real_domains_actual_actions, {
+        let binding = FulfillmentCommandV1Binding;
+        assert_eq!(binding.binding_name(), "fulfillment-command-v1");
+        assert_eq!(
+            binding.supported_actions(),
+            vec!["notify-customer", "reserve-inventory"]
+        );
+
         let mut workflow =
             EmbeddedWorkflow::new(DOMAIN).expect("embedded planning domain must parse");
         let order = Order { id: 42, paid: true };
         let verified = workflow.plan(&order).expect("workflow should be admitted");
-        let registry = BindingRegistry::new(FulfillmentCommandV1Binding)
-            .expect("generated binding schema should validate");
+        let registry =
+            BindingRegistry::new(binding).expect("generated binding schema should validate");
         let coverage = registry.coverage(
             verified
                 .batches()
@@ -142,16 +149,57 @@ mod generated_binding_proof {
                 .flat_map(|batch| batch.actions().iter().map(|action| action.name.clone())),
         );
         assert!(
-                coverage.is_complete(),
-                "generated binding's action set must match the real domain's planned actions: {coverage:?}"
-            );
+            coverage.is_complete(),
+            "generated binding's action set must match the real domain's planned actions: {coverage:?}"
+        );
+
         let commands = verified
             .bind::<Command>()
             .expect("every planner action must have a generated Rust binding");
+        let mut saw_notify = false;
+        let mut saw_reserve = false;
+        let mut command_count = 0;
+
         for batch in commands.batches() {
             for command in batch.actions() {
-                let _kind = default_execution_kind(command);
+                command_count += 1;
+                match command {
+                    Command::NotifyCustomer => {
+                        saw_notify = true;
+                        assert_eq!(
+                            default_execution_kind(command),
+                            ExecutionKind::Durable,
+                            "customer notification must retain durable default routing"
+                        );
+                    }
+                    Command::ReserveInventory => {
+                        saw_reserve = true;
+                        assert_eq!(
+                            default_execution_kind(command),
+                            ExecutionKind::Local,
+                            "inventory reservation must retain local default routing"
+                        );
+                    }
+                }
             }
         }
+
+        assert_eq!(command_count, 2, "the fulfillment plan must bind two commands");
+        assert!(saw_notify, "the plan must bind notify-customer");
+        assert!(saw_reserve, "the plan must bind reserve-inventory");
+    });
+
+    chicago_tdd_tools::test!(unpaid_orders_are_refused_before_binding, {
+        let mut workflow =
+            EmbeddedWorkflow::new(DOMAIN).expect("embedded planning domain must parse");
+        let unpaid_order = Order {
+            id: 43,
+            paid: false,
+        };
+
+        assert!(
+            workflow.plan(&unpaid_order).is_err(),
+            "an unpaid order must not manufacture executable commands"
+        );
     });
 }
