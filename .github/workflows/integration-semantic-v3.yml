@@ -78,6 +78,14 @@ jobs:
                   'pipeline_res.is_ok & (input.policy_valid as u8)',
               )
               path.write_text(source)
+
+          causal_buffer = Path('crates/bcinr-powl-receipt/src/causal_buffer_integration.rs')
+          source = causal_buffer.read_text()
+          source = source.replace(
+              'frames: [empty_frame; N],',
+              'frames: core::array::from_fn(|_| empty_frame.clone()),',
+          )
+          causal_buffer.write_text(source)
           PY
 
       - name: Regenerate lockfile and format
