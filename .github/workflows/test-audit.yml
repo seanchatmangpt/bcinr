@@ -68,6 +68,13 @@ jobs:
           import subprocess
           import time
 
+          def text(value):
+              if value is None:
+                  return ''
+              if isinstance(value, bytes):
+                  return value.decode(errors='replace')
+              return value
+
           records = {}
           with open('cargo-test-build.jsonl', encoding='utf-8') as stream:
               for line in stream:
@@ -117,21 +124,24 @@ jobs:
                   output = run.stdout
               except subprocess.TimeoutExpired as exc:
                   status = 'TIMEOUT_60S'
-                  output = (exc.stdout or '') + (exc.stderr or '')
-                  if isinstance(output, bytes):
-                      output = output.decode(errors='replace')
+                  output = text(exc.stdout) + text(exc.stderr)
+              except OSError as exc:
+                  status = f'OS_ERROR_{exc.errno}'
+                  output = str(exc)
               elapsed_ms = (time.monotonic_ns() - started) // 1_000_000
 
               log_name = f"{metadata['package']}__{metadata['target']}.log".replace('/', '_')
               pathlib.Path('test-logs', log_name).write_text(output, encoding='utf-8')
 
-              rows.append({
+              row = {
                   **metadata,
                   'test_count': len(tests),
                   'elapsed_ms': elapsed_ms,
                   'status': status,
                   'executable': executable,
-              })
+              }
+              rows.append(row)
+              print(f"{row['package']}\t{row['target']}\t{row['test_count']}\t{row['elapsed_ms']}\t{row['status']}", flush=True)
 
           columns = ['package', 'target', 'kind', 'src_path', 'test_count', 'elapsed_ms', 'status', 'executable']
           with open('test-runtime.tsv', 'w', encoding='utf-8') as out:
@@ -152,13 +162,10 @@ jobs:
                   out.write(f"## {metadata['package']} :: {metadata['target']} :: {metadata['src_path']}\n")
                   out.write(listing.stdout)
                   out.write('\n')
-
-          print('package\ttarget\ttests\telapsed_ms\tstatus')
-          for row in sorted(rows, key=lambda row: row['elapsed_ms'], reverse=True):
-              print(f"{row['package']}\t{row['target']}\t{row['test_count']}\t{row['elapsed_ms']}\t{row['status']}")
           PY
 
       - name: Upload audit evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: workspace-test-audit
@@ -167,5 +174,5 @@ jobs:
             test-runtime.tsv
             test-list.txt
             test-logs/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 7
