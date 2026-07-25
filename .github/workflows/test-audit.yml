@@ -1,13 +1,11 @@
 name: Test Audit
 
 on:
-  push:
-    branches: [ggen-embedded-workflow-pack-demo]
   pull_request:
     branches: [main, master]
 
 concurrency:
-  group: test-audit-${{ github.event.pull_request.number || github.ref }}
+  group: test-audit-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 env:
