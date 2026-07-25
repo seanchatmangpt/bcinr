@@ -16,7 +16,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn stable_partition_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn stable_partition_branchless(val: u64, aux: u64) -> u64 {
     let t = aux & 0xFF;
     let b = [
         val & 0xFF,
@@ -176,7 +177,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_stable_partition_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_stable_partition_branchless(c: &mut Criterion) {
         c.bench_function("stable_partition_branchless", |b| {
             b.iter(|| {
                 let res = stable_partition_branchless(black_box(42), black_box(1337));
@@ -185,3 +187,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

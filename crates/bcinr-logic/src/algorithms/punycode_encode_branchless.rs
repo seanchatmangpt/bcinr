@@ -24,7 +24,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn punycode_encode_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn punycode_encode_branchless(val: u64, aux: u64) -> u64 {
     let d = val % 36;
     let flag = aux & 1;
     let is_alpha = (d < 26) as u64;
@@ -125,7 +126,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_punycode_encode_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_punycode_encode_branchless(c: &mut Criterion) {
         c.bench_function("punycode_encode_branchless", |b| {
             b.iter(|| {
                 let res = punycode_encode_branchless(black_box(42), black_box(1337));
@@ -134,3 +136,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

@@ -51,7 +51,8 @@
 /// ```
 #[must_use = "DFA transition state — ignoring discards the next state"]
 #[inline(always)]
-pub fn dfa_advance(state: usize, input: u8, table: &[usize], alphabet_size: usize) -> usize {
+#[rustfmt::skip]
+pub  fn dfa_advance(state: usize, input: u8, table: &[usize], alphabet_size: usize) -> usize {
     let index = state
         .wrapping_mul(alphabet_size)
         .wrapping_add(input as usize);
@@ -85,7 +86,8 @@ pub fn dfa_advance(state: usize, input: u8, table: &[usize], alphabet_size: usiz
 /// ```
 #[must_use = "DFA transition state — ignoring discards the next state"]
 #[inline(always)]
-pub fn dfa_run(table: &[usize], alphabet_size: usize, initial_state: usize, input: &[u8]) -> usize {
+#[rustfmt::skip]
+pub  fn dfa_run(table: &[usize], alphabet_size: usize, initial_state: usize, input: &[u8]) -> usize {
     let mut state = initial_state;
     input.iter().for_each(|&b| {
         state = dfa_advance(state, b, table, alphabet_size);
@@ -113,7 +115,8 @@ pub fn dfa_run(table: &[usize], alphabet_size: usize, initial_state: usize, inpu
 /// ```
 #[must_use = "DFA transition state — ignoring discards the next state"]
 #[inline(always)]
-pub fn dfa_is_accepting(state: usize, accept_states: &[usize]) -> bool {
+#[rustfmt::skip]
+pub  fn dfa_is_accepting(state: usize, accept_states: &[usize]) -> bool {
     let mut found = 0usize;
     (0..accept_states.len()).for_each(|i| {
         found |= (accept_states[i] == state) as usize;
@@ -236,3 +239,7 @@ mod tests {
 // Padding Line 112
 // Padding Line 113
 // Padding Line 114
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

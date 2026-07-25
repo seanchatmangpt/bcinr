@@ -50,7 +50,8 @@ const PEARSON_TABLE: [u8; 256] = [
 ///
 /// # Branchless Contract
 #[no_mangle]
-pub fn pearson_hash_u8(input: u64, seed: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn pearson_hash_u8(input: u64, seed: u64) -> u64 {
     // Extract the lowest byte from input
     let byte_input = (input & 0xFF) as u8;
 
@@ -128,7 +129,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_pearson_hash_u8(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_pearson_hash_u8(c: &mut Criterion) {
         c.bench_function("pearson_hash_u8_small", |b| {
             b.iter(|| pearson_hash_u8(black_box(42), black_box(1337)))
         });
@@ -142,3 +144,11 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

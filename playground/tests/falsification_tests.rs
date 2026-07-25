@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! Property-based falsification tests for `playground`'s HOEG/TEKG/GNN
 //! compilation pipeline — adversarial proptest cases aimed at breaking the
 //! compiled-matrix/snapshot-chain invariants rather than confirming them.

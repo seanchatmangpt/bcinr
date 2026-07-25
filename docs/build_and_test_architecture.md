@@ -1,0 +1,19 @@
+Here is the requested documentation on how the `bcinr` project handles build generation, benchmarking, and testing, derived from the codebase structure and the deterministic substrate constitutional rules (`AGENTS.md`, `GEMINI.md`, `TEST_INFRA.md`, etc.).
+
+### 1. Build Generation (`build.rs`)
+- **Strictly Banned in Authoritative Code**: The repository strongly forbids the use of `build.rs` to dynamically generate code or artifacts as a side-effect of `cargo build` in the runtime. A search across the crates (`bcinr-cmca`, `bcinr-core`, `bcinr-api`, etc.) reveals **no `build.rs` files**.
+- **Rule Enforcement**: As per the constitutional rules (e.g., *Generated-code law*, *No runtime theorem discovery*, and anti-cheat rule *CHEAT-006*), all generated code must be explicit, reproducible, and verifiable. Code generation must occur ahead-of-time (via explicit Python scripts in the root or `Makefile.toml` targets), must be committed to version control, and checked byte-for-byte.
+- **Cheat Scanner Checks**: Using `build.rs` or declarative macros to hide loops, `if` statements, or dynamically alter the instruction shape is a violation of the Radon Law ($CC=1$). The `bcinr-cheat-scanner` must inspect expanded macro output to ensure the *true* object-code graph is entirely branchless.
+
+### 2. Benchmarking (`benches/`)
+- **Location**: Benchmarks are structured conventionally in crates like `bcinr-bench/benches/` and `bcinr-core/benches/`.
+- **Bench Auditor (F4)**: The project enforces strict benchmark coverage dynamically using a `bcinr-bench-auditor`. Under the *fixed bounded execution work* mandate, every public symbol in the authoritative runtime *must* have benchmark coverage.
+- **Execution**: The `Makefile.toml` orchestrates workspace-wide benchmarking via `bench` and `bench-report` tasks. It also invokes low-level `perf stat -e instructions,branch-misses` in specialized bench tasks (e.g., `factory-bench`) to verify branchless constraints dynamically.
+- **Anti-Cheat Law (CHEAT-008)**: "Benchmark theater" (benchmarking stubs, constant-folded paths, or reduced problems) is prohibited. Benchmarking must prove that the production-equivalent code satisfies fixed, $O(1)$ constant-time transitions.
+
+### 3. Testing (`tests/`)
+- **Tiered Opaque-Box Infrastructure**: Outlined in `TEST_INFRA.md`, testing operates on four tiers—from unit tests to real-world scenarios and mutation testing. They are located in crate-level test directories and a root `tests/` directory (e.g., `test_scanner.rs`, `test_jaro.rs`).
+- **Differential Verification**: A core strategy is *differential testing*. The highly optimized, branchless, zero-allocation production implementations are fed generated traces, and their exact bit-for-bit outcomes are compared against a branching "slow rail" independent oracle. 
+- **The Substrate Integrity Score (SIS)**: A feature only achieves "PhD-Verified" standing (SIS 100/100) when it passes the complete maturity matrix: structural proof + independent oracle + hostile tests + object-code audit.
+- **Hostile Mutation Protocol (`@armstrong_fault`)**: Testing is highly adversarial. `Makefile.toml` dictates a dedicated `test-mutants` target that selectively injects 11 plausible defects (via cargo features like `mutant_1`, `mutant_2`, etc.). The oracle must specifically identify the mutation by returning structured "Typed Refusals" (e.g., `Err(StabilityRefusal::DigestMismatch)`), not via simple `assert_ne!` or thread panics.
+- **Contract Gate Validation**: The E2E tests go beyond executing logic; they execute the *Contract Gate*. This scans the codebase via `bcinr-cheat-scanner` to assert the Radon Law (Cyclomatic Complexity = 1), zero memory allocations, absence of forbidden operators, and LSP Canary compliance to prevent LLM generation shortcuts.

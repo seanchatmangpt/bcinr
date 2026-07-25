@@ -35,7 +35,8 @@
 /// ```
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
-pub fn mul_sat_u64(a: u64, b: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn mul_sat_u64(a: u64, b: u64) -> u64 {
     // Compute full 128-bit product via u64 -> u128 conversions
     let product_128 = (a as u128).wrapping_mul(b as u128);
 
@@ -131,7 +132,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_mul_sat_u64(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_mul_sat_u64(c: &mut Criterion) {
         c.bench_function("mul_sat_u64_no_overflow", |b| {
             // Small numbers, no saturation
             b.iter(|| mul_sat_u64(black_box(42), black_box(1337)))
@@ -148,3 +150,11 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

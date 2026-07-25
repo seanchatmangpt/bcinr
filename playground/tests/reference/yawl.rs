@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! Binary YAWL (bYAWL) Routing Engine Reference
 //!
 //! `#![allow(dead_code)]`: see `reference/petri.rs`'s module doc comment —

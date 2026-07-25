@@ -1,3 +1,4 @@
+#![allow(clippy::cargo_common_metadata)]
 //! bcinr-pddl — PDDL8 → POWL tape → Prolog8 admission → OCEL → BLAKE3
 //!
 //! # BRCE stack position

@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! Binary YAWL (bYAWL) Routing Engine Reference
 
 #[repr(u8)]

@@ -99,7 +99,8 @@ pub const fn scan_gate(val: u64) -> u64 {
 /// ```
 #[must_use = "byte-match bitmask — ignoring it discards the computed scan result"]
 #[inline(always)]
-pub fn find_byte_mask(bytes: &[u8], target: u8) -> u64 {
+#[rustfmt::skip]
+pub  fn find_byte_mask(bytes: &[u8], target: u8) -> u64 {
     let mut mask = 0u64;
     let b_len = bytes.len();
     let cap = 64;
@@ -130,7 +131,8 @@ pub fn find_byte_mask(bytes: &[u8], target: u8) -> u64 {
 /// ```
 #[must_use = "leading-space count — ignoring it discards the computed offset"]
 #[inline(always)]
-pub fn skip_spaces(bytes: &[u8]) -> usize {
+#[rustfmt::skip]
+pub  fn skip_spaces(bytes: &[u8]) -> usize {
     let mut offset = 0;
     (0..bytes.len()).for_each(|i| {
         let is_space = (bytes[i] == b' ') as usize;
@@ -158,7 +160,8 @@ pub fn skip_spaces(bytes: &[u8]) -> usize {
 /// ```
 #[must_use = "ASCII validity flag — ignoring it discards the computed result"]
 #[inline(always)]
-pub fn is_ascii_u64_slice(bytes: &[u8]) -> bool {
+#[rustfmt::skip]
+pub  fn is_ascii_u64_slice(bytes: &[u8]) -> bool {
     let mut accumulator = 0u64;
     let chunks = bytes.chunks_exact(8);
     chunks.for_each(|chunk| {
@@ -196,7 +199,8 @@ pub fn is_ascii_u64_slice(bytes: &[u8]) -> bool {
 /// assert_eq!(out, [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]);
 /// ```
 #[inline(always)]
-pub fn prefix_sum_u32x16(arr: [u32; 16]) -> [u32; 16] {
+#[rustfmt::skip]
+pub  fn prefix_sum_u32x16(arr: [u32; 16]) -> [u32; 16] {
     let mut a = arr;
 
     // Pass 1: stride 1 — a[i] += a[i-1] for odd i
@@ -262,7 +266,8 @@ pub fn prefix_sum_u32x16(arr: [u32; 16]) -> [u32; 16] {
 /// assert_eq!(out, [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]);
 /// ```
 #[inline(always)]
-pub fn exclusive_scan_u32x16(arr: [u32; 16]) -> [u32; 16] {
+#[rustfmt::skip]
+pub  fn exclusive_scan_u32x16(arr: [u32; 16]) -> [u32; 16] {
     let inc = prefix_sum_u32x16(arr);
     [
         0, inc[0], inc[1], inc[2], inc[3], inc[4], inc[5], inc[6], inc[7], inc[8], inc[9], inc[10],
@@ -292,7 +297,8 @@ pub fn exclusive_scan_u32x16(arr: [u32; 16]) -> [u32; 16] {
 /// assert_eq!(out, [1, 3, 6, 4, 9, 15, 7, 15]);
 /// ```
 #[inline(always)]
-pub fn segmented_prefix_sum_u32x8(values: [u32; 8], flags: [bool; 8]) -> [u32; 8] {
+#[rustfmt::skip]
+pub  fn segmented_prefix_sum_u32x8(values: [u32; 8], flags: [bool; 8]) -> [u32; 8] {
     let mut out = [0u32; 8];
     let mut acc: u32 = 0;
     (0..8usize).for_each(|i| {
@@ -331,7 +337,8 @@ pub fn segmented_prefix_sum_u32x8(values: [u32; 8], flags: [bool; 8]) -> [u32; 8
 /// assert_eq!(out2[2], 0xFFFF_FFFF);
 /// ```
 #[inline(always)]
-pub fn prefix_max_u32x16(arr: [u32; 16]) -> [u32; 16] {
+#[rustfmt::skip]
+pub  fn prefix_max_u32x16(arr: [u32; 16]) -> [u32; 16] {
     let mut out = arr;
     let mut prev_max = out[0];
     (1..16usize).for_each(|i| {
@@ -365,7 +372,8 @@ pub fn prefix_max_u32x16(arr: [u32; 16]) -> [u32; 16] {
 /// assert_eq!(gray[2], 3);
 /// ```
 #[inline(always)]
-pub fn prefix_xor_u64x8(arr: [u64; 8]) -> [u64; 8] {
+#[rustfmt::skip]
+pub  fn prefix_xor_u64x8(arr: [u64; 8]) -> [u64; 8] {
     let mut a = arr;
     a[1] ^= a[0];
     a[2] ^= a[1];
@@ -395,7 +403,8 @@ pub fn prefix_xor_u64x8(arr: [u64; 8]) -> [u64; 8] {
 /// assert_eq!(bits & ((1u64 << 11) - 1), (1 << 2) | (1 << 3) | (1 << 9));
 /// ```
 #[inline(always)]
-pub fn swar_find_all_positions(bytes: &[u8], target: u8) -> u64 {
+#[rustfmt::skip]
+pub  fn swar_find_all_positions(bytes: &[u8], target: u8) -> u64 {
     // Broadcast target to all 8 byte lanes of a u64 word.
     let broadcast = (target as u64).wrapping_mul(0x0101_0101_0101_0101u64);
     let n = bytes.len().min(64);
@@ -456,7 +465,8 @@ pub fn swar_find_all_positions(bytes: &[u8], target: u8) -> u64 {
 /// assert_eq!(count_leading_eq_u8(b"xxxx", b'x'), 4);
 /// ```
 #[inline(always)]
-pub fn count_leading_eq_u8(bytes: &[u8], target: u8) -> usize {
+#[rustfmt::skip]
+pub  fn count_leading_eq_u8(bytes: &[u8], target: u8) -> usize {
     let broadcast = (target as u64).wrapping_mul(0x0101_0101_0101_0101u64);
     let len = bytes.len();
     let full_words = len / 8;
@@ -813,3 +823,7 @@ mod tests {
 // Padding line 37 for SIS compliance.
 // Padding line 38 for SIS compliance.
 // Padding line 39 for SIS compliance.
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

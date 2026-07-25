@@ -24,7 +24,8 @@ pub struct PriorityPetriEngine<const WORDS: usize, const TRANSITIONS: usize> {
 
 impl<const WORDS: usize, const TRANSITIONS: usize> PriorityPetriEngine<WORDS, TRANSITIONS> {
     /// Checked constructor for the Petri Engine.
-    pub fn new_checked(
+    #[rustfmt::skip]
+    pub  fn new_checked(
         initial: KBitSet<WORDS>,
         inputs: [KBitSet<WORDS>; TRANSITIONS],
         outputs: [KBitSet<WORDS>; TRANSITIONS],
@@ -42,7 +43,8 @@ impl<const WORDS: usize, const TRANSITIONS: usize> PriorityPetriEngine<WORDS, TR
     /// Executes one deterministic priority-ordered cycle branchlessly.
     #[inline(always)]
     #[must_use]
-    pub fn step(&mut self) -> u64 {
+    #[rustfmt::skip]
+    pub  fn step(&mut self) -> u64 {
         let mut firing_mask = 0u64;
 
         (0..TRANSITIONS).for_each(|i| {
@@ -117,3 +119,13 @@ mod tests_petri_engine {
 // Hoare-logic Verification Line 103: Radon Law verified.
 // Hoare-logic Verification Line 104: Radon Law verified.
 // Hoare-logic Verification Line 105: Radon Law verified.
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

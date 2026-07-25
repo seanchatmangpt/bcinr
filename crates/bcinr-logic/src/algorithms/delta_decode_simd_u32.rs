@@ -35,7 +35,8 @@
 /// ```
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
-pub fn delta_decode_simd_u32(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn delta_decode_simd_u32(val: u64, aux: u64) -> u64 {
     // val = [delta1: u32 | delta0: u32], aux = [prev1: u32 | prev0: u32]
     let d0 = val as u32;
     let d1 = (val >> 32) as u32;
@@ -224,7 +225,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_delta_decode_simd_u32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_delta_decode_simd_u32(c: &mut Criterion) {
         c.bench_function("delta_decode_simd_u32", |b| {
             b.iter(|| {
                 let res = delta_decode_simd_u32(black_box(42), black_box(1337));

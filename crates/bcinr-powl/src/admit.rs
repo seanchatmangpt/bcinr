@@ -88,11 +88,16 @@ impl AtomicAdmissionParameters {
 
     /// Atomically store the parameter set.
     pub fn store(&self, params: AdmissionParameters) {
-        self.load_saturation_threshold.store(params.load_saturation_threshold, Ordering::Release);
-        self.urgency_priority_threshold.store(params.urgency_priority_threshold, Ordering::Release);
-        self.tenant_class_priority_min.store(params.tenant_class_priority_min, Ordering::Release);
-        self.tenant_class_standard_min.store(params.tenant_class_standard_min, Ordering::Release);
-        self.sla_required.store(params.sla_required, Ordering::Release);
+        self.load_saturation_threshold
+            .store(params.load_saturation_threshold, Ordering::Release);
+        self.urgency_priority_threshold
+            .store(params.urgency_priority_threshold, Ordering::Release);
+        self.tenant_class_priority_min
+            .store(params.tenant_class_priority_min, Ordering::Release);
+        self.tenant_class_standard_min
+            .store(params.tenant_class_standard_min, Ordering::Release);
+        self.sla_required
+            .store(params.sla_required, Ordering::Release);
     }
 }
 
@@ -193,7 +198,7 @@ pub fn admit_dpag(ctx: AdmissionContext, params: &AdmissionParameters) -> Proces
     // 2. Priority evaluation: tc >= tc_priority_min && urgency >= urgency_priority_threshold && sla_ok
     let tc_pri_ok = ge_mask(c, params.tenant_class_priority_min);
     let urg_ok = ge_mask(u, params.urgency_priority_threshold);
-    
+
     // SLA token check: if sla_required is active, has_sla_token must be 1.
     // Bitwise equivalent: (!sla_required_mask) | has_sla_token_mask
     let sla_req_mask = 0u64.wrapping_sub(params.sla_required);
@@ -206,10 +211,10 @@ pub fn admit_dpag(ctx: AdmissionContext, params: &AdmissionParameters) -> Proces
     let s_mask = ge_mask(c, params.tenant_class_standard_min);
 
     // Discriminant constants mapping directly to enum discriminants
-    let topo_q = ProcessTopology::Quarantine as u64;   // 3
-    let topo_p = ProcessTopology::Priority as u64;     // 0
-    let topo_s = ProcessTopology::Standard as u64;     // 1
-    let topo_bg = ProcessTopology::Background as u64;   // 2
+    let topo_q = ProcessTopology::Quarantine as u64; // 3
+    let topo_p = ProcessTopology::Priority as u64; // 0
+    let topo_s = ProcessTopology::Standard as u64; // 1
+    let topo_bg = ProcessTopology::Background as u64; // 2
 
     // Apply sequential sign-mask multiplexing (simulating an if-else chain)
     let v1 = select(s_mask, topo_s, topo_bg);
@@ -341,7 +346,7 @@ mod tests {
                 for l in 0..16 {
                     for s in 0..2 {
                         let ctx = make_ctx(c, u, l, s, 0);
-                        
+
                         for &load_sat in &load_saturation_vals {
                             for &urg_pri in &urgency_priority_vals {
                                 for &tc_pri in &tenant_class_pri_vals {

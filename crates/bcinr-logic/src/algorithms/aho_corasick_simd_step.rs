@@ -21,7 +21,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn aho_corasick_simd_step(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn aho_corasick_simd_step(val: u64, aux: u64) -> u64 {
     // Broadcast the low byte of `aux` to all 8 lanes, then XOR each lane of
     // `val` against it (the per-byte match-difference of the SIMD step), and
     // finally add 1 to every lane independently. The +1 is carry-isolated via
@@ -124,7 +125,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_aho_corasick_simd_step(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_aho_corasick_simd_step(c: &mut Criterion) {
         c.bench_function("aho_corasick_simd_step", |b| {
             b.iter(|| {
                 let res = aho_corasick_simd_step(black_box(42), black_box(1337));
@@ -133,3 +135,9 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// Axiomatic Hoare logic

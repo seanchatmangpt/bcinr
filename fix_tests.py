@@ -1,21 +1,40 @@
 import re
 
-for f in ['crates/bcinr-cmca/tests/differential.rs', 'crates/bcinr-cmca/tests/hostile_mutants.rs', 'crates/bcinr-cmca/tests/case_studies.rs']:
-    with open(f, 'r') as file:
-        content = file.read()
-    
-    # Replace NonNegativeFixed(123) with NonNegativeFixed::from_bits(123)
-    content = re.sub(r'NonNegativeFixed\(([\d\-]+)\)', r'NonNegativeFixed::from_bits(\1)', content)
-    # Replace SignedFixed(123) with SignedFixed::from_bits(123)
-    content = re.sub(r'SignedFixed\(([\d\-]+)\)', r'SignedFixed::from_bits(\1)', content)
-    
-    # Replace .0 with .val ONLY for fixed types, which are mostly like `result[i].0` or `NonNegativeFixed::ONE.0`
-    content = re.sub(r'\]\.0', '].val', content)
-    content = re.sub(r'::ONE\.0', '::ONE.val', content)
-    content = re.sub(r'::ZERO\.0', '::ZERO.val', content)
-    
-    # Specifically for case_studies expected array size
-    content = content.replace("Expected [bcinr_cmca::fixed::NonNegativeFixed; 8]", "Expected [bcinr_cmca::fixed::NonNegativeFixed; 9]")
-    
-    with open(f, 'w') as file:
-        file.write(content)
+# Fix oracle_full_mapek_loop
+with open("crates/bcinr-powl/src/full_mapek_loop.rs", "r") as f:
+    code = f.read()
+
+old_oracle_inner = """            let trace_res = log_execution_trace(trace_state, &input.trace);
+            if trace_res.refusal_code == 0 {
+                let safe_cursor = trace_state.cursor as usize % P;
+                trace_state.frames[safe_cursor] = input.trace;
+                trace_state.cursor += 1;
+            }
+            refusal_code |= trace_res.refusal_code;"""
+new_oracle_inner = """            let trace_res = log_execution_trace(trace_state, &input.trace);
+            refusal_code |= trace_res.refusal_code;"""
+code = code.replace(old_oracle_inner, new_oracle_inner)
+
+# Fix test_full_mapek_equivalence instruction_id
+code = code.replace("input.trace.ts_ns = 100;", "input.trace.ts_ns = 100;\n        input.trace.instruction_id = 1;")
+
+# Fix test_full_mapek_mutants instruction_id
+code = code.replace("input.trace.ts_ns = 100;\n\n        let mut sub_ref", "input.trace.ts_ns = 100;\n        input.trace.instruction_id = 1;\n\n        let mut sub_ref")
+
+# Wait, the double declaration `let mut t_ref = TraceBufferState::<16>::default();` etc.
+# I had a regex that replaced `let mut (o[a-z0-9_]*) = OcelBufferState::<4>::default\(\);`
+# It might have been run twice? Let's fix that.
+code = re.sub(r'let mut t([a-z0-9_]*) = TraceBufferState::<16>::default\(\);\s*let mut t\1 = TraceBufferState::<4>::default\(\);', r'let mut t\1 = TraceBufferState::<4>::default();', code)
+
+with open("crates/bcinr-powl/src/full_mapek_loop.rs", "w") as f:
+    f.write(code)
+
+with open("crates/bcinr-powl/src/mapek_loop.rs", "r") as f:
+    code = f.read()
+# Fix mapek_loop.rs tests just in case instruction_id is missing
+code = code.replace("input.trace.ts_ns = 100;\n\n        let mut sub_ref", "input.trace.ts_ns = 100;\n        input.trace.instruction_id = 1;\n\n        let mut sub_ref")
+code = code.replace("input.trace.ts_ns = 100;\n        let mut w_candidate", "input.trace.ts_ns = 100;\n        input.trace.instruction_id = 1;\n        let mut w_candidate")
+
+with open("crates/bcinr-powl/src/mapek_loop.rs", "w") as f:
+    f.write(code)
+

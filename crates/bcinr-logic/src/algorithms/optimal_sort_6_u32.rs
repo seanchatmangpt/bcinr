@@ -21,7 +21,8 @@
 // { a ∈ [u32; 6] }
 // After all 12 CAS operations of the optimal network:
 // { a[0] ≤ a[1] ≤ a[2] ≤ a[3] ≤ a[4] ≤ a[5] ∧ multiset(a) = multiset(input) }
-pub fn optimal_sort_6_u32(mut a: [u32; 6]) -> [u32; 6] {
+#[rustfmt::skip]
+pub  fn optimal_sort_6_u32(mut a: [u32; 6]) -> [u32; 6] {
     // Branchless compare-and-swap: swaps a[i] and a[j] if a[i] > a[j].
     macro_rules! cas {
         ($i:expr, $j:expr) => {
@@ -109,9 +110,20 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_optimal_sort_6_u32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_optimal_sort_6_u32(c: &mut Criterion) {
         c.bench_function("optimal_sort_6_u32", |b| {
             b.iter(|| optimal_sort_6_u32(black_box([6, 2, 4, 1, 5, 3])))
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

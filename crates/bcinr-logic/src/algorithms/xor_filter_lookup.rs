@@ -25,7 +25,8 @@
 /// let table = [0u8; 3];
 /// let _ = xor_filter_lookup(0, &table, 0);
 /// ```
-pub fn xor_filter_lookup(key: u64, table: &[u8], seed: u64) -> bool {
+#[rustfmt::skip]
+pub  fn xor_filter_lookup(key: u64, table: &[u8], seed: u64) -> bool {
     // A table with fewer than 3 entries cannot hold a valid filter.
     if table.len() < 3 {
         return false;
@@ -47,7 +48,8 @@ pub fn xor_filter_lookup(key: u64, table: &[u8], seed: u64) -> bool {
 /// Uses a finalisation mix of the key XORed with the seed so that different
 /// seeds yield independent fingerprint families.
 #[inline]
-pub fn xor_filter_fingerprint(key: u64, seed: u64) -> u8 {
+#[rustfmt::skip]
+pub  fn xor_filter_fingerprint(key: u64, seed: u64) -> u8 {
     // Mix key with seed, then apply a finalisation hash (MurmurHash3 finaliser).
     let mut h = key ^ seed;
     h ^= h >> 33;
@@ -64,7 +66,8 @@ pub fn xor_filter_fingerprint(key: u64, seed: u64) -> u8 {
 /// `block` in {0, 1, 2} selects which hash function to use.
 /// Each block hash uses a different additive rotation of the seed.
 #[inline]
-pub fn xor_filter_hash(key: u64, seed: u64, block: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn xor_filter_hash(key: u64, seed: u64, block: u64) -> u64 {
     // Derive a per-block seed by rotating and adding to differentiate hash families.
     let block_seed = seed.wrapping_add(block.wrapping_mul(0x6C62272E07BB0142));
     let mut h = key ^ block_seed;
@@ -230,7 +233,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_xor_filter_lookup(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_xor_filter_lookup(c: &mut Criterion) {
         let table = [0xAAu8; 30];
         c.bench_function("xor_filter_lookup", |b| {
             b.iter(|| {
@@ -241,3 +245,13 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant
+
+// counterfactual_mutant
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

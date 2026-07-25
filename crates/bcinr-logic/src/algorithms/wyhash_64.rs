@@ -20,7 +20,8 @@ extern crate alloc;
 /// This is the avalanche kernel of WyHash — two multiplies drive all
 /// output bits to depend on all input bits.
 #[inline(always)]
-pub fn wymix(a: u64, b: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn wymix(a: u64, b: u64) -> u64 {
     let r = (a as u128).wrapping_mul(b as u128);
     ((r >> 64) as u64) ^ (r as u64)
 }
@@ -63,7 +64,8 @@ fn read_u32_le(src: &[u8], offset: usize) -> u64 {
 /// // Deterministic: same seed, same data → same hash
 /// assert_eq!(wyhash_64(b"hello", 0), wyhash_64(b"hello", 0));
 /// ```
-pub fn wyhash_64(data: &[u8], seed: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn wyhash_64(data: &[u8], seed: u64) -> u64 {
     const WY_P0: u64 = 0xa0761d6478bd642f;
     const WY_P1: u64 = 0xe7037ed1a0b428db;
     const WY_P2: u64 = 0x8ebc6af09c88c6e3;
@@ -312,7 +314,8 @@ pub mod bench {
     use criterion::{black_box, Criterion};
     #[cfg(feature = "alloc")]
 
-    pub fn bench_wyhash_64(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_wyhash_64(c: &mut Criterion) {
         #[cfg(feature = "alloc")]
         {
             let data: Vec<u8> = (0u8..=63).collect();
@@ -322,3 +325,9 @@ pub mod bench {
         }
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle

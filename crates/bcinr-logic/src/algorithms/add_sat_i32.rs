@@ -20,7 +20,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn add_sat_i32(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn add_sat_i32(val: u64, aux: u64) -> u64 {
     // Branchless Contract: take the low 32 bits of each word as i32 and return
     // their saturating sum, as the zero-extended u32 bit pattern of the result.
     ((val as i32).saturating_add(aux as i32)) as u32 as u64
@@ -119,7 +120,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_add_sat_i32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_add_sat_i32(c: &mut Criterion) {
         c.bench_function("add_sat_i32", |b| {
             b.iter(|| {
                 let res = add_sat_i32(black_box(42), black_box(1337));
@@ -128,3 +130,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

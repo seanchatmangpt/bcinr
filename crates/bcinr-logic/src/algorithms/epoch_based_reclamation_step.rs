@@ -19,7 +19,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn epoch_based_reclamation_step(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn epoch_based_reclamation_step(val: u64, aux: u64) -> u64 {
     // Advance the epoch counter (`val + 1`) only while a reclamation guard is
     // active (`aux != 0`); a zero guard parks the epoch at 0. The nonzero test
     // is branchless: OR-ing a value with its two's-complement negation sets the
@@ -108,7 +109,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_epoch_based_reclamation_step(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_epoch_based_reclamation_step(c: &mut Criterion) {
         c.bench_function("epoch_based_reclamation_step", |b| {
             b.iter(|| {
                 let res = epoch_based_reclamation_step(black_box(42), black_box(1337));
@@ -117,3 +119,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

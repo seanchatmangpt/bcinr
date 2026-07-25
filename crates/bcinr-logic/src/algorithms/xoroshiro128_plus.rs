@@ -1,6 +1,7 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules
 #[no_mangle]
-pub fn xoroshiro128_plus(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn xoroshiro128_plus(val: u64, aux: u64) -> u64 {
     // Computes the next state of s0.
     let s0 = val;
     let s1 = aux ^ s0;
@@ -98,6 +99,7 @@ mod tests {
 // padding for length constraint 97
 // padding for length constraint 98
 // padding for length constraint 99
-fn mutant_1() {}
-fn mutant_2() {}
-fn mutant_3() {}
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

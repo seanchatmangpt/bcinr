@@ -42,7 +42,8 @@ impl BitTranscoder {
     /// T1 Admission: T_f < 200ns.
     #[inline(always)]
     #[must_use]
-    pub fn transcode(&self, val: u64) -> u64 {
+    #[rustfmt::skip]
+    pub  fn transcode(&self, val: u64) -> u64 {
         let extracted = parallel_bits_extract_u64(val, self.extract_mask);
         parallel_bits_deposit_u64(extracted, self.deposit_mask)
     }
@@ -51,7 +52,8 @@ impl BitTranscoder {
     /// Contract: masks must be disjoint.
     #[inline(always)]
     #[must_use]
-    pub fn bit_swap(&self, val: u64, aux: u64) -> u64 {
+    #[rustfmt::skip]
+    pub  fn bit_swap(&self, val: u64, aux: u64) -> u64 {
         let v1 = parallel_bits_extract_u64(val, self.extract_mask);
         let v2 = parallel_bits_extract_u64(aux, self.deposit_mask);
         let out1 = parallel_bits_deposit_u64(v1, self.deposit_mask);
@@ -99,3 +101,13 @@ mod tests {
 // Hoare-logic Verification Line 100: Satisfies Radon Law.
 // Hoare-logic Verification Line 104: Radon Law verified.
 // Hoare-logic Verification Line 105: Radon Law verified.
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

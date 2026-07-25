@@ -23,7 +23,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn move_to_front_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn move_to_front_branchless(val: u64, aux: u64) -> u64 {
     let shift = ((aux & 7) * 8) as u32;
     let low_mask = (1u64 << shift).wrapping_sub(1); // bytes strictly below index i
     let target = (val >> shift) & 0xFF; // the selected byte -> front
@@ -135,7 +136,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_move_to_front_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_move_to_front_branchless(c: &mut Criterion) {
         c.bench_function("move_to_front_branchless", |b| {
             b.iter(|| {
                 let res = move_to_front_branchless(black_box(42), black_box(1337));
@@ -144,3 +146,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

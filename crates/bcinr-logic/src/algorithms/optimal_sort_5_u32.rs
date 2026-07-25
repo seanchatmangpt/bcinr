@@ -23,7 +23,8 @@
 // { a ∈ [u32; 5] }
 // After all 9 CAS operations of the optimal Knuth network:
 // { a[0] ≤ a[1] ≤ a[2] ≤ a[3] ≤ a[4] ∧ multiset(a) = multiset(input) }
-pub fn optimal_sort_5_u32(mut a: [u32; 5]) -> [u32; 5] {
+#[rustfmt::skip]
+pub  fn optimal_sort_5_u32(mut a: [u32; 5]) -> [u32; 5] {
     // Branchless compare-and-swap: swaps a[i] and a[j] if a[i] > a[j].
     // diff = 1 if a[i] > a[j], else 0.
     // mask = 0xFFFFFFFF if diff=1 (swap), 0 if diff=0 (no-op).
@@ -110,9 +111,20 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_optimal_sort_5_u32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_optimal_sort_5_u32(c: &mut Criterion) {
         c.bench_function("optimal_sort_5_u32", |b| {
             b.iter(|| optimal_sort_5_u32(black_box([5, 3, 1, 4, 2])))
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

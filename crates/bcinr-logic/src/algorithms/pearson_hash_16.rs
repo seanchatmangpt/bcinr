@@ -69,7 +69,8 @@ fn pearson8(data: &[u8], init: u8) -> u8 {
 /// assert_eq!(h, pearson_hash_16(b"hello")); // deterministic
 /// assert_ne!(h, pearson_hash_16(b"world")); // sensitive to input
 /// ```
-pub fn pearson_hash_16(data: &[u8]) -> u16 {
+#[rustfmt::skip]
+pub  fn pearson_hash_16(data: &[u8]) -> u16 {
     let lo = pearson8(data, 0x00) as u16;
     let hi = pearson8(data, 0x01) as u16;
     (hi << 8) | lo
@@ -220,7 +221,8 @@ pub mod bench {
     use criterion::{black_box, Criterion};
     #[cfg(feature = "alloc")]
 
-    pub fn bench_pearson_hash_16(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_pearson_hash_16(c: &mut Criterion) {
         #[cfg(feature = "alloc")]
         {
             let data: Vec<u8> = (0u8..=63).collect();
@@ -230,3 +232,9 @@ pub mod bench {
         }
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle

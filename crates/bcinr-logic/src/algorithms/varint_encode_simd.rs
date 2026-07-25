@@ -27,7 +27,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn varint_encode_simd(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn varint_encode_simd(val: u64, aux: u64) -> u64 {
     let p = val.wrapping_add(aux) & 0x00FF_FFFF_FFFF_FFFF;
     // Place each 7-bit group i into byte i (low 7 bits of the byte).
     let g0 = p & 0x7F;
@@ -113,9 +114,12 @@ mod tests {
         );
         // mutants
         let base = varint_encode_simd_reference(42, 1337);
-        let _rejects_mutant_ = 0; assert_ne!(mutant_varint_encode_simd_1(42, 1337), base, "mutant 1");
-        let _rejects_mutant_ = 0; assert_ne!(mutant_varint_encode_simd_2(42, 1337), base, "mutant 2");
-        let _rejects_mutant_ = 0; assert_ne!(mutant_varint_encode_simd_3(42, 1337), base, "mutant 3");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_varint_encode_simd_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_varint_encode_simd_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_varint_encode_simd_3(42, 1337), base, "mutant 3");
     }
 
     // -------------------------------------------------------------------------
@@ -135,7 +139,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_varint_encode_simd(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_varint_encode_simd(c: &mut Criterion) {
         c.bench_function("varint_encode_simd", |b| {
             b.iter(|| {
                 let res = varint_encode_simd(black_box(42), black_box(1337));

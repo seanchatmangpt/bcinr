@@ -16,7 +16,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn radix_sort_step_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn radix_sort_step_branchless(val: u64, aux: u64) -> u64 {
     let k = (aux & 7) as u32;
     let b = [
         val & 0xFF,
@@ -175,7 +176,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_radix_sort_step_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_radix_sort_step_branchless(c: &mut Criterion) {
         c.bench_function("radix_sort_step_branchless", |b| {
             b.iter(|| {
                 let res = radix_sort_step_branchless(black_box(42), black_box(1337));
@@ -184,3 +186,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

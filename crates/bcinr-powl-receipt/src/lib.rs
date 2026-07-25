@@ -1,3 +1,4 @@
+#![allow(clippy::cargo_common_metadata)]
 //! bcinr-powl-receipt — OCEL event emission and causal receipt generation for bcinr-powl.
 //!
 //! # Two receipt families

@@ -21,7 +21,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn locality_sensitive_hash_cosine(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn locality_sensitive_hash_cosine(val: u64, aux: u64) -> u64 {
     let mut dot = 0i64;
     for i in 0..8 {
         let a = (((val >> (i * 8)) & 0xFF) as i8) as i64;
@@ -114,7 +115,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_locality_sensitive_hash_cosine(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_locality_sensitive_hash_cosine(c: &mut Criterion) {
         c.bench_function("locality_sensitive_hash_cosine", |b| {
             b.iter(|| {
                 let res = locality_sensitive_hash_cosine(black_box(42), black_box(1337));
@@ -123,3 +125,9 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// Axiomatic Hoare logic

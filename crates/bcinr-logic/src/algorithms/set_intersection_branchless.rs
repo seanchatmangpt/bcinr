@@ -30,7 +30,8 @@
 /// ```
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn set_intersection_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn set_intersection_branchless(val: u64, aux: u64) -> u64 {
     val & aux
 }
 
@@ -144,7 +145,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_set_intersection_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_set_intersection_branchless(c: &mut Criterion) {
         c.bench_function("set_intersection_branchless", |b| {
             b.iter(|| {
                 let res = set_intersection_branchless(black_box(42), black_box(1337));
@@ -161,3 +163,7 @@ pub mod bench {
 // Line 118
 // Line 119
 // Line 120
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

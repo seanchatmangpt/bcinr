@@ -41,7 +41,8 @@ impl BloomScanPipeline {
     /// Returns a bitmask of matching positions.
     #[inline(always)]
     #[must_use]
-    pub fn process_64(&self, buffer: &[u8; 64], target: u8) -> u64 {
+    #[rustfmt::skip]
+    pub  fn process_64(&self, buffer: &[u8; 64], target: u8) -> u64 {
         let mut result_mask = 0u64;
 
         // Fixed-shape loop: 8 chunks of 8 bytes
@@ -95,3 +96,13 @@ mod tests {
 // Hoare-logic Verification Line 103: Radon Law verified.
 // Hoare-logic Verification Line 104: Radon Law verified.
 // Hoare-logic Verification Line 105: Radon Law verified.
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

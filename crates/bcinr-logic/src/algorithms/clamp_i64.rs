@@ -20,7 +20,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn clamp_i64(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn clamp_i64(val: u64, aux: u64) -> u64 {
     // Branchless Contract: clamp `val` (as i64) into the inclusive range whose
     // endpoints are the sign-extended low and high 32-bit halves of `aux`.
     // Endpoints are ordered first so lo <= hi, then v is clamped via min/max.
@@ -129,7 +130,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_clamp_i64(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_clamp_i64(c: &mut Criterion) {
         c.bench_function("clamp_i64", |b| {
             b.iter(|| {
                 let res = clamp_i64(black_box(42), black_box(1337));
@@ -138,3 +140,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

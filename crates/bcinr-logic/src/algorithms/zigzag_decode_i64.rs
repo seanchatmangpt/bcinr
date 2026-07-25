@@ -25,7 +25,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn zigzag_decode_i64(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn zigzag_decode_i64(val: u64, aux: u64) -> u64 {
     let c = val.wrapping_add(aux);
     (c >> 1) ^ (0u64.wrapping_sub(c & 1))
 }
@@ -92,9 +93,12 @@ mod tests {
         );
         // mutants
         let base = zigzag_decode_i64_reference(42, 1337);
-        let _rejects_mutant_ = 0; assert_ne!(mutant_zigzag_decode_i64_1(42, 1337), base, "mutant 1");
-        let _rejects_mutant_ = 0; assert_ne!(mutant_zigzag_decode_i64_2(42, 1337), base, "mutant 2");
-        let _rejects_mutant_ = 0; assert_ne!(mutant_zigzag_decode_i64_3(42, 1337), base, "mutant 3");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_zigzag_decode_i64_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_zigzag_decode_i64_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_zigzag_decode_i64_3(42, 1337), base, "mutant 3");
     }
 
     // -------------------------------------------------------------------------
@@ -114,7 +118,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_zigzag_decode_i64(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_zigzag_decode_i64(c: &mut Criterion) {
         c.bench_function("zigzag_decode_i64", |b| {
             b.iter(|| {
                 let res = zigzag_decode_i64(black_box(42), black_box(1337));

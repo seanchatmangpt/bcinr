@@ -16,7 +16,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn unrolled_binary_search_u32(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn unrolled_binary_search_u32(val: u64, aux: u64) -> u64 {
     let len = val & 0xFFFF_FFFF;
     let k = aux & 0xFFFF_FFFF;
     // Build the largest index `pos` in [0, len] with pos <= k, bit by bit.
@@ -170,7 +171,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_unrolled_binary_search_u32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_unrolled_binary_search_u32(c: &mut Criterion) {
         c.bench_function("unrolled_binary_search_u32", |b| {
             b.iter(|| {
                 let res = unrolled_binary_search_u32(black_box(42), black_box(1337));

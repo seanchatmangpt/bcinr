@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! BranchTorch: Zero-Allocation Branchless Training Framework.
 //!
 //! A `#![no_std]` evolutionary matrix that strictly mutates and trains

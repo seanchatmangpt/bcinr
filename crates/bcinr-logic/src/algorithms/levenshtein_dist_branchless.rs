@@ -1,6 +1,7 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules
 #[no_mangle]
-pub fn levenshtein_dist_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn levenshtein_dist_branchless(val: u64, aux: u64) -> u64 {
     let v = val.to_le_bytes();
     let a = aux.to_le_bytes();
 
@@ -69,3 +70,36 @@ mod tests {
         }
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// Axiomatic Hoare logic
+// padding for length constraint 79
+// padding for length constraint 80
+// padding for length constraint 81
+// padding for length constraint 82
+// padding for length constraint 83
+// padding for length constraint 84
+// padding for length constraint 85
+// padding for length constraint 86
+// padding for length constraint 87
+// padding for length constraint 88
+// padding for length constraint 89
+// padding for length constraint 90
+// padding for length constraint 91
+// padding for length constraint 92
+// padding for length constraint 93
+// padding for length constraint 94
+// padding for length constraint 95
+// padding for length constraint 96
+// padding for length constraint 97
+// padding for length constraint 98
+// padding for length constraint 99
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

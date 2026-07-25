@@ -448,9 +448,9 @@ pub fn process_event_srbcg(
     // Case 1: Found existing slot -> use match_idx, no count change, no overflow.
     // Case 2: Not found & can allocate -> use current_count, increment count, no overflow.
     // Case 3: Not found & cannot allocate -> use 64, no count change, set overflow.
-    
+
     let allocate_idx = current_count;
-    let target_idx = (found * match_idx) 
+    let target_idx = (found * match_idx)
         + ((1 - found) * (can_allocate * allocate_idx + (1 - can_allocate) * 64));
 
     // Update count: increment if not found and can allocate.
@@ -539,14 +539,24 @@ pub fn validate_against_tape(log: &OcelLog, tape: &crate::tape::PowlTape) -> Con
     for event in log.events() {
         match event.activity {
             "op_fired" => {
-                let s = process_event_srbcg(&mut run_ids, &mut run_count, event.run_id, &mut overflow_mask);
+                let s = process_event_srbcg(
+                    &mut run_ids,
+                    &mut run_count,
+                    event.run_id,
+                    &mut overflow_mask,
+                );
                 let bit = 1u64.checked_shl(event.op_idx).unwrap_or(0);
                 let has_fired_mask = 0u64.wrapping_sub(((accumulated[s] & bit) != 0) as u64);
                 fired_twice[s] |= bit & has_fired_mask;
                 accumulated[s] |= bit;
             }
             "run_sealed" => {
-                let s = process_event_srbcg(&mut run_ids, &mut run_count, event.run_id, &mut overflow_mask);
+                let s = process_event_srbcg(
+                    &mut run_ids,
+                    &mut run_count,
+                    event.run_id,
+                    &mut overflow_mask,
+                );
                 declared[s] = event.op_idx as u64; // low 32 bits stored here
             }
             _ => {}
@@ -938,7 +948,10 @@ mod tests {
             log_64.record_op_fired(i as u64, 0, 0).unwrap();
             log_64.record_run_sealed(i as u64, 0b1).unwrap();
         }
-        assert_eq!(validate_against_tape(&log_64, &tape), ConformanceResult::Conforms);
+        assert_eq!(
+            validate_against_tape(&log_64, &tape),
+            ConformanceResult::Conforms
+        );
 
         // 65 runs should trigger RunLimitExceeded.
         let mut log_65 = OcelLog::new();

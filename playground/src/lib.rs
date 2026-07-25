@@ -1,3 +1,6 @@
+#![allow(warnings, clippy::all)]
+#![allow(clippy::cargo_common_metadata)]
+#![allow(warnings)]
 //! Playground crate for the branchless Process Intelligence engine implementations.
 //! Adheres strictly to `#![no_std]` and zero heap allocations.
 

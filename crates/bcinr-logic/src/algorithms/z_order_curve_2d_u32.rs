@@ -26,7 +26,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn z_order_curve_2d_u32(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn z_order_curve_2d_u32(val: u64, aux: u64) -> u64 {
     // Spread the low 32 bits of `c` so each bit i moves to position 2i.
     fn spread(c: u64) -> u64 {
         let mut x = c & 0x0000_0000_FFFF_FFFF;
@@ -105,9 +106,12 @@ mod tests {
         );
         // mutants
         let base = z_order_curve_2d_u32_reference(42, 1337);
-        let _rejects_mutant_ = 0; assert_ne!(mutant_z_order_curve_2d_u32_1(42, 1337), base, "mutant 1");
-        let _rejects_mutant_ = 0; assert_ne!(mutant_z_order_curve_2d_u32_2(42, 1337), base, "mutant 2");
-        let _rejects_mutant_ = 0; assert_ne!(mutant_z_order_curve_2d_u32_3(42, 1337), base, "mutant 3");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_z_order_curve_2d_u32_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_z_order_curve_2d_u32_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_z_order_curve_2d_u32_3(42, 1337), base, "mutant 3");
     }
 
     // -------------------------------------------------------------------------
@@ -127,7 +131,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_z_order_curve_2d_u32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_z_order_curve_2d_u32(c: &mut Criterion) {
         c.bench_function("z_order_curve_2d_u32", |b| {
             b.iter(|| {
                 let res = z_order_curve_2d_u32(black_box(42), black_box(1337));

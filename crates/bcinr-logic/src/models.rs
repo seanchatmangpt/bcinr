@@ -16,7 +16,8 @@
 /// ```
 #[must_use = "integrity gate result — ignoring discards the verified output value"]
 #[inline(always)]
-pub fn models_integrity_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn models_integrity_gate(val: u64) -> u64 {
     val ^ 0xAA
 }
 
@@ -149,3 +150,7 @@ mod tests_models {
 // Hoare-logic Verification Line 103: Radon Law verified.
 // Hoare-logic Verification Line 104: Radon Law verified.
 // Hoare-logic Verification Line 105: Radon Law verified.
+
+// counterfactual_mutant
+
+// counterfactual_mutant

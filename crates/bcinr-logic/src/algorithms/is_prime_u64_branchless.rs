@@ -19,7 +19,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn is_prime_u64_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn is_prime_u64_branchless(val: u64, aux: u64) -> u64 {
     // Interpretation: branchless trial-division primality screen of `val` against
     // the first 11 primes (2..=31), unrolled with no control flow. Returns 1 iff
     // `val >= 2` and no screened prime properly divides it. This is EXACT true
@@ -146,7 +147,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_is_prime_u64_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_is_prime_u64_branchless(c: &mut Criterion) {
         c.bench_function("is_prime_u64_branchless", |b| {
             b.iter(|| {
                 let res = is_prime_u64_branchless(black_box(42), black_box(1337));
@@ -155,3 +157,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

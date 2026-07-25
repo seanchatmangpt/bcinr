@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 use std::collections::HashMap;
 
 // ── Types and Models from wasm4pm-compat ────────────────────────────────────

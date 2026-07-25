@@ -26,7 +26,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn weighted_reservoir_sample(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn weighted_reservoir_sample(val: u64, aux: u64) -> u64 {
     let w = val | 1;
     u64::MAX - (aux / w)
 }
@@ -127,7 +128,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_weighted_reservoir_sample(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_weighted_reservoir_sample(c: &mut Criterion) {
         c.bench_function("weighted_reservoir_sample", |b| {
             b.iter(|| {
                 let res = weighted_reservoir_sample(black_box(42), black_box(1337));

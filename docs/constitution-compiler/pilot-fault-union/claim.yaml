@@ -1,0 +1,43 @@
+# ConstitutionIR claim instance — pilot instance.
+# Status: DESIGN / ILLUSTRATIVE. Not parsed by any compiler; no ConstitutionIR compiler exists.
+# Formalizes: /Users/sac/bcinr/.claude/rules/cmca/numeric-hot-path.md, Invariant 1.
+# This is the same claim as Example 1 in 01_CONSTITUTION_IR_SCHEMA.md, reproduced here
+# standalone as the pilot's single source-of-truth instance, so all five other projection
+# files in this directory can be checked for consistency against exactly this one YAML body.
+
+id: cmca.numeric.fault-join-semilattice
+scope:
+  - "crates/bcinr-cmca/src/fixed.rs"
+  - "crates/bcinr-cmca/src/allocator.rs"
+preconditions:
+  - "Two fault-bearing computation steps a and b are composed sequentially (a ; b)"
+postconditions:
+  - "faults(a ; b) equals the set union of faults(a) and faults(b)"
+  - "The empty fault set is the identity element of composition"
+invariant_statement: >
+  The set of faults produced along a computation path forms a join-semilattice under
+  union, with the empty fault set as the zero element; sequential composition of two
+  fault-bearing steps must union their fault sets and must never collapse to
+  first-fault-only or last-fault-only.
+falsifier_family:
+  - description: >
+      Construct step a raising fault F1 only, and step b raising a distinct,
+      non-overlapping fault F2 only; compose a ; b.
+    expected_observation: >
+      A violation is observed if faults(a ; b) is a strict subset of {F1, F2} —
+      e.g. only {F1} (last-fault-dropped) or only {F2} (first-fault-dropped).
+owner: cmca-numeric
+verifier: hoare-oracle
+evidence_classes_required:
+  - property_test
+  - mutant_kill
+standing_transport:
+  fixed_conditions:
+    - "same toolchain (rustc version + target triple)"
+    - "same numeric profile (fixed-point width/scale configuration)"
+    - "same commit hash for fixed.rs and allocator.rs"
+  invalidated_by:
+    - "any change to the fault-set representation type"
+    - "any change to the composition operator's implementation"
+    - "toolchain upgrade that changes floating/fixed-point codegen"
+dependencies: []

@@ -19,7 +19,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn fast_inverse_sqrt_u32(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn fast_inverse_sqrt_u32(val: u64, aux: u64) -> u64 {
     let x = (val & 0xFFFFFFFF) as f32;
     let i = x.to_bits();
     let i = 0x5f3759df - (i >> 1);
@@ -105,7 +106,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_fast_inverse_sqrt_u32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_fast_inverse_sqrt_u32(c: &mut Criterion) {
         c.bench_function("fast_inverse_sqrt_u32", |b| {
             b.iter(|| {
                 let res = fast_inverse_sqrt_u32(black_box(42), black_box(1337));
@@ -114,3 +116,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

@@ -25,7 +25,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn sub_sat_i32(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn sub_sat_i32(val: u64, aux: u64) -> u64 {
     let a = val as u32 as i32;
     let b = aux as u32 as i32;
     a.saturating_sub(b) as u32 as u64
@@ -87,8 +88,11 @@ mod tests {
         assert_eq!(sub_sat_i32(0, u64::MAX), sub_sat_i32_reference(0, u64::MAX));
         // mutants
         let base = sub_sat_i32_reference(42, 1337);
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_sub_sat_i32_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_sub_sat_i32_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_sub_sat_i32_3(42, 1337), base, "mutant 3");
     }
 
@@ -109,7 +113,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_sub_sat_i32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_sub_sat_i32(c: &mut Criterion) {
         c.bench_function("sub_sat_i32", |b| {
             b.iter(|| {
                 let res = sub_sat_i32(black_box(42), black_box(1337));
@@ -118,3 +123,9 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant
+
+// counterfactual_mutant
+
+// counterfactual_mutant

@@ -11,6 +11,8 @@ categories = ["algorithms"]
 # No path deps on bcinr-powl or wasm4pm-cognition — PDDL must not bleed into
 # every consumer. Opt-in only via this crate.
 
+readme = "README.md"
+
 [dependencies]
 # PDDL 3.1 parser — strongly typed AST, nom-based, no planner bundled.
 pddl = { version = "0.2", features = ["parser"] }

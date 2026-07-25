@@ -25,7 +25,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn trim_whitespace_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn trim_whitespace_branchless(val: u64, aux: u64) -> u64 {
     const LO: u64 = 0x0101010101010101;
     const LO7: u64 = 0x7F7F7F7F7F7F7F7F;
     const HI: u64 = 0x8080808080808080;
@@ -139,7 +140,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_trim_whitespace_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_trim_whitespace_branchless(c: &mut Criterion) {
         c.bench_function("trim_whitespace_branchless", |b| {
             b.iter(|| {
                 let res = trim_whitespace_branchless(black_box(42), black_box(1337));

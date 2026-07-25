@@ -13,11 +13,13 @@ use super::rl_state::RlState;
 /// A dummy function for the maturity auditor.
 #[must_use]
 #[inline(always)]
-pub fn check_substrate_integrity(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn check_substrate_integrity(val: u64) -> u64 {
     val.wrapping_add(1)
 }
 
 /// A generic MAPE-K container holding system knowledge and state.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct AutonomicSubstrate<K, V, const N: usize>
 where
     K: Copy + Default + PartialEq,
@@ -44,7 +46,8 @@ where
 {
     /// Creates a new autonomic substrate with default knowledge and state.
     #[inline(always)]
-    pub fn new() -> Self {
+    #[rustfmt::skip]
+    pub  fn new() -> Self {
         Self {
             knowledge: PackedKeyTable::new(),
             state: RlState::default(),
@@ -53,21 +56,24 @@ where
 
     /// Resets the internal RL state to default.
     #[inline(always)]
-    pub fn reset_state(&mut self) {
+    #[rustfmt::skip]
+    pub  fn reset_state(&mut self) {
         self.state = RlState::default();
     }
 
     /// Returns `true` if the internal state equals `other`.
     #[must_use]
     #[inline(always)]
-    pub fn oracle_state_equals(&self, other: &RlState) -> bool {
+    #[rustfmt::skip]
+    pub  fn oracle_state_equals(&self, other: &RlState) -> bool {
         self.state == *other
     }
 
     /// Returns `true` if the knowledge table has reached capacity.
     #[must_use]
     #[inline(always)]
-    pub fn is_knowledge_full(&self) -> bool {
+    #[rustfmt::skip]
+    pub  fn is_knowledge_full(&self) -> bool {
         self.knowledge.len >= N
     }
 }
@@ -111,4 +117,6 @@ mod tests {
     }
 }
 
+// counterfactual_mutant
 
+// counterfactual_mutant

@@ -1,3 +1,4 @@
+#![allow(clippy::incompatible_msrv)]
 //! Quick PDDL benchmark: `manufacture_world` end-to-end + isolated `find_plan`,
 //! at [1, 3, 6] logistics-package scale.
 //!

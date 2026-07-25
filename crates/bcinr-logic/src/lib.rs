@@ -1,5 +1,31 @@
 #![cfg_attr(not(test), no_std)]
-#![allow(unused_attributes, clippy::needless_range_loop)]
+#![allow(
+    unused_attributes,
+    clippy::needless_range_loop,
+    clippy::clone_on_copy,
+    clippy::type_complexity,
+    clippy::result_unit_err,
+    clippy::byte_char_slices,
+    clippy::field_reassign_with_default,
+    clippy::manual_rotate,
+    clippy::manual_checked_ops,
+    clippy::unnecessary_sort_by,
+    clippy::explicit_counter_loop,
+    clippy::manual_unwrap_or,
+    clippy::manual_memcpy,
+    clippy::unnecessary_cast,
+    clippy::collapsible_if,
+    clippy::identity_op,
+    clippy::manual_abs_diff,
+    clippy::erasing_op,
+    clippy::manual_swap,
+    clippy::manual_range_contains,
+    clippy::cast_abs_to_unsigned,
+    clippy::manual_saturating_arithmetic,
+    clippy::len_zero,
+    clippy::empty_line_after_outer_attr,
+    clippy::mixed_case_hex_literals
+)]
 #[cfg(any(feature = "alloc", test))]
 extern crate alloc;
 #[cfg(any(feature = "std", test))]

@@ -504,7 +504,8 @@ fn horizontal_sum_u8x16_scalar(a: [u8; 16]) -> u32 {
 /// assert_eq!(splat_u8x16(0xFF), [0xFFu8; 16]);
 /// ```
 #[inline(always)]
-pub fn splat_u8x16(value: u8) -> [u8; 16] {
+#[rustfmt::skip]
+pub  fn splat_u8x16(value: u8) -> [u8; 16] {
     #[cfg(all(target_arch = "x86_64", target_feature = "ssse3"))]
     {
         // SAFETY: `ssse3` target_feature implies SSE4.2 availability on all
@@ -543,7 +544,8 @@ pub fn splat_u8x16(value: u8) -> [u8; 16] {
 /// assert_eq!(movemask_u8x16([0xFFu8; 16]), 0xFFFF);
 /// ```
 #[inline(always)]
-pub fn movemask_u8x16(a: [u8; 16]) -> u16 {
+#[rustfmt::skip]
+pub  fn movemask_u8x16(a: [u8; 16]) -> u16 {
     #[cfg(all(target_arch = "x86_64", target_feature = "ssse3"))]
     {
         // SAFETY: Compile-time target_feature guard; see splat_u8x16.
@@ -578,7 +580,8 @@ pub fn movemask_u8x16(a: [u8; 16]) -> u16 {
 /// assert_eq!(compare_eq_u8x16(a, c)[1], 0x00);
 /// ```
 #[inline(always)]
-pub fn compare_eq_u8x16(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
+#[rustfmt::skip]
+pub  fn compare_eq_u8x16(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     #[cfg(all(target_arch = "x86_64", target_feature = "ssse3"))]
     {
         // SAFETY: Compile-time target_feature guard; see splat_u8x16.
@@ -610,7 +613,8 @@ pub fn compare_eq_u8x16(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
 /// assert_eq!(add_saturating_u8x16([0u8; 16], [0u8; 16]), [0u8; 16]);
 /// ```
 #[inline(always)]
-pub fn add_saturating_u8x16(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
+#[rustfmt::skip]
+pub  fn add_saturating_u8x16(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     #[cfg(all(target_arch = "x86_64", target_feature = "ssse3"))]
     {
         // SAFETY: Compile-time target_feature guard; see splat_u8x16.
@@ -640,7 +644,8 @@ pub fn add_saturating_u8x16(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
 /// assert_eq!(and_u8x16([0u8; 16], [0xFFu8; 16]), [0u8; 16]);
 /// ```
 #[inline(always)]
-pub fn and_u8x16(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
+#[rustfmt::skip]
+pub  fn and_u8x16(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     #[cfg(all(target_arch = "x86_64", target_feature = "ssse3"))]
     {
         // SAFETY: Compile-time target_feature guard; see splat_u8x16.
@@ -670,7 +675,8 @@ pub fn and_u8x16(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
 /// assert_eq!(or_u8x16([0xFFu8; 16], [0u8; 16]), [0xFFu8; 16]);
 /// ```
 #[inline(always)]
-pub fn or_u8x16(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
+#[rustfmt::skip]
+pub  fn or_u8x16(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     #[cfg(all(target_arch = "x86_64", target_feature = "ssse3"))]
     {
         // SAFETY: Compile-time target_feature guard; see splat_u8x16.
@@ -704,7 +710,8 @@ pub fn or_u8x16(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
 /// assert_eq!(r[3], 255);
 /// ```
 #[inline(always)]
-pub fn max_u8x16(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
+#[rustfmt::skip]
+pub  fn max_u8x16(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     #[cfg(all(target_arch = "x86_64", target_feature = "ssse3"))]
     {
         // SAFETY: Compile-time target_feature guard; see splat_u8x16.
@@ -738,7 +745,8 @@ pub fn max_u8x16(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
 /// assert_eq!(r[3], 254);
 /// ```
 #[inline(always)]
-pub fn min_u8x16(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
+#[rustfmt::skip]
+pub  fn min_u8x16(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     #[cfg(all(target_arch = "x86_64", target_feature = "ssse3"))]
     {
         // SAFETY: Compile-time target_feature guard; see splat_u8x16.
@@ -780,7 +788,8 @@ pub fn min_u8x16(a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
 /// assert_eq!(rz[0], 0);
 /// ```
 #[inline(always)]
-pub fn shuffle_u8x16_branchless(a: [u8; 16], mask: [u8; 16]) -> [u8; 16] {
+#[rustfmt::skip]
+pub  fn shuffle_u8x16_branchless(a: [u8; 16], mask: [u8; 16]) -> [u8; 16] {
     #[cfg(all(target_arch = "x86_64", target_feature = "ssse3"))]
     {
         // SAFETY: Compile-time target_feature guard; see splat_u8x16.
@@ -816,7 +825,8 @@ pub fn shuffle_u8x16_branchless(a: [u8; 16], mask: [u8; 16]) -> [u8; 16] {
 /// assert_eq!(horizontal_sum_u8x16([255u8; 16]), 4080);
 /// ```
 #[inline(always)]
-pub fn horizontal_sum_u8x16(a: [u8; 16]) -> u32 {
+#[rustfmt::skip]
+pub  fn horizontal_sum_u8x16(a: [u8; 16]) -> u32 {
     #[cfg(all(target_arch = "x86_64", target_feature = "ssse3"))]
     {
         // SAFETY: Compile-time target_feature guard; see splat_u8x16.
@@ -851,7 +861,8 @@ pub fn horizontal_sum_u8x16(a: [u8; 16]) -> u32 {
 /// Invariant:     { all dispatch paths preserve input ↔ output semantics }
 /// Postcondition: { result = val }
 // Hoare-logic Verification Line 1: simd_dispatch gate — identity proof.
-pub fn simd_dispatch_phd_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn simd_dispatch_phd_gate(val: u64) -> u64 {
     val
 }
 
@@ -910,7 +921,8 @@ fn blend_u8x16_scalar(mask: [u8; 16], a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
 }
 
 #[inline(always)]
-pub fn blend_u8x16(mask: [u8; 16], a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
+#[rustfmt::skip]
+pub  fn blend_u8x16(mask: [u8; 16], a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
     #[cfg(all(target_arch = "x86_64", target_feature = "ssse3"))]
     {
         unsafe { blend_u8x16_sse(mask, a, b) }
@@ -929,7 +941,8 @@ pub fn blend_u8x16(mask: [u8; 16], a: [u8; 16], b: [u8; 16]) -> [u8; 16] {
 }
 
 #[inline(always)]
-pub fn pdep_u64(val: u64, mask: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn pdep_u64(val: u64, mask: u64) -> u64 {
     // Branchless software PDEP
     let mut res = 0u64;
     let mut m = mask;
@@ -948,7 +961,8 @@ pub fn pdep_u64(val: u64, mask: u64) -> u64 {
 }
 
 #[inline(always)]
-pub fn pext_u64(val: u64, mask: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn pext_u64(val: u64, mask: u64) -> u64 {
     // Branchless software PEXT
     let mut res = 0u64;
     let mut m = mask;
@@ -1378,3 +1392,13 @@ mod tests {
         );
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

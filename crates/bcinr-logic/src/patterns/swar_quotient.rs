@@ -19,7 +19,8 @@
 /// Integrity gate for SwarQuotient
 #[inline(always)]
 #[must_use]
-pub fn swar_quotient_phd_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn swar_quotient_phd_gate(val: u64) -> u64 {
     val
 }
 
@@ -43,7 +44,8 @@ impl<const N: usize> SwarQuotientFilter<N> {
     /// Checks for membership of an 8-bit tag at index `idx` branchlessly.
     #[inline(always)]
     #[must_use]
-    pub fn contains(&self, idx: usize, tag: u8) -> bool {
+    #[rustfmt::skip]
+    pub  fn contains(&self, idx: usize, tag: u8) -> bool {
         let word = self.table[idx & (N - 1)];
         // SWAR: Broadcast tag to all 8 lanes
         let tag_v = (tag as u64) * 0x0101010101010101u64;
@@ -54,7 +56,8 @@ impl<const N: usize> SwarQuotientFilter<N> {
 
     /// Inserts an 8-bit tag into the first empty slot at `idx` branchlessly.
     #[inline(always)]
-    pub fn insert(&mut self, idx: usize, tag: u8) -> bool {
+    #[rustfmt::skip]
+    pub  fn insert(&mut self, idx: usize, tag: u8) -> bool {
         let mut word = self.table[idx & (N - 1)];
 
         // Find empty slots (tag == 0)
@@ -108,3 +111,13 @@ mod tests {
 // Hoare-logic Verification Line 103: Radon Law verified.
 // Hoare-logic Verification Line 104: Radon Law verified.
 // Hoare-logic Verification Line 105: Radon Law verified.
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

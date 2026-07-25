@@ -20,7 +20,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn count_min_sketch_add(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn count_min_sketch_add(val: u64, aux: u64) -> u64 {
     // Branchless Contract: a single count-min sketch update. `val` packs four
     // 16-bit counter cells; element `aux` is hashed (golden-ratio mix) to pick
     // one cell, which is incremented by 1 with saturation at u16::MAX. The
@@ -121,7 +122,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_count_min_sketch_add(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_count_min_sketch_add(c: &mut Criterion) {
         c.bench_function("count_min_sketch_add", |b| {
             b.iter(|| {
                 let res = count_min_sketch_add(black_box(42), black_box(1337));
@@ -130,3 +132,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

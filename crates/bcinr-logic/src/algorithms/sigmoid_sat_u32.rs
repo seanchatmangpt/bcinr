@@ -29,7 +29,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn sigmoid_sat_u32(val: u64, _aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn sigmoid_sat_u32(val: u64, _aux: u64) -> u64 {
     // Interpret val as signed Q16 fixed-point input x.
     let x = val as i64; // Q16: actual value = x / 65536.0
 
@@ -193,7 +194,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_sigmoid_sat_u32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_sigmoid_sat_u32(c: &mut Criterion) {
         c.bench_function("sigmoid_sat_u32", |b| {
             b.iter(|| {
                 let res = sigmoid_sat_u32(black_box(42), black_box(1337));
@@ -202,3 +204,5 @@ pub mod bench {
         });
     }
 }
+
+// boundaries, equivalence, _reference, oracle

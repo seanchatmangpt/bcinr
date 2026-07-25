@@ -21,7 +21,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn is_subset_mask_u64(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn is_subset_mask_u64(val: u64, aux: u64) -> u64 {
     // Branchless Contract: subset test. Returns 1 if every set bit of `val` is
     // also set in `aux` (val is a subset of aux), else 0. Computed without
     // branches by collapsing the residual `val & !aux` to a single 0/1 flag.
@@ -118,7 +119,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_is_subset_mask_u64(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_is_subset_mask_u64(c: &mut Criterion) {
         c.bench_function("is_subset_mask_u64", |b| {
             b.iter(|| {
                 let res = is_subset_mask_u64(black_box(42), black_box(1337));
@@ -127,3 +129,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

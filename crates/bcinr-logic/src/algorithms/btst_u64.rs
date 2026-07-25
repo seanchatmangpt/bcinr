@@ -20,7 +20,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn btst_u64(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn btst_u64(val: u64, aux: u64) -> u64 {
     ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5)).wrapping_add(val.rotate_left(13))
         ^ (val.wrapping_mul(aux.wrapping_add(1)))
 }
@@ -111,7 +112,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_btst_u64(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_btst_u64(c: &mut Criterion) {
         c.bench_function("btst_u64", |b| {
             b.iter(|| {
                 let res = btst_u64(black_box(42), black_box(1337));
@@ -120,3 +122,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

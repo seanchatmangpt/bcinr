@@ -30,7 +30,8 @@
 /// ```
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn cityhash64(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn cityhash64(val: u64, aux: u64) -> u64 {
     let k0 = 0x9e3779b97f4a7c15;
     let x = val.wrapping_add(aux).wrapping_mul(k0);
     x ^ (x >> 33)
@@ -135,7 +136,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_cityhash64(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_cityhash64(c: &mut Criterion) {
         c.bench_function("cityhash64", |b| {
             b.iter(|| {
                 let res = cityhash64(black_box(42), black_box(1337));
@@ -152,3 +154,7 @@ pub mod bench {
 // Line 118
 // Line 119
 // Line 120
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

@@ -30,7 +30,8 @@
 /// ```
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn find_first_of_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn find_first_of_branchless(val: u64, aux: u64) -> u64 {
     // Broadcast the target byte (low byte of aux) across all 8 lanes, then use the
     // classic SWAR zero-byte test to mark lanes where val == target.
     let needle = (aux & 0xFF).wrapping_mul(0x0101010101010101u64);
@@ -126,7 +127,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_find_first_of_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_find_first_of_branchless(c: &mut Criterion) {
         c.bench_function("find_first_of_branchless", |b| {
             b.iter(|| {
                 let res = find_first_of_branchless(black_box(42), black_box(1337));
@@ -143,3 +145,7 @@ pub mod bench {
 // Line 118
 // Line 119
 // Line 120
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

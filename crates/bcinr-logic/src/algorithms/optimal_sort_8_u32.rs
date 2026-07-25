@@ -21,7 +21,8 @@
 // { a ∈ [u32; 8] }
 // After all 19 CAS operations of Batcher's odd-even merge sort:
 // { a[0] ≤ a[1] ≤ ... ≤ a[7] ∧ multiset(a) = multiset(input) }
-pub fn optimal_sort_8_u32(mut a: [u32; 8]) -> [u32; 8] {
+#[rustfmt::skip]
+pub  fn optimal_sort_8_u32(mut a: [u32; 8]) -> [u32; 8] {
     // Branchless compare-and-swap: swaps a[i] and a[j] if a[i] > a[j].
     macro_rules! cas {
         ($i:expr, $j:expr) => {
@@ -133,9 +134,20 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_optimal_sort_8_u32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_optimal_sort_8_u32(c: &mut Criterion) {
         c.bench_function("optimal_sort_8_u32", |b| {
             b.iter(|| optimal_sort_8_u32(black_box([8, 3, 6, 1, 7, 2, 5, 4])))
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

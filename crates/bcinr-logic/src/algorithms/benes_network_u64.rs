@@ -22,7 +22,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn benes_network_u64(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn benes_network_u64(val: u64, aux: u64) -> u64 {
     let m1 = aux;
     let t1 = ((val >> 1) ^ val) & m1;
     let s1 = val ^ t1 ^ (t1 << 1);
@@ -148,7 +149,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_benes_network_u64(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_benes_network_u64(c: &mut Criterion) {
         c.bench_function("benes_network_u64", |b| {
             b.iter(|| {
                 let res = benes_network_u64(black_box(42), black_box(1337));
@@ -157,3 +159,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

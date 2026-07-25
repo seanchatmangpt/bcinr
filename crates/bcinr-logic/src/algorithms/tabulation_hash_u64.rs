@@ -42,7 +42,8 @@
 /// assert_eq!(h, tabulation_hash_u64(0x12345678, &tables)); // deterministic
 /// assert_ne!(h, tabulation_hash_u64(0x12345679, &tables)); // sensitive to key
 /// ```
-pub fn tabulation_hash_u64(key: u32, tables: &[[u64; 256]; 4]) -> u64 {
+#[rustfmt::skip]
+pub  fn tabulation_hash_u64(key: u32, tables: &[[u64; 256]; 4]) -> u64 {
     let b0 = (key & 0xFF) as usize;
     let b1 = ((key >> 8) & 0xFF) as usize;
     let b2 = ((key >> 16) & 0xFF) as usize;
@@ -64,7 +65,8 @@ pub fn tabulation_hash_u64(key: u32, tables: &[[u64; 256]; 4]) -> u64 {
 /// // Tables are filled; entries are all nonzero with overwhelming probability
 /// assert_ne!(tables[0][0], 0);
 /// ```
-pub fn tabulation_hash_init_tables(seed: u64, tables: &mut [[u64; 256]; 4]) {
+#[rustfmt::skip]
+pub  fn tabulation_hash_init_tables(seed: u64, tables: &mut [[u64; 256]; 4]) {
     // xorshift64 PRNG — period 2^64 - 1, all nonzero states
     let mut state = if seed == 0 { 0x853c49e6748fea9b } else { seed };
     for table in tables.iter_mut() {
@@ -224,7 +226,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_tabulation_hash_u64(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_tabulation_hash_u64(c: &mut Criterion) {
         let mut tables = [[0u64; 256]; 4];
         tabulation_hash_init_tables(123456789, &mut tables);
         c.bench_function("tabulation_hash_u64", |b| {
@@ -237,3 +240,9 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle

@@ -19,7 +19,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn fp_sqrt_u32_q16(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn fp_sqrt_u32_q16(val: u64, aux: u64) -> u64 {
     // Branchless digit-by-digit integer sqrt of (val << 16).
     // val < 2^64 so the scaled operand is < 2^80; the highest possible
     // even power of four is 4^40 = 2^80, so 41 reduction steps suffice.
@@ -123,7 +124,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_fp_sqrt_u32_q16(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_fp_sqrt_u32_q16(c: &mut Criterion) {
         c.bench_function("fp_sqrt_u32_q16", |b| {
             b.iter(|| {
                 let res = fp_sqrt_u32_q16(black_box(42), black_box(1337));
@@ -132,3 +134,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

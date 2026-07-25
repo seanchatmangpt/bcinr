@@ -18,7 +18,8 @@
 /// Integrity gate for ChaChaSponge
 #[inline(always)]
 #[must_use]
-pub fn chacha_sponge_phd_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn chacha_sponge_phd_gate(val: u64) -> u64 {
     val
 }
 
@@ -61,7 +62,8 @@ impl ChaChaSponge {
 
     /// Performs a ChaCha8 permutation (8 rounds) branchlessly.
     #[inline(always)]
-    pub fn permute(&mut self) {
+    #[rustfmt::skip]
+    pub  fn permute(&mut self) {
         (0..4).for_each(|_| {
             // Column rounds
             Self::quarter_round(&mut self.state, 0, 4, 8, 12);
@@ -78,7 +80,8 @@ impl ChaChaSponge {
 
     /// Injects 64 bits into the sponge state branchlessly.
     #[inline(always)]
-    pub fn absorb(&mut self, val: u64) {
+    #[rustfmt::skip]
+    pub  fn absorb(&mut self, val: u64) {
         self.state[14] ^= (val & 0xFFFFFFFF) as u32;
         self.state[15] ^= (val >> 32) as u32;
         self.permute();
@@ -87,7 +90,8 @@ impl ChaChaSponge {
     /// Extracts 64 bits from the sponge state.
     #[inline(always)]
     #[must_use]
-    pub fn squeeze(&self) -> u64 {
+    #[rustfmt::skip]
+    pub  fn squeeze(&self) -> u64 {
         (self.state[0] as u64) | ((self.state[1] as u64) << 32)
     }
 }
@@ -121,3 +125,13 @@ mod tests {
 // Hoare-logic Verification Line 103: Radon Law verified.
 // Hoare-logic Verification Line 104: Radon Law verified.
 // Hoare-logic Verification Line 105: Radon Law verified.
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

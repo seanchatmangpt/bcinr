@@ -1,0 +1,10 @@
+Based on the constitutional laws defined in `AGENTS.md` for the BCINR deterministic substrate, here is the research regarding the `CertificateMissing` and `CertificateStale` typed refusals:
+
+### Why they are required categories (Rule 18 & Rule 11)
+1. **Bounded, Deterministic Failure:** Under Rule 18 (Typed Refusals), rejected authoritative operations are strictly prohibited from panicking, silently clamping, mutating partial state, or falling back to defaults. Failures must be handled via bounded, typed refusal codes in the hot path. 
+2. **The ReceiptSound Law:** Under Rule 11, any adaptive mutation strictly requires a mathematical proof of authority, which includes an `AcceptedCertificate`. There are no alternate APIs or bypasses. `CertificateMissing` and `CertificateStale` are required to explicitly encode the absence or expiration of this cryptographic/mathematical proof. 
+
+### How they prevent uncertified state mutation (Rule 10 & Rule 24)
+1. **Mask-Based Admission:** Rule 10 (No mutation before complete admission) forbids speculative mutation. State transitions must follow a strict shape: current state → candidate state → **verify all predicates** → derive admission mask → masked commit. If a certificate is missing or stale, the predicates fail, triggering the typed refusal. The admission mask evaluates to `0`, ensuring the persistent state remains "bit-for-bit unchanged."
+2. **Freezing Learning:** When these refusals occur, the system safely falls back. As stated in Rule 11, when learning is frozen due to missing/stale certificates, deterministic selection continues via masked state selection, but adaptive state fields remain unaltered.
+3. **Absolute Constitutional Enforcement:** Rule 24 designates "stale certificate acceptance" and "state mutation after refusal" as absolute failures. If the runtime fails to emit these typed refusals and accidentally processes uncertified state, the Substrate Integrity Score (SIS) instantly drops to 0, triggering an immediate quarantine of the code.

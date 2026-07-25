@@ -21,7 +21,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn k_independent_hash_gen(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn k_independent_hash_gen(val: u64, aux: u64) -> u64 {
     let x = val;
     let a = aux & 0xFFFFFFFF;
     let b = aux >> 32;
@@ -105,7 +106,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_k_independent_hash_gen(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_k_independent_hash_gen(c: &mut Criterion) {
         c.bench_function("k_independent_hash_gen", |b| {
             b.iter(|| {
                 let res = k_independent_hash_gen(black_box(42), black_box(1337));
@@ -114,3 +116,9 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// Axiomatic Hoare logic

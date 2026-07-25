@@ -36,7 +36,8 @@
 /// # Branchless Contract
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
-pub fn leb128_decode_u64(bytes: u64, _aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn leb128_decode_u64(bytes: u64, _aux: u64) -> u64 {
     // Extract bytes from the packed u64 in little-endian order
     let b0 = (bytes & 0xFF) as u8;
     let b1 = ((bytes >> 8) & 0xFF) as u8;
@@ -162,7 +163,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_leb128_decode_u64(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_leb128_decode_u64(c: &mut Criterion) {
         c.bench_function("leb128_decode_u64_single_byte", |b| {
             // Single-byte encoding (0x2A = 42)
             b.iter(|| leb128_decode_u64(black_box(0x2A), black_box(0)))
@@ -179,3 +181,11 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

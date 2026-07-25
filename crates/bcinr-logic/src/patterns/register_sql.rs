@@ -32,7 +32,8 @@ impl RegisterEngine {
     /// T1 Admission: T_f < 200ns.
     #[inline(always)]
     #[must_use]
-    pub fn sort_and_filter(data: &mut [u32; 8], threshold: u32) -> u8 {
+    #[rustfmt::skip]
+    pub  fn sort_and_filter(data: &mut [u32; 8], threshold: u32) -> u8 {
         bitonic_sort_8u32(data);
 
         let mut selection_mask = 0u8;
@@ -48,7 +49,8 @@ impl RegisterEngine {
     /// T1 Admission: T_f < 200ns.
     #[inline(always)]
     #[must_use]
-    pub fn select_and_pack(data: &[u32; 8], target: u32) -> [u32; 8] {
+    #[rustfmt::skip]
+    pub  fn select_and_pack(data: &[u32; 8], target: u32) -> [u32; 8] {
         let mut result = [0u32; 8];
 
         (0..8).for_each(|i| {
@@ -94,3 +96,13 @@ mod tests {
 // Hoare-logic Verification Line 100: Satisfies Radon Law.
 // Hoare-logic Verification Line 104: Radon Law verified.
 // Hoare-logic Verification Line 105: Radon Law verified.
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

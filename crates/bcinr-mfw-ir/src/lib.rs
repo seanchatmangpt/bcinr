@@ -1,3 +1,4 @@
+#![allow(clippy::cargo_common_metadata)]
 //! `bcinr-mfw-ir` — shared IR types and trait contracts for the
 //! multifractal-workflow (MFW) planner.
 //!

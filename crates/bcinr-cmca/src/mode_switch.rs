@@ -426,8 +426,7 @@ mod tests {
         let expected = CertificateReceipt::admit_certificate(99);
 
         // Attempted transition identity (1, 999) does not match the dwell token's (1, 2).
-        let (res, evidence) =
-            apply_mode_switch(&mut state, switch, dwell, 1, 999, cert, expected);
+        let (res, evidence) = apply_mode_switch(&mut state, switch, dwell, 1, 999, cert, expected);
         assert_eq!(res, Err(ModeSwitchRefusal::DwellIdentityMismatch));
         assert_eq!(
             state, snapshot,

@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! Debug oracle: prints bishop-attack bitboards from `bcinr`'s
 //! `bishop_attacks` alongside the `chess` crate's reference
 //! `get_bishop_moves`, for eyeballing a divergence at a single square.

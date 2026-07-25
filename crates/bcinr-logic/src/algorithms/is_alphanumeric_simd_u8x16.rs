@@ -19,7 +19,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn is_alphanumeric_simd_u8x16(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn is_alphanumeric_simd_u8x16(val: u64, aux: u64) -> u64 {
     // Interpretation: `val` packs 8 ASCII bytes; `aux` packs a per-lane enable
     // mask (a lane is active iff its byte is non-zero). For every active lane we
     // emit the byte's most-significant bit when the byte is ASCII alphanumeric
@@ -149,7 +150,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_is_alphanumeric_simd_u8x16(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_is_alphanumeric_simd_u8x16(c: &mut Criterion) {
         c.bench_function("is_alphanumeric_simd_u8x16", |b| {
             b.iter(|| {
                 let res = is_alphanumeric_simd_u8x16(black_box(42), black_box(1337));
@@ -158,3 +160,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

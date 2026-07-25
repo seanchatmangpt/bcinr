@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! Object-Centric Event Log (OCEL) chess drill: plays out a game while
 //! recording each move as an OCEL event, for exercising the OCEL export path
 //! against a real game trace rather than a synthetic fixture.

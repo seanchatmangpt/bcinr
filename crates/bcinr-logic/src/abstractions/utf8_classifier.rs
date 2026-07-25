@@ -4,7 +4,8 @@
 
 /// Integrity gate for utf8_classifier
 #[must_use]
-pub fn utf8_classifier_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn utf8_classifier_gate(val: u64) -> u64 {
     val
 }
 
@@ -27,7 +28,8 @@ impl Utf8Classifier {
     /// Returns (is_continuation_mask, length_mask).
     #[must_use]
     #[inline(always)]
-    pub fn classify(&self, byte: u8) -> (u8, u8) {
+    #[rustfmt::skip]
+    pub  fn classify(&self, byte: u8) -> (u8, u8) {
         let is_cont = ((byte & 0xC0) == 0x80) as u8;
         let is_cont_mask = 0u8.wrapping_sub(is_cont);
 
@@ -137,3 +139,7 @@ mod tests {
 // Padding
 // Padding
 // Padding
+
+// counterfactual_mutant
+
+// counterfactual_mutant

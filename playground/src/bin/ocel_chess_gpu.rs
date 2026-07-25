@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! GPU (wgpu compute-shader) variant of the OCEL chess NNUE evaluation drill
 //! — mirrors `ocel_chess`'s CPU evaluation loop but dispatches the NNUE
 //! forward pass to the GPU for throughput comparison.

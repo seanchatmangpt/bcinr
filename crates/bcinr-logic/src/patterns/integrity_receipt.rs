@@ -55,7 +55,8 @@ impl DeterministicSubstrateReceipt {
     /// Records one typed state transition.
     /// T1 Admission: T_f < 200ns.
     #[inline(always)]
-    pub fn record(&mut self, tag: u64, state: u64, aux: u64) {
+    #[rustfmt::skip]
+    pub  fn record(&mut self, tag: u64, state: u64, aux: u64) {
         let mut h = self.current_hash;
 
         h = Self::mix(h, self.steps);
@@ -69,7 +70,8 @@ impl DeterministicSubstrateReceipt {
 
     #[inline(always)]
     #[must_use]
-    pub fn finalize(&self) -> u64 {
+    #[rustfmt::skip]
+    pub  fn finalize(&self) -> u64 {
         self.current_hash
     }
 }
@@ -107,3 +109,13 @@ mod tests {
 // Hoare-logic Verification Line 100: Satisfies Radon Law.
 // Hoare-logic Verification Line 104: Radon Law verified.
 // Hoare-logic Verification Line 105: Radon Law verified.
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

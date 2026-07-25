@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! Branchless POWL v2 OCEL Chess Validator
 //!
 //! Validates OCEL v2 Object-Centric execution transitions for the Chess engine

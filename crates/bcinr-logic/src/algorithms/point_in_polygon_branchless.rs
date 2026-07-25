@@ -19,7 +19,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn point_in_polygon_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn point_in_polygon_branchless(val: u64, aux: u64) -> u64 {
     // One ray-casting crossing test (Jordan curve / even-odd rule) for the
     // horizontal ray from the query point against a single polygon edge.
     // `val` packs the query point: py in bits 32..63, px in bits 0..31.
@@ -142,7 +143,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_point_in_polygon_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_point_in_polygon_branchless(c: &mut Criterion) {
         c.bench_function("point_in_polygon_branchless", |b| {
             b.iter(|| {
                 let res = point_in_polygon_branchless(black_box(42), black_box(1337));
@@ -151,3 +153,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

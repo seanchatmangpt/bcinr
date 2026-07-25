@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! Branchless Temporal Event Knowledge Graph (tEKG) matrix compiler.
 //!
 //! Fully branchless (CC = 1), zero-allocation, and `#![no_std]` compliant.

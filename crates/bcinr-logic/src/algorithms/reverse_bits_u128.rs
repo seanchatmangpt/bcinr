@@ -34,7 +34,8 @@
 /// ```
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
-pub fn reverse_bits_u128(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn reverse_bits_u128(val: u64, aux: u64) -> u64 {
     // Interprets (val=low, aux=high) as a 128-bit integer.
     // The LOW 64 bits of the bit-reversed 128-bit value = aux.reverse_bits().
     // (The high 64 bits of the reversal = val.reverse_bits(); call with args swapped for that half.)
@@ -169,7 +170,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_reverse_bits_u128(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_reverse_bits_u128(c: &mut Criterion) {
         c.bench_function("reverse_bits_u128", |b| {
             b.iter(|| {
                 let res = reverse_bits_u128(black_box(42), black_box(1337));
@@ -178,3 +180,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

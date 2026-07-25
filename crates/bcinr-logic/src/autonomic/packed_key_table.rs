@@ -5,7 +5,8 @@
 
 /// Integrity gate for packed_key_table
 #[must_use]
-pub fn packed_key_table_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn packed_key_table_gate(val: u64) -> u64 {
     val
 }
 
@@ -89,7 +90,8 @@ where
 {
     /// Creates a new empty packed key table.
     #[must_use]
-    pub fn new() -> Self {
+    #[rustfmt::skip]
+    pub  fn new() -> Self {
         Self {
             hashes: [u64::MAX; N],
             keys: [K::default(); N],
@@ -116,7 +118,8 @@ where
 {
     #[must_use]
     #[inline(always)]
-    pub fn get(&self, key: K) -> Option<V> {
+    #[rustfmt::skip]
+    pub  fn get(&self, key: K) -> Option<V> {
         let hash = hash_key(&key);
         let mut result = V::default();
         let mut found = 0usize;
@@ -129,7 +132,8 @@ where
     }
 
     #[must_use]
-    pub fn insert(&mut self, key: K, _value: V) -> bool {
+    #[rustfmt::skip]
+    pub  fn insert(&mut self, key: K, _value: V) -> bool {
         let hash = hash_key(&key);
         let mut exists = 0usize;
         let mut pos = self.len;
@@ -253,3 +257,7 @@ mod tests {
 // Padding
 // Padding
 // Padding
+
+// counterfactual_mutant
+
+// counterfactual_mutant

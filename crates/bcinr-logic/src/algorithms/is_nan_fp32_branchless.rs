@@ -19,7 +19,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn is_nan_fp32_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn is_nan_fp32_branchless(val: u64, aux: u64) -> u64 {
     // Interpretation: the low 32 bits of `val` and of `aux` each hold an IEEE-754
     // binary32 bit pattern. A value is NaN iff its exponent field is all-ones
     // (0xFF) AND its 23-bit mantissa is non-zero. We pack: bit0 = nan(val),
@@ -128,7 +129,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_is_nan_fp32_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_is_nan_fp32_branchless(c: &mut Criterion) {
         c.bench_function("is_nan_fp32_branchless", |b| {
             b.iter(|| {
                 let res = is_nan_fp32_branchless(black_box(42), black_box(1337));
@@ -137,3 +139,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

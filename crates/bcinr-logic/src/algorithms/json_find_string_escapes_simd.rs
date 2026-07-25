@@ -19,7 +19,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn json_find_string_escapes_simd(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn json_find_string_escapes_simd(val: u64, aux: u64) -> u64 {
     // Interpretation: SIMD scan of the 8 bytes of `val` for the JSON in-string
     // escape-relevant characters: backslash '\' (0x5C) and double-quote '"'
     // (0x22). For each matching lane we emit that byte's most-significant bit,
@@ -142,7 +143,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_json_find_string_escapes_simd(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_json_find_string_escapes_simd(c: &mut Criterion) {
         c.bench_function("json_find_string_escapes_simd", |b| {
             b.iter(|| {
                 let res = json_find_string_escapes_simd(black_box(42), black_box(1337));
@@ -151,3 +153,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

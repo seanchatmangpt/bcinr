@@ -8,6 +8,7 @@ rust-version = "1.70"
 repository = "https://github.com/seanchatmangpt/bcinr"
 readme = "../../README.md"
 keywords = ["branchless", "cmca", "deterministic"]
+categories = ["algorithms"]
 # quarantine/ holds superseded legacy RDF generator/ontology sources, kept in-tree
 # for historical reference (see quarantine/README.md) but not reachable from any
 # production build, packaged test, or fixture path (tests/fixtures/pre_migration/
@@ -29,19 +30,12 @@ proptest = "1.2.0"
 blake3 = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+chicago-tdd-tools = { version = "26.7.1", features = ["ocel-generation"] }
 
 [features]
 default = []
 alloc = []
 std = ["bcinr-logic/std", "alloc"]
-# Default-off: gates `src/generated_artifact/` (mfw-producer-sourced Gamma_CMCA
-# modules). Compiling that module unconditionally currently fails (611 errors:
-# the producer's cmca_generated.rs calls fixed-point constructors/fields this
-# crate's src/fixed.rs API does not expose under those names). See
-# src/generated_artifact/mod.rs and src/lib.rs for the full account. Not
-# enabled by any other feature; flip on only once src/fixed.rs's owning task
-# reconciles the API surface.
-generated_artifact_pending = []
 # Default-off, dev-only: gates `src/alloc_counter.rs`'s `CountingAlloc` global
 # allocator and `tests/alloc_gate.rs`, which installs it as the process's
 # `#[global_allocator]` to assert zero heap allocations across a call to the

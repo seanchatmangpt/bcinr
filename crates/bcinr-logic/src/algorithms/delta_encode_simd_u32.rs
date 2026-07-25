@@ -31,7 +31,8 @@
 /// ```
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
-pub fn delta_encode_simd_u32(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn delta_encode_simd_u32(val: u64, aux: u64) -> u64 {
     // Treat val and aux as two packed u32 lanes (SWAR / SIMD-within-a-register)
     // val = [v1: u32 | v0: u32], aux = [prev1: u32 | prev0: u32]
     let v0 = val as u32;
@@ -152,7 +153,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_delta_encode_simd_u32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_delta_encode_simd_u32(c: &mut Criterion) {
         c.bench_function("delta_encode_simd_u32", |b| {
             b.iter(|| {
                 let res = delta_encode_simd_u32(black_box(42), black_box(1337));
@@ -161,3 +163,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

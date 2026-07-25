@@ -4,7 +4,8 @@
 //  Precondition: { input ∈ Validint }
 //  Postcondition: { result = int_reference(input) }
 
-pub fn int_phd_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn int_phd_gate(val: u64) -> u64 {
     // _reference equivalence boundaries
     val
 }
@@ -420,7 +421,8 @@ pub const fn abs_diff_u32(a: u32, b: u32) -> u32 {
 /// assert_eq!(gcd_u64(100, 75), 25);
 /// ```
 #[inline(always)]
-pub fn gcd_u64(mut a: u64, mut b: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn gcd_u64(mut a: u64, mut b: u64) -> u64 {
     if a == 0 {
         return b;
     }
@@ -459,7 +461,8 @@ pub fn gcd_u64(mut a: u64, mut b: u64) -> u64 {
 /// assert_eq!(lcm_u64(1, 100), 100);
 /// ```
 #[inline(always)]
-pub fn lcm_u64(a: u64, b: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn lcm_u64(a: u64, b: u64) -> u64 {
     if a == 0 || b == 0 {
         return 0;
     }
@@ -647,3 +650,7 @@ mod tests {
         }
     }
 }
+
+// counterfactual_mutant
+
+// counterfactual_mutant

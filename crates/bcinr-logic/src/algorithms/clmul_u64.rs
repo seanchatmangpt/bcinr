@@ -20,7 +20,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn clmul_u64(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn clmul_u64(val: u64, aux: u64) -> u64 {
     // Branchless Contract: carry-less (GF(2)) polynomial multiply of `val` by
     // `aux`, truncated to the low 64 bits. For each set bit i of `aux` we XOR in
     // `val << i`; the shift is gated by a 0/all-ones mask derived from bit i, so
@@ -189,7 +190,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_clmul_u64(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_clmul_u64(c: &mut Criterion) {
         c.bench_function("clmul_u64", |b| {
             b.iter(|| {
                 let res = clmul_u64(black_box(42), black_box(1337));
@@ -198,3 +200,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

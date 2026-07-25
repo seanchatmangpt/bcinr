@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! Plain-Rust Petri-net reference implementation, mirroring
 //! `wasm4pm-compat`'s `Place`/`Transition`/`Arc`/`Marking` model, for
 //! differential-testing `playground`'s branchless Petri primitives against.

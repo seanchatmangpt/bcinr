@@ -220,6 +220,7 @@ version = "26.7.17"
 dependencies = [
  "bcinr-logic",
  "blake3",
+ "chicago-tdd-tools",
  "proptest",
  "serde",
  "serde_json",

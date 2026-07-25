@@ -1,3 +1,4 @@
+#![allow(clippy::incompatible_msrv)]
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn algorithms_301_307(c: &mut Criterion) {

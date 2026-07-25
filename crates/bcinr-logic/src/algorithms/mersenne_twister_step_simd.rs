@@ -19,7 +19,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn mersenne_twister_step_simd(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn mersenne_twister_step_simd(val: u64, aux: u64) -> u64 {
     // Interpretation: the MT19937-64 tempering transform applied to the mixed
     // state word `x = val ^ aux` (the recurrence combines two state words before
     // tempering). This is the canonical 64-bit MT output whitening, fully
@@ -132,7 +133,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_mersenne_twister_step_simd(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_mersenne_twister_step_simd(c: &mut Criterion) {
         c.bench_function("mersenne_twister_step_simd", |b| {
             b.iter(|| {
                 let res = mersenne_twister_step_simd(black_box(42), black_box(1337));
@@ -141,3 +143,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

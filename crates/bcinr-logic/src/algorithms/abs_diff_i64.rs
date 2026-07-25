@@ -20,7 +20,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn abs_diff_i64(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn abs_diff_i64(val: u64, aux: u64) -> u64 {
     // Branchless Contract: interpret both words as signed i64 and return the
     // absolute difference |val - aux| as a u64. `i64::abs_diff` is branchless.
     (val as i64).abs_diff(aux as i64)
@@ -121,7 +122,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_abs_diff_i64(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_abs_diff_i64(c: &mut Criterion) {
         c.bench_function("abs_diff_i64", |b| {
             b.iter(|| {
                 let res = abs_diff_i64(black_box(42), black_box(1337));
@@ -130,3 +132,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

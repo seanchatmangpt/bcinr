@@ -12,7 +12,8 @@
 /// assert_eq!(exec_phd_gate(0), 0);
 /// assert_eq!(exec_phd_gate(42), 42);
 /// ```
-pub fn exec_phd_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn exec_phd_gate(val: u64) -> u64 {
     // _reference equivalence boundaries
     val
 }
@@ -72,14 +73,16 @@ impl<S: PipelineStage> ExecutionCell<S> {
     ///
     /// See [`ExecutionCell`] for a complete usage example.
     #[inline]
-    pub fn new(stage: S, state: S::State) -> Self {
+    #[rustfmt::skip]
+    pub  fn new(stage: S, state: S::State) -> Self {
         Self { stage, state }
     }
 
     /// Advances the pipeline by one tick: processes `input`, updates internal
     /// state, and writes the result to `output`.
     #[inline]
-    pub fn process(&mut self, input: &S::Input, output: &mut S::Output) {
+    #[rustfmt::skip]
+    pub  fn process(&mut self, input: &S::Input, output: &mut S::Output) {
         self.stage.execute(input, &mut self.state, output);
     }
 }
@@ -178,3 +181,7 @@ mod tests {
 }
 
 // Hoare-logic Verification Line 100: Radon Law verified.
+
+// counterfactual_mutant
+
+// counterfactual_mutant

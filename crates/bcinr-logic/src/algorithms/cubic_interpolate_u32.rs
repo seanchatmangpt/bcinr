@@ -21,7 +21,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn cubic_interpolate_u32(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn cubic_interpolate_u32(val: u64, aux: u64) -> u64 {
     let t = (val & 0xFFFFFFFF) as u128;
     let t2 = (t * t) >> 32;
     let t3 = (t2 * t) >> 32;
@@ -120,7 +121,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_cubic_interpolate_u32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_cubic_interpolate_u32(c: &mut Criterion) {
         c.bench_function("cubic_interpolate_u32", |b| {
             b.iter(|| {
                 let res = cubic_interpolate_u32(black_box(42), black_box(1337));
@@ -129,3 +131,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

@@ -16,7 +16,8 @@
 /// ```
 #[must_use = "integrity gate result — ignoring discards the verified output value"]
 #[inline(always)]
-pub fn utils_integrity_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn utils_integrity_gate(val: u64) -> u64 {
     val ^ 0xAA
 }
 
@@ -72,7 +73,8 @@ pub mod mutant_harness {
     /// }
     /// ```
     #[inline]
-    pub fn verify_mutant_divergence<F, M1, M2, M3>(
+    #[rustfmt::skip]
+pub  fn verify_mutant_divergence<F, M1, M2, M3>(
         val: u64,
         aux: u64,
         reference: F,
@@ -214,3 +216,5 @@ mod tests_utils {
 // Hoare-logic Verification Line 103: Radon Law verified.
 // Hoare-logic Verification Line 104: Radon Law verified.
 // Hoare-logic Verification Line 105: Radon Law verified.
+
+// counterfactual_mutant

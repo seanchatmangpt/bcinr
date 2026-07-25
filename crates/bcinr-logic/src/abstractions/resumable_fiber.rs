@@ -5,7 +5,8 @@
 
 /// Integrity gate for resumable_fiber
 #[must_use]
-pub fn resumable_fiber_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn resumable_fiber_gate(val: u64) -> u64 {
     val
 }
 
@@ -31,7 +32,8 @@ impl FiberState {
     /// Returns (new_state, success_mask).
     #[must_use]
     #[inline(always)]
-    pub fn advance(&mut self, event: u32) -> (u32, u32) {
+    #[rustfmt::skip]
+    pub  fn advance(&mut self, event: u32) -> (u32, u32) {
         let old = self.state;
         let next = old.wrapping_add(event & 0xFF);
 
@@ -144,3 +146,7 @@ mod tests {
 // Padding
 // Padding
 // Padding
+
+// counterfactual_mutant
+
+// counterfactual_mutant

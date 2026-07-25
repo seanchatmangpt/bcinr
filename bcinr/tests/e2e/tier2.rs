@@ -681,4 +681,3 @@ fn test_tier4_scenario_cargo_fmt() {
         .unwrap();
     assert_status_in(&out, &[0, 1]);
 }
-

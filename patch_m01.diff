@@ -1,0 +1,16 @@
+--- crates/bcinr-cmca/tests/hostile_mutants.rs
++++ crates/bcinr-cmca/tests/hostile_mutants.rs
+@@ -80,14 +80,13 @@
+-// stays set for a reason unrelated to M01. This is `mutant_10`'s own dedicated oracle
+-// (`kill_mutant_10_false_numerically_uncertain` below) doing its job on the same shared
+-// condition — not a weakening of what this test asserts under the default build.
+-#[cfg(not(feature = "mutant_10"))]
+ #[test]
+ fn kill_m01_ignore_numeric_error() {
+     let result = evaluate_m01(
+-        NonNegativeFixed::from_value_bits(66000), // kappa_hat > epsilon_on
+-        NonNegativeFixed::from_value_bits(65000), // kappa_under < epsilon_on
+-        NonNegativeFixed::from_value_bits(65536), // epsilon_on = 1.0
++        NonNegativeFixed::from_value_bits(65536), // kappa_hat >= epsilon_on (triggers NumericallyUncertain off)
++        NonNegativeFixed::from_value_bits(65000), // kappa_under < epsilon_on (this would be off, but mutant substitutes it)
++        NonNegativeFixed::from_value_bits(65536), // epsilon_on = 1.0

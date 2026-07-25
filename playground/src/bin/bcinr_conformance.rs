@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! Attaches the playground's branchless process-intelligence (the Petri-net token
 //! replay engine) to the chess decision engine.
 //!

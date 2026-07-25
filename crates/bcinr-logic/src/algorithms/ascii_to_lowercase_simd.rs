@@ -25,7 +25,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn ascii_to_lowercase_simd(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn ascii_to_lowercase_simd(val: u64, aux: u64) -> u64 {
     const ONES: u64 = 0x0101010101010101;
     const H: u64 = 0x8080808080808080;
     const LO7: u64 = 0x7F7F7F7F7F7F7F7F;
@@ -138,7 +139,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_ascii_to_lowercase_simd(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_ascii_to_lowercase_simd(c: &mut Criterion) {
         c.bench_function("ascii_to_lowercase_simd", |b| {
             b.iter(|| {
                 let res = ascii_to_lowercase_simd(black_box(42), black_box(1337));
@@ -147,3 +149,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

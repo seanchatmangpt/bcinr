@@ -23,7 +23,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn vector_cross_product_f32(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn vector_cross_product_f32(val: u64, aux: u64) -> u64 {
     let x1 = val & 0xFFFF_FFFF;
     let y1 = val >> 32;
     let x2 = aux & 0xFFFF_FFFF;
@@ -128,7 +129,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_vector_cross_product_f32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_vector_cross_product_f32(c: &mut Criterion) {
         c.bench_function("vector_cross_product_f32", |b| {
             b.iter(|| {
                 let res = vector_cross_product_f32(black_box(42), black_box(1337));

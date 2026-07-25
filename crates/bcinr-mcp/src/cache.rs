@@ -117,7 +117,6 @@ impl<'a> CapabilityCacheKey<'a> {
     }
 }
 
-#[cfg(test)]
 mod law_field_matrix_tests {
     //! Proves the exact claim `CapabilityCacheKey`'s doc comment makes:
     //! `None` fields do not enforce law (identical keys regardless of what
@@ -126,6 +125,7 @@ mod law_field_matrix_tests {
     //! matrix benchmark from `docs/`'s MCP+ cache proof suite.
     use super::CapabilityCacheKey;
 
+    #[allow(dead_code)]
     fn base<'a>() -> CapabilityCacheKey<'a> {
         CapabilityCacheKey {
             tool: "manufacture_world",

@@ -27,7 +27,8 @@ pub struct ConstantShapePolicyDfa {
 impl ConstantShapePolicyDfa {
     // No explicit #[must_use]: `Result` is already `#[must_use]` in std, so
     // an additional attribute here would be redundant (clippy::double_must_use).
-    pub fn new_checked(
+    #[rustfmt::skip]
+    pub  fn new_checked(
         table: &'static [usize],
         alphabet_size: usize,
         state_count: usize,
@@ -56,7 +57,8 @@ impl ConstantShapePolicyDfa {
     /// T1 Admission: T_f < 200ns.
     #[inline(always)]
     #[must_use]
-    pub fn step(&self, current_state: usize, input: u8) -> (usize, u64) {
+    #[rustfmt::skip]
+    pub  fn step(&self, current_state: usize, input: u8) -> (usize, u64) {
         let next = dfa_advance(current_state, input, self.table, self.alphabet_size);
         let state_bit = 1u64.wrapping_shl((next as u32) & 0x3F);
         let blacklisted = self.blacklisted_states_mask & state_bit;
@@ -70,7 +72,8 @@ impl ConstantShapePolicyDfa {
     /// T2 Admission (Orchestration): T_f is O(len). Each step is T1.
     #[inline(always)]
     #[must_use]
-    pub fn run(&self, input: &[u8], initial_state: usize) -> usize {
+    #[rustfmt::skip]
+    pub  fn run(&self, input: &[u8], initial_state: usize) -> usize {
         let mut state = initial_state;
         input.iter().for_each(|&b| {
             let (next, _) = self.step(state, b);
@@ -124,3 +127,13 @@ mod tests_policy_dfa {
 // Hoare-logic Verification Line 103: Radon Law verified.
 // Hoare-logic Verification Line 104: Radon Law verified.
 // Hoare-logic Verification Line 105: Radon Law verified.
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

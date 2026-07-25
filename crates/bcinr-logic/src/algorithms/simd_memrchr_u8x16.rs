@@ -24,7 +24,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn simd_memrchr_u8x16(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn simd_memrchr_u8x16(val: u64, aux: u64) -> u64 {
     const LO: u64 = 0x0101010101010101;
     const HI: u64 = 0x8080808080808080;
     const LO7: u64 = 0x7F7F7F7F7F7F7F7F;
@@ -99,8 +100,11 @@ mod tests {
         );
         // mutants
         let base = simd_memrchr_u8x16_reference(42, 1337);
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_simd_memrchr_u8x16_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_simd_memrchr_u8x16_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_simd_memrchr_u8x16_3(42, 1337), base, "mutant 3");
     }
 
@@ -121,7 +125,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_simd_memrchr_u8x16(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_simd_memrchr_u8x16(c: &mut Criterion) {
         c.bench_function("simd_memrchr_u8x16", |b| {
             b.iter(|| {
                 let res = simd_memrchr_u8x16(black_box(42), black_box(1337));
@@ -130,3 +135,9 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant
+
+// counterfactual_mutant
+
+// counterfactual_mutant

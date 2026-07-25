@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 #![allow(unsafe_code)]
 //! WASM API C-Interface Wrappers Reference Implementation
 

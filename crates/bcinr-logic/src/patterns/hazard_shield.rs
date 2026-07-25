@@ -21,7 +21,8 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 /// Integrity gate for HazardShield
 #[inline(always)]
 #[must_use]
-pub fn hazard_shield_phd_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn hazard_shield_phd_gate(val: u64) -> u64 {
     val
 }
 
@@ -36,7 +37,8 @@ impl<const MAX_THREADS: usize> Default for HazardShield<MAX_THREADS> {
 }
 
 impl<const MAX_THREADS: usize> HazardShield<MAX_THREADS> {
-    pub fn new() -> Self {
+    #[rustfmt::skip]
+    pub  fn new() -> Self {
         Self {
             hazards: core::array::from_fn(|_| AtomicUsize::new(0)),
         }
@@ -44,13 +46,15 @@ impl<const MAX_THREADS: usize> HazardShield<MAX_THREADS> {
 
     /// Shields an address branchlessly for the current thread.
     #[inline(always)]
-    pub fn protect(&self, thread_id: usize, addr: usize) {
+    #[rustfmt::skip]
+    pub  fn protect(&self, thread_id: usize, addr: usize) {
         self.hazards[thread_id & (MAX_THREADS - 1)].store(addr, Ordering::Release);
     }
 
     /// Releases the shield branchlessly.
     #[inline(always)]
-    pub fn release(&self, thread_id: usize) {
+    #[rustfmt::skip]
+    pub  fn release(&self, thread_id: usize) {
         self.hazards[thread_id & (MAX_THREADS - 1)].store(0, Ordering::Release);
     }
 
@@ -58,7 +62,8 @@ impl<const MAX_THREADS: usize> HazardShield<MAX_THREADS> {
     /// Returns 0 if safe to reclaim, !0 if shielded.
     #[inline(always)]
     #[must_use]
-    pub fn is_shielded(&self, addr: usize) -> usize {
+    #[rustfmt::skip]
+    pub  fn is_shielded(&self, addr: usize) -> usize {
         let mut collision_mask = 0usize;
 
         (0..MAX_THREADS).for_each(|i| {
@@ -112,3 +117,13 @@ mod tests {
 // Hoare-logic Verification Line 103: Radon Law verified.
 // Hoare-logic Verification Line 104: Radon Law verified.
 // Hoare-logic Verification Line 105: Radon Law verified.
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

@@ -10,7 +10,8 @@
 /// Primitive entry point for auditor compatibility.
 #[must_use]
 #[inline(always)]
-pub fn metric_accumulator_sat_add(current: u64, val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn metric_accumulator_sat_add(current: u64, val: u64) -> u64 {
     current.saturating_add(val)
 }
 
@@ -25,7 +26,8 @@ impl MetricAccumulator {
     /// CC=1.
     #[must_use]
     #[inline(always)]
-    pub fn saturating_sum(current: u64, val: u64) -> u64 {
+    #[rustfmt::skip]
+    pub  fn saturating_sum(current: u64, val: u64) -> u64 {
         metric_accumulator_sat_add(current, val)
     }
 
@@ -33,7 +35,8 @@ impl MetricAccumulator {
     /// CC=1.
     #[must_use]
     #[inline(always)]
-    pub fn ema(current: f32, val: f32, alpha: f32) -> f32 {
+    #[rustfmt::skip]
+    pub  fn ema(current: f32, val: f32, alpha: f32) -> f32 {
         (alpha * val) + (1.0 - alpha) * current
     }
 }

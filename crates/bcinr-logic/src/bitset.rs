@@ -95,7 +95,8 @@ pub const fn rank_u64(x: u64, pos: usize) -> usize {
 /// ```
 #[inline(always)]
 #[must_use = "select_bit_u64 result — ignoring discards the bit position of the n-th set bit"]
-pub fn select_bit_u64(x: u64, n: usize) -> Option<usize> {
+#[rustfmt::skip]
+pub  fn select_bit_u64(x: u64, n: usize) -> Option<usize> {
     let mut res = 0;
     let mut x_copy = x;
     let mut count = n + 1;
@@ -132,7 +133,8 @@ pub fn select_bit_u64(x: u64, n: usize) -> Option<usize> {
 /// ```
 #[inline(always)]
 #[must_use = "parity_u64_slice result — ignoring discards the parity of set bits in the slice"]
-pub fn parity_u64_slice(a: &[u64]) -> u64 {
+#[rustfmt::skip]
+pub  fn parity_u64_slice(a: &[u64]) -> u64 {
     let mut acc = 0;
     (0..a.len()).for_each(|i| acc ^= a[i]);
     (acc.count_ones() & 1) as u64
@@ -157,7 +159,8 @@ pub fn parity_u64_slice(a: &[u64]) -> u64 {
 /// ```
 #[inline(always)]
 #[must_use = "jaccard_u64_slices result — ignoring discards the similarity score"]
-pub fn jaccard_u64_slices(a: &[u64], b: &[u64]) -> f32 {
+#[rustfmt::skip]
+pub  fn jaccard_u64_slices(a: &[u64], b: &[u64]) -> f32 {
     let mut intersection = 0;
     let mut union = 0;
     let len_a = a.len();
@@ -191,7 +194,8 @@ pub fn jaccard_u64_slices(a: &[u64], b: &[u64]) -> f32 {
 /// ```
 #[inline(always)]
 #[must_use = "hamming_u64_slices result — ignoring discards the bit-difference count"]
-pub fn hamming_u64_slices(a: &[u64], b: &[u64]) -> usize {
+#[rustfmt::skip]
+pub  fn hamming_u64_slices(a: &[u64], b: &[u64]) -> usize {
     let mut dist = 0;
     let len_a = a.len();
     let len_b = b.len();
@@ -215,7 +219,8 @@ pub fn hamming_u64_slices(a: &[u64], b: &[u64]) -> usize {
 /// assert_eq!(a, [0b0101u64, 0b1000u64]);
 /// ```
 #[inline(always)]
-pub fn intersect_u64_slices(a: &mut [u64], b: &[u64]) {
+#[rustfmt::skip]
+pub  fn intersect_u64_slices(a: &mut [u64], b: &[u64]) {
     let len_a = a.len();
     let len_b = b.len();
     let min_len = (len_a & (0usize.wrapping_sub((len_a < len_b) as usize)))
@@ -237,7 +242,8 @@ pub fn intersect_u64_slices(a: &mut [u64], b: &[u64]) {
 /// assert_eq!(a, [0b1111u64, 0b1111u64]);
 /// ```
 #[inline(always)]
-pub fn union_u64_slices(a: &mut [u64], b: &[u64]) {
+#[rustfmt::skip]
+pub  fn union_u64_slices(a: &mut [u64], b: &[u64]) {
     let len_a = a.len();
     let len_b = b.len();
     let min_len = (len_a & (0usize.wrapping_sub((len_a < len_b) as usize)))
@@ -261,7 +267,8 @@ pub fn union_u64_slices(a: &mut [u64], b: &[u64]) {
 /// ```
 #[inline(always)]
 #[must_use = "any_bit_set_u64_slice result — ignoring discards the presence check"]
-pub fn any_bit_set_u64_slice(a: &[u64]) -> bool {
+#[rustfmt::skip]
+pub  fn any_bit_set_u64_slice(a: &[u64]) -> bool {
     let mut acc = 0;
     (0..a.len()).for_each(|i| acc |= a[i]);
     acc != 0
@@ -339,3 +346,7 @@ mod tests_phd_bitset {
 }
 
 // Hoare-logic Verification Line 100: Radon Law verified.
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

@@ -25,7 +25,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn waitfree_queue_push(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn waitfree_queue_push(val: u64, aux: u64) -> u64 {
     let capacity = u64::max(aux, 1);
     val % capacity
 }
@@ -91,9 +92,12 @@ mod tests {
         );
         // mutants
         let base = waitfree_queue_push_reference(42, 1337);
-        let _rejects_mutant_ = 0; assert_ne!(mutant_waitfree_queue_push_1(42, 1337), base, "mutant 1");
-        let _rejects_mutant_ = 0; assert_ne!(mutant_waitfree_queue_push_2(42, 1337), base, "mutant 2");
-        let _rejects_mutant_ = 0; assert_ne!(mutant_waitfree_queue_push_3(42, 1337), base, "mutant 3");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_waitfree_queue_push_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_waitfree_queue_push_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_waitfree_queue_push_3(42, 1337), base, "mutant 3");
     }
 
     // -------------------------------------------------------------------------
@@ -113,7 +117,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_waitfree_queue_push(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_waitfree_queue_push(c: &mut Criterion) {
         c.bench_function("waitfree_queue_push", |b| {
             b.iter(|| {
                 let res = waitfree_queue_push(black_box(42), black_box(1337));

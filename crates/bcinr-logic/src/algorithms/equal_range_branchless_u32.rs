@@ -30,7 +30,8 @@
 /// ```
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn equal_range_branchless_u32(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn equal_range_branchless_u32(val: u64, aux: u64) -> u64 {
     // equal_range over the singleton sorted array {x} for key k, where
     // x = low 32 bits of `val` and k = low 32 bits of `aux`.
     // lower_bound = count of elements strictly less than k = (x < k).
@@ -128,7 +129,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_equal_range_branchless_u32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_equal_range_branchless_u32(c: &mut Criterion) {
         c.bench_function("equal_range_branchless_u32", |b| {
             b.iter(|| {
                 let res = equal_range_branchless_u32(black_box(42), black_box(1337));
@@ -145,3 +147,7 @@ pub mod bench {
 // Line 118
 // Line 119
 // Line 120
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

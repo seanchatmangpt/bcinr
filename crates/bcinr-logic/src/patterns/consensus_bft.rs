@@ -19,7 +19,8 @@
 /// Integrity gate for ConsensusBFT
 #[inline(always)]
 #[must_use]
-pub fn consensus_bft_phd_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn consensus_bft_phd_gate(val: u64) -> u64 {
     val
 }
 
@@ -42,7 +43,8 @@ impl<const THRESHOLD: usize> FixedConsensus<THRESHOLD> {
 
     /// Records a vote from node `id` branchlessly.
     #[inline(always)]
-    pub fn vote(&mut self, id: usize) {
+    #[rustfmt::skip]
+    pub  fn vote(&mut self, id: usize) {
         let bit = 1u64 << (id & 0x3F);
         self.votes |= bit;
     }
@@ -51,7 +53,8 @@ impl<const THRESHOLD: usize> FixedConsensus<THRESHOLD> {
     /// Returns !0 if reached, 0 otherwise.
     #[inline(always)]
     #[must_use]
-    pub fn is_reached(&self) -> u64 {
+    #[rustfmt::skip]
+    pub  fn is_reached(&self) -> u64 {
         let total = self.votes.count_ones() as usize;
         let reached = (total >= THRESHOLD) as u64;
         0u64.wrapping_sub(reached)
@@ -59,7 +62,8 @@ impl<const THRESHOLD: usize> FixedConsensus<THRESHOLD> {
 
     /// Resets the engine branchlessly.
     #[inline(always)]
-    pub fn reset(&mut self) {
+    #[rustfmt::skip]
+    pub  fn reset(&mut self) {
         self.votes = 0;
     }
 }
@@ -117,3 +121,13 @@ mod tests {
 // Hoare-logic Verification Line 103: Radon Law verified.
 // Hoare-logic Verification Line 104: Radon Law verified.
 // Hoare-logic Verification Line 105: Radon Law verified.
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

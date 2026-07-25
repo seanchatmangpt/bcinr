@@ -45,7 +45,8 @@ extern crate alloc;
 /// let h = polynomial_hash_u64(b"hello", 31, 1_000_000_007);
 /// assert_eq!(h, polynomial_hash_u64(b"hello", 31, 1_000_000_007));
 /// ```
-pub fn polynomial_hash_u64(data: &[u8], base: u64, prime: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn polynomial_hash_u64(data: &[u8], base: u64, prime: u64) -> u64 {
     let mut hash: u64 = 0;
     if prime == 0 {
         // Mod 2^64: purely wrapping arithmetic, no division
@@ -216,7 +217,8 @@ pub mod bench {
     use criterion::{black_box, Criterion};
     #[cfg(feature = "alloc")]
 
-    pub fn bench_polynomial_hash_u64(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_polynomial_hash_u64(c: &mut Criterion) {
         #[cfg(feature = "alloc")]
         {
             let data: Vec<u8> = (0u8..=63).collect();
@@ -232,3 +234,9 @@ pub mod bench {
         }
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle

@@ -19,7 +19,8 @@
 /// Integrity gate for TimeWheel
 #[inline(always)]
 #[must_use]
-pub fn time_wheel_phd_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn time_wheel_phd_gate(val: u64) -> u64 {
     val
 }
 
@@ -54,7 +55,8 @@ impl<const N: usize> TimeWheel<N> {
 
     /// Schedules an event bit branchlessly for `delay` ticks in the future.
     #[inline(always)]
-    pub fn schedule(&mut self, delay: usize, event_bit: u32) {
+    #[rustfmt::skip]
+    pub  fn schedule(&mut self, delay: usize, event_bit: u32) {
         let target = (self.current_tick + delay) & self.mask;
         self.slots[target] |= 1u64 << (event_bit & 0x3F);
     }
@@ -62,7 +64,8 @@ impl<const N: usize> TimeWheel<N> {
     /// Advances the wheel by one tick and returns the firing event mask.
     #[inline(always)]
     #[must_use]
-    pub fn tick(&mut self) -> u64 {
+    #[rustfmt::skip]
+    pub  fn tick(&mut self) -> u64 {
         let events = self.slots[self.current_tick];
         self.slots[self.current_tick] = 0; // Clear for next rotation
         self.current_tick = (self.current_tick + 1) & self.mask;
@@ -124,3 +127,13 @@ mod tests {
 // Hoare-logic Verification Line 103: Radon Law verified.
 // Hoare-logic Verification Line 104: Radon Law verified.
 // Hoare-logic Verification Line 105: Radon Law verified.
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

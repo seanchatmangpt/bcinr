@@ -370,7 +370,7 @@ fn select_sf(condition: u32, a: SignedFixed, b: SignedFixed) -> SignedFixed {
         mask.select_faults(a.faults(), b.faults()),
     )
 }
-use crate::generated::case_studies::{
+use crate::generated_artifact::case_studies::{
     LensSpec, PackedSemanticState, FACTOR_ACCESS_FREQUENCY, FACTOR_BUSINESS_VALUE,
     FACTOR_DOWNSTREAM_CONSEQUENCE, FACTOR_RECOMPUTATION_COST, FACTOR_RETRIEVAL_DEMAND,
     FACTOR_SCHEDULING_DEMAND, FACTOR_SEARCH_DEMAND, FACTOR_STANDING, FACTOR_VERIFICATION_COST, K,
@@ -503,11 +503,19 @@ const REFUSALS: [StabilityRefusal; 32] = [
 // term is now computed per-leaf via an exact base-q + residual-r scheme (see the
 // `q_floor`/`r_floor`/`leaf_rank` computation in `allocate`) rather than a single
 // rounded value shared by every leaf, which did not sum exactly to 65536 for values
-// of `nl` that do not divide 65536 evenly. The mfw generated-artifact manifest at
-// `generated-artifact/case-studies/cmca_generation_manifest.json` exposes only a
-// `leaf_floor_n_max` dimension (no `leaf_floor_base`/`leaf_floor_remainder` tables),
-// so the formula is computed directly in Rust below rather than sourced from the
-// artifact.
+// of `nl` that do not divide 65536 evenly.
+//
+// As of the 2026-07-20/21 CMCA reconciliation, `generated_artifact::case_studies`
+// DOES expose `LEAF_FLOOR_BASE`/`LEAF_FLOOR_REMAINDER: [u32; LEAF_FLOOR_N_MAX]`
+// tables covering this same q/r split for every `nl` in `1..=LEAF_FLOOR_N_MAX`
+// (correcting an earlier version of this comment, written when the manifest
+// exposed only a `leaf_floor_n_max` dimension with no base/remainder tables).
+// The formula below is intentionally NOT switched to consume those tables yet:
+// doing so has no test coverage today proving `LEAF_FLOOR_BASE[nl-1]`/
+// `LEAF_FLOOR_REMAINDER[nl-1]` agree with this formula beyond the symbol-name
+// diff in `src/generated_artifact/mod.rs`'s module doc, so it is left as a
+// separate, reviewed follow-up rather than bundled into that reconciliation.
+// The formula is computed directly in Rust below.
 
 /// Refusal reasons that can co-occur while producing an [`AllocationOutcome`] — a flag
 /// set, never a lossy single-variant enum, per `authority-and-c3.md` Invariant 2.
@@ -1459,7 +1467,7 @@ fn compute_pi_kq_for_kq(
 /// ```rust
 /// use bcinr_cmca::fixed::NonNegativeFixed;
 /// use bcinr_cmca::allocator::{allocate, AdaptiveUpdate, AdmittedControlState, CertificateReceipt, EnvelopeReceipt, OutcomeReceipt, CertifiedLearning};
-/// use bcinr_cmca::generated::case_studies::{OBJECT_REGISTRY, LENS_REGISTRY, LAMBDA, ETA, N, Q};
+/// use bcinr_cmca::generated_artifact::case_studies::{OBJECT_REGISTRY, LENS_REGISTRY, LAMBDA, ETA, N, Q};
 /// use bcinr_cmca::generated::stability_profile::CERTIFICATE_DIGEST;
 ///
 /// let mut weights = [[NonNegativeFixed::ONE; 2 * Q]; N];
@@ -1941,9 +1949,10 @@ pub fn allocate(
     // leaves under canonical (index) rank. `nl_safe` avoids a divide-by-zero when
     // `nl == 0`; the divided-out value is unused in that case since no `x` has
     // `is_leaf[x]` true, and the defensive zeroing below makes that explicit rather than
-    // incidental. The mfw generated-artifact manifest exposes no
-    // `leaf_floor_base`/`leaf_floor_remainder` tables (only a `leaf_floor_n_max`
-    // dimension), so the formula is computed directly here.
+    // incidental. `generated_artifact::case_studies::{LEAF_FLOOR_BASE, LEAF_FLOOR_REMAINDER}`
+    // now expose an equivalent precomputed table (see the comment above `RefusalSet`
+    // near the top of this file for why it is intentionally not yet consumed here);
+    // the formula is computed directly instead.
     let nl_safe = const_select_u32(nl_is_zero, 1, nl);
     let q_floor = 65536u32 / nl_safe;
     let r_floor = 65536u32 - q_floor * nl_safe;

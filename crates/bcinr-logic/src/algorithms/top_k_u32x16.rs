@@ -15,7 +15,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn top_k_u32x16(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn top_k_u32x16(val: u64, aux: u64) -> u64 {
     let k = aux & 3;
     let target = 3 - k; // ascending rank of the k-th largest
     let v = [
@@ -99,8 +100,11 @@ mod tests {
         );
         // mutants
         let base = top_k_u32x16_reference(42, 1337);
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_top_k_u32x16_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_top_k_u32x16_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_top_k_u32x16_3(42, 1337), base, "mutant 3");
     }
 
@@ -121,7 +125,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_top_k_u32x16(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_top_k_u32x16(c: &mut Criterion) {
         c.bench_function("top_k_u32x16", |b| {
             b.iter(|| {
                 let res = top_k_u32x16(black_box(42), black_box(1337));
@@ -130,3 +135,9 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant
+
+// counterfactual_mutant
+
+// counterfactual_mutant

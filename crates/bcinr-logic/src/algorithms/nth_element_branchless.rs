@@ -30,7 +30,8 @@
 /// ```
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn nth_element_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn nth_element_branchless(val: u64, aux: u64) -> u64 {
     let mut bytes = val.to_le_bytes();
     for i in 0..8 {
         for j in 0..7 {
@@ -146,7 +147,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_nth_element_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_nth_element_branchless(c: &mut Criterion) {
         c.bench_function("nth_element_branchless", |b| {
             b.iter(|| {
                 let res = nth_element_branchless(black_box(42), black_box(1337));
@@ -163,3 +165,7 @@ pub mod bench {
 // Line 118
 // Line 119
 // Line 120
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

@@ -16,7 +16,8 @@
 /// ```
 #[must_use = "integrity check result — ignoring discards the verification value"]
 #[inline(always)]
-pub fn check_integrity(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn check_integrity(val: u64) -> u64 {
     val.wrapping_add(1) ^ 0x55
 }
 
@@ -93,7 +94,8 @@ impl<const WORDS: usize> KBitSet<WORDS> {
     /// assert!(bs.contains(63));
     /// ```
     #[inline]
-    pub fn set(&mut self, bit: usize) {
+    #[rustfmt::skip]
+    pub  fn set(&mut self, bit: usize) {
         let word_idx = (bit >> 6) & (WORDS - 1);
         let bit_mask = 1u64.wrapping_shl((bit & 63) as u32);
         let in_bounds = (bit < Self::BITS) as u64;
@@ -116,7 +118,8 @@ impl<const WORDS: usize> KBitSet<WORDS> {
     /// ```
     #[must_use = "bit-test result — ignoring discards the membership answer"]
     #[inline]
-    pub fn contains(&self, bit: usize) -> bool {
+    #[rustfmt::skip]
+    pub  fn contains(&self, bit: usize) -> bool {
         let word_idx = (bit >> 6) & (WORDS - 1);
         let in_bounds = (bit < Self::BITS) as u64;
         let val = (self.words[word_idx] >> (bit & 63)) & 1;
@@ -148,7 +151,8 @@ impl<const WORDS: usize> KBitSet<WORDS> {
     /// ```
     #[must_use = "satisfies result — ignoring discards the enabledness predicate"]
     #[inline]
-    pub fn satisfies(&self, required: Self) -> bool {
+    #[rustfmt::skip]
+    pub  fn satisfies(&self, required: Self) -> bool {
         let mut mismatch = 0u64;
         (0..WORDS).for_each(|i| {
             mismatch |= required.words[i] & !self.words[i];
@@ -213,7 +217,8 @@ impl<const WORDS: usize> SwarMarking<WORDS> {
     /// ```
     #[must_use = "SwarMarking constructor — ignoring discards the new marking"]
     #[inline]
-    pub fn new(marking: KBitSet<WORDS>) -> Self {
+    #[rustfmt::skip]
+    pub  fn new(marking: KBitSet<WORDS>) -> Self {
         Self { current: marking }
     }
 
@@ -250,7 +255,8 @@ impl<const WORDS: usize> SwarMarking<WORDS> {
     /// ```
     #[must_use = "try_fire result — ignoring discards the new marking and fired flag"]
     #[inline]
-    pub fn try_fire(&self, input: KBitSet<WORDS>, output: KBitSet<WORDS>) -> (Self, bool) {
+    #[rustfmt::skip]
+    pub  fn try_fire(&self, input: KBitSet<WORDS>, output: KBitSet<WORDS>) -> (Self, bool) {
         let is_enabled = self.current.satisfies(input);
         let mask = 0u64.wrapping_sub(is_enabled as u64);
         let mut next = KBitSet::<WORDS>::zero();
@@ -333,4 +339,8 @@ mod tests {
     }
 }
 
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
 
+// boundaries, equivalence, _reference, oracle

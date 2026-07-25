@@ -25,7 +25,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn topological_sort_step_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn topological_sort_step_branchless(val: u64, aux: u64) -> u64 {
     val & !aux
 }
 
@@ -122,7 +123,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_topological_sort_step_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_topological_sort_step_branchless(c: &mut Criterion) {
         c.bench_function("topological_sort_step_branchless", |b| {
             b.iter(|| {
                 let res = topological_sort_step_branchless(black_box(42), black_box(1337));
@@ -131,3 +133,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

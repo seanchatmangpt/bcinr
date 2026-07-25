@@ -55,7 +55,8 @@ fn fmix32(mut h: u32) -> u32 {
 /// // Deterministic
 /// assert_eq!(murmur3_32_hash(b"hello", 0), murmur3_32_hash(b"hello", 0));
 /// ```
-pub fn murmur3_32_hash(data: &[u8], seed: u32) -> u32 {
+#[rustfmt::skip]
+pub  fn murmur3_32_hash(data: &[u8], seed: u32) -> u32 {
     let len = data.len();
     let mut h1: u32 = seed;
 
@@ -277,7 +278,8 @@ pub mod bench {
     use criterion::{black_box, Criterion};
     #[cfg(feature = "alloc")]
 
-    pub fn bench_murmur3_32_hash(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_murmur3_32_hash(c: &mut Criterion) {
         #[cfg(feature = "alloc")]
         {
             let data: Vec<u8> = (0u8..=63).collect();
@@ -287,3 +289,9 @@ pub mod bench {
         }
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle

@@ -1,3 +1,4 @@
+#![allow(clippy::cargo_common_metadata)]
 //! # CMCA: Covariance Monitoring and Calibration Assessment
 //!
 //! `bcinr-cmca` is an authoritative systems library implementing deterministic,
@@ -112,46 +113,40 @@ pub mod stability;
 #[cfg(test)]
 pub mod artifact;
 
-// mfw-producer-sourced artifact modules, wired alongside (not in place of)
-// `generated::case_studies` / `generated::generalization`.
+// mfw-producer-sourced artifact modules (fresh Gamma_CMCA output, generator
+// v2.0.0-mfw), reachable as `bcinr_cmca::generated_artifact::case_studies` /
+// `bcinr_cmca::generated_artifact::generalization`. This is now the live,
+// unconditional (default-features) path that `allocator.rs`/`observatory.rs`
+// and the test suite import from.
 //
-// NOTE ON PLACEMENT: the task for this phase asked for this wiring to live in
-// `src/generated/mod.rs`. That edit is BLOCKED by the repo's own Level-1 gate
-// `scripts/gates/block-generated-edit.sh` (invariant: "the generator ... is
-// the only authoritative producer of files under
-// crates/bcinr-cmca/src/generated/" per cmca/rdf-generation.md), which fires
-// on any path containing `crates/bcinr-cmca/src/generated/` regardless of
-// content. Per this task's hard constraints ("No ... gate skipping"), that
-// gate is not bypassed. The modules are instead declared here, at crate
-// root, reachable as `bcinr_cmca::generated_artifact::case_studies` /
-// `bcinr_cmca::generated_artifact::generalization` -- functionally
-// equivalent exposure, different path. Updating `src/generated/mod.rs`
-// itself remains a pending action item requiring either a gate-policy
-// change (out of scope for this task/role) or being performed by a role
-// authorized to edit that directory.
+// RECONCILIATION HISTORY (2026-07-20/21): earlier revisions of this comment
+// claimed compiling this module unconditionally produced 611 errors (a
+// `SignedFixed::from_bits`/private-field mismatch against `src/fixed.rs`'s
+// real API). That claim was stale even at the time it was checked in: a
+// clean-rebuild (`cargo clean -p bcinr-cmca && cargo build -p bcinr-cmca
+// --features generated_artifact_pending`) and a grep of both
+// `generated-artifact/*/cmca_generated.rs` files for `from_bits(` found zero
+// matches -- every call site already used `NonNegativeFixed::from_value_bits`,
+// which `src/fixed.rs` has always exposed. There was no real API mismatch to
+// fix; the module built cleanly (0 errors, 0 warnings) before this
+// reconciliation, gated only behind the now-removed `generated_artifact_pending`
+// feature. That feature flag has been removed from `Cargo.toml` and this
+// module is unconditionally compiled.
 //
-// See `src/generated/mod.rs`'s header comment attempt (not applied, blocked)
-// and this module's own doc comment for the full old-symbol -> new-symbol
-// mapping table (CORRESPONDENCE_REQUIRED / NEW_LAW_REQUIRED classification
-// per `tests/fixtures/PRE_MIGRATION_BASELINE.md`).
-//
-// BLOCKED (not gate-skipped, a genuine API mismatch): the mfw producer's
-// `cmca_generated.rs` output calls constructors this crate's current
-// `src/fixed.rs` does not expose under those names (observed:
-// `SignedFixed::from_bits` / a private-field literal-struct pattern the
-// producer emits vs. this crate's actual `NonNegativeFixed`/`SignedFixed`
-// API surface, e.g. `from_value_bits`/`from_parts`/`from_num`). Building
-// `cargo build -p bcinr-cmca` with this module unconditionally compiled
-// produces 611 errors (506x E0599 unresolved associated fn/const, 102x
-// E0616 private-field access, plus a few E0433/E0425), all inside the two
-// `generated-artifact/*/cmca_generated.rs` files. `src/fixed.rs` is owned by
-// a sibling task in this phase and is not touched here, so this module is
-// gated behind the (default-off) `generated_artifact_pending` feature until
-// that API surface is reconciled -- this keeps `cargo build -p bcinr-cmca`
-// (default features) green while still checking-in the wiring code per this
-// task's "proceed ... note this as a pending integration point, do not
-// block on it" instruction.
-#[cfg(feature = "generated_artifact_pending")]
+// NOTE ON PLACEMENT: this module is declared here rather than folded into
+// `src/generated/mod.rs` (which still declares the superseded
+// `crate::generated::case_studies` / `crate::generated::generalization`,
+// alongside the still-live `crate::generated::stability_profile`) because
+// `src/generated/` carries a repo-level invariant (`cmca/rdf-generation.md`)
+// that only the generator produces files there, enforced for interactive
+// sessions by `scripts/gates/block-generated-edit.sh`. Consolidating the two
+// module trees is a separate, larger structural change than this
+// reconciliation pass; `crate::generated::case_studies` is dead code (no
+// production or test consumer imports it after this pass -- see its own
+// header comment) but left in place rather than deleted, since deleting it
+// touches the same gate-protected directory. See
+// `src/generated_artifact/mod.rs`'s module doc for the old-symbol ->
+// new-symbol correspondence table this reconciliation verified.
 pub mod generated_artifact;
 
 pub use allocator::StabilityRefusal;

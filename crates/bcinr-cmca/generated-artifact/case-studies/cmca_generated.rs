@@ -10,8 +10,10 @@ pub const Q: usize = 4;
 pub const LEAF_FLOOR_N_MAX: usize = 8;
 
 pub const GENERATOR_VERSION: &str = "v2.0.0-mfw";
-pub const RDF_INPUT_DIGEST: &str = "blake3:9e8c346a943e27085e67d9fc15aa506ad59bb7c6986ff4e44e12e1b7ecf99253";
-pub const GENERATOR_SOURCE_DIGEST: &str = "blake3:a9e0941502600b62551a9bcecf4220428f6149ecddf22b1b8908e548026fbcf4";
+pub const RDF_INPUT_DIGEST: &str =
+    "blake3:9e8c346a943e27085e67d9fc15aa506ad59bb7c6986ff4e44e12e1b7ecf99253";
+pub const GENERATOR_SOURCE_DIGEST: &str =
+    "blake3:a9e0941502600b62551a9bcecf4220428f6149ecddf22b1b8908e548026fbcf4";
 pub const SCHEMA_VERSION: u32 = 1;
 pub const FACTOR_ACCESS_FREQUENCY: usize = 0;
 pub const FACTOR_ACCESS_FREQUENCY_IRI: &str = "cmca:accessFrequency";
@@ -65,7 +67,8 @@ pub const OBJECT_OBJ__SINGLE: usize = 6;
 pub const OBJECT_OBJ__SINGLE_IRI: &str = "cmca:Obj_Single";
 pub const OBJECT_OBJ__VALUE: usize = 7;
 pub const OBJECT_OBJ__VALUE_IRI: &str = "cmca:Obj_Value";
-pub const FORMULA_UNIFORM_LEAF_FLOOR: &str = "F_i = 1[i in Leaves] / |Leaves|  (for i in Leaves; F_i = 0 for i not in Leaves)";
+pub const FORMULA_UNIFORM_LEAF_FLOOR: &str =
+    "F_i = 1[i in Leaves] / |Leaves|  (for i in Leaves; F_i = 0 for i not in Leaves)";
 pub const FORMULA_UNIFORM_LEAF_FLOOR_Q16_RESIDUAL: &str = "q = floor(65536 / n_leaves); r = 65536 - q * n_leaves; the first r leaves under canonical rank each receive q + 1 raw Q16.16 units, the remaining (n_leaves - r) leaves each receive q raw units; q * n_leaves + r = 65536 exactly (exact conservation, no residual rounding error).";
 
 #[derive(Copy, Clone, Debug)]
@@ -83,10 +86,30 @@ pub struct LensSpec {
 pub static ETA: NonNegativeFixed = NonNegativeFixed::from_value_bits(32768); // 0.5
 
 pub static LAMBDA: [[NonNegativeFixed; Q]; K] = [
-    [NonNegativeFixed::from_value_bits(26214), NonNegativeFixed::from_value_bits(19661), NonNegativeFixed::from_value_bits(13107), NonNegativeFixed::from_value_bits(6554)], // MeasureCache
-    [NonNegativeFixed::from_value_bits(6554), NonNegativeFixed::from_value_bits(13107), NonNegativeFixed::from_value_bits(19661), NonNegativeFixed::from_value_bits(26214)], // MeasureSearch
-    [NonNegativeFixed::from_value_bits(16384), NonNegativeFixed::from_value_bits(16384), NonNegativeFixed::from_value_bits(16384), NonNegativeFixed::from_value_bits(16384)], // MeasureRetrieval
-    [NonNegativeFixed::from_value_bits(32768), NonNegativeFixed::from_value_bits(0), NonNegativeFixed::from_value_bits(32768), NonNegativeFixed::from_value_bits(0)], // MeasureScheduling
+    [
+        NonNegativeFixed::from_value_bits(26214),
+        NonNegativeFixed::from_value_bits(19661),
+        NonNegativeFixed::from_value_bits(13107),
+        NonNegativeFixed::from_value_bits(6554),
+    ], // MeasureCache
+    [
+        NonNegativeFixed::from_value_bits(6554),
+        NonNegativeFixed::from_value_bits(13107),
+        NonNegativeFixed::from_value_bits(19661),
+        NonNegativeFixed::from_value_bits(26214),
+    ], // MeasureSearch
+    [
+        NonNegativeFixed::from_value_bits(16384),
+        NonNegativeFixed::from_value_bits(16384),
+        NonNegativeFixed::from_value_bits(16384),
+        NonNegativeFixed::from_value_bits(16384),
+    ], // MeasureRetrieval
+    [
+        NonNegativeFixed::from_value_bits(32768),
+        NonNegativeFixed::from_value_bits(0),
+        NonNegativeFixed::from_value_bits(32768),
+        NonNegativeFixed::from_value_bits(0),
+    ], // MeasureScheduling
 ];
 
 pub static OBJECT_REGISTRY: [PackedSemanticState; N] = [
@@ -97,12 +120,12 @@ pub static OBJECT_REGISTRY: [PackedSemanticState; N] = [
             NonNegativeFixed::from_value_bits(32768), // accessFrequency: 0.5
             NonNegativeFixed::from_value_bits(655360), // businessValue: 10.0
             NonNegativeFixed::from_value_bits(58982), // recomputationCost: 0.9
-            NonNegativeFixed::from_value_bits(0), // retrievalDemand: 0.0
-            NonNegativeFixed::from_value_bits(0), // schedulingDemand: 0.0
-            NonNegativeFixed::from_value_bits(0), // searchDemand: 0.0
+            NonNegativeFixed::from_value_bits(0),     // retrievalDemand: 0.0
+            NonNegativeFixed::from_value_bits(0),     // schedulingDemand: 0.0
+            NonNegativeFixed::from_value_bits(0),     // searchDemand: 0.0
             NonNegativeFixed::from_value_bits(65536), // standing: 1.0
             NonNegativeFixed::from_value_bits(65536), // validity: 1.0
-            NonNegativeFixed::from_value_bits(6554), // verificationCost: 0.1
+            NonNegativeFixed::from_value_bits(6554),  // verificationCost: 0.1
             NonNegativeFixed::from_value_bits(655360), // downstreamConsequence: 10.0
         ],
     },
@@ -112,10 +135,10 @@ pub static OBJECT_REGISTRY: [PackedSemanticState; N] = [
         factors: [
             NonNegativeFixed::from_value_bits(32768), // accessFrequency: 0.5
             NonNegativeFixed::from_value_bits(655360), // businessValue: 10.0
-            NonNegativeFixed::from_value_bits(6554), // recomputationCost: 0.1
-            NonNegativeFixed::from_value_bits(0), // retrievalDemand: 0.0
-            NonNegativeFixed::from_value_bits(0), // schedulingDemand: 0.0
-            NonNegativeFixed::from_value_bits(0), // searchDemand: 0.0
+            NonNegativeFixed::from_value_bits(6554),  // recomputationCost: 0.1
+            NonNegativeFixed::from_value_bits(0),     // retrievalDemand: 0.0
+            NonNegativeFixed::from_value_bits(0),     // schedulingDemand: 0.0
+            NonNegativeFixed::from_value_bits(0),     // searchDemand: 0.0
             NonNegativeFixed::from_value_bits(65536), // standing: 1.0
             NonNegativeFixed::from_value_bits(65536), // validity: 1.0
             NonNegativeFixed::from_value_bits(58982), // verificationCost: 0.9
@@ -127,7 +150,7 @@ pub static OBJECT_REGISTRY: [PackedSemanticState; N] = [
         id: 2,
         factors: [
             NonNegativeFixed::from_value_bits(32768), // accessFrequency: 0.5
-            NonNegativeFixed::from_value_bits(0), // businessValue: 0.0
+            NonNegativeFixed::from_value_bits(0),     // businessValue: 0.0
             NonNegativeFixed::from_value_bits(32768), // recomputationCost: 0.5
             NonNegativeFixed::from_value_bits(32768), // retrievalDemand: 0.5
             NonNegativeFixed::from_value_bits(32768), // schedulingDemand: 0.5
@@ -143,7 +166,7 @@ pub static OBJECT_REGISTRY: [PackedSemanticState; N] = [
         id: 3,
         factors: [
             NonNegativeFixed::from_value_bits(32768), // accessFrequency: 0.5
-            NonNegativeFixed::from_value_bits(0), // businessValue: 0.0
+            NonNegativeFixed::from_value_bits(0),     // businessValue: 0.0
             NonNegativeFixed::from_value_bits(32768), // recomputationCost: 0.5
             NonNegativeFixed::from_value_bits(32768), // retrievalDemand: 0.5
             NonNegativeFixed::from_value_bits(32768), // schedulingDemand: 0.5
@@ -159,7 +182,7 @@ pub static OBJECT_REGISTRY: [PackedSemanticState; N] = [
         id: 4,
         factors: [
             NonNegativeFixed::from_value_bits(32768), // accessFrequency: 0.5
-            NonNegativeFixed::from_value_bits(0), // businessValue: 0.0
+            NonNegativeFixed::from_value_bits(0),     // businessValue: 0.0
             NonNegativeFixed::from_value_bits(32768), // recomputationCost: 0.5
             NonNegativeFixed::from_value_bits(32768), // retrievalDemand: 0.5
             NonNegativeFixed::from_value_bits(32768), // schedulingDemand: 0.5
@@ -175,7 +198,7 @@ pub static OBJECT_REGISTRY: [PackedSemanticState; N] = [
         id: 5,
         factors: [
             NonNegativeFixed::from_value_bits(32768), // accessFrequency: 0.5
-            NonNegativeFixed::from_value_bits(0), // businessValue: 0.0
+            NonNegativeFixed::from_value_bits(0),     // businessValue: 0.0
             NonNegativeFixed::from_value_bits(32768), // recomputationCost: 0.5
             NonNegativeFixed::from_value_bits(32768), // retrievalDemand: 0.5
             NonNegativeFixed::from_value_bits(32768), // schedulingDemand: 0.5
@@ -194,8 +217,8 @@ pub static OBJECT_REGISTRY: [PackedSemanticState; N] = [
             NonNegativeFixed::from_value_bits(6553600), // businessValue: 100.0
             NonNegativeFixed::from_value_bits(52429), // recomputationCost: 0.8
             NonNegativeFixed::from_value_bits(58982), // retrievalDemand: 0.9
-            NonNegativeFixed::from_value_bits(0), // schedulingDemand: 0.0
-            NonNegativeFixed::from_value_bits(6554), // searchDemand: 0.1
+            NonNegativeFixed::from_value_bits(0),     // schedulingDemand: 0.0
+            NonNegativeFixed::from_value_bits(6554),  // searchDemand: 0.1
             NonNegativeFixed::from_value_bits(65536), // standing: 1.0
             NonNegativeFixed::from_value_bits(65536), // validity: 1.0
             NonNegativeFixed::from_value_bits(52429), // verificationCost: 0.8
@@ -222,20 +245,33 @@ pub static OBJECT_REGISTRY: [PackedSemanticState; N] = [
 
 pub static LENS_REGISTRY: [LensSpec; Q] = [
     // LensExploitation (cmca:LensExploitation)
-    LensSpec { id: 0, q: SignedFixed::from_value_bits(131072) },
+    LensSpec {
+        id: 0,
+        q: SignedFixed::from_value_bits(131072),
+    },
     // LensProportional (cmca:LensProportional)
-    LensSpec { id: 1, q: SignedFixed::from_value_bits(65536) },
+    LensSpec {
+        id: 1,
+        q: SignedFixed::from_value_bits(65536),
+    },
     // LensCoverage (cmca:LensCoverage)
-    LensSpec { id: 2, q: SignedFixed::from_value_bits(0) },
+    LensSpec {
+        id: 2,
+        q: SignedFixed::from_value_bits(0),
+    },
     // LensRare (cmca:LensRare)
-    LensSpec { id: 3, q: SignedFixed::from_value_bits(-65536) },
+    LensSpec {
+        id: 3,
+        q: SignedFixed::from_value_bits(-65536),
+    },
 ];
 
 // Base-q + residual-r Q16.16 uniform leaf-floor projection tables (replaces the
 // rounded-reciprocal LEAF_RECIP table). Index i (0-based) corresponds to n_leaves = i + 1.
 // Invariant checked at generation time (not emitted as a runtime assert): for every
 // n_leaves in [1, LEAF_FLOOR_N_MAX], base_q * n_leaves + residual_r == 65536 exactly.
-pub static LEAF_FLOOR_BASE: [u32; LEAF_FLOOR_N_MAX] = [65536, 32768, 21845, 16384, 13107, 10922, 9362, 8192];
+pub static LEAF_FLOOR_BASE: [u32; LEAF_FLOOR_N_MAX] =
+    [65536, 32768, 21845, 16384, 13107, 10922, 9362, 8192];
 pub static LEAF_FLOOR_REMAINDER: [u32; LEAF_FLOOR_N_MAX] = [0, 0, 1, 0, 1, 4, 2, 0];
 
 // Macro generation

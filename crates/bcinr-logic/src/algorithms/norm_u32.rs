@@ -19,7 +19,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn norm_u32(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn norm_u32(val: u64, aux: u64) -> u64 {
     let x = (val & 0xFFFFFFFF) as u128;
     let y = (val >> 32) as u128;
     // Branchless 2D Euclidean magnitude: floor(sqrt(x^2 + y^2)).
@@ -130,7 +131,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_norm_u32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_norm_u32(c: &mut Criterion) {
         c.bench_function("norm_u32", |b| {
             b.iter(|| {
                 let res = norm_u32(black_box(42), black_box(1337));
@@ -139,3 +141,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! Branchless Legal Move Generation using Kogge-Stone Parallel Prefix
 //! and compile-time bitboard masks.
 //! CC = 1, 0 allocations, #![no_std].

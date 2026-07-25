@@ -27,7 +27,8 @@
 // { a ∈ [u32; 4], b ∈ [u32; 4], a sorted, b sorted }
 // After Batcher odd-even merge (8 comparators):
 // { result sorted ∧ multiset(result) = multiset(a) ∪ multiset(b) }
-pub fn merge_sorted_u32x8(a: [u32; 4], b: [u32; 4]) -> [u32; 8] {
+#[rustfmt::skip]
+pub  fn merge_sorted_u32x8(a: [u32; 4], b: [u32; 4]) -> [u32; 8] {
     // Batcher's odd-even merge for two sorted sequences of length 4.
     // Place a in positions 0..4 and b in positions 4..8, then apply the
     // odd-even merge network which correctly merges two adjacent sorted halves.
@@ -177,9 +178,20 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_merge_sorted_u32x8(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_merge_sorted_u32x8(c: &mut Criterion) {
         c.bench_function("merge_sorted_u32x8", |b| {
             b.iter(|| merge_sorted_u32x8(black_box([1, 3, 5, 7]), black_box([2, 4, 6, 8])))
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

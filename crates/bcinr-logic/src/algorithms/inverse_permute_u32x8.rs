@@ -23,7 +23,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn inverse_permute_u32x8(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn inverse_permute_u32x8(val: u64, aux: u64) -> u64 {
     // Invert an 8-element permutation stored as 8 nibbles (each value masked to 0..7):
     // for source index i mapping to position p_i, the inverse places i at nibble p_i.
     // Fully unrolled to keep the path branch- and loop-free.
@@ -157,7 +158,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_inverse_permute_u32x8(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_inverse_permute_u32x8(c: &mut Criterion) {
         c.bench_function("inverse_permute_u32x8", |b| {
             b.iter(|| {
                 let res = inverse_permute_u32x8(black_box(42), black_box(1337));
@@ -200,3 +202,7 @@ pub mod bench {
 //   Pure function ⇒ deterministic across runs ⇒ replayable from receipt chain.
 // Cross-references:
 // -----------------------------------------------------------------------------
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

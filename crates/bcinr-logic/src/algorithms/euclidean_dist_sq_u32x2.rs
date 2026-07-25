@@ -22,7 +22,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn euclidean_dist_sq_u32x2(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn euclidean_dist_sq_u32x2(val: u64, aux: u64) -> u64 {
     let dx = (val as u32).abs_diff(aux as u32) as u64;
     let dy = ((val >> 32) as u32).abs_diff((aux >> 32) as u32) as u64;
     dx.wrapping_mul(dx).wrapping_add(dy.wrapping_mul(dy))
@@ -112,7 +113,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_euclidean_dist_sq_u32x2(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_euclidean_dist_sq_u32x2(c: &mut Criterion) {
         c.bench_function("euclidean_dist_sq_u32x2", |b| {
             b.iter(|| {
                 let res = euclidean_dist_sq_u32x2(black_box(42), black_box(1337));
@@ -121,3 +123,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

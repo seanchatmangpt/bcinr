@@ -111,8 +111,8 @@ fn generalization_numeric_payload_matches_old_lawful_output_exactly() {
     // cmca:measureIndex order (Cache=0, Search=1, Retrieval=2, Scheduling=3,
     // GeneralizationProof=4 per generalization.ttl), not the old fixture's
     // incidental alphabetical order.
-    let artifact_text = fs::read_to_string(NEW_GENERALIZATION)
-        .expect("new generalization artifact must exist");
+    let artifact_text =
+        fs::read_to_string(NEW_GENERALIZATION).expect("new generalization artifact must exist");
     let expected_measure_order = [
         "MeasureCache",
         "MeasureSearch",
@@ -122,7 +122,11 @@ fn generalization_numeric_payload_matches_old_lawful_output_exactly() {
     ];
     let mut found: Vec<(usize, &str)> = expected_measure_order
         .iter()
-        .filter_map(|name| artifact_text.find(&format!("// {name}")).map(|idx| (idx, *name)))
+        .filter_map(|name| {
+            artifact_text
+                .find(&format!("// {name}"))
+                .map(|idx| (idx, *name))
+        })
         .collect();
     found.sort_by_key(|(idx, _)| *idx);
     let actual_order: Vec<&str> = found.into_iter().map(|(_, name)| name).collect();

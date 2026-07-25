@@ -23,7 +23,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn insertion_sort_branchless_fixed(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn insertion_sort_branchless_fixed(val: u64, aux: u64) -> u64 {
     // Sorts the 8 bytes of `val` ascending. Branchless and loop-free: each
     // byte's destination index is its stable rank = (# bytes strictly less)
     // + (# equal bytes at an earlier position). Computed by fully unrolled
@@ -198,7 +199,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_insertion_sort_branchless_fixed(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_insertion_sort_branchless_fixed(c: &mut Criterion) {
         c.bench_function("insertion_sort_branchless_fixed", |b| {
             b.iter(|| {
                 let res = insertion_sort_branchless_fixed(black_box(42), black_box(1337));
@@ -241,3 +243,7 @@ pub mod bench {
 //   Pure function ⇒ deterministic across runs ⇒ replayable from receipt chain.
 // Cross-references:
 // -----------------------------------------------------------------------------
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

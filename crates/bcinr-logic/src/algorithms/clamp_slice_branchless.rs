@@ -30,7 +30,8 @@
 /// ```
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn clamp_slice_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn clamp_slice_branchless(val: u64, aux: u64) -> u64 {
     let min = aux >> 32;
     let max = aux & 0xFFFFFFFF;
     (val.max(min)).min(max)
@@ -141,7 +142,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_clamp_slice_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_clamp_slice_branchless(c: &mut Criterion) {
         c.bench_function("clamp_slice_branchless", |b| {
             b.iter(|| {
                 let res = clamp_slice_branchless(black_box(42), black_box(1337));
@@ -158,3 +160,7 @@ pub mod bench {
 // Line 118
 // Line 119
 // Line 120
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

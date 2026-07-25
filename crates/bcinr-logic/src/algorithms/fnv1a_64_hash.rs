@@ -36,7 +36,8 @@ extern crate alloc;
 /// // Known vector: "a" => 0xaf63dc4c8601ec8c
 /// assert_eq!(fnv1a_64_hash(b"a"), 0xaf63dc4c8601ec8c);
 /// ```
-pub fn fnv1a_64_hash(data: &[u8]) -> u64 {
+#[rustfmt::skip]
+pub  fn fnv1a_64_hash(data: &[u8]) -> u64 {
     const OFFSET_BASIS: u64 = 0xcbf29ce484222325;
     const PRIME: u64 = 0x00000100000001b3;
 
@@ -227,7 +228,8 @@ pub mod bench {
     use criterion::{black_box, Criterion};
     #[cfg(feature = "alloc")]
 
-    pub fn bench_fnv1a_64_hash(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_fnv1a_64_hash(c: &mut Criterion) {
         #[cfg(feature = "alloc")]
         {
             let data: Vec<u8> = (0u8..=63).collect();
@@ -240,3 +242,9 @@ pub mod bench {
         }
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle

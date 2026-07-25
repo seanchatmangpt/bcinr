@@ -6,7 +6,7 @@
     feature = "mutant_5"
 )))]
 
-use bcinr_cmca::fixed::{CanonicalMask, NonNegativeFixed, SignedFixed};
+use bcinr_cmca::fixed::NonNegativeFixed;
 use bcinr_cmca::observatory::{
     evaluate_calibration, MeasurementArtifact, ModeDelta, ObservatoryFlag, SupportStanding,
 };

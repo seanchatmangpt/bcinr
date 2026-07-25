@@ -10,8 +10,8 @@ use bcinr_cmca::allocator::{
     allocate, AdaptiveUpdate, AdmittedControlState, CertificateReceipt, CertifiedLearning,
     EnvelopeReceipt, OutcomeReceipt, RefusalSet, StabilityRefusal,
 };
-use bcinr_cmca::fixed::{CanonicalMask, NonNegativeFixed, SignedFixed};
-use bcinr_cmca::generated::case_studies::{ETA, LAMBDA, LENS_REGISTRY, N, OBJECT_REGISTRY, Q};
+use bcinr_cmca::fixed::NonNegativeFixed;
+use bcinr_cmca::generated_artifact::case_studies::{ETA, LAMBDA, LENS_REGISTRY, N, OBJECT_REGISTRY, Q};
 
 fn get_proof() -> Option<AdaptiveUpdate<CertifiedLearning>> {
     AdaptiveUpdate::admit_adaptive_update(
@@ -24,7 +24,6 @@ fn get_proof() -> Option<AdaptiveUpdate<CertifiedLearning>> {
         CertifiedLearning::admit_learning(),
     )
 }
-use bcinr_cmca::generated::generalization as gen;
 use bcinr_cmca::generated::stability_profile::CERTIFICATE_DIGEST;
 
 #[test]

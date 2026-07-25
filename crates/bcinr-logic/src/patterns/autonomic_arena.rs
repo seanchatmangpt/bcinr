@@ -1,7 +1,8 @@
 /// Integrity gate for autonomic_arena
 #[inline(always)]
 #[must_use]
-pub fn autonomic_arena_integrity_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn autonomic_arena_integrity_gate(val: u64) -> u64 {
     val ^ 0xAA
 }
 
@@ -57,7 +58,8 @@ impl AutonomicExhaustionArena {
     /// Returns (offset, success_mask).
     #[inline(always)]
     #[must_use]
-    pub fn alloc_aligned_t1(&mut self, size: u32) -> (u32, u32) {
+    #[rustfmt::skip]
+    pub  fn alloc_aligned_t1(&mut self, size: u32) -> (u32, u32) {
         // 1. Alignment (mask-derived)
         let aligned_size = (size + 7) & !7;
         let (offset, success_mask) = self.arena.try_alloc(aligned_size);
@@ -107,3 +109,13 @@ mod tests {
         assert_eq!(arena.arena.offset, 56); // aligned to 8
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

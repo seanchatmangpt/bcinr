@@ -31,7 +31,8 @@ pub struct LockFreeMpmcRing<T, const N: usize> {
 }
 
 impl<T: Default + Copy, const N: usize> LockFreeMpmcRing<T, N> {
-    pub fn new_checked() -> Result<Self, &'static str> {
+    #[rustfmt::skip]
+    pub  fn new_checked() -> Result<Self, &'static str> {
         if !N.is_power_of_two() {
             return Err("capacity N must be a power of two");
         }
@@ -118,7 +119,8 @@ impl<T: Default + Copy, const N: usize> LockFreeMpmcRing<T, N> {
     ///                { if CAS failed: value discarded, next attempt uses new head }
     /// ```
     #[inline(always)]
-    pub fn push_t1(&self, val: T) -> u32 {
+    #[rustfmt::skip]
+    pub  fn push_t1(&self, val: T) -> u32 {
         let mut h = self.head.load(Ordering::Relaxed);
         let mut success = 0u32;
         let mut dummy = T::default();
@@ -243,7 +245,8 @@ impl<T: Default + Copy, const N: usize> LockFreeMpmcRing<T, N> {
     ///                { if CAS failed: result is dummy, next attempt uses new tail }
     /// ```
     #[inline(always)]
-    pub fn pop_t1(&self) -> (Option<T>, u32) {
+    #[rustfmt::skip]
+    pub  fn pop_t1(&self) -> (Option<T>, u32) {
         let mut t = self.tail.load(Ordering::Relaxed);
         let mut success = 0u32;
         let mut result = T::default();
@@ -327,3 +330,9 @@ mod tests_phd_mpmc {
 // 3
 // 4
 // 5
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle

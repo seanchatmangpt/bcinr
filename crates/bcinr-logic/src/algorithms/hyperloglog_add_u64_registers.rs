@@ -27,7 +27,8 @@
 /// hyperloglog_add_u64_registers(&mut regs, 0xAAAA_BBBB_CCCC_DDDDu64, b);
 /// assert!(regs.iter().any(|&r| r > 0));
 /// ```
-pub fn hyperloglog_add_u64_registers(registers: &mut [u8], hash: u64, b: u32) {
+#[rustfmt::skip]
+pub  fn hyperloglog_add_u64_registers(registers: &mut [u8], hash: u64, b: u32) {
     // Select register index from top b bits.
     let idx = (hash >> (64 - b)) as usize;
     // Remaining bits for rank computation.
@@ -209,7 +210,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_hyperloglog_add_u64_registers(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_hyperloglog_add_u64_registers(c: &mut Criterion) {
         const B: u32 = 8;
         const M: usize = 1 << B;
         let mut regs = [0u8; M];
@@ -224,3 +226,13 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant
+
+// counterfactual_mutant
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

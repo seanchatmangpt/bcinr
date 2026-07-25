@@ -19,7 +19,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn morton_encode_2d_u32(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn morton_encode_2d_u32(val: u64, aux: u64) -> u64 {
     let mut x = val & 0xFFFFFFFF;
     x = (x ^ (x << 16)) & 0x0000ffff0000ffff;
     x = (x ^ (x << 8)) & 0x00ff00ff00ff00ff;
@@ -127,7 +128,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_morton_encode_2d_u32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_morton_encode_2d_u32(c: &mut Criterion) {
         c.bench_function("morton_encode_2d_u32", |b| {
             b.iter(|| {
                 let res = morton_encode_2d_u32(black_box(42), black_box(1337));
@@ -136,3 +138,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

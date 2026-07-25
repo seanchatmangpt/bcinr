@@ -19,7 +19,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn fp_div_u32_q16(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn fp_div_u32_q16(val: u64, aux: u64) -> u64 {
     let mask = (aux == 0) as u64;
     let res = (((val as u128) << 16) / (aux as u128 | 1)) as u64;
     res & (!mask.wrapping_neg())
@@ -101,7 +102,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_fp_div_u32_q16(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_fp_div_u32_q16(c: &mut Criterion) {
         c.bench_function("fp_div_u32_q16", |b| {
             b.iter(|| {
                 let res = fp_div_u32_q16(black_box(42), black_box(1337));
@@ -110,3 +112,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

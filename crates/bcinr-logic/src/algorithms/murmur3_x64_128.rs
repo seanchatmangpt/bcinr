@@ -30,7 +30,8 @@
 /// ```
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn murmur3_x64_128(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn murmur3_x64_128(val: u64, aux: u64) -> u64 {
     let mut h1 = val;
     let mut h2 = aux;
     let c1 = 0x87c37b91114253d5u64;
@@ -164,7 +165,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_murmur3_x64_128(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_murmur3_x64_128(c: &mut Criterion) {
         c.bench_function("murmur3_x64_128", |b| {
             b.iter(|| {
                 let res = murmur3_x64_128(black_box(42), black_box(1337));
@@ -181,3 +183,7 @@ pub mod bench {
 // Line 118
 // Line 119
 // Line 120
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

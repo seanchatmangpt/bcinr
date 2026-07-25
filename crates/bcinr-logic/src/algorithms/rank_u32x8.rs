@@ -27,7 +27,8 @@
 // { arr ∈ [u32; 8] }
 // ranks[i] = #{j : arr[j] < arr[i]} + #{j < i : arr[j] = arr[i]}
 // { ranks is a permutation of {0..7} }
-pub fn rank_u32x8(arr: [u32; 8]) -> [u32; 8] {
+#[rustfmt::skip]
+pub  fn rank_u32x8(arr: [u32; 8]) -> [u32; 8] {
     let mut ranks = [0u32; 8];
     // For each element i, count elements strictly less than arr[i]
     // plus elements equal to arr[i] with smaller index (for stability).
@@ -148,9 +149,20 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_rank_u32x8(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_rank_u32x8(c: &mut Criterion) {
         c.bench_function("rank_u32x8", |b| {
             b.iter(|| rank_u32x8(black_box([3, 1, 4, 1, 5, 9, 2, 6])))
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

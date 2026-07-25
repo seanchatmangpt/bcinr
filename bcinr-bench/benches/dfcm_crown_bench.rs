@@ -1,3 +1,4 @@
+#![allow(clippy::incompatible_msrv)]
 //! DfCM crown bench: one fixed, bounded (ops × capacity) matrix exercising
 //! topology -> planning -> analysis -> admission -> receipt -> replay, all
 //! within the 8/64 bound. See docs/DFCM_CONTRACT.md for the contract this

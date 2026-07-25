@@ -25,7 +25,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn halton_sampler_simd(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn halton_sampler_simd(val: u64, aux: u64) -> u64 {
     let radical_inverse = val.reverse_bits();
     let scramble = aux.wrapping_mul(0x9E3779B97F4A7C15).rotate_left(17) ^ aux;
     radical_inverse ^ scramble
@@ -117,7 +118,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_halton_sampler_simd(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_halton_sampler_simd(c: &mut Criterion) {
         c.bench_function("halton_sampler_simd", |b| {
             b.iter(|| {
                 let res = halton_sampler_simd(black_box(42), black_box(1337));
@@ -126,3 +128,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

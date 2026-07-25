@@ -27,7 +27,8 @@ extern crate alloc;
 // { slice ∈ &[u32] }
 // Let result = AND_{i=0}^{n-2} (slice[i] <= slice[i+1])
 // { return value = (result ≠ 0) ↔ slice is non-decreasingly sorted }
-pub fn sorting_network_verify_u32(slice: &[u32]) -> bool {
+#[rustfmt::skip]
+pub  fn sorting_network_verify_u32(slice: &[u32]) -> bool {
     let mut result = 1u32;
     let n = slice.len();
     // Branchlessly fold all adjacent comparisons into a single bit.
@@ -123,7 +124,8 @@ pub mod bench {
     use criterion::{black_box, Criterion};
     #[cfg(feature = "alloc")]
 
-    pub fn bench_sorting_network_verify_u32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_sorting_network_verify_u32(c: &mut Criterion) {
         #[cfg(feature = "alloc")]
         {
             let data: Vec<u32> = (0..256).collect();
@@ -133,3 +135,13 @@ pub mod bench {
         }
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

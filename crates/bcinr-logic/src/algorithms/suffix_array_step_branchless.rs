@@ -23,7 +23,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn suffix_array_step_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn suffix_array_step_branchless(val: u64, aux: u64) -> u64 {
     ((val & 0xFFFF_FFFF) << 32) | (aux & 0xFFFF_FFFF)
 }
 
@@ -128,7 +129,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_suffix_array_step_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_suffix_array_step_branchless(c: &mut Criterion) {
         c.bench_function("suffix_array_step_branchless", |b| {
             b.iter(|| {
                 let res = suffix_array_step_branchless(black_box(42), black_box(1337));
@@ -137,3 +139,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

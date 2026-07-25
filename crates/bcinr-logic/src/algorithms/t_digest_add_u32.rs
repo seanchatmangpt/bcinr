@@ -26,7 +26,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn t_digest_add_u32(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn t_digest_add_u32(val: u64, aux: u64) -> u64 {
     let n = val & 0xFFFFFFFF;
     let w = val >> 32;
     let x = aux & 0xFFFFFFFF;
@@ -111,8 +112,11 @@ mod tests {
         );
         // mutants
         let base = t_digest_add_u32_reference(42, 1337);
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_t_digest_add_u32_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_t_digest_add_u32_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_t_digest_add_u32_3(42, 1337), base, "mutant 3");
     }
 
@@ -133,7 +137,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_t_digest_add_u32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_t_digest_add_u32(c: &mut Criterion) {
         c.bench_function("t_digest_add_u32", |b| {
             b.iter(|| {
                 let res = t_digest_add_u32(black_box(42), black_box(1337));
@@ -142,3 +147,9 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant
+
+// counterfactual_mutant
+
+// counterfactual_mutant

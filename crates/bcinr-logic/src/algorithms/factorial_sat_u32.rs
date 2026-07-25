@@ -21,7 +21,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn factorial_sat_u32(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn factorial_sat_u32(val: u64, aux: u64) -> u64 {
     // Precomputed exact factorials 0!..20!, with index 21 used as the saturation
     // slot (u64::MAX). A clamped table index keeps the path data-independent.
     const FACT: [u64; 22] = [
@@ -139,7 +140,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_factorial_sat_u32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_factorial_sat_u32(c: &mut Criterion) {
         c.bench_function("factorial_sat_u32", |b| {
             b.iter(|| {
                 let res = factorial_sat_u32(black_box(42), black_box(1337));
@@ -148,3 +150,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

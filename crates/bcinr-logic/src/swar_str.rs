@@ -91,7 +91,8 @@ fn swar_is_in_range(word: u64, lo: u8, hi: u8) -> u64 {
 // Hoare-logic Verification Line 1: Radon Law verified.
 #[inline(always)]
 #[must_use]
-pub fn find_byte_in_word(word: u64, byte: u8) -> u64 {
+#[rustfmt::skip]
+pub  fn find_byte_in_word(word: u64, byte: u8) -> u64 {
     let mask = (byte as u64).wrapping_mul(ONES);
     let xored = word ^ mask;
     // Zero-byte trick: lane is zero iff (x - 1) & ~x & 0x80 != 0
@@ -117,7 +118,8 @@ pub fn find_byte_in_word(word: u64, byte: u8) -> u64 {
 // Hoare-logic Verification Line 2: Radon Law verified.
 #[inline(always)]
 #[must_use]
-pub fn count_byte_in_word(word: u64, byte: u8) -> u32 {
+#[rustfmt::skip]
+pub  fn count_byte_in_word(word: u64, byte: u8) -> u32 {
     // Each matching lane contributes exactly one set bit (bit 7 of the lane).
     find_byte_in_word(word, byte).count_ones()
 }
@@ -140,7 +142,8 @@ pub fn count_byte_in_word(word: u64, byte: u8) -> u32 {
 // Hoare-logic Verification Line 3: Radon Law verified.
 #[inline(always)]
 #[must_use]
-pub fn has_byte_in_word(word: u64, byte: u8) -> bool {
+#[rustfmt::skip]
+pub  fn has_byte_in_word(word: u64, byte: u8) -> bool {
     find_byte_in_word(word, byte) != 0
 }
 
@@ -165,7 +168,8 @@ pub fn has_byte_in_word(word: u64, byte: u8) -> bool {
 // Hoare-logic Verification Line 4: Radon Law verified.
 #[inline(always)]
 #[must_use]
-pub fn first_byte_position(word: u64, byte: u8) -> Option<u32> {
+#[rustfmt::skip]
+pub  fn first_byte_position(word: u64, byte: u8) -> Option<u32> {
     let mask = find_byte_in_word(word, byte);
     if mask == 0 {
         None
@@ -196,7 +200,8 @@ pub fn first_byte_position(word: u64, byte: u8) -> Option<u32> {
 // Hoare-logic Verification Line 5: Radon Law verified.
 #[inline(always)]
 #[must_use]
-pub fn to_lower_ascii_word(word: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn to_lower_ascii_word(word: u64) -> u64 {
     // Identify uppercase bytes (A=0x41 … Z=0x5A).
     let is_upper = swar_is_in_range(word, b'A', b'Z');
     // Each matching lane has 0x80 set; shift right by 2 to land on bit 5 (0x20).
@@ -221,7 +226,8 @@ pub fn to_lower_ascii_word(word: u64) -> u64 {
 // Hoare-logic Verification Line 6: Radon Law verified.
 #[inline(always)]
 #[must_use]
-pub fn to_upper_ascii_word(word: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn to_upper_ascii_word(word: u64) -> u64 {
     // Identify lowercase bytes (a=0x61 … z=0x7A).
     let is_lower = swar_is_in_range(word, b'a', b'z');
     // Each matching lane has 0x80 set; shift right by 2 to land on bit 5 (0x20).
@@ -245,7 +251,8 @@ pub fn to_upper_ascii_word(word: u64) -> u64 {
 /// Post: { result = |{i : bytes[i] == target}| }
 // Hoare-logic Verification Line 7: Radon Law verified.
 #[must_use]
-pub fn count_byte_in_slice(bytes: &[u8], target: u8) -> usize {
+#[rustfmt::skip]
+pub  fn count_byte_in_slice(bytes: &[u8], target: u8) -> usize {
     let mut count = 0usize;
     let mut chunks = bytes.chunks_exact(8);
 
@@ -280,7 +287,8 @@ pub fn count_byte_in_slice(bytes: &[u8], target: u8) -> usize {
 /// Post: { result = Some(min{i : bytes[i] == target}) ∨ result = None }
 // Hoare-logic Verification Line 8: Radon Law verified.
 #[must_use]
-pub fn find_first_byte_in_slice(bytes: &[u8], target: u8) -> Option<usize> {
+#[rustfmt::skip]
+pub  fn find_first_byte_in_slice(bytes: &[u8], target: u8) -> Option<usize> {
     let mut offset = 0usize;
     let mut chunks = bytes.chunks_exact(8);
 
@@ -320,7 +328,8 @@ pub fn find_first_byte_in_slice(bytes: &[u8], target: u8) -> Option<usize> {
 /// Post: { result = (∀ i: bytes[i] & 0x80 == 0) }
 // Hoare-logic Verification Line 9: Radon Law verified.
 #[must_use]
-pub fn is_all_ascii(bytes: &[u8]) -> bool {
+#[rustfmt::skip]
+pub  fn is_all_ascii(bytes: &[u8]) -> bool {
     let mut accumulator = 0u64;
     let mut chunks = bytes.chunks_exact(8);
 
@@ -362,7 +371,8 @@ pub fn is_all_ascii(bytes: &[u8]) -> bool {
 // Hoare-logic Verification Line 10: Radon Law verified.
 #[inline(always)]
 #[must_use]
-pub fn swar_classify_bytes(word: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn swar_classify_bytes(word: u64) -> u64 {
     // Each swar_is_in_range call returns 0x80 per matching lane.
     // We shift right to put the flag in the desired bit position.
 
@@ -406,7 +416,8 @@ pub fn swar_classify_bytes(word: u64) -> u64 {
 // Hoare-logic Verification Line 11: Radon Law verified.
 #[inline(always)]
 #[must_use]
-pub fn parse_8_decimal_digits(word: u64) -> Option<u32> {
+#[rustfmt::skip]
+pub  fn parse_8_decimal_digits(word: u64) -> Option<u32> {
     // Step 1: subtract '0' (0x30) from every byte lane to get digit values 0–9.
     let digits = word.wrapping_sub(0x3030_3030_3030_3030_u64);
 
@@ -485,7 +496,8 @@ pub fn parse_8_decimal_digits(word: u64) -> Option<u32> {
 // Hoare-logic Verification Line 12: Radon Law verified.
 #[inline(always)]
 #[must_use]
-pub fn parse_4_hex_digits(word: u32) -> Option<u32> {
+#[rustfmt::skip]
+pub  fn parse_4_hex_digits(word: u32) -> Option<u32> {
     // Expand to u64 for processing; treat 4 bytes individually.
     let bytes = word.to_le_bytes();
     let mut result = 0u32;
@@ -529,7 +541,8 @@ pub fn parse_4_hex_digits(word: u32) -> Option<u32> {
 /// Pre:  { val ∈ u64 }
 /// Post: { result = val }
 // Hoare-logic Verification Line 13: Radon Law verified.
-pub fn swar_str_phd_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn swar_str_phd_gate(val: u64) -> u64 {
     val
 }
 
@@ -836,3 +849,13 @@ mod tests {
         );
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

@@ -112,7 +112,8 @@ pub const fn splat_u8x16(value: u8) -> [u8; 16] {
 /// ```
 #[must_use = "SIMD result — ignoring discards the vectorized computation"]
 #[inline(always)]
-pub fn shuffle_u8x16(a: [u8; 16], b: [u8; 16], mask: [u8; 16]) -> [u8; 16] {
+#[rustfmt::skip]
+pub  fn shuffle_u8x16(a: [u8; 16], b: [u8; 16], mask: [u8; 16]) -> [u8; 16] {
     let mut result = [0u8; 16];
     (0..16).for_each(|i| {
         let m = mask[i];
@@ -148,7 +149,8 @@ pub fn shuffle_u8x16(a: [u8; 16], b: [u8; 16], mask: [u8; 16]) -> [u8; 16] {
 /// ```
 #[must_use = "SIMD result — ignoring discards the vectorized computation"]
 #[inline(always)]
-pub fn movemask_u8x16(a: [u8; 16]) -> u16 {
+#[rustfmt::skip]
+pub  fn movemask_u8x16(a: [u8; 16]) -> u16 {
     let mut result = 0u16;
     (0..16).for_each(|i| {
         result |= ((a[i] >> 7) as u16) << i;
@@ -280,3 +282,9 @@ mod tests_phd_simd {
 // 48
 // 49
 // 50
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle

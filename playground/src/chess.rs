@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! Branchless Bitboard Chess Engine mapping for Binarized GNN evaluation.
 //!
 //! Enforces CC=1 by resolving piece movements as 64-bit integer physics.

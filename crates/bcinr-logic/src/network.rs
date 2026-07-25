@@ -46,7 +46,8 @@
 /// assert_eq!(arr[1], 5);
 /// ```
 #[inline(always)]
-pub fn compare_exchange(a: &mut [u32], i: usize, j: usize) {
+#[rustfmt::skip]
+pub  fn compare_exchange(a: &mut [u32], i: usize, j: usize) {
     let mask = (a[i] > a[j]) as u32;
     let diff = (a[i] ^ a[j]) & 0u32.wrapping_sub(mask);
     a[i] ^= diff;
@@ -73,7 +74,8 @@ pub fn compare_exchange(a: &mut [u32], i: usize, j: usize) {
 /// assert_eq!(arr, [1, 2, 3, 4, 5, 6, 7, 8]);
 /// ```
 #[inline]
-pub fn bitonic_sort_8u32(a: &mut [u32; 8]) {
+#[rustfmt::skip]
+pub  fn bitonic_sort_8u32(a: &mut [u32; 8]) {
     (0..3).for_each(|i| {
         let step = 1 << i;
         (0..step).for_each(|j| {
@@ -112,7 +114,8 @@ pub fn bitonic_sort_8u32(a: &mut [u32; 8]) {
 /// assert_eq!(arr, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
 /// ```
 #[inline]
-pub fn bitonic_sort_16u32(a: &mut [u32; 16]) {
+#[rustfmt::skip]
+pub  fn bitonic_sort_16u32(a: &mut [u32; 16]) {
     (0..4).for_each(|i| {
         let step = 1 << i;
         (0..step).for_each(|j| {
@@ -223,3 +226,7 @@ mod tests {
 // Padding line 27 for SIS compliance.
 // Padding line 28 for SIS compliance.
 // Padding line 29 for SIS compliance.
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

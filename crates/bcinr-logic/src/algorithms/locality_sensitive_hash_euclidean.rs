@@ -25,7 +25,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn locality_sensitive_hash_euclidean(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn locality_sensitive_hash_euclidean(val: u64, aux: u64) -> u64 {
     let w = (aux & 0xFFFF) + 1;
     let b = (aux >> 16) % w;
     val.wrapping_add(b) / w
@@ -119,7 +120,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_locality_sensitive_hash_euclidean(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_locality_sensitive_hash_euclidean(c: &mut Criterion) {
         c.bench_function("locality_sensitive_hash_euclidean", |b| {
             b.iter(|| {
                 let res = locality_sensitive_hash_euclidean(black_box(42), black_box(1337));
@@ -128,3 +130,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

@@ -304,7 +304,7 @@ mod tests {
         assert!(v.replay_frame(&f(0, 0x1, 0x1, 0x0)).is_ok());
         let m = v.finalize();
         assert_eq!(m.generalization, 0x0000_8000); // 0.5
-        assert_eq!(m.simplicity, 0x0000_E38E);     // 8/9
+        assert_eq!(m.simplicity, 0x0000_E38E); // 8/9
     }
 
     #[test]
@@ -325,18 +325,13 @@ mod tests {
         assert!(ConformancePredicate::STRICT.check(&m).is_ok());
     }
 
-    fn oracle_rcme(
-        tape_len: u64,
-        n_unique: u64,
-        t_not_taken: u64,
-        t_active: u64,
-    ) -> (f64, f64) {
+    fn oracle_rcme(tape_len: u64, n_unique: u64, t_not_taken: u64, t_active: u64) -> (f64, f64) {
         let g = 1.0 - (n_unique as f64 / (tape_len + t_not_taken + 1) as f64);
         let g_clamped = g.clamp(0.0, 1.0);
-        
+
         let k = 8.0;
         let s = k / (n_unique + t_not_taken + t_active + 8) as f64;
-        
+
         (g_clamped, s)
     }
 
@@ -362,7 +357,7 @@ mod tests {
     #[test]
     fn test_rcme_differential_oracle() {
         let mut lcg = Lcg::new(42);
-        
+
         // 1. Boundary cases
         let boundaries = [
             // L, N_unique, T_not_taken, T_active
@@ -373,56 +368,78 @@ mod tests {
             (100, 50, 64, 64),
             (10000, 64, 64, 64),
         ];
-        
+
         for &(tape_length, replayed, not_taken, active) in &boundaries {
             let v = PowlReplayVerifier {
                 enabled_tokens: (1u64.checked_shl(active as u32).unwrap_or(0)).wrapping_sub(1),
                 replayed: (1u64.checked_shl(replayed as u32).unwrap_or(0)).wrapping_sub(1),
                 fitted: (1u64.checked_shl(replayed as u32).unwrap_or(0)).wrapping_sub(1),
-                enabled_not_taken: (1u64.checked_shl(not_taken as u32).unwrap_or(0)).wrapping_sub(1),
+                enabled_not_taken: (1u64.checked_shl(not_taken as u32).unwrap_or(0))
+                    .wrapping_sub(1),
                 tape_length,
             };
-            
+
             assert_eq!(v.replayed.count_ones() as u64, replayed);
             assert_eq!(v.enabled_not_taken.count_ones() as u64, not_taken);
             assert_eq!(v.enabled_tokens.count_ones() as u64, active);
-            
+
             let m = v.finalize();
             let (g_exp, s_exp) = oracle_rcme(tape_length, replayed, not_taken, active);
-            
+
             let g_act_f = m.generalization as f64 / 65536.0;
             let s_act_f = m.simplicity as f64 / 65536.0;
-            
-            assert!((g_act_f - g_exp).abs() <= 1.5 / 65536.0, "G diff boundary fail: act={}, exp={}", g_act_f, g_exp);
-            assert!((s_act_f - s_exp).abs() <= 1.5 / 65536.0, "S diff boundary fail: act={}, exp={}", s_act_f, s_exp);
+
+            assert!(
+                (g_act_f - g_exp).abs() <= 1.5 / 65536.0,
+                "G diff boundary fail: act={}, exp={}",
+                g_act_f,
+                g_exp
+            );
+            assert!(
+                (s_act_f - s_exp).abs() <= 1.5 / 65536.0,
+                "S diff boundary fail: act={}, exp={}",
+                s_act_f,
+                s_exp
+            );
         }
-        
+
         // 2. 50,000 random runs
         for _ in 0..50000 {
             let tape_length = lcg.next_range(0, 10000);
             let replayed = lcg.next_range(0, tape_length.min(64));
             let not_taken = lcg.next_range(0, 64);
             let active = lcg.next_range(0, 64);
-            
+
             let v = PowlReplayVerifier {
                 enabled_tokens: (1u64.checked_shl(active as u32).unwrap_or(0)).wrapping_sub(1),
                 replayed: (1u64.checked_shl(replayed as u32).unwrap_or(0)).wrapping_sub(1),
                 fitted: (1u64.checked_shl(replayed as u32).unwrap_or(0)).wrapping_sub(1),
-                enabled_not_taken: (1u64.checked_shl(not_taken as u32).unwrap_or(0)).wrapping_sub(1),
+                enabled_not_taken: (1u64.checked_shl(not_taken as u32).unwrap_or(0))
+                    .wrapping_sub(1),
                 tape_length,
             };
-            
+
             let m = v.finalize();
             let (g_exp, s_exp) = oracle_rcme(tape_length, replayed, not_taken, active);
-            
+
             let g_act_f = m.generalization as f64 / 65536.0;
             let s_act_f = m.simplicity as f64 / 65536.0;
-            
+
             let g_diff = (g_act_f - g_exp).abs();
             let s_diff = (s_act_f - s_exp).abs();
-            
-            assert!(g_diff <= 1.5 / 65536.0, "G random diff too large: act={}, exp={}", g_act_f, g_exp);
-            assert!(s_diff <= 1.5 / 65536.0, "S random diff too large: act={}, exp={}", s_act_f, s_exp);
+
+            assert!(
+                g_diff <= 1.5 / 65536.0,
+                "G random diff too large: act={}, exp={}",
+                g_act_f,
+                g_exp
+            );
+            assert!(
+                s_diff <= 1.5 / 65536.0,
+                "S random diff too large: act={}, exp={}",
+                s_act_f,
+                s_exp
+            );
         }
     }
 

@@ -21,7 +21,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn utf8_validate_chunk8(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn utf8_validate_chunk8(val: u64, aux: u64) -> u64 {
     ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5)).wrapping_add(val.rotate_left(13))
         ^ ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5))
 }
@@ -84,9 +85,12 @@ mod tests {
         );
         // mutants
         let base = utf8_validate_chunk8_reference(42, 1337);
-        let _rejects_mutant_ = 0; assert_ne!(mutant_utf8_validate_chunk8_1(42, 1337), base, "mutant 1");
-        let _rejects_mutant_ = 0; assert_ne!(mutant_utf8_validate_chunk8_2(42, 1337), base, "mutant 2");
-        let _rejects_mutant_ = 0; assert_ne!(mutant_utf8_validate_chunk8_3(42, 1337), base, "mutant 3");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_utf8_validate_chunk8_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_utf8_validate_chunk8_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_utf8_validate_chunk8_3(42, 1337), base, "mutant 3");
     }
 
     // -------------------------------------------------------------------------
@@ -106,7 +110,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_utf8_validate_chunk8(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_utf8_validate_chunk8(c: &mut Criterion) {
         c.bench_function("utf8_validate_chunk8", |b| {
             b.iter(|| {
                 let res = utf8_validate_chunk8(black_box(42), black_box(1337));

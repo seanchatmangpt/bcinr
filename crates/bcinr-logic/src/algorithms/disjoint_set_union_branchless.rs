@@ -19,7 +19,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn disjoint_set_union_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn disjoint_set_union_branchless(val: u64, aux: u64) -> u64 {
     let is_root = (val == aux) as u64;
     (is_root.wrapping_neg() & val) | ((!is_root.wrapping_neg()) & aux)
 }
@@ -103,7 +104,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_disjoint_set_union_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_disjoint_set_union_branchless(c: &mut Criterion) {
         c.bench_function("disjoint_set_union_branchless", |b| {
             b.iter(|| {
                 let res = disjoint_set_union_branchless(black_box(42), black_box(1337));
@@ -112,3 +114,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

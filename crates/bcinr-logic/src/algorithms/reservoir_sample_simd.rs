@@ -26,7 +26,8 @@
 /// let sample = reservoir_sample_step(0, 42, 1, 0xAAAA_BBBB);
 /// assert_eq!(sample, 42, "First element must always be accepted");
 /// ```
-pub fn reservoir_sample_step(current: u64, candidate: u64, item_index: u64, rand_val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn reservoir_sample_step(current: u64, candidate: u64, item_index: u64, rand_val: u64) -> u64 {
     // item_index must be >= 1; use max(item_index, 1) to avoid division by zero.
     let idx = item_index.max(1);
     // Accept candidate iff rand_val % idx == 0.
@@ -59,7 +60,8 @@ pub fn reservoir_sample_step(current: u64, candidate: u64, item_index: u64, rand
 /// let sample = reservoir_sample_batch(stream[0], &stream[1..], 2, &mut rng, lcg);
 /// assert!(stream.contains(&sample));
 /// ```
-pub fn reservoir_sample_batch<F>(
+#[rustfmt::skip]
+pub  fn reservoir_sample_batch<F>(
     initial: u64,
     stream: &[u64],
     start_index: u64,
@@ -266,7 +268,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_reservoir_sample_step(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_reservoir_sample_step(c: &mut Criterion) {
         c.bench_function("reservoir_sample_step", |b| {
             b.iter(|| {
                 let res = reservoir_sample_step(
@@ -280,3 +283,11 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

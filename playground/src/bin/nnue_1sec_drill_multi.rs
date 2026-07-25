@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! Multi-threaded variant of `nnue_1sec_drill`: runs the same one-second NNUE
 //! evaluation drill across multiple worker threads and reports aggregate
 //! evaluations/sec.

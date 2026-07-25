@@ -1,3 +1,4 @@
+#![allow(clippy::incompatible_msrv)]
 //! MCP+ admission-key cache proof suite (cold/warm latency + concurrent
 //! throughput) — see docs/ for the full 7-benchmark proposal and which
 //! items are honestly buildable today vs. deferred (token displacement and

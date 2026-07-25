@@ -1,53 +1,53 @@
-import os
-
-# Files to delete (LLM bluffs / fakes)
-fakes = [
-    "jaro_winkler_branchless.rs",
-    "simd_strstr_branchless.rs",
-    "lcp_array_step_branchless.rs",
-    "hazard_pointer_retire.rs",
-    "quotient_filter_add_u64.rs",
-    "xoroshiro128_plus.rs",
-    "wyhash_64.rs"
-]
-
-algorithms_dir = "crates/bcinr-logic/src/algorithms"
-
-for fake in fakes:
-    path = os.path.join(algorithms_dir, fake)
-    if os.path.exists(path):
-        os.remove(path)
-        print(f"Deleted {fake}")
-
-# Update mod.rs
-mod_path = os.path.join(algorithms_dir, "mod.rs")
-with open(mod_path, "r") as f:
-    mod_lines = f.readlines()
-
-with open(mod_path, "w") as f:
-    for line in mod_lines:
-        skip = False
-        for fake in fakes:
-            module = fake.replace(".rs", "")
-            if f"pub mod {module};" in line:
-                skip = True
-                break
-        if not skip:
-            f.write(line)
-
-# Fix tabulation_hash_u64.rs (magic constant)
-tab_path = os.path.join(algorithms_dir, "tabulation_hash_u64.rs")
-with open(tab_path, "r") as f:
-    tab_content = f.read()
-
-tab_content = tab_content.replace("0xDEADBEEF", "123456789")
-
-# Remove boilerplate Hoare-logic Verification lines
 import re
-tab_content = re.sub(r'// Hoare Verification Line \d+:.*?\n', '', tab_content)
 
-with open(tab_path, "w") as f:
-    f.write(tab_content)
+with open("crates/bcinr-powl/src/auto_select_final_integration.rs", "r") as f:
+    text = f.read()
 
-print("Fixed tabulation_hash_u64.rs")
+# Fix final_integration_reference signature
+text = text.replace(
+"""    fn final_integration_reference<
+        K: Copy + Default + PartialEq,
+        V: Copy + Default,
+        const N: usize,
+        const O: usize,
+        const P: usize,
+    >(
+        input: &FullMapekInput,
+        substrate: &mut AutonomicSubstrate<K, V, N>,
+        learning_weights: &mut LearningWeights,
+        ocel_state: &mut OcelBufferState<O>,
+        trace_state: &mut TraceBufferState<P>,
+    ) -> FullMapekResult {""",
+"""    fn final_integration_reference<
+        K: Copy + Default + PartialEq,
+        V: Copy + Default,
+        const N: usize,
+        const O: usize,
+        const P: usize,
+    >(
+        input: &FullMapekInput,
+        substrate: &mut AutonomicSubstrate<K, V, N>,
+        learning_weights: &mut LearningWeights,
+        ocel_state: &mut OcelBufferState<O>,
+        trace_state: &mut TraceBufferState<P>,
+        terminal_state: &mut PersistentControlState,
+    ) -> FullMapekResult {""")
 
+# Fix final_integration_reference calls in test_counterfactual_mutants
+text = text.replace(
+    "final_integration_reference(&input, &mut sub_ref, &mut w_ref, &mut o_ref, &mut _t_ref);",
+    "final_integration_reference(&input, &mut sub_ref, &mut w_ref, &mut o_ref, &mut _t_ref, &mut terminal_state);"
+)
+
+with open("crates/bcinr-powl/src/auto_select_final_integration.rs", "w") as f:
+    f.write(text)
+
+with open("crates/bcinr-powl/src/full_mapek_loop.rs", "r") as f:
+    text = f.read()
+
+text = text.replace("let mut intermediate_refusal", "let intermediate_refusal")
+text = text.replace("let m_term_commit", "let _m_term_commit")
+text = text.replace("let mut terminal_state = PersistentControlState::default();", "let terminal_state = PersistentControlState::default();")
+
+with open("crates/bcinr-powl/src/full_mapek_loop.rs", "w") as f:
+    f.write(text)

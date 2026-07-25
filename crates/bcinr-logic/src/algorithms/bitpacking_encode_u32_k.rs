@@ -23,7 +23,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn bitpacking_encode_u32_k(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn bitpacking_encode_u32_k(val: u64, aux: u64) -> u64 {
     let k = (aux & 31) as u32 + 1;
     let off = ((aux >> 5) & 31) as u32;
     let field_mask = (1u64 << k).wrapping_sub(1);
@@ -130,7 +131,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_bitpacking_encode_u32_k(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_bitpacking_encode_u32_k(c: &mut Criterion) {
         c.bench_function("bitpacking_encode_u32_k", |b| {
             b.iter(|| {
                 let res = bitpacking_encode_u32_k(black_box(42), black_box(1337));
@@ -139,3 +141,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

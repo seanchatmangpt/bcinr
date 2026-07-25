@@ -19,7 +19,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn lerp_sat_u8(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn lerp_sat_u8(val: u64, aux: u64) -> u64 {
     // Interpretation: saturating fixed-point linear interpolation between two u8
     // endpoints. a = byte0 of `val`, b = byte1 of `val`, t = byte0 of `aux`
     // (an 8-bit blend fraction in 0..=255).
@@ -116,7 +117,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_lerp_sat_u8(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_lerp_sat_u8(c: &mut Criterion) {
         c.bench_function("lerp_sat_u8", |b| {
             b.iter(|| {
                 let res = lerp_sat_u8(black_box(42), black_box(1337));
@@ -125,3 +127,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

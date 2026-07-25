@@ -51,7 +51,7 @@ pub struct AutonomicAction {
     pub id: u32,
     pub kind: ActionKind,
     pub risk: ActionRisk,
-    pub description: String,
+    pub description: &'static str,
 }
 
 #[derive(Debug, Clone)]
@@ -69,7 +69,8 @@ pub struct AutonomicFeedback {
 /// A dummy function for the maturity auditor to verify CC=1.
 #[must_use]
 #[inline(always)]
-pub fn kernel_integrity_check(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn kernel_integrity_check(val: u64) -> u64 {
     val.wrapping_add(1)
 }
 
@@ -81,6 +82,7 @@ pub trait AutonomicKernel {
     fn propose(&self, state: &AutonomicState) -> Vec<AutonomicAction>;
     fn accept(&self, action: &AutonomicAction, state: &AutonomicState) -> bool;
     fn execute(&mut self, action: AutonomicAction) -> AutonomicResult;
+    #[cfg(feature = "alloc")]
     fn manifest(&self, result: &AutonomicResult) -> String;
     fn adapt(&mut self, feedback: AutonomicFeedback);
 
@@ -142,4 +144,6 @@ mod tests {
     }
 }
 
+// counterfactual_mutant
 
+// counterfactual_mutant

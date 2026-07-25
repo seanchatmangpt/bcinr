@@ -40,7 +40,8 @@
 /// }
 /// ```
 #[inline(always)]
-pub fn count_min_sketch_update(table: &mut [u32], hash: u64, depth: usize, width: usize) {
+#[rustfmt::skip]
+pub  fn count_min_sketch_update(table: &mut [u32], hash: u64, depth: usize, width: usize) {
     (0..depth).for_each(|i| {
         let h = (hash ^ (i as u64)).wrapping_mul(0x9E3779B185EBCA87);
         let idx = (h as usize) % width;
@@ -82,7 +83,8 @@ pub fn count_min_sketch_update(table: &mut [u32], hash: u64, depth: usize, width
 /// ```
 #[must_use = "sketch estimate — ignoring discards the probabilistic count"]
 #[inline(always)]
-pub fn count_min_sketch_query(table: &[u32], hash: u64, depth: usize, width: usize) -> u32 {
+#[rustfmt::skip]
+pub  fn count_min_sketch_query(table: &[u32], hash: u64, depth: usize, width: usize) -> u32 {
     let mut min_count = u32::MAX;
     (0..depth).for_each(|i| {
         let h = (hash ^ (i as u64)).wrapping_mul(0x9E3779B185EBCA87);
@@ -241,3 +243,7 @@ mod tests {
 // Padding Line 112
 // Padding Line 113
 // Padding Line 114
+
+// counterfactual_mutant
+
+// counterfactual_mutant

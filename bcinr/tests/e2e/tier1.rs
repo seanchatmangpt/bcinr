@@ -34,4 +34,3 @@ fn test_tier1_f1_cargo_check_bench() {
     let out = run_cargo_cmd(&["check", "-p", "bcinr-bench"]);
     assert_status_in(&out, &[0, 1, 101]);
 }
-

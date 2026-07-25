@@ -1,0 +1,15 @@
+I have researched the `CertificateStale` typed refusal and its relationship to the `AcceptedCertificate` proof in the BCINR substrate based on the `AGENTS.md` constitution and the internal documentation.
+
+### What is the `CertificateStale` Typed Refusal?
+Mandated by **Rule 18**, `CertificateStale` is a bounded typed refusal raised when an authoritative operation requiring a verified state context is invoked with a certificate that is no longer valid for the current system state.
+- **Cause:** It triggers if any upstream parameters (e.g., generated tables, kernel implementations, bounds, or switching laws) drift, causing the certificate's cryptographic digest ($H_a$) to fail its structural binding to the current system state.
+- **Branchless Handling (Radon Law $CC=1$):** Because data-dependent branches (`if`/`match`/early returns) are strictly forbidden, the stale condition is accumulated branchlessly via bitwise operations. This produces a refusal bitflag and forces the final admission mask to evaluate to `0`.
+- **Effect:** The runtime structurally rejects the candidate state, performing a masked selection that ensures the persistent state remains bit-for-bit unchanged (**Rule 10**). It safely forces a transition out of `CertifiedLearning` mode into a fallback mode (like `CertifiedSelectionOnly` / `CMCA_LEARNING_FROZEN`) where deterministic selection continues, but adaptive state mutation is frozen.
+
+### How it relates to the `AcceptedCertificate` Proof
+The `AcceptedCertificate` is a foundational cryptographic receipt mandated by **Rule 11 (The ReceiptSound Law)**. Because **Rule 12** prohibits unbounded runtime theorem discovery in the allocation-free Authoritative Hot Path, the branching "Slow Rail" computes the mathematical proofs (e.g., the certified gain matrix $G_{\mathrm{certified}}$, contraction margin $\delta$, and eigenvector $d$) and statically packages them into the `AcceptedCertificate`.
+
+- **Cryptographic Cohesion:** The certificate serves as a proof-carrying type, proving the system's contractive stability and static domination. To guarantee these bounds apply to the *exact current* state, the certificate includes a digest that must perfectly match the `AdmittedControlState`.
+- **Validation:** In the Hot Path, verification is strictly branchless, relying on a parallel XOR cascade (e.g., `(((state.digest ^ cert.digest) | ...) == 0) as u32`).
+- **Enforcement:** If this bitwise check yields any non-zero difference, the proof is considered stale and decoupled from the state. Without a valid, matching `AcceptedCertificate`, the conjunctive prerequisite for adaptive mutation is broken, and the `CertificateStale` condition is mathematically unioned into the refusal set to block the update.
+- **Absolute Failure:** According to **Rule 24**, failing to issue this refusal and accidentally processing uncertified state by accepting a stale certificate is an absolute constitutional failure, which drops the Substrate Integrity Score (SIS) to 0 and instantly quarantines the code.

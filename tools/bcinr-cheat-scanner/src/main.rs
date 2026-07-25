@@ -1,3 +1,4 @@
+#![allow(clippy::cmp_owned)]
 use std::fs;
 use std::path::Path;
 use std::process;

@@ -12,8 +12,8 @@ use bcinr_cmca::allocator::{
     allocate, AdaptiveUpdate, AdmittedControlState, CertificateReceipt, CertifiedLearning,
     EnvelopeReceipt, OutcomeReceipt,
 };
-use bcinr_cmca::fixed::{CanonicalMask, NonNegativeFixed, SignedFixed};
-use bcinr_cmca::generated::case_studies::{LensSpec, PackedSemanticState, K, N, Q};
+use bcinr_cmca::fixed::{NonNegativeFixed, SignedFixed};
+use bcinr_cmca::generated_artifact::case_studies::{LensSpec, PackedSemanticState, K, N, Q};
 use bcinr_cmca::generated::stability_profile::CERTIFICATE_DIGEST;
 use reference::allocate_f64;
 

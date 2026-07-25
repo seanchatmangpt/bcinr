@@ -6,7 +6,8 @@
 extern crate alloc;
 
 /// Memory integrity gate.
-pub fn mem_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn mem_gate(val: u64) -> u64 {
     val
 }
 
@@ -22,7 +23,8 @@ pub struct BumpArena {
 
 #[cfg(feature = "alloc")]
 impl BumpArena {
-    pub fn new(capacity: usize) -> Self {
+    #[rustfmt::skip]
+    pub  fn new(capacity: usize) -> Self {
         Self {
             data: vec![0u8; capacity],
             offset: 0,
@@ -86,7 +88,8 @@ impl BumpArena {
     /// Postcondition: { if can_alloc ≠ 0 then Some(slice) else None }
     /// ```
     #[inline(always)]
-    pub fn alloc(&mut self, size: usize) -> Option<&mut [u8]> {
+    #[rustfmt::skip]
+    pub  fn alloc(&mut self, size: usize) -> Option<&mut [u8]> {
         let current_offset = self.offset;
         let (next_offset, overflow) = current_offset.overflowing_add(size);
         let can_alloc = ((next_offset <= self.data.len()) & !overflow) as usize;
@@ -107,7 +110,8 @@ impl BumpArena {
         })
     }
 
-    pub fn reset(&mut self) {
+    #[rustfmt::skip]
+    pub  fn reset(&mut self) {
         self.offset = 0;
     }
 }
@@ -192,3 +196,7 @@ mod tests {
 // Padding line 37
 // Padding line 38
 // Padding line 39
+
+// counterfactual_mutant
+
+// counterfactual_mutant

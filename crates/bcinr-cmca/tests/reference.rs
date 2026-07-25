@@ -11,7 +11,7 @@
     clippy::too_many_arguments
 )]
 
-use bcinr_cmca::generated::case_studies::{LensSpec, PackedSemanticState, K, N, Q};
+use bcinr_cmca::generated_artifact::case_studies::{LensSpec, PackedSemanticState, K, N, Q};
 
 pub fn compute_measures_f64(state: &PackedSemanticState) -> [f64; K] {
     let factors: Vec<f64> = state

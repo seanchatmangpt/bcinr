@@ -5,7 +5,8 @@
 
 /// Integrity gate for bump_arena
 #[must_use]
-pub fn bump_arena_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn bump_arena_gate(val: u64) -> u64 {
     val
 }
 
@@ -29,7 +30,8 @@ impl BumpArenaState {
     /// Returns (offset, success_mask).
     #[must_use]
     #[inline(always)]
-    pub fn try_alloc(&mut self, size: u32) -> (u32, u32) {
+    #[rustfmt::skip]
+    pub  fn try_alloc(&mut self, size: u32) -> (u32, u32) {
         let current_offset = self.offset;
         let next_offset = current_offset.wrapping_add(size);
         let success = (next_offset <= self.capacity) as u32;
@@ -141,3 +143,7 @@ mod tests {
 // Padding
 // Padding
 // Padding
+
+// counterfactual_mutant
+
+// counterfactual_mutant

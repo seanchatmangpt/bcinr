@@ -21,7 +21,8 @@ use super::fp_sin_u32_q16::fp_sin_u32_q16;
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn fp_cos_u32_q16(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn fp_cos_u32_q16(val: u64, aux: u64) -> u64 {
     // cos(x) = sin(x + 90°), implemented via phase shift in Q16 fixed-point.
     // Adding QUARTER wraps safely within u64 modular arithmetic; the sin
     // implementation reduces modulo 360° so overflow here is harmless.
@@ -157,7 +158,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_fp_cos_u32_q16(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_fp_cos_u32_q16(c: &mut Criterion) {
         c.bench_function("fp_cos_u32_q16", |b| {
             b.iter(|| {
                 let res = fp_cos_u32_q16(black_box(45 * 65536), black_box(1337));

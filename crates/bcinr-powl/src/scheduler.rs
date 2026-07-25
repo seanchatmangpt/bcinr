@@ -105,7 +105,7 @@ use bcinr_mfw_ir::EventSet;
 ///
 /// Designed to track the status of up to 64 operations (slots) within a single
 /// POWL tape run. It uses compact bitmasks to avoid allocation and branching.
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[repr(C, align(8))]
 pub struct PowlRunState {
     /// Bitmask of slots that have completed.

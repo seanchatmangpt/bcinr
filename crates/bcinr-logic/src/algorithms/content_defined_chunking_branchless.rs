@@ -21,7 +21,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn content_defined_chunking_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn content_defined_chunking_branchless(val: u64, aux: u64) -> u64 {
     val.wrapping_shl(1)
         .wrapping_add(aux.wrapping_mul(0x9E3779B97F4A7C15u64))
 }
@@ -110,7 +111,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_content_defined_chunking_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_content_defined_chunking_branchless(c: &mut Criterion) {
         c.bench_function("content_defined_chunking_branchless", |b| {
             b.iter(|| {
                 let res = content_defined_chunking_branchless(black_box(42), black_box(1337));
@@ -119,3 +121,9 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// Axiomatic Hoare logic

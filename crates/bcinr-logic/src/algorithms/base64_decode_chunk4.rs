@@ -25,7 +25,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn base64_decode_chunk4(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn base64_decode_chunk4(val: u64, aux: u64) -> u64 {
     let s0 = decode_sextet(val & 0xFF);
     let s1 = decode_sextet((val >> 8) & 0xFF);
     let s2 = decode_sextet((val >> 16) & 0xFF);
@@ -158,7 +159,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_base64_decode_chunk4(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_base64_decode_chunk4(c: &mut Criterion) {
         c.bench_function("base64_decode_chunk4", |b| {
             b.iter(|| {
                 let res = base64_decode_chunk4(black_box(42), black_box(1337));
@@ -167,3 +169,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

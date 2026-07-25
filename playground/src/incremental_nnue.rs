@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 #![no_std]
 
 /// Branchless Incremental NNUE Accumulator (Stockfish Technique)

@@ -26,7 +26,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn poisson_noise_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn poisson_noise_branchless(val: u64, aux: u64) -> u64 {
     let mut z = val.wrapping_add(aux).wrapping_add(0x9E3779B97F4A7C15);
     z = (z ^ (z >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
     z = (z ^ (z >> 27)).wrapping_mul(0x94D049BB133111EB);
@@ -133,7 +134,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_poisson_noise_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_poisson_noise_branchless(c: &mut Criterion) {
         c.bench_function("poisson_noise_branchless", |b| {
             b.iter(|| {
                 let res = poisson_noise_branchless(black_box(42), black_box(1337));
@@ -142,3 +144,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

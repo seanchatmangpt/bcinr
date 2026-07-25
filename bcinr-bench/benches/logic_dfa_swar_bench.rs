@@ -1,3 +1,4 @@
+#![allow(clippy::incompatible_msrv)]
 use bcinr_core::logic::dfa::{dfa_is_accepting, dfa_run};
 use bcinr_core::logic::swar_str::{count_byte_in_slice, find_first_byte_in_slice, is_all_ascii};
 

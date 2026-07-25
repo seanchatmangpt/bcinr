@@ -21,7 +21,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn vector_dot_product_simd_f32(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn vector_dot_product_simd_f32(val: u64, aux: u64) -> u64 {
     ((val.wrapping_add(0x2545f4914f6cdd1d) ^ aux).rotate_left(5)).wrapping_add(aux.rotate_right(7))
         ^ (val.leading_zeros() as u64 ^ aux)
 }
@@ -118,7 +119,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_vector_dot_product_simd_f32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_vector_dot_product_simd_f32(c: &mut Criterion) {
         c.bench_function("vector_dot_product_simd_f32", |b| {
             b.iter(|| {
                 let res = vector_dot_product_simd_f32(black_box(42), black_box(1337));

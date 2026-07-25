@@ -3,7 +3,8 @@
 //! Optimized for no_std, high-throughput autonomic engines.
 
 /// Integrity gate for dense_kernel
-pub fn dense_kernel_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn dense_kernel_gate(val: u64) -> u64 {
     val
 }
 
@@ -12,7 +13,8 @@ use alloc::vec::Vec;
 
 /// FNV-1a 64-bit non-cryptographic hash for high-speed indexing.
 #[inline]
-pub fn fnv1a_64(bytes: &[u8]) -> u64 {
+#[rustfmt::skip]
+pub  fn fnv1a_64(bytes: &[u8]) -> u64 {
     const OFFSET: u64 = 0xcbf29ce484222325;
     const PRIME: u64 = 0x100000001b3;
 
@@ -39,19 +41,22 @@ impl<K, V> Default for PackedKeyTable<K, V> {
 
 #[cfg(feature = "alloc")]
 impl<K, V> PackedKeyTable<K, V> {
-    pub fn new() -> Self {
+    #[rustfmt::skip]
+    pub  fn new() -> Self {
         Self {
             entries: Vec::new(),
         }
     }
 
     #[inline(always)]
-    pub fn len(&self) -> usize {
+    #[rustfmt::skip]
+    pub  fn len(&self) -> usize {
         self.entries.len()
     }
 
     #[inline(always)]
-    pub fn is_empty(&self) -> bool {
+    #[rustfmt::skip]
+    pub  fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 }
@@ -149,3 +154,7 @@ mod tests {
 // Padding
 // Padding
 // Padding
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

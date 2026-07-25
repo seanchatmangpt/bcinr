@@ -23,7 +23,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn copy_sign_i64(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn copy_sign_i64(val: u64, aux: u64) -> u64 {
     // Branchless Contract: return a value with the magnitude of `val` (as i64)
     // and the sign of `aux` (as i64). Computed by taking |val| then applying a
     // conditional two's-complement negation driven by aux's sign bit.
@@ -111,7 +112,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_copy_sign_i64(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_copy_sign_i64(c: &mut Criterion) {
         c.bench_function("copy_sign_i64", |b| {
             b.iter(|| {
                 let res = copy_sign_i64(black_box(42), black_box(1337));
@@ -120,3 +122,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

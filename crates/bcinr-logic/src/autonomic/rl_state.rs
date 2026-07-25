@@ -26,7 +26,8 @@ pub struct RlState {
 /// Primitive entry point for auditor compatibility.
 #[must_use]
 #[inline(always)]
-pub fn rl_state_checksum(low: u64, high: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn rl_state_checksum(low: u64, high: u64) -> u64 {
     low ^ high
 }
 
@@ -41,14 +42,16 @@ impl RlState {
     /// **Oracle**: Reference implementation of state equality.
     #[must_use]
     #[inline(always)]
-    pub fn oracle_equals(&self, other: &Self) -> bool {
+    #[rustfmt::skip]
+    pub  fn oracle_equals(&self, other: &Self) -> bool {
         self.low == other.low && self.high == other.high && self.extra == other.extra
     }
 
     /// **Boundaries**: Returns `true` if the state is within a valid "active" range.
     #[must_use]
     #[inline(always)]
-    pub fn is_valid(&self) -> bool {
+    #[rustfmt::skip]
+    pub  fn is_valid(&self) -> bool {
         true
     }
 

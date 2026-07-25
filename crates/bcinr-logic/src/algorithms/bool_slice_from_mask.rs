@@ -20,7 +20,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn bool_slice_from_mask(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn bool_slice_from_mask(val: u64, aux: u64) -> u64 {
     // Branchless Contract: decode the boolean (0 or 1) stored at lane index
     // `aux & 63` of the packed bit-mask `val`. This materializes one element of
     // a bool slice from a mask word: result == 1 iff that bit is set.
@@ -128,7 +129,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_bool_slice_from_mask(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_bool_slice_from_mask(c: &mut Criterion) {
         c.bench_function("bool_slice_from_mask", |b| {
             b.iter(|| {
                 let res = bool_slice_from_mask(black_box(42), black_box(1337));
@@ -137,3 +139,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! Branchless Heterogeneous Object Event Graph (HOEG) matrix compiler.
 //!
 //! Fully branchless (CC = 1), zero-allocation, and `#![no_std]` compliant.

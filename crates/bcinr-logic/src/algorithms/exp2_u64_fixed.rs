@@ -21,7 +21,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn exp2_u64_fixed(val: u64, _aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn exp2_u64_fixed(val: u64, _aux: u64) -> u64 {
     // val is Q16: integer exponent is val >> 16.
     // Result in Q16: 65536 * 2^int_exp = 65536 << int_exp.
     // Saturate at u64::MAX for int_exp >= 48 (65536 << 48 would overflow u64).
@@ -172,7 +173,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_exp2_u64_fixed(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_exp2_u64_fixed(c: &mut Criterion) {
         c.bench_function("exp2_u64_fixed", |b| {
             b.iter(|| {
                 let res = exp2_u64_fixed(black_box(65536), black_box(1337));

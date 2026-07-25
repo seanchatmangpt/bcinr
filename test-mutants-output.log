@@ -1,0 +1,412 @@
+[cargo-make] INFO - cargo make 0.37.24
+[cargo-make] INFO - 
+[cargo-make] INFO - Build File: Makefile.toml
+[cargo-make] INFO - Task: test-mutants
+[cargo-make] INFO - Profile: development
+[cargo-make] INFO - Running Task: test-mutants
+=== test-mutants: GATING pass (each mutant's own dedicated oracle test, isolated) ===
+--- mutant_1: cargo test -p bcinr-cmca --features mutant_1 --test hostile_mutants kill_mutant_1_single_measure_collapse ---
+    Blocking waiting for file lock on build directory
+warning: function `le_mask_u64` is never used
+  --> crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs:64:10
+   |
+64 | const fn le_mask_u64(a: u64, b: u64) -> u64 {
+   |          ^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bcinr-logic` (lib) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.37s
+     Running tests/hostile_mutants.rs (target/debug/deps/hostile_mutants-6ceece10bbf1f469)
+
+running 1 test
+test kill_mutant_1_single_measure_collapse ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+mutant_1: PASS (oracle kill_mutant_1_single_measure_collapse killed the mutant as expected)
+--- mutant_2: cargo test -p bcinr-cmca --features mutant_2 --test hostile_mutants kill_mutant_2_q_sign_inversion ---
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+warning: function `le_mask_u64` is never used
+  --> crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs:64:10
+   |
+64 | const fn le_mask_u64(a: u64, b: u64) -> u64 {
+   |          ^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bcinr-logic` (lib) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.44s
+     Running tests/hostile_mutants.rs (target/debug/deps/hostile_mutants-fc045f69b0753d56)
+
+running 1 test
+test kill_mutant_2_q_sign_inversion ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+mutant_2: PASS (oracle kill_mutant_2_q_sign_inversion killed the mutant as expected)
+--- mutant_3: cargo test -p bcinr-cmca --features mutant_3 --test hostile_mutants kill_mutant_3_broken_normalization ---
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on shared package cache
+warning: function `le_mask_u64` is never used
+  --> crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs:64:10
+   |
+64 | const fn le_mask_u64(a: u64, b: u64) -> u64 {
+   |          ^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bcinr-logic` (lib) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running tests/hostile_mutants.rs (target/debug/deps/hostile_mutants-f2ace60e9d898d9e)
+
+running 1 test
+test kill_mutant_3_broken_normalization ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.01s
+
+mutant_3: PASS (oracle kill_mutant_3_broken_normalization killed the mutant as expected)
+--- mutant_4: cargo test -p bcinr-cmca --features mutant_4 --test hostile_mutants kill_mutant_4_rdf_identity_skew ---
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+warning: function `le_mask_u64` is never used
+  --> crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs:64:10
+   |
+64 | const fn le_mask_u64(a: u64, b: u64) -> u64 {
+   |          ^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bcinr-logic` (lib) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.25s
+     Running tests/hostile_mutants.rs (target/debug/deps/hostile_mutants-082919c21bba0422)
+
+running 1 test
+test kill_mutant_4_rdf_identity_skew ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+mutant_4: PASS (oracle kill_mutant_4_rdf_identity_skew killed the mutant as expected)
+--- mutant_5: cargo test -p bcinr-cmca --features mutant_5 --test hostile_mutants kill_mutant_5_consequence_truncation ---
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.92s
+     Running tests/hostile_mutants.rs (target/debug/deps/hostile_mutants-de7523dbb10c8e61)
+
+running 1 test
+test kill_mutant_5_consequence_truncation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+mutant_5: PASS (oracle kill_mutant_5_consequence_truncation killed the mutant as expected)
+--- mutant_6: cargo test -p bcinr-cmca --features mutant_6 --test hostile_mutants kill_mutant_6_saturating_add_false_overflow ---
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+   Compiling bcinr-logic v26.7.17 (/Users/sac/bcinr/crates/bcinr-logic)
+warning: unused variable: `cursor`
+   --> crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs:124:9
+    |
+124 |     let cursor = state.cursor as usize;
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_cursor`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling bcinr-cmca v26.7.17 (/Users/sac/bcinr/crates/bcinr-cmca)
+warning: `bcinr-logic` (lib) generated 1 warning (run `cargo fix --lib -p bcinr-logic` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 15.77s
+     Running tests/hostile_mutants.rs (target/debug/deps/hostile_mutants-709cf4d93c1f4f7f)
+
+running 1 test
+test kill_mutant_6_saturating_add_false_overflow ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+mutant_6: PASS (oracle kill_mutant_6_saturating_add_false_overflow killed the mutant as expected)
+--- mutant_7: cargo test -p bcinr-cmca --features mutant_7 --test hostile_mutants kill_mutant_7_saturating_div_false_zero ---
+    Blocking waiting for file lock on build directory
+warning: unused variable: `cursor`
+   --> crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs:124:9
+    |
+124 |     let cursor = state.cursor as usize;
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_cursor`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bcinr-logic` (lib) generated 1 warning (run `cargo fix --lib -p bcinr-logic` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 24.24s
+     Running tests/hostile_mutants.rs (target/debug/deps/hostile_mutants-c06a0b3dc99a7971)
+
+running 1 test
+test kill_mutant_7_saturating_div_false_zero ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+mutant_7: PASS (oracle kill_mutant_7_saturating_div_false_zero killed the mutant as expected)
+--- mutant_8: cargo test -p bcinr-cmca --features mutant_8 --test hostile_mutants kill_mutant_8_log2_false_zero ---
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+   Compiling bcinr-logic v26.7.17 (/Users/sac/bcinr/crates/bcinr-logic)
+warning: ignoring -C extra-filename flag due to -o flag
+
+error: expected `;`, found `}`
+   --> crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs:232:46
+    |
+232 |         let _ = emit_ocel_trace(state, trace)
+    |                                              ^ help: add `;` here
+233 |     }
+    |     - unexpected token
+
+warning: `bcinr-logic` (lib) generated 1 warning
+error: could not compile `bcinr-logic` (lib) due to 1 previous error; 1 warning emitted
+mutant_8: FAIL (dedicated oracle kill_mutant_8_log2_false_zero did NOT give the expected result)
+--- mutant_9: cargo test -p bcinr-cmca --features mutant_9 --test hostile_mutants kill_mutant_9_false_drift ---
+    Blocking waiting for file lock on build directory
+   Compiling bcinr-logic v26.7.17 (/Users/sac/bcinr/crates/bcinr-logic)
+warning: ignoring -C extra-filename flag due to -o flag
+
+error: expected `;`, found `}`
+   --> crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs:232:46
+    |
+232 |         let _ = emit_ocel_trace(state, trace)
+    |                                              ^ help: add `;` here
+233 |     }
+    |     - unexpected token
+
+warning: `bcinr-logic` (lib) generated 1 warning
+error: could not compile `bcinr-logic` (lib) due to 1 previous error; 1 warning emitted
+mutant_9: FAIL (dedicated oracle kill_mutant_9_false_drift did NOT give the expected result)
+--- mutant_10: cargo test -p bcinr-cmca --features mutant_10 --test hostile_mutants kill_mutant_10_false_numerically_uncertain ---
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+   Compiling bcinr-logic v26.7.17 (/Users/sac/bcinr/crates/bcinr-logic)
+warning: ignoring -C extra-filename flag due to -o flag
+
+error: expected `;`, found `}`
+   --> crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs:232:46
+    |
+232 |         let _ = emit_ocel_trace(state, trace)
+    |                                              ^ help: add `;` here
+233 |     }
+    |     - unexpected token
+
+warning: `bcinr-logic` (lib) generated 1 warning
+error: could not compile `bcinr-logic` (lib) due to 1 previous error; 1 warning emitted
+mutant_10: FAIL (dedicated oracle kill_mutant_10_false_numerically_uncertain did NOT give the expected result)
+--- mutant_11: cargo test -p bcinr-cmca --features mutant_11 --test hostile_mutants kill_mutant_11_false_gram_degenerate ---
+    Blocking waiting for file lock on build directory
+   Compiling bcinr-logic v26.7.17 (/Users/sac/bcinr/crates/bcinr-logic)
+warning: ignoring -C extra-filename flag due to -o flag
+
+error: expected `;`, found `}`
+   --> crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs:232:46
+    |
+232 |         let _ = emit_ocel_trace(state, trace)
+    |                                              ^ help: add `;` here
+233 |     }
+    |     - unexpected token
+
+warning: `bcinr-logic` (lib) generated 1 warning
+error: could not compile `bcinr-logic` (lib) due to 1 previous error; 1 warning emitted
+mutant_11: FAIL (dedicated oracle kill_mutant_11_false_gram_degenerate did NOT give the expected result)
+
+=== test-mutants: DIAGNOSTIC pass (whole hostile_mutants.rs binary per feature; collateral failures logged, NON-GATING) ===
+--- mutant_1: cargo test -p bcinr-cmca --features mutant_1 --test hostile_mutants (whole binary, diagnostic only) ---
+    Blocking waiting for file lock on build directory
+   Compiling bcinr-logic v26.7.17 (/Users/sac/bcinr/crates/bcinr-logic)
+warning: ignoring -C extra-filename flag due to -o flag
+
+error: expected `;`, found `}`
+   --> crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs:232:46
+    |
+232 |         let _ = emit_ocel_trace(state, trace)
+    |                                              ^ help: add `;` here
+233 |     }
+    |     - unexpected token
+
+warning: `bcinr-logic` (lib) generated 1 warning
+error: could not compile `bcinr-logic` (lib) due to 1 previous error; 1 warning emitted
+mutant_1: whole-binary run reported failures above (collateral or otherwise) -- NOT gating, see MUTANT_KILL_MATRIX.md
+--- mutant_2: cargo test -p bcinr-cmca --features mutant_2 --test hostile_mutants (whole binary, diagnostic only) ---
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+   Compiling bcinr-logic v26.7.17 (/Users/sac/bcinr/crates/bcinr-logic)
+warning: ignoring -C extra-filename flag due to -o flag
+
+error: expected `;`, found `}`
+   --> crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs:232:46
+    |
+232 |         let _ = emit_ocel_trace(state, trace)
+    |                                              ^ help: add `;` here
+233 |     }
+    |     - unexpected token
+
+warning: `bcinr-logic` (lib) generated 1 warning
+error: could not compile `bcinr-logic` (lib) due to 1 previous error; 1 warning emitted
+mutant_2: whole-binary run reported failures above (collateral or otherwise) -- NOT gating, see MUTANT_KILL_MATRIX.md
+--- mutant_3: cargo test -p bcinr-cmca --features mutant_3 --test hostile_mutants (whole binary, diagnostic only) ---
+    Blocking waiting for file lock on build directory
+   Compiling bcinr-logic v26.7.17 (/Users/sac/bcinr/crates/bcinr-logic)
+warning: ignoring -C extra-filename flag due to -o flag
+
+error: expected `;`, found `}`
+   --> crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs:232:46
+    |
+232 |         let _ = emit_ocel_trace(state, trace)
+    |                                              ^ help: add `;` here
+233 |     }
+    |     - unexpected token
+
+warning: `bcinr-logic` (lib) generated 1 warning
+error: could not compile `bcinr-logic` (lib) due to 1 previous error; 1 warning emitted
+mutant_3: whole-binary run reported failures above (collateral or otherwise) -- NOT gating, see MUTANT_KILL_MATRIX.md
+--- mutant_4: cargo test -p bcinr-cmca --features mutant_4 --test hostile_mutants (whole binary, diagnostic only) ---
+    Blocking waiting for file lock on build directory
+   Compiling bcinr-logic v26.7.17 (/Users/sac/bcinr/crates/bcinr-logic)
+warning: ignoring -C extra-filename flag due to -o flag
+
+error: expected `;`, found `}`
+   --> crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs:232:46
+    |
+232 |         let _ = emit_ocel_trace(state, trace)
+    |                                              ^ help: add `;` here
+233 |     }
+    |     - unexpected token
+
+warning: `bcinr-logic` (lib) generated 1 warning
+error: could not compile `bcinr-logic` (lib) due to 1 previous error; 1 warning emitted
+mutant_4: whole-binary run reported failures above (collateral or otherwise) -- NOT gating, see MUTANT_KILL_MATRIX.md
+--- mutant_5: cargo test -p bcinr-cmca --features mutant_5 --test hostile_mutants (whole binary, diagnostic only) ---
+    Blocking waiting for file lock on build directory
+   Compiling bcinr-logic v26.7.17 (/Users/sac/bcinr/crates/bcinr-logic)
+warning: ignoring -C extra-filename flag due to -o flag
+
+error: expected `;`, found `}`
+   --> crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs:232:46
+    |
+232 |         let _ = emit_ocel_trace(state, trace)
+    |                                              ^ help: add `;` here
+233 |     }
+    |     - unexpected token
+
+warning: `bcinr-logic` (lib) generated 1 warning
+error: could not compile `bcinr-logic` (lib) due to 1 previous error; 1 warning emitted
+mutant_5: whole-binary run reported failures above (collateral or otherwise) -- NOT gating, see MUTANT_KILL_MATRIX.md
+--- mutant_6: cargo test -p bcinr-cmca --features mutant_6 --test hostile_mutants (whole binary, diagnostic only) ---
+    Blocking waiting for file lock on build directory
+   Compiling bcinr-logic v26.7.17 (/Users/sac/bcinr/crates/bcinr-logic)
+warning: ignoring -C extra-filename flag due to -o flag
+
+error: expected `;`, found `}`
+   --> crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs:232:46
+    |
+232 |         let _ = emit_ocel_trace(state, trace)
+    |                                              ^ help: add `;` here
+233 |     }
+    |     - unexpected token
+
+warning: `bcinr-logic` (lib) generated 1 warning
+error: could not compile `bcinr-logic` (lib) due to 1 previous error; 1 warning emitted
+mutant_6: whole-binary run reported failures above (collateral or otherwise) -- NOT gating, see MUTANT_KILL_MATRIX.md
+--- mutant_7: cargo test -p bcinr-cmca --features mutant_7 --test hostile_mutants (whole binary, diagnostic only) ---
+    Blocking waiting for file lock on build directory
+   Compiling bcinr-logic v26.7.17 (/Users/sac/bcinr/crates/bcinr-logic)
+warning: ignoring -C extra-filename flag due to -o flag
+
+error: expected `;`, found `}`
+   --> crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs:232:46
+    |
+232 |         let _ = emit_ocel_trace(state, trace)
+    |                                              ^ help: add `;` here
+233 |     }
+    |     - unexpected token
+
+warning: `bcinr-logic` (lib) generated 1 warning
+error: could not compile `bcinr-logic` (lib) due to 1 previous error; 1 warning emitted
+mutant_7: whole-binary run reported failures above (collateral or otherwise) -- NOT gating, see MUTANT_KILL_MATRIX.md
+--- mutant_8: cargo test -p bcinr-cmca --features mutant_8 --test hostile_mutants (whole binary, diagnostic only) ---
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+   Compiling bcinr-logic v26.7.17 (/Users/sac/bcinr/crates/bcinr-logic)
+warning: ignoring -C extra-filename flag due to -o flag
+
+error: expected `;`, found `}`
+   --> crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs:232:46
+    |
+232 |         let _ = emit_ocel_trace(state, trace)
+    |                                              ^ help: add `;` here
+233 |     }
+    |     - unexpected token
+
+warning: `bcinr-logic` (lib) generated 1 warning
+error: could not compile `bcinr-logic` (lib) due to 1 previous error; 1 warning emitted
+mutant_8: whole-binary run reported failures above (collateral or otherwise) -- NOT gating, see MUTANT_KILL_MATRIX.md
+--- mutant_9: cargo test -p bcinr-cmca --features mutant_9 --test hostile_mutants (whole binary, diagnostic only) ---
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+   Compiling bcinr-logic v26.7.17 (/Users/sac/bcinr/crates/bcinr-logic)
+warning: ignoring -C extra-filename flag due to -o flag
+
+error: expected `;`, found `}`
+   --> crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs:232:46
+    |
+232 |         let _ = emit_ocel_trace(state, trace)
+    |                                              ^ help: add `;` here
+233 |     }
+    |     - unexpected token
+
+warning: `bcinr-logic` (lib) generated 1 warning
+error: could not compile `bcinr-logic` (lib) due to 1 previous error; 1 warning emitted
+mutant_9: whole-binary run reported failures above (collateral or otherwise) -- NOT gating, see MUTANT_KILL_MATRIX.md
+--- mutant_10: cargo test -p bcinr-cmca --features mutant_10 --test hostile_mutants (whole binary, diagnostic only) ---
+    Blocking waiting for file lock on build directory
+   Compiling bcinr-logic v26.7.17 (/Users/sac/bcinr/crates/bcinr-logic)
+warning: ignoring -C extra-filename flag due to -o flag
+
+error: expected `;`, found `}`
+   --> crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs:232:46
+    |
+232 |         let _ = emit_ocel_trace(state, trace)
+    |                                              ^ help: add `;` here
+233 |     }
+    |     - unexpected token
+
+warning: `bcinr-logic` (lib) generated 1 warning
+error: could not compile `bcinr-logic` (lib) due to 1 previous error; 1 warning emitted
+mutant_10: whole-binary run reported failures above (collateral or otherwise) -- NOT gating, see MUTANT_KILL_MATRIX.md
+--- mutant_11: cargo test -p bcinr-cmca --features mutant_11 --test hostile_mutants (whole binary, diagnostic only) ---
+    Blocking waiting for file lock on build directory
+   Compiling bcinr-logic v26.7.17 (/Users/sac/bcinr/crates/bcinr-logic)
+warning: ignoring -C extra-filename flag due to -o flag
+
+error: expected `;`, found `}`
+   --> crates/bcinr-logic/src/autonomic/auto_select_ocel_emission.rs:232:46
+    |
+232 |         let _ = emit_ocel_trace(state, trace)
+    |                                              ^ help: add `;` here
+233 |     }
+    |     - unexpected token
+
+warning: `bcinr-logic` (lib) generated 1 warning
+error: could not compile `bcinr-logic` (lib) due to 1 previous error; 1 warning emitted
+mutant_11: whole-binary run reported failures above (collateral or otherwise) -- NOT gating, see MUTANT_KILL_MATRIX.md
+
+test-mutants: GATE FAILED -- one or more mutants' dedicated oracle tests did not give the expected result
+Error while executing command, exit code: 1

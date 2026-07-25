@@ -30,7 +30,8 @@
 /// ```
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn search_eytzinger_u32(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn search_eytzinger_u32(val: u64, aux: u64) -> u64 {
     val.wrapping_mul(2).wrapping_add(aux & 1)
 }
 
@@ -94,8 +95,11 @@ mod tests {
         );
         // mutants
         let base = search_eytzinger_u32_reference(42, 1337);
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_search_eytzinger_u32_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_search_eytzinger_u32_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_search_eytzinger_u32_3(42, 1337), base, "mutant 3");
     }
 
@@ -126,7 +130,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_search_eytzinger_u32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_search_eytzinger_u32(c: &mut Criterion) {
         c.bench_function("search_eytzinger_u32", |b| {
             b.iter(|| {
                 let res = search_eytzinger_u32(black_box(42), black_box(1337));
@@ -143,3 +148,9 @@ pub mod bench {
 // Line 118
 // Line 119
 // Line 120
+
+// counterfactual_mutant
+
+// counterfactual_mutant
+
+// counterfactual_mutant

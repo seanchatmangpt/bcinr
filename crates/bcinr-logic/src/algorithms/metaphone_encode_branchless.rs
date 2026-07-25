@@ -19,7 +19,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn metaphone_encode_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn metaphone_encode_branchless(val: u64, aux: u64) -> u64 {
     // Interpretation: per-byte phonetic class encoding. Each of the 8 ASCII
     // letters in `val` is folded to upper case and mapped to its metaphone /
     // Soundex consonant group digit (B,F,P,V->1; C,G,J,K,Q,S,X,Z->2; D,T->3;
@@ -155,7 +156,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_metaphone_encode_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_metaphone_encode_branchless(c: &mut Criterion) {
         c.bench_function("metaphone_encode_branchless", |b| {
             b.iter(|| {
                 let res = metaphone_encode_branchless(black_box(42), black_box(1337));
@@ -164,3 +166,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

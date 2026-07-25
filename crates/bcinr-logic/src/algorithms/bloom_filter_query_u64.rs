@@ -23,7 +23,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn bloom_filter_query_u64(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn bloom_filter_query_u64(val: u64, aux: u64) -> u64 {
     let h1 = val.wrapping_mul(0x9E3779B97F4A7C15);
     let h2 = (val ^ 0xCBF29CE484222325).wrapping_mul(0x100000001B3);
     let i = (h1 >> 58) & 63;
@@ -140,7 +141,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_bloom_filter_query_u64(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_bloom_filter_query_u64(c: &mut Criterion) {
         c.bench_function("bloom_filter_query_u64", |b| {
             b.iter(|| {
                 let res = bloom_filter_query_u64(black_box(42), black_box(1337));
@@ -149,3 +151,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

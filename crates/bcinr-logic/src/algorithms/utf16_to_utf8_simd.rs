@@ -26,7 +26,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn utf16_to_utf8_simd(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn utf16_to_utf8_simd(val: u64, aux: u64) -> u64 {
     fn encode2(lane: u64) -> u64 {
         let cp = lane & 0x7FF;
         let lead = 0xC0 | (cp >> 6);
@@ -97,9 +98,12 @@ mod tests {
         );
         // mutants
         let base = utf16_to_utf8_simd_reference(42, 1337);
-        let _rejects_mutant_ = 0; assert_ne!(mutant_utf16_to_utf8_simd_1(42, 1337), base, "mutant 1");
-        let _rejects_mutant_ = 0; assert_ne!(mutant_utf16_to_utf8_simd_2(42, 1337), base, "mutant 2");
-        let _rejects_mutant_ = 0; assert_ne!(mutant_utf16_to_utf8_simd_3(42, 1337), base, "mutant 3");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_utf16_to_utf8_simd_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_utf16_to_utf8_simd_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_utf16_to_utf8_simd_3(42, 1337), base, "mutant 3");
     }
 
     // -------------------------------------------------------------------------
@@ -119,7 +123,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_utf16_to_utf8_simd(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_utf16_to_utf8_simd(c: &mut Criterion) {
         c.bench_function("utf16_to_utf8_simd", |b| {
             b.iter(|| {
                 let res = utf16_to_utf8_simd(black_box(42), black_box(1337));

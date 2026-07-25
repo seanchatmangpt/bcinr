@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! Branchless YAWL routing semantics engine.
 
 use bcinr::int::popcount_u64;

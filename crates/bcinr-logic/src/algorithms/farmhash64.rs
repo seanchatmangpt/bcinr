@@ -32,7 +32,8 @@
 /// ```
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn farmhash64(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn farmhash64(val: u64, aux: u64) -> u64 {
     // FarmHash-style mixing using the actual FarmHash64 constants
     const K0: u64 = 0xc3a5c85c97cb3127;
     const K1: u64 = 0xb492b66fbe98f273;
@@ -135,7 +136,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_farmhash64(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_farmhash64(c: &mut Criterion) {
         c.bench_function("farmhash64", |b| {
             b.iter(|| {
                 let res = farmhash64(black_box(42), black_box(1337));
@@ -152,3 +154,7 @@ pub mod bench {
 // Line 118
 // Line 119
 // Line 120
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

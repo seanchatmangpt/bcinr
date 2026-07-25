@@ -25,7 +25,8 @@
 /// ```
 #[must_use = "parse result — ignoring discards the parsed value and cursor"]
 #[inline(always)]
-pub fn skip_whitespace(bytes: &[u8]) -> usize {
+#[rustfmt::skip]
+pub  fn skip_whitespace(bytes: &[u8]) -> usize {
     let mut offset = 0;
     (0..bytes.len()).for_each(|i| {
         let is_ws = (bytes[i] <= 32) as usize;
@@ -61,7 +62,8 @@ pub fn skip_whitespace(bytes: &[u8]) -> usize {
 /// ```
 #[must_use = "parse result — ignoring discards the parsed value and cursor"]
 #[inline(always)]
-pub fn parse_hex_u32(bytes: &[u8]) -> Result<u32, ()> {
+#[rustfmt::skip]
+pub  fn parse_hex_u32(bytes: &[u8]) -> Result<u32, ()> {
     let mut res = 0u32;
     let len = bytes.len();
     let mut err = (len == 0 || len > 8) as u32;
@@ -118,7 +120,8 @@ pub fn parse_hex_u32(bytes: &[u8]) -> Result<u32, ()> {
 /// ```
 #[must_use = "parse result — ignoring discards the parsed value and cursor"]
 #[inline(always)]
-pub fn parse_decimal_u64(bytes: &[u8]) -> Result<u64, ()> {
+#[rustfmt::skip]
+pub  fn parse_decimal_u64(bytes: &[u8]) -> Result<u64, ()> {
     let len = bytes.len();
     let mut err = (len == 0 || len > 20) as u32;
     let mut acc: u128 = 0;
@@ -283,3 +286,7 @@ mod tests {
 // Padding Line 112
 // Padding Line 113
 // Padding Line 114
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

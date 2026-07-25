@@ -22,7 +22,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn fixed_point_log2(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn fixed_point_log2(val: u64, aux: u64) -> u64 {
     let lz = val.leading_zeros(); // 64 when val == 0
     let nz = ((val | val.wrapping_neg()) >> 63) & 1; // 1 iff val != 0
     let ip = 63u64.wrapping_sub(lz as u64) & nz.wrapping_neg(); // 0 when val == 0
@@ -127,7 +128,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_fixed_point_log2(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_fixed_point_log2(c: &mut Criterion) {
         c.bench_function("fixed_point_log2", |b| {
             b.iter(|| {
                 let res = fixed_point_log2(black_box(42), black_box(1337));
@@ -136,3 +138,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

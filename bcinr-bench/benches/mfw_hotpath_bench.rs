@@ -1,3 +1,4 @@
+#![allow(clippy::incompatible_msrv)]
 //! Microbenchmarks for the MFW retrofit's genuinely hot-path primitives.
 //!
 //! Before this file, `bcinr-bench` had zero coverage of `bcinr-mfw-ir`'s

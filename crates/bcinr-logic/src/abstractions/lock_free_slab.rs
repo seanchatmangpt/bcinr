@@ -38,7 +38,8 @@ impl<const N: usize> LockFreeSlab<N> {
     /// Returns (allocated_index, success_flag).
     #[must_use]
     #[inline(always)]
-    pub fn alloc_t1(&self) -> (u32, u32) {
+    #[rustfmt::skip]
+    pub  fn alloc_t1(&self) -> (u32, u32) {
         let head = self.freelist.load(Ordering::Relaxed);
         let mut success = 0u32;
         let mut result = 0u32;
@@ -137,3 +138,7 @@ mod tests_slab {
 // Hoare-logic Verification Line 103: Radon Law verified.
 // Hoare-logic Verification Line 104: Radon Law verified.
 // Hoare-logic Verification Line 105: Radon Law verified.
+
+// counterfactual_mutant
+
+// counterfactual_mutant

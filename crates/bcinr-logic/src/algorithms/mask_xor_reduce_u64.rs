@@ -21,7 +21,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn mask_xor_reduce_u64(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn mask_xor_reduce_u64(val: u64, aux: u64) -> u64 {
     // Branchless Contract: XOR-reduction over the masked bits. Returns the parity
     // (0 or 1) of the population of `val & aux` — i.e. the XOR of all selected
     // bits, which is the reduction of a masked bit-slice under XOR.
@@ -121,7 +122,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_mask_xor_reduce_u64(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_mask_xor_reduce_u64(c: &mut Criterion) {
         c.bench_function("mask_xor_reduce_u64", |b| {
             b.iter(|| {
                 let res = mask_xor_reduce_u64(black_box(42), black_box(1337));
@@ -130,3 +132,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

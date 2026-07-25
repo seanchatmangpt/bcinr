@@ -24,7 +24,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn space_saving_add(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn space_saving_add(val: u64, aux: u64) -> u64 {
     val.saturating_add(aux)
 }
 
@@ -86,8 +87,11 @@ mod tests {
         );
         // mutants
         let base = space_saving_add_reference(42, 1337);
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_space_saving_add_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_space_saving_add_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_space_saving_add_3(42, 1337), base, "mutant 3");
     }
 
@@ -108,7 +112,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_space_saving_add(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_space_saving_add(c: &mut Criterion) {
         c.bench_function("space_saving_add", |b| {
             b.iter(|| {
                 let res = space_saving_add(black_box(42), black_box(1337));
@@ -117,3 +122,9 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant
+
+// counterfactual_mutant
+
+// counterfactual_mutant

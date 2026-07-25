@@ -1,3 +1,4 @@
+#![allow(clippy::incompatible_msrv)]
 //! Throughput Benchmark Suite
 //!
 //! Measures MB/s, ops/ns, and provides side-by-side SIMD vs scalar comparisons

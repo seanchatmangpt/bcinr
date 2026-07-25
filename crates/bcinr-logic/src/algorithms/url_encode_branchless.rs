@@ -27,7 +27,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn url_encode_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn url_encode_branchless(val: u64, aux: u64) -> u64 {
     fn hex(nibble: u64) -> u64 {
         let n = nibble & 0xF;
         // mask = 1 iff n > 9 (i.e. needs 'A'..'F')
@@ -102,9 +103,12 @@ mod tests {
         );
         // mutants
         let base = url_encode_branchless_reference(42, 1337);
-        let _rejects_mutant_ = 0; assert_ne!(mutant_url_encode_branchless_1(42, 1337), base, "mutant 1");
-        let _rejects_mutant_ = 0; assert_ne!(mutant_url_encode_branchless_2(42, 1337), base, "mutant 2");
-        let _rejects_mutant_ = 0; assert_ne!(mutant_url_encode_branchless_3(42, 1337), base, "mutant 3");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_url_encode_branchless_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_url_encode_branchless_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_url_encode_branchless_3(42, 1337), base, "mutant 3");
     }
 
     // -------------------------------------------------------------------------
@@ -124,7 +128,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_url_encode_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_url_encode_branchless(c: &mut Criterion) {
         c.bench_function("url_encode_branchless", |b| {
             b.iter(|| {
                 let res = url_encode_branchless(black_box(42), black_box(1337));

@@ -30,7 +30,8 @@
 /// ```
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn binary_search_v_u32x4(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn binary_search_v_u32x4(val: u64, aux: u64) -> u64 {
     let k = (aux & 0xFFFFFFFF) as u32;
     let v0 = (val & 0xFFFFFFFF) as u32;
     let v1 = (val >> 32) as u32;
@@ -143,7 +144,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_binary_search_v_u32x4(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_binary_search_v_u32x4(c: &mut Criterion) {
         c.bench_function("binary_search_v_u32x4", |b| {
             b.iter(|| {
                 let res = binary_search_v_u32x4(black_box(42), black_box(1337));
@@ -160,3 +162,7 @@ pub mod bench {
 // Line 118
 // Line 119
 // Line 120
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

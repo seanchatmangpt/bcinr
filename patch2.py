@@ -1,21 +1,35 @@
-with open('crates/bcinr-cmca/generator.py', 'r') as f:
-    content = f.read()
-
 import re
 
-# Patch Measure Heads sorting
-content = re.sub(
-    r"measure_heads = \[mh for mh, cls in classes.items\(\) if cls == 'cmca:MeasureHead'\]\s+sorted_mh = sorted\(measure_heads\)",
-    "measure_heads = [mh for mh, cls in classes.items() if cls == 'cmca:MeasureHead']\n    mh_indices = {mh: properties.get(mh, {}).get('cmca:measureIndex', 0) for mh in measure_heads}\n    sorted_mh = sorted(measure_heads, key=lambda m: int(mh_indices[m]))",
-    content
-)
+with open("crates/bcinr-powl/src/auto_select_pipeline.rs", "r") as f:
+    content = f.read()
 
-# Patch Lenses sorting
-content = re.sub(
-    r"lenses = \[lens for lens, cls in classes.items\(\) if cls == 'cmca:Lens'\]\s+lens_indices = \{lens: properties.get\(lens, \{\}\).get\('cmca:lensIndex', 0\) for lens in lenses\}\s+lens_exponents = \{lens: properties.get\(lens, \{\}\).get\('cmca:lensExponent', 0.0\) for lens in lenses\}\s+sorted_lenses = sorted\(lenses\)",
-    "lenses = [lens for lens, cls in classes.items() if cls == 'cmca:Lens']\n    lens_indices = {lens: properties.get(lens, {}).get('cmca:lensIndex', 0) for lens in lenses}\n    lens_exponents = {lens: properties.get(lens, {}).get('cmca:lensExponent', 0.0) for lens in lenses}\n    sorted_lenses = sorted(lenses, key=lambda l: int(lens_indices[l]))",
-    content
-)
+# Fix ToolCandidate in oracle
+replacement_oracle = """            let c = proj.candidate;
+            auto_input.candidates[i] = bcinr_logic::autonomic::canonical_mass::ToolCandidate {
+                tool_id: c.tool_id,
+                semantic_fit: c.semantic_fit,
+                evidence_fit: c.evidence_fit,
+                authority_fit: c.authority_fit,
+                timing_fit: c.timing_fit,
+                downstream_fit: c.downstream_fit,
+                reliability: c.reliability,
+                cost_fit: c.cost_fit,
+                mass: c.mass,
+            };"""
+content = content.replace("auto_input.candidates[i] = proj.candidate;", replacement_oracle)
 
-with open('crates/bcinr-cmca/generator.py', 'w') as f:
+# Fix AutoSelectResult everywhere before calling powl_bridge_select
+def replace_bridge(match):
+    return """
+    let bridge_auto_res = bcinr_logic::autonomic::auto_select::AutoSelectResult {
+        is_ok: auto_res.is_ok,
+        tool_id: auto_res.tool_id,
+        refusal_code: auto_res.refusal_code,
+    };
+    let tape_mask = powl_bridge_select(&bridge_auto_res);
+    """
+
+content = re.sub(r'let tape_mask = powl_bridge_select\(&auto_res\);', replace_bridge, content)
+
+with open("crates/bcinr-powl/src/auto_select_pipeline.rs", "w") as f:
     f.write(content)

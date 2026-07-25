@@ -19,7 +19,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn fp_sin_u32_q16(val: u64, _aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn fp_sin_u32_q16(val: u64, _aux: u64) -> u64 {
     // Bhaskara I sine approximation extended to full circle via quadrant folding.
     // val is Q16 degrees (degrees * 65536). We reduce modulo 360° then fold
     // the second semicircle [180°, 360°) using sin(x) = -sin(x - 180°).
@@ -166,7 +167,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_fp_sin_u32_q16(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_fp_sin_u32_q16(c: &mut Criterion) {
         c.bench_function("fp_sin_u32_q16", |b| {
             b.iter(|| {
                 let res = fp_sin_u32_q16(black_box(90 * 65536), black_box(1337));

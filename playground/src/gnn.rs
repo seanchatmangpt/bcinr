@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! Branchless Binarized Graph Neural Network (BGNN) for HOEG.
 //!
 //! Enforces the Radon Law (CC=1) by replacing standard floating-point

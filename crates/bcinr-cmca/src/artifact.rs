@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 //! # Gamma_CMCA artifact verification (`VerifyGeneratedProfile`)
 //!
 //! Implements the bcinr-side obligation defined in
@@ -358,7 +360,8 @@ mod tests {
     /// Any well-formed `blake3:<64 hex>` string; used for the five digest
     /// fields this module does not itself recompute (only
     /// `generated_payload_digest` is checked against recomputed bytes).
-    const FILLER_DIGEST: &str = "blake3:0000000000000000000000000000000000000000000000000000000000000000";
+    const FILLER_DIGEST: &str =
+        "blake3:0000000000000000000000000000000000000000000000000000000000000000";
 
     fn valid_manifest_json(payload_digest: &str) -> String {
         format!(
@@ -501,7 +504,10 @@ mod tests {
     /// present.
     #[test]
     fn smoke_test_against_real_mfw_artifact() {
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/generated-artifact/case-studies");
+        let dir = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/generated-artifact/case-studies"
+        );
         let manifest_path = format!("{dir}/cmca_generation_manifest.json");
         let source_path = format!("{dir}/cmca_generated.rs");
         let manifest_bytes = std::fs::read_to_string(&manifest_path)

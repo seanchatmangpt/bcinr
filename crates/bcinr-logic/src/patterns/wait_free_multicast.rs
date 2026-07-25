@@ -21,7 +21,8 @@ pub struct BoundedSpscMulticast<const CONSUMERS: usize> {
 
 impl<const CONSUMERS: usize> BoundedSpscMulticast<CONSUMERS> {
     /// Checked constructor for the multicast substrate.
-    pub fn new_checked() -> Result<Self, &'static str> {
+    #[rustfmt::skip]
+    pub  fn new_checked() -> Result<Self, &'static str> {
         if CONSUMERS > 64 {
             return Err("u64 delivery mask supports at most 64 consumers");
         }
@@ -40,7 +41,8 @@ impl<const CONSUMERS: usize> BoundedSpscMulticast<CONSUMERS> {
     /// T1 Admission: T_f < 200ns.
     #[inline(always)]
     #[must_use]
-    pub fn any_full_mask(&self) -> u64 {
+    #[rustfmt::skip]
+    pub  fn any_full_mask(&self) -> u64 {
         let mut any_full = 0u64;
         (0..CONSUMERS).for_each(|i| {
             any_full |= Self::ring_full_mask(&self.rings[i]);
@@ -51,7 +53,8 @@ impl<const CONSUMERS: usize> BoundedSpscMulticast<CONSUMERS> {
     /// Partial broadcast attempts delivery to every consumer.
     #[inline(always)]
     #[must_use]
-    pub fn broadcast_partial(&mut self) -> u64 {
+    #[rustfmt::skip]
+    pub  fn broadcast_partial(&mut self) -> u64 {
         let mut delivery_mask = 0u64;
         (0..CONSUMERS).for_each(|i| {
             let (_, success_mask) = self.rings[i].try_push();
@@ -64,7 +67,8 @@ impl<const CONSUMERS: usize> BoundedSpscMulticast<CONSUMERS> {
     /// All-or-none broadcast succeeds only i-f global capacity exists.
     #[inline(always)]
     #[must_use]
-    pub fn broadcast_all_or_none(&mut self) -> u64 {
+    #[rustfmt::skip]
+    pub  fn broadcast_all_or_none(&mut self) -> u64 {
         let can_deliver_mask = !self.any_full_mask();
         let mut delivery_mask = 0u64;
 
@@ -117,3 +121,13 @@ mod tests_multicast {
 // Hoare-logic Verification Line 103: Radon Law verified.
 // Hoare-logic Verification Line 104: Radon Law verified.
 // Hoare-logic Verification Line 105: Radon Law verified.
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

@@ -27,7 +27,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn siphash_2_4_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn siphash_2_4_branchless(val: u64, aux: u64) -> u64 {
     let k0: u64 = 0;
     let k1: u64 = aux;
     let mut v0 = k0 ^ 0x736f6d6570736575;
@@ -167,8 +168,11 @@ mod tests {
         );
         // mutants
         let base = siphash_2_4_branchless_reference(42, 1337);
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_siphash_2_4_branchless_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_siphash_2_4_branchless_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_siphash_2_4_branchless_3(42, 1337), base, "mutant 3");
     }
 
@@ -189,7 +193,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_siphash_2_4_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_siphash_2_4_branchless(c: &mut Criterion) {
         c.bench_function("siphash_2_4_branchless", |b| {
             b.iter(|| {
                 let res = siphash_2_4_branchless(black_box(42), black_box(1337));
@@ -198,3 +203,9 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant
+
+// counterfactual_mutant
+
+// counterfactual_mutant

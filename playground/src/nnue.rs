@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 /// A simplified 768 -> 16 -> 1 NNUE architecture
 pub struct BranchTorchNNUE {
     /// Layer-1 weights: `l1_weights[neuron][feature]`, one 768-wide row per

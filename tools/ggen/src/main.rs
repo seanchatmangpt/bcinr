@@ -1,4 +1,10 @@
-#![allow(clippy::eq_op, clippy::erasing_op, clippy::identity_op)]
+#![allow(clippy::cargo_common_metadata)]
+#![allow(
+    clippy::eq_op,
+    clippy::erasing_op,
+    clippy::identity_op,
+    clippy::empty_line_after_doc_comments
+)]
 use walkdir::WalkDir;
 
 /// Counterfactual & Falsification Test Generator

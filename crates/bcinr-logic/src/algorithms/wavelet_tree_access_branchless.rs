@@ -26,7 +26,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn wavelet_tree_access_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn wavelet_tree_access_branchless(val: u64, aux: u64) -> u64 {
     let i = (aux & 63) as u32;
     let bit = (val >> i) & 1;
     // Mask of positions [0, i] inclusive: low (i+1) bits set.
@@ -139,7 +140,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_wavelet_tree_access_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_wavelet_tree_access_branchless(c: &mut Criterion) {
         c.bench_function("wavelet_tree_access_branchless", |b| {
             b.iter(|| {
                 let res = wavelet_tree_access_branchless(black_box(42), black_box(1337));

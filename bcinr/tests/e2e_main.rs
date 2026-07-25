@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::{Mutex, MutexGuard, OnceLock};
 
 pub fn str_has_substr(s: &str, pat: &str) -> bool {
     if pat.is_empty() {
@@ -42,6 +41,7 @@ pub struct TestCtx {
 }
 
 impl TestCtx {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             to_cleanup: Vec::new(),
@@ -93,7 +93,7 @@ impl Drop for TestCtx {
 }
 
 pub fn run_cargo_cmd(args: &[&str]) -> std::process::Output {
-        let mut cmd = Command::new("cargo");
+    let mut cmd = Command::new("cargo");
     cmd.args(args);
     cmd.current_dir("/Users/sac/bcinr");
     cmd.env("CARGO_TARGET_DIR", "/tmp/bcinr-e2e-target");
@@ -105,31 +105,6 @@ fn touch_lib_rs() {
     if let Ok(content) = fs::read_to_string(lib_path) {
         let _ = fs::write(lib_path, content);
     }
-}
-
-static BUILD_ONCE: std::sync::Once = std::sync::Once::new();
-
-fn ensure_binaries_built() {
-    BUILD_ONCE.call_once(|| {
-        if Path::new("/tmp/bcinr-e2e-target/debug/bcinr-contract-gate").exists()
-            && Path::new("/tmp/bcinr-e2e-target/debug/bcinr-bench-auditor").exists()
-        {
-            return;
-        }
-        let mut cmd = Command::new("cargo");
-        cmd.args([
-            "build",
-            "--quiet",
-            "--bin",
-            "bcinr-contract-gate",
-            "--bin",
-            "bcinr-bench-auditor",
-        ]);
-        cmd.current_dir("/Users/sac/bcinr");
-        cmd.env("CARGO_TARGET_DIR", "/tmp/bcinr-e2e-target");
-        let status = cmd.status().unwrap();
-        assert!(status.success(), "Failed to build helper binaries");
-    });
 }
 
 static LSP_BUILD_ONCE: std::sync::Once = std::sync::Once::new();
@@ -168,14 +143,26 @@ fn ensure_lsp_built() {
 
 pub fn run_gate_cmd() -> std::process::Output {
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "--manifest-path", "tools/bcinr-contract-gate/Cargo.toml", "--release", "--quiet"]);
+    cmd.args([
+        "run",
+        "--manifest-path",
+        "tools/bcinr-contract-gate/Cargo.toml",
+        "--release",
+        "--quiet",
+    ]);
     cmd.current_dir("/Users/sac/bcinr");
     cmd.output().expect("failed to execute bcinr-contract-gate")
 }
 
 pub fn run_bench_cmd() -> std::process::Output {
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "--manifest-path", "tools/bcinr-bench-auditor/Cargo.toml", "--release", "--quiet"]);
+    cmd.args([
+        "run",
+        "--manifest-path",
+        "tools/bcinr-bench-auditor/Cargo.toml",
+        "--release",
+        "--quiet",
+    ]);
     cmd.current_dir("/Users/sac/bcinr");
     cmd.output().expect("failed to execute bcinr-bench-auditor")
 }
@@ -230,9 +217,4 @@ pub fn assert_status_eq(output: &std::process::Output, expected: i32) {
 // FEATURE 1: Workspace Health (f1)
 // ==========================================
 
-
 mod e2e;
-use e2e::tier1::*;
-use e2e::tier2::*;
-use e2e::tier3::*;
-use e2e::tier4::*;

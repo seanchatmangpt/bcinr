@@ -13,7 +13,8 @@
 //  Postcondition: { result = ct_reference(input) }
 
 /// Integrity gate for the constant-time module.
-pub fn ct_phd_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn ct_phd_gate(val: u64) -> u64 {
     val
 }
 
@@ -30,7 +31,8 @@ pub fn ct_phd_gate(val: u64) -> u64 {
 /// ```
 #[inline(always)]
 #[must_use]
-pub fn ct_select_u8(condition: u8, a: u8, b: u8) -> u8 {
+#[rustfmt::skip]
+pub  fn ct_select_u8(condition: u8, a: u8, b: u8) -> u8 {
     // 0u8.wrapping_sub(1) = 0xFF (all ones), 0u8.wrapping_sub(0) = 0x00 (all zeros).
     // The & 1 ensures correctness even if condition is not 0/1.
     let mask = 0u8.wrapping_sub(condition & 1);
@@ -50,7 +52,8 @@ pub fn ct_select_u8(condition: u8, a: u8, b: u8) -> u8 {
 /// ```
 #[inline(always)]
 #[must_use]
-pub fn ct_select_u32(condition: u32, a: u32, b: u32) -> u32 {
+#[rustfmt::skip]
+pub  fn ct_select_u32(condition: u32, a: u32, b: u32) -> u32 {
     let mask = 0u32.wrapping_sub(condition & 1);
     (a & mask) | (b & !mask)
 }
@@ -68,7 +71,8 @@ pub fn ct_select_u32(condition: u32, a: u32, b: u32) -> u32 {
 /// ```
 #[inline(always)]
 #[must_use]
-pub fn ct_select_u64(condition: u64, a: u64, b: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn ct_select_u64(condition: u64, a: u64, b: u64) -> u64 {
     let mask = 0u64.wrapping_sub(condition & 1);
     (a & mask) | (b & !mask)
 }
@@ -86,7 +90,8 @@ pub fn ct_select_u64(condition: u64, a: u64, b: u64) -> u64 {
 /// ```
 #[inline(always)]
 #[must_use]
-pub fn ct_select_i64(condition: u64, a: i64, b: i64) -> i64 {
+#[rustfmt::skip]
+pub  fn ct_select_i64(condition: u64, a: i64, b: i64) -> i64 {
     // Reinterpret bit patterns through unsigned arithmetic, then cast back.
     let mask = 0u64.wrapping_sub(condition & 1);
     let ua = a as u64;
@@ -104,7 +109,8 @@ pub fn ct_select_i64(condition: u64, a: i64, b: i64) -> i64 {
 /// ```
 #[inline(always)]
 #[must_use]
-pub fn ct_eq_u8(a: u8, b: u8) -> u8 {
+#[rustfmt::skip]
+pub  fn ct_eq_u8(a: u8, b: u8) -> u8 {
     let x = a ^ b;
     // x == 0 iff a == b.
     // (x | x.wrapping_neg()) has its MSB set iff x != 0.
@@ -123,7 +129,8 @@ pub fn ct_eq_u8(a: u8, b: u8) -> u8 {
 /// ```
 #[inline(always)]
 #[must_use]
-pub fn ct_eq_u32(a: u32, b: u32) -> u32 {
+#[rustfmt::skip]
+pub  fn ct_eq_u32(a: u32, b: u32) -> u32 {
     let x = a ^ b;
     let nonzero = (x | x.wrapping_neg()) >> 31;
     1u32.wrapping_sub(nonzero)
@@ -139,7 +146,8 @@ pub fn ct_eq_u32(a: u32, b: u32) -> u32 {
 /// ```
 #[inline(always)]
 #[must_use]
-pub fn ct_eq_u64(a: u64, b: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn ct_eq_u64(a: u64, b: u64) -> u64 {
     let x = a ^ b;
     let nonzero = (x | x.wrapping_neg()) >> 63;
     1u64.wrapping_sub(nonzero)
@@ -158,7 +166,8 @@ pub fn ct_eq_u64(a: u64, b: u64) -> u64 {
 /// ```
 #[inline(always)]
 #[must_use]
-pub fn ct_lt_u32(a: u32, b: u32) -> u32 {
+#[rustfmt::skip]
+pub  fn ct_lt_u32(a: u32, b: u32) -> u32 {
     // Technique: for unsigned a < b, the borrow propagation trick.
     // (a ^ ((a ^ b) | ((a.wrapping_sub(b)) ^ b))) >> 31 isolates the borrow bit.
     // This is the standard Hacker's Delight unsigned-LT without comparison opcode.
@@ -178,7 +187,8 @@ pub fn ct_lt_u32(a: u32, b: u32) -> u32 {
 /// ```
 #[inline(always)]
 #[must_use]
-pub fn ct_lt_i64(a: i64, b: i64) -> u64 {
+#[rustfmt::skip]
+pub  fn ct_lt_i64(a: i64, b: i64) -> u64 {
     // Reinterpret as u64 for bit manipulation.
     let ua = a as u64;
     let ub = b as u64;
@@ -209,7 +219,8 @@ pub fn ct_lt_i64(a: i64, b: i64) -> u64 {
 /// ```
 #[inline]
 #[must_use]
-pub fn ct_byte_slice_eq(a: &[u8], b: &[u8]) -> u8 {
+#[rustfmt::skip]
+pub  fn ct_byte_slice_eq(a: &[u8], b: &[u8]) -> u8 {
     if a.len() != b.len() {
         return 0;
     }
@@ -236,7 +247,8 @@ pub fn ct_byte_slice_eq(a: &[u8], b: &[u8]) -> u8 {
 /// assert_eq!((x, y), (20, 10));
 /// ```
 #[inline(always)]
-pub fn ct_conditional_swap_u64(condition: u64, a: &mut u64, b: &mut u64) {
+#[rustfmt::skip]
+pub  fn ct_conditional_swap_u64(condition: u64, a: &mut u64, b: &mut u64) {
     // mask is all-ones if condition == 1, all-zeros otherwise.
     // diff is (*a ^ *b) masked: equals *a ^ *b when swapping, 0 when not.
     // XOR-ing both by diff swaps them (XOR swap) only when condition == 1.
@@ -260,7 +272,8 @@ pub fn ct_conditional_swap_u64(condition: u64, a: &mut u64, b: &mut u64) {
 /// ```
 #[inline(always)]
 #[must_use]
-pub fn ct_abs_i64(x: i64) -> i64 {
+#[rustfmt::skip]
+pub  fn ct_abs_i64(x: i64) -> i64 {
     // Arithmetic right shift propagates the sign bit into all positions.
     // mask = 0 for non-negative, -1 (all ones) for negative.
     // (x ^ mask) - mask: for negative, flips all bits then adds 1 = two's complement negation.
@@ -279,7 +292,8 @@ pub fn ct_abs_i64(x: i64) -> i64 {
 /// ```
 #[inline(always)]
 #[must_use]
-pub fn ct_min_u32(a: u32, b: u32) -> u32 {
+#[rustfmt::skip]
+pub  fn ct_min_u32(a: u32, b: u32) -> u32 {
     // If a < b: mask = all-ones, selects a; else mask = 0, b + 0 = b.
     // b + ((a - b) & mask): when a < b, a - b is the negative delta; b + (a-b) = a.
     let mask = 0u32.wrapping_sub(ct_lt_u32(a, b));
@@ -297,7 +311,8 @@ pub fn ct_min_u32(a: u32, b: u32) -> u32 {
 /// ```
 #[inline(always)]
 #[must_use]
-pub fn ct_max_u32(a: u32, b: u32) -> u32 {
+#[rustfmt::skip]
+pub  fn ct_max_u32(a: u32, b: u32) -> u32 {
     // max(a, b) = a + ((b - a) & mask) where mask is all-ones when a < b.
     // When a < b: ct_lt_u32(a,b) = 1 => mask = 0xFFFFFFFF => result = a + (b-a) = b.
     // When a >= b: ct_lt_u32(a,b) = 0 => mask = 0 => result = a + 0 = a.
@@ -316,7 +331,8 @@ pub fn ct_max_u32(a: u32, b: u32) -> u32 {
 /// ```
 #[inline(always)]
 #[must_use]
-pub fn ct_clamp_u32(val: u32, lo: u32, hi: u32) -> u32 {
+#[rustfmt::skip]
+pub  fn ct_clamp_u32(val: u32, lo: u32, hi: u32) -> u32 {
     ct_min_u32(ct_max_u32(val, lo), hi)
 }
 

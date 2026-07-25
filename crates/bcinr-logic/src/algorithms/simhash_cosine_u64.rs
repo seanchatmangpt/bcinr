@@ -24,7 +24,8 @@
 /// let sig = simhash_cosine_u64(&features);
 /// assert_eq!(simhash_hamming_distance(sig, sig), 0);
 /// ```
-pub fn simhash_cosine_u64(features: &[u64]) -> u64 {
+#[rustfmt::skip]
+pub  fn simhash_cosine_u64(features: &[u64]) -> u64 {
     // Accumulate signed bit-votes: +1 for each feature with bit set, -1 for clear.
     let mut counts = [0i32; 64];
     features.iter().for_each(|&f| {
@@ -56,7 +57,8 @@ pub fn simhash_cosine_u64(features: &[u64]) -> u64 {
 /// assert_eq!(simhash_hamming_distance(0u64, 0u64), 0);
 /// assert_eq!(simhash_hamming_distance(u64::MAX, 0u64), 64);
 /// ```
-pub fn simhash_hamming_distance(a: u64, b: u64) -> u32 {
+#[rustfmt::skip]
+pub  fn simhash_hamming_distance(a: u64, b: u64) -> u32 {
     (a ^ b).count_ones()
 }
 
@@ -235,7 +237,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_simhash_cosine_u64(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_simhash_cosine_u64(c: &mut Criterion) {
         let features: [u64; 64] = core::array::from_fn(|i| i as u64);
         c.bench_function("simhash_cosine_u64", |b| {
             b.iter(|| {
@@ -245,7 +248,8 @@ pub mod bench {
         });
     }
 
-    pub fn bench_simhash_hamming_distance(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_simhash_hamming_distance(c: &mut Criterion) {
         c.bench_function("simhash_hamming_distance", |b| {
             b.iter(|| {
                 let res = simhash_hamming_distance(
@@ -257,3 +261,13 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant
+
+// counterfactual_mutant
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

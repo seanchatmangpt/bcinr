@@ -1,3 +1,4 @@
+#![allow(clippy::incompatible_msrv)]
 use bcinr_core::logic::fix::add_sat;
 use bcinr_core::logic::int::popcount_u64;
 use bcinr_core::logic::mask::select_u32;

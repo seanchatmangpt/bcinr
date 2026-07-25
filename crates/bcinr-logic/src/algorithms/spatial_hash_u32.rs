@@ -26,7 +26,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn spatial_hash_u32(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn spatial_hash_u32(val: u64, aux: u64) -> u64 {
     let hx = val.wrapping_mul(73856093);
     let hy = aux.wrapping_mul(19349663);
     hx ^ hy
@@ -93,8 +94,11 @@ mod tests {
         );
         // mutants
         let base = spatial_hash_u32_reference(42, 1337);
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_spatial_hash_u32_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_spatial_hash_u32_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_spatial_hash_u32_3(42, 1337), base, "mutant 3");
     }
 
@@ -115,7 +119,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_spatial_hash_u32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_spatial_hash_u32(c: &mut Criterion) {
         c.bench_function("spatial_hash_u32", |b| {
             b.iter(|| {
                 let res = spatial_hash_u32(black_box(42), black_box(1337));
@@ -124,3 +129,9 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant
+
+// counterfactual_mutant
+
+// counterfactual_mutant

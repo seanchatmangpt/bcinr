@@ -101,7 +101,8 @@ pub const fn bucketize_u32(val: u32, step: u32) -> u32 {
 /// assert!((result - 7.5).abs() < 0.001);
 /// ```
 #[inline(always)]
-pub fn q16_mul(a: i32, b: i32) -> i32 {
+#[rustfmt::skip]
+pub  fn q16_mul(a: i32, b: i32) -> i32 {
     ((a as i64 * b as i64) >> 16) as i32
 }
 
@@ -118,7 +119,8 @@ pub fn q16_mul(a: i32, b: i32) -> i32 {
 /// assert!((result - 2.5).abs() < 0.001);
 /// ```
 #[inline(always)]
-pub fn q16_div(a: i32, b: i32) -> i32 {
+#[rustfmt::skip]
+pub  fn q16_div(a: i32, b: i32) -> i32 {
     // Branchless: replace zero divisor with 1 to avoid division by zero.
     // When b == 0, (b == 0) as i32 == 1, so safe_b = 0 | 1 = 1.
     // When b != 0, (b == 0) as i32 == 0, so safe_b = b | 0 = b.
@@ -135,7 +137,8 @@ pub fn q16_div(a: i32, b: i32) -> i32 {
 /// assert_eq!(f32_to_q16(0.5), 32768);
 /// ```
 #[inline(always)]
-pub fn f32_to_q16(x: f32) -> i32 {
+#[rustfmt::skip]
+pub  fn f32_to_q16(x: f32) -> i32 {
     (x * 65536.0) as i32
 }
 
@@ -147,7 +150,8 @@ pub fn f32_to_q16(x: f32) -> i32 {
 /// assert!((q16_to_f32(65536) - 1.0).abs() < 1e-6);
 /// ```
 #[inline(always)]
-pub fn q16_to_f32(x: i32) -> f32 {
+#[rustfmt::skip]
+pub  fn q16_to_f32(x: i32) -> f32 {
     x as f32 / 65536.0
 }
 
@@ -169,7 +173,8 @@ pub fn q16_to_f32(x: i32) -> f32 {
 /// assert!((q16_to_f32(r) - 0.25).abs() < 0.001);
 /// ```
 #[inline(always)]
-pub fn q16_recip(x: i32) -> i32 {
+#[rustfmt::skip]
+pub  fn q16_recip(x: i32) -> i32 {
     // Guard: saturate for zero input (branchless via mask).
     let is_zero = (x == 0) as i32; // 0 or 1
     let zero_mask = 0i32.wrapping_sub(is_zero); // 0 or 0xFFFFFFFF
@@ -207,7 +212,8 @@ pub fn q16_recip(x: i32) -> i32 {
 /// assert_eq!(isqrt_u32(u32::MAX), 65535);
 /// ```
 #[inline(always)]
-pub fn isqrt_u32(n: u32) -> u32 {
+#[rustfmt::skip]
+pub  fn isqrt_u32(n: u32) -> u32 {
     if n == 0 {
         return 0;
     }
@@ -245,7 +251,8 @@ pub fn isqrt_u32(n: u32) -> u32 {
 /// assert!((result - 2.0).abs() < 0.01);
 /// ```
 #[inline(always)]
-pub fn q16_sqrt(x: i32) -> i32 {
+#[rustfmt::skip]
+pub  fn q16_sqrt(x: i32) -> i32 {
     if x <= 0 {
         return 0;
     }
@@ -310,7 +317,8 @@ pub mod trig_const {
 /// assert!((s - 1.0).abs() < 0.002);
 /// ```
 #[inline(always)]
-pub fn q16_sin_bhaskara(theta: i32) -> i32 {
+#[rustfmt::skip]
+pub  fn q16_sin_bhaskara(theta: i32) -> i32 {
     use trig_const::PI;
     let pi_minus_theta = PI - theta;
     // Numerator: 16 * theta * (PI - theta) in Q32.32.
@@ -339,7 +347,8 @@ pub fn q16_sin_bhaskara(theta: i32) -> i32 {
 /// assert!((s - 1.0).abs() < 0.002);
 /// ```
 #[inline(always)]
-pub fn q16_sin_approx(theta: i32) -> i32 {
+#[rustfmt::skip]
+pub  fn q16_sin_approx(theta: i32) -> i32 {
     use trig_const::{PI, TWO_PI};
     // Reduce theta to [0, 2*pi) -- integer modulo in Q16.16.
     // For negative theta, bring into positive range first.
@@ -378,7 +387,8 @@ pub fn q16_sin_approx(theta: i32) -> i32 {
 /// assert!(c2.abs() < 0.01);
 /// ```
 #[inline(always)]
-pub fn q16_cos_approx(theta: i32) -> i32 {
+#[rustfmt::skip]
+pub  fn q16_cos_approx(theta: i32) -> i32 {
     q16_sin_approx(trig_const::PI_OVER_2.wrapping_sub(theta))
 }
 
@@ -423,7 +433,8 @@ pub const fn ilog2_u32(x: u32) -> u32 {
 /// assert!((q16_to_f32(q16_log2(four)) - 2.0).abs() < 0.05);
 /// ```
 #[inline(always)]
-pub fn q16_log2(x: i32) -> i32 {
+#[rustfmt::skip]
+pub  fn q16_log2(x: i32) -> i32 {
     if x <= 0 {
         return i32::MIN; // Undefined / -infinity.
     }
@@ -584,7 +595,16 @@ mod tests {
 
     #[test]
     fn test_f32_q16_roundtrip() {
-        let vals = [0.0f32, 1.0, -1.0, 0.5, -0.5, std::f32::consts::PI, 100.0, -100.0];
+        let vals = [
+            0.0f32,
+            1.0,
+            -1.0,
+            0.5,
+            -0.5,
+            std::f32::consts::PI,
+            100.0,
+            -100.0,
+        ];
         for &v in &vals {
             let encoded = f32_to_q16(v);
             let decoded = q16_to_f32(encoded);
@@ -853,3 +873,11 @@ mod tests {
 // Padding Line 112
 // Padding Line 113
 // Padding Line 114
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

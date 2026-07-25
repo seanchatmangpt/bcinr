@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! Branchless POWL ontology matrix compiler and executor.
 //!
 //! Fully branchless (CC = 1), zero-allocation, and `#![no_std]` compliant.

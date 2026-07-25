@@ -20,7 +20,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn branchless_signum_i64(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn branchless_signum_i64(val: u64, aux: u64) -> u64 {
     // Branchless Contract: signum of (val + aux) interpreted as i64, returning
     // -1, 0, or 1 as a two's-complement u64 bit pattern. Computed via two
     // arithmetic shifts: the sign bit OR'd with the negated-sign indicator.
@@ -129,7 +130,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_branchless_signum_i64(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_branchless_signum_i64(c: &mut Criterion) {
         c.bench_function("branchless_signum_i64", |b| {
             b.iter(|| {
                 let res = branchless_signum_i64(black_box(42), black_box(1337));
@@ -138,3 +140,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

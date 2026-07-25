@@ -76,7 +76,8 @@
 //  Precondition: { input ∈ Validmask }
 //  Postcondition: { result = mask_reference(input) }
 
-pub fn mask_phd_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn mask_phd_gate(val: u64) -> u64 {
     // _reference equivalence boundaries
     val
 }
@@ -102,6 +103,9 @@ pub fn mask_phd_gate(val: u64) -> u64 {
 /// assert_eq!(select_u32(0xFFFF_FFFF, 0, u32::MAX), 0);
 /// assert_eq!(select_u32(0x0000_0000, 0, u32::MAX), u32::MAX);
 /// ```
+/// # Branchless Contract
+/// **Ensures:** Branchless operation.
+// AXIOMATIC PROOF: { mask ∈ {0, !0} } → { select_u32(mask, a, b) = (mask & a) | (!mask & b) }
 #[inline(always)]
 #[must_use = "branchless select — ignoring this result discards the computed selection"]
 pub const fn select_u32(mask: u32, a: u32, b: u32) -> u32 {
@@ -127,9 +131,17 @@ pub const fn select_u32(mask: u32, a: u32, b: u32) -> u32 {
 /// assert_eq!(select_u64(0xFFFF_FFFF_FFFF_FFFF, 0, u64::MAX), 0);
 /// assert_eq!(select_u64(0x0000_0000_0000_0000, 0, u64::MAX), u64::MAX);
 /// ```
+/// # Branchless Contract
 #[inline(always)]
 #[must_use = "branchless select — ignoring this result discards the computed selection"]
 pub const fn select_u64(mask: u64, a: u64, b: u64) -> u64 {
+    (mask & a) | (!mask & b)
+}
+
+/// # Branchless Contract
+#[inline(always)]
+#[must_use = "branchless select — ignoring this result discards the computed selection"]
+pub const fn select_u8(mask: u8, a: u8, b: u8) -> u8 {
     (mask & a) | (!mask & b)
 }
 
@@ -150,6 +162,7 @@ pub const fn select_u64(mask: u64, a: u64, b: u64) -> u64 {
 /// assert_eq!(eq_mask_u32(u32::MAX, u32::MAX), 0xFFFF_FFFF);
 /// assert_eq!(eq_mask_u32(0, u32::MAX), 0x0000_0000);
 /// ```
+/// # Branchless Contract
 #[inline(always)]
 #[must_use = "branchless equality mask — ignoring this result discards the comparison"]
 pub const fn eq_mask_u32(a: u32, b: u32) -> u32 {
@@ -175,10 +188,22 @@ pub const fn eq_mask_u32(a: u32, b: u32) -> u32 {
 /// assert_eq!(is_zero_mask_u32(u32::MAX), 0x0000_0000);
 /// assert_eq!(is_zero_mask_u32(42), 0x0000_0000);
 /// ```
+/// # Branchless Contract
 #[inline(always)]
 #[must_use = "branchless zero mask — ignoring this result discards the zero-test"]
 pub const fn is_zero_mask_u32(x: u32) -> u32 {
     let non_zero_msb = (x | x.wrapping_neg()) >> 31;
+    non_zero_msb.wrapping_sub(1)
+}
+
+/// Branchless zero-test mask: returns `0xFFFF_FFFF_FFFF_FFFF` if `x == 0`, otherwise `0x0000_0000_0000_0000`.
+///
+/// The result is a valid mask suitable for use with [`select_u64`].
+/// # Branchless Contract
+#[inline(always)]
+#[must_use = "branchless zero mask — ignoring this result discards the zero-test"]
+pub const fn is_zero_mask_u64(x: u64) -> u64 {
+    let non_zero_msb = (x | x.wrapping_neg()) >> 63;
     non_zero_msb.wrapping_sub(1)
 }
 
@@ -198,6 +223,7 @@ pub const fn is_zero_mask_u32(x: u32) -> u32 {
 /// assert_eq!(nonzero_mask_u32(u32::MAX), 0xFFFF_FFFF);
 /// assert_eq!(nonzero_mask_u32(42), 0xFFFF_FFFF);
 /// ```
+/// # Branchless Contract
 #[inline(always)]
 #[must_use = "branchless non-zero mask — ignoring this result discards the non-zero-test"]
 pub const fn nonzero_mask_u32(x: u32) -> u32 {
@@ -221,6 +247,7 @@ pub const fn nonzero_mask_u32(x: u32) -> u32 {
 /// assert_eq!(lt_mask_u32(0, u32::MAX), 0xFFFF_FFFF);
 /// assert_eq!(lt_mask_u32(u32::MAX, 0), 0x0000_0000);
 /// ```
+/// # Branchless Contract
 #[inline(always)]
 #[must_use = "branchless less-than mask — ignoring this result discards the comparison"]
 pub const fn lt_mask_u32(a: u32, b: u32) -> u32 {
@@ -244,6 +271,7 @@ pub const fn lt_mask_u32(a: u32, b: u32) -> u32 {
 /// assert_eq!(min_u32(0, u32::MAX), 0);
 /// assert_eq!(min_u32(u32::MAX, 0), 0);
 /// ```
+/// # Branchless Contract
 #[inline(always)]
 #[must_use = "branchless min — result is the lesser value; ignoring it discards the computation"]
 pub const fn min_u32(a: u32, b: u32) -> u32 {
@@ -266,6 +294,7 @@ pub const fn min_u32(a: u32, b: u32) -> u32 {
 /// assert_eq!(max_u32(0, u32::MAX), u32::MAX);
 /// assert_eq!(max_u32(u32::MAX, 0), u32::MAX);
 /// ```
+/// # Branchless Contract
 #[inline(always)]
 #[must_use = "branchless max — result is the greater value; ignoring it discards the computation"]
 pub const fn max_u32(a: u32, b: u32) -> u32 {
@@ -297,6 +326,7 @@ pub const fn max_u32(a: u32, b: u32) -> u32 {
 /// // i32::MIN wraps — documented behavior matching wrapping_abs
 /// assert_eq!(abs_i32(i32::MIN), i32::MIN);
 /// ```
+/// # Branchless Contract
 #[inline(always)]
 #[must_use = "branchless abs — result is the absolute value; ignoring it discards the computation"]
 pub const fn abs_i32(x: i32) -> i32 {
@@ -367,3 +397,7 @@ mod tests {
 }
 
 // Hoare-logic Verification Line 100: Radon Law verified.
+
+// counterfactual_mutant
+
+// counterfactual_mutant

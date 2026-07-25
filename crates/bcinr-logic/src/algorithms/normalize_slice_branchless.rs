@@ -30,7 +30,8 @@
 /// ```
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn normalize_slice_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn normalize_slice_branchless(val: u64, aux: u64) -> u64 {
     let scale = (aux & 0xFF) | ((aux & 0xFF) == 0) as u64;
     let mut res = 0u64;
     for i in 0..8 {
@@ -142,7 +143,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_normalize_slice_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_normalize_slice_branchless(c: &mut Criterion) {
         c.bench_function("normalize_slice_branchless", |b| {
             b.iter(|| {
                 let res = normalize_slice_branchless(black_box(42), black_box(1337));
@@ -159,3 +161,7 @@ pub mod bench {
 // Line 118
 // Line 119
 // Line 120
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

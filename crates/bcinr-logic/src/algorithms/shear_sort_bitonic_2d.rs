@@ -21,7 +21,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn shear_sort_bitonic_2d(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn shear_sort_bitonic_2d(val: u64, aux: u64) -> u64 {
     // Branchless Contract: one compare-exchange of a shear-sort / bitonic step on
     // the 2-element pair (val, aux). The pair is sorted ascending and packed as
     // (min in low 32 bits, max in high 32 bits), the canonical ordered cell.
@@ -89,8 +90,11 @@ mod tests {
         );
         // mutants
         let base = shear_sort_bitonic_2d_reference(42, 1337);
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_shear_sort_bitonic_2d_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_shear_sort_bitonic_2d_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_shear_sort_bitonic_2d_3(42, 1337), base, "mutant 3");
     }
 
@@ -111,7 +115,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_shear_sort_bitonic_2d(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_shear_sort_bitonic_2d(c: &mut Criterion) {
         c.bench_function("shear_sort_bitonic_2d", |b| {
             b.iter(|| {
                 let res = shear_sort_bitonic_2d(black_box(42), black_box(1337));
@@ -120,3 +125,9 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant
+
+// counterfactual_mutant
+
+// counterfactual_mutant

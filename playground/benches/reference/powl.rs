@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! POWL v2 → POWL64 compiler and execution engine reference.
 
 // ── AST & Core Types ────────────────────────────────────────────────────────

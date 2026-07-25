@@ -60,7 +60,8 @@ static CRC32C_TABLE: [u32; 256] = build_crc32c_table();
 /// // CRC-32C of "123456789" (standard test vector) = 0xE3069283
 /// assert_eq!(crc32c_branchless(b"123456789", !0) ^ !0, 0xE3069283);
 /// ```
-pub fn crc32c_branchless(data: &[u8], initial: u32) -> u32 {
+#[rustfmt::skip]
+pub  fn crc32c_branchless(data: &[u8], initial: u32) -> u32 {
     let mut crc = initial;
     for &byte in data {
         let idx = ((crc ^ byte as u32) & 0xFF) as usize;
@@ -223,7 +224,8 @@ pub mod bench {
     use criterion::{black_box, Criterion};
     #[cfg(feature = "alloc")]
 
-    pub fn bench_crc32c_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_crc32c_branchless(c: &mut Criterion) {
         #[cfg(feature = "alloc")]
         {
             let data: Vec<u8> = (0u8..=63).collect();
@@ -233,3 +235,9 @@ pub mod bench {
         }
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle

@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! Fuzz oracle: checks `bcinr`'s branchless `rook_attacks`/`bishop_attacks`
 //! against the `chess` crate's reference move generators over randomized
 //! squares and occupancy bitboards.

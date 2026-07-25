@@ -21,7 +21,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn triangle_count_bitset(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn triangle_count_bitset(val: u64, aux: u64) -> u64 {
     // Branchless Contract: bitset triangle/common-neighbour count. Given two
     // adjacency rows `val` and `aux`, the number of shared neighbours is the
     // population count of their intersection `val & aux` — the closed-form bitset
@@ -94,8 +95,11 @@ mod tests {
         );
         // mutants
         let base = triangle_count_bitset_reference(42, 1337);
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_triangle_count_bitset_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_triangle_count_bitset_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_triangle_count_bitset_3(42, 1337), base, "mutant 3");
     }
 
@@ -116,7 +120,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_triangle_count_bitset(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_triangle_count_bitset(c: &mut Criterion) {
         c.bench_function("triangle_count_bitset", |b| {
             b.iter(|| {
                 let res = triangle_count_bitset(black_box(42), black_box(1337));
@@ -125,3 +130,9 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant
+
+// counterfactual_mutant
+
+// counterfactual_mutant

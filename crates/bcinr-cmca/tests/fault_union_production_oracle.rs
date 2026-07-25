@@ -52,7 +52,10 @@ fn oracle_union_is_idempotent_on_repeated_fault_bit() {
         "union(a, a) must equal a (idempotent bitwise-OR); a corrupted xor-union \
          would instead cancel every shared bit back to EMPTY"
     );
-    assert!(!doubled.is_empty(), "idempotent union of a nonempty fault set must stay nonempty");
+    assert!(
+        !doubled.is_empty(),
+        "idempotent union of a nonempty fault set must stay nonempty"
+    );
 }
 
 /// Exercises the full three-way accumulation law

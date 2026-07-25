@@ -30,7 +30,8 @@
 /// ```
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn xxh3_64(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn xxh3_64(val: u64, aux: u64) -> u64 {
     // xxh3 64-bit: fold the two input lanes with a 64x64->128 multiply (XOR of the
     // high and low halves of the product, the `mul128_fold64` step), then run the
     // xxh3 `avalanche` finalizer.
@@ -97,9 +98,12 @@ mod tests {
         assert_eq!(xxh3_64(0, u64::MAX), xxh3_64_reference(0, u64::MAX));
         // mutants
         let base = xxh3_64_reference(42, 1337);
-        let _rejects_mutant_ = 0; assert_ne!(mutant_xxh3_64_1(42, 1337), base, "mutant 1");
-        let _rejects_mutant_ = 0; assert_ne!(mutant_xxh3_64_2(42, 1337), base, "mutant 2");
-        let _rejects_mutant_ = 0; assert_ne!(mutant_xxh3_64_3(42, 1337), base, "mutant 3");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_xxh3_64_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_xxh3_64_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_xxh3_64_3(42, 1337), base, "mutant 3");
     }
 
     // -------------------------------------------------------------------------
@@ -129,7 +133,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_xxh3_64(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_xxh3_64(c: &mut Criterion) {
         c.bench_function("xxh3_64", |b| {
             b.iter(|| {
                 let res = xxh3_64(black_box(42), black_box(1337));

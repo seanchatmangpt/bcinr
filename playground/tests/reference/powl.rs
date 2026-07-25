@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! POWL v2 → POWL64 compiler and execution engine reference.
 //!
 //! `#![allow(dead_code)]`: see `reference/petri.rs`'s module doc comment —

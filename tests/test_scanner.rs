@@ -1,3 +1,4 @@
+#![allow(clippy::cmp_owned)]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum RuleId {
     SelfCancelingOperations,

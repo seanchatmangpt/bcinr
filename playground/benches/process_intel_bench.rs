@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! Criterion micro-benchmarks for `playground`'s process-intelligence
 //! primitives (YAWL engine, POWL step execution, TEKG snapshot chains, and
 //! their WASM-exported counterparts).

@@ -20,7 +20,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn binom_sat_u32(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn binom_sat_u32(val: u64, aux: u64) -> u64 {
     // Branchless Contract: saturating binomial coefficient C(n, k) where
     // n = low 32 bits of val and k = low 32 bits of aux clamped to {0,1,2}
     // (the branchlessly computable initial column of Pascal's triangle).
@@ -141,7 +142,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_binom_sat_u32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_binom_sat_u32(c: &mut Criterion) {
         c.bench_function("binom_sat_u32", |b| {
             b.iter(|| {
                 let res = binom_sat_u32(black_box(42), black_box(1337));
@@ -150,3 +152,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

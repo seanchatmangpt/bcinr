@@ -29,7 +29,8 @@
 /// // Key 42 must appear with count >= 1.
 /// assert!(table.iter().any(|&(k, c)| k == 42 && c >= 1));
 /// ```
-pub fn heavy_hitter_update(table: &mut [(u64, u64)], key: u64) {
+#[rustfmt::skip]
+pub  fn heavy_hitter_update(table: &mut [(u64, u64)], key: u64) {
     let k = table.len();
     if k == 0 {
         return;
@@ -252,7 +253,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_heavy_hitter_update(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_heavy_hitter_update(c: &mut Criterion) {
         let mut table = [(0u64, 0u64); 16];
         c.bench_function("heavy_hitter_update", |b| {
             b.iter(|| {
@@ -261,3 +263,13 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

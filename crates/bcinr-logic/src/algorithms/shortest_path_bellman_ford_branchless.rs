@@ -19,7 +19,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn shortest_path_bellman_ford_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn shortest_path_bellman_ford_branchless(val: u64, aux: u64) -> u64 {
     val.saturating_add(aux)
 }
 
@@ -117,7 +118,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_shortest_path_bellman_ford_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_shortest_path_bellman_ford_branchless(c: &mut Criterion) {
         c.bench_function("shortest_path_bellman_ford_branchless", |b| {
             b.iter(|| {
                 let res = shortest_path_bellman_ford_branchless(black_box(42), black_box(1337));
@@ -126,3 +128,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

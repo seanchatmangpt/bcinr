@@ -20,7 +20,8 @@
 /// ```
 #[inline(always)]
 #[must_use = "horizontal_or_u32 result — ignoring discards the OR-reduction"]
-pub fn horizontal_or_u32(slice: &[u32]) -> u32 {
+#[rustfmt::skip]
+pub  fn horizontal_or_u32(slice: &[u32]) -> u32 {
     let mut res = 0;
     (0..slice.len()).for_each(|i| res |= slice[i]);
     res
@@ -43,7 +44,8 @@ pub fn horizontal_or_u32(slice: &[u32]) -> u32 {
 /// ```
 #[inline(always)]
 #[must_use = "horizontal_and_u32 result — ignoring discards the AND-reduction"]
-pub fn horizontal_and_u32(slice: &[u32]) -> u32 {
+#[rustfmt::skip]
+pub  fn horizontal_and_u32(slice: &[u32]) -> u32 {
     let is_empty = slice.is_empty() as u32;
     let mut res = 0u32.wrapping_sub(1 - is_empty);
     (0..slice.len()).for_each(|i| res &= slice[i]);
@@ -66,7 +68,8 @@ pub fn horizontal_and_u32(slice: &[u32]) -> u32 {
 /// ```
 #[inline(always)]
 #[must_use = "horizontal_xor_u32 result — ignoring discards the XOR-reduction"]
-pub fn horizontal_xor_u32(slice: &[u32]) -> u32 {
+#[rustfmt::skip]
+pub  fn horizontal_xor_u32(slice: &[u32]) -> u32 {
     let mut res = 0;
     (0..slice.len()).for_each(|i| res ^= slice[i]);
     res
@@ -156,7 +159,8 @@ fn swar_byte_min(a: u64, b: u64) -> u64 {
 /// ```
 #[inline(always)]
 #[must_use = "horizontal_max_u8x8 result — ignoring discards the maximum lane value"]
-pub fn horizontal_max_u8x8(v: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn horizontal_max_u8x8(v: u64) -> u64 {
     // 3-step pairwise SWAR tournament reduction.
     let v1 = swar_byte_max(v, v >> 8); // compare bytes (0,1),(2,3),(4,5),(6,7)
     let v1 = swar_byte_max(v1, v1 >> 16); // compare pairs
@@ -183,7 +187,8 @@ pub fn horizontal_max_u8x8(v: u64) -> u64 {
 /// ```
 #[inline(always)]
 #[must_use = "horizontal_min_u8x8 result — ignoring discards the minimum lane value"]
-pub fn horizontal_min_u8x8(v: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn horizontal_min_u8x8(v: u64) -> u64 {
     // 3-step pairwise SWAR tournament reduction.
     let v1 = swar_byte_min(v, v >> 8); // compare bytes (0,1),(2,3),(4,5),(6,7)
     let v1 = swar_byte_min(v1, v1 >> 16); // compare pairs
@@ -209,7 +214,8 @@ pub fn horizontal_min_u8x8(v: u64) -> u64 {
 /// assert_eq!(swar_horizontal_sum(word), 36); // 1+2+3+4+5+6+7+8
 /// ```
 #[inline(always)]
-pub fn swar_horizontal_sum(word: u64) -> u32 {
+#[rustfmt::skip]
+pub  fn swar_horizontal_sum(word: u64) -> u32 {
     // Step 1: add pairs of adjacent bytes into u16 lanes.
     let lo = word & 0x00FF_00FF_00FF_00FFu64;
     let hi = (word >> 8) & 0x00FF_00FF_00FF_00FFu64;
@@ -237,7 +243,8 @@ pub fn swar_horizontal_sum(word: u64) -> u32 {
 /// assert_eq!(swar_horizontal_max_u8(word), 9);
 /// ```
 #[inline(always)]
-pub fn swar_horizontal_max_u8(word: u64) -> u8 {
+#[rustfmt::skip]
+pub  fn swar_horizontal_max_u8(word: u64) -> u8 {
     // Extract each byte lane explicitly — avoids inter-lane interference.
     let b = [
         (word) as u8,
@@ -277,7 +284,8 @@ pub fn swar_horizontal_max_u8(word: u64) -> u8 {
 /// assert_eq!(swar_count_eq_u8(word, b'a'), 5);
 /// ```
 #[inline(always)]
-pub fn swar_count_eq_u8(word: u64, target: u8) -> u32 {
+#[rustfmt::skip]
+pub  fn swar_count_eq_u8(word: u64, target: u8) -> u32 {
     // Broadcast target across all 8 byte lanes.
     let broadcast = (target as u64).wrapping_mul(0x0101_0101_0101_0101u64);
 
@@ -312,7 +320,8 @@ pub fn swar_count_eq_u8(word: u64, target: u8) -> u32 {
 /// assert_eq!(reduce_min_u32(&[]), u32::MAX);
 /// ```
 #[inline]
-pub fn reduce_min_u32(slice: &[u32]) -> u32 {
+#[rustfmt::skip]
+pub  fn reduce_min_u32(slice: &[u32]) -> u32 {
     let mut acc = u32::MAX;
     (0..slice.len()).for_each(|i| {
         let a = acc;
@@ -339,7 +348,8 @@ pub fn reduce_min_u32(slice: &[u32]) -> u32 {
 /// assert_eq!(reduce_max_u32(&[]), 0);
 /// ```
 #[inline]
-pub fn reduce_max_u32(slice: &[u32]) -> u32 {
+#[rustfmt::skip]
+pub  fn reduce_max_u32(slice: &[u32]) -> u32 {
     let mut acc = 0u32;
     (0..slice.len()).for_each(|i| {
         let a = acc;
@@ -366,7 +376,8 @@ pub fn reduce_max_u32(slice: &[u32]) -> u32 {
 /// assert_eq!(reduce_sum_u64(&[u32::MAX, u32::MAX]), 2 * u32::MAX as u64);
 /// ```
 #[inline]
-pub fn reduce_sum_u64(slice: &[u32]) -> u64 {
+#[rustfmt::skip]
+pub  fn reduce_sum_u64(slice: &[u32]) -> u64 {
     let mut acc = 0u64;
     (0..slice.len()).for_each(|i| {
         acc = acc.wrapping_add(slice[i] as u64);
@@ -740,3 +751,7 @@ mod tests_phd_reduce {
 // Padding Line 112
 // Padding Line 113
 // Padding Line 114
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

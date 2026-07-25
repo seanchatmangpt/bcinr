@@ -23,7 +23,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn compress_bits_u64(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn compress_bits_u64(val: u64, aux: u64) -> u64 {
     // Branchless Contract: parallel bit-gather (PEXT). Extract the bits of
     // `val` at positions where mask `aux` is set and pack them into the low
     // end of the result, in order. Hacker's Delight `compress`, fully unrolled
@@ -203,7 +204,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_compress_bits_u64(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_compress_bits_u64(c: &mut Criterion) {
         c.bench_function("compress_bits_u64", |b| {
             b.iter(|| {
                 let res = compress_bits_u64(black_box(42), black_box(1337));
@@ -212,3 +214,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

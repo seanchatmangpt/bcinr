@@ -19,7 +19,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn clique_check_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn clique_check_branchless(val: u64, aux: u64) -> u64 {
     ((val & aux) == val) as u64
 }
 
@@ -120,7 +121,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_clique_check_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_clique_check_branchless(c: &mut Criterion) {
         c.bench_function("clique_check_branchless", |b| {
             b.iter(|| {
                 let res = clique_check_branchless(black_box(42), black_box(1337));
@@ -129,3 +131,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

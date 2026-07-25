@@ -23,7 +23,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn prefix_sum_simd_u32x8(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn prefix_sum_simd_u32x8(val: u64, aux: u64) -> u64 {
     let lane0 = val as u32;
     let lane1 = (val >> 32) as u32;
     let seed = aux as u32;
@@ -125,7 +126,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_prefix_sum_simd_u32x8(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_prefix_sum_simd_u32x8(c: &mut Criterion) {
         c.bench_function("prefix_sum_simd_u32x8", |b| {
             b.iter(|| {
                 let res = prefix_sum_simd_u32x8(black_box(42), black_box(1337));
@@ -134,3 +136,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

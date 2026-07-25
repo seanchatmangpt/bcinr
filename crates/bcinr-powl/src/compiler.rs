@@ -1492,7 +1492,7 @@ mod tests {
     fn oracle_check_reachability(tape: &PowlTape) -> bool {
         let mut visited = std::collections::HashSet::new();
         let mut queue = std::collections::VecDeque::new();
-        
+
         // Seed queue with entry nodes
         for i in 0..tape.len {
             let idx = i as usize;
@@ -1501,7 +1501,7 @@ mod tests {
                 visited.insert(idx);
             }
         }
-        
+
         // BFS traversal
         while let Some(u) = queue.pop_front() {
             let succs = tape.ops[u].succ_mask;
@@ -1513,7 +1513,7 @@ mod tests {
                 }
             }
         }
-        
+
         // Verify all active non-LoopRedo nodes are visited
         for i in 0..tape.len {
             let idx = i as usize;
@@ -1665,7 +1665,7 @@ mod tests {
             let mut tape = PowlTape::new();
             let len = rng.next_range(1, 64);
             tape.len = len as u8;
-            
+
             for i in 0..len {
                 let kind_val = rng.next_range(0, 4);
                 tape.ops[i].kind = match kind_val {
@@ -1679,7 +1679,7 @@ mod tests {
                     tape.ops[i].kind = OpKind::LoopRedo;
                 }
             }
-            
+
             for i in 0..len {
                 let mut succs = 0u64;
                 for j in (i + 1)..len {
@@ -1689,7 +1689,7 @@ mod tests {
                 }
                 tape.ops[i].succ_mask = succs;
             }
-            
+
             for i in 0..len {
                 if tape.ops[i].kind == OpKind::LoopRedo {
                     let mut succs = 0u64;
@@ -1725,7 +1725,7 @@ mod tests {
 
             let expected = oracle_check_reachability(&tape);
             let actual = bp_tcrv_validate_reachability(&tape);
-            
+
             assert_eq!(
                 actual == !0u64,
                 expected,
@@ -1750,9 +1750,15 @@ mod tests {
             }
         }
 
-        assert!(killed_mutant_1, "Mutant 1 (Identity Reachability Omission) survived!");
+        assert!(
+            killed_mutant_1,
+            "Mutant 1 (Identity Reachability Omission) survived!"
+        );
         assert!(killed_mutant_2, "Mutant 2 (Pivot index Skew) survived!");
-        assert!(killed_mutant_3, "Mutant 3 (LoopRedo Admittance Corruption) survived!");
+        assert!(
+            killed_mutant_3,
+            "Mutant 3 (LoopRedo Admittance Corruption) survived!"
+        );
     }
 
     #[test]

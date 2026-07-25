@@ -2,16 +2,49 @@
 //!
 //! Provides primitives for building autonomic loops without imposing a specific execution model.
 
+pub mod auto_select;
+pub mod auto_select_adaptive_mutation;
+pub mod auto_select_epoch_reclamation;
+pub mod auto_select_execution_dispatch;
+pub mod auto_select_ocel_emission;
+pub mod auto_select_substrate_convergence;
+pub mod auto_select_terminal_convergence;
+pub mod auto_select_trace_logging;
 pub mod autonomic_substrate;
-#[cfg(feature = "alloc")]
+pub mod canonical_mass;
 pub mod kernel;
 pub mod metric_accumulator;
 pub mod packed_key_table;
 pub mod policy_guard;
+pub mod receipt_integration;
 pub mod rl_state;
+pub mod semantic_projection;
 
+pub use auto_select::{AutoSelectInput8, AutoSelectRefusal, AutoSelectResult, ToolCandidate};
+pub use auto_select_adaptive_mutation::{
+    apply_gradients, auto_select_adaptive_mutation, AdaptiveMutationRefusal,
+    AdaptiveMutationResult, AutoSelectTelemetry,
+};
+pub use auto_select_epoch_reclamation::{
+    EpochReclamationInput, EpochReclamationRefusal, EpochReclamationResult,
+};
+pub use auto_select_execution_dispatch::{
+    ExecutionDispatchInput, ExecutionDispatchRefusal, ExecutionDispatchResult, ToolExecutionState,
+};
+pub use auto_select_ocel_emission::{
+    emit_ocel_trace, OcelBufferState, OcelCausalFrame, OcelEmissionRefusal, OcelEmissionResult,
+};
+pub use auto_select_substrate_convergence::{
+    substrate_convergence, ConvergenceResult, SubstrateConvergenceRefusal,
+};
+pub use auto_select_terminal_convergence::{
+    terminal_convergence, PersistentControlState, RefusalAggregationState,
+    TerminalConvergenceInput, TerminalConvergenceRefusal, TerminalConvergenceResult,
+};
+pub use auto_select_trace_logging::{
+    log_execution_trace, TraceBufferState, TraceLoggingRefusal, TraceLoggingResult,
+};
 pub use autonomic_substrate::AutonomicSubstrate;
-#[cfg(feature = "alloc")]
 pub use kernel::{
     ActionKind, ActionRisk, AutonomicAction, AutonomicFeedback, AutonomicKernel, AutonomicResult,
     AutonomicState,
@@ -19,7 +52,15 @@ pub use kernel::{
 pub use metric_accumulator::MetricAccumulator;
 pub use packed_key_table::PackedKeyTable;
 pub use policy_guard::PolicyGuard;
+pub use receipt_integration::{
+    mfw_apply_receipt, powl_ingest_receipt, IngestResult, LearningWeights,
+    ReceiptIntegrationRefusal,
+};
 pub use rl_state::RlState;
+pub use semantic_projection::{
+    project_semantic_coordinate, SemanticConstraintMatrix, SemanticProjectionResult,
+    ToolCapabilityMatrix,
+};
 
 /// Generic Autonomic Health/Integrity state.
 #[derive(Debug, Clone, Copy, PartialEq)]

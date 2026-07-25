@@ -25,7 +25,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn wildcard_match_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn wildcard_match_branchless(val: u64, aux: u64) -> u64 {
     let residual = val & !aux;
     // residual == 0  ->  1, else 0  (branchless: any set bit makes (x|-x)>>63 == 1)
     1 ^ ((residual | residual.wrapping_neg()) >> 63)
@@ -127,7 +128,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_wildcard_match_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_wildcard_match_branchless(c: &mut Criterion) {
         c.bench_function("wildcard_match_branchless", |b| {
             b.iter(|| {
                 let res = wildcard_match_branchless(black_box(42), black_box(1337));

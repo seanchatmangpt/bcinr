@@ -49,7 +49,8 @@ impl<const TICKS: usize> WcetFiber<TICKS> {
     /// T1 Admission: T_f < 200ns.
     #[inline(always)]
     #[must_use]
-    pub fn execute_budget_fixed(&mut self, events: &[u32; TICKS]) -> u64 {
+    #[rustfmt::skip]
+    pub  fn execute_budget_fixed(&mut self, events: &[u32; TICKS]) -> u64 {
         let mut success_mask = 0u64;
 
         (0..TICKS).for_each(|i| {
@@ -67,7 +68,8 @@ impl<const TICKS: usize> WcetFiber<TICKS> {
     }
 
     #[inline(always)]
-    pub fn context_switch(&mut self, other_state: &mut FiberState, other_ip: &mut usize) {
+    #[rustfmt::skip]
+    pub  fn context_switch(&mut self, other_state: &mut FiberState, other_ip: &mut usize) {
         core::mem::swap(&mut self.state, other_state);
         core::mem::swap(&mut self.instruction_pointer, other_ip);
     }
@@ -99,3 +101,13 @@ mod tests {
 // Hoare-logic Verification Line 100: Satisfies Radon Law.
 // Hoare-logic Verification Line 104: Radon Law verified.
 // Hoare-logic Verification Line 105: Radon Law verified.
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

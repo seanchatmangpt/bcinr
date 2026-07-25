@@ -31,7 +31,8 @@
 /// count_min_sketch_update(&mut sketch, d, w, 42, 1);
 /// assert!(sketch.iter().any(|&c| c > 0));
 /// ```
-pub fn count_min_sketch_update(sketch: &mut [u32], d: usize, w: usize, key: u64, delta: u32) {
+#[rustfmt::skip]
+pub  fn count_min_sketch_update(sketch: &mut [u32], d: usize, w: usize, key: u64, delta: u32) {
     (0..d).for_each(|i| {
         let h = cm_hash(key, i as u64) as usize % w;
         let idx = i * w + h;
@@ -43,7 +44,8 @@ pub fn count_min_sketch_update(sketch: &mut [u32], d: usize, w: usize, key: u64,
 ///
 /// Maps (key, row_index) to a column in [0, w) via modular reduction.
 #[inline]
-pub fn cm_hash(key: u64, seed: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn cm_hash(key: u64, seed: u64) -> u64 {
     // Combine key and per-row seed with a golden-ratio multiplicative hash.
     let mut h = key ^ seed.wrapping_mul(0x9E3779B97F4A7C15);
     // splitmix64 finalisation for avalanche
@@ -215,7 +217,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_count_min_sketch_update(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_count_min_sketch_update(c: &mut Criterion) {
         let d = 4;
         let w = 64;
         let mut sketch = [0u32; 256];
@@ -232,3 +235,13 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant
+
+// counterfactual_mutant
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

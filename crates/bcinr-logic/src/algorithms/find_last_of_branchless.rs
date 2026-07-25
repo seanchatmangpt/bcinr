@@ -30,7 +30,8 @@
 /// ```
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn find_last_of_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn find_last_of_branchless(val: u64, aux: u64) -> u64 {
     let x = val ^ ((aux & 0xFF).wrapping_mul(0x0101010101010101));
     // Cascade-safe per-byte match mask (0x80 in each lane equal to the needle).
     let m = !(((x & 0x7F7F7F7F7F7F7F7F).wrapping_add(0x7F7F7F7F7F7F7F7F) | x) & 0x8080808080808080)
@@ -122,7 +123,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_find_last_of_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_find_last_of_branchless(c: &mut Criterion) {
         c.bench_function("find_last_of_branchless", |b| {
             b.iter(|| {
                 let res = find_last_of_branchless(black_box(42), black_box(1337));
@@ -139,3 +141,7 @@ pub mod bench {
 // Line 118
 // Line 119
 // Line 120
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

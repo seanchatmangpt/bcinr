@@ -1,3 +1,4 @@
+#![allow(clippy::cargo_common_metadata)]
 //! bcinr-mcp — MCP server exposing the ENTIRE bcinr library as MCP tools over stdio.
 //!
 //! Tools:
@@ -31,25 +32,28 @@ use serde::Deserialize;
 // causing "invalid type: floating point, expected u64". This deserializer also
 // accepts decimal strings ("18446744073709551615"), which LLMs often generate.
 
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum NumOrStrFlex {
+    Int(u64),
+    Float(f64),
+    Str(String),
+}
+
+fn flex_float_to_u64<E: serde::de::Error>(f: f64) -> Result<u64, E> {
+    if f >= 0.0 && f <= u64::MAX as f64 && f.fract() == 0.0 {
+        Ok(f as u64)
+    } else {
+        Err(E::custom(format!("{f} is not a valid u64")))
+    }
+}
+
 fn de_u64_flex<'de, D: serde::Deserializer<'de>>(d: D) -> Result<u64, D::Error> {
     use serde::de::Error as _;
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum NumOrStr {
-        Int(u64),
-        Float(f64),
-        Str(String),
-    }
-    match NumOrStr::deserialize(d)? {
-        NumOrStr::Int(n) => Ok(n),
-        NumOrStr::Float(f) => {
-            if f >= 0.0 && f <= u64::MAX as f64 && f.fract() == 0.0 {
-                Ok(f as u64)
-            } else {
-                Err(D::Error::custom(format!("{f} is not a valid u64")))
-            }
-        }
-        NumOrStr::Str(s) => s.parse::<u64>().map_err(D::Error::custom),
+    match NumOrStrFlex::deserialize(d)? {
+        NumOrStrFlex::Int(n) => Ok(n),
+        NumOrStrFlex::Float(f) => flex_float_to_u64(f),
+        NumOrStrFlex::Str(s) => s.parse::<u64>().map_err(D::Error::custom),
     }
 }
 
@@ -925,36 +929,37 @@ impl BcinrServer {
         description = "Perform branchless bitset operations: popcount, leading_zeros, trailing_zeros, msb, lsb. Returns JSON with operation, value, result."
     )]
     async fn bitset_operations(&self, Parameters(input): Parameters<BitsetInput>) -> String {
-        let v = input.value;
-        let result = match input.operation.as_str() {
-            "popcount" => v.count_ones() as u64,
-            "leading_zeros" => v.leading_zeros() as u64,
-            "trailing_zeros" => v.trailing_zeros() as u64,
-            "msb" => {
-                if v == 0 {
-                    u64::MAX
-                } else {
-                    63 - v.leading_zeros() as u64
-                }
-            }
-            "lsb" => {
-                if v == 0 {
-                    u64::MAX
-                } else {
-                    v.trailing_zeros() as u64
-                }
-            }
-            _ => {
-                return serde_json::json!({ "ok": false, "error": "unknown operation" }).to_string()
-            }
-        };
-        serde_json::json!({
-            "ok": true,
-            "operation": input.operation,
-            "value": v,
-            "result": result,
-        })
-        .to_string()
+        let result = Self::compute_bitset_op(input.value, &input.operation);
+        match result {
+            Some(res) => serde_json::json!({
+                "ok": true,
+                "operation": input.operation,
+                "value": input.value,
+                "result": res,
+            })
+            .to_string(),
+            None => serde_json::json!({ "ok": false, "error": "unknown operation" }).to_string(),
+        }
+    }
+}
+impl BcinrServer {
+    fn compute_bitset_op(v: u64, op: &str) -> Option<u64> {
+        match op {
+            "popcount" => Some(v.count_ones() as u64),
+            "leading_zeros" => Some(v.leading_zeros() as u64),
+            "trailing_zeros" => Some(v.trailing_zeros() as u64),
+            "msb" => Some(if v == 0 {
+                u64::MAX
+            } else {
+                63 - v.leading_zeros() as u64
+            }),
+            "lsb" => Some(if v == 0 {
+                u64::MAX
+            } else {
+                v.trailing_zeros() as u64
+            }),
+            _ => None,
+        }
     }
 
     /// Get information about DFA and automata capabilities.

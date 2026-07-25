@@ -23,7 +23,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn bitonic_merge_u64x8(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn bitonic_merge_u64x8(val: u64, aux: u64) -> u64 {
     let dirm = 0u64.wrapping_sub(aux & 1);
     let mut b = [
         val & 0xFF,
@@ -194,7 +195,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_bitonic_merge_u64x8(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_bitonic_merge_u64x8(c: &mut Criterion) {
         c.bench_function("bitonic_merge_u64x8", |b| {
             b.iter(|| {
                 let res = bitonic_merge_u64x8(black_box(42), black_box(1337));
@@ -203,3 +205,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

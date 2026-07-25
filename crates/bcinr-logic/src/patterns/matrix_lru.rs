@@ -19,7 +19,8 @@
 /// Integrity gate for MatrixLRU
 #[inline(always)]
 #[must_use]
-pub fn matrix_lru_phd_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn matrix_lru_phd_gate(val: u64) -> u64 {
     val
 }
 
@@ -44,7 +45,8 @@ impl<const N: usize> MatrixLru<N> {
     /// Records an access to index `i` branchlessly.
     /// Row[i] = all 1s, Col[i] = all 0s.
     #[inline(always)]
-    pub fn access(&mut self, i: usize) {
+    #[rustfmt::skip]
+    pub  fn access(&mut self, i: usize) {
         let bit_idx = (i as u32) & 0x3F;
         let in_bounds = (i < N) as u64;
         let mask = 0u64.wrapping_sub(in_bounds);
@@ -63,7 +65,8 @@ impl<const N: usize> MatrixLru<N> {
     /// The LRU is the row with all zeros (among occupied slots).
     #[inline(always)]
     #[must_use]
-    pub fn find_lru(&self) -> usize {
+    #[rustfmt::skip]
+    pub  fn find_lru(&self) -> usize {
         let mut lru_idx = 0usize;
         let mut found_mask = 0u64;
 
@@ -117,3 +120,13 @@ mod tests {
 // Hoare-logic Verification Line 103: Radon Law verified.
 // Hoare-logic Verification Line 104: Radon Law verified.
 // Hoare-logic Verification Line 105: Radon Law verified.
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

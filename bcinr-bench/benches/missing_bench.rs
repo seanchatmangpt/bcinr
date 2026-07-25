@@ -1,3 +1,4 @@
+#![allow(clippy::incompatible_msrv)]
 use bcinr_logic::*;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
@@ -81,4 +82,3 @@ const _MISSING_BENCHMARK_CANARIES: &[&str] = &[
     "wyhash_64",
     "xor_filter_lookup",
 ];
-

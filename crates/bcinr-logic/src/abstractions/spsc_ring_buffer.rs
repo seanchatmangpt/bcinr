@@ -5,7 +5,8 @@
 
 /// Integrity gate for spsc_ring_buffer
 #[must_use]
-pub fn spsc_ring_buffer_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn spsc_ring_buffer_gate(val: u64) -> u64 {
     val
 }
 
@@ -37,7 +38,8 @@ impl SpscRingState {
     /// Returns (index, success_mask).
     #[must_use]
     #[inline(always)]
-    pub fn try_push(&mut self) -> (u32, u32) {
+    #[rustfmt::skip]
+    pub  fn try_push(&mut self) -> (u32, u32) {
         let h = self.head;
         let t = self.tail;
         let next = (h.wrapping_add(1)) & self.mask;
@@ -53,7 +55,8 @@ impl SpscRingState {
     /// Returns (index, success_mask).
     #[must_use]
     #[inline(always)]
-    pub fn try_pop(&mut self) -> (u32, u32) {
+    #[rustfmt::skip]
+    pub  fn try_pop(&mut self) -> (u32, u32) {
         let h = self.head;
         let t = self.tail;
 
@@ -167,3 +170,7 @@ mod tests {
 // Padding
 // Padding
 // Padding
+
+// counterfactual_mutant
+
+// counterfactual_mutant

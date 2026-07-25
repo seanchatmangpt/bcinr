@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! BCINR-AZ: a branchless AlphaZero-style (DeepMind paradigm) chess engine that
 //! drives an MCTS tree and evaluates leaf positions in *batches* on the Apple
 //! M3 Max 40-core GPU via the dual-head NNUE compute shader.

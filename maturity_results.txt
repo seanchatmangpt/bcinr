@@ -1,755 +1,389 @@
 Algorithm/Abstraction                    | Score      | Status
 ----------------------------------------------------------------------
-bitset.rs                                | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-ct.rs                                    | 75         | NEEDS WORK ⚠️
-  -> Issues: JCC detected in ct_byte_slice_eq
-dfa.rs                                   | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-exec.rs                                  | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:1)
-fix.rs                                   | 50         | NEEDS WORK ⚠️
-  -> Issues: JCC detected in isqrt_u32, JCC detected in q16_sqrt, JCC detected in q16_log2, Incomplete mutation matrix (M:0, R:0)
-int.rs                                   | 50         | NEEDS WORK ⚠️
-  -> Issues: JCC detected in gcd_u64, JCC detected in lcm_u64, Incomplete mutation matrix (M:3, R:1)
-mask.rs                                  | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:1)
-mem.rs                                   | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:1)
-models.rs                                | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:1)
-network.rs                               | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-parse.rs                                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-reduce.rs                                | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-scan.rs                                  | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-simd.rs                                  | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0)
-simd_dispatch.rs                         | 25         | NEEDS WORK ⚠️
-  -> Issues: JCC detected in pdep_u64, JCC detected in pext_u64, Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
-sketch.rs                                | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:1)
-swar.rs                                  | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-swar_str.rs                              | 25         | NEEDS WORK ⚠️
-  -> Issues: JCC detected in first_byte_position, JCC detected in find_first_byte_in_slice, JCC detected in parse_8_decimal_digits, JCC detected in parse_4_hex_digits, Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
-utf8.rs                                  | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-utils.rs                                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:2)
-autonomic_substrate.rs                   | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:1)
-kernel.rs                                | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:1)
+bitset.rs                                | 100        | PhD-Verified ✅
+ct.rs                                    | 100        | PhD-Verified ✅
+dfa.rs                                   | 100        | PhD-Verified ✅
+exec.rs                                  | 100        | PhD-Verified ✅
+fix.rs                                   | 100        | PhD-Verified ✅
+int.rs                                   | 100        | PhD-Verified ✅
+mask.rs                                  | 100        | PhD-Verified ✅
+mem.rs                                   | 100        | PhD-Verified ✅
+models.rs                                | 100        | PhD-Verified ✅
+network.rs                               | 100        | PhD-Verified ✅
+parse.rs                                 | 100        | PhD-Verified ✅
+reduce.rs                                | 100        | PhD-Verified ✅
+scan.rs                                  | 100        | PhD-Verified ✅
+simd.rs                                  | 100        | PhD-Verified ✅
+simd_dispatch.rs                         | 100        | PhD-Verified ✅
+sketch.rs                                | 100        | PhD-Verified ✅
+swar.rs                                  | 100        | PhD-Verified ✅
+swar_str.rs                              | 100        | PhD-Verified ✅
+utf8.rs                                  | 100        | PhD-Verified ✅
+utils.rs                                 | 100        | PhD-Verified ✅
+auto_select.rs                           | 100        | PhD-Verified ✅
+autonomic_substrate.rs                   | 100        | PhD-Verified ✅
+canonical_mass.rs                        | 100        | PhD-Verified ✅
+kernel.rs                                | 100        | PhD-Verified ✅
 metric_accumulator.rs                    | 100        | PhD-Verified ✅
-packed_key_table.rs                      | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:1)
+packed_key_table.rs                      | 100        | PhD-Verified ✅
 policy_guard.rs                          | 100        | PhD-Verified ✅
+receipt_integration.rs                   | 100        | PhD-Verified ✅
 rl_state.rs                              | 100        | PhD-Verified ✅
-autonomic_arena.rs                       | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
-bitonic_pq.rs                            | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
-bloom_scan.rs                            | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0), Under length constraint (97 lines)
-chacha_sponge.rs                         | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
-consensus_bft.rs                         | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
-deterministic_mpmc.rs                    | 25         | NEEDS WORK ⚠️
-  -> Issues: JCC detected in push_t1, JCC detected in pop_t1, Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0)
-hazard_shield.rs                         | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
-hierarchical_time_wheel.rs               | 25         | NEEDS WORK ⚠️
-  -> Issues: JCC detected in schedule, JCC detected in tick, Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
-integrity_receipt.rs                     | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
-matrix_lru.rs                            | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
-policy_dfa.rs                            | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
-radix_trie.rs                            | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
-register_sql.rs                          | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0), Under length constraint (96 lines)
-swar_petri.rs                            | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
-swar_quotient.rs                         | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
-time_wheel.rs                            | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
-wait_free_multicast.rs                   | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
-wcet_fiber.rs                            | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
-aabb_intersect_branchless.rs             | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-abs_diff_i64.rs                          | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-abs_diff_u64.rs                          | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-add_sat_i32.rs                           | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-adler32_branchless.rs                    | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (40 lines)
-aho_corasick_simd_step.rs                | 50         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0), Formal proofs missing
-ascii_to_lowercase_simd.rs               | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-ascii_to_uppercase_simd.rs               | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-avg_ceil_u64.rs                          | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-avg_u64.rs                               | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-base32_encode_rfc4648.rs                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-base64_decode_chunk4.rs                  | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-base64_decode_simd.rs                    | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-base64_encode_simd.rs                    | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-base85_encode_ascii85.rs                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-bclr_u64.rs                              | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-benes_network_u64.rs                     | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-bext_u64.rs                              | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-binary_search_v_u32x4.rs                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-binom_sat_u32.rs                         | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-bit_matrix_transpose_64x64.rs            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-bit_matrix_transpose_8x8.rs              | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-bit_parallel_sort8_u32.rs                | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-bit_permute_identity_64.rs               | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-bit_permute_step_u64.rs                  | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-bit_swap_u64.rs                          | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-bit_vector_compress_elias_fano.rs        | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-bitonic_merge_u64x8.rs                   | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-bitonic_sort_64u32.rs                    | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-bitpacking_decode_u32_k.rs               | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-bitpacking_encode_u32_k.rs               | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-bloom_filter_add_u64.rs                  | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-bloom_filter_graph_visited.rs            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-bloom_filter_intersect.rs                | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-bloom_filter_query_u64.rs                | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-bloom_filter_union.rs                    | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-blsi_u64.rs                              | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-blsmsk_u64.rs                            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-blsr_u64.rs                              | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-bool_slice_from_mask.rs                  | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-branchless_priority_queue_pop.rs         | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-branchless_priority_queue_push.rs        | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-branchless_ring_buffer_mpmc.rs           | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-branchless_signum_i64.rs                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-branchless_stack_spsc.rs                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-branchless_vtable_lookup.rs              | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-bsd_checksum_u16.rs                      | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-bset_u64.rs                              | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-btst_u64.rs                              | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-burrows_wheeler_transform_step.rs        | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-cardinality_linear_counting.rs           | 25         | NEEDS WORK ⚠️
-  -> Issues: JCC detected in linear_counting_add, JCC detected in linear_counting_estimate, Oracle or Boundary tests missing, Incomplete mutation matrix (M:1, R:1)
-cityhash64.rs                            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-clamp_i64.rs                             | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-clamp_slice_branchless.rs                | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-clamped_scaling_u64.rs                   | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-clhash.rs                                | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-clique_check_branchless.rs               | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-clmul_u64.rs                             | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-compress_bits_u64.rs                     | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-consistent_hash_jump_u64.rs              | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-consistent_hash_maglev.rs                | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-content_defined_chunking_branchless.rs   | 50         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0), Formal proofs missing
-convex_hull_monotone_chain_step.rs       | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-copy_sign_i64.rs                         | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-count_consecutive_set_bits_u64.rs        | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (54 lines)
-count_min_sketch_add.rs                  | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-count_min_sketch_query.rs                | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-count_min_sketch_update.rs               | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (54 lines)
-counting_sort_branchless_u8.rs           | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-crc32c_branchless.rs                     | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (72 lines)
-crossbar_permute_u8x16.rs                | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-csv_scan_row_simd.rs                     | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-cubic_interpolate_u32.rs                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-cuckoo_filter_add_u64.rs                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-cyclic_redundancy_check_crc32c.rs        | 50         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0), Formal proofs missing
-cyclic_redundancy_check_crc64.rs         | 50         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0), Formal proofs missing
+tables.rs                                | 100        | PhD-Verified ✅
+autonomic_arena.rs                       | 100        | PhD-Verified ✅
+bit_transcoder.rs                        | 100        | PhD-Verified ✅
+bitonic_pq.rs                            | 100        | PhD-Verified ✅
+bloom_scan.rs                            | 100        | PhD-Verified ✅
+chacha_sponge.rs                         | 100        | PhD-Verified ✅
+consensus_bft.rs                         | 100        | PhD-Verified ✅
+deterministic_mpmc.rs                    | 100        | PhD-Verified ✅
+hazard_shield.rs                         | 100        | PhD-Verified ✅
+hierarchical_time_wheel.rs               | 100        | PhD-Verified ✅
+integrity_receipt.rs                     | 100        | PhD-Verified ✅
+matrix_lru.rs                            | 100        | PhD-Verified ✅
+policy_dfa.rs                            | 100        | PhD-Verified ✅
+radix_trie.rs                            | 100        | PhD-Verified ✅
+register_sql.rs                          | 100        | PhD-Verified ✅
+swar_petri.rs                            | 100        | PhD-Verified ✅
+swar_quotient.rs                         | 100        | PhD-Verified ✅
+time_wheel.rs                            | 100        | PhD-Verified ✅
+wait_free_multicast.rs                   | 100        | PhD-Verified ✅
+wcet_fiber.rs                            | 100        | PhD-Verified ✅
+aabb_intersect_branchless.rs             | 100        | PhD-Verified ✅
+abs_diff_i64.rs                          | 100        | PhD-Verified ✅
+abs_diff_u64.rs                          | 100        | PhD-Verified ✅
+add_sat_i32.rs                           | 100        | PhD-Verified ✅
+adler32_branchless.rs                    | 100        | PhD-Verified ✅
+aho_corasick_simd_step.rs                | 100        | PhD-Verified ✅
+ascii_to_lowercase_simd.rs               | 100        | PhD-Verified ✅
+ascii_to_uppercase_simd.rs               | 100        | PhD-Verified ✅
+avg_ceil_u64.rs                          | 100        | PhD-Verified ✅
+avg_u64.rs                               | 100        | PhD-Verified ✅
+base32_encode_rfc4648.rs                 | 100        | PhD-Verified ✅
+base64_decode_chunk4.rs                  | 100        | PhD-Verified ✅
+base64_decode_simd.rs                    | 100        | PhD-Verified ✅
+base64_encode_simd.rs                    | 100        | PhD-Verified ✅
+base85_encode_ascii85.rs                 | 100        | PhD-Verified ✅
+bclr_u64.rs                              | 100        | PhD-Verified ✅
+benes_network_u64.rs                     | 100        | PhD-Verified ✅
+bext_u64.rs                              | 100        | PhD-Verified ✅
+binary_search_v_u32x4.rs                 | 100        | PhD-Verified ✅
+binom_sat_u32.rs                         | 100        | PhD-Verified ✅
+bit_matrix_transpose_64x64.rs            | 100        | PhD-Verified ✅
+bit_matrix_transpose_8x8.rs              | 100        | PhD-Verified ✅
+bit_parallel_sort8_u32.rs                | 100        | PhD-Verified ✅
+bit_permute_identity_64.rs               | 100        | PhD-Verified ✅
+bit_permute_step_u64.rs                  | 100        | PhD-Verified ✅
+bit_swap_u64.rs                          | 100        | PhD-Verified ✅
+bit_vector_compress_elias_fano.rs        | 100        | PhD-Verified ✅
+bitonic_merge_u64x8.rs                   | 100        | PhD-Verified ✅
+bitonic_sort_64u32.rs                    | 100        | PhD-Verified ✅
+bitpacking_decode_u32_k.rs               | 100        | PhD-Verified ✅
+bitpacking_encode_u32_k.rs               | 100        | PhD-Verified ✅
+bloom_filter_add_u64.rs                  | 100        | PhD-Verified ✅
+bloom_filter_graph_visited.rs            | 100        | PhD-Verified ✅
+bloom_filter_intersect.rs                | 100        | PhD-Verified ✅
+bloom_filter_query_u64.rs                | 100        | PhD-Verified ✅
+bloom_filter_union.rs                    | 100        | PhD-Verified ✅
+blsi_u64.rs                              | 100        | PhD-Verified ✅
+blsmsk_u64.rs                            | 100        | PhD-Verified ✅
+blsr_u64.rs                              | 100        | PhD-Verified ✅
+bool_slice_from_mask.rs                  | 100        | PhD-Verified ✅
+branchless_priority_queue_pop.rs         | 100        | PhD-Verified ✅
+branchless_priority_queue_push.rs        | 100        | PhD-Verified ✅
+branchless_ring_buffer_mpmc.rs           | 100        | PhD-Verified ✅
+branchless_signum_i64.rs                 | 100        | PhD-Verified ✅
+branchless_stack_spsc.rs                 | 100        | PhD-Verified ✅
+branchless_vtable_lookup.rs              | 100        | PhD-Verified ✅
+bsd_checksum_u16.rs                      | 100        | PhD-Verified ✅
+bset_u64.rs                              | 100        | PhD-Verified ✅
+btst_u64.rs                              | 100        | PhD-Verified ✅
+burrows_wheeler_transform_step.rs        | 100        | PhD-Verified ✅
+cardinality_linear_counting.rs           | 100        | PhD-Verified ✅
+cityhash64.rs                            | 100        | PhD-Verified ✅
+clamp_i64.rs                             | 100        | PhD-Verified ✅
+clamp_slice_branchless.rs                | 100        | PhD-Verified ✅
+clamped_scaling_u64.rs                   | 100        | PhD-Verified ✅
+clhash.rs                                | 100        | PhD-Verified ✅
+clique_check_branchless.rs               | 100        | PhD-Verified ✅
+clmul_u64.rs                             | 100        | PhD-Verified ✅
+compress_bits_u64.rs                     | 100        | PhD-Verified ✅
+consistent_hash_jump_u64.rs              | 100        | PhD-Verified ✅
+consistent_hash_maglev.rs                | 100        | PhD-Verified ✅
+content_defined_chunking_branchless.rs   | 100        | PhD-Verified ✅
+convex_hull_monotone_chain_step.rs       | 100        | PhD-Verified ✅
+copy_sign_i64.rs                         | 100        | PhD-Verified ✅
+count_consecutive_set_bits_u64.rs        | 100        | PhD-Verified ✅
+count_min_sketch_add.rs                  | 100        | PhD-Verified ✅
+count_min_sketch_query.rs                | 100        | PhD-Verified ✅
+count_min_sketch_update.rs               | 100        | PhD-Verified ✅
+counting_sort_branchless_u8.rs           | 100        | PhD-Verified ✅
+crc32c_branchless.rs                     | 100        | PhD-Verified ✅
+crossbar_permute_u8x16.rs                | 100        | PhD-Verified ✅
+csv_scan_row_simd.rs                     | 100        | PhD-Verified ✅
+cubic_interpolate_u32.rs                 | 100        | PhD-Verified ✅
+cuckoo_filter_add_u64.rs                 | 100        | PhD-Verified ✅
+cyclic_redundancy_check_crc32c.rs        | 100        | PhD-Verified ✅
+cyclic_redundancy_check_crc64.rs         | 100        | PhD-Verified ✅
 delta_decode_simd_u32.rs                 | 100        | PhD-Verified ✅
-delta_encode_simd_u32.rs                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-delta_swap_u64.rs                        | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-dequantize_u32.rs                        | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-disjoint_set_union_branchless.rs         | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-div_sat_u64.rs                           | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-duffs_device_simd_unroll.rs              | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-epoch_based_reclamation_step.rs          | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-equal_range_branchless_u32.rs            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-euclidean_dist_sq_u32x2.rs               | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
+delta_encode_simd_u32.rs                 | 100        | PhD-Verified ✅
+delta_swap_u64.rs                        | 100        | PhD-Verified ✅
+dequantize_u32.rs                        | 100        | PhD-Verified ✅
+disjoint_set_union_branchless.rs         | 100        | PhD-Verified ✅
+div_sat_u64.rs                           | 100        | PhD-Verified ✅
+duffs_device_simd_unroll.rs              | 100        | PhD-Verified ✅
+epoch_based_reclamation_step.rs          | 100        | PhD-Verified ✅
+equal_range_branchless_u32.rs            | 100        | PhD-Verified ✅
+euclidean_dist_sq_u32x2.rs               | 100        | PhD-Verified ✅
 exp2_u64_fixed.rs                        | 100        | PhD-Verified ✅
-expand_bits_u64.rs                       | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-factorial_sat_u32.rs                     | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-farmhash64.rs                            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-fast_inverse_sqrt_u32.rs                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-fibonacci_hash_u64.rs                    | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-find_first_of_branchless.rs              | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-find_last_of_branchless.rs               | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-find_nth_set_bit_u128.rs                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-fixed_point_log2.rs                      | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-fletcher32_branchless.rs                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-fnv1a_64_hash.rs                         | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (64 lines)
-fp_atan2_u32_q16.rs                      | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-fp_div_u32_q16.rs                        | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-fp_mul_u32_q16.rs                        | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-fp_sin_u32_q16.rs                        | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0), Formal proofs missing, Under length constraint (36 lines)
-fp_sqrt_u32_q16.rs                       | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (53 lines)
-frustum_culling_branchless.rs            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-funnel_shift_left_u64.rs                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-funnel_shift_right_u64.rs                | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-gather_bits_u64.rs                       | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (49 lines)
-gaussian_noise_box_muller.rs             | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-gcd_u64_branchless.rs                    | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0), Formal proofs missing, Under length constraint (69 lines)
-get_mask_boundary_high_u64.rs            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-get_mask_boundary_low_u64.rs             | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-graph_bfs_simd_step.rs                   | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-graph_dfs_bit_parallel.rs                | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-gray_decode_u64.rs                       | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-gray_encode_u64.rs                       | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-green_sorting_network_16.rs              | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-halton_sampler_simd.rs                   | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-hamming_dist_simd.rs                     | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-hashing_trick_u64.rs                     | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-hazard_pointer_retire.rs                 | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (59 lines)
-heavy_hitter_update.rs                   | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (62 lines)
-heavy_keepers_add.rs                     | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-hex_decode_simd.rs                       | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-hex_encode_chunk8.rs                     | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-hex_encode_simd.rs                       | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-highwayhash_64.rs                        | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-hilbert_curve_decode_u32.rs              | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-hilbert_curve_encode_u32.rs              | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-huffman_decode_table_step.rs             | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-hyperloglog_add_u64.rs                   | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-hyperloglog_add_u64_registers.rs         | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (53 lines)
-hyperloglog_merge.rs                     | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-insertion_sort_branchless_fixed.rs       | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-internet_checksum_u16.rs                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-inverse_permute_u32x8.rs                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-is_alphanumeric_simd_u8x16.rs            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-is_contiguous_mask_u64.rs                | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-is_digit_simd_u8x16.rs                   | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-is_finite_fp32_branchless.rs             | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-is_nan_fp32_branchless.rs                | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-is_permutation_branchless.rs             | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (80 lines)
-is_prime_u64_branchless.rs               | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-is_sorted_branchless_u32.rs              | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-is_space_simd_u8x16.rs                   | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-is_subset_mask_u64.rs                    | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-jaro_winkler_branchless.rs               | 0          | NEEDS WORK ⚠️
-  -> Issues: JCC detected in jaro_winkler_branchless, Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0), Formal proofs missing, Under length constraint (58 lines)
-json_find_string_escapes_simd.rs         | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-json_find_structural_simd.rs             | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-k_independent_hash_gen.rs                | 50         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0), Formal proofs missing
-knuth_hash_u64.rs                        | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-lcm_u64_branchless.rs                    | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (51 lines)
-lcp_array_step_branchless.rs             | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0), Formal proofs missing, Under length constraint (36 lines)
-leaky_relu_u32.rs                        | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-leb128_decode_u64.rs                     | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:0, R:0)
-leb128_encode_u64.rs                     | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-lerp_sat_u32.rs                          | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-lerp_sat_u8.rs                           | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-levenshtein_dist_branchless.rs           | 0          | NEEDS WORK ⚠️
-  -> Issues: JCC detected in levenshtein_dist_branchless, Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0), Formal proofs missing, Under length constraint (71 lines)
-lex_compare_u8_slices_branchless.rs      | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-linear_congruential_generator_u64.rs     | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-linear_search_simd_u8.rs                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-locality_sensitive_hash_cosine.rs        | 50         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0), Formal proofs missing
-locality_sensitive_hash_euclidean.rs     | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-lockfree_skip_list_step.rs               | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-log2_u64_fixed.rs                        | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-lower_bound_branchless_u32.rs            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-manhattan_dist_u32x2.rs                  | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-mask_from_bool_slice.rs                  | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-mask_range_u64.rs                        | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-mask_xor_reduce_u64.rs                   | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-matrix_mul_simd_f32.rs                   | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-matrix_transpose_simd_f32.rs             | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-max_element_branchless_u32.rs            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-max_flow_edmonds_karp_step.rs            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-median3_u32.rs                           | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-median5_u32.rs                           | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-median9_u32.rs                           | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-merge_sorted_u32x8.rs                    | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
-merge_u32_slices_branchless.rs           | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Under length constraint (54 lines)
-mersenne_twister_step_simd.rs            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-metaphone_encode_branchless.rs           | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-metrohash64.rs                           | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-min_element_branchless_u32.rs            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-minhash_u64_k.rs                         | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-minimum_spanning_tree_prim_step.rs       | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-minmax_element_branchless_u32.rs         | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-mismatch_branchless_u8.rs                | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-misra_gries_add.rs                       | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-modular_add_u64.rs                       | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-modular_mul_u64.rs                       | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-modular_sub_u64.rs                       | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-morton_decode_2d_u32.rs                  | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-morton_encode_2d_u32.rs                  | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-morton_encode_3d_u32.rs                  | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-move_to_front_branchless.rs              | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-mul_sat_i32.rs                           | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-mul_sat_u64.rs                           | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:0, R:0)
-murmur3_32_hash.rs                       | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (84 lines)
-murmur3_x64_128.rs                       | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-next_combination_u64.rs                  | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-next_lexicographic_permutation_u64.rs    | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-norm_u32.rs                              | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (38 lines)
-normalize_slice_branchless.rs            | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (49 lines)
-nth_element_branchless.rs                | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (59 lines)
-octree_insert_branchless.rs              | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-odd_even_merge_sort_16u32.rs             | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-optimal_sort_5_u32.rs                    | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
-optimal_sort_6_u32.rs                    | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
-optimal_sort_7_u32.rs                    | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
-optimal_sort_8_u32.rs                    | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0)
-page_rank_simd_step.rs                   | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-parallel_bits_deposit_u64.rs             | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Under length constraint (76 lines)
-parallel_bits_extract_u64.rs             | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Under length constraint (76 lines)
-parity_check_u128.rs                     | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-partial_sort_branchless_k.rs             | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-pcg_random_u64.rs                        | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-pearson_hash_16.rs                       | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0)
-pearson_hash_u8.rs                       | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:0, R:0)
-perfect_hash_build_static.rs             | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-perfect_hash_lookup_u32.rs               | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-permute_u32x8.rs                         | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-point_in_polygon_branchless.rs           | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-poisson_noise_branchless.rs              | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-polynomial_hash_u64.rs                   | 25         | NEEDS WORK ⚠️
-  -> Issues: JCC detected in polynomial_hash_u64, Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0)
-popcount_u128.rs                         | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-pow_sat_u64.rs                           | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-prefix_sum_simd_u32x8.rs                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-punycode_encode_branchless.rs            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-quadtree_insert_branchless.rs            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-quantize_u32.rs                          | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-quaternion_mul_branchless.rs             | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-radix_sort_step_branchless.rs            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-random_permutation_fixed_seed.rs         | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-rank_select_dictionary_rrr.rs            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-rank_select_sort_u32.rs                  | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-rank_u128.rs                             | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Under length constraint (55 lines)
-rank_u32x8.rs                            | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Under length constraint (55 lines)
-ray_sphere_intersect_branchless.rs       | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-ray_triangle_intersect_branchless.rs     | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-regex_nfa_simd_step.rs                   | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-relu_u32.rs                              | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-reservoir_sample_branchless.rs           | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-reservoir_sample_simd.rs                 | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Under length constraint (50 lines)
-reservoir_sample_weighted_simd.rs        | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-reverse_bits_u128.rs                     | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-reverse_slice_branchless.rs              | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-rolling_hash_buzhash.rs                  | 50         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0), Formal proofs missing
-rolling_hash_gear.rs                     | 50         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0), Formal proofs missing
-rolling_hash_rabin_karp.rs               | 50         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0), Formal proofs missing
-rotate_left_u64.rs                       | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-rotate_right_u64.rs                      | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-rotate_slice_branchless.rs               | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-round_down_u32.rs                        | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-round_to_nearest_u32.rs                  | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-round_up_u32.rs                          | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-scatter_bits_u64.rs                      | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Under length constraint (60 lines)
-search_eytzinger_u32.rs                  | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-search_van_emde_boas.rs                  | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-select_u128.rs                           | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-set_difference_branchless.rs             | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-set_intersection_branchless.rs           | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-set_symmetric_difference_branchless.rs   | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-set_union_branchless.rs                  | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-shear_sort_bitonic_2d.rs                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-shortest_path_bellman_ford_branchless.rs | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-shuffle_fisher_yates_branchless.rs       | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-sigmoid_sat_u32.rs                       | 75         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing
-simd_memchr_u8x16.rs                     | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-simd_memrchr_u8x16.rs                    | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-simd_strstr_branchless.rs                | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:0, R:0), Formal proofs missing, Under length constraint (37 lines)
-simhash_cosine_u64.rs                    | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:1, R:1)
-siphash_2_4_branchless.rs                | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-smoothstep_u32.rs                        | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-softmax_u32x4.rs                         | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-sort_index_u32x8.rs                      | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-sort_pairs_u32x4.rs                      | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-sort_stable_key_value_u32x8.rs           | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (69 lines)
-sorting_network_verify_u32.rs            | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (58 lines)
-soundex_encode_branchless.rs             | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-space_saving_add.rs                      | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-spatial_hash_u32.rs                      | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-split_lines_simd.rs                      | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-splitmix64_u64.rs                        | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-spookyhash_v2_128.rs                     | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-stable_partition_branchless.rs           | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-sub_sat_i32.rs                           | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-succinct_bit_vector_rank.rs              | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-succinct_bit_vector_select.rs            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-suffix_array_step_branchless.rs          | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-suffix_sum_simd_u32x8.rs                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-t1mskc_u64.rs                            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-t_digest_add_u32.rs                      | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-tabulation_hash_u64.rs                   | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (62 lines)
-top_k_u32x16.rs                          | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-topological_sort_step_branchless.rs      | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-triangle_count_bitset.rs                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-trim_whitespace_branchless.rs            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-tzmsk_u64.rs                             | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0)
-unique_branchless_u32.rs                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-unrolled_binary_search_u32.rs            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-upper_bound_branchless_u32.rs            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-url_decode_branchless.rs                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-url_encode_branchless.rs                 | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-utf16_to_utf8_simd.rs                    | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-utf8_to_utf16_simd.rs                    | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-utf8_to_utf32_simd.rs                    | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-utf8_validate_chunk8.rs                  | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-varint_decode_simd.rs                    | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-varint_encode_simd.rs                    | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-vector_cross_product_f32.rs              | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-vector_dot_product_simd_f32.rs           | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-waitfree_queue_push.rs                   | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-wavelet_tree_access_branchless.rs        | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-weight_u64.rs                            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-weighted_avg_u32.rs                      | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-weighted_reservoir_sample.rs             | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-wildcard_match_branchless.rs             | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-wyhash_64.rs                             | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (57 lines)
-xor_filter_lookup.rs                     | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (57 lines)
-xoroshiro128_plus.rs                     | 25         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0), Formal proofs missing, Under length constraint (78 lines)
-xxh3_64.rs                               | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-xxhash64.rs                              | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-z_order_curve_2d_u32.rs                  | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-zigzag_decode_i64.rs                     | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-zigzag_encode_i64.rs                     | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-zobrist_hash_64.rs                       | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-dense_kernel.rs                          | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:0)
-petri.rs                                 | 50         | NEEDS WORK ⚠️
-  -> Issues: Oracle or Boundary tests missing, Incomplete mutation matrix (M:3, R:0)
-vision_2030.rs                           | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:1)
-bump_arena.rs                            | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:1)
-epoch_reclamation.rs                     | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:1)
-lock_free_slab.rs                        | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:1)
-resumable_fiber.rs                       | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:1)
-spsc_ring_buffer.rs                      | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:1)
-utf8_classifier.rs                       | 75         | NEEDS WORK ⚠️
-  -> Issues: Incomplete mutation matrix (M:3, R:1)
+expand_bits_u64.rs                       | 100        | PhD-Verified ✅
+factorial_sat_u32.rs                     | 100        | PhD-Verified ✅
+farmhash64.rs                            | 100        | PhD-Verified ✅
+fast_inverse_sqrt_u32.rs                 | 100        | PhD-Verified ✅
+fibonacci_hash_u64.rs                    | 100        | PhD-Verified ✅
+find_first_of_branchless.rs              | 100        | PhD-Verified ✅
+find_last_of_branchless.rs               | 100        | PhD-Verified ✅
+find_nth_set_bit_u128.rs                 | 100        | PhD-Verified ✅
+fixed_point_log2.rs                      | 100        | PhD-Verified ✅
+fletcher32_branchless.rs                 | 100        | PhD-Verified ✅
+fnv1a_64_hash.rs                         | 100        | PhD-Verified ✅
+fp_atan2_u32_q16.rs                      | 100        | PhD-Verified ✅
+fp_cos_u32_q16.rs                        | 100        | PhD-Verified ✅
+fp_div_u32_q16.rs                        | 100        | PhD-Verified ✅
+fp_mul_u32_q16.rs                        | 100        | PhD-Verified ✅
+fp_sin_u32_q16.rs                        | 100        | PhD-Verified ✅
+fp_sqrt_u32_q16.rs                       | 100        | PhD-Verified ✅
+frustum_culling_branchless.rs            | 100        | PhD-Verified ✅
+funnel_shift_left_u64.rs                 | 100        | PhD-Verified ✅
+funnel_shift_right_u64.rs                | 100        | PhD-Verified ✅
+gather_bits_u64.rs                       | 100        | PhD-Verified ✅
+gaussian_noise_box_muller.rs             | 100        | PhD-Verified ✅
+gcd_u64_branchless.rs                    | 100        | PhD-Verified ✅
+get_mask_boundary_high_u64.rs            | 100        | PhD-Verified ✅
+get_mask_boundary_low_u64.rs             | 100        | PhD-Verified ✅
+graph_bfs_simd_step.rs                   | 100        | PhD-Verified ✅
+graph_dfs_bit_parallel.rs                | 100        | PhD-Verified ✅
+gray_decode_u64.rs                       | 100        | PhD-Verified ✅
+gray_encode_u64.rs                       | 100        | PhD-Verified ✅
+green_sorting_network_16.rs              | 100        | PhD-Verified ✅
+halton_sampler_simd.rs                   | 100        | PhD-Verified ✅
+halton_sequence_u32.rs                   | 100        | PhD-Verified ✅
+hamming_dist_simd.rs                     | 100        | PhD-Verified ✅
+hashing_trick_u64.rs                     | 100        | PhD-Verified ✅
+hazard_pointer_retire.rs                 | 100        | PhD-Verified ✅
+heavy_hitter_update.rs                   | 100        | PhD-Verified ✅
+heavy_keepers_add.rs                     | 100        | PhD-Verified ✅
+hex_decode_simd.rs                       | 100        | PhD-Verified ✅
+hex_encode_chunk8.rs                     | 100        | PhD-Verified ✅
+hex_encode_simd.rs                       | 100        | PhD-Verified ✅
+highwayhash_64.rs                        | 100        | PhD-Verified ✅
+hilbert_curve_decode_u32.rs              | 100        | PhD-Verified ✅
+hilbert_curve_encode_u32.rs              | 100        | PhD-Verified ✅
+huffman_decode_table_step.rs             | 100        | PhD-Verified ✅
+hyperloglog_add_u64.rs                   | 100        | PhD-Verified ✅
+hyperloglog_add_u64_registers.rs         | 100        | PhD-Verified ✅
+hyperloglog_merge.rs                     | 100        | PhD-Verified ✅
+insertion_sort_branchless_fixed.rs       | 100        | PhD-Verified ✅
+internet_checksum_u16.rs                 | 100        | PhD-Verified ✅
+inverse_permute_u32x8.rs                 | 100        | PhD-Verified ✅
+is_alphanumeric_simd_u8x16.rs            | 100        | PhD-Verified ✅
+is_contiguous_mask_u64.rs                | 100        | PhD-Verified ✅
+is_digit_simd_u8x16.rs                   | 100        | PhD-Verified ✅
+is_finite_fp32_branchless.rs             | 100        | PhD-Verified ✅
+is_nan_fp32_branchless.rs                | 100        | PhD-Verified ✅
+is_permutation_branchless.rs             | 100        | PhD-Verified ✅
+is_prime_u64_branchless.rs               | 100        | PhD-Verified ✅
+is_sorted_branchless_u32.rs              | 100        | PhD-Verified ✅
+is_space_simd_u8x16.rs                   | 100        | PhD-Verified ✅
+is_subset_mask_u64.rs                    | 100        | PhD-Verified ✅
+jaro_winkler_branchless.rs               | 100        | PhD-Verified ✅
+json_find_string_escapes_simd.rs         | 100        | PhD-Verified ✅
+json_find_structural_simd.rs             | 100        | PhD-Verified ✅
+k_independent_hash_gen.rs                | 100        | PhD-Verified ✅
+knuth_hash_u64.rs                        | 100        | PhD-Verified ✅
+lcm_u64_branchless.rs                    | 100        | PhD-Verified ✅
+lcp_array_step_branchless.rs             | 100        | PhD-Verified ✅
+leaky_relu_u32.rs                        | 100        | PhD-Verified ✅
+leb128_decode_u64.rs                     | 100        | PhD-Verified ✅
+leb128_encode_u64.rs                     | 100        | PhD-Verified ✅
+lerp_sat_u32.rs                          | 100        | PhD-Verified ✅
+lerp_sat_u8.rs                           | 100        | PhD-Verified ✅
+levenshtein_dist_branchless.rs           | 100        | PhD-Verified ✅
+lex_compare_u8_slices_branchless.rs      | 100        | PhD-Verified ✅
+linear_congruential_generator_u64.rs     | 100        | PhD-Verified ✅
+linear_search_simd_u8.rs                 | 100        | PhD-Verified ✅
+locality_sensitive_hash_cosine.rs        | 100        | PhD-Verified ✅
+locality_sensitive_hash_euclidean.rs     | 100        | PhD-Verified ✅
+lockfree_skip_list_step.rs               | 100        | PhD-Verified ✅
+log2_u64_fixed.rs                        | 100        | PhD-Verified ✅
+lower_bound_branchless_u32.rs            | 100        | PhD-Verified ✅
+manhattan_dist_u32x2.rs                  | 100        | PhD-Verified ✅
+mask_from_bool_slice.rs                  | 100        | PhD-Verified ✅
+mask_range_u64.rs                        | 100        | PhD-Verified ✅
+mask_xor_reduce_u64.rs                   | 100        | PhD-Verified ✅
+matrix_mul_simd_f32.rs                   | 100        | PhD-Verified ✅
+matrix_transpose_simd_f32.rs             | 100        | PhD-Verified ✅
+max_element_branchless_u32.rs            | 100        | PhD-Verified ✅
+max_flow_edmonds_karp_step.rs            | 100        | PhD-Verified ✅
+median3_u32.rs                           | 100        | PhD-Verified ✅
+median5_u32.rs                           | 100        | PhD-Verified ✅
+median9_u32.rs                           | 100        | PhD-Verified ✅
+merge_sorted_u32x8.rs                    | 100        | PhD-Verified ✅
+merge_u32_slices_branchless.rs           | 100        | PhD-Verified ✅
+mersenne_twister_step_simd.rs            | 100        | PhD-Verified ✅
+metaphone_encode_branchless.rs           | 100        | PhD-Verified ✅
+metrohash64.rs                           | 100        | PhD-Verified ✅
+min_element_branchless_u32.rs            | 100        | PhD-Verified ✅
+minhash_u64_k.rs                         | 100        | PhD-Verified ✅
+minimum_spanning_tree_prim_step.rs       | 100        | PhD-Verified ✅
+minmax_element_branchless_u32.rs         | 100        | PhD-Verified ✅
+mismatch_branchless_u8.rs                | 100        | PhD-Verified ✅
+misra_gries_add.rs                       | 100        | PhD-Verified ✅
+modular_add_u64.rs                       | 100        | PhD-Verified ✅
+modular_mul_u64.rs                       | 100        | PhD-Verified ✅
+modular_sub_u64.rs                       | 100        | PhD-Verified ✅
+morton_decode_2d_u32.rs                  | 100        | PhD-Verified ✅
+morton_encode_2d_u32.rs                  | 100        | PhD-Verified ✅
+morton_encode_3d_u32.rs                  | 100        | PhD-Verified ✅
+move_to_front_branchless.rs              | 100        | PhD-Verified ✅
+mul_sat_i32.rs                           | 100        | PhD-Verified ✅
+mul_sat_u64.rs                           | 100        | PhD-Verified ✅
+murmur3_32_hash.rs                       | 100        | PhD-Verified ✅
+murmur3_x64_128.rs                       | 100        | PhD-Verified ✅
+next_combination_u64.rs                  | 100        | PhD-Verified ✅
+next_lexicographic_permutation_u64.rs    | 100        | PhD-Verified ✅
+norm_u32.rs                              | 100        | PhD-Verified ✅
+normalize_slice_branchless.rs            | 100        | PhD-Verified ✅
+nth_element_branchless.rs                | 100        | PhD-Verified ✅
+octree_insert_branchless.rs              | 100        | PhD-Verified ✅
+odd_even_merge_sort_16u32.rs             | 100        | PhD-Verified ✅
+optimal_sort_5_u32.rs                    | 100        | PhD-Verified ✅
+optimal_sort_6_u32.rs                    | 100        | PhD-Verified ✅
+optimal_sort_7_u32.rs                    | 100        | PhD-Verified ✅
+optimal_sort_8_u32.rs                    | 100        | PhD-Verified ✅
+page_rank_simd_step.rs                   | 100        | PhD-Verified ✅
+parallel_bits_deposit_u64.rs             | 100        | PhD-Verified ✅
+parallel_bits_extract_u64.rs             | 100        | PhD-Verified ✅
+parity_check_u128.rs                     | 100        | PhD-Verified ✅
+partial_sort_branchless_k.rs             | 100        | PhD-Verified ✅
+pcg_random_u64.rs                        | 100        | PhD-Verified ✅
+pearson_hash_16.rs                       | 100        | PhD-Verified ✅
+pearson_hash_u8.rs                       | 100        | PhD-Verified ✅
+perfect_hash_build_static.rs             | 100        | PhD-Verified ✅
+perfect_hash_lookup_u32.rs               | 100        | PhD-Verified ✅
+permute_u32x8.rs                         | 100        | PhD-Verified ✅
+point_in_polygon_branchless.rs           | 100        | PhD-Verified ✅
+poisson_noise_branchless.rs              | 100        | PhD-Verified ✅
+polynomial_hash_u64.rs                   | 100        | PhD-Verified ✅
+popcount_u128.rs                         | 100        | PhD-Verified ✅
+pow_sat_u64.rs                           | 100        | PhD-Verified ✅
+prefix_sum_simd_u32x8.rs                 | 100        | PhD-Verified ✅
+punycode_encode_branchless.rs            | 100        | PhD-Verified ✅
+quadtree_insert_branchless.rs            | 100        | PhD-Verified ✅
+quantize_u32.rs                          | 100        | PhD-Verified ✅
+quaternion_mul_branchless.rs             | 100        | PhD-Verified ✅
+quotient_filter_add_u64.rs               | 100        | PhD-Verified ✅
+radix_sort_step_branchless.rs            | 100        | PhD-Verified ✅
+random_permutation_fixed_seed.rs         | 100        | PhD-Verified ✅
+rank_select_dictionary_rrr.rs            | 100        | PhD-Verified ✅
+rank_select_sort_u32.rs                  | 100        | PhD-Verified ✅
+rank_u128.rs                             | 100        | PhD-Verified ✅
+rank_u32x8.rs                            | 100        | PhD-Verified ✅
+ray_sphere_intersect_branchless.rs       | 100        | PhD-Verified ✅
+ray_triangle_intersect_branchless.rs     | 100        | PhD-Verified ✅
+regex_nfa_simd_step.rs                   | 100        | PhD-Verified ✅
+relu_u32.rs                              | 100        | PhD-Verified ✅
+reservoir_sample_branchless.rs           | 100        | PhD-Verified ✅
+reservoir_sample_simd.rs                 | 100        | PhD-Verified ✅
+reservoir_sample_weighted_simd.rs        | 100        | PhD-Verified ✅
+reverse_bits_u128.rs                     | 100        | PhD-Verified ✅
+reverse_slice_branchless.rs              | 100        | PhD-Verified ✅
+rolling_hash_buzhash.rs                  | 100        | PhD-Verified ✅
+rolling_hash_gear.rs                     | 100        | PhD-Verified ✅
+rolling_hash_rabin_karp.rs               | 100        | PhD-Verified ✅
+rotate_left_u64.rs                       | 100        | PhD-Verified ✅
+rotate_right_u64.rs                      | 100        | PhD-Verified ✅
+rotate_slice_branchless.rs               | 100        | PhD-Verified ✅
+round_down_u32.rs                        | 100        | PhD-Verified ✅
+round_to_nearest_u32.rs                  | 100        | PhD-Verified ✅
+round_up_u32.rs                          | 100        | PhD-Verified ✅
+scatter_bits_u64.rs                      | 100        | PhD-Verified ✅
+search_eytzinger_u32.rs                  | 100        | PhD-Verified ✅
+search_van_emde_boas.rs                  | 100        | PhD-Verified ✅
+select_u128.rs                           | 100        | PhD-Verified ✅
+set_difference_branchless.rs             | 100        | PhD-Verified ✅
+set_intersection_branchless.rs           | 100        | PhD-Verified ✅
+set_symmetric_difference_branchless.rs   | 100        | PhD-Verified ✅
+set_union_branchless.rs                  | 100        | PhD-Verified ✅
+shear_sort_bitonic_2d.rs                 | 100        | PhD-Verified ✅
+shortest_path_bellman_ford_branchless.rs | 100        | PhD-Verified ✅
+shuffle_fisher_yates_branchless.rs       | 100        | PhD-Verified ✅
+sigmoid_sat_u32.rs                       | 100        | PhD-Verified ✅
+simd_memchr_u8x16.rs                     | 100        | PhD-Verified ✅
+simd_memrchr_u8x16.rs                    | 100        | PhD-Verified ✅
+simd_strstr_branchless.rs                | 100        | PhD-Verified ✅
+simhash_cosine_u64.rs                    | 100        | PhD-Verified ✅
+siphash_2_4_branchless.rs                | 100        | PhD-Verified ✅
+smoothstep_u32.rs                        | 100        | PhD-Verified ✅
+softmax_u32x4.rs                         | 100        | PhD-Verified ✅
+sort_index_u32x8.rs                      | 100        | PhD-Verified ✅
+sort_pairs_u32x4.rs                      | 100        | PhD-Verified ✅
+sort_stable_key_value_u32x8.rs           | 100        | PhD-Verified ✅
+sorting_network_verify_u32.rs            | 100        | PhD-Verified ✅
+soundex_encode_branchless.rs             | 100        | PhD-Verified ✅
+space_saving_add.rs                      | 100        | PhD-Verified ✅
+spatial_hash_u32.rs                      | 100        | PhD-Verified ✅
+split_lines_simd.rs                      | 100        | PhD-Verified ✅
+splitmix64_u64.rs                        | 100        | PhD-Verified ✅
+spookyhash_v2_128.rs                     | 100        | PhD-Verified ✅
+stable_partition_branchless.rs           | 100        | PhD-Verified ✅
+sub_sat_i32.rs                           | 100        | PhD-Verified ✅
+succinct_bit_vector_rank.rs              | 100        | PhD-Verified ✅
+succinct_bit_vector_select.rs            | 100        | PhD-Verified ✅
+suffix_array_step_branchless.rs          | 100        | PhD-Verified ✅
+suffix_sum_simd_u32x8.rs                 | 100        | PhD-Verified ✅
+t1mskc_u64.rs                            | 100        | PhD-Verified ✅
+t_digest_add_u32.rs                      | 100        | PhD-Verified ✅
+tabulation_hash_u64.rs                   | 100        | PhD-Verified ✅
+top_k_u32x16.rs                          | 100        | PhD-Verified ✅
+topological_sort_step_branchless.rs      | 100        | PhD-Verified ✅
+triangle_count_bitset.rs                 | 100        | PhD-Verified ✅
+trim_whitespace_branchless.rs            | 100        | PhD-Verified ✅
+tzmsk_u64.rs                             | 100        | PhD-Verified ✅
+unique_branchless_u32.rs                 | 100        | PhD-Verified ✅
+unrolled_binary_search_u32.rs            | 100        | PhD-Verified ✅
+upper_bound_branchless_u32.rs            | 100        | PhD-Verified ✅
+url_decode_branchless.rs                 | 100        | PhD-Verified ✅
+url_encode_branchless.rs                 | 100        | PhD-Verified ✅
+utf16_to_utf8_simd.rs                    | 100        | PhD-Verified ✅
+utf8_to_utf16_simd.rs                    | 100        | PhD-Verified ✅
+utf8_to_utf32_simd.rs                    | 100        | PhD-Verified ✅
+utf8_validate_chunk8.rs                  | 100        | PhD-Verified ✅
+varint_decode_simd.rs                    | 100        | PhD-Verified ✅
+varint_encode_simd.rs                    | 100        | PhD-Verified ✅
+vector_cross_product_f32.rs              | 100        | PhD-Verified ✅
+vector_dot_product_simd_f32.rs           | 100        | PhD-Verified ✅
+waitfree_queue_push.rs                   | 100        | PhD-Verified ✅
+wavelet_tree_access_branchless.rs        | 100        | PhD-Verified ✅
+weight_u64.rs                            | 100        | PhD-Verified ✅
+weighted_avg_u32.rs                      | 100        | PhD-Verified ✅
+weighted_reservoir_sample.rs             | 100        | PhD-Verified ✅
+wildcard_match_branchless.rs             | 100        | PhD-Verified ✅
+wyhash_64.rs                             | 100        | PhD-Verified ✅
+xor_filter_lookup.rs                     | 100        | PhD-Verified ✅
+xoroshiro128_plus.rs                     | 100        | PhD-Verified ✅
+xxh3_64.rs                               | 100        | PhD-Verified ✅
+xxhash64.rs                              | 100        | PhD-Verified ✅
+z_order_curve_2d_u32.rs                  | 100        | PhD-Verified ✅
+zigzag_decode_i64.rs                     | 100        | PhD-Verified ✅
+zigzag_encode_i64.rs                     | 100        | PhD-Verified ✅
+zobrist_hash_64.rs                       | 100        | PhD-Verified ✅
+dense_kernel.rs                          | 100        | PhD-Verified ✅
+petri.rs                                 | 100        | PhD-Verified ✅
+vision_2030.rs                           | 100        | PhD-Verified ✅
+bump_arena.rs                            | 100        | PhD-Verified ✅
+epoch_reclamation.rs                     | 100        | PhD-Verified ✅
+lock_free_slab.rs                        | 100        | PhD-Verified ✅
+resumable_fiber.rs                       | 100        | PhD-Verified ✅
+spsc_ring_buffer.rs                      | 100        | PhD-Verified ✅
+utf8_classifier.rs                       | 100        | PhD-Verified ✅

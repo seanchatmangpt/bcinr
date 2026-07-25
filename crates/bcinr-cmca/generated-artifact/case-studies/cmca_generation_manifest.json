@@ -1,1 +1,30 @@
-{"digests":{"admission_digest":"blake3:494df59a72ac5f0a2f0e02bf5ffb4e68df998a169c00c29344cd64f7b28413e3","formula_registry_digest":"blake3:fc96ee0c6239925cb960b12ce8e58ff9f019d720d3791ea3b90702fb323d20b3","generated_payload_digest":"blake3:5c3a9eadd5c087bf3b83e8700f712f509a58416783e2a255e193b20b10919aee","generator_digest":"blake3:a9e0941502600b62551a9bcecf4220428f6149ecddf22b1b8908e548026fbcf4","numeric_profile_digest":"blake3:a321b76a4c8143036dbcda620fd24d439aeb4febfea9165c1d14de73c32715fc","rdf_digest":"blake3:d41228c35e898bea45cc43d3204dc5bf03003a970b473eea9953bdde5ad4c896"},"dimensions":{"F":10,"K":4,"N":8,"Q":4,"leaf_floor_n_max":8},"generator_source_order":["../../Users/sac/mfw/tools/cmca-generator/generator.py"],"numeric_profile":{"precision":80,"q16_16_scale":65536,"rounding":"ROUND_HALF_EVEN","signed_max":2147483647,"signed_min":-2147483648,"unsigned_max":4294967295,"unsigned_min":0},"schema_version":1}
+{
+  "digests": {
+    "admission_digest": "blake3:494df59a72ac5f0a2f0e02bf5ffb4e68df998a169c00c29344cd64f7b28413e3",
+    "formula_registry_digest": "blake3:fc96ee0c6239925cb960b12ce8e58ff9f019d720d3791ea3b90702fb323d20b3",
+    "generated_payload_digest": "blake3:a4f73ed041cbc050be21a0eb9fe234a22e6ce17226b74323b8f9f1875b1cbd1a",
+    "generator_digest": "blake3:a9e0941502600b62551a9bcecf4220428f6149ecddf22b1b8908e548026fbcf4",
+    "numeric_profile_digest": "blake3:a321b76a4c8143036dbcda620fd24d439aeb4febfea9165c1d14de73c32715fc",
+    "rdf_digest": "blake3:d41228c35e898bea45cc43d3204dc5bf03003a970b473eea9953bdde5ad4c896"
+  },
+  "dimensions": {
+    "F": 10,
+    "K": 4,
+    "N": 8,
+    "Q": 4,
+    "leaf_floor_n_max": 8
+  },
+  "generator_source_order": [
+    "../../Users/sac/mfw/tools/cmca-generator/generator.py"
+  ],
+  "numeric_profile": {
+    "precision": 80,
+    "q16_16_scale": 65536,
+    "rounding": "ROUND_HALF_EVEN",
+    "signed_max": 2147483647,
+    "signed_min": -2147483648,
+    "unsigned_max": 4294967295,
+    "unsigned_min": 0
+  },
+  "schema_version": 1
+}

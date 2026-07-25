@@ -218,26 +218,24 @@ pub fn verify_order_preservation(
 
     loop {
         match (next_src, next_tgt) {
-            (Some(&src_edge), Some(&tgt_edge)) => {
-                match src_edge.cmp(&tgt_edge) {
-                    std::cmp::Ordering::Less => {
-                        return Err(PreservationError::DroppedOrderEdge(src_edge));
-                    }
-                    std::cmp::Ordering::Greater => {
-                        return Err(PreservationError::InventedOrderEdge(tgt_edge));
-                    }
-                    std::cmp::Ordering::Equal => {
-                        if !map.action_to_node.contains_key(&src_edge.before) {
-                            return Err(PreservationError::UnmappedAction(src_edge.before));
-                        }
-                        if !map.action_to_node.contains_key(&src_edge.after) {
-                            return Err(PreservationError::UnmappedAction(src_edge.after));
-                        }
-                        next_src = it_src.next();
-                        next_tgt = it_tgt.next();
-                    }
+            (Some(&src_edge), Some(&tgt_edge)) => match src_edge.cmp(&tgt_edge) {
+                std::cmp::Ordering::Less => {
+                    return Err(PreservationError::DroppedOrderEdge(src_edge));
                 }
-            }
+                std::cmp::Ordering::Greater => {
+                    return Err(PreservationError::InventedOrderEdge(tgt_edge));
+                }
+                std::cmp::Ordering::Equal => {
+                    if !map.action_to_node.contains_key(&src_edge.before) {
+                        return Err(PreservationError::UnmappedAction(src_edge.before));
+                    }
+                    if !map.action_to_node.contains_key(&src_edge.after) {
+                        return Err(PreservationError::UnmappedAction(src_edge.after));
+                    }
+                    next_src = it_src.next();
+                    next_tgt = it_tgt.next();
+                }
+            },
             (Some(&src_edge), None) => {
                 return Err(PreservationError::DroppedOrderEdge(src_edge));
             }

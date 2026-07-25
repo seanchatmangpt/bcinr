@@ -30,7 +30,8 @@
 /// ```
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn merge_u32_slices_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn merge_u32_slices_branchless(val: u64, aux: u64) -> u64 {
     let mut arr = [
         (val & 0xFFFFFFFF) as u32,
         (val >> 32) as u32,
@@ -150,7 +151,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_merge_u32_slices_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_merge_u32_slices_branchless(c: &mut Criterion) {
         c.bench_function("merge_u32_slices_branchless", |b| {
             b.iter(|| {
                 let res = merge_u32_slices_branchless(black_box(42), black_box(1337));
@@ -167,3 +169,7 @@ pub mod bench {
 // Line 118
 // Line 119
 // Line 120
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

@@ -30,7 +30,8 @@
 /// ```
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn upper_bound_branchless_u32(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn upper_bound_branchless_u32(val: u64, aux: u64) -> u64 {
     let target = val;
     let mut pos = 0u64;
     pos |= (((aux >> (pos | 8)) & 0xFF) <= target) as u64 * 8;
@@ -154,7 +155,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_upper_bound_branchless_u32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_upper_bound_branchless_u32(c: &mut Criterion) {
         c.bench_function("upper_bound_branchless_u32", |b| {
             b.iter(|| {
                 let res = upper_bound_branchless_u32(black_box(42), black_box(1337));

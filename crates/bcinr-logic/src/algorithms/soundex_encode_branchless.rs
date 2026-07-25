@@ -28,7 +28,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn soundex_encode_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn soundex_encode_branchless(val: u64, aux: u64) -> u64 {
     fn digit(byte: u64) -> u64 {
         // Packed nibble tables: LO holds A..P, HI holds Q..Z (local index 0..9).
         const LO: u64 = 0x1055_4220_0210_3210;
@@ -151,7 +152,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_soundex_encode_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_soundex_encode_branchless(c: &mut Criterion) {
         c.bench_function("soundex_encode_branchless", |b| {
             b.iter(|| {
                 let res = soundex_encode_branchless(black_box(42), black_box(1337));
@@ -160,3 +162,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

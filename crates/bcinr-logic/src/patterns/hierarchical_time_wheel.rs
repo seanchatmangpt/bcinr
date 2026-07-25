@@ -113,7 +113,8 @@ impl<const A: usize, const B: usize, const C: usize> HierarchicalTimeWheel<A, B,
     ///
     /// Delays ≥ A×B×C silently saturate to `A×B×C - 1` (wrap-around).
     #[inline(always)]
-    pub fn schedule(&mut self, delay: usize, event_bit: u32) {
+    #[rustfmt::skip]
+    pub  fn schedule(&mut self, delay: usize, event_bit: u32) {
         let bit = 1u64 << (event_bit & 63);
         if delay < A {
             // Fits in level-0: land in current slot + delay.
@@ -145,7 +146,8 @@ impl<const A: usize, const B: usize, const C: usize> HierarchicalTimeWheel<A, B,
     /// that bucket, amortised over A ticks.  Level-2 drain is amortised over
     /// A×B ticks.
     #[inline]
-    pub fn tick(&mut self) -> u64 {
+    #[rustfmt::skip]
+    pub  fn tick(&mut self) -> u64 {
         // Drain current level-0 slot.
         let fired = self.level0[self.tick0];
         self.level0[self.tick0] = 0;
@@ -182,7 +184,8 @@ impl<const A: usize, const B: usize, const C: usize> HierarchicalTimeWheel<A, B,
     /// Current absolute tick count (level-0 position is the fine-grain clock).
     #[inline(always)]
     #[must_use]
-    pub fn current_tick(&self) -> usize {
+    #[rustfmt::skip]
+    pub  fn current_tick(&self) -> usize {
         self.tick2 * (A * B) + self.tick1 * A + self.tick0
     }
 }
@@ -285,3 +288,13 @@ mod tests {
         assert_eq!(w.current_tick(), 15);
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

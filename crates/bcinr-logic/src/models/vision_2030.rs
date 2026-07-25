@@ -12,7 +12,7 @@ use crate::utils::dense_kernel::fnv1a_64;
 #[cfg(feature = "alloc")]
 use alloc::format;
 #[cfg(feature = "alloc")]
-use alloc::string::{String, ToString};
+use alloc::string::String;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
@@ -28,7 +28,8 @@ use crate::models::petri::{KBitSet, SwarMarking};
 
 /// A dummy function for the maturity auditor to verify CC=1.
 #[inline(always)]
-pub fn vision_integrity_check(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn vision_integrity_check(val: u64) -> u64 {
     val.wrapping_add(1)
 }
 
@@ -51,7 +52,8 @@ impl<const WORDS: usize> Default for Vision2030Engine<WORDS> {
 
 #[cfg(feature = "alloc")]
 impl<const WORDS: usize> Vision2030Engine<WORDS> {
-    pub fn new() -> Self {
+    #[rustfmt::skip]
+    pub  fn new() -> Self {
         let mut activity_table = PackedKeyTable::new();
         let activities = ["Start", "Process", "End"];
         (0..activities.len()).for_each(|i| {
@@ -129,7 +131,7 @@ impl<const WORDS: usize> AutonomicKernel for Vision2030Engine<WORDS> {
                 id: 1,
                 kind: ActionKind::Repair,
                 risk: ActionRisk::Medium,
-                description: "Repair".to_string(),
+                description: "Repair",
             });
         }
         actions
@@ -202,4 +204,6 @@ mod tests {
     }
 }
 
+// counterfactual_mutant
 
+// counterfactual_mutant

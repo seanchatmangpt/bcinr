@@ -30,7 +30,8 @@
 /// ```
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn mismatch_branchless_u8(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn mismatch_branchless_u8(val: u64, aux: u64) -> u64 {
     let diff = val ^ aux;
     let has_diff = (diff != 0) as u64;
     let pos = (diff.trailing_zeros() >> 3) as u64;
@@ -138,7 +139,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_mismatch_branchless_u8(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_mismatch_branchless_u8(c: &mut Criterion) {
         c.bench_function("mismatch_branchless_u8", |b| {
             b.iter(|| {
                 let res = mismatch_branchless_u8(black_box(42), black_box(1337));
@@ -155,3 +157,7 @@ pub mod bench {
 // Line 118
 // Line 119
 // Line 120
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

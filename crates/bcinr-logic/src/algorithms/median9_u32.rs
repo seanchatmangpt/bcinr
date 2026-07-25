@@ -21,7 +21,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn median9_u32(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn median9_u32(val: u64, aux: u64) -> u64 {
     // Median of nine byte values: the eight bytes of `val` plus the low byte
     // of `aux`. Median = the element of stable rank 4 (the 5th smallest).
     // Each byte's stable rank is computed branchlessly (no loops) and the
@@ -152,7 +153,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_median9_u32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_median9_u32(c: &mut Criterion) {
         c.bench_function("median9_u32", |b| {
             b.iter(|| {
                 let res = median9_u32(black_box(42), black_box(1337));
@@ -161,3 +163,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

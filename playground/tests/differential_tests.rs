@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! Differential tests: runs `playground`'s branchless Petri/POWL/YAWL
 //! primitives side by side against the `reference` module's plain-Rust
 //! reference implementations and asserts they agree.

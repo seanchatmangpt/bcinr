@@ -33,7 +33,8 @@
 // ranks[i] = stable rank of pairs[i].0 among all keys
 // output[ranks[i]] = pairs[i]
 // { output sorted by key, stable for equal keys }
-pub fn sort_stable_key_value_u32x8(pairs: [(u32, u32); 8]) -> [(u32, u32); 8] {
+#[rustfmt::skip]
+pub  fn sort_stable_key_value_u32x8(pairs: [(u32, u32); 8]) -> [(u32, u32); 8] {
     // Compute stable rank for each key.
     // rank[i] = number of keys < pairs[i].0
     //         + number of equal keys at earlier indices (stability tiebreak).
@@ -226,7 +227,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_sort_stable_key_value_u32x8(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_sort_stable_key_value_u32x8(c: &mut Criterion) {
         let pairs = [
             (5u32, 50u32),
             (3, 30),
@@ -242,3 +244,13 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

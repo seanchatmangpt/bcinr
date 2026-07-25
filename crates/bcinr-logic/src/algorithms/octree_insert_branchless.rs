@@ -23,7 +23,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn octree_insert_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn octree_insert_branchless(val: u64, aux: u64) -> u64 {
     // Spread the low 21 bits of `c` so each occupies every third bit position.
     fn spread3(c: u64) -> u64 {
         let mut x = c & 0x1F_FFFF; // 21 bits
@@ -147,7 +148,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_octree_insert_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_octree_insert_branchless(c: &mut Criterion) {
         c.bench_function("octree_insert_branchless", |b| {
             b.iter(|| {
                 let res = octree_insert_branchless(black_box(42), black_box(1337));
@@ -156,3 +158,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

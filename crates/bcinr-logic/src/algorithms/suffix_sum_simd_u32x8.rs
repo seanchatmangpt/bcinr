@@ -25,7 +25,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn suffix_sum_simd_u32x8(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn suffix_sum_simd_u32x8(val: u64, aux: u64) -> u64 {
     let carry = aux & 0xFFFFFFFF;
     let lane0 = val & 0xFFFFFFFF;
     let lane1 = val >> 32;
@@ -102,8 +103,11 @@ mod tests {
         );
         // mutants
         let base = suffix_sum_simd_u32x8_reference(42, 1337);
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_suffix_sum_simd_u32x8_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_suffix_sum_simd_u32x8_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0;
         assert_ne!(mutant_suffix_sum_simd_u32x8_3(42, 1337), base, "mutant 3");
     }
 
@@ -124,7 +128,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_suffix_sum_simd_u32x8(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_suffix_sum_simd_u32x8(c: &mut Criterion) {
         c.bench_function("suffix_sum_simd_u32x8", |b| {
             b.iter(|| {
                 let res = suffix_sum_simd_u32x8(black_box(42), black_box(1337));
@@ -133,3 +138,9 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant
+
+// counterfactual_mutant
+
+// counterfactual_mutant

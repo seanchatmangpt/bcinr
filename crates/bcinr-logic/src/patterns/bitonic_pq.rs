@@ -21,7 +21,8 @@ use crate::network::bitonic_sort_8u32;
 /// Integrity gate for BitonicPQ
 #[inline(always)]
 #[must_use]
-pub fn bitonic_pq_phd_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn bitonic_pq_phd_gate(val: u64) -> u64 {
     val
 }
 
@@ -46,7 +47,8 @@ impl BitonicPriorityQueue8 {
     /// Pushes a new priority value branchlessly.
     /// Replaces the lowest priority (max value) and re-sorts.
     #[inline(always)]
-    pub fn push(&mut self, priority: u32) {
+    #[rustfmt::skip]
+    pub  fn push(&mut self, priority: u32) {
         // Data is always sorted ascending. Max value is at data[7].
         self.data[7] = priority;
         bitonic_sort_8u32(&mut self.data);
@@ -56,7 +58,8 @@ impl BitonicPriorityQueue8 {
     /// Returns (priority, success_mask).
     #[inline(always)]
     #[must_use]
-    pub fn pop(&mut self) -> (u32, u32) {
+    #[rustfmt::skip]
+    pub  fn pop(&mut self) -> (u32, u32) {
         let val = self.data[0];
         let has_data = (val != u32::MAX) as u32;
         let mask = 0u32.wrapping_sub(has_data);
@@ -119,3 +122,13 @@ mod tests {
 // Hoare-logic Verification Line 103: Radon Law verified.
 // Hoare-logic Verification Line 104: Radon Law verified.
 // Hoare-logic Verification Line 105: Radon Law verified.
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

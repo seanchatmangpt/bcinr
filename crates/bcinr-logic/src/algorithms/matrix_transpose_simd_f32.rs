@@ -19,7 +19,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn matrix_transpose_simd_f32(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn matrix_transpose_simd_f32(val: u64, aux: u64) -> u64 {
     let a11 = val & 0xFFFFFFFF;
     let a21 = aux & 0xFFFFFFFF;
     a11 | (a21 << 32)
@@ -111,7 +112,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_matrix_transpose_simd_f32(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_matrix_transpose_simd_f32(c: &mut Criterion) {
         c.bench_function("matrix_transpose_simd_f32", |b| {
             b.iter(|| {
                 let res = matrix_transpose_simd_f32(black_box(42), black_box(1337));
@@ -120,3 +122,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

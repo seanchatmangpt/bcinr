@@ -15,7 +15,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn green_sorting_network_16(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn green_sorting_network_16(val: u64, aux: u64) -> u64 {
     let l0 = val & 0xFFFF;
     let l1 = (val >> 16) & 0xFFFF;
     let l2 = (val >> 32) & 0xFFFF;
@@ -122,7 +123,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_green_sorting_network_16(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_green_sorting_network_16(c: &mut Criterion) {
         c.bench_function("green_sorting_network_16", |b| {
             b.iter(|| {
                 let res = green_sorting_network_16(black_box(42), black_box(1337));
@@ -131,3 +133,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

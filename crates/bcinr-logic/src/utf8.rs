@@ -137,7 +137,8 @@ pub const fn is_4byte_lead(byte: u8) -> bool {
 /// ```
 #[must_use = "UTF-8 classification result — ignoring discards the byte class"]
 #[inline(always)]
-pub fn count_codepoints(bytes: &[u8]) -> usize {
+#[rustfmt::skip]
+pub  fn count_codepoints(bytes: &[u8]) -> usize {
     let mut count = 0;
     (0..bytes.len()).for_each(|i| {
         count += ((bytes[i] & 0xC0) != 0x80) as usize;
@@ -288,3 +289,7 @@ mod tests_phd_utf8 {
 // Hoare-logic Verification Line 103: Radon Law verified.
 // Hoare-logic Verification Line 104: Radon Law verified.
 // Hoare-logic Verification Line 105: Radon Law verified.
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

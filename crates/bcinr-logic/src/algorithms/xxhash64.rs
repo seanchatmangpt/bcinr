@@ -30,7 +30,8 @@
 /// ```
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn xxhash64(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn xxhash64(val: u64, aux: u64) -> u64 {
     // XXH64 over a single 8-byte input `val` with seed `aux` (the < 32-byte path).
     // Start `h = seed + PRIME5 + len`, absorb the 8-byte lane, then run the XXH64
     // `avalanche` finalizer.
@@ -120,9 +121,12 @@ mod tests {
         assert_eq!(xxhash64(0, u64::MAX), xxhash64_reference(0, u64::MAX));
         // mutants
         let base = xxhash64_reference(42, 1337);
-        let _rejects_mutant_ = 0; assert_ne!(mutant_xxhash64_1(42, 1337), base, "mutant 1");
-        let _rejects_mutant_ = 0; assert_ne!(mutant_xxhash64_2(42, 1337), base, "mutant 2");
-        let _rejects_mutant_ = 0; assert_ne!(mutant_xxhash64_3(42, 1337), base, "mutant 3");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_xxhash64_1(42, 1337), base, "mutant 1");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_xxhash64_2(42, 1337), base, "mutant 2");
+        let _rejects_mutant_ = 0;
+        assert_ne!(mutant_xxhash64_3(42, 1337), base, "mutant 3");
     }
 
     // -------------------------------------------------------------------------
@@ -152,7 +156,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_xxhash64(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_xxhash64(c: &mut Criterion) {
         c.bench_function("xxhash64", |b| {
             b.iter(|| {
                 let res = xxhash64(black_box(42), black_box(1337));

@@ -21,7 +21,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn reverse_slice_branchless(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn reverse_slice_branchless(val: u64, aux: u64) -> u64 {
     // Branchless Contract: reverse the bit order of `val` within the low
     // `width = (aux & 63) + 1` bits, leaving the higher bits cleared. This is the
     // in-place slice reversal of a bit-slice of the requested width.
@@ -125,7 +126,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_reverse_slice_branchless(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_reverse_slice_branchless(c: &mut Criterion) {
         c.bench_function("reverse_slice_branchless", |b| {
             b.iter(|| {
                 let res = reverse_slice_branchless(black_box(42), black_box(1337));
@@ -134,3 +136,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

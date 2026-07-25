@@ -1,11 +1,12 @@
+#![allow(clippy::collapsible_if)]
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
 use syn::visit::{self, Visit};
-use syn::{Attribute, Expr, ItemFn, ImplItemFn, Meta, Visibility};
+use syn::{Attribute, Expr, ImplItemFn, ItemFn, Meta, Visibility};
 use walkdir::WalkDir;
 
-const AUTHORITATIVE_ROOTS: &[&str] = &["allocate", "evaluate_calibration"];
+const AUTHORITATIVE_ROOTS: &[&str] = &["allocate", "evaluate_calibration", "select_optimal"];
 
 fn str_has_substr(s: &str, pat: &str) -> bool {
     if pat.is_empty() {
@@ -96,15 +97,13 @@ impl<'ast> Visit<'ast> for CalleeVisitor {
                     }
                 }
             }
-            Expr::Binary(b) => {
-                match b.op {
-                    syn::BinOp::Add(_) => self.forbidden_ops.push("+".to_string()),
-                    syn::BinOp::Sub(_) => self.forbidden_ops.push("-".to_string()),
-                    syn::BinOp::Mul(_) => self.forbidden_ops.push("*".to_string()),
-                    syn::BinOp::Div(_) => self.forbidden_ops.push("/".to_string()),
-                    _ => {}
-                }
-            }
+            Expr::Binary(b) => match b.op {
+                syn::BinOp::Add(_) => self.forbidden_ops.push("+".to_string()),
+                syn::BinOp::Sub(_) => self.forbidden_ops.push("-".to_string()),
+                syn::BinOp::Mul(_) => self.forbidden_ops.push("*".to_string()),
+                syn::BinOp::Div(_) => self.forbidden_ops.push("/".to_string()),
+                _ => {}
+            },
             _ => {}
         }
         visit::visit_expr(self, i);
@@ -302,10 +301,7 @@ fn main() {
     let mut missing_u64 = Vec::new();
     for f in &public_functions {
         let p = f.path.to_string_lossy();
-        if !str_ends_with(&p, "/mod.rs")
-            && !str_starts_with(&f.name, "bench_")
-            && !f.has_contract
-        {
+        if !str_ends_with(&p, "/mod.rs") && !str_starts_with(&f.name, "bench_") && !f.has_contract {
             missing_u64.push(f);
         }
     }
@@ -327,7 +323,14 @@ fn main() {
     }
 
     println!("--- BCINR INTEGRITY AUDIT (Complexity + Construction + Branchless) ---");
-    println!("Verified {} reachable public primitives ✅", public_functions.len());
-    println!("Branchless-contracted: {}/{}", public_functions.iter().filter(|f| f.has_contract).count(), public_functions.len());
+    println!(
+        "Verified {} reachable public primitives ✅",
+        public_functions.len()
+    );
+    println!(
+        "Branchless-contracted: {}/{}",
+        public_functions.iter().filter(|f| f.has_contract).count(),
+        public_functions.len()
+    );
     println!("No bluffs, no hidden branches, no missing U64 contracts.");
 }

@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! Branchless Petri net token replay engine implementation.
 //! Adheres strictly to bcinr's Radon Law (CC=1), zero-alloc, and no_std constraints.
 

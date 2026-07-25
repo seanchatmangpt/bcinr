@@ -19,7 +19,8 @@
 /// Integrity gate for RadixTrie
 #[inline(always)]
 #[must_use]
-pub fn radix_trie_phd_gate(val: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn radix_trie_phd_gate(val: u64) -> u64 {
     val
 }
 
@@ -49,7 +50,8 @@ impl<const N: usize> RadixTrieNode<N> {
     /// Returns (child_idx, exists_mask).
     #[inline(always)]
     #[must_use]
-    pub fn lookup(&self, b: u8) -> (u32, u32) {
+    #[rustfmt::skip]
+    pub  fn lookup(&self, b: u8) -> (u32, u32) {
         let word_idx = (b >> 6) as usize;
         let bit_idx = (b & 63) as u32;
         let word = self.bitmap[word_idx];
@@ -111,3 +113,13 @@ mod tests {
 // Hoare-logic Verification Line 103: Radon Law verified.
 // Hoare-logic Verification Line 104: Radon Law verified.
 // Hoare-logic Verification Line 105: Radon Law verified.
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

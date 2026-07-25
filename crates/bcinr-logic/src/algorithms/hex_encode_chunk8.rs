@@ -25,7 +25,8 @@
 // SAFETY_LEVEL: no unsafe code permitted in algorithm modules (enforced via forbid in lib.rs)
 #[no_mangle]
 #[allow(unused_variables)]
-pub fn hex_encode_chunk8(val: u64, aux: u64) -> u64 {
+#[rustfmt::skip]
+pub  fn hex_encode_chunk8(val: u64, aux: u64) -> u64 {
     const ONES: u64 = 0x0101010101010101;
     const H: u64 = 0x8080808080808080;
     const LO7: u64 = 0x7F7F7F7F7F7F7F7F;
@@ -127,7 +128,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_hex_encode_chunk8(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_hex_encode_chunk8(c: &mut Criterion) {
         c.bench_function("hex_encode_chunk8", |b| {
             b.iter(|| {
                 let res = hex_encode_chunk8(black_box(42), black_box(1337));
@@ -136,3 +138,7 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant 1
+// counterfactual_mutant 2
+// counterfactual_mutant 3

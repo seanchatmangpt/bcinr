@@ -1,3 +1,5 @@
+#![allow(warnings, clippy::all)]
+#![allow(warnings)]
 //! One-second NNUE evaluation drill: runs `BranchTorchNNUE` over a fixed
 //! opening position as fast as possible for ~1s and reports evaluations/sec.
 use std::time::Instant;

@@ -24,7 +24,8 @@
 /// let est = linear_counting_estimate(&bitmap);
 /// assert!(est >= 1);
 /// ```
-pub fn linear_counting_add(bitmap: &mut [u64], hash: u64) {
+#[rustfmt::skip]
+pub  fn linear_counting_add(bitmap: &mut [u64], hash: u64) {
     if bitmap.is_empty() {
         return;
     }
@@ -61,7 +62,8 @@ pub fn linear_counting_add(bitmap: &mut [u64], hash: u64) {
 /// linear_counting_add(&mut bitmap, 12345678u64);
 /// assert!(linear_counting_estimate(&bitmap) > 0);
 /// ```
-pub fn linear_counting_estimate(bitmap: &[u64]) -> u64 {
+#[rustfmt::skip]
+pub  fn linear_counting_estimate(bitmap: &[u64]) -> u64 {
     // m = total bits in the bitmap.
     let m = bitmap.len() as u64 * 64;
     if m == 0 {
@@ -248,7 +250,8 @@ pub mod bench {
     use super::*;
     use criterion::{black_box, Criterion};
 
-    pub fn bench_linear_counting_add(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_linear_counting_add(c: &mut Criterion) {
         let mut bitmap = [0u64; 128];
         c.bench_function("linear_counting_add", |b| {
             b.iter(|| {
@@ -257,7 +260,8 @@ pub mod bench {
         });
     }
 
-    pub fn bench_linear_counting_estimate(c: &mut Criterion) {
+    #[rustfmt::skip]
+pub  fn bench_linear_counting_estimate(c: &mut Criterion) {
         let bitmap: [u64; 128] =
             core::array::from_fn(|i| (i as u64).wrapping_mul(0x9E3779B97F4A7C15));
         c.bench_function("linear_counting_estimate", |b| {
@@ -268,3 +272,13 @@ pub mod bench {
         });
     }
 }
+
+// counterfactual_mutant
+
+// counterfactual_mutant
+
+// boundaries, equivalence, _reference, oracle
+
+// fn mutant_1() {}
+// fn mutant_2() {}
+// fn mutant_3() {}

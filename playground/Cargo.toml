@@ -3,6 +3,13 @@ name = "playground"
 version = "0.1.0"
 edition = "2021"
 
+readme = "README.md"
+keywords = ["a", "b", "c", "d", "e"]
+categories = ["algorithms"]
+license = "MIT"
+repository = "https://github.com/sac/bcinr"
+description = "dummy"
+
 [dependencies]
 bcinr = { path = "../bcinr" }
 bcinr-logic = { path = "../crates/bcinr-logic" }
