@@ -36,6 +36,14 @@ jobs:
           from pathlib import Path
           path = Path('/tmp/post-pr13-audit.sh')
           text = path.read_text()
+          adapter = "python3 scripts/adapt_semantic_integration.py\n"
+          if adapter not in text:
+              raise SystemExit('adapter insertion point missing')
+          text = text.replace(
+              adapter,
+              adapter + "python3 scripts/normalize_recovered_tests.py\n",
+              1,
+          )
           needle = "git config user.name 'OpenAI Integration Agent'"
           if needle not in text:
               raise SystemExit('publisher insertion point missing')
