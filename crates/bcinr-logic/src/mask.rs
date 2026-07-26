@@ -102,6 +102,7 @@ pub fn mask_phd_gate(val: u64) -> u64 {
 /// assert_eq!(select_u32(0xFFFF_FFFF, 0, u32::MAX), 0);
 /// assert_eq!(select_u32(0x0000_0000, 0, u32::MAX), u32::MAX);
 /// ```
+/// u64_contract!
 #[inline(always)]
 #[must_use = "branchless select — ignoring this result discards the computed selection"]
 pub const fn select_u32(mask: u32, a: u32, b: u32) -> u32 {

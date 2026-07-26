@@ -32,20 +32,26 @@ jobs:
         run: cargo check --workspace --all-features
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-      - name: CMCA focused tests
-        run: |
-          cargo test -p bcinr-cmca --all-features
-          cargo test -p bcinr-cmca --test calibration
-          cargo test -p bcinr-cmca --test differential
-          cargo test -p bcinr-cmca --test hostile_mutants
-          cargo test -p bcinr-cmca --test compile_fail_tests
-      - name: PDDL and POWL canonical conformance
-        run: |
-          cargo test -p bcinr-pddl --all-features --test canonical_ipc
-          cargo test -p bcinr-pddl --all-features ground_v2
-          cargo test -p bcinr-powl --all-features powl2
-          cargo test -p bcinr-powl --all-features scheduler_v2
-          cargo test -p bcinr-powl-receipt --all-features execution_v2
+      - name: CMCA all-features baseline
+        run: cargo test -p bcinr-cmca --all-features
+      - name: CMCA calibration
+        run: cargo test -p bcinr-cmca --test calibration
+      - name: CMCA differential
+        run: cargo test -p bcinr-cmca --test differential
+      - name: CMCA hostile-mutant baseline
+        run: cargo test -p bcinr-cmca --test hostile_mutants
+      - name: CMCA compile-fail contracts
+        run: cargo test -p bcinr-cmca --test compile_fail_tests
+      - name: PDDL canonical IPC
+        run: cargo test -p bcinr-pddl --all-features --test canonical_ipc
+      - name: PDDL v2 grounding
+        run: cargo test -p bcinr-pddl --all-features ground_v2
+      - name: POWL 2.0
+        run: cargo test -p bcinr-powl --all-features powl2
+      - name: POWL scheduler v2
+        run: cargo test -p bcinr-powl --all-features scheduler_v2
+      - name: POWL receipt execution v2
+        run: cargo test -p bcinr-powl-receipt --all-features execution_v2
       - name: Locked dependency graph
         run: cargo metadata --locked --format-version 1 --no-deps > /dev/null
 
@@ -59,18 +65,14 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Style and compile
-        run: |
-          cargo fmt --all -- --check
-          cargo check --workspace --all-features
-          cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Formatting
+        run: cargo fmt --all -- --check
+      - name: Workspace compile
+        run: cargo check --workspace --all-features
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - name: Full Linux workspace
         run: cargo test --workspace --all-features --all-targets --no-fail-fast
-      - name: Production PDDL/POWL/receipt rails
-        run: |
-          cargo test -p bcinr-pddl --all-features
-          cargo test -p bcinr-powl --all-features
-          cargo test -p bcinr-powl-receipt --all-features
       - name: Documentation
         env:
           RUSTDOCFLAGS: -D warnings

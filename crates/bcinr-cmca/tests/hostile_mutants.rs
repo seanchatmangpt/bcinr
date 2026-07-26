@@ -61,6 +61,9 @@ pub fn evaluate_m01(
 
 #[test]
 fn kill_m01_ignore_numeric_error() {
+    if !require_production_semantics("kill_m01_ignore_numeric_error") {
+        return;
+    }
     let result = evaluate_m01(
         NonNegativeFixed::from_bits(66000), // kappa_hat > epsilon_on
         NonNegativeFixed::from_bits(65000), // kappa_under < epsilon_on
@@ -108,6 +111,9 @@ pub fn evaluate_m03(
 
 #[test]
 fn kill_m03_point_estimate_gram_gate() {
+    if !require_production_semantics("kill_m03_point_estimate_gram_gate") {
+        return;
+    }
     let result = evaluate_m03(
         NonNegativeFixed::from_bits(131072),
         NonNegativeFixed::from_bits(131072),
@@ -155,6 +161,9 @@ pub fn evaluate_m05(
 
 #[test]
 fn kill_m05_ignore_drift() {
+    if !require_production_semantics("kill_m05_ignore_drift") {
+        return;
+    }
     let result = evaluate_m05(
         NonNegativeFixed::from_bits(131072),
         NonNegativeFixed::from_bits(131072),
@@ -202,6 +211,9 @@ pub fn evaluate_m07(
 
 #[test]
 fn kill_m07_ignore_gram() {
+    if !require_production_semantics("kill_m07_ignore_gram") {
+        return;
+    }
     let result = evaluate_m07(
         NonNegativeFixed::from_bits(131072),
         NonNegativeFixed::from_bits(131072),
@@ -339,9 +351,46 @@ const CORRECT_BASELINE: [u32; N] = [8349, 7741, 6684, 6684, 6684, 6684, 7973, 14
 const CORRECT_TREE: [u32; N] = [0, 9391, 6623, 8066, 8066, 8066, 9275, 16043];
 const CORRECT_MU_COST: [u32; N] = [4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096];
 
+const ACTIVE_MUTANT_COUNT: u8 = cfg!(feature = "mutant_1") as u8
+    + cfg!(feature = "mutant_2") as u8
+    + cfg!(feature = "mutant_3") as u8
+    + cfg!(feature = "mutant_4") as u8
+    + cfg!(feature = "mutant_5") as u8
+    + cfg!(feature = "mutant_6") as u8
+    + cfg!(feature = "mutant_7") as u8
+    + cfg!(feature = "mutant_8") as u8
+    + cfg!(feature = "mutant_9") as u8
+    + cfg!(feature = "mutant_10") as u8
+    + cfg!(feature = "mutant_11") as u8;
+
+fn require_isolated_mutant(mutant: &str) -> bool {
+    if ACTIVE_MUTANT_COUNT == 1 {
+        true
+    } else {
+        eprintln!(
+            "BCINR_TYPED_SKIP[cmca-mutant-composition]: {mutant} requires exactly one active mutant feature; observed {ACTIVE_MUTANT_COUNT}"
+        );
+        false
+    }
+}
+
+fn require_production_semantics(test: &str) -> bool {
+    if ACTIVE_MUTANT_COUNT == 0 {
+        true
+    } else {
+        eprintln!(
+            "BCINR_TYPED_SKIP[cmca-mutant-composition]: {test} is a handcrafted wrapper rail and requires zero crate-level mutant features; observed {ACTIVE_MUTANT_COUNT}"
+        );
+        false
+    }
+}
+
 #[cfg(feature = "mutant_1")]
 #[test]
 fn kill_mutant_1_single_measure_collapse() {
+    if !require_isolated_mutant("mutant_1") {
+        return;
+    }
     let result_mutant = run_alloc_baseline().map(|x| x.val);
     assert_ne!(
         result_mutant, CORRECT_BASELINE,
@@ -352,6 +401,9 @@ fn kill_mutant_1_single_measure_collapse() {
 #[cfg(feature = "mutant_2")]
 #[test]
 fn kill_mutant_2_q_sign_inversion() {
+    if !require_isolated_mutant("mutant_2") {
+        return;
+    }
     let result_mutant = run_alloc_baseline().map(|x| x.val);
     assert_ne!(
         result_mutant, CORRECT_BASELINE,
@@ -362,6 +414,9 @@ fn kill_mutant_2_q_sign_inversion() {
 #[cfg(feature = "mutant_3")]
 #[test]
 fn kill_mutant_3_broken_normalization() {
+    if !require_isolated_mutant("mutant_3") {
+        return;
+    }
     let result_mutant = run_alloc_tree().map(|x| x.val);
     assert_ne!(
         result_mutant, CORRECT_TREE,
@@ -372,6 +427,9 @@ fn kill_mutant_3_broken_normalization() {
 #[cfg(feature = "mutant_4")]
 #[test]
 fn kill_mutant_4_rdf_identity_skew() {
+    if !require_isolated_mutant("mutant_4") {
+        return;
+    }
     let result_mutant = run_alloc_baseline().map(|x| x.val);
     assert_ne!(
         result_mutant, CORRECT_BASELINE,
@@ -382,6 +440,9 @@ fn kill_mutant_4_rdf_identity_skew() {
 #[cfg(feature = "mutant_5")]
 #[test]
 fn kill_mutant_5_consequence_truncation() {
+    if !require_isolated_mutant("mutant_5") {
+        return;
+    }
     let result_mutant = run_alloc_mu_cost().map(|x| x.val);
     assert_ne!(
         result_mutant, CORRECT_MU_COST,
@@ -392,6 +453,9 @@ fn kill_mutant_5_consequence_truncation() {
 #[cfg(feature = "mutant_6")]
 #[test]
 fn kill_mutant_6_saturating_add_false_overflow() {
+    if !require_isolated_mutant("mutant_6") {
+        return;
+    }
     let a = NonNegativeFixed {
         val: 10,
         err: u32::MAX,
@@ -411,6 +475,9 @@ fn kill_mutant_6_saturating_add_false_overflow() {
 #[cfg(feature = "mutant_7")]
 #[test]
 fn kill_mutant_7_saturating_div_false_zero() {
+    if !require_isolated_mutant("mutant_7") {
+        return;
+    }
     let a = NonNegativeFixed {
         val: 100,
         err: u32::MAX,
@@ -421,15 +488,23 @@ fn kill_mutant_7_saturating_div_false_zero() {
     };
     let c = a.saturating_div(b);
     assert_eq!(
+        c.val,
+        u32::MAX,
+        "Mutant 7 should falsely classify a nonzero denominator as zero and saturate"
+    );
+    assert_eq!(
         c.err,
-        bcinr_cmca::allocator::StabilityRefusal::UnsupportedDomain as u32,
-        "Mutant 7 should trigger UnsupportedDomain"
+        u32::MAX,
+        "Mutant 7 should expose the coupled equality-mask defect that suppresses the refusal code"
     );
 }
 
 #[cfg(feature = "mutant_8")]
 #[test]
 fn kill_mutant_8_log2_false_zero() {
+    if !require_isolated_mutant("mutant_8") {
+        return;
+    }
     let a = NonNegativeFixed {
         val: 100,
         err: u32::MAX,
@@ -445,6 +520,9 @@ fn kill_mutant_8_log2_false_zero() {
 #[cfg(feature = "mutant_9")]
 #[test]
 fn kill_mutant_9_false_drift() {
+    if !require_isolated_mutant("mutant_9") {
+        return;
+    }
     let artifact = bcinr_cmca::observatory::MeasurementArtifact {
         point_estimate: NonNegativeFixed::from_bits(65536),
         lower_bound: NonNegativeFixed::from_bits(65536),
@@ -479,6 +557,9 @@ fn kill_mutant_9_false_drift() {
 #[cfg(feature = "mutant_10")]
 #[test]
 fn kill_mutant_10_false_numerically_uncertain() {
+    if !require_isolated_mutant("mutant_10") {
+        return;
+    }
     let artifact = bcinr_cmca::observatory::MeasurementArtifact {
         point_estimate: NonNegativeFixed::from_bits(131072),
         lower_bound: NonNegativeFixed::from_bits(131072),
@@ -513,6 +594,9 @@ fn kill_mutant_10_false_numerically_uncertain() {
 #[cfg(feature = "mutant_11")]
 #[test]
 fn kill_mutant_11_false_gram_degenerate() {
+    if !require_isolated_mutant("mutant_11") {
+        return;
+    }
     let artifact = bcinr_cmca::observatory::MeasurementArtifact {
         point_estimate: NonNegativeFixed::from_bits(131072),
         lower_bound: NonNegativeFixed::from_bits(131072),

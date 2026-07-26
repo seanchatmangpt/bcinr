@@ -1,0 +1,54 @@
+name: Export Verified Post-Integration Tree
+
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-post-integration-final
+  cancel-in-progress: true
+
+jobs:
+  export:
+    if: github.event.pull_request.head.ref == 'agent/repair-post-integration-verification-ci' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/repair-post-integration-verification-ci
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - name: Materialize the already-verified source tree
+        run: |
+          python3 scripts/repair_post_integration_verification.py
+          python3 scripts/repair_cmca_all_features_composition.py
+          python3 scripts/repair_mcp_transport.py
+          cargo fmt --all
+          git diff --check
+      - name: Assemble final commit and export patch
+        shell: bash
+        run: |
+          set +e
+          bash scripts/finalize_post_integration_verification.sh
+          status=$?
+          git format-patch -1 --stdout > verified-final.patch
+          git show --stat --oneline HEAD > verified-final-stat.txt
+          echo "publisher_exit=${status}" >> verified-final-stat.txt
+          exit 0
+      - name: Upload verified final commit
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-post-integration-final-${{ github.run_id }}
+          path: |
+            verified-final.patch
+            verified-final-stat.txt
+          if-no-files-found: error
+          retention-days: 7

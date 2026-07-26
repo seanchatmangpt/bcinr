@@ -187,44 +187,87 @@ fn ensure_binaries_built() {
     });
 }
 
-static LSP_BUILD_ONCE: std::sync::Once = std::sync::Once::new();
+#[derive(Debug)]
+pub enum LspSkip {
+    MissingSiblingRepository(PathBuf),
+}
 
-fn ensure_lsp_built() {
-    LSP_BUILD_ONCE.call_once(|| {
-        let target_dir = std::env::temp_dir().join("bcinr-e2e-target");
-        if target_dir.join("debug/anti-llm-cheat-lsp").exists() {
-            return;
+impl std::fmt::Display for LspSkip {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MissingSiblingRepository(manifest) => write!(
+                formatter,
+                "anti-llm-cheat-lsp sibling repository is not admitted at {}",
+                manifest.display()
+            ),
         }
-        let repo_root = get_repo_root();
-        // The `anti-llm-cheat-lsp` package lives in its own standalone repo,
-        // one level up from the main bcinr repo as `anti-llm-cheat-lsp`.
-        // Skip build if the repo doesn't exist (e.g., in CI environments).
-        let parent_dir = repo_root.parent().unwrap_or(&repo_root);
-        let lsp_manifest = parent_dir.join("anti-llm-cheat-lsp/Cargo.toml");
-        if !lsp_manifest.exists() {
-            eprintln!(
-                "anti-llm-cheat-lsp repository not found at {:?}, skipping LSP tests",
-                lsp_manifest
-            );
-            return;
+    }
+}
+
+fn ensure_lsp_built() -> Result<PathBuf, LspSkip> {
+    let target_dir = std::env::temp_dir().join("bcinr-e2e-target");
+    let lsp_binary = target_dir.join("debug/anti-llm-cheat-lsp");
+    if lsp_binary.exists() {
+        return Ok(lsp_binary);
+    }
+
+    let repo_root = get_repo_root();
+    let parent_dir = repo_root.parent().unwrap_or(repo_root.as_path());
+    let lsp_manifest = parent_dir.join("anti-llm-cheat-lsp/Cargo.toml");
+    if !lsp_manifest.exists() {
+        return Err(LspSkip::MissingSiblingRepository(lsp_manifest));
+    }
+
+    let mut cmd = Command::new("cargo");
+    cmd.args([
+        "build",
+        "--quiet",
+        "--manifest-path",
+        lsp_manifest.to_str().unwrap(),
+        "--package",
+        "anti-llm-cheat-lsp",
+    ]);
+    cmd.current_dir(&repo_root);
+    cmd.env("CARGO_TARGET_DIR", &target_dir);
+    let status = cmd
+        .status()
+        .expect("failed to launch anti-llm-cheat-lsp build");
+    assert!(
+        status.success(),
+        "Failed to build anti-llm-cheat-lsp binary"
+    );
+    assert!(
+        lsp_binary.exists(),
+        "anti-llm-cheat-lsp build succeeded without producing {}",
+        lsp_binary.display()
+    );
+    Ok(lsp_binary)
+}
+
+pub fn run_lsp_cmd(dir: &str) -> Result<std::process::Output, LspSkip> {
+    let lsp_binary = ensure_lsp_built()?;
+    let mut cmd = Command::new(&lsp_binary);
+    cmd.arg("scan");
+    cmd.args(["--dir", dir]);
+    cmd.current_dir(get_repo_root());
+    Ok(cmd.output().unwrap_or_else(|error| {
+        panic!(
+            "failed to execute admitted anti-llm-cheat-lsp binary {}: {error}",
+            lsp_binary.display()
+        )
+    }))
+}
+
+macro_rules! lsp_output_or_skip {
+    ($dir:expr) => {{
+        match crate::run_lsp_cmd($dir) {
+            Ok(output) => output,
+            Err(reason) => {
+                eprintln!("BCINR_TYPED_SKIP[anti-llm-lsp]: {reason}");
+                return;
+            }
         }
-        let mut cmd = Command::new("cargo");
-        cmd.args([
-            "build",
-            "--quiet",
-            "--manifest-path",
-            lsp_manifest.to_str().unwrap(),
-            "--package",
-            "anti-llm-cheat-lsp",
-        ]);
-        cmd.current_dir(&repo_root);
-        cmd.env("CARGO_TARGET_DIR", &target_dir);
-        let status = cmd.status().unwrap();
-        assert!(
-            status.success(),
-            "Failed to build anti-llm-cheat-lsp binary"
-        );
-    });
+    }};
 }
 
 pub fn run_gate_cmd() -> std::process::Output {
@@ -251,25 +294,6 @@ pub fn run_bench_cmd() -> std::process::Output {
     ]);
     cmd.current_dir(get_repo_root());
     cmd.output().expect("failed to execute bcinr-bench-auditor")
-}
-
-pub fn run_lsp_cmd(dir: &str) -> std::process::Output {
-    ensure_lsp_built();
-    let target_dir = std::env::temp_dir().join("bcinr-e2e-target");
-    let lsp_binary = target_dir.join("debug/anti-llm-cheat-lsp");
-    if !lsp_binary.exists() {
-        eprintln!(
-            "anti-llm-cheat-lsp binary not found at {:?}, returning empty output",
-            lsp_binary
-        );
-        // Return a dummy output that indicates the test should be skipped
-        return std::process::Command::new("true").output().unwrap();
-    }
-    let mut cmd = Command::new(&lsp_binary);
-    cmd.arg("scan");
-    cmd.args(["--dir", dir]);
-    cmd.current_dir(get_repo_root());
-    cmd.output().unwrap()
 }
 
 fn assert_status_in(output: &std::process::Output, codes: &[i32]) {

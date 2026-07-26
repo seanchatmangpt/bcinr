@@ -20,10 +20,9 @@
 use bcinr_mcp::cache;
 
 use cache::CapabilityCache;
-use rmcp::{
-    handler::server::wrapper::Parameters, schemars, tool, tool_router, transport::stdio, ServiceExt,
-};
+use rmcp::{handler::server::wrapper::Parameters, schemars, tool, tool_router, ServiceExt};
 use serde::Deserialize;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 // ─── Flexible u64 deserializer ────────────────────────────────────────────────
 //
@@ -1188,6 +1187,59 @@ impl BcinrServer {
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
+/// Build a strict newline-delimited stdio ingress.
+///
+/// rmcp 2.2 intentionally ignores syntactically unparsable input. BCINR's
+/// protocol contract is stricter: malformed JSON must receive JSON-RPC -32700.
+/// Valid JSON frames are forwarded unchanged to rmcp for normal MCP handling.
+fn strict_stdio() -> (tokio::io::DuplexStream, tokio::io::Stdout) {
+    let (rmcp_read, mut ingress_write) = tokio::io::duplex(64 * 1024);
+
+    tokio::spawn(async move {
+        let mut lines = BufReader::new(tokio::io::stdin()).lines();
+        let mut error_output = tokio::io::stdout();
+
+        loop {
+            let line = match lines.next_line().await {
+                Ok(Some(line)) => line,
+                Ok(None) => break,
+                Err(error) => {
+                    tracing::error!("strict stdio ingress failed: {error}");
+                    break;
+                }
+            };
+
+            if serde_json::from_str::<serde_json::Value>(&line).is_err() {
+                let response = serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "error": {
+                        "code": -32700,
+                        "message": "Parse error"
+                    },
+                    "id": serde_json::Value::Null
+                });
+                let mut encoded = response.to_string();
+                encoded.push('\n');
+                if error_output.write_all(encoded.as_bytes()).await.is_err()
+                    || error_output.flush().await.is_err()
+                {
+                    break;
+                }
+                continue;
+            }
+
+            if ingress_write.write_all(line.as_bytes()).await.is_err()
+                || ingress_write.write_all(b"\n").await.is_err()
+                || ingress_write.flush().await.is_err()
+            {
+                break;
+            }
+        }
+    });
+
+    (rmcp_read, tokio::io::stdout())
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt()
@@ -1201,7 +1253,7 @@ async fn main() {
     tracing::info!("bcinr-mcp starting — 25 tools ready (PDDL:8 + POWL:6 + core:3 + algorithms:6 + receipts:1 + cross-crate:1)");
 
     let server = BcinrServer::default();
-    let running = match server.serve(stdio()).await {
+    let running = match server.serve(strict_stdio()).await {
         Ok(r) => r,
         Err(e) => {
             tracing::error!("MCP server init error: {}", e);
