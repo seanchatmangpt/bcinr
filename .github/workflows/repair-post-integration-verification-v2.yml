@@ -46,7 +46,19 @@ jobs:
       - name: Workspace compile
         run: cargo check --workspace --all-features
       - name: Clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+        id: clippy
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo clippy --workspace --all-targets --all-features -- -D warnings 2>&1 | tee clippy.log
+      - name: Upload Clippy diagnostics
+        if: failure() && steps.clippy.conclusion == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: post-integration-clippy-${{ github.run_id }}
+          path: clippy.log
+          if-no-files-found: error
+          retention-days: 7
       - name: CMCA all-features baseline
         run: cargo test -p bcinr-cmca --all-features
       - name: CMCA calibration
