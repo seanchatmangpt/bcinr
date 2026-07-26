@@ -23,6 +23,7 @@ divan = "0.1"
 trybuild = "1"
 proptest = "1"
 chicago-tdd-tools = { version = "26.7.1", features = ["ocel-generation"] }
+ocel = "0.1.5"
 serde_json = "1"
 
 [features]

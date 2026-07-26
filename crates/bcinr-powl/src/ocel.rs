@@ -81,13 +81,14 @@
 
 #[cfg(feature = "std")]
 use wasm4pm_compat::ocel::{
-    OCELEvent, OCELEventAttribute, OCELObject, OCELRelationship, OCELType, OCEL,
+    OCELEvent, OCELEventAttribute, OCELObject, OCELRelationship, OCELType, OCELTypeAttribute, OCEL,
 };
 
 /// A discrete event recorded within an [`OcelLog`].
 ///
 /// An event represents either the firing of an individual operation or the
 /// sealing of a workflow run.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct OcelEvent {
     /// A unique sequential identifier for the event.
     pub event_id: u64,
@@ -100,6 +101,9 @@ pub struct OcelEvent {
     /// For `"op_fired"`, the index of the operation that fired.
     /// For `"run_sealed"`, the low 32 bits of the declared `op_trace` bitmask.
     pub op_idx: u32,
+    /// For `run_sealed`, the complete 64-bit declared operation trace.
+    /// For `op_fired`, this is zero.
+    pub op_trace: u64,
     /// Auxiliary tag storing the operation kind or metadata.
     pub kind_tag: u8,
 }
@@ -108,6 +112,7 @@ pub struct OcelEvent {
 ///
 /// `OcelLog` can hold up to 512 events of type [`OcelEvent`]. It supports
 /// appending events with guaranteed $O(1)$ time complexity and no dynamic allocation.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OcelLog {
     events: [OcelEvent; 512],
     count: usize,
@@ -136,6 +141,17 @@ pub enum ConformanceResult {
         /// A bitmask of predecessor operations that were missing.
         missing_pred_mask: u64,
     },
+    /// An XOR join observed zero or multiple branch entries before firing.
+    ChoiceViolation {
+        /// The identifier of the affected run.
+        run_id: u64,
+        /// The XOR join operation index.
+        join_op_idx: u32,
+        /// Branch entries declared by the compiled XOR join.
+        branch_mask: u64,
+        /// Branch entries actually observed before the join fired.
+        fired_branch_mask: u64,
+    },
     /// The same op index fired more than once within a single run.
     DuplicateFire {
         /// The identifier of the run.
@@ -153,11 +169,66 @@ pub enum ConformanceResult {
         /// The actual accumulated bitmask of fired operations.
         accumulated: u64,
     },
+    /// An operation index does not exist in the compiled tape.
+    UnknownOperation {
+        /// The identifier of the affected run.
+        run_id: u64,
+        /// The unknown operation index.
+        op_idx: u32,
+    },
+    /// An operation was recorded after its run had already been sealed.
+    EventAfterSeal {
+        /// The identifier of the affected run.
+        run_id: u64,
+        /// The operation recorded after sealing.
+        op_idx: u32,
+    },
+    /// A run was sealed more than once.
+    DuplicateSeal {
+        /// The identifier of the multiply sealed run.
+        run_id: u64,
+    },
+    /// A run contains events but no terminal seal.
+    MissingSeal {
+        /// The identifier of the unsealed run.
+        run_id: u64,
+    },
     /// The log contains no events.
     EmptyLog,
     /// Refusal: The log contains more unique run IDs than the fixed limits
     /// of the deterministic validator.
     RunLimitExceeded,
+}
+
+/// A deterministic BLAKE3 receipt that owns the exact ordered OCEL trace it seals.
+///
+/// Unlike diagnostic collectors that may assign random event identifiers, this receipt
+/// commits only to the canonical fields recorded by [`OcelLog`]. The owned log is retained
+/// so an auditor can replay the exact operation sequence rather than trusting a bare digest.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OcelTraceReceipt {
+    log: OcelLog,
+    digest: [u8; 32],
+}
+
+impl OcelTraceReceipt {
+    /// Return the sealed, ordered event log.
+    #[inline]
+    pub fn log(&self) -> &OcelLog {
+        &self.log
+    }
+
+    /// Return the deterministic BLAKE3 digest of the canonical event encoding.
+    #[inline]
+    pub fn digest(&self) -> [u8; 32] {
+        self.digest
+    }
+
+    /// Number of ordered events committed by this receipt.
+    #[inline]
+    pub fn event_count(&self) -> usize {
+        self.log.count
+    }
 }
 
 impl OcelLog {
@@ -178,6 +249,7 @@ impl OcelLog {
             timestamp: 0,
             run_id: 0,
             op_idx: 0,
+            op_trace: 0,
             kind_tag: 0,
         };
         Self {
@@ -219,14 +291,15 @@ impl OcelLog {
             timestamp: self.tick,
             run_id,
             op_idx,
+            op_trace: 0,
             kind_tag,
         };
         self.count += 1;
         Ok(())
     }
 
-    /// Records that run `run_id` was sealed with the given `op_trace` bitmask.
-    /// The low 32 bits of `op_trace` are stored in `op_idx`; `kind_tag` is 0.
+    /// Records that run `run_id` was sealed with the complete `op_trace` bitmask.
+    /// `op_idx` retains the low 32 bits for wire compatibility; `op_trace` is authoritative.
     ///
     /// # Errors
     ///
@@ -253,6 +326,7 @@ impl OcelLog {
             timestamp: self.tick,
             run_id,
             op_idx: op_trace as u32,
+            op_trace,
             kind_tag: 0,
         };
         self.count += 1;
@@ -262,6 +336,34 @@ impl OcelLog {
     /// Returns the slice of recorded events.
     pub fn events(&self) -> &[OcelEvent] {
         &self.events[..self.count]
+    }
+
+    /// Seal the exact ordered trace into a deterministic, replayable BLAKE3 receipt.
+    ///
+    /// The encoding is domain-separated and explicitly length-prefixed. Every event field
+    /// that can affect conformance or audit interpretation is committed independently.
+    pub fn seal_receipt(&self) -> OcelTraceReceipt {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"bcinr-powl-ocel-trace-v1");
+        hasher.update(&(self.count as u64).to_le_bytes());
+        hasher.update(&self.tick.to_le_bytes());
+
+        for event in self.events() {
+            let activity = event.activity.as_bytes();
+            hasher.update(&(activity.len() as u64).to_le_bytes());
+            hasher.update(activity);
+            hasher.update(&event.event_id.to_le_bytes());
+            hasher.update(&event.timestamp.to_le_bytes());
+            hasher.update(&event.run_id.to_le_bytes());
+            hasher.update(&event.op_idx.to_le_bytes());
+            hasher.update(&event.op_trace.to_le_bytes());
+            hasher.update(&[event.kind_tag]);
+        }
+
+        OcelTraceReceipt {
+            log: self.clone(),
+            digest: *hasher.finalize().as_bytes(),
+        }
     }
 
     /// Validates the log against the given POWL tape's predecessor masks.
@@ -320,7 +422,10 @@ impl OcelLog {
             },
             OCELType {
                 name: "run_sealed".to_string(),
-                attributes: vec![],
+                attributes: vec![OCELTypeAttribute {
+                    name: "op_trace".to_string(),
+                    value_type: "integer".to_string(),
+                }],
             },
         ];
 
@@ -348,7 +453,7 @@ impl OcelLog {
                     events.push(evt);
                 }
                 "run_sealed" => {
-                    let op_trace = e.op_idx as u64;
+                    let op_trace = e.op_trace;
                     let mut evt = OCELEvent::new(format!("evt-{}", e.event_id), "run_sealed");
                     evt.attributes
                         .push(OCELEventAttribute::integer("op_trace", op_trace as i64));
@@ -434,7 +539,8 @@ pub fn process_event_srbcg(
     // Unrolled comparison across all 64 slots.
     // Compiles to branchless conditional selections (CSEL/CMOV).
     for (i, &rid) in run_ids.iter().enumerate() {
-        let is_match = (rid == incoming_rid) as usize;
+        let is_occupied = (i < current_count) as usize;
+        let is_match = is_occupied * (rid == incoming_rid) as usize;
         // If a match is found, match_idx becomes the slot index.
         // Otherwise, it remains unchanged.
         match_idx = (is_match * i) + ((1 - is_match) * match_idx);
@@ -519,97 +625,113 @@ pub fn process_event_srbcg(
 /// assert_eq!(result, ConformanceResult::Conforms);
 /// ```
 pub fn validate_against_tape(log: &OcelLog, tape: &crate::tape::PowlTape) -> ConformanceResult {
-    // 1. Empty log.
     if log.events().is_empty() {
         return ConformanceResult::EmptyLog;
     }
 
     let ops = &tape.ops[..tape.len as usize];
-
-    // We need to visit every run_id.  With no_std/no-heap we use a fixed-size
-    // table of up to 64 run_ids seen in this log.
     const MAX_RUNS: usize = 64;
     let mut run_ids: [u64; MAX_RUNS] = [u64::MAX; MAX_RUNS];
+    // Slot 64 is a bounded overflow sink. It is never admitted for semantic validation.
     let mut accumulated: [u64; MAX_RUNS + 1] = [0u64; MAX_RUNS + 1];
-    let mut fired_twice: [u64; MAX_RUNS + 1] = [0u64; MAX_RUNS + 1]; // bits set on 2nd fire
-    let mut declared: [u64; MAX_RUNS + 1] = [u64::MAX; MAX_RUNS + 1]; // sentinel = not seen
+    let mut sealed: [bool; MAX_RUNS + 1] = [false; MAX_RUNS + 1];
     let mut run_count: usize = 0;
     let mut overflow_mask: u64 = 0;
 
+    // Validate in event order. The predecessor check is performed against the state that
+    // existed immediately before the current event, not against a reconstructed final set.
     for event in log.events() {
         match event.activity {
             "op_fired" => {
-                let s = process_event_srbcg(
+                let slot = process_event_srbcg(
                     &mut run_ids,
                     &mut run_count,
                     event.run_id,
                     &mut overflow_mask,
                 );
-                let bit = 1u64.checked_shl(event.op_idx).unwrap_or(0);
-                let has_fired_mask = 0u64.wrapping_sub(((accumulated[s] & bit) != 0) as u64);
-                fired_twice[s] |= bit & has_fired_mask;
-                accumulated[s] |= bit;
+                if overflow_mask != 0 {
+                    return ConformanceResult::RunLimitExceeded;
+                }
+                if sealed[slot] {
+                    return ConformanceResult::EventAfterSeal {
+                        run_id: event.run_id,
+                        op_idx: event.op_idx,
+                    };
+                }
+
+                let op_idx = event.op_idx as usize;
+                if op_idx >= ops.len() {
+                    return ConformanceResult::UnknownOperation {
+                        run_id: event.run_id,
+                        op_idx: event.op_idx,
+                    };
+                }
+
+                let bit = 1u64 << event.op_idx;
+                if accumulated[slot] & bit != 0 {
+                    return ConformanceResult::DuplicateFire {
+                        run_id: event.run_id,
+                        op_idx: event.op_idx,
+                    };
+                }
+
+                let tape_op = &ops[event.op_idx as usize];
+                if tape_op.kind == crate::tape::OpKind::Join && tape_op.branch_mask != 0 {
+                    let fired_branch_mask = tape_op.branch_mask & accumulated[slot];
+                    if fired_branch_mask.count_ones() != 1 {
+                        return ConformanceResult::ChoiceViolation {
+                            run_id: event.run_id,
+                            join_op_idx: event.op_idx,
+                            branch_mask: tape_op.branch_mask,
+                            fired_branch_mask,
+                        };
+                    }
+                } else {
+                    let missing = tape_op.pred_mask & !accumulated[slot];
+                    if missing != 0 {
+                        return ConformanceResult::Violation {
+                            run_id: event.run_id,
+                            op_idx: event.op_idx,
+                            missing_pred_mask: missing,
+                        };
+                    }
+                }
+
+                accumulated[slot] |= bit;
             }
             "run_sealed" => {
-                let s = process_event_srbcg(
+                let slot = process_event_srbcg(
                     &mut run_ids,
                     &mut run_count,
                     event.run_id,
                     &mut overflow_mask,
                 );
-                declared[s] = event.op_idx as u64; // low 32 bits stored here
+                if overflow_mask != 0 {
+                    return ConformanceResult::RunLimitExceeded;
+                }
+                if sealed[slot] {
+                    return ConformanceResult::DuplicateSeal {
+                        run_id: event.run_id,
+                    };
+                }
+                if event.op_trace != accumulated[slot] {
+                    return ConformanceResult::SealMismatch {
+                        run_id: event.run_id,
+                        declared: event.op_trace,
+                        accumulated: accumulated[slot],
+                    };
+                }
+                sealed[slot] = true;
             }
             _ => {}
         }
     }
 
-    if overflow_mask != 0 {
-        return ConformanceResult::RunLimitExceeded;
-    }
-
-    // Check each run.
-    for s in 0..run_count {
-        let run_id = run_ids[s];
-
-        // 2. DuplicateFire — if any bit is set, report the lowest one.
-        if fired_twice[s] != 0 {
-            let op_idx = fired_twice[s].trailing_zeros();
-            return ConformanceResult::DuplicateFire { run_id, op_idx };
-        }
-
-        // 3. SealMismatch — declared op_trace must equal accumulated fired mask.
-        //    Only check if we actually saw a run_sealed event (sentinel u64::MAX).
-        if declared[s] != u64::MAX {
-            let decl = declared[s];
-            let accum = accumulated[s];
-            if decl != accum {
-                return ConformanceResult::SealMismatch {
-                    run_id,
-                    declared: decl,
-                    accumulated: accum,
-                };
-            }
-        }
-
-        // 4. Predecessor violation — iterate over every fired op in this run.
-        let op_trace = accumulated[s];
-        let mut bits = op_trace;
-        while bits != 0 {
-            let op_idx = bits.trailing_zeros();
-            bits &= bits - 1;
-            let op_idx_usize = op_idx as usize;
-            if op_idx_usize >= ops.len() {
-                continue;
-            }
-            let pred_mask = ops[op_idx_usize].pred_mask;
-            let missing = pred_mask & !op_trace;
-            if missing != 0 {
-                return ConformanceResult::Violation {
-                    run_id,
-                    op_idx,
-                    missing_pred_mask: missing,
-                };
-            }
+    for slot in 0..run_count {
+        if !sealed[slot] {
+            return ConformanceResult::MissingSeal {
+                run_id: run_ids[slot],
+            };
         }
     }
 
@@ -683,7 +805,7 @@ mod tests {
         let sealed_trace = events
             .iter()
             .find(|e| e.activity == "run_sealed" && e.run_id == run_id)
-            .map(|e| e.op_idx as u64)
+            .map(|e| e.op_trace)
             .expect("run_sealed must exist");
         assert_eq!(
             computed_trace, sealed_trace,
@@ -706,7 +828,7 @@ mod tests {
         let sealed_trace = events
             .iter()
             .find(|e| e.activity == "run_sealed" && e.run_id == run_id)
-            .map(|e| e.op_idx as u64)
+            .map(|e| e.op_trace)
             .expect("run_sealed must exist");
         let sealed_op_count = sealed_trace.count_ones() as usize;
         assert!(op_fired_count < sealed_op_count,
@@ -992,5 +1114,196 @@ mod tests {
             validate_against_tape(&log, &tape),
             ConformanceResult::RunLimitExceeded
         );
+    }
+
+    #[test]
+    fn process_event_srbcg_admits_u64_max_run_id_without_sentinel_collision() {
+        let mut run_ids = [u64::MAX; 64];
+        let mut run_count = 0usize;
+        let mut overflow_mask = 0u64;
+
+        let first = process_event_srbcg(&mut run_ids, &mut run_count, u64::MAX, &mut overflow_mask);
+        let replay =
+            process_event_srbcg(&mut run_ids, &mut run_count, u64::MAX, &mut overflow_mask);
+
+        assert_eq!(first, 0);
+        assert_eq!(replay, 0);
+        assert_eq!(run_count, 1);
+        assert_eq!(overflow_mask, 0);
+    }
+
+    #[test]
+    fn validate_rejects_temporal_inversion_even_when_final_set_is_complete() {
+        use crate::compiler::{compile_powl, PowlAstNode};
+        let tape = compile_powl(&PowlAstNode::Sequence(vec![
+            PowlAstNode::Atom("a"),
+            PowlAstNode::Atom("b"),
+        ]))
+        .unwrap();
+        let mut log = OcelLog::new();
+        log.record_op_fired(99, 1, 0).unwrap();
+        log.record_op_fired(99, 0, 0).unwrap();
+        log.record_run_sealed(99, 0b11).unwrap();
+
+        assert_eq!(
+            validate_against_tape(&log, &tape),
+            ConformanceResult::Violation {
+                run_id: 99,
+                op_idx: 1,
+                missing_pred_mask: 0b01,
+            }
+        );
+    }
+
+    #[test]
+    fn validate_rejects_event_after_seal() {
+        use crate::compiler::{compile_powl, PowlAstNode};
+        let tape = compile_powl(&PowlAstNode::Atom("a")).unwrap();
+        let mut log = OcelLog::new();
+        log.record_run_sealed(7, 0).unwrap();
+        log.record_op_fired(7, 0, 0).unwrap();
+        assert_eq!(
+            validate_against_tape(&log, &tape),
+            ConformanceResult::EventAfterSeal {
+                run_id: 7,
+                op_idx: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn validate_rejects_duplicate_seal() {
+        use crate::compiler::{compile_powl, PowlAstNode};
+        let tape = compile_powl(&PowlAstNode::Atom("a")).unwrap();
+        let mut log = OcelLog::new();
+        log.record_op_fired(8, 0, 0).unwrap();
+        log.record_run_sealed(8, 1).unwrap();
+        log.record_run_sealed(8, 1).unwrap();
+        assert_eq!(
+            validate_against_tape(&log, &tape),
+            ConformanceResult::DuplicateSeal { run_id: 8 }
+        );
+    }
+
+    #[test]
+    fn validate_rejects_missing_seal() {
+        use crate::compiler::{compile_powl, PowlAstNode};
+        let tape = compile_powl(&PowlAstNode::Atom("a")).unwrap();
+        let mut log = OcelLog::new();
+        log.record_op_fired(9, 0, 0).unwrap();
+        assert_eq!(
+            validate_against_tape(&log, &tape),
+            ConformanceResult::MissingSeal { run_id: 9 }
+        );
+    }
+
+    #[test]
+    fn full_width_seal_preserves_operation_63() {
+        use crate::compiler::{compile_powl, PowlAstNode};
+        let children = (0..64).map(|_| PowlAstNode::Atom("op")).collect();
+        let tape = compile_powl(&PowlAstNode::Sequence(children)).unwrap();
+        let mut log = OcelLog::new();
+        for op_idx in 0..64 {
+            log.record_op_fired(10, op_idx, 0).unwrap();
+        }
+        log.record_run_sealed(10, u64::MAX).unwrap();
+
+        assert_eq!(log.events().last().unwrap().op_trace, u64::MAX);
+        assert_eq!(
+            validate_against_tape(&log, &tape),
+            ConformanceResult::Conforms
+        );
+    }
+
+    #[test]
+    fn deterministic_trace_receipt_owns_exact_ordered_events() {
+        let mut first = OcelLog::new();
+        first.record_op_fired(11, 0, 3).unwrap();
+        first.record_run_sealed(11, 1).unwrap();
+        let mut second = OcelLog::new();
+        second.record_op_fired(11, 0, 3).unwrap();
+        second.record_run_sealed(11, 1).unwrap();
+
+        let receipt_a = first.seal_receipt();
+        let receipt_b = second.seal_receipt();
+        assert_eq!(receipt_a.digest(), receipt_b.digest());
+        assert_eq!(receipt_a.log().events(), first.events());
+        assert_eq!(receipt_a.event_count(), first.events().len());
+    }
+
+    #[test]
+    fn validate_xor_join_accepts_exactly_one_observed_branch() {
+        use crate::compiler::{compile_powl, PowlAstNode};
+        let tape = compile_powl(&PowlAstNode::XorChoice(vec![
+            PowlAstNode::Atom("a"),
+            PowlAstNode::Atom("b"),
+            PowlAstNode::Atom("c"),
+        ]))
+        .unwrap();
+        let join = &tape.ops[1];
+        assert_eq!(join.kind, crate::tape::OpKind::Join);
+        assert_eq!(join.branch_mask, join.pred_mask);
+        assert_eq!(join.branch_mask.count_ones(), 3);
+
+        let chosen = join.branch_mask.isolate_lowest_one();
+        let chosen_idx = chosen.trailing_zeros();
+        let trace = 1u64 | (1u64 << 1) | chosen;
+        let mut log = OcelLog::new();
+        log.record_op_fired(70, 0, 0).unwrap();
+        log.record_op_fired(70, chosen_idx, 0).unwrap();
+        log.record_op_fired(70, 1, 0).unwrap();
+        log.record_run_sealed(70, trace).unwrap();
+        assert_eq!(
+            validate_against_tape(&log, &tape),
+            ConformanceResult::Conforms
+        );
+    }
+
+    #[test]
+    fn validate_xor_join_refuses_multiple_observed_branches() {
+        use crate::compiler::{compile_powl, PowlAstNode};
+        let tape = compile_powl(&PowlAstNode::XorChoice(vec![
+            PowlAstNode::Atom("a"),
+            PowlAstNode::Atom("b"),
+            PowlAstNode::Atom("c"),
+        ]))
+        .unwrap();
+        let branch_mask = tape.ops[1].branch_mask;
+        let first = branch_mask.isolate_lowest_one();
+        let remaining = branch_mask & !first;
+        let second = remaining.isolate_lowest_one();
+        let fired_branch_mask = first | second;
+        let mut log = OcelLog::new();
+        log.record_op_fired(71, 0, 0).unwrap();
+        log.record_op_fired(71, first.trailing_zeros(), 0).unwrap();
+        log.record_op_fired(71, second.trailing_zeros(), 0).unwrap();
+        log.record_op_fired(71, 1, 0).unwrap();
+        log.record_run_sealed(71, 1u64 | (1u64 << 1) | fired_branch_mask)
+            .unwrap();
+        assert_eq!(
+            validate_against_tape(&log, &tape),
+            ConformanceResult::ChoiceViolation {
+                run_id: 71,
+                join_op_idx: 1,
+                branch_mask,
+                fired_branch_mask,
+            }
+        );
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn ocel_export_declares_every_emitted_run_sealed_attribute() {
+        let mut log = OcelLog::new();
+        log.record_run_sealed(81, 1).unwrap();
+        let exported = log.to_ocel_2_0();
+        let run_sealed = exported
+            .event_types
+            .iter()
+            .find(|event_type| event_type.name == "run_sealed")
+            .expect("run_sealed event type must be declared");
+        assert_eq!(run_sealed.attributes.len(), 1);
+        assert_eq!(run_sealed.attributes[0].name, "op_trace");
+        assert_eq!(run_sealed.attributes[0].value_type, "integer");
     }
 }

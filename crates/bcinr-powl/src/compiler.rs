@@ -306,9 +306,11 @@ fn compile_xor_choice<'a>(
 
     tape.ops[dispatch_idx as usize].branch_mask = branch_entries;
     tape.ops[dispatch_idx as usize].branch_count = branches.len() as u8;
-    // join pred_mask = branch_entries (all); scheduler suppresses unchosen branches
-    // via choice_taken. See scheduler.rs for the XOR suppression protocol.
+    // Mark the matching XOR join with the same branch set. The scheduler uses
+    // `choice_taken` at runtime; conformance validation uses this explicit marker to
+    // distinguish an XOR exactly-one join from an ordinary all-predecessors join.
     tape.ops[join_idx as usize].pred_mask = branch_entries;
+    tape.ops[join_idx as usize].branch_mask = branch_entries;
 
     Ok(Segment {
         entries: dispatch_bit,

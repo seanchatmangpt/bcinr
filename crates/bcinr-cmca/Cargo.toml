@@ -14,6 +14,7 @@ readme = "../../README.md"
 bcinr-logic = { path = "../bcinr-logic", version = "26.7.25" }
 
 [dev-dependencies]
+chicago-tdd-tools = { version = "26.7.1", features = ["ocel-generation"] }
 trybuild = "1.0"
 proptest = "1.2.0"
 
