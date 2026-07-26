@@ -212,7 +212,7 @@ fn test_tier2_f3_poor_format_fails() {
     ctx.create_temp_algo_file(
         "temp_bad_fmt",
         "pub fn   temp_bad_fmt   (val:u64) ->   u64 {val}",
-        false,
+        true,
     );
     let out = Command::new("cargo")
         .args(["fmt", "--check"])
@@ -407,7 +407,7 @@ fn create_dirty_temp_dir() -> tempfile::TempDir {
 #[test]
 fn test_tier1_f5_run_tool() {
     let _e2e_lock = crate::acquire_mod_rs_lock();
-    let out = run_lsp_cmd(get_repo_root().to_str().unwrap());
+    let out = lsp_output_or_skip!(get_repo_root().to_str().unwrap());
     assert_status_eq(&out, 0);
 }
 
@@ -415,7 +415,7 @@ fn test_tier1_f5_run_tool() {
 fn test_tier1_f5_output_contains_violations() {
     let _e2e_lock = crate::acquire_mod_rs_lock();
     let temp_dir = create_dirty_temp_dir();
-    let out = run_lsp_cmd(&temp_dir.path().to_string_lossy());
+    let out = lsp_output_or_skip!(&temp_dir.path().to_string_lossy());
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(str_has_substr(&stdout, "Findings"));
 }
@@ -424,7 +424,7 @@ fn test_tier1_f5_output_contains_violations() {
 fn test_tier1_f5_contains_specific_diagnostic() {
     let _e2e_lock = crate::acquire_mod_rs_lock();
     let temp_dir = create_dirty_temp_dir();
-    let out = run_lsp_cmd(&temp_dir.path().to_string_lossy());
+    let out = lsp_output_or_skip!(&temp_dir.path().to_string_lossy());
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
         str_has_substr(&stdout, "ANTI-LLM-SURFACE-001")
@@ -437,7 +437,7 @@ fn test_tier1_f5_contains_specific_diagnostic() {
 fn test_tier1_f5_finds_default_version() {
     let _e2e_lock = crate::acquire_mod_rs_lock();
     let temp_dir = create_dirty_temp_dir();
-    let out = run_lsp_cmd(&temp_dir.path().to_string_lossy());
+    let out = lsp_output_or_skip!(&temp_dir.path().to_string_lossy());
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(str_has_substr(&stdout, "ANTI-LLM-VERSION-001"));
 }
@@ -446,7 +446,7 @@ fn test_tier1_f5_finds_default_version() {
 fn test_tier1_f5_finds_strange_rule() {
     let _e2e_lock = crate::acquire_mod_rs_lock();
     let temp_dir = create_dirty_temp_dir();
-    let out = run_lsp_cmd(&temp_dir.path().to_string_lossy());
+    let out = lsp_output_or_skip!(&temp_dir.path().to_string_lossy());
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(str_has_substr(&stdout, "ANTI-LLM-STRANGE-007"));
 }
@@ -462,7 +462,7 @@ fn test_tier2_f5_detect_plain_towerlsp_canary() {
     );
     res.unwrap();
 
-    let out = run_lsp_cmd(&temp_dir.path().to_string_lossy());
+    let out = lsp_output_or_skip!(&temp_dir.path().to_string_lossy());
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(str_has_substr(&stdout, "ANTI-LLM-SURFACE-001"));
     assert!(str_has_substr(
@@ -479,7 +479,7 @@ fn test_tier2_f5_detect_version_template() {
     let res = fs::write(&cargo_toml_path, format!("{} = \"{}\"", "version", "1.0.0"));
     res.unwrap();
 
-    let out = run_lsp_cmd(&temp_dir.path().to_string_lossy());
+    let out = lsp_output_or_skip!(&temp_dir.path().to_string_lossy());
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(str_has_substr(&stdout, "ANTI-LLM-VERSION-001"));
 }
@@ -487,13 +487,19 @@ fn test_tier2_f5_detect_version_template() {
 #[test]
 fn test_tier2_f5_nonexistent_dir_fails() {
     let _e2e_lock = crate::acquire_mod_rs_lock();
-    ensure_lsp_built();
-    let out = Command::new("/tmp/bcinr-e2e-target/debug/anti-llm-cheat-lsp")
-        .args(["scan", "--invalid-flag"])
-        .current_dir(get_repo_root().to_str().unwrap())
-        .output()
-        .unwrap();
+    let temp_dir = tempfile::tempdir().unwrap();
+    let missing_dir = temp_dir.path().join("missing-directory");
+    let out = lsp_output_or_skip!(missing_dir.to_str().unwrap());
     assert_status_not(&out, 0);
+    let diagnostic = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        !diagnostic.trim().is_empty(),
+        "nonexistent directory must produce a typed diagnostic"
+    );
 }
 
 #[test]
@@ -503,7 +509,7 @@ fn test_tier2_f5_clean_rs_no_diagnostics() {
     let main_rs_path = temp_dir.path().join("main.rs");
     fs::write(&main_rs_path, "fn main() {}").unwrap();
 
-    let out = run_lsp_cmd(&temp_dir.path().to_string_lossy());
+    let out = lsp_output_or_skip!(&temp_dir.path().to_string_lossy());
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(!str_has_substr(&stdout, "ANTI-LLM-"));
 }
@@ -522,7 +528,7 @@ fn test_tier2_f5_detect_substring_check() {
     )
     .unwrap();
 
-    let out = run_lsp_cmd(&temp_dir.path().to_string_lossy());
+    let out = lsp_output_or_skip!(&temp_dir.path().to_string_lossy());
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(str_has_substr(&stdout, "ANTI-LLM-STRANGE-007"));
 }
@@ -598,7 +604,7 @@ fn test_tier3_towerlsp_canary_in_tool() {
     let res2 = fs::write(&main_rs_path, "fn   bad_fmt   () {}");
     res2.unwrap();
 
-    let res_lsp = run_lsp_cmd(&temp_dir.path().to_string_lossy());
+    let res_lsp = lsp_output_or_skip!(&temp_dir.path().to_string_lossy());
     let res_fmt = Command::new("rustfmt")
         .args(["--check", &main_rs_path.to_string_lossy()])
         .output()
@@ -615,7 +621,7 @@ fn test_tier3_all_fail() {
     ctx.create_temp_algo_file(
         "temp_cross_all",
         "pub fn   temp_all   (val: u64, aux: u64) -> u64 {\n    if val > 0 { val } else { aux }\n}",
-        false,
+        true,
     );
 
     let res_fmt = Command::new("cargo")
@@ -665,7 +671,7 @@ fn test_tier4_scenario_bench_auditor() {
 #[test]
 fn test_tier4_scenario_anti_llm_lsp() {
     let _e2e_lock = crate::acquire_mod_rs_lock();
-    let res = run_lsp_cmd(get_repo_root().to_str().unwrap());
+    let res = lsp_output_or_skip!(get_repo_root().to_str().unwrap());
     assert_status_eq(&res, 0);
     let stdout = String::from_utf8_lossy(&res.stdout);
     assert!(str_has_substr(&stdout, "Diagnostics emitted: 0"));

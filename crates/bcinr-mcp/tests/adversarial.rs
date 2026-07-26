@@ -14,6 +14,9 @@
 use chicago_tdd_mcp::assert::error_scenarios;
 use chicago_tdd_mcp::{McpServerHarnessBuilder, McpSession};
 use rmcp::model::ContentBlock;
+use std::process::Stdio;
+use std::time::Duration;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
 
 fn bcinr_mcp_cmd() -> Command {
@@ -37,9 +40,34 @@ fn text_from_content(blocks: &[ContentBlock]) -> &str {
 
 #[tokio::test]
 async fn malformed_json_rejected() {
-    let response = error_scenarios::send_malformed_json(bcinr_mcp_cmd())
+    let mut command = bcinr_mcp_cmd();
+    command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    let mut child = command.spawn().expect("server must start");
+    let mut stdin = child.stdin.take().expect("server stdin must be piped");
+    let stdout = child.stdout.take().expect("server stdout must be piped");
+
+    stdin
+        .write_all(b"{not valid json}\n")
         .await
-        .expect("harness must not fail on spawn");
+        .expect("malformed frame must be written");
+    stdin
+        .flush()
+        .await
+        .expect("malformed frame must be flushed");
+
+    let mut lines = BufReader::new(stdout).lines();
+    let response_line = tokio::time::timeout(Duration::from_secs(5), lines.next_line())
+        .await
+        .expect("server must answer malformed JSON within five seconds")
+        .expect("server response must be readable")
+        .expect("server must emit a JSON-RPC parse-error response");
+    let _ = child.kill().await;
+
+    let response: serde_json::Value =
+        serde_json::from_str(&response_line).expect("parse-error response must be valid JSON");
     let code = response
         .get("error")
         .and_then(|e| e.get("code"))
