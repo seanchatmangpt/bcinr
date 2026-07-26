@@ -333,7 +333,9 @@ mod admission {
     #[divan::bench]
     fn matching_receipts() -> Option<AdaptiveUpdate<CertifiedLearning>> {
         AdaptiveUpdate::admit_adaptive_update(
-            divan::black_box(AdmittedControlState::admit_control_state(CONTROL_MODE_DIGEST)),
+            divan::black_box(AdmittedControlState::admit_control_state(
+                CONTROL_MODE_DIGEST,
+            )),
             divan::black_box(CertificateReceipt::admit_certificate(CONTROL_MODE_DIGEST)),
             divan::black_box(EnvelopeReceipt::admit_envelope(CONTROL_MODE_DIGEST)),
             divan::black_box(OutcomeReceipt::admit_outcome(CONTROL_MODE_DIGEST)),
@@ -346,7 +348,9 @@ mod admission {
     #[divan::bench]
     fn mismatched_receipts() -> Option<AdaptiveUpdate<CertifiedLearning>> {
         AdaptiveUpdate::admit_adaptive_update(
-            divan::black_box(AdmittedControlState::admit_control_state(CONTROL_MODE_DIGEST + 1)),
+            divan::black_box(AdmittedControlState::admit_control_state(
+                CONTROL_MODE_DIGEST + 1,
+            )),
             divan::black_box(CertificateReceipt::admit_certificate(CONTROL_MODE_DIGEST)),
             divan::black_box(EnvelopeReceipt::admit_envelope(CONTROL_MODE_DIGEST)),
             divan::black_box(OutcomeReceipt::admit_outcome(CONTROL_MODE_DIGEST)),
@@ -395,12 +399,7 @@ mod allocator {
     #[divan::bench]
     fn dwell_time_refusal() -> Result<[NonNegativeFixed; N], StabilityRefusal> {
         let proof = admitted_proof();
-        AllocatorHarness::new().run(
-            NonNegativeFixed::ZERO,
-            10,
-            CERTIFICATE_DIGEST,
-            Some(&proof),
-        )
+        AllocatorHarness::new().run(NonNegativeFixed::ZERO, 10, CERTIFICATE_DIGEST, Some(&proof))
     }
 
     #[divan::bench]
