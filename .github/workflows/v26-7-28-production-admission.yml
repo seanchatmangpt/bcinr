@@ -25,20 +25,25 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  BCINR_TOOLCHAIN: nightly-2026-07-25
   CARGO_INCREMENTAL: 0
-  GGEN_COMMIT: 50164750c70b8808a71706702aee68b2f3a77875
   EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+  GGEN_COMMIT: 50164750c70b8808a71706702aee68b2f3a77875
+  GGEN_TOOLCHAIN: nightly-2026-06-22
+  RUSTUP_TOOLCHAIN: nightly-2026-07-25
+  EVIDENCE_DIR: target/release-evidence/v26.7.28/${{ github.event.pull_request.head.sha || github.sha }}/${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
   production-admission:
-    runs-on: ubuntu-latest
-    timeout-minutes: 150
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
     steps:
       - name: Checkout exact BCINR head
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ env.EXPECTED_HEAD }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Checkout exact ggen manufacturer
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -47,23 +52,50 @@ jobs:
           ref: ${{ env.GGEN_COMMIT }}
           path: target/release-input/ggen
           fetch-depth: 1
+          persist-credentials: false
 
-      - name: Install BCINR nightly toolchain
+      - name: Install exact BCINR nightly toolchain
         uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
         with:
-          toolchain: nightly
-          components: rustfmt,clippy
+          toolchain: ${{ env.BCINR_TOOLCHAIN }}
+          components: rustfmt,clippy,miri
           targets: wasm32-unknown-unknown
 
-      - name: Install ggen pinned toolchain and sccache
+      - name: Install exact ggen nightly toolchain
+        shell: bash
         run: |
           set -euo pipefail
-          rustup toolchain install nightly-2026-06-22 --profile minimal --component rustfmt --component clippy
+          rustup toolchain install "$GGEN_TOOLCHAIN" \
+            --profile minimal \
+            --component rustfmt \
+            --component clippy
 
       - name: Install pinned sccache binary
-        uses: taiki-e/install-action@81ecf985428d5c2ea81dbf079bceca32bc9604ab
+        uses: taiki-e/install-action@81ecf985428d5c2ea81dbf079bceca32bc9604ab # v2.62.43
         with:
           tool: sccache
+
+      - name: Install pinned cargo-audit binary
+        uses: taiki-e/install-action@81ecf985428d5c2ea81dbf079bceca32bc9604ab # v2.62.43
+        with:
+          tool: cargo-audit
+
+      - name: Install pinned cargo-deny binary
+        uses: taiki-e/install-action@81ecf985428d5c2ea81dbf079bceca32bc9604ab # v2.62.43
+        with:
+          tool: cargo-deny
+
+      - name: Prove exact toolchain admission
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(rustup show active-toolchain | awk '{print $1}')" = "${BCINR_TOOLCHAIN}-x86_64-unknown-linux-gnu"
+          rustc -Vv
+          cargo -Vv
+          cargo miri -V
+          cargo audit --version
+          cargo deny --version
+          sccache --version
 
       - name: Provision exact ggen sibling dependencies
         shell: bash
@@ -86,7 +118,10 @@ jobs:
 
       - name: Build exact ggen CLI
         working-directory: target/release-input/ggen
-        run: cargo build --locked -p ggen-cli-lib --bin ggen
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo "+$GGEN_TOOLCHAIN" build --locked -p ggen-cli-lib --bin ggen
 
       - name: Prove two-pass ggen byte stability
         working-directory: target/release-input/ggen/examples/bcinr-v26-7-28
@@ -98,15 +133,21 @@ jobs:
           timeout 600 ../../target/debug/ggen sync run
           git -C ../.. diff --exit-code -- examples/bcinr-v26-7-28/generated
 
+      - name: Build exact release verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --locked -p bcinr-release --bin bcinr-release
+          test -x target/debug/bcinr-release
+
       - name: Execute fail-closed production admission
         shell: bash
         run: |
           set +e
-          cargo run --locked -p bcinr-release -- \
-            verify \
+          target/debug/bcinr-release verify \
             --profile release/v26.7.28/production.json \
             --expected-head "$EXPECTED_HEAD" \
-            --output target/release-evidence/v26.7.28
+            --output "$EVIDENCE_DIR"
           status=$?
           set -e
           echo "BCINR_RELEASE_EXIT=$status" >> "$GITHUB_ENV"
@@ -116,7 +157,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: v26-7-28-production-evidence-${{ env.EXPECTED_HEAD }}
-          path: target/release-evidence/v26.7.28
+          name: v26-7-28-production-evidence-${{ env.EXPECTED_HEAD }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.EVIDENCE_DIR }}
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 90
+          compression-level: 9
