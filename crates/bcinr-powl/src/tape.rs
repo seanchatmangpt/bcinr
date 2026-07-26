@@ -32,7 +32,8 @@ pub struct Powl64Op {
     pub pred_mask: u64,
     /// Bitmask of slots whose `check_mask` is updated when this slot completes.
     pub succ_mask: u64,
-    /// For XorDispatch: bitmask of branch-entry slots (one will be chosen).
+    /// For `XorDispatch`: bitmask of branch-entry slots (one will be chosen).
+    /// For the matching XOR `Join`: the same bitmask marks exactly-one semantics.
     /// For other kinds: 0.
     pub branch_mask: u64,
     /// Kind of this slot.

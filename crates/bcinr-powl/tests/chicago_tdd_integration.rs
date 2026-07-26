@@ -1,8 +1,8 @@
 //! Chicago-TDD integration tests for bcinr-powl.
 //!
-//! These tests prove that bcinr-powl POWL execution produces conformant,
-//! process-mining-auditable OCEL 2.0 artifacts by routing conformance results
-//! through chicago-tdd-tools' OcelCollector and sealing them as receipted Evidence.
+//! The suite exercises the real compiler, scheduler, temporal conformance validator,
+//! deterministic trace receipt, Chicago diagnostic collector, and an independent OCEL 2.0
+//! importer/semantic validator.
 //!
 //! Run with:
 //!   cargo test -p bcinr-powl --test chicago_tdd_integration --features std
@@ -10,29 +10,82 @@
 #![cfg(feature = "std")]
 
 use bcinr_powl::compiler::{compile_powl, PowlAstNode};
-use bcinr_powl::ocel::{ConformanceResult, OcelLog};
+use bcinr_powl::ocel::{ConformanceResult, OcelEvent, OcelLog};
 use bcinr_powl::scheduler::{scheduler_tick, PowlRunState};
+use bcinr_powl::tape::OpKind;
 use chicago_tdd_tools::core::governance::{
     Diagnostic, DiagnosticCategory, DiagnosticCode, DiagnosticSink, RunSummary, Severity,
 };
 use chicago_tdd_tools::observability::ocel::wasm4pm::seal_run;
 use chicago_tdd_tools::observability::ocel::OcelCollector;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-// ─── helpers ─────────────────────────────────────────────────────────────────
+fn emit_event(
+    sink: &OcelCollector,
+    collector_run_id: &str,
+    event: &OcelEvent,
+    severity: Severity,
+    elapsed_ns: u64,
+) {
+    let mut context = HashMap::new();
+    context.insert("event_id", serde_json::json!(event.event_id));
+    context.insert("activity", serde_json::json!(event.activity));
+    context.insert("timestamp", serde_json::json!(event.timestamp));
+    context.insert("powl_run_id", serde_json::json!(event.run_id));
+    context.insert("op_idx", serde_json::json!(event.op_idx));
+    context.insert(
+        "op_trace",
+        serde_json::json!(format!("{:#018x}", event.op_trace)),
+    );
+    context.insert("kind_tag", serde_json::json!(event.kind_tag));
 
-/// Build and emit a conformance Diagnostic to `sink`.
-/// `elapsed_ns` must be strictly increasing per `run_id`.
-fn emit_conformance(
+    sink.emit(Diagnostic {
+        code: DiagnosticCode::new("POWL", DiagnosticCategory::Conformance, 1),
+        category: DiagnosticCategory::Conformance,
+        run_id: collector_run_id.to_string(),
+        agent_id: None,
+        location: None,
+        message: format!(
+            "{} run={} op={} trace={:#018x}",
+            event.activity, event.run_id, event.op_idx, event.op_trace
+        ),
+        severity,
+        source_module: "chicago_tdd_integration",
+        context,
+        elapsed_ns,
+    })
+    .expect("POWL trace diagnostic must be admitted");
+}
+
+fn mirror_trace(
+    sink: &OcelCollector,
+    collector_run_id: &str,
+    log: &OcelLog,
+    severity: Severity,
+    elapsed_start: u64,
+) -> usize {
+    for (offset, event) in log.events().iter().enumerate() {
+        emit_event(
+            sink,
+            collector_run_id,
+            event,
+            severity,
+            elapsed_start + offset as u64,
+        );
+    }
+    log.events().len()
+}
+
+fn emit_summary(
     sink: &OcelCollector,
     run_id: &str,
     severity: Severity,
     message: &str,
     elapsed_ns: u64,
 ) {
-    let d = Diagnostic {
-        code: DiagnosticCode::new("POWL", DiagnosticCategory::Conformance, 1),
+    sink.emit(Diagnostic {
+        code: DiagnosticCode::new("POWL", DiagnosticCategory::Conformance, 2),
         category: DiagnosticCategory::Conformance,
         run_id: run_id.to_string(),
         agent_id: None,
@@ -42,416 +95,267 @@ fn emit_conformance(
         source_module: "chicago_tdd_integration",
         context: HashMap::new(),
         elapsed_ns,
-    };
-    // emit() logs a warning on refusal; test proceeds (refusal is not a panic).
-    let _ = sink.emit(d);
+    })
+    .expect("POWL conformance summary must be admitted");
 }
 
-fn make_run_summary(run_id: &str) -> RunSummary {
+fn make_run_summary(run_id: &str, total_diagnostics: usize, andon_count: usize) -> RunSummary {
     RunSummary {
         run_id: run_id.to_string(),
         evaluated: 1,
-        admitted: 1,
-        p_admitted: 1.0,
-        andon_count: 0,
+        admitted: usize::from(andon_count == 0),
+        p_admitted: if andon_count == 0 { 1.0 } else { 0.0 },
+        andon_count,
         warning_count: 0,
         dominant_category: Some(DiagnosticCategory::Conformance),
-        total_diagnostics: 1,
+        total_diagnostics,
         category_counts: HashMap::new(),
     }
 }
 
-// ─── test 1 ──────────────────────────────────────────────────────────────────
+fn execute(
+    ast: &PowlAstNode<'_>,
+    run_id: u64,
+) -> (bcinr_powl::tape::PowlTape, PowlRunState, OcelLog, u64) {
+    let tape = compile_powl(ast).expect("POWL model must compile");
+    let mut state = PowlRunState::new(&tape);
+    let mut log = OcelLog::new();
+    let mut op_trace = 0u64;
 
-/// A 3-op linear chain runs to completion, validates as conforming, and is
-/// sealed by chicago-tdd-tools' OcelCollector into a receipted Evidence with a
-/// non-empty hex digest. This is the golden path: the test run itself becomes
-/// an auditable OCEL 2.0 artifact.
+    for _ in 0..128 {
+        if state.check_mask == 0 {
+            break;
+        }
+        let mut bits = scheduler_tick(&tape.ops[..tape.len as usize], &mut state).0;
+        while bits != 0 {
+            let op_idx = bits.trailing_zeros();
+            bits &= bits - 1;
+            log.record_op_fired(run_id, op_idx, 0).unwrap();
+            op_trace |= 1u64 << op_idx;
+        }
+    }
+    assert_eq!(state.check_mask, 0, "bounded scheduler must complete");
+    log.record_run_sealed(run_id, op_trace).unwrap();
+    (tape, state, log, op_trace)
+}
+
+fn assert_independent_ocel_conformance(path: &Path) {
+    let imported = ::ocel::io::json::read_path(path)
+        .expect("independent OCEL implementation must import the exported log");
+    imported
+        .validate()
+        .unwrap_or_else(|violations| panic!("independent OCEL validation failed: {violations:?}"));
+}
+
 #[test]
-fn powl_linear_chain_conformance_receipted() {
+fn powl_linear_chain_conformance_is_trace_receipted() {
     let ast = PowlAstNode::Sequence(vec![
         PowlAstNode::Atom("setup"),
         PowlAstNode::Atom("process"),
         PowlAstNode::Atom("teardown"),
     ]);
-    let tape = compile_powl(&ast).expect("linear chain must compile");
-    let _full_mask = tape.entry_mask | {
-        let ops = &tape.ops[..tape.len as usize];
-        ops.iter()
-            .fold(0u64, |acc, op| acc | op.pred_mask | op.succ_mask)
-    };
-
-    let mut state = PowlRunState::new(&tape);
-    let mut ocel_log = OcelLog::new();
-    let run_id: u64 = 42;
-    let mut op_trace: u64 = 0;
-
-    for _ in 0..20 {
-        if state.check_mask == 0 {
-            break;
-        }
-        let fired = scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
-        let bits = fired.0;
-        let mut b = bits;
-        while b != 0 {
-            let idx = b.trailing_zeros() as u32;
-            b &= b - 1;
-            ocel_log.record_op_fired(run_id, idx, 0).unwrap();
-            op_trace |= 1u64 << idx;
-        }
-    }
-    ocel_log.record_run_sealed(run_id, op_trace).unwrap();
-
-    // Conformance check: all predecessor constraints satisfied.
-    let result = ocel_log.validate_against_tape(&tape);
+    let (tape, _state, log, _) = execute(&ast, 42);
     assert_eq!(
-        result,
-        ConformanceResult::Conforms,
-        "linear chain must conform"
+        log.validate_against_tape(&tape),
+        ConformanceResult::Conforms
     );
 
-    // Route result through chicago-tdd-tools OcelCollector.
-    std::fs::create_dir_all("target").ok();
+    let receipt = log.seal_receipt();
+    assert_eq!(receipt.log().events(), log.events());
+    assert_eq!(receipt.event_count(), log.events().len());
+
+    std::fs::create_dir_all("target").unwrap();
     let path = PathBuf::from("target/bcinr-powl-chicago-tdd-linear-chain.ocel.json");
     let collector = OcelCollector::new(Some(path));
-    emit_conformance(
+    let mirrored = mirror_trace(&collector, "powl-linear-001", &log, Severity::Info, 1_000);
+    emit_summary(
         &collector,
         "powl-linear-001",
         Severity::Info,
-        "POWL linear chain conforms — all predecessor constraints satisfied",
-        1000,
+        "temporal predecessor law admitted",
+        1_000 + mirrored as u64,
     );
 
-    // Seal: produces receipted Evidence + 64-char hex digest.
     let (receipted, digest) =
         seal_run(&collector, "powl-linear-001".to_string()).expect("seal_run must succeed");
-    assert_eq!(digest.len(), 64, "digest must be 64 hex chars");
-    assert!(
-        digest.chars().all(|c| c.is_ascii_hexdigit()),
-        "digest must be hex"
-    );
-
-    // The receipted log must contain our conformance event.
-    let log = receipted.inner();
-    assert!(
-        !log.events.is_empty(),
-        "receipted log must contain at least one event"
-    );
-
-    // Close writes the OCEL JSON to disk.
+    assert_eq!(digest.len(), 64);
+    assert!(digest.chars().all(|c| c.is_ascii_hexdigit()));
+    assert!(receipted.inner().events.len() >= mirrored);
     collector
-        .close(make_run_summary("powl-linear-001"))
-        .expect("close must succeed");
+        .close(make_run_summary("powl-linear-001", mirrored + 1, 0))
+        .expect("collector close must succeed");
 }
 
-// ─── test 2 ──────────────────────────────────────────────────────────────────
-
-/// A deliberately invalid OcelLog (op 1 sealed without op 0 having fired)
-/// is detected as a predecessor violation. The violation is routed through
-/// chicago-tdd-tools as an Andon diagnostic and sealed into a receipted Evidence.
-/// The receipt digest changes when the log is mutated — tamper evidence.
 #[test]
-fn powl_predecessor_violation_detected_and_receipted() {
-    // 2-op sequence: op 1 depends on op 0.
-    let ast = PowlAstNode::Sequence(vec![
+fn powl_temporal_predecessor_inversion_is_refused_and_receipted() {
+    let tape = compile_powl(&PowlAstNode::Sequence(vec![
         PowlAstNode::Atom("precondition"),
         PowlAstNode::Atom("action"),
-    ]);
-    let tape = compile_powl(&ast).expect("2-op chain must compile");
+    ]))
+    .unwrap();
+    let mut log = OcelLog::new();
+    log.record_op_fired(99, 1, 0).unwrap();
+    log.record_op_fired(99, 0, 0).unwrap();
+    log.record_run_sealed(99, 0b11).unwrap();
 
-    // Build an invalid log: seal with only op 1 fired, skipping op 0.
-    let mut bad_log = OcelLog::new();
-    let run_id: u64 = 99;
-    bad_log.record_op_fired(run_id, 1, 0).unwrap(); // op 1 fires without op 0
-    bad_log.record_run_sealed(run_id, 0b10).unwrap(); // op_trace has bit 1 only
-
-    let result = bad_log.validate_against_tape(&tape);
-    assert!(
-        matches!(result, ConformanceResult::Violation { run_id: 99, .. }),
-        "must detect predecessor violation: op 1 fired without op 0"
+    assert_eq!(
+        log.validate_against_tape(&tape),
+        ConformanceResult::Violation {
+            run_id: 99,
+            op_idx: 1,
+            missing_pred_mask: 0b01,
+        }
     );
 
-    // Route violation through chicago-tdd-tools as Andon.
+    let receipt = log.seal_receipt();
+    assert_eq!(receipt.log().events()[0].op_idx, 1);
+    assert_eq!(receipt.log().events()[1].op_idx, 0);
+
     let collector = OcelCollector::new(None);
-    emit_conformance(
+    let mirrored = mirror_trace(
+        &collector,
+        "powl-violation-001",
+        &log,
+        Severity::Andon,
+        2_000,
+    );
+    emit_summary(
         &collector,
         "powl-violation-001",
         Severity::Andon,
-        "POWL predecessor violation: op 1 fired without op 0 — ANDON",
-        2000,
+        "temporal predecessor inversion refused",
+        2_000 + mirrored as u64,
     );
-
-    let (receipted_v1, digest_v1) = seal_run(&collector, "powl-violation-001".to_string())
-        .expect("seal must succeed for violation log");
-    assert_eq!(digest_v1.len(), 64);
-    assert!(!receipted_v1.inner().events.is_empty());
-
-    // Now emit a second (different) event and reseal — digest must change.
-    let collector2 = OcelCollector::new(None);
-    emit_conformance(
-        &collector2,
-        "powl-violation-002",
-        Severity::Andon,
-        "POWL predecessor violation (mutated log)",
-        3000,
-    );
-    emit_conformance(
-        &collector2,
-        "powl-violation-002",
-        Severity::Warning,
-        "Additional conformance note",
-        4000,
-    );
-
-    let (_receipted_v2, digest_v2) =
-        seal_run(&collector2, "powl-violation-002".to_string()).expect("reseal must succeed");
-    assert_ne!(
-        digest_v1, digest_v2,
-        "digest must change when log content changes — tamper evidence"
-    );
+    let (receipted, digest) = seal_run(&collector, "powl-violation-001".to_string())
+        .expect("violation trace must still be receiptable");
+    assert_eq!(digest.len(), 64);
+    assert!(receipted.inner().events.len() >= mirrored);
 }
 
-// ─── test 3 ──────────────────────────────────────────────────────────────────
-
-/// A 3-branch XorChoice workflow produces valid OCEL 2.0 JSON containing
-/// the required structural keys. The JSON is written to disk for external
-/// process-mining tooling (pm4py, Celonis, etc.).
 #[test]
-fn powl_xor_workflow_ocel_export() {
+fn powl_xor_executes_exactly_one_branch_and_exports_independently_valid_ocel() {
     let ast = PowlAstNode::XorChoice(vec![
         PowlAstNode::Atom("branch_a"),
         PowlAstNode::Atom("branch_b"),
         PowlAstNode::Atom("branch_c"),
     ]);
-    let tape = compile_powl(&ast).expect("XorChoice must compile");
+    let (tape, state, log, op_trace) = execute(&ast, 7);
+    assert_eq!(
+        log.validate_against_tape(&tape),
+        ConformanceResult::Conforms
+    );
 
-    let mut state = PowlRunState::new(&tape);
-    let mut ocel_log = OcelLog::new();
-    let run_id: u64 = 7;
-    let mut op_trace: u64 = 0;
+    let dispatch = tape.ops[..tape.len as usize]
+        .iter()
+        .find(|op| op.kind == OpKind::XorDispatch)
+        .expect("compiled XOR must contain a dispatch operation");
+    let fired_branches = op_trace & dispatch.branch_mask;
+    assert_eq!(
+        fired_branches.count_ones(),
+        1,
+        "exactly one XOR branch may fire"
+    );
+    assert_eq!(state.choice_taken, fired_branches);
 
-    for _ in 0..20 {
-        if state.check_mask == 0 {
-            break;
-        }
-        let fired = scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
-        let bits = fired.0;
-        let mut b = bits;
-        while b != 0 {
-            let idx = b.trailing_zeros() as u32;
-            b &= b - 1;
-            ocel_log.record_op_fired(run_id, idx, 0).unwrap();
-            op_trace |= 1u64 << idx;
-        }
-    }
-    ocel_log.record_run_sealed(run_id, op_trace).unwrap();
-
-    // Export OCEL 2.0 JSON.
-    let json = ocel_log
+    let json = log
         .to_ocel_json()
-        .expect("to_ocel_json must succeed with std feature");
-    assert!(!json.is_empty(), "OCEL JSON must be non-empty");
-
-    // Structural assertions on the JSON — strict OCEL 2.0 per-key checks.
-    let parsed: serde_json::Value =
-        serde_json::from_str(&json).expect("OCEL JSON must be valid JSON");
-
-    // objectTypes must be present.
-    assert!(
-        parsed.get("objectTypes").is_some(),
-        "OCEL 2.0 JSON must contain top-level 'objectTypes' key"
-    );
-    // eventTypes must be present.
-    assert!(
-        parsed.get("eventTypes").is_some(),
-        "OCEL 2.0 JSON must contain top-level 'eventTypes' key"
-    );
-    // objects must be present.
-    assert!(
-        parsed.get("objects").is_some(),
-        "OCEL 2.0 JSON must contain top-level 'objects' key"
-    );
-    // events must be present.
-    assert!(
-        parsed.get("events").is_some(),
-        "OCEL 2.0 JSON must contain top-level 'events' key"
-    );
-
-    // eventTypes must include op_fired and run_sealed.
-    let event_types = parsed["eventTypes"]
-        .as_array()
-        .expect("'eventTypes' must be an array");
-    let et_names: Vec<&str> = event_types
-        .iter()
-        .filter_map(|t| t.get("name").and_then(|n| n.as_str()))
-        .collect();
-    assert!(
-        et_names.contains(&"op_fired"),
-        "eventTypes must contain 'op_fired'"
-    );
-    assert!(
-        et_names.contains(&"run_sealed"),
-        "eventTypes must contain 'run_sealed'"
-    );
-
-    // objectTypes must include PowlRun and PowlOp.
-    let object_types = parsed["objectTypes"]
-        .as_array()
-        .expect("'objectTypes' must be an array");
-    let ot_names: Vec<&str> = object_types
-        .iter()
-        .filter_map(|t| t.get("name").and_then(|n| n.as_str()))
-        .collect();
-    assert!(
-        ot_names.contains(&"PowlRun"),
-        "objectTypes must contain 'PowlRun'"
-    );
-    assert!(
-        ot_names.contains(&"PowlOp"),
-        "objectTypes must contain 'PowlOp'"
-    );
-
-    // Every event must carry a time field (OCEL 2.0 uses "time").
-    let events_arr = parsed["events"]
-        .as_array()
-        .expect("'events' must be an array");
-    for (i, evt) in events_arr.iter().enumerate() {
+        .expect("OCEL 2.0 JSON export must succeed");
+    let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+    for key in ["objectTypes", "eventTypes", "objects", "events"] {
         assert!(
-            evt.get("time").is_some(),
-            "event at index {i} is missing 'time' field"
+            parsed.get(key).is_some(),
+            "missing OCEL top-level key {key}"
         );
     }
 
-    // Every event relationship must reference an object declared in the objects array.
-    let objects_arr = parsed["objects"]
-        .as_array()
-        .expect("'objects' must be an array");
-    let declared_ids: std::collections::HashSet<&str> = objects_arr
+    let objects = parsed["objects"].as_array().unwrap();
+    let declared_ids: std::collections::HashSet<&str> = objects
         .iter()
-        .filter_map(|o| o.get("id").and_then(|id| id.as_str()))
+        .filter_map(|object| object.get("id").and_then(|id| id.as_str()))
         .collect();
-    for (i, evt) in events_arr.iter().enumerate() {
-        if let Some(rels) = evt.get("relationships").and_then(|r| r.as_array()) {
-            for rel in rels {
-                // OCEL 2.0 serializes as "objectId" (camelCase via serde rename).
-                if let Some(oid) = rel.get("objectId").and_then(|o| o.as_str()) {
-                    assert!(
-                        declared_ids.contains(oid),
-                        "event {i} relationship references undeclared object '{oid}'"
-                    );
-                }
-            }
+    for event in parsed["events"].as_array().unwrap() {
+        assert!(event.get("time").is_some(), "OCEL event is missing time");
+        for relation in event
+            .get("relationships")
+            .and_then(|value| value.as_array())
+            .into_iter()
+            .flatten()
+        {
+            let object_id = relation["objectId"].as_str().unwrap();
+            assert!(declared_ids.contains(object_id));
         }
     }
 
-    // Write to disk for external tooling.
-    std::fs::create_dir_all("target").ok();
-    std::fs::write(
-        "target/bcinr-powl-chicago-tdd-xor-workflow.ocel.json",
-        &json,
-    )
-    .expect("must write OCEL JSON to target/");
+    std::fs::create_dir_all("target").unwrap();
+    let export_path = PathBuf::from("target/bcinr-powl-chicago-tdd-xor-workflow.jsonocel");
+    std::fs::write(&export_path, &json).unwrap();
+    assert_independent_ocel_conformance(&export_path);
 
-    // Route through chicago-tdd-tools.
     let collector = OcelCollector::new(Some(PathBuf::from(
         "target/bcinr-powl-chicago-tdd-xor-collector.ocel.json",
     )));
-    emit_conformance(
+    let mirrored = mirror_trace(&collector, "powl-xor-001", &log, Severity::Info, 5_000);
+    emit_summary(
         &collector,
         "powl-xor-001",
         Severity::Info,
-        "XOR workflow OCEL 2.0 export: structurally valid",
-        5000,
+        "XOR exact-one and independent OCEL validation admitted",
+        5_000 + mirrored as u64,
     );
-
-    let (receipted, digest) =
-        seal_run(&collector, "powl-xor-001".to_string()).expect("seal must succeed");
-    assert_eq!(digest.len(), 64);
-    assert!(!receipted.inner().events.is_empty());
-
+    let (receipted, _) =
+        seal_run(&collector, "powl-xor-001".to_string()).expect("XOR trace must seal");
+    assert!(receipted.inner().events.len() >= mirrored);
     collector
-        .close(make_run_summary("powl-xor-001"))
-        .expect("close must succeed");
+        .close(make_run_summary("powl-xor-001", mirrored + 1, 0))
+        .unwrap();
 }
 
-// ─── test 4 ──────────────────────────────────────────────────────────────────
-
-/// The chicago-tdd-tools digest is a function of all events in the log.
-/// Two collectors with different events produce different digests.
-/// This is the tamper-evidence property: inserting, removing, or mutating
-/// events changes the digest.
 #[test]
-fn sealed_receipt_digest_changes_on_event_mutation() {
-    // Collector A: one Info event.
-    let c_a = OcelCollector::new(None);
-    emit_conformance(
-        &c_a,
-        "digest-run-a",
-        Severity::Info,
-        "original conformance event",
-        10_000,
-    );
-    let (_, digest_a) = seal_run(&c_a, "digest-run-a".to_string()).expect("seal A");
+fn deterministic_trace_receipts_replay_identically() {
+    let build = || {
+        let mut log = OcelLog::new();
+        log.record_op_fired(123, 0, 7).unwrap();
+        log.record_op_fired(123, 1, 8).unwrap();
+        log.record_run_sealed(123, 0b11).unwrap();
+        log
+    };
+    let first = build().seal_receipt();
+    let second = build().seal_receipt();
+    assert_eq!(first.digest(), second.digest());
+    assert_eq!(first.log().events(), second.log().events());
+}
 
-    // Collector B: same run_id, same message — should match A's content.
-    let c_b = OcelCollector::new(None);
-    emit_conformance(
-        &c_b,
-        "digest-run-a",
-        Severity::Info,
-        "original conformance event",
-        10_000,
-    );
-    let (_, digest_b) = seal_run(&c_b, "digest-run-a".to_string()).expect("seal B");
-    // Deterministic: same events → same digest.
-    // Note: uuid in event_id is random, so digests may differ.
-    // Instead we verify that changing the message changes the digest.
+#[test]
+fn deterministic_trace_receipt_binds_each_mutation_dimension() {
+    fn digest(
+        run_id: u64,
+        first_op: u32,
+        first_kind: u8,
+        second_op: Option<u32>,
+        seal: u64,
+    ) -> [u8; 32] {
+        let mut log = OcelLog::new();
+        log.record_op_fired(run_id, first_op, first_kind).unwrap();
+        if let Some(op_idx) = second_op {
+            log.record_op_fired(run_id, op_idx, 9).unwrap();
+        }
+        log.record_run_sealed(run_id, seal).unwrap();
+        log.seal_receipt().digest()
+    }
 
-    // Collector C: different message → different digest.
-    let c_c = OcelCollector::new(None);
-    emit_conformance(
-        &c_c,
-        "digest-run-c",
-        Severity::Andon,
-        "MUTATED — different message than A",
-        10_001,
-    );
-    let (_, digest_c) = seal_run(&c_c, "digest-run-c".to_string()).expect("seal C");
-    assert_ne!(
-        digest_a, digest_c,
-        "digest must differ when event message differs — tamper evidence"
-    );
+    let baseline = digest(55, 0, 7, None, 0b1);
+    let mutations = [
+        digest(56, 0, 7, None, 0b1),     // run identity
+        digest(55, 1, 7, None, 0b1),     // operation identity
+        digest(55, 0, 8, None, 0b1),     // operation kind
+        digest(55, 0, 7, Some(1), 0b11), // event count and ordered content
+        digest(55, 0, 7, None, 0b11),    // declared seal trace only
+    ];
 
-    // Collector D: two events vs one → different digest.
-    let c_d = OcelCollector::new(None);
-    emit_conformance(
-        &c_d,
-        "digest-run-d",
-        Severity::Info,
-        "original conformance event",
-        10_000,
-    );
-    emit_conformance(
-        &c_d,
-        "digest-run-d",
-        Severity::Warning,
-        "additional event changes the log",
-        11_000,
-    );
-    let (_, digest_d) = seal_run(&c_d, "digest-run-d".to_string()).expect("seal D");
-    // Two events in D vs one in B (same run_id prefix doesn't matter since IDs differ).
-    let _ = digest_b; // used above
-    assert_ne!(
-        digest_a, digest_d,
-        "digest must differ when event count differs — tamper evidence"
-    );
-
-    // All digests are well-formed.
-    for d in &[&digest_a, &digest_c, &digest_d] {
-        assert_eq!(d.len(), 64, "digest must be 64 hex chars");
-        assert!(
-            d.chars().all(|c| c.is_ascii_hexdigit()),
-            "digest must be hex"
+    for (index, mutated) in mutations.into_iter().enumerate() {
+        assert_ne!(
+            baseline, mutated,
+            "mutation dimension {index} escaped the receipt"
         );
     }
 }
