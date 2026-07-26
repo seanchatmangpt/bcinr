@@ -58,6 +58,19 @@ def extract_block(text: str, marker: str) -> str:
     return ""
 
 
+def rust_code_lines(text: str) -> str:
+    """Return executable-looking Rust lines, excluding comment-only evidence.
+
+    The swarm scenarios intentionally document the zero-LLM invariant and show
+    forbidden grep examples in doc comments. Those mentions are evidence, not
+    calls. Admission therefore scans code and manifests for actuation surfaces
+    rather than rejecting negative documentation.
+    """
+    return "\n".join(
+        line for line in text.splitlines() if not line.lstrip().startswith("//")
+    )
+
+
 def phase1() -> None:
     require_file("crates/bcinr-pddl/src/logical_time.rs")
     ground = require_contains(
@@ -123,11 +136,22 @@ def phase5() -> None:
     tests = sorted(path("crates/bcinr-powl/tests").glob("usecase_swarm_*.rs"))
     if len(tests) != 10:
         fail(f"expected exactly 10 swarm scenario files, found {len(tests)}")
-    forbidden = re.compile(r"api\.anthropic|openai|model\s*provider|gpt-|claude", re.IGNORECASE)
+
+    # Zero LLM calls means zero executable network/model actuation surfaces.
+    # Negative documentation such as "grep openai" is deliberately excluded.
+    forbidden_actuation = re.compile(
+        r"\b(?:async_openai|anthropic|openai|reqwest|ureq|hyper|"
+        r"TcpStream|UdpSocket|std::net|tokio::net|std::process::Command)\b",
+        re.IGNORECASE,
+    )
+    manifest = require_file("crates/bcinr-powl/Cargo.toml")
+    if forbidden_actuation.search(rust_code_lines(manifest)):
+        fail("crates/bcinr-powl/Cargo.toml: contains an LLM/network actuation dependency")
+
     for test in tests:
         text = test.read_text(encoding="utf-8")
-        if forbidden.search(text):
-            fail(f"{test.relative_to(ROOT)}: contains an LLM/provider reference")
+        if forbidden_actuation.search(rust_code_lines(text)):
+            fail(f"{test.relative_to(ROOT)}: contains an executable LLM/network actuation token")
         if not re.search(r"\bassert(?:_eq|_ne)?!", text):
             fail(f"{test.relative_to(ROOT)}: contains no executable assertion")
 
