@@ -1,0 +1,103 @@
+name: POWL Chicago PR Verifier
+
+on:
+  pull_request:
+    branches:
+      - agent/powl-chicago-verifier-base
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: powl-chicago-pr-verifier
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: never
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: 1
+
+jobs:
+  verify:
+    name: Manufacture and verify complete Chicago closure
+    if: github.event.pull_request.head.ref == 'agent/cmca-chicago-jtbd-validation-v26.7.25' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/cmca-chicago-jtbd-validation-v26.7.25
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Execute verification ladder
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          : > /tmp/powl-chicago-closure.log
+          overall=0
+          run_step() {
+            name="$1"
+            shift
+            echo "===== ${name} =====" | tee -a /tmp/powl-chicago-closure.log
+            "$@" 2>&1 | tee -a /tmp/powl-chicago-closure.log
+            status=${PIPESTATUS[0]}
+            echo "exit=${status}" | tee -a /tmp/powl-chicago-closure.log
+            if [ "${status}" -ne 0 ]; then overall=1; fi
+          }
+
+          run_step manufacture python3 scripts/implement_powl_chicago_closure.py
+          if [ "${overall}" -eq 0 ]; then
+            run_step format cargo fmt --all
+            run_step diff-check git diff --check
+            run_step powl-ocel-unit cargo test -p bcinr-powl --features std ocel
+            run_step powl-chicago cargo test -p bcinr-powl --test chicago_tdd_integration --features std
+            run_step powl-all cargo test -p bcinr-powl --all-features
+            run_step powl-receipt cargo test -p bcinr-powl-receipt --all-features
+            run_step cmca-chicago cargo test -p bcinr-cmca --test jtbd_certified_actuation_chicago
+            run_step workspace-check cargo check --workspace --all-features
+            run_step powl-clippy cargo clippy -p bcinr-powl --all-targets --all-features -- -D warnings
+            run_step format-check cargo fmt --all -- --check
+          fi
+          echo "${overall}" > /tmp/powl-chicago-closure.status
+          exit 0
+
+      - name: Publish source or diagnostic
+        shell: bash
+        run: |
+          status=$(cat /tmp/powl-chicago-closure.status)
+          mkdir -p docs/testing
+          cp /tmp/powl-chicago-closure.log docs/testing/powl-chicago-closure-latest.log
+          cat > docs/testing/powl-chicago-closure-v26.7.25.md <<EOF
+          # POWL Chicago closure execution receipt
+
+          - Workflow run: ${GITHUB_RUN_ID}
+          - Verified input commit: ${GITHUB_SHA}
+          - Verification status: $([ "${status}" -eq 0 ] && echo ALIVE || echo BUILD_BROKEN)
+          - Runner: Ubuntu 24.04 / nightly Rust
+
+          The retained log records the manufacturer, temporal validator unit tests, strengthened Chicago integration suite, independent OCEL importer/validator, POWL and receipt regressions, CMCA regression, workspace compile, formatting, and clippy.
+          EOF
+
+          rm -f .github/workflows/powl-chicago-closure.yml
+          git config user.name 'OpenAI Test Agent'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          if [ "${status}" -eq 0 ]; then
+            rm -f scripts/implement_powl_chicago_closure.py
+            git add -A
+            git diff --cached --check
+            git commit -m 'fix(powl): close Chicago conformance and receipt gaps'
+          else
+            git restore --worktree --staged crates Cargo.lock 2>/dev/null || true
+            git add docs/testing/powl-chicago-closure-latest.log docs/testing/powl-chicago-closure-v26.7.25.md
+            git add -u .github/workflows/powl-chicago-closure.yml
+            git commit -m 'test(powl): capture Chicago closure diagnostic'
+          fi
+          git push origin HEAD:agent/cmca-chicago-jtbd-validation-v26.7.25
