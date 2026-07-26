@@ -133,6 +133,7 @@ fn test_timing_constant_across_candidate_sets() {
 /// - Denormalized numbers
 /// - Rounding modes
 /// - Flush-to-zero optimizations
+///
 /// These vary by CPU, compiler, and timing, leaking information.
 ///
 /// Q16.16 fixed-point arithmetic is deterministic:
@@ -301,9 +302,9 @@ fn test_allocation_only_depends_on_inputs() {
     }
 
     assert_eq!(results.len(), 2, "both allocation attempts must have run");
-    for i in 0..N {
+    for (i, (first, second)) in results[0].iter().zip(&results[1]).enumerate() {
         assert_eq!(
-            results[0][i], results[1][i],
+            first, second,
             "allocation must be deterministic (result [{}] must be identical)",
             i
         );
