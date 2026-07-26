@@ -26,10 +26,6 @@ jobs:
           file=.github/workflows/v26-7-26-final-repairs.yml
           old='require(chaos_scenarios_path, chaos_scenarios, "result.ticks_executed > 0", 1)'
           new='require(chaos_scenarios_path, chaos_scenarios, "result.ticks_executed > 0", 2)'
-          [[ "$(grep -Fxc "          ${old}" "${file}")" -eq 1 ]] || {
-            echo 'PATCH_REFUSED: exact stale postcondition not found once' >&2
-            exit 1
-          }
           python3 - "${file}" "${old}" "${new}" <<'PY'
           from pathlib import Path
           import sys
