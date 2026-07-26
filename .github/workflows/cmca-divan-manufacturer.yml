@@ -1,30 +1,23 @@
-name: CMCA Divan Manufacturer
+name: CMCA Divan Isolated Verifier
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/cmca-divan-execution-benchmarks
+      - main
 
 permissions:
-  contents: write
-
-concurrency:
-  group: cmca-divan-manufacturer-${{ github.ref }}
-  cancel-in-progress: true
+  contents: read
 
 jobs:
-  manufacture:
-    if: github.actor != 'github-actions[bot]'
+  verify:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
       CARGO_TERM_COLOR: never
 
     steps:
-      - name: Checkout benchmark branch
+      - name: Checkout pull request
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Install repository toolchain
         uses: dtolnay/rust-toolchain@nightly
@@ -34,9 +27,9 @@ jobs:
       - name: Cache Cargo state
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: cmca-divan-standalone
+          shared-key: cmca-divan-isolated
 
-      - name: Move benchmark to CMCA package
+      - name: Isolate benchmark in CMCA package
         shell: bash
         run: |
           set -euo pipefail
@@ -50,70 +43,34 @@ jobs:
           text = cmca.read_text()
           if 'divan = "0.1"' not in text:
               text = text.replace('proptest = "1.2.0"\n', 'proptest = "1.2.0"\ndivan = "0.1"\n')
-          bench = '\n[[bench]]\nname = "cmca_execution_bench"\nharness = false\n'
           if 'name = "cmca_execution_bench"' not in text:
-              text = text.rstrip() + bench
+              text = text.rstrip() + '\n\n[[bench]]\nname = "cmca_execution_bench"\nharness = false\n'
           cmca.write_text(text)
-
-          aggregate = Path('bcinr-bench/Cargo.toml')
-          text = aggregate.read_text()
-          text = text.replace('bcinr-cmca = { path = "../crates/bcinr-cmca", version = "26.7.25" }\n', '')
-          text = text.replace('\n[[bench]]\nname = "cmca_execution_bench"\nharness = false\n', '')
-          aggregate.write_text(text)
           PY
-          rm -f bcinr-bench/benches/cmca_execution_bench.rs
-          rm -f docs/testing/cmca-divan-clippy-diagnostic.md
-          rm -f docs/testing/.cmca-divan-trigger
           cargo fmt --all
 
-      - name: Compile standalone CMCA Divan target
+      - name: Compile isolated CMCA Divan target
         run: cargo check -p bcinr-cmca --bench cmca_execution_bench
 
-      - name: Lint standalone CMCA Divan target
+      - name: Lint isolated CMCA Divan target
         run: cargo clippy -p bcinr-cmca --bench cmca_execution_bench -- -D warnings
 
-      - name: Execute and receipt CMCA Divan baseline
+      - name: Execute isolated CMCA Divan baseline
+        id: bench
+        continue-on-error: true
         shell: bash
         run: |
-          set -euo pipefail
-          mkdir -p docs/testing
-          cargo bench -p bcinr-cmca --bench cmca_execution_bench 2>&1 | tee /tmp/cmca-divan-output.txt
-          {
-            echo '# CMCA Divan Execution Baseline — v26.7.25'
-            echo
-            echo '- Standing: **ALIVE**'
-            echo '- Workflow run: `${{ github.run_id }}`'
-            echo '- Source commit: `${{ github.sha }}`'
-            echo '- Runner: `ubuntu-latest`'
-            echo '- Kernel:'
-            echo '```text'
-            uname -a
-            echo '```'
-            echo '- Rust toolchain:'
-            echo '```text'
-            rustc -Vv
-            echo '```'
-            echo
-            echo '## Command'
-            echo
-            echo '```bash'
-            echo 'cargo bench -p bcinr-cmca --bench cmca_execution_bench'
-            echo '```'
-            echo
-            echo '## Divan output'
-            echo
-            echo '```text'
-            cat /tmp/cmca-divan-output.txt
-            echo '```'
-          } > docs/testing/cmca-divan-execution-v26.7.25.md
+          set -o pipefail
+          cargo bench -p bcinr-cmca --bench cmca_execution_bench 2>&1 | tee cmca-divan-isolated-output.txt
 
-      - name: Commit final benchmark rail and receipt
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -f .github/workflows/cmca-divan-manufacturer.yml
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git commit -m 'bench(cmca): add standalone Divan execution baseline'
-          git push
+      - name: Upload complete Divan output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmca-divan-isolated-${{ github.run_id }}
+          path: cmca-divan-isolated-output.txt
+          if-no-files-found: error
+
+      - name: Enforce benchmark result
+        if: steps.bench.outcome == 'failure'
+        run: exit 1
