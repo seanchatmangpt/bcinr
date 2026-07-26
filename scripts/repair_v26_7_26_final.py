@@ -13,8 +13,10 @@ ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_FILES = {
     "crates/bcinr-cmca/tests/usecase_ml_fairness_audit.rs",
     "crates/bcinr-cmca/tests/usecase_radiation_hardened.rs",
+    "crates/bcinr-powl/src/ocel.rs",
     "crates/bcinr-powl/tests/chaos_harness.rs",
     "crates/bcinr-powl/tests/chaos_scenarios.rs",
+    "crates/bcinr-powl/tests/chicago_tdd_integration.rs",
     "crates/bcinr-powl/tests/usecase_compliance_audit.rs",
     "crates/bcinr-powl/tests/usecase_swarm_02_parallel_independent_workers.rs",
     "scripts/generate_v26_7_26_report.sh",
@@ -119,6 +121,84 @@ def repair_compliance(text: str) -> str:
     return text
 
 
+def repair_chicago(text: str) -> str:
+    text = text.replace(
+        'context.insert("timestamp", serde_json::json!(event.timestamp));',
+        'context.insert("start_time", serde_json::json!(event.start_time));\n    context.insert("duration", serde_json::json!(event.duration));',
+        1,
+    )
+    text = text.replace(
+        'context.insert("kind_tag", serde_json::json!(event.kind_tag));',
+        'context.insert(\n        "event_kind",\n        serde_json::json!(format!("{:?}", event.event_kind)),\n    );',
+        1,
+    )
+    text = text.replace(
+        "let mut op_trace = 0u64;",
+        "let mut op_trace = 0u64;\n    let mut ticks = 0u32;",
+        1,
+    )
+    text = text.replace(
+        "let mut bits = scheduler_tick(&tape.ops[..tape.len as usize], &mut state).0;",
+        "ticks += 1;\n        let mut bits = scheduler_tick(&tape.ops[..tape.len as usize], &mut state).0;",
+        1,
+    )
+    replacements = {
+        "log.record_op_fired(run_id, op_idx, 0).unwrap();":
+            "log.record_op_fired(run_id, op_idx, ticks, 1).unwrap();",
+        "log.record_run_sealed(run_id, op_trace).unwrap();":
+            "log.record_run_sealed(run_id, op_trace, ticks).unwrap();",
+        "log.record_op_fired(99, 1, 0).unwrap();":
+            "log.record_op_fired(99, 1, 0, 1).unwrap();",
+        "log.record_op_fired(99, 0, 0).unwrap();":
+            "log.record_op_fired(99, 0, 1, 1).unwrap();",
+        "log.record_run_sealed(99, 0b11).unwrap();":
+            "log.record_run_sealed(99, 0b11, 2).unwrap();",
+        "log.record_op_fired(123, 0, 7).unwrap();":
+            "log.record_op_fired(123, 0, 7, 1).unwrap();",
+        "log.record_op_fired(123, 1, 8).unwrap();":
+            "log.record_op_fired(123, 1, 8, 1).unwrap();",
+        "log.record_run_sealed(123, 0b11).unwrap();":
+            "log.record_run_sealed(123, 0b11, 9).unwrap();",
+        "first_kind: u8,": "first_start_time: u32,",
+        "log.record_op_fired(run_id, first_op, first_kind).unwrap();":
+            "log.record_op_fired(run_id, first_op, first_start_time, 1)\n            .unwrap();",
+        "log.record_op_fired(run_id, op_idx, 9).unwrap();":
+            "log.record_op_fired(run_id, op_idx, 9, 1).unwrap();",
+        "log.record_run_sealed(run_id, seal).unwrap();":
+            "log.record_run_sealed(run_id, seal, 10).unwrap();",
+        ".record_op_fired(run_id, candidate_idx as u32, i as u8)":
+            ".record_op_fired(run_id, candidate_idx as u32, i as u32, 1)",
+        ".record_run_sealed(run_id, op_trace)":
+            ".record_run_sealed(run_id, op_trace, expected_selections.len() as u32)",
+        "emit_conformance(": "emit_summary(",
+        "// operation kind": "// operation start time",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    return text
+
+
+def repair_ocel(text: str) -> str:
+    text = text.replace(
+        "log.record_op_fired(run_id, 0, 0).unwrap();",
+        "log.record_op_fired(run_id, 0, 0, 1).unwrap();",
+    )
+    text = text.replace(
+        "log.record_op_fired(run_id, 1, 0).unwrap();",
+        "log.record_op_fired(run_id, 1, 1, 1).unwrap();",
+    )
+    text = text.replace(
+        "log.record_run_sealed(run_id, 0b11).unwrap();",
+        "log.record_run_sealed(run_id, 0b11, 2).unwrap();",
+    )
+    text = text.replace(
+        "log.record_run_sealed(81, 1).unwrap();",
+        "log.record_run_sealed(81, 1, 0).unwrap();",
+        1,
+    )
+    return text
+
+
 def repair_chaos_scenarios(text: str) -> str:
     if "fn test_chaos_config_default_is_bounded" not in text:
         marker = "/// Test 1: Crash injection after 5 of 10 sequential operations."
@@ -168,6 +248,20 @@ def main() -> int:
     require(compliance_rel, compliance, "record_op_fired(run_id, op_idx, ticks, 1)", 1)
     if re.search(r"record_op_fired\([^\n]+, 0\)\.unwrap", compliance):
         raise SystemExit(f"REPAIR_REFUSED: {compliance_rel}: stale OCEL call remains")
+
+    chicago_rel = "crates/bcinr-powl/tests/chicago_tdd_integration.rs"
+    chicago = edit(chicago_rel, repair_chicago)
+    require(chicago_rel, chicago, 'context.insert("start_time"', 1)
+    require(chicago_rel, chicago, 'context.insert("duration"', 1)
+    require(chicago_rel, chicago, '"event_kind"', 1)
+    require(chicago_rel, chicago, "record_op_fired(run_id, op_idx, ticks, 1)", 1)
+    require(chicago_rel, chicago, "emit_summary(", 6)
+    if "emit_conformance(" in chicago or "event.timestamp" in chicago or "event.kind_tag" in chicago:
+        raise SystemExit(f"REPAIR_REFUSED: {chicago_rel}: stale event surface remains")
+
+    ocel_rel = "crates/bcinr-powl/src/ocel.rs"
+    ocel = edit(ocel_rel, repair_ocel)
+    require(ocel_rel, ocel, "log.record_run_sealed(81, 1, 0)", 1)
 
     harness_rel = "crates/bcinr-powl/tests/chaos_harness.rs"
     harness = edit(
