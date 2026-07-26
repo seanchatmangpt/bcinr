@@ -42,8 +42,10 @@ jobs:
           allowed=(
             crates/bcinr-cmca/tests/usecase_ml_fairness_audit.rs
             crates/bcinr-cmca/tests/usecase_radiation_hardened.rs
+            crates/bcinr-powl/src/ocel.rs
             crates/bcinr-powl/tests/chaos_harness.rs
             crates/bcinr-powl/tests/chaos_scenarios.rs
+            crates/bcinr-powl/tests/chicago_tdd_integration.rs
             crates/bcinr-powl/tests/usecase_compliance_audit.rs
             crates/bcinr-powl/tests/usecase_swarm_02_parallel_independent_workers.rs
             scripts/generate_v26_7_26_report.sh
