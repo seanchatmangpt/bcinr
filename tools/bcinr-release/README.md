@@ -1,74 +1,145 @@
 # bcinr-release
 
-`bcinr-release` is the fail-closed release-admission tool for BCINR. It does not implement temporal planning, POWL execution, scheduling, resource law, OCEL semantics, swarm behavior, or another runtime capability. Those remain owned by their authoritative crates.
+`bcinr-release` is BCINR's fail-closed release-admission engine. It does not implement temporal planning, POWL execution, scheduling, resource law, OCEL semantics, swarm behavior, or another runtime capability. Those remain owned by their authoritative crates.
 
 ## Jurisdiction
 
-This tool owns the transition from an exact repository tree to a replayable release-verification receipt:
+The tool owns one transition:
 
 ```text
-exact tree
-  -> validated release profile
-  -> bounded verifier rails
-  -> retained stdout/stderr evidence
-  -> artifact admission
+exact repository object
+  -> authenticated bounded profile
+  -> preflight admission or zero-actuation refusal
+  -> hermetic verifier rails
+  -> retained and hashed evidence
+  -> artifact-tree admission
   -> byte-identity proof
-  -> exact standing
-  -> BLAKE3 receipt
+  -> computed standing
+  -> atomic release receipt
 ```
 
-The tool may execute capability tests, but it may not redefine capability semantics or convert a capability failure into a release success.
+The tool may execute capability verifiers. It may not redefine capability semantics, repair a failed capability implicitly, or convert a capability failure into release success.
 
-## Design laws
+## Admission before actuation
 
-- No shell is used to execute profile commands.
-- Programs and arguments are represented separately.
-- Every rail has a bounded timeout.
-- Standard output and standard error are retained separately.
-- Every retained log is BLAKE3-digested.
-- The exact Git head, branch, remote, toolchain, operating system, architecture, and tree status are captured.
-- A dirty input tree, changed head, changed tracked tree, repository mismatch, or exact-head mismatch blocks admission.
-- Required artifacts must be regular files and receive BLAKE3 digests.
-- Manufactured and consumed files are compared byte-for-byte, not by names or reported versions.
-- Evidence is emitted only below `target/`.
-- `ALIVE` is calculated from observed results. It is never accepted from a report field or command output.
+No verifier rail starts until all preflight laws are admitted:
 
-## Standing
+- the caller supplies a full 40- or 64-digit expected Git object ID;
+- `HEAD` resolves to that exact commit;
+- `origin` normalizes exactly to the profile's `owner/name` repository;
+- Git object format and commit timestamp are known;
+- Rust and Cargo toolchains are observable;
+- the tracked and unignored tree is clean;
+- recursive submodule state is exact;
+- profile and evidence paths remain inside the repository without symlink traversal.
 
-- `ALIVE`: every required rail passed, every required artifact exists, every required identity pair is byte-identical, and repository admission remained valid.
-- `PARTIAL_ALIVE`: every required condition passed but an explicitly optional condition failed.
-- `BUILD_BROKEN`: at least one required executable rail failed or timed out.
-- `BLOCKED`: repository identity, exact-head, clean-tree, artifact, or byte-identity admission failed.
+A preflight failure emits skipped rail receipts. It does not execute commands.
 
-The process exits with code `0`, `3`, `1`, or `2`, respectively.
+## Process-execution laws
+
+Each rail executes without a shell and with:
+
+- separate program and argument vectors;
+- cleared ambient environment;
+- an explicit inherited-environment allowlist;
+- refused dynamic-loader and Rust compiler-wrapper injection variables;
+- closed standard input;
+- fixed `LC_ALL=C`, `LANG=C`, and `TZ=UTC`;
+- deterministic `SOURCE_DATE_EPOCH` from the admitted commit;
+- an exact canonical executable target and BLAKE3 digest before and after execution;
+- a repository-state digest before and after execution;
+- bounded timeout and bounded retained log volume;
+- complete stdout/stderr stream hashing even when retained logs are truncated;
+- whole-process-group termination on Unix;
+- Linux pidfd-backed `wait`, `try_wait`, and termination to avoid PID-reuse races.
+
+A changed executable or repository state stops subsequent rails.
+
+## Evidence laws
+
+Evidence is emitted only under a new, empty `target/` directory. The engine:
+
+- refuses symlink components;
+- creates private directories and files;
+- acquires a create-new run lock;
+- retains stdout and stderr independently;
+- supports bounded recursive artifact trees;
+- rejects artifact-tree symlinks;
+- compares manufactured and consumed files byte-for-byte;
+- hashes the verifier executable itself;
+- derives domain-separated BLAKE3 hashes for profiles, executables, logs, artifacts, artifact trees, receipts, and the complete evidence graph;
+- writes the final receipt with flush, `fsync`, atomic rename, and parent-directory synchronization.
+
+`ALIVE` is derived only from the observed receipt graph. Command output cannot assert its own standing.
+
+## Nightly boundary
+
+The crate intentionally uses two narrowly fenced standard-library nightly features:
+
+- `linux_pidfd` for race-free Linux child supervision;
+- `unix_kill_process_group` for descendant-complete timeout termination.
+
+The release profile compiles the crate through `-Z allow-features=linux_pidfd,unix_kill_process_group`, preventing unrelated unstable features from entering the verifier.
+
+Cargo nightly rails additionally produce SBOM precursor files and two independently built, path-trimmed release binaries whose bytes must match.
+
+## Profile bounds
+
+Profile schema v2 bounds every externally supplied dimension, including:
+
+- profile bytes;
+- rail, artifact, and identity counts;
+- argument and environment counts;
+- string lengths;
+- timeout duration;
+- retained log bytes;
+- recursive artifact entries;
+- minimum artifact-file count.
+
+Unknown JSON fields and duplicate IDs are refused.
+
+## Standing and exit codes
+
+| Standing | Meaning | Exit |
+|---|---|---:|
+| `ALIVE` | Every required rail, artifact, identity, and repository law passed. | 0 |
+| `BUILD_BROKEN` | At least one required executable rail failed or timed out. | 10 |
+| `BLOCKED` | Repository, provenance, artifact, byte-identity, or actuation authority was refused. | 20 |
+| `PARTIAL_ALIVE` | Required conditions passed but an explicitly optional condition failed. | 30 |
+| `UNKNOWN` | The engine could not establish a bounded standing. | 40 |
+| `UNSUPPORTED` | The requested verification boundary is not implemented. | 50 |
+| verifier refusal | CLI, profile, or evidence-engine failure prevented a receipt. | 70 |
 
 ## Invocation
 
+Build the exact verifier first, then invoke that binary directly:
+
 ```bash
-cargo run --locked -p bcinr-release -- \
-  verify \
+cargo build --locked -p bcinr-release --bin bcinr-release
+
+target/debug/bcinr-release verify \
   --profile release/v26.7.28/production.json \
   --expected-head "$(git rev-parse HEAD)" \
-  --output target/release-evidence/v26.7.28
+  --output "target/release-evidence/v26.7.28/$(git rev-parse HEAD)/manual-1"
 ```
 
-The output directory must be repository-relative and located under `target/`.
+The output directory must be repository-relative, below `target/`, empty, and free of symlink components.
 
-## Evidence
-
-A run emits:
+## Evidence layout
 
 ```text
-target/release-evidence/v26.7.28/
+target/release-evidence/v26.7.28/<head>/<run>/
   logs/
     <rail>.stdout.log
     <rail>.stderr.log
-  receipt.json
+  evidence.root
   receipt.blake3
+  receipt.json
+  standing.txt
 ```
 
-`receipt.json` records each command vector, working directory, timeout outcome, exit code, duration, log digest, artifact digest, identity comparison, provenance observation, admission issue, and final standing.
+`receipt.json` records command vectors, admitted environment names, canonical executable identity, process outcome, exit signal, timeout, duration, complete-stream log hashes, retained-byte bounds, repository-state hashes, artifact trees, identity comparisons, exact provenance, admission issues, verifier identity, and final standing.
 
 ## Version policy
 
-The executable is generic. Version-specific requirements belong under `release/<version>/`. Adding a release must not hardcode expected counts, benchmark values, checksums, or success states into Rust or shell source.
+The executable is generic. Version-specific requirements belong under `release/<version>/`. Adding a release must not hardcode expected counts, benchmark values, checksums, or success states into Rust, workflow, or shell source.
