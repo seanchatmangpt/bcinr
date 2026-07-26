@@ -84,6 +84,10 @@ required-features = ["mfw-planner"]
 name = "temporal_swarm_v26_7_28"
 path = "tests/temporal_swarm_v26_7_28.rs"
 
+[[test]]
+name = "manufactured_swarm_scenarios_v26_7_28"
+path = "tests/manufactured_swarm_scenarios_v26_7_28.rs"
+
 [[bench]]
 name = "pddl_80_20"
 path = "benches/pddl_80_20.rs"
