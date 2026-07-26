@@ -79,23 +79,76 @@
 
 #![forbid(unsafe_code)]
 
+use crate::scheduler::LogicalTime;
+
 #[cfg(feature = "std")]
 use wasm4pm_compat::ocel::{
     OCELEvent, OCELEventAttribute, OCELObject, OCELRelationship, OCELType, OCELTypeAttribute, OCEL,
 };
 
+/// Duration in logical time units (equivalent to LogicalTime).
+/// Represents elapsed time from start to fire.
+pub type Duration = u32;
+
+/// Extended event kind enumeration with resource and refusal tracking.
+///
+/// This enum captures the various event types that can occur during POWL execution,
+/// including operation execution, run sealing, resource lifecycle, and refusal events.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum EventKind {
+    /// Operation fired with start time and duration.
+    OpFired {
+        /// Wall/logical time when the operation started.
+        start_time: LogicalTime,
+        /// Elapsed time from start to fire.
+        duration: Duration,
+    },
+    /// Run sealed with completion time.
+    RunSealed {
+        /// Wall/logical time when the run was sealed.
+        run_time: LogicalTime,
+    },
+    /// Resource acquired.
+    ResourceAcquired {
+        /// Unique resource identifier.
+        resource_id: u64,
+        /// Acquisition start time.
+        start: LogicalTime,
+        /// Acquisition end time.
+        end: LogicalTime,
+        /// Lease expiry deadline.
+        lease_expiry: LogicalTime,
+    },
+    /// Resource released.
+    ResourceReleased {
+        /// Unique resource identifier.
+        resource_id: u64,
+    },
+    /// Refusal event with classification.
+    Refused {
+        /// Refusal class (e.g., "policy_violation", "resource_unavailable").
+        refusal_class: u8,
+        /// Execution stage where refusal occurred.
+        stage: u8,
+        /// Policy boundary index.
+        policy_boundary: u8,
+    },
+}
+
 /// A discrete event recorded within an [`OcelLog`].
 ///
-/// An event represents either the firing of an individual operation or the
-/// sealing of a workflow run.
+/// An event represents either the firing of an individual operation, the
+/// sealing of a workflow run, or other lifecycle events (resource, refusal).
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct OcelEvent {
     /// A unique sequential identifier for the event.
     pub event_id: u64,
     /// The event type, either `"op_fired"` or `"run_sealed"`.
     pub activity: &'static str,
-    /// A monotonic tick counter used to preserve order of events.
-    pub timestamp: u64,
+    /// Wall/logical time (not tick-indexed) when the event start occurred.
+    pub start_time: LogicalTime,
+    /// Elapsed time from start to event fire (in logical time units).
+    pub duration: Duration,
     /// The identifier of the execution run.
     pub run_id: u64,
     /// For `"op_fired"`, the index of the operation that fired.
@@ -104,8 +157,8 @@ pub struct OcelEvent {
     /// For `run_sealed`, the complete 64-bit declared operation trace.
     /// For `op_fired`, this is zero.
     pub op_trace: u64,
-    /// Auxiliary tag storing the operation kind or metadata.
-    pub kind_tag: u8,
+    /// Extended event kind enumeration.
+    pub event_kind: EventKind,
 }
 
 /// A fixed-capacity, heap-allocation-free event log.
@@ -198,6 +251,33 @@ pub enum ConformanceResult {
     /// Refusal: The log contains more unique run IDs than the fixed limits
     /// of the deterministic validator.
     RunLimitExceeded,
+    /// An operation's actual duration exceeded its maximum allowed duration.
+    DurationViolation {
+        /// The identifier of the affected run.
+        run_id: u64,
+        /// The index of the operation that exceeded its duration limit.
+        op_idx: u32,
+        /// The actual duration observed.
+        actual_duration: Duration,
+        /// The maximum allowed duration for this operation.
+        max_allowed: Duration,
+    },
+    /// A resource's release timestamp exceeded its lease expiry deadline.
+    LeaseViolation {
+        /// The unique resource identifier.
+        resource_id: u64,
+        /// The amount by which the release exceeded the lease expiry (in time units).
+        exceeded_by: u32,
+    },
+    /// The total run time exceeded the deadline specified on the tape.
+    DeadlineViolation {
+        /// The identifier of the affected run.
+        run_id: u64,
+        /// The actual time when the run completed.
+        actual_time: LogicalTime,
+        /// The deadline specified on the tape.
+        deadline: LogicalTime,
+    },
 }
 
 /// A deterministic BLAKE3 receipt that owns the exact ordered OCEL trace it seals.
@@ -246,11 +326,15 @@ impl OcelLog {
         const DEFAULT_EVENT: OcelEvent = OcelEvent {
             event_id: 0,
             activity: "",
-            timestamp: 0,
+            start_time: 0,
+            duration: 0,
             run_id: 0,
             op_idx: 0,
             op_trace: 0,
-            kind_tag: 0,
+            event_kind: EventKind::OpFired {
+                start_time: 0,
+                duration: 0,
+            },
         };
         Self {
             events: [DEFAULT_EVENT; 512],
@@ -259,7 +343,14 @@ impl OcelLog {
         }
     }
 
-    /// Records that operation `op_idx` fired within `run_id`.
+    /// Records that operation `op_idx` fired within `run_id` with temporal information.
+    ///
+    /// # Arguments
+    ///
+    /// * `run_id` - The identifier of the execution run.
+    /// * `op_idx` - The index of the operation that fired.
+    /// * `start_time` - Wall/logical time when the operation started.
+    /// * `duration` - Elapsed time from start to fire.
     ///
     /// # Errors
     ///
@@ -272,14 +363,15 @@ impl OcelLog {
     /// use bcinr_powl::ocel::OcelLog;
     ///
     /// let mut log = OcelLog::new();
-    /// log.record_op_fired(42, 0, 1).unwrap();
+    /// log.record_op_fired(42, 0, 10, 5).unwrap();
     /// assert_eq!(log.events().len(), 1);
     /// ```
     pub fn record_op_fired(
         &mut self,
         run_id: u64,
         op_idx: u32,
-        kind_tag: u8,
+        start_time: LogicalTime,
+        duration: Duration,
     ) -> Result<(), OcelError> {
         if self.count >= 512 {
             return Err(OcelError::Overflow);
@@ -288,11 +380,15 @@ impl OcelLog {
         self.events[self.count] = OcelEvent {
             event_id: self.count as u64,
             activity: "op_fired",
-            timestamp: self.tick,
+            start_time,
+            duration,
             run_id,
             op_idx,
             op_trace: 0,
-            kind_tag,
+            event_kind: EventKind::OpFired {
+                start_time,
+                duration,
+            },
         };
         self.count += 1;
         Ok(())
@@ -300,6 +396,12 @@ impl OcelLog {
 
     /// Records that run `run_id` was sealed with the complete `op_trace` bitmask.
     /// `op_idx` retains the low 32 bits for wire compatibility; `op_trace` is authoritative.
+    ///
+    /// # Arguments
+    ///
+    /// * `run_id` - The identifier of the run being sealed.
+    /// * `op_trace` - The complete 64-bit bitmask of operations that fired.
+    /// * `run_time` - Wall/logical time when the run was sealed.
     ///
     /// # Errors
     ///
@@ -312,10 +414,15 @@ impl OcelLog {
     /// use bcinr_powl::ocel::OcelLog;
     ///
     /// let mut log = OcelLog::new();
-    /// log.record_run_sealed(42, 0b11).unwrap();
+    /// log.record_run_sealed(42, 0b11, 20).unwrap();
     /// assert_eq!(log.events().len(), 1);
     /// ```
-    pub fn record_run_sealed(&mut self, run_id: u64, op_trace: u64) -> Result<(), OcelError> {
+    pub fn record_run_sealed(
+        &mut self,
+        run_id: u64,
+        op_trace: u64,
+        run_time: LogicalTime,
+    ) -> Result<(), OcelError> {
         if self.count >= 512 {
             return Err(OcelError::Overflow);
         }
@@ -323,11 +430,12 @@ impl OcelLog {
         self.events[self.count] = OcelEvent {
             event_id: self.count as u64,
             activity: "run_sealed",
-            timestamp: self.tick,
+            start_time: run_time,
+            duration: 0,
             run_id,
             op_idx: op_trace as u32,
             op_trace,
-            kind_tag: 0,
+            event_kind: EventKind::RunSealed { run_time },
         };
         self.count += 1;
         Ok(())
@@ -342,9 +450,10 @@ impl OcelLog {
     ///
     /// The encoding is domain-separated and explicitly length-prefixed. Every event field
     /// that can affect conformance or audit interpretation is committed independently.
+    /// Now includes wall/logical time fields for comprehensive temporal audit trails.
     pub fn seal_receipt(&self) -> OcelTraceReceipt {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"bcinr-powl-ocel-trace-v1");
+        hasher.update(b"bcinr-powl-ocel-trace-v2");
         hasher.update(&(self.count as u64).to_le_bytes());
         hasher.update(&self.tick.to_le_bytes());
 
@@ -353,11 +462,21 @@ impl OcelLog {
             hasher.update(&(activity.len() as u64).to_le_bytes());
             hasher.update(activity);
             hasher.update(&event.event_id.to_le_bytes());
-            hasher.update(&event.timestamp.to_le_bytes());
+            // Include temporal fields: start_time and duration
+            hasher.update(&(event.start_time as u64).to_le_bytes());
+            hasher.update(&(event.duration as u64).to_le_bytes());
             hasher.update(&event.run_id.to_le_bytes());
             hasher.update(&event.op_idx.to_le_bytes());
             hasher.update(&event.op_trace.to_le_bytes());
-            hasher.update(&[event.kind_tag]);
+            // Include event_kind discriminant for extensibility
+            let kind_byte = match event.event_kind {
+                EventKind::OpFired { .. } => 0u8,
+                EventKind::RunSealed { .. } => 1u8,
+                EventKind::ResourceAcquired { .. } => 2u8,
+                EventKind::ResourceReleased { .. } => 3u8,
+                EventKind::Refused { .. } => 4u8,
+            };
+            hasher.update(&[kind_byte]);
         }
 
         OcelTraceReceipt {
@@ -378,8 +497,8 @@ impl OcelLog {
     ///
     /// let tape = compile_powl(&PowlAstNode::Atom("a")).unwrap();
     /// let mut log = OcelLog::new();
-    /// log.record_op_fired(1, 0, 0).unwrap();
-    /// log.record_run_sealed(1, 0b1).unwrap();
+    /// log.record_op_fired(1, 0, 10, 5).unwrap();  // op_idx 0, start_time 10, duration 5
+    /// log.record_run_sealed(1, 0b1, 15).unwrap(); // op_trace 0b1, run_time 15
     ///
     /// assert_eq!(log.validate_against_tape(&tape), ConformanceResult::Conforms);
     /// ```
@@ -635,6 +754,7 @@ pub fn validate_against_tape(log: &OcelLog, tape: &crate::tape::PowlTape) -> Con
     // Slot 64 is a bounded overflow sink. It is never admitted for semantic validation.
     let mut accumulated: [u64; MAX_RUNS + 1] = [0u64; MAX_RUNS + 1];
     let mut sealed: [bool; MAX_RUNS + 1] = [false; MAX_RUNS + 1];
+    let mut run_completion_times: [LogicalTime; MAX_RUNS + 1] = [0u32; MAX_RUNS + 1];
     let mut run_count: usize = 0;
     let mut overflow_mask: u64 = 0;
 
@@ -672,6 +792,17 @@ pub fn validate_against_tape(log: &OcelLog, tape: &crate::tape::PowlTape) -> Con
                     return ConformanceResult::DuplicateFire {
                         run_id: event.run_id,
                         op_idx: event.op_idx,
+                    };
+                }
+
+                // Check duration constraint for this operation.
+                let max_duration = tape.max_durations[event.op_idx as usize];
+                if max_duration > 0 && event.duration > max_duration {
+                    return ConformanceResult::DurationViolation {
+                        run_id: event.run_id,
+                        op_idx: event.op_idx,
+                        actual_duration: event.duration,
+                        max_allowed: max_duration,
                     };
                 }
 
@@ -722,6 +853,57 @@ pub fn validate_against_tape(log: &OcelLog, tape: &crate::tape::PowlTape) -> Con
                     };
                 }
                 sealed[slot] = true;
+                // Record the run completion time for deadline checks.
+                run_completion_times[slot] = event.start_time;
+
+                // Check deadline constraint for this run.
+                if tape.deadline > 0 && event.start_time > tape.deadline {
+                    return ConformanceResult::DeadlineViolation {
+                        run_id: event.run_id,
+                        actual_time: event.start_time,
+                        deadline: tape.deadline,
+                    };
+                }
+            }
+            "resource_released" => {
+                // For ResourceReleased events, check lease expiry.
+                if let EventKind::ResourceReleased { .. } = event.event_kind {
+                    // Find the corresponding ResourceAcquired event to get lease_expiry.
+                    let mut lease_expiry = 0u32;
+                    for prev_event in log.events() {
+                        if prev_event.event_id >= event.event_id {
+                            break;
+                        }
+                        if prev_event.activity == "resource_acquired" {
+                            if let EventKind::ResourceAcquired {
+                                resource_id: acq_rid,
+                                lease_expiry: expiry,
+                                ..
+                            } = prev_event.event_kind
+                            {
+                                if let EventKind::ResourceReleased { resource_id: rel_rid } =
+                                    event.event_kind
+                                {
+                                    if acq_rid == rel_rid {
+                                        lease_expiry = expiry;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Check if release exceeds lease expiry.
+                    if lease_expiry > 0 && event.start_time > lease_expiry {
+                        let exceeded_by =
+                            event.start_time.saturating_sub(lease_expiry);
+                        if let EventKind::ResourceReleased { resource_id } = event.event_kind {
+                            return ConformanceResult::LeaseViolation {
+                                resource_id,
+                                exceeded_by,
+                            };
+                        }
+                    }
+                }
             }
             _ => {}
         }
@@ -756,9 +938,9 @@ mod tests {
     fn ocel_log_conforms_to_powl_model() {
         let mut log = OcelLog::new();
         let run_id = 42u64;
-        log.record_op_fired(run_id, 0, 1).unwrap();
-        log.record_op_fired(run_id, 1, 2).unwrap();
-        log.record_run_sealed(run_id, 0b11).unwrap();
+        log.record_op_fired(run_id, 0, 0, 1).unwrap();
+        log.record_op_fired(run_id, 1, 0, 1).unwrap();
+        log.record_run_sealed(run_id, 0b11, 0).unwrap();
         let events = log.events();
         let op_fired_runs: Vec<u64> = events
             .iter()
@@ -779,16 +961,16 @@ mod tests {
         let sealed_ts = events
             .iter()
             .find(|e| e.activity == "run_sealed" && e.run_id == run_id)
-            .map(|e| e.timestamp)
+            .map(|e| e.start_time)
             .expect("run_sealed must exist");
         for e in events
             .iter()
             .filter(|e| e.activity == "op_fired" && e.run_id == run_id)
         {
             assert!(
-                e.timestamp < sealed_ts,
-                "op_fired at {} must precede run_sealed at {}",
-                e.timestamp,
+                e.start_time <= sealed_ts,
+                "op_fired at {} must precede or equal run_sealed at {}",
+                e.start_time,
                 sealed_ts
             );
         }
@@ -817,9 +999,9 @@ mod tests {
     fn ocel_rejects_impossible_op_trace() {
         let mut log = OcelLog::new();
         let run_id = 99u64;
-        log.record_op_fired(run_id, 0, 1).unwrap();
-        log.record_op_fired(run_id, 1, 2).unwrap();
-        log.record_run_sealed(run_id, 0b111).unwrap();
+        log.record_op_fired(run_id, 0, 0, 1).unwrap();
+        log.record_op_fired(run_id, 1, 0, 1).unwrap();
+        log.record_run_sealed(run_id, 0b111, 0).unwrap();
         let events = log.events();
         let op_fired_count = events
             .iter()
@@ -847,9 +1029,9 @@ mod tests {
 
         let mut log = OcelLog::new();
         // Record op_fired only for op_idx=1 (skip op_idx=0)
-        log.record_op_fired(99, 1, 0).unwrap();
+        log.record_op_fired(99, 1, 0, 0).unwrap();
         // Seal with only op1 fired (bit 1 = 0b10, missing bit 0 = 0b01)
-        log.record_run_sealed(99, 0b10).unwrap();
+        log.record_run_sealed(99, 0b10, 0).unwrap();
 
         let result = validate_against_tape(&log, &tape);
         assert_eq!(
@@ -873,9 +1055,9 @@ mod tests {
         .unwrap();
 
         let mut log = OcelLog::new();
-        log.record_op_fired(1, 0, 0).unwrap();
-        log.record_op_fired(1, 1, 0).unwrap();
-        log.record_run_sealed(1, 0b11).unwrap();
+        log.record_op_fired(1, 0, 0, 0).unwrap();
+        log.record_op_fired(1, 1, 0, 0).unwrap();
+        log.record_run_sealed(1, 0b11, 0).unwrap();
 
         let result = validate_against_tape(&log, &tape);
         assert_eq!(result, ConformanceResult::Conforms);
@@ -885,8 +1067,8 @@ mod tests {
     #[test]
     fn to_ocel_2_0_has_object_types_and_event_types() {
         let mut log = OcelLog::new();
-        log.record_op_fired(1, 0, 0).unwrap();
-        log.record_run_sealed(1, 0b1).unwrap();
+        log.record_op_fired(1, 0, 0, 0).unwrap();
+        log.record_run_sealed(1, 0b1, 0).unwrap();
 
         let ocel = log.to_ocel_2_0();
         let obj_type_names: Vec<&str> = ocel.object_types.iter().map(|t| t.name.as_str()).collect();
@@ -915,8 +1097,8 @@ mod tests {
     #[test]
     fn to_ocel_2_0_events_have_object_relationships() {
         let mut log = OcelLog::new();
-        log.record_op_fired(42, 0, 0).unwrap();
-        log.record_run_sealed(42, 0b1).unwrap();
+        log.record_op_fired(42, 0, 0, 0).unwrap();
+        log.record_run_sealed(42, 0b1, 0).unwrap();
 
         let ocel = log.to_ocel_2_0();
         let op_fired_events: Vec<_> = ocel
@@ -940,8 +1122,8 @@ mod tests {
     #[test]
     fn to_ocel_json_is_valid_json() {
         let mut log = OcelLog::new();
-        log.record_op_fired(1, 0, 0).unwrap();
-        log.record_run_sealed(1, 0b1).unwrap();
+        log.record_op_fired(1, 0, 0, 0).unwrap();
+        log.record_run_sealed(1, 0b1, 0).unwrap();
 
         let json = log.to_ocel_json().expect("serialisation must succeed");
         assert!(
@@ -956,10 +1138,10 @@ mod tests {
     fn record_op_fired_returns_overflow_when_full() {
         let mut log = OcelLog::new();
         for i in 0u32..512 {
-            log.record_op_fired(0, i % 64, 0).unwrap();
+            log.record_op_fired(0, i % 64, 0, 0).unwrap();
         }
         let err = log
-            .record_op_fired(0, 0, 0)
+            .record_op_fired(0, 0, 0, 0)
             .expect_err("must return Overflow when log is full");
         assert_eq!(err, OcelError::Overflow);
     }
@@ -968,10 +1150,10 @@ mod tests {
     fn record_run_sealed_returns_overflow_when_full() {
         let mut log = OcelLog::new();
         for i in 0u32..512 {
-            log.record_op_fired(0, i % 64, 0).unwrap();
+            log.record_op_fired(0, i % 64, 0, 0).unwrap();
         }
         let err = log
-            .record_run_sealed(0, 0)
+            .record_run_sealed(0, 0, 0)
             .expect_err("must return Overflow when log is full");
         assert_eq!(err, OcelError::Overflow);
     }
@@ -997,9 +1179,9 @@ mod tests {
         let tape = compile_powl(&PowlAstNode::Atom("a")).unwrap();
         let mut log = OcelLog::new();
         let run_id = 7u64;
-        log.record_op_fired(run_id, 0, 0).unwrap();
-        log.record_op_fired(run_id, 0, 0).unwrap(); // duplicate
-        log.record_run_sealed(run_id, 0b1).unwrap();
+        log.record_op_fired(run_id, 0, 0, 0).unwrap();
+        log.record_op_fired(run_id, 0, 0, 0).unwrap(); // duplicate
+        log.record_run_sealed(run_id, 0b1, 0).unwrap();
         let result = validate_against_tape(&log, &tape);
         assert_eq!(
             result,
@@ -1019,10 +1201,10 @@ mod tests {
         .unwrap();
         let mut log = OcelLog::new();
         let run_id = 55u64;
-        log.record_op_fired(run_id, 0, 0).unwrap();
-        log.record_op_fired(run_id, 1, 0).unwrap();
+        log.record_op_fired(run_id, 0, 0, 0).unwrap();
+        log.record_op_fired(run_id, 1, 0, 0).unwrap();
         // Declare op 2 as done but it was never fired.
-        log.record_run_sealed(run_id, 0b111).unwrap();
+        log.record_run_sealed(run_id, 0b111, 0).unwrap();
         let result = validate_against_tape(&log, &tape);
         assert_eq!(
             result,
@@ -1044,10 +1226,10 @@ mod tests {
         .unwrap();
         let mut log = OcelLog::new();
         let run_id = 56u64;
-        log.record_op_fired(run_id, 0, 0).unwrap();
-        log.record_op_fired(run_id, 1, 0).unwrap();
+        log.record_op_fired(run_id, 0, 0, 0).unwrap();
+        log.record_op_fired(run_id, 1, 0, 0).unwrap();
         // Declare only op 0 as done but op 1 was also fired.
-        log.record_run_sealed(run_id, 0b01).unwrap();
+        log.record_run_sealed(run_id, 0b01, 0).unwrap();
         let result = validate_against_tape(&log, &tape);
         assert_eq!(
             result,
@@ -1067,8 +1249,8 @@ mod tests {
         // 64 runs should succeed.
         let mut log_64 = OcelLog::new();
         for i in 0..64 {
-            log_64.record_op_fired(i as u64, 0, 0).unwrap();
-            log_64.record_run_sealed(i as u64, 0b1).unwrap();
+            log_64.record_op_fired(i as u64, 0, 0, 0).unwrap();
+            log_64.record_run_sealed(i as u64, 0b1, 0).unwrap();
         }
         assert_eq!(
             validate_against_tape(&log_64, &tape),
@@ -1078,8 +1260,8 @@ mod tests {
         // 65 runs should trigger RunLimitExceeded.
         let mut log_65 = OcelLog::new();
         for i in 0..65 {
-            log_65.record_op_fired(i as u64, 0, 0).unwrap();
-            log_65.record_run_sealed(i as u64, 0b1).unwrap();
+            log_65.record_op_fired(i as u64, 0, 0, 0).unwrap();
+            log_65.record_run_sealed(i as u64, 0b1, 0).unwrap();
         }
         assert_eq!(
             validate_against_tape(&log_65, &tape),
@@ -1100,13 +1282,13 @@ mod tests {
         // 64 conforming runs.
         let mut log = OcelLog::new();
         for i in 0..64 {
-            log.record_op_fired(i as u64, 0, 0).unwrap();
-            log.record_op_fired(i as u64, 1, 0).unwrap();
-            log.record_run_sealed(i as u64, 0b11).unwrap();
+            log.record_op_fired(i as u64, 0, 0, 0).unwrap();
+            log.record_op_fired(i as u64, 1, 0, 0).unwrap();
+            log.record_run_sealed(i as u64, 0b11, 0).unwrap();
         }
         // 65th run is non-conforming (predecessor violation: fire op 1 without op 0, seal with 0b10).
-        log.record_op_fired(64, 1, 0).unwrap();
-        log.record_run_sealed(64, 0b10).unwrap();
+        log.record_op_fired(64, 1, 0, 0).unwrap();
+        log.record_run_sealed(64, 0b10, 0).unwrap();
 
         // Legitimate validation must return RunLimitExceeded because we have 65 unique run IDs.
         // It must NOT return Conforms (silent skipping vulnerability) or Violation (analyzing unadmitted runs).
@@ -1141,9 +1323,9 @@ mod tests {
         ]))
         .unwrap();
         let mut log = OcelLog::new();
-        log.record_op_fired(99, 1, 0).unwrap();
-        log.record_op_fired(99, 0, 0).unwrap();
-        log.record_run_sealed(99, 0b11).unwrap();
+        log.record_op_fired(99, 1, 0, 0).unwrap();
+        log.record_op_fired(99, 0, 0, 0).unwrap();
+        log.record_run_sealed(99, 0b11, 0).unwrap();
 
         assert_eq!(
             validate_against_tape(&log, &tape),
@@ -1160,8 +1342,8 @@ mod tests {
         use crate::compiler::{compile_powl, PowlAstNode};
         let tape = compile_powl(&PowlAstNode::Atom("a")).unwrap();
         let mut log = OcelLog::new();
-        log.record_run_sealed(7, 0).unwrap();
-        log.record_op_fired(7, 0, 0).unwrap();
+        log.record_run_sealed(7, 0, 0).unwrap();
+        log.record_op_fired(7, 0, 0, 0).unwrap();
         assert_eq!(
             validate_against_tape(&log, &tape),
             ConformanceResult::EventAfterSeal {
@@ -1176,9 +1358,9 @@ mod tests {
         use crate::compiler::{compile_powl, PowlAstNode};
         let tape = compile_powl(&PowlAstNode::Atom("a")).unwrap();
         let mut log = OcelLog::new();
-        log.record_op_fired(8, 0, 0).unwrap();
-        log.record_run_sealed(8, 1).unwrap();
-        log.record_run_sealed(8, 1).unwrap();
+        log.record_op_fired(8, 0, 0, 0).unwrap();
+        log.record_run_sealed(8, 1, 0).unwrap();
+        log.record_run_sealed(8, 1, 0).unwrap();
         assert_eq!(
             validate_against_tape(&log, &tape),
             ConformanceResult::DuplicateSeal { run_id: 8 }
@@ -1190,7 +1372,7 @@ mod tests {
         use crate::compiler::{compile_powl, PowlAstNode};
         let tape = compile_powl(&PowlAstNode::Atom("a")).unwrap();
         let mut log = OcelLog::new();
-        log.record_op_fired(9, 0, 0).unwrap();
+        log.record_op_fired(9, 0, 0, 0).unwrap();
         assert_eq!(
             validate_against_tape(&log, &tape),
             ConformanceResult::MissingSeal { run_id: 9 }
@@ -1204,9 +1386,9 @@ mod tests {
         let tape = compile_powl(&PowlAstNode::Sequence(children)).unwrap();
         let mut log = OcelLog::new();
         for op_idx in 0..64 {
-            log.record_op_fired(10, op_idx, 0).unwrap();
+            log.record_op_fired(10, op_idx, 0, 0).unwrap();
         }
-        log.record_run_sealed(10, u64::MAX).unwrap();
+        log.record_run_sealed(10, u64::MAX, 0).unwrap();
 
         assert_eq!(log.events().last().unwrap().op_trace, u64::MAX);
         assert_eq!(
@@ -1218,11 +1400,11 @@ mod tests {
     #[test]
     fn deterministic_trace_receipt_owns_exact_ordered_events() {
         let mut first = OcelLog::new();
-        first.record_op_fired(11, 0, 3).unwrap();
-        first.record_run_sealed(11, 1).unwrap();
+        first.record_op_fired(11, 0, 0, 3).unwrap();
+        first.record_run_sealed(11, 1, 0).unwrap();
         let mut second = OcelLog::new();
-        second.record_op_fired(11, 0, 3).unwrap();
-        second.record_run_sealed(11, 1).unwrap();
+        second.record_op_fired(11, 0, 0, 3).unwrap();
+        second.record_run_sealed(11, 1, 0).unwrap();
 
         let receipt_a = first.seal_receipt();
         let receipt_b = second.seal_receipt();
@@ -1249,10 +1431,10 @@ mod tests {
         let chosen_idx = chosen.trailing_zeros();
         let trace = 1u64 | (1u64 << 1) | chosen;
         let mut log = OcelLog::new();
-        log.record_op_fired(70, 0, 0).unwrap();
-        log.record_op_fired(70, chosen_idx, 0).unwrap();
-        log.record_op_fired(70, 1, 0).unwrap();
-        log.record_run_sealed(70, trace).unwrap();
+        log.record_op_fired(70, 0, 0, 0).unwrap();
+        log.record_op_fired(70, chosen_idx, 0, 0).unwrap();
+        log.record_op_fired(70, 1, 0, 0).unwrap();
+        log.record_run_sealed(70, trace, 0).unwrap();
         assert_eq!(
             validate_against_tape(&log, &tape),
             ConformanceResult::Conforms
@@ -1274,11 +1456,11 @@ mod tests {
         let second = remaining.isolate_lowest_one();
         let fired_branch_mask = first | second;
         let mut log = OcelLog::new();
-        log.record_op_fired(71, 0, 0).unwrap();
-        log.record_op_fired(71, first.trailing_zeros(), 0).unwrap();
-        log.record_op_fired(71, second.trailing_zeros(), 0).unwrap();
-        log.record_op_fired(71, 1, 0).unwrap();
-        log.record_run_sealed(71, 1u64 | (1u64 << 1) | fired_branch_mask)
+        log.record_op_fired(71, 0, 0, 0).unwrap();
+        log.record_op_fired(71, first.trailing_zeros(), 0, 0).unwrap();
+        log.record_op_fired(71, second.trailing_zeros(), 0, 0).unwrap();
+        log.record_op_fired(71, 1, 0, 0).unwrap();
+        log.record_run_sealed(71, 1u64 | (1u64 << 1) | fired_branch_mask, 0)
             .unwrap();
         assert_eq!(
             validate_against_tape(&log, &tape),

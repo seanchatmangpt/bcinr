@@ -96,24 +96,185 @@
 use crate::tape::v2::ConcurrencyGuardTable;
 use crate::tape::{OpKind, Powl64Op, PowlTape};
 use bcinr_mfw_ir::EventSet;
+use std::collections::BTreeMap;
+
+// ---------------------------------------------------------------------------
+// Resource Conflict Checking (lawful-overlap-vs-conflict)
+// ---------------------------------------------------------------------------
+
+/// Logical time coordinate for operation scheduling.
+/// Measured in scheduler ticks (u32 enables up to 2^32 ticks per workflow).
+pub type LogicalTime = u32;
+
+/// Time interval represented as [start, end) with exclusive upper bound.
+/// Pairs an operation index with its resource-reservation interval.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct OpTimeInterval {
+    /// Operation tape slot index (0..63).
+    pub op_idx: u32,
+    /// Interval start (inclusive).
+    pub start: LogicalTime,
+    /// Interval end (exclusive).
+    pub end: LogicalTime,
+}
+
+impl OpTimeInterval {
+    /// Construct a new operation time interval.
+    #[inline]
+    pub const fn new(op_idx: u32, start: LogicalTime, end: LogicalTime) -> Self {
+        Self { op_idx, start, end }
+    }
+
+    /// Returns true if this interval overlaps with another: [a.start, a.end) ∩ [b.start, b.end) ≠ ∅.
+    /// Proof: two intervals overlap iff a.start < b.end AND b.start < a.end.
+    #[inline]
+    pub fn overlaps_with(&self, other: &OpTimeInterval) -> bool {
+        self.start < other.end && other.start < self.end
+    }
+}
+
+/// Branchless conflict detector for operation time intervals on a shared resource.
+///
+/// # Arguments
+///
+/// - `tape`: The compiled POWL tape (provides operation metadata).
+/// - `op_a_idx`: First operation's tape slot index.
+/// - `op_a_interval`: First operation's [start, end) time interval.
+/// - `op_b_idx`: Second operation's tape slot index.
+/// - `op_b_interval`: Second operation's [start, end) time interval.
+/// - `resource_id`: Resource name (for error messages; unused in logic).
+///
+/// # Returns
+///
+/// `true` if the two operations' intervals overlap on the shared resource,
+/// indicating a conflict that must be resolved. `false` if intervals are disjoint.
+///
+/// # Complexity
+///
+/// O(1) — pure bitwise interval comparison, no allocation or branching.
+///
+/// # Examples
+///
+/// ```ignore
+/// use bcinr_powl::scheduler::{intervals_conflict, OpTimeInterval};
+/// use bcinr_powl::compiler::compile_powl;
+/// use bcinr_powl::compiler::PowlAstNode;
+///
+/// let tape = compile_powl(&PowlAstNode::Atom("op")).unwrap();
+/// let interval_a = OpTimeInterval::new(0, 0, 5);
+/// let interval_b = OpTimeInterval::new(1, 3, 8); // overlaps [0, 5)
+/// assert!(intervals_conflict(&tape, 0, interval_a, 1, interval_b, "worker"));
+/// ```
+#[inline]
+pub fn intervals_conflict(
+    _tape: &PowlTape,
+    _op_a_idx: u32,
+    op_a_interval: OpTimeInterval,
+    _op_b_idx: u32,
+    op_b_interval: OpTimeInterval,
+    _resource_id: &str,
+) -> bool {
+    op_a_interval.overlaps_with(&op_b_interval)
+}
+
+/// A registry tracking time intervals allocated to each operation on a per-resource basis.
+///
+/// Maps resource_id → BTreeMap of operation slots to their booked intervals.
+/// Used by the scheduler to check for resource conflicts before firing operations.
+#[derive(Clone, Debug)]
+pub struct ResourceRegistry {
+    /// Per-resource allocation map: resource_id → (op_idx → intervals).
+    resources: BTreeMap<String, BTreeMap<u32, Vec<OpTimeInterval>>>,
+}
+
+impl ResourceRegistry {
+    /// Construct an empty registry.
+    pub fn new() -> Self {
+        Self {
+            resources: BTreeMap::new(),
+        }
+    }
+
+    /// Record an operation's interval on a resource.
+    pub fn book_interval(
+        &mut self,
+        resource_id: String,
+        interval: OpTimeInterval,
+    ) {
+        self.resources
+            .entry(resource_id)
+            .or_default()
+            .entry(interval.op_idx)
+            .or_default()
+            .push(interval);
+    }
+
+    /// Check if an operation's interval conflicts with any existing allocation on a resource.
+    /// Returns the first conflicting operation index, or None if no conflict.
+    pub fn check_conflict(
+        &self,
+        resource_id: &str,
+        interval: OpTimeInterval,
+    ) -> Option<u32> {
+        self.resources.get(resource_id).and_then(|allocations| {
+            allocations.iter().find_map(|(&op_idx, intervals)| {
+                if intervals.iter().any(|existing| {
+                    intervals_conflict(&PowlTape::new(), interval.op_idx, interval, op_idx, *existing, resource_id)
+                }) {
+                    Some(op_idx)
+                } else {
+                    None
+                }
+            })
+        })
+    }
+}
+
+impl Default for ResourceRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Public types
 // ---------------------------------------------------------------------------
 
-/// Mutable run-state for a POWL tape execution.
+/// Mutable run-state for a POWL tape execution with 8-state lifecycle tracking.
 ///
 /// Designed to track the status of up to 64 operations (slots) within a single
 /// POWL tape run. It uses compact bitmasks to avoid allocation and branching.
+/// Maps the legacy 3-mask model to an 8-state model per PRD §3:
+///
+/// - **Pending**: not yet eligible (no mask, implicit state)
+/// - **Eligible**: ready to run (check_mask)
+/// - **Active**: currently firing (active_mask)
+/// - **Completed**: finished (done_mask)
+/// - **Cancelled**: explicitly cancelled (cancelled_mask)
+/// - **TimedOut**: exceeded iteration/time limit (timed_out_mask)
+/// - **Refused**: execution denied (refused_mask + refused_reasons)
+/// - **Blocked**: held by external constraint (blocked_mask + blocked_reasons)
 #[derive(Clone)]
 #[repr(C, align(8))]
 pub struct PowlRunState {
-    /// Bitmask of slots that have completed.
+    /// Bitmask of slots that have completed (Completed state).
     pub done_mask: u64,
-    /// Bitmask of slots that are currently firing (in-progress this tick).
+    /// Bitmask of slots that are currently firing (Active state, in-progress this tick).
     pub active_mask: u64,
-    /// Bitmask of slots whose readiness should be checked next tick.
+    /// Bitmask of slots whose readiness should be checked next tick (Eligible state).
     pub check_mask: u64,
+    /// Bitmask of slots that have been explicitly cancelled (Cancelled state).
+    pub cancelled_mask: u64,
+    /// Bitmask of slots that exceeded iteration/time limits (TimedOut state).
+    pub timed_out_mask: u64,
+    /// Bitmask of slots whose execution was refused (Refused state).
+    pub refused_mask: u64,
+    /// Bitmask of slots blocked by external constraint (Blocked state).
+    pub blocked_mask: u64,
+    /// Reasons for Refused state (slot index -> reason string). Sparse map.
+    pub refused_reasons: Vec<(usize, String)>,
+    /// Reasons for Blocked state (slot index -> reason string). Sparse map.
+    pub blocked_reasons: Vec<(usize, String)>,
     /// For XorChoice: bitmask of slots in the *chosen* branch (others suppressed).
     pub choice_taken: u64,
     /// Per-slot loop iteration counter (saturates at 255).
@@ -125,6 +286,7 @@ pub struct PowlRunState {
 
 impl PowlRunState {
     /// Construct initial state for a tape, seeding `check_mask` from its `entry_mask`.
+    /// All 8 state masks are initialized to 0 except check_mask (Eligible) which gets entry_mask.
     ///
     /// # Examples
     ///
@@ -144,6 +306,12 @@ impl PowlRunState {
             done_mask: 0,
             active_mask: 0,
             check_mask: tape.entry_mask,
+            cancelled_mask: 0,
+            timed_out_mask: 0,
+            refused_mask: 0,
+            blocked_mask: 0,
+            refused_reasons: Vec::new(),
+            blocked_reasons: Vec::new(),
             choice_taken: 0,
             loop_iters: [0u8; 64],
             tick: 0,
