@@ -1,4 +1,4 @@
-name: Publish Verified Post-Integration Tree
+name: Export Verified Post-Integration Tree
 
 on:
   pull_request:
@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  publish:
+  export:
     if: github.event.pull_request.head.ref == 'agent/repair-post-integration-verification-ci' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -33,17 +33,22 @@ jobs:
           python3 scripts/repair_mcp_transport.py
           cargo fmt --all
           git diff --check
-      - name: Publish and self-delete
-        id: publish
+      - name: Assemble final commit and export patch
         shell: bash
         run: |
-          set -o pipefail
-          bash -x scripts/finalize_post_integration_verification.sh 2>&1 | tee final-publication.log
-      - name: Upload final publication diagnostics
-        if: failure() && steps.publish.conclusion == 'failure'
+          set +e
+          bash scripts/finalize_post_integration_verification.sh
+          status=$?
+          git format-patch -1 --stdout > verified-final.patch
+          git show --stat --oneline HEAD > verified-final-stat.txt
+          echo "publisher_exit=${status}" >> verified-final-stat.txt
+          exit 0
+      - name: Upload verified final commit
         uses: actions/upload-artifact@v4
         with:
-          name: post-integration-publication-${{ github.run_id }}
-          path: final-publication.log
+          name: verified-post-integration-final-${{ github.run_id }}
+          path: |
+            verified-final.patch
+            verified-final-stat.txt
           if-no-files-found: error
           retention-days: 7
