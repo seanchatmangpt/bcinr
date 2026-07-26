@@ -1,0 +1,1205 @@
+{
+  "eventTypes": [
+    {
+      "name": "InterviewStarted",
+      "attributes": []
+    },
+    {
+      "name": "QuestionAsked",
+      "attributes": []
+    },
+    {
+      "name": "ObservationRecorded",
+      "attributes": []
+    },
+    {
+      "name": "SelectionMade",
+      "attributes": []
+    },
+    {
+      "name": "PolicyStateCheckpoint",
+      "attributes": []
+    },
+    {
+      "name": "ExecutionActionTriggered",
+      "attributes": []
+    },
+    {
+      "name": "ReceiptGenerated",
+      "attributes": []
+    },
+    {
+      "name": "InterviewSealed",
+      "attributes": []
+    }
+  ],
+  "objectTypes": [
+    {
+      "name": "InterviewRun",
+      "attributes": []
+    },
+    {
+      "name": "InterviewRound",
+      "attributes": []
+    },
+    {
+      "name": "Candidate",
+      "attributes": []
+    },
+    {
+      "name": "Question",
+      "attributes": []
+    },
+    {
+      "name": "InterviewObservation",
+      "attributes": []
+    },
+    {
+      "name": "Selection",
+      "attributes": []
+    },
+    {
+      "name": "PolicyState",
+      "attributes": []
+    },
+    {
+      "name": "ExecutionAction",
+      "attributes": []
+    },
+    {
+      "name": "Receipt",
+      "attributes": []
+    }
+  ],
+  "events": [
+    {
+      "id": "ev-run-001-start",
+      "type": "InterviewStarted",
+      "time": "2026-07-25T08:00:00Z",
+      "attributes": [
+        {
+          "name": "run_id",
+          "value": "react-chicago-001",
+          "time": "2026-07-25T08:00:00Z"
+        },
+        {
+          "name": "candidate_id",
+          "value": "candidate-alice-chen",
+          "time": "2026-07-25T08:00:00Z"
+        },
+        {
+          "name": "round_number",
+          "value": 1,
+          "time": "2026-07-25T08:00:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "run-react-chicago-001",
+          "qualifier": "belongs_to"
+        },
+        {
+          "objectId": "candidate-alice-chen",
+          "qualifier": "involves"
+        },
+        {
+          "objectId": "round-technical-r1",
+          "qualifier": "enters"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-001-q1",
+      "type": "QuestionAsked",
+      "time": "2026-07-25T08:05:00Z",
+      "attributes": [
+        {
+          "name": "question_id",
+          "value": "q-hooks-composition",
+          "time": "2026-07-25T08:05:00Z"
+        },
+        {
+          "name": "category",
+          "value": "React Hooks",
+          "time": "2026-07-25T08:05:00Z"
+        },
+        {
+          "name": "prompt",
+          "value": "Build a custom hook that composes useState and useCallback for a form handler.",
+          "time": "2026-07-25T08:05:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "round-technical-r1",
+          "qualifier": "posed_in"
+        },
+        {
+          "objectId": "q-hooks-composition",
+          "qualifier": "instantiates"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-001-obs1",
+      "type": "ObservationRecorded",
+      "time": "2026-07-25T08:45:00Z",
+      "attributes": [
+        {
+          "name": "observation_id",
+          "value": "obs-alice-hooks-1",
+          "time": "2026-07-25T08:45:00Z"
+        },
+        {
+          "name": "finding_text",
+          "value": "Candidate correctly used useCallback to prevent infinite loops; dependency array complete.",
+          "time": "2026-07-25T08:45:00Z"
+        },
+        {
+          "name": "severity",
+          "value": "PASS",
+          "time": "2026-07-25T08:45:00Z"
+        },
+        {
+          "name": "observer_id",
+          "value": "interviewer-001",
+          "time": "2026-07-25T08:45:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "q-hooks-composition",
+          "qualifier": "documents"
+        },
+        {
+          "objectId": "obs-alice-hooks-1",
+          "qualifier": "produced_by"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-001-q2",
+      "type": "QuestionAsked",
+      "time": "2026-07-25T08:46:00Z",
+      "attributes": [
+        {
+          "name": "question_id",
+          "value": "q-perf-optimization",
+          "time": "2026-07-25T08:46:00Z"
+        },
+        {
+          "name": "category",
+          "value": "Performance",
+          "time": "2026-07-25T08:46:00Z"
+        },
+        {
+          "name": "prompt",
+          "value": "Identify the bottleneck in this React render tree; propose fix.",
+          "time": "2026-07-25T08:46:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "round-technical-r1",
+          "qualifier": "posed_in"
+        },
+        {
+          "objectId": "q-perf-optimization",
+          "qualifier": "instantiates"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-001-obs2",
+      "type": "ObservationRecorded",
+      "time": "2026-07-25T09:30:00Z",
+      "attributes": [
+        {
+          "name": "observation_id",
+          "value": "obs-alice-perf-1",
+          "time": "2026-07-25T09:30:00Z"
+        },
+        {
+          "name": "finding_text",
+          "value": "Candidate used React DevTools Profiler correctly; identified memo boundary; explained trade-offs.",
+          "time": "2026-07-25T09:30:00Z"
+        },
+        {
+          "name": "severity",
+          "value": "PASS",
+          "time": "2026-07-25T09:30:00Z"
+        },
+        {
+          "name": "observer_id",
+          "value": "interviewer-001",
+          "time": "2026-07-25T09:30:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "q-perf-optimization",
+          "qualifier": "documents"
+        },
+        {
+          "objectId": "obs-alice-perf-1",
+          "qualifier": "produced_by"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-001-sel",
+      "type": "SelectionMade",
+      "time": "2026-07-25T09:35:00Z",
+      "attributes": [
+        {
+          "name": "selection_id",
+          "value": "sel-alice-round1",
+          "time": "2026-07-25T09:35:00Z"
+        },
+        {
+          "name": "observation_ids",
+          "value": "[\"obs-alice-hooks-1\", \"obs-alice-perf-1\"]",
+          "time": "2026-07-25T09:35:00Z"
+        },
+        {
+          "name": "selected_outcome",
+          "value": "ADVANCE_TO_ROUND_2",
+          "time": "2026-07-25T09:35:00Z"
+        },
+        {
+          "name": "confidence",
+          "value": 0.92,
+          "time": "2026-07-25T09:35:00Z"
+        },
+        {
+          "name": "rationale",
+          "value": "All technical questions passed; strong conceptual grasp and practical debugging skills.",
+          "time": "2026-07-25T09:35:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "obs-alice-hooks-1",
+          "qualifier": "consolidates"
+        },
+        {
+          "objectId": "obs-alice-perf-1",
+          "qualifier": "consolidates"
+        },
+        {
+          "objectId": "sel-alice-round1",
+          "qualifier": "results_in"
+        },
+        {
+          "objectId": "ps-alice-checkpoint-1",
+          "qualifier": "applied_to"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-001-checkpoint",
+      "type": "PolicyStateCheckpoint",
+      "time": "2026-07-25T09:36:00Z",
+      "attributes": [
+        {
+          "name": "state_id",
+          "value": "ps-alice-checkpoint-1",
+          "time": "2026-07-25T09:36:00Z"
+        },
+        {
+          "name": "checkpoint_name",
+          "value": "ROUND_1_TECHNICAL_COMPLETE",
+          "time": "2026-07-25T09:36:00Z"
+        },
+        {
+          "name": "is_passing",
+          "value": true,
+          "time": "2026-07-25T09:36:00Z"
+        },
+        {
+          "name": "policy_version",
+          "value": "v1.0",
+          "time": "2026-07-25T09:36:00Z"
+        },
+        {
+          "name": "dominant_factors",
+          "value": "[\"hooks_competency=PASS\", \"perf_diagnosis=PASS\", \"communication_quality=PASS\"]",
+          "time": "2026-07-25T09:36:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "ps-alice-checkpoint-1",
+          "qualifier": "captures"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-001-action",
+      "type": "ExecutionActionTriggered",
+      "time": "2026-07-25T09:37:00Z",
+      "attributes": [
+        {
+          "name": "action_id",
+          "value": "act-alice-advance",
+          "time": "2026-07-25T09:37:00Z"
+        },
+        {
+          "name": "action_type",
+          "value": "SEND_ROUND_2_INVITATION",
+          "time": "2026-07-25T09:37:00Z"
+        },
+        {
+          "name": "status",
+          "value": "SUCCESS",
+          "time": "2026-07-25T09:37:00Z"
+        },
+        {
+          "name": "reason",
+          "value": "Selection outcome=ADVANCE_TO_ROUND_2; policy applied automatically.",
+          "time": "2026-07-25T09:37:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "act-alice-advance",
+          "qualifier": "enacts"
+        },
+        {
+          "objectId": "sel-alice-round1",
+          "qualifier": "follows"
+        },
+        {
+          "objectId": "ps-alice-checkpoint-1",
+          "qualifier": "implements"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-001-receipt",
+      "type": "ReceiptGenerated",
+      "time": "2026-07-25T09:38:00Z",
+      "attributes": [
+        {
+          "name": "receipt_id",
+          "value": "receipt-react-chicago-001",
+          "time": "2026-07-25T09:38:00Z"
+        },
+        {
+          "name": "blake3_hash",
+          "value": "a3c7d8e9f1b2c3d4e5f6a7b8c9d0e1f2a3c7d8e9f1b2c3d4e5f6a7b8c9d0e1f",
+          "time": "2026-07-25T09:38:00Z"
+        },
+        {
+          "name": "event_ids",
+          "value": "[\"ev-run-001-start\", \"ev-run-001-q1\", \"ev-run-001-obs1\", \"ev-run-001-q2\", \"ev-run-001-obs2\", \"ev-run-001-sel\", \"ev-run-001-checkpoint\", \"ev-run-001-action\"]",
+          "time": "2026-07-25T09:38:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "run-react-chicago-001",
+          "qualifier": "seals"
+        },
+        {
+          "objectId": "ps-alice-checkpoint-1",
+          "qualifier": "validates_checkpoint"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-001-sealed",
+      "type": "InterviewSealed",
+      "time": "2026-07-25T09:39:00Z",
+      "attributes": [
+        {
+          "name": "run_id",
+          "value": "react-chicago-001",
+          "time": "2026-07-25T09:39:00Z"
+        },
+        {
+          "name": "final_status",
+          "value": "PASSED_ROUND_1",
+          "time": "2026-07-25T09:39:00Z"
+        },
+        {
+          "name": "total_duration",
+          "value": 99,
+          "time": "2026-07-25T09:39:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "run-react-chicago-001",
+          "qualifier": "concludes"
+        },
+        {
+          "objectId": "ps-alice-checkpoint-1",
+          "qualifier": "final_state"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-002-start",
+      "type": "InterviewStarted",
+      "time": "2026-07-25T10:00:00Z",
+      "attributes": [
+        {
+          "name": "run_id",
+          "value": "react-chicago-002",
+          "time": "2026-07-25T10:00:00Z"
+        },
+        {
+          "name": "candidate_id",
+          "value": "candidate-bob-martinez",
+          "time": "2026-07-25T10:00:00Z"
+        },
+        {
+          "name": "round_number",
+          "value": 1,
+          "time": "2026-07-25T10:00:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "run-react-chicago-002",
+          "qualifier": "belongs_to"
+        },
+        {
+          "objectId": "candidate-bob-martinez",
+          "qualifier": "involves"
+        },
+        {
+          "objectId": "round-technical-r1",
+          "qualifier": "enters"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-002-q1",
+      "type": "QuestionAsked",
+      "time": "2026-07-25T10:05:00Z",
+      "attributes": [
+        {
+          "name": "question_id",
+          "value": "q-hooks-composition",
+          "time": "2026-07-25T10:05:00Z"
+        },
+        {
+          "name": "category",
+          "value": "React Hooks",
+          "time": "2026-07-25T10:05:00Z"
+        },
+        {
+          "name": "prompt",
+          "value": "Build a custom hook that composes useState and useCallback for a form handler.",
+          "time": "2026-07-25T10:05:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "round-technical-r1",
+          "qualifier": "posed_in"
+        },
+        {
+          "objectId": "q-hooks-composition",
+          "qualifier": "instantiates"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-002-obs1",
+      "type": "ObservationRecorded",
+      "time": "2026-07-25T10:50:00Z",
+      "attributes": [
+        {
+          "name": "observation_id",
+          "value": "obs-bob-hooks-1",
+          "time": "2026-07-25T10:50:00Z"
+        },
+        {
+          "name": "finding_text",
+          "value": "Candidate struggled with useCallback; created infinite loop due to missing dependency. Required significant guidance.",
+          "time": "2026-07-25T10:50:00Z"
+        },
+        {
+          "name": "severity",
+          "value": "FAIL",
+          "time": "2026-07-25T10:50:00Z"
+        },
+        {
+          "name": "observer_id",
+          "value": "interviewer-001",
+          "time": "2026-07-25T10:50:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "q-hooks-composition",
+          "qualifier": "documents"
+        },
+        {
+          "objectId": "obs-bob-hooks-1",
+          "qualifier": "produced_by"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-002-sel",
+      "type": "SelectionMade",
+      "time": "2026-07-25T10:55:00Z",
+      "attributes": [
+        {
+          "name": "selection_id",
+          "value": "sel-bob-round1",
+          "time": "2026-07-25T10:55:00Z"
+        },
+        {
+          "name": "observation_ids",
+          "value": "[\"obs-bob-hooks-1\"]",
+          "time": "2026-07-25T10:55:00Z"
+        },
+        {
+          "name": "selected_outcome",
+          "value": "REJECT",
+          "time": "2026-07-25T10:55:00Z"
+        },
+        {
+          "name": "confidence",
+          "value": 0.78,
+          "time": "2026-07-25T10:55:00Z"
+        },
+        {
+          "name": "rationale",
+          "value": "Fundamental gaps in hook understanding; insufficient proficiency for senior role. Recommend junior positions or training.",
+          "time": "2026-07-25T10:55:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "obs-bob-hooks-1",
+          "qualifier": "consolidates"
+        },
+        {
+          "objectId": "sel-bob-round1",
+          "qualifier": "results_in"
+        },
+        {
+          "objectId": "ps-bob-checkpoint-1",
+          "qualifier": "applied_to"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-002-checkpoint",
+      "type": "PolicyStateCheckpoint",
+      "time": "2026-07-25T10:56:00Z",
+      "attributes": [
+        {
+          "name": "state_id",
+          "value": "ps-bob-checkpoint-1",
+          "time": "2026-07-25T10:56:00Z"
+        },
+        {
+          "name": "checkpoint_name",
+          "value": "ROUND_1_TECHNICAL_COMPLETE",
+          "time": "2026-07-25T10:56:00Z"
+        },
+        {
+          "name": "is_passing",
+          "value": false,
+          "time": "2026-07-25T10:56:00Z"
+        },
+        {
+          "name": "policy_version",
+          "value": "v1.0",
+          "time": "2026-07-25T10:56:00Z"
+        },
+        {
+          "name": "dominant_factors",
+          "value": "[\"hooks_competency=FAIL\"]",
+          "time": "2026-07-25T10:56:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "ps-bob-checkpoint-1",
+          "qualifier": "captures"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-002-action",
+      "type": "ExecutionActionTriggered",
+      "time": "2026-07-25T10:57:00Z",
+      "attributes": [
+        {
+          "name": "action_id",
+          "value": "act-bob-reject",
+          "time": "2026-07-25T10:57:00Z"
+        },
+        {
+          "name": "action_type",
+          "value": "SEND_REJECTION_EMAIL",
+          "time": "2026-07-25T10:57:00Z"
+        },
+        {
+          "name": "status",
+          "value": "SUCCESS",
+          "time": "2026-07-25T10:57:00Z"
+        },
+        {
+          "name": "reason",
+          "value": "Selection outcome=REJECT; policy applied automatically.",
+          "time": "2026-07-25T10:57:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "act-bob-reject",
+          "qualifier": "enacts"
+        },
+        {
+          "objectId": "sel-bob-round1",
+          "qualifier": "follows"
+        },
+        {
+          "objectId": "ps-bob-checkpoint-1",
+          "qualifier": "implements"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-002-receipt",
+      "type": "ReceiptGenerated",
+      "time": "2026-07-25T10:58:00Z",
+      "attributes": [
+        {
+          "name": "receipt_id",
+          "value": "receipt-react-chicago-002",
+          "time": "2026-07-25T10:58:00Z"
+        },
+        {
+          "name": "blake3_hash",
+          "value": "b4d8e9f0a1c2d3e4f5a6b7c8d9e0f1a2b4d8e9f0a1c2d3e4f5a6b7c8d9e0f1",
+          "time": "2026-07-25T10:58:00Z"
+        },
+        {
+          "name": "event_ids",
+          "value": "[\"ev-run-002-start\", \"ev-run-002-q1\", \"ev-run-002-obs1\", \"ev-run-002-sel\", \"ev-run-002-checkpoint\", \"ev-run-002-action\"]",
+          "time": "2026-07-25T10:58:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "run-react-chicago-002",
+          "qualifier": "seals"
+        },
+        {
+          "objectId": "ps-bob-checkpoint-1",
+          "qualifier": "validates_checkpoint"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-002-sealed",
+      "type": "InterviewSealed",
+      "time": "2026-07-25T10:59:00Z",
+      "attributes": [
+        {
+          "name": "run_id",
+          "value": "react-chicago-002",
+          "time": "2026-07-25T10:59:00Z"
+        },
+        {
+          "name": "final_status",
+          "value": "REJECTED",
+          "time": "2026-07-25T10:59:00Z"
+        },
+        {
+          "name": "total_duration",
+          "value": 59,
+          "time": "2026-07-25T10:59:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "run-react-chicago-002",
+          "qualifier": "concludes"
+        },
+        {
+          "objectId": "ps-bob-checkpoint-1",
+          "qualifier": "final_state"
+        }
+      ]
+    }
+  ],
+  "objects": [
+    {
+      "id": "run-react-chicago-001",
+      "type": "InterviewRun",
+      "attributes": [
+        {
+          "name": "run_id",
+          "value": "react-chicago-001",
+          "time": "2026-07-25T08:00:00Z"
+        },
+        {
+          "name": "candidate_id",
+          "value": "candidate-alice-chen",
+          "time": "2026-07-25T08:00:00Z"
+        },
+        {
+          "name": "round_number",
+          "value": 1,
+          "time": "2026-07-25T08:00:00Z"
+        },
+        {
+          "name": "start_time",
+          "value": "2026-07-25T08:00:00Z",
+          "time": "2026-07-25T08:00:00Z"
+        },
+        {
+          "name": "end_time",
+          "value": "2026-07-25T09:39:00Z",
+          "time": "2026-07-25T09:39:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "run-react-chicago-002",
+      "type": "InterviewRun",
+      "attributes": [
+        {
+          "name": "run_id",
+          "value": "react-chicago-002",
+          "time": "2026-07-25T10:00:00Z"
+        },
+        {
+          "name": "candidate_id",
+          "value": "candidate-bob-martinez",
+          "time": "2026-07-25T10:00:00Z"
+        },
+        {
+          "name": "round_number",
+          "value": 1,
+          "time": "2026-07-25T10:00:00Z"
+        },
+        {
+          "name": "start_time",
+          "value": "2026-07-25T10:00:00Z",
+          "time": "2026-07-25T10:00:00Z"
+        },
+        {
+          "name": "end_time",
+          "value": "2026-07-25T10:59:00Z",
+          "time": "2026-07-25T10:59:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "round-technical-r1",
+      "type": "InterviewRound",
+      "attributes": [
+        {
+          "name": "round_id",
+          "value": "technical-r1",
+          "time": "2026-07-25T08:00:00Z"
+        },
+        {
+          "name": "round_type",
+          "value": "TECHNICAL",
+          "time": "2026-07-25T08:00:00Z"
+        },
+        {
+          "name": "duration_minutes",
+          "value": 90,
+          "time": "2026-07-25T08:00:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "candidate-alice-chen",
+      "type": "Candidate",
+      "attributes": [
+        {
+          "name": "candidate_id",
+          "value": "candidate-alice-chen",
+          "time": "2026-07-10T14:22:00Z"
+        },
+        {
+          "name": "name",
+          "value": "Alice Chen",
+          "time": "2026-07-10T14:22:00Z"
+        },
+        {
+          "name": "email",
+          "value": "alice.chen@example.com",
+          "time": "2026-07-10T14:22:00Z"
+        },
+        {
+          "name": "experience_years",
+          "value": 5,
+          "time": "2026-07-10T14:22:00Z"
+        },
+        {
+          "name": "self_reported_proficiency",
+          "value": "ADVANCED",
+          "time": "2026-07-10T14:22:00Z"
+        },
+        {
+          "name": "education",
+          "value": "BS Computer Science (UC Berkeley)",
+          "time": "2026-07-10T14:22:00Z"
+        },
+        {
+          "name": "registration_timestamp",
+          "value": "2026-07-10T14:22:00Z",
+          "time": "2026-07-10T14:22:00Z"
+        },
+        {
+          "name": "registration_source",
+          "value": "LINKEDIN",
+          "time": "2026-07-10T14:22:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "candidate-bob-martinez",
+      "type": "Candidate",
+      "attributes": [
+        {
+          "name": "candidate_id",
+          "value": "candidate-bob-martinez",
+          "time": "2026-07-12T09:45:00Z"
+        },
+        {
+          "name": "name",
+          "value": "Bob Martinez",
+          "time": "2026-07-12T09:45:00Z"
+        },
+        {
+          "name": "email",
+          "value": "bob.m@example.com",
+          "time": "2026-07-12T09:45:00Z"
+        },
+        {
+          "name": "experience_years",
+          "value": 2,
+          "time": "2026-07-12T09:45:00Z"
+        },
+        {
+          "name": "self_reported_proficiency",
+          "value": "INTERMEDIATE",
+          "time": "2026-07-12T09:45:00Z"
+        },
+        {
+          "name": "education",
+          "value": "Bootcamp Graduate (CodePath)",
+          "time": "2026-07-12T09:45:00Z"
+        },
+        {
+          "name": "registration_timestamp",
+          "value": "2026-07-12T09:45:00Z",
+          "time": "2026-07-12T09:45:00Z"
+        },
+        {
+          "name": "registration_source",
+          "value": "JOB_BOARD",
+          "time": "2026-07-12T09:45:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "q-hooks-composition",
+      "type": "Question",
+      "attributes": [
+        {
+          "name": "question_id",
+          "value": "q-hooks-composition",
+          "time": "2026-07-25T08:05:00Z"
+        },
+        {
+          "name": "category",
+          "value": "React Hooks",
+          "time": "2026-07-25T08:05:00Z"
+        },
+        {
+          "name": "prompt_text",
+          "value": "Build a custom hook that composes useState and useCallback for a form handler.",
+          "time": "2026-07-25T08:05:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "q-perf-optimization",
+      "type": "Question",
+      "attributes": [
+        {
+          "name": "question_id",
+          "value": "q-perf-optimization",
+          "time": "2026-07-25T08:46:00Z"
+        },
+        {
+          "name": "category",
+          "value": "Performance",
+          "time": "2026-07-25T08:46:00Z"
+        },
+        {
+          "name": "prompt_text",
+          "value": "Identify the bottleneck in this React render tree; propose fix.",
+          "time": "2026-07-25T08:46:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "obs-alice-hooks-1",
+      "type": "InterviewObservation",
+      "attributes": [
+        {
+          "name": "observation_id",
+          "value": "obs-alice-hooks-1",
+          "time": "2026-07-25T08:45:00Z"
+        },
+        {
+          "name": "finding_text",
+          "value": "Candidate correctly used useCallback to prevent infinite loops; dependency array complete.",
+          "time": "2026-07-25T08:45:00Z"
+        },
+        {
+          "name": "severity",
+          "value": "PASS",
+          "time": "2026-07-25T08:45:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "obs-alice-perf-1",
+      "type": "InterviewObservation",
+      "attributes": [
+        {
+          "name": "observation_id",
+          "value": "obs-alice-perf-1",
+          "time": "2026-07-25T09:30:00Z"
+        },
+        {
+          "name": "finding_text",
+          "value": "Candidate used React DevTools Profiler correctly; identified memo boundary; explained trade-offs.",
+          "time": "2026-07-25T09:30:00Z"
+        },
+        {
+          "name": "severity",
+          "value": "PASS",
+          "time": "2026-07-25T09:30:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "obs-bob-hooks-1",
+      "type": "InterviewObservation",
+      "attributes": [
+        {
+          "name": "observation_id",
+          "value": "obs-bob-hooks-1",
+          "time": "2026-07-25T10:50:00Z"
+        },
+        {
+          "name": "finding_text",
+          "value": "Candidate struggled with useCallback; created infinite loop due to missing dependency. Required significant guidance.",
+          "time": "2026-07-25T10:50:00Z"
+        },
+        {
+          "name": "severity",
+          "value": "FAIL",
+          "time": "2026-07-25T10:50:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "sel-alice-round1",
+      "type": "Selection",
+      "attributes": [
+        {
+          "name": "selection_id",
+          "value": "sel-alice-round1",
+          "time": "2026-07-25T09:35:00Z"
+        },
+        {
+          "name": "selected_outcome",
+          "value": "ADVANCE_TO_ROUND_2",
+          "time": "2026-07-25T09:35:00Z"
+        },
+        {
+          "name": "confidence",
+          "value": 0.92,
+          "time": "2026-07-25T09:35:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "sel-bob-round1",
+      "type": "Selection",
+      "attributes": [
+        {
+          "name": "selection_id",
+          "value": "sel-bob-round1",
+          "time": "2026-07-25T10:55:00Z"
+        },
+        {
+          "name": "selected_outcome",
+          "value": "REJECT",
+          "time": "2026-07-25T10:55:00Z"
+        },
+        {
+          "name": "confidence",
+          "value": 0.78,
+          "time": "2026-07-25T10:55:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "ps-alice-checkpoint-1",
+      "type": "PolicyState",
+      "attributes": [
+        {
+          "name": "state_id",
+          "value": "ps-alice-checkpoint-1",
+          "time": "2026-07-25T09:36:00Z"
+        },
+        {
+          "name": "checkpoint_name",
+          "value": "ROUND_1_TECHNICAL_COMPLETE",
+          "time": "2026-07-25T09:36:00Z"
+        },
+        {
+          "name": "is_passing",
+          "value": true,
+          "time": "2026-07-25T09:36:00Z"
+        },
+        {
+          "name": "policy_version",
+          "value": "v1.0",
+          "time": "2026-07-25T09:36:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "ps-bob-checkpoint-1",
+      "type": "PolicyState",
+      "attributes": [
+        {
+          "name": "state_id",
+          "value": "ps-bob-checkpoint-1",
+          "time": "2026-07-25T10:56:00Z"
+        },
+        {
+          "name": "checkpoint_name",
+          "value": "ROUND_1_TECHNICAL_COMPLETE",
+          "time": "2026-07-25T10:56:00Z"
+        },
+        {
+          "name": "is_passing",
+          "value": false,
+          "time": "2026-07-25T10:56:00Z"
+        },
+        {
+          "name": "policy_version",
+          "value": "v1.0",
+          "time": "2026-07-25T10:56:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "act-alice-advance",
+      "type": "ExecutionAction",
+      "attributes": [
+        {
+          "name": "action_id",
+          "value": "act-alice-advance",
+          "time": "2026-07-25T09:37:00Z"
+        },
+        {
+          "name": "action_type",
+          "value": "SEND_ROUND_2_INVITATION",
+          "time": "2026-07-25T09:37:00Z"
+        },
+        {
+          "name": "status",
+          "value": "SUCCESS",
+          "time": "2026-07-25T09:37:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "act-bob-reject",
+      "type": "ExecutionAction",
+      "attributes": [
+        {
+          "name": "action_id",
+          "value": "act-bob-reject",
+          "time": "2026-07-25T10:57:00Z"
+        },
+        {
+          "name": "action_type",
+          "value": "SEND_REJECTION_EMAIL",
+          "time": "2026-07-25T10:57:00Z"
+        },
+        {
+          "name": "status",
+          "value": "SUCCESS",
+          "time": "2026-07-25T10:57:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "receipt-react-chicago-001",
+      "type": "Receipt",
+      "attributes": [
+        {
+          "name": "receipt_id",
+          "value": "receipt-react-chicago-001",
+          "time": "2026-07-25T09:38:00Z"
+        },
+        {
+          "name": "blake3_hash",
+          "value": "a3c7d8e9f1b2c3d4e5f6a7b8c9d0e1f2a3c7d8e9f1b2c3d4e5f6a7b8c9d0e1f",
+          "time": "2026-07-25T09:38:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "receipt-react-chicago-002",
+      "type": "Receipt",
+      "attributes": [
+        {
+          "name": "receipt_id",
+          "value": "receipt-react-chicago-002",
+          "time": "2026-07-25T10:58:00Z"
+        },
+        {
+          "name": "blake3_hash",
+          "value": "b4d8e9f0a1c2d3e4f5a6b7c8d9e0f1a2b4d8e9f0a1c2d3e4f5a6b7c8d9e0f1",
+          "time": "2026-07-25T10:58:00Z"
+        }
+      ],
+      "relationships": []
+    }
+  ]
+}

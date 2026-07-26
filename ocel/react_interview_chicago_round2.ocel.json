@@ -1,0 +1,722 @@
+{
+  "eventTypes": [
+    {
+      "name": "InterviewStarted",
+      "attributes": []
+    },
+    {
+      "name": "QuestionAsked",
+      "attributes": []
+    },
+    {
+      "name": "ObservationRecorded",
+      "attributes": []
+    },
+    {
+      "name": "SelectionMade",
+      "attributes": []
+    },
+    {
+      "name": "PolicyStateCheckpoint",
+      "attributes": []
+    },
+    {
+      "name": "ExecutionActionTriggered",
+      "attributes": []
+    },
+    {
+      "name": "ReceiptGenerated",
+      "attributes": []
+    },
+    {
+      "name": "InterviewSealed",
+      "attributes": []
+    }
+  ],
+  "objectTypes": [
+    {
+      "name": "InterviewRun",
+      "attributes": []
+    },
+    {
+      "name": "InterviewRound",
+      "attributes": []
+    },
+    {
+      "name": "Candidate",
+      "attributes": []
+    },
+    {
+      "name": "Question",
+      "attributes": []
+    },
+    {
+      "name": "InterviewObservation",
+      "attributes": []
+    },
+    {
+      "name": "Selection",
+      "attributes": []
+    },
+    {
+      "name": "PolicyState",
+      "attributes": []
+    },
+    {
+      "name": "ExecutionAction",
+      "attributes": []
+    },
+    {
+      "name": "Receipt",
+      "attributes": []
+    }
+  ],
+  "events": [
+    {
+      "id": "ev-run-003-start",
+      "type": "InterviewStarted",
+      "time": "2026-07-25T11:00:00Z",
+      "attributes": [
+        {
+          "name": "run_id",
+          "value": "react-chicago-003",
+          "time": "2026-07-25T11:00:00Z"
+        },
+        {
+          "name": "candidate_id",
+          "value": "candidate-carol-singh",
+          "time": "2026-07-25T11:00:00Z"
+        },
+        {
+          "name": "round_number",
+          "value": 2,
+          "time": "2026-07-25T11:00:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "run-react-chicago-003",
+          "qualifier": "belongs_to"
+        },
+        {
+          "objectId": "candidate-carol-singh",
+          "qualifier": "involves"
+        },
+        {
+          "objectId": "round-architecture-r2",
+          "qualifier": "enters"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-003-q1",
+      "type": "QuestionAsked",
+      "time": "2026-07-25T11:05:00Z",
+      "attributes": [
+        {
+          "name": "question_id",
+          "value": "q-architecture-design",
+          "time": "2026-07-25T11:05:00Z"
+        },
+        {
+          "name": "category",
+          "value": "Architecture",
+          "time": "2026-07-25T11:05:00Z"
+        },
+        {
+          "name": "prompt",
+          "value": "Design a scalable state management architecture for a large enterprise React application with 500+ components.",
+          "time": "2026-07-25T11:05:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "round-architecture-r2",
+          "qualifier": "posed_in"
+        },
+        {
+          "objectId": "q-architecture-design",
+          "qualifier": "instantiates"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-003-obs1",
+      "type": "ObservationRecorded",
+      "time": "2026-07-25T12:15:00Z",
+      "attributes": [
+        {
+          "name": "observation_id",
+          "value": "obs-carol-arch-1",
+          "time": "2026-07-25T12:15:00Z"
+        },
+        {
+          "name": "finding_text",
+          "value": "Candidate proposed Redux+Redux Toolkit with code-splitting strategy; discussed trade-offs vs Zustand/MobX; demonstrated deep understanding of selector memoization and reselect patterns.",
+          "time": "2026-07-25T12:15:00Z"
+        },
+        {
+          "name": "severity",
+          "value": "PASS_EXCEPTIONAL",
+          "time": "2026-07-25T12:15:00Z"
+        },
+        {
+          "name": "observer_id",
+          "value": "interviewer-002",
+          "time": "2026-07-25T12:15:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "q-architecture-design",
+          "qualifier": "documents"
+        },
+        {
+          "objectId": "obs-carol-arch-1",
+          "qualifier": "produced_by"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-003-q2",
+      "type": "QuestionAsked",
+      "time": "2026-07-25T12:16:00Z",
+      "attributes": [
+        {
+          "name": "question_id",
+          "value": "q-team-mentorship",
+          "time": "2026-07-25T12:16:00Z"
+        },
+        {
+          "name": "category",
+          "value": "Leadership",
+          "time": "2026-07-25T12:16:00Z"
+        },
+        {
+          "name": "prompt",
+          "value": "Describe your approach to mentoring junior engineers on React best practices. Share an example of a difficult refactoring you led.",
+          "time": "2026-07-25T12:16:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "round-architecture-r2",
+          "qualifier": "posed_in"
+        },
+        {
+          "objectId": "q-team-mentorship",
+          "qualifier": "instantiates"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-003-obs2",
+      "type": "ObservationRecorded",
+      "time": "2026-07-25T12:50:00Z",
+      "attributes": [
+        {
+          "name": "observation_id",
+          "value": "obs-carol-leadership-1",
+          "time": "2026-07-25T12:50:00Z"
+        },
+        {
+          "name": "finding_text",
+          "value": "Candidate articulated clear mentoring philosophy: start with fundamentals, build confidence, then introduce advanced patterns. Shared example of migrating legacy class components to hooks across 40-component module with excellent communication strategy.",
+          "time": "2026-07-25T12:50:00Z"
+        },
+        {
+          "name": "severity",
+          "value": "PASS_EXCEPTIONAL",
+          "time": "2026-07-25T12:50:00Z"
+        },
+        {
+          "name": "observer_id",
+          "value": "interviewer-002",
+          "time": "2026-07-25T12:50:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "q-team-mentorship",
+          "qualifier": "documents"
+        },
+        {
+          "objectId": "obs-carol-leadership-1",
+          "qualifier": "produced_by"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-003-sel",
+      "type": "SelectionMade",
+      "time": "2026-07-25T12:55:00Z",
+      "attributes": [
+        {
+          "name": "selection_id",
+          "value": "sel-carol-round2",
+          "time": "2026-07-25T12:55:00Z"
+        },
+        {
+          "name": "observation_ids",
+          "value": "[\"obs-carol-arch-1\", \"obs-carol-leadership-1\"]",
+          "time": "2026-07-25T12:55:00Z"
+        },
+        {
+          "name": "selected_outcome",
+          "value": "ADVANCE_TO_FINAL_OFFER",
+          "time": "2026-07-25T12:55:00Z"
+        },
+        {
+          "name": "confidence",
+          "value": 0.98,
+          "time": "2026-07-25T12:55:00Z"
+        },
+        {
+          "name": "rationale",
+          "value": "Exceptional technical depth and architectural expertise. Strong leadership and mentoring capability. Recommend immediate offer for Principal Engineer role.",
+          "time": "2026-07-25T12:55:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "obs-carol-arch-1",
+          "qualifier": "consolidates"
+        },
+        {
+          "objectId": "obs-carol-leadership-1",
+          "qualifier": "consolidates"
+        },
+        {
+          "objectId": "sel-carol-round2",
+          "qualifier": "results_in"
+        },
+        {
+          "objectId": "ps-carol-checkpoint-2",
+          "qualifier": "applied_to"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-003-checkpoint",
+      "type": "PolicyStateCheckpoint",
+      "time": "2026-07-25T12:56:00Z",
+      "attributes": [
+        {
+          "name": "state_id",
+          "value": "ps-carol-checkpoint-2",
+          "time": "2026-07-25T12:56:00Z"
+        },
+        {
+          "name": "checkpoint_name",
+          "value": "ROUND_2_ARCHITECTURE_COMPLETE",
+          "time": "2026-07-25T12:56:00Z"
+        },
+        {
+          "name": "is_passing",
+          "value": true,
+          "time": "2026-07-25T12:56:00Z"
+        },
+        {
+          "name": "policy_version",
+          "value": "v1.0",
+          "time": "2026-07-25T12:56:00Z"
+        },
+        {
+          "name": "dominant_factors",
+          "value": "[\"architecture_competency=PASS_EXCEPTIONAL\", \"leadership_competency=PASS_EXCEPTIONAL\", \"recommend_level=PRINCIPAL_ENGINEER\"]",
+          "time": "2026-07-25T12:56:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "ps-carol-checkpoint-2",
+          "qualifier": "captures"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-003-action",
+      "type": "ExecutionActionTriggered",
+      "time": "2026-07-25T12:57:00Z",
+      "attributes": [
+        {
+          "name": "action_id",
+          "value": "act-carol-offer",
+          "time": "2026-07-25T12:57:00Z"
+        },
+        {
+          "name": "action_type",
+          "value": "SEND_OFFER_PACKAGE",
+          "time": "2026-07-25T12:57:00Z"
+        },
+        {
+          "name": "status",
+          "value": "SUCCESS",
+          "time": "2026-07-25T12:57:00Z"
+        },
+        {
+          "name": "reason",
+          "value": "Selection outcome=ADVANCE_TO_FINAL_OFFER; policy applied automatically. Triggered executive compensation package generation.",
+          "time": "2026-07-25T12:57:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "act-carol-offer",
+          "qualifier": "enacts"
+        },
+        {
+          "objectId": "sel-carol-round2",
+          "qualifier": "follows"
+        },
+        {
+          "objectId": "ps-carol-checkpoint-2",
+          "qualifier": "implements"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-003-receipt",
+      "type": "ReceiptGenerated",
+      "time": "2026-07-25T12:58:00Z",
+      "attributes": [
+        {
+          "name": "receipt_id",
+          "value": "receipt-react-chicago-003",
+          "time": "2026-07-25T12:58:00Z"
+        },
+        {
+          "name": "blake3_hash",
+          "value": "c5e9f0a1b2d3e4f5a6b7c8d9e0f1a2b3c5e9f0a1b2d3e4f5a6b7c8d9e0f1a2",
+          "time": "2026-07-25T12:58:00Z"
+        },
+        {
+          "name": "event_ids",
+          "value": "[\"ev-run-003-start\", \"ev-run-003-q1\", \"ev-run-003-obs1\", \"ev-run-003-q2\", \"ev-run-003-obs2\", \"ev-run-003-sel\", \"ev-run-003-checkpoint\", \"ev-run-003-action\"]",
+          "time": "2026-07-25T12:58:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "run-react-chicago-003",
+          "qualifier": "seals"
+        },
+        {
+          "objectId": "ps-carol-checkpoint-2",
+          "qualifier": "validates_checkpoint"
+        }
+      ]
+    },
+    {
+      "id": "ev-run-003-sealed",
+      "type": "InterviewSealed",
+      "time": "2026-07-25T12:59:00Z",
+      "attributes": [
+        {
+          "name": "run_id",
+          "value": "react-chicago-003",
+          "time": "2026-07-25T12:59:00Z"
+        },
+        {
+          "name": "final_status",
+          "value": "PASSED_ROUND_2_ADVANCE_TO_OFFER",
+          "time": "2026-07-25T12:59:00Z"
+        },
+        {
+          "name": "total_duration",
+          "value": 119,
+          "time": "2026-07-25T12:59:00Z"
+        }
+      ],
+      "relationships": [
+        {
+          "objectId": "run-react-chicago-003",
+          "qualifier": "concludes"
+        },
+        {
+          "objectId": "ps-carol-checkpoint-2",
+          "qualifier": "final_state"
+        }
+      ]
+    }
+  ],
+  "objects": [
+    {
+      "id": "run-react-chicago-003",
+      "type": "InterviewRun",
+      "attributes": [
+        {
+          "name": "run_id",
+          "value": "react-chicago-003",
+          "time": "2026-07-25T11:00:00Z"
+        },
+        {
+          "name": "candidate_id",
+          "value": "candidate-carol-singh",
+          "time": "2026-07-25T11:00:00Z"
+        },
+        {
+          "name": "round_number",
+          "value": 2,
+          "time": "2026-07-25T11:00:00Z"
+        },
+        {
+          "name": "start_time",
+          "value": "2026-07-25T11:00:00Z",
+          "time": "2026-07-25T11:00:00Z"
+        },
+        {
+          "name": "end_time",
+          "value": "2026-07-25T12:59:00Z",
+          "time": "2026-07-25T12:59:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "round-architecture-r2",
+      "type": "InterviewRound",
+      "attributes": [
+        {
+          "name": "round_id",
+          "value": "architecture-r2",
+          "time": "2026-07-25T11:00:00Z"
+        },
+        {
+          "name": "round_type",
+          "value": "ARCHITECTURE",
+          "time": "2026-07-25T11:00:00Z"
+        },
+        {
+          "name": "duration_minutes",
+          "value": 120,
+          "time": "2026-07-25T11:00:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "candidate-carol-singh",
+      "type": "Candidate",
+      "attributes": [
+        {
+          "name": "candidate_id",
+          "value": "candidate-carol-singh",
+          "time": "2026-07-05T11:30:00Z"
+        },
+        {
+          "name": "name",
+          "value": "Carol Singh",
+          "time": "2026-07-05T11:30:00Z"
+        },
+        {
+          "name": "email",
+          "value": "carol.singh@example.com",
+          "time": "2026-07-05T11:30:00Z"
+        },
+        {
+          "name": "experience_years",
+          "value": 8,
+          "time": "2026-07-05T11:30:00Z"
+        },
+        {
+          "name": "self_reported_proficiency",
+          "value": "EXPERT",
+          "time": "2026-07-05T11:30:00Z"
+        },
+        {
+          "name": "education",
+          "value": "MS Computer Science (CMU)",
+          "time": "2026-07-05T11:30:00Z"
+        },
+        {
+          "name": "registration_timestamp",
+          "value": "2026-07-05T11:30:00Z",
+          "time": "2026-07-05T11:30:00Z"
+        },
+        {
+          "name": "registration_source",
+          "value": "REFERRAL",
+          "time": "2026-07-05T11:30:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "q-architecture-design",
+      "type": "Question",
+      "attributes": [
+        {
+          "name": "question_id",
+          "value": "q-architecture-design",
+          "time": "2026-07-25T11:05:00Z"
+        },
+        {
+          "name": "category",
+          "value": "Architecture",
+          "time": "2026-07-25T11:05:00Z"
+        },
+        {
+          "name": "prompt_text",
+          "value": "Design a scalable state management architecture for a large enterprise React application with 500+ components.",
+          "time": "2026-07-25T11:05:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "q-team-mentorship",
+      "type": "Question",
+      "attributes": [
+        {
+          "name": "question_id",
+          "value": "q-team-mentorship",
+          "time": "2026-07-25T12:16:00Z"
+        },
+        {
+          "name": "category",
+          "value": "Leadership",
+          "time": "2026-07-25T12:16:00Z"
+        },
+        {
+          "name": "prompt_text",
+          "value": "Describe your approach to mentoring junior engineers on React best practices. Share an example of a difficult refactoring you led.",
+          "time": "2026-07-25T12:16:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "obs-carol-arch-1",
+      "type": "InterviewObservation",
+      "attributes": [
+        {
+          "name": "observation_id",
+          "value": "obs-carol-arch-1",
+          "time": "2026-07-25T12:15:00Z"
+        },
+        {
+          "name": "finding_text",
+          "value": "Candidate proposed Redux+Redux Toolkit with code-splitting strategy; discussed trade-offs vs Zustand/MobX; demonstrated deep understanding of selector memoization and reselect patterns.",
+          "time": "2026-07-25T12:15:00Z"
+        },
+        {
+          "name": "severity",
+          "value": "PASS_EXCEPTIONAL",
+          "time": "2026-07-25T12:15:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "obs-carol-leadership-1",
+      "type": "InterviewObservation",
+      "attributes": [
+        {
+          "name": "observation_id",
+          "value": "obs-carol-leadership-1",
+          "time": "2026-07-25T12:50:00Z"
+        },
+        {
+          "name": "finding_text",
+          "value": "Candidate articulated clear mentoring philosophy: start with fundamentals, build confidence, then introduce advanced patterns. Shared example of migrating legacy class components to hooks across 40-component module with excellent communication strategy.",
+          "time": "2026-07-25T12:50:00Z"
+        },
+        {
+          "name": "severity",
+          "value": "PASS_EXCEPTIONAL",
+          "time": "2026-07-25T12:50:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "sel-carol-round2",
+      "type": "Selection",
+      "attributes": [
+        {
+          "name": "selection_id",
+          "value": "sel-carol-round2",
+          "time": "2026-07-25T12:55:00Z"
+        },
+        {
+          "name": "selected_outcome",
+          "value": "ADVANCE_TO_FINAL_OFFER",
+          "time": "2026-07-25T12:55:00Z"
+        },
+        {
+          "name": "confidence",
+          "value": 0.98,
+          "time": "2026-07-25T12:55:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "ps-carol-checkpoint-2",
+      "type": "PolicyState",
+      "attributes": [
+        {
+          "name": "state_id",
+          "value": "ps-carol-checkpoint-2",
+          "time": "2026-07-25T12:56:00Z"
+        },
+        {
+          "name": "checkpoint_name",
+          "value": "ROUND_2_ARCHITECTURE_COMPLETE",
+          "time": "2026-07-25T12:56:00Z"
+        },
+        {
+          "name": "is_passing",
+          "value": true,
+          "time": "2026-07-25T12:56:00Z"
+        },
+        {
+          "name": "policy_version",
+          "value": "v1.0",
+          "time": "2026-07-25T12:56:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "act-carol-offer",
+      "type": "ExecutionAction",
+      "attributes": [
+        {
+          "name": "action_id",
+          "value": "act-carol-offer",
+          "time": "2026-07-25T12:57:00Z"
+        },
+        {
+          "name": "action_type",
+          "value": "SEND_OFFER_PACKAGE",
+          "time": "2026-07-25T12:57:00Z"
+        },
+        {
+          "name": "status",
+          "value": "SUCCESS",
+          "time": "2026-07-25T12:57:00Z"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "id": "receipt-react-chicago-003",
+      "type": "Receipt",
+      "attributes": [
+        {
+          "name": "receipt_id",
+          "value": "receipt-react-chicago-003",
+          "time": "2026-07-25T12:58:00Z"
+        },
+        {
+          "name": "blake3_hash",
+          "value": "c5e9f0a1b2d3e4f5a6b7c8d9e0f1a2b3c5e9f0a1b2d3e4f5a6b7c8d9e0f1a2",
+          "time": "2026-07-25T12:58:00Z"
+        }
+      ],
+      "relationships": []
+    }
+  ]
+}
