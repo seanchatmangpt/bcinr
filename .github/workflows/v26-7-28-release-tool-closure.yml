@@ -59,35 +59,27 @@ jobs:
           path = Path('tools/bcinr-release/src/main.rs')
           source = path.read_text()
 
-          module_old = 'mod provenance;\n'
-          module_new = 'mod provenance;\nmod standing;\n'
-          if source.count(module_old) != 1 or 'mod standing;' in source:
-              raise SystemExit('standing module insertion boundary changed')
-          source = source.replace(module_old, module_new, 1)
+          module_marker = 'mod provenance;\n'
+          if source.count(module_marker) != 1 or 'mod standing;' in source:
+              raise SystemExit('standing module boundary changed')
+          source = source.replace(module_marker, module_marker + 'mod standing;\n', 1)
 
-          import_old = '''use crate::model::{
-              AdmissionIssue, ArtifactEntryReceipt, ArtifactReceipt, ByteIdentityReceipt, IssueCode,
-              RailOutcome, RailReceipt, ReleaseReceipt, Standing, RECEIPT_SCHEMA_VERSION,
-          };
-          '''
-          import_new = import_old + 'use crate::standing::{calculate as calculate_standing, StandingInputs};\n'
-          if source.count(import_old) != 1:
+          import_marker = 'use serde::Serialize;\n'
+          if source.count(import_marker) != 1 or 'StandingInputs' in source:
               raise SystemExit('standing import boundary changed')
-          source = source.replace(import_old, import_new, 1)
+          source = source.replace(
+              import_marker,
+              'use crate::standing::{calculate as calculate_standing, StandingInputs};\n' + import_marker,
+              1,
+          )
 
-          standing_old = '''    let standing = if blocked {
-              Standing::Blocked
-          } else if required_rail_failure {
-              Standing::BuildBroken
-          } else if required_artifact_failure || required_identity_failure {
-              Standing::Blocked
-          } else if optional_rail_failure || optional_artifact_failure || optional_identity_failure {
-              Standing::PartialAlive
-          } else {
-              Standing::Alive
-          };
-          '''
-          standing_new = '''    let standing = calculate_standing(StandingInputs {
+          start_marker = '    let standing = if blocked {'
+          end_marker = '\n\n    let evidence_material = EvidenceMaterial {'
+          if source.count(start_marker) != 1 or source.count(end_marker) != 1:
+              raise SystemExit('standing calculation boundary changed')
+          start = source.index(start_marker)
+          end = source.index(end_marker, start)
+          replacement = '''    let standing = calculate_standing(StandingInputs {
               blocked,
               required_rail_failure,
               required_artifact_failure,
@@ -95,11 +87,8 @@ jobs:
               optional_rail_failure,
               optional_artifact_failure,
               optional_identity_failure,
-          });
-          '''
-          if source.count(standing_old) != 1:
-              raise SystemExit('standing calculation boundary changed')
-          source = source.replace(standing_old, standing_new, 1)
+          });'''
+          source = source[:start] + replacement + source[end:]
           path.write_text(source)
           PY
 
