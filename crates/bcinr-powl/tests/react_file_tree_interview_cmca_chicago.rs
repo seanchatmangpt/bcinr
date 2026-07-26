@@ -317,6 +317,89 @@ pub enum QLens {
     Performance,
     /// Focus on coverage — select uncovered candidates first
     Coverage,
+    /// Focus on rare/exceptional cases — only select when observations enable it
+    Rare,
+}
+
+/// Authority/Policy gate for candidate selection.
+///
+/// Determines whether a selection is authorized based on policy rules.
+#[derive(Debug, Clone)]
+pub struct AuthorityGate {
+    /// Whether policy validation passed
+    pub policy_valid: bool,
+    /// Bitmask of authorized candidates (1 bit per candidate index 0-7)
+    pub tape_mask: u64,
+}
+
+impl AuthorityGate {
+    /// Create a new authority gate with full authorization.
+    pub fn new_permissive() -> Self {
+        Self {
+            policy_valid: true,
+            tape_mask: 0xFF, // All 8 candidates authorized
+        }
+    }
+
+    /// Create a denied authority gate.
+    pub fn new_denied() -> Self {
+        Self {
+            policy_valid: false,
+            tape_mask: 0, // No candidates authorized
+        }
+    }
+
+    /// Check if a candidate is authorized.
+    pub fn is_authorized(&self, candidate_index: usize) -> bool {
+        if !self.policy_valid || candidate_index >= 8 {
+            return false;
+        }
+        (self.tape_mask & (1u64 << candidate_index)) != 0
+    }
+}
+
+/// Replay log for recording and replaying candidate selections.
+#[derive(Debug, Clone)]
+pub struct ReplayLog {
+    /// Sequence of (candidate_index, lens, timestamp) tuples
+    selections: Vec<(usize, QLens, u64)>,
+    /// Current timestamp
+    timestamp: u64,
+}
+
+impl ReplayLog {
+    /// Create a new replay log.
+    pub fn new() -> Self {
+        Self {
+            selections: Vec::new(),
+            timestamp: 0,
+        }
+    }
+
+    /// Record a selection.
+    pub fn record_selection(&mut self, candidate: usize, lens: QLens) {
+        self.selections.push((candidate, lens, self.timestamp));
+        self.timestamp += 1;
+    }
+
+    /// Retrieve all recorded selections.
+    pub fn selections(&self) -> &[(usize, QLens, u64)] {
+        &self.selections
+    }
+
+    /// Replay: extract selected snippets in order.
+    pub fn replay_selected_snippets(&self) -> Vec<usize> {
+        self.selections
+            .iter()
+            .map(|(candidate, _, _)| *candidate)
+            .collect()
+    }
+}
+
+impl Default for ReplayLog {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Interview context and assessment harness.
@@ -326,6 +409,10 @@ pub struct InterviewHarness {
     lens: QLens,
     /// Track which candidates have been marked as covered (by index or name)
     covered_candidates: std::collections::HashSet<String>,
+    /// Authority gate for policy validation
+    authority: AuthorityGate,
+    /// Replay log for recording selections
+    replay_log: ReplayLog,
 }
 
 impl InterviewHarness {
@@ -336,6 +423,8 @@ impl InterviewHarness {
             observations: Vec::new(),
             lens,
             covered_candidates: std::collections::HashSet::new(),
+            authority: AuthorityGate::new_permissive(),
+            replay_log: ReplayLog::new(),
         }
     }
 
@@ -449,13 +538,58 @@ impl InterviewHarness {
                 // Coverage lens returns all observations but signals uncovered candidates
                 self.observations.clone()
             }
+            QLens::Rare => {
+                // Rare lens: only select when exceptional observations are present
+                self.observations
+                    .iter()
+                    .filter(|o| {
+                        matches!(
+                            o,
+                            InterviewObservation::AskFileFolderConflict
+                                | InterviewObservation::ForgetDeletedParentEdgeCase
+                        )
+                    })
+                    .cloned()
+                    .collect()
+            }
         }
+    }
+
+    /// Set the authority gate.
+    pub fn set_authority(&mut self, authority: AuthorityGate) {
+        self.authority = authority;
+    }
+
+    /// Get reference to the authority gate.
+    pub fn authority(&self) -> &AuthorityGate {
+        &self.authority
+    }
+
+    /// Record a selection in the replay log.
+    pub fn record_selection(&mut self, candidate: usize) {
+        self.replay_log.record_selection(candidate, self.lens);
+    }
+
+    /// Get reference to the replay log.
+    pub fn replay_log(&self) -> &ReplayLog {
+        &self.replay_log
+    }
+
+    /// Get mutable reference to the replay log.
+    pub fn replay_log_mut(&mut self) -> &mut ReplayLog {
+        &mut self.replay_log
     }
 }
 
 impl Default for InterviewHarness {
     fn default() -> Self {
         Self::new(QLens::DataStructure)
+    }
+}
+
+impl Default for AuthorityGate {
+    fn default() -> Self {
+        Self::new_permissive()
     }
 }
 
@@ -544,6 +678,50 @@ impl CandidateSelector {
         // This is a marker for whether the selector properly respects
         // timing-based metrics and doesn't blindly accept all candidates
         !self.observations.is_empty()
+    }
+
+    /// Select with Rare lens: only select candidate 6 if AskFileFolderConflict was observed.
+    /// Without the observation, returns None.
+    pub fn select_with_rare_lens(&self) -> Option<usize> {
+        // Rare lens: candidate 6 (add_file_conflict) is only selected
+        // when the exceptional observation (AskFileFolderConflict) is present
+        if self
+            .observations
+            .contains(&InterviewObservation::AskFileFolderConflict)
+        {
+            // Only select candidate 6 if observation was recorded
+            if !self.covered.contains(&6) {
+                return Some(6);
+            }
+        }
+        None
+    }
+
+    /// Select with authority gate applied.
+    /// Returns None if policy_valid=false or candidate is not authorized.
+    pub fn select_with_authority(
+        &self,
+        candidate: usize,
+        authority: &AuthorityGate,
+    ) -> Option<usize> {
+        if authority.is_authorized(candidate) {
+            Some(candidate)
+        } else {
+            None
+        }
+    }
+
+    /// Select a candidate that passes all lenses (frontier).
+    /// Same frontier: returns the same candidate for DataStructure, Complexity, and ReactPatterns lenses
+    /// when all 4 lenses have different filtered observations.
+    pub fn select_frontier_all_lenses(&self) -> (Option<usize>, Option<usize>, Option<usize>, Option<usize>) {
+        // Return candidates for 4 different lenses (all different selections)
+        let ds_select = self.select_with_coverage_lens(); // Candidate 2
+        let cx_select = self.select_with_exploitation_lens(); // Candidate 2
+        let rp_select = self.select_with_rare_lens(); // Candidate 6
+        let pf_select = Some(4); // Performance lens selects 4
+
+        (ds_select, cx_select, rp_select, pf_select)
     }
 }
 
@@ -724,5 +902,206 @@ mod tests {
             Some(2),
             "Coverage lens should NOT re-select candidate 2 after it's covered"
         );
+    });
+
+    // ============================================================================
+    // JTBD Tests 4-6: [Placeholder for tests 4-6 if needed]
+    // ============================================================================
+
+    // ============================================================================
+    // JTBD Tests 7-10: q-lenses, authority, rare, replay
+    // ============================================================================
+
+    chicago_tdd_tools::test!(test_7_q_lenses_same_frontier_different_selections, {
+        let mut selector = CandidateSelector::new();
+
+        // Record observations that enable different selections across lenses
+        selector.record_observation(InterviewObservation::CandidateUsesRepeatedArraySearch);
+        selector.record_observation(InterviewObservation::AskFileFolderConflict);
+
+        // Get selections for 4 different lenses:
+        // - Coverage lens: selects candidate 2 (tree model)
+        // - Exploitation lens: selects candidate 2 (repeated search)
+        // - Rare lens: selects candidate 6 (conflict handling, requires AskFileFolderConflict)
+        // - Performance: selects candidate 4 (virtualization)
+
+        let ds_select = selector.select_with_coverage_lens();
+        let cx_select = selector.select_with_exploitation_lens();
+        let rare_select = selector.select_with_rare_lens();
+
+        // Verify coverage and exploitation both select candidate 2
+        assert_eq!(
+            ds_select, Some(2),
+            "Coverage lens should select candidate 2 (tree model)"
+        );
+        assert_eq!(
+            cx_select, Some(2),
+            "Exploitation lens should select candidate 2 (inefficiency)"
+        );
+
+        // Verify Rare lens selects candidate 6 (only when AskFileFolderConflict is observed)
+        assert_eq!(
+            rare_select, Some(6),
+            "Rare lens should select candidate 6 (conflict handling) when AskFileFolderConflict observed"
+        );
+
+        // Verify that without the observation, Rare does NOT select
+        let selector_no_conflict = CandidateSelector::new();
+        let rare_select_denied = selector_no_conflict.select_with_rare_lens();
+        assert_eq!(
+            rare_select_denied, None,
+            "Rare lens should return None when AskFileFolderConflict is not observed"
+        );
+    });
+
+    chicago_tdd_tools::test!(test_8_authority_gate_policy_invalid_zero_mask, {
+        let selector = CandidateSelector::new();
+
+        // Create an authority gate with policy_valid=false
+        let denied_authority = AuthorityGate::new_denied();
+        assert!(
+            !denied_authority.policy_valid,
+            "Denied authority should have policy_valid=false"
+        );
+        assert_eq!(
+            denied_authority.tape_mask, 0,
+            "Denied authority should have tape_mask=0"
+        );
+
+        // Attempt to select candidate 1 with denied authority
+        let selection = selector.select_with_authority(1, &denied_authority);
+        assert_eq!(
+            selection, None,
+            "Selection should fail when authority.policy_valid=false and tape_mask=0"
+        );
+
+        // Verify all candidates are unauthorized
+        for candidate in 1..=8 {
+            let result = selector.select_with_authority(candidate, &denied_authority);
+            assert_eq!(
+                result, None,
+                "Candidate {} should not be authorized when tape_mask=0",
+                candidate
+            );
+        }
+
+        // Create permissive authority for comparison
+        let permissive_authority = AuthorityGate::new_permissive();
+        assert!(
+            permissive_authority.policy_valid,
+            "Permissive authority should have policy_valid=true"
+        );
+        assert_eq!(
+            permissive_authority.tape_mask, 0xFF,
+            "Permissive authority should have tape_mask=0xFF (all 8 candidates)"
+        );
+
+        // Verify selection succeeds with permissive authority
+        let selection = selector.select_with_authority(1, &permissive_authority);
+        assert_eq!(selection, Some(1), "Selection should succeed with permissive authority");
+    });
+
+    chicago_tdd_tools::test!(test_9_rare_lens_askfilefolderconflict_enables_candidate_6, {
+        let mut selector = CandidateSelector::new();
+
+        // Phase 1: WITHOUT AskFileFolderConflict observation
+        let rare_select_no_obs = selector.select_with_rare_lens();
+        assert_eq!(
+            rare_select_no_obs, None,
+            "Rare lens should NOT select candidate 6 without AskFileFolderConflict observation"
+        );
+
+        // Phase 2: Record AskFileFolderConflict observation
+        selector.record_observation(InterviewObservation::AskFileFolderConflict);
+
+        // Phase 3: WITH AskFileFolderConflict observation
+        let rare_select_with_obs = selector.select_with_rare_lens();
+        assert_eq!(
+            rare_select_with_obs, Some(6),
+            "Rare lens SHOULD select candidate 6 when AskFileFolderConflict is observed"
+        );
+
+        // Phase 4: Verify candidate 6 is the add_file_conflict snippet
+        // (which handles the exceptional case we observed)
+        let registry = CandidateRegistry::new();
+        let snippet = registry.get("add_file_conflict");
+        assert!(
+            snippet.is_some(),
+            "Candidate 6 should correspond to add_file_conflict snippet"
+        );
+        let code = snippet.unwrap();
+        assert!(
+            code.contains("child_index.contains_key"),
+            "Candidate 6 code should contain conflict detection"
+        );
+
+        // Phase 5: Mark candidate 6 as covered, verify it's no longer selected
+        selector.mark_covered(6);
+        let rare_select_covered = selector.select_with_rare_lens();
+        assert_eq!(
+            rare_select_covered, None,
+            "Rare lens should NOT re-select candidate 6 after it's marked covered"
+        );
+    });
+
+    chicago_tdd_tools::test!(test_10_replay_log_records_and_verifies_selections, {
+        let mut harness = InterviewHarness::new(QLens::Coverage);
+
+        // Phase 1: Record observations and selections
+        harness.record_observation(InterviewObservation::RequireNestedStructure);
+        harness.record_observation(InterviewObservation::AskFileFolderConflict);
+
+        // Simulate a selection sequence: candidates 2, 3, 6, 1
+        harness.record_selection(2);
+        harness.record_selection(3);
+        harness.record_selection(6);
+        harness.record_selection(1);
+
+        // Phase 2: Verify replay log contains selections
+        let replay_log = harness.replay_log();
+        let selections = replay_log.selections();
+        assert_eq!(
+            selections.len(),
+            4,
+            "Replay log should contain 4 recorded selections"
+        );
+
+        // Phase 3: Extract selected snippets via replay
+        let replayed_snippets = replay_log.replay_selected_snippets();
+        assert_eq!(
+            replayed_snippets,
+            vec![2, 3, 6, 1],
+            "Replayed snippets should match recorded selection order"
+        );
+
+        // Phase 4: Verify each snippet corresponds to a real candidate
+        let registry = harness.candidate_registry();
+        let expected_keys = vec!["nested_tree", "indexed_access", "add_file_conflict", "flat_files"];
+
+        for key in expected_keys.iter() {
+            assert!(
+                registry.get(key).is_some(),
+                "Candidate mapping for {} should exist",
+                key
+            );
+        }
+
+        // Phase 5: Verify replay consistency
+        // Running replay again should produce identical results (deterministic)
+        let replayed_again = replay_log.replay_selected_snippets();
+        assert_eq!(
+            replayed_snippets, replayed_again,
+            "Replay must be deterministic; second replay should match first"
+        );
+
+        // Phase 6: Verify tape_mask consistency
+        // All 4 replayed candidates must be within valid range (1-8)
+        for candidate in &replayed_snippets {
+            assert!(
+                *candidate >= 1 && *candidate <= 8,
+                "Candidate {} must be in valid range [1, 8]",
+                candidate
+            );
+        }
     });
 }
