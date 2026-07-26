@@ -1,6 +1,6 @@
 [package]
 name = "bcinr-mfw-ir"
-version = "26.4.22"
+version = "26.7.25"
 edition = "2021"
 description = "Shared IR types and trait contracts for the multifractal-workflow (MFW) planner: witness algebra, formal-law contracts, EventSet, causal/concurrency IR, POWL projection contracts. No PDDL- or POWL-specific concepts; bcinr-pddl and bcinr-powl depend on this crate, never the reverse."
 license = "MIT OR Apache-2.0"

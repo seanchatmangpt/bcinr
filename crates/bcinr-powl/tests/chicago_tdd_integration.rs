@@ -469,14 +469,11 @@ fn jtbd_04_refuse_hostile_candidate_array_index_react_key() {
     // Simulate 8 candidates: 0-3 are stable, 4 is hostile (array-index React key),
     // 5-7 are stable.
     let hostile_mask = 0b00010000u64; // bit 4 is the hostile React key candidate
-    let stable_mask = 0b11101111u64;  // bits 0-3, 5-7 are stable
+    let stable_mask = 0b11101111u64; // bits 0-3, 5-7 are stable
 
     // admitted_mask should exclude the hostile candidate
     let admitted_mask = stable_mask;
-    assert!(
-        hostile_mask != 0u64,
-        "setup: hostile_mask must be non-zero"
-    );
+    assert!(hostile_mask != 0u64, "setup: hostile_mask must be non-zero");
     assert_eq!(
         admitted_mask & hostile_mask,
         0u64,
@@ -493,7 +490,10 @@ fn jtbd_04_refuse_hostile_candidate_array_index_react_key() {
 
     // Verify that candidate 4 (hostile) is not in admitted_mask
     let bit_4_selected = (admitted_mask >> 4) & 1;
-    assert_eq!(bit_4_selected, 0, "candidate 4 (hostile React key) must be excluded");
+    assert_eq!(
+        bit_4_selected, 0,
+        "candidate 4 (hostile React key) must be excluded"
+    );
 
     // Verify that candidate 5 (stable key) is in admitted_mask
     let bit_5_selected = (admitted_mask >> 5) & 1;
@@ -543,7 +543,10 @@ fn jtbd_05_selection_stability_with_dwell() {
         dwell_counter, 1,
         "after single event, dwell_counter should be 1"
     );
-    assert!(!state_admitted, "after single event, state should not yet be ADMITTED");
+    assert!(
+        !state_admitted,
+        "after single event, state should not yet be ADMITTED"
+    );
 
     // Simulate second event (no change in candidate)
     dwell_counter += 1;
@@ -554,9 +557,15 @@ fn jtbd_05_selection_stability_with_dwell() {
 
     // Simulate third event (dwell threshold reached)
     dwell_counter += 1;
-    assert_eq!(dwell_counter, dwell_threshold, "dwell_counter reaches threshold");
+    assert_eq!(
+        dwell_counter, dwell_threshold,
+        "dwell_counter reaches threshold"
+    );
     state_admitted = dwell_counter >= dwell_threshold;
-    assert!(state_admitted, "after dwell_threshold events, state transitions to ADMITTED");
+    assert!(
+        state_admitted,
+        "after dwell_threshold events, state transitions to ADMITTED"
+    );
 
     // Simulate fourth event (selection finalizes)
     dwell_counter += 1;
@@ -680,8 +689,7 @@ fn jtbd_06_end_to_end_complete_transcript_with_selections() {
         .expect("to_ocel_json must succeed with std feature");
     assert!(!json.is_empty(), "OCEL JSON must be non-empty");
 
-    let parsed: serde_json::Value =
-        serde_json::from_str(&json).expect("OCEL JSON must be valid");
+    let parsed: serde_json::Value = serde_json::from_str(&json).expect("OCEL JSON must be valid");
     assert!(
         parsed.get("events").is_some(),
         "OCEL JSON must contain events"
@@ -708,11 +716,11 @@ fn jtbd_06_end_to_end_complete_transcript_with_selections() {
     let (receipted_v1, digest_v1) =
         seal_run(&collector, "jtbd-06-complete".to_string()).expect("seal must succeed");
     assert_eq!(digest_v1.len(), 64, "receipt digest must be 64 hex chars");
+    assert!(!digest_v1.is_empty(), "receipt digest must not be empty");
     assert!(
-        !digest_v1.is_empty(),
-        "receipt digest must not be empty"
+        !receipted_v1.inner().events.is_empty(),
+        "receipt must contain events"
     );
-    assert!(!receipted_v1.inner().events.is_empty(), "receipt must contain events");
 
     // Verify determinism: same transcript → same receipt
     let collector2 = OcelCollector::new(None);

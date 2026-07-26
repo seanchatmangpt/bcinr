@@ -1,6 +1,6 @@
 [package]
 name = "bcinr-powl"
-version = "26.4.22"
+version = "26.7.25"
 edition = "2021"
 description = "POWL 2.0 model, compiler, concurrency guards, executable scheduler, and cryptographic execution evidence"
 license = "MIT OR Apache-2.0"
@@ -10,9 +10,9 @@ keywords = ["workflow", "branchless", "petri", "conformance", "blake3"]
 categories = ["algorithms", "data-structures"]
 
 [dependencies]
-bcinr-logic = { version = "26.4.22", path = "../bcinr-logic" }
+bcinr-logic = { version = "26.7.25", path = "../bcinr-logic" }
 # Shared IR types/trait contracts for multifractal planning. This edge is one-way.
-bcinr-mfw-ir = { version = "26.4.22", path = "../bcinr-mfw-ir" }
+bcinr-mfw-ir = { version = "26.7.25", path = "../bcinr-mfw-ir" }
 blake3 = "1"
 wasm4pm-compat = "26.6.29"
 serde = { version = "1", features = ["derive"], optional = true }

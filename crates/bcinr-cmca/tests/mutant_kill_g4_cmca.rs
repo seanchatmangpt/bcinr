@@ -165,6 +165,9 @@ fn all_cmca_mutants_killed_by_oracle() {
 
     // All three mutations must fail oracle
     assert!(gd_ok, "oracle baseline must pass");
-    assert_eq!(MODE_DWELL_ROUNDS_MIN, 461, "dwell constant must be immutable");
+    assert_eq!(
+        MODE_DWELL_ROUNDS_MIN, 461,
+        "dwell constant must be immutable"
+    );
     // Mutants 1-3 are caught by the oracle in dedicated tests above
 }

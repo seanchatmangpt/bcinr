@@ -8,7 +8,6 @@
 /// 5. Deterministic routing
 ///
 /// Run with: cargo test --test gate_g5_integration_test -- --nocapture
-
 use bcinr_pddl::prelude::*;
 use std::borrow::Cow;
 
@@ -106,33 +105,33 @@ impl WorkflowProblem for TestOrder {
 
 #[test]
 fn g5_01_fulfillment_domain_parses_correctly() {
-    let workflow = EmbeddedWorkflow::new(FULFILLMENT_DOMAIN)
-        .expect("fulfillment domain must parse");
+    let workflow =
+        EmbeddedWorkflow::new(FULFILLMENT_DOMAIN).expect("fulfillment domain must parse");
     assert_eq!(workflow.domain_name(), "fulfillment");
-    println!("✓ Fulfillment domain parsed: {}", workflow.domain_source_root());
+    println!(
+        "✓ Fulfillment domain parsed: {}",
+        workflow.domain_source_root()
+    );
 }
 
 #[test]
 fn g5_02_fulfillment_workflow_generates_plan() {
-    let mut workflow = EmbeddedWorkflow::new(FULFILLMENT_DOMAIN)
-        .expect("fulfillment domain must parse");
+    let mut workflow =
+        EmbeddedWorkflow::new(FULFILLMENT_DOMAIN).expect("fulfillment domain must parse");
     let order = TestOrder { id: 42, paid: true };
 
-    let verified = workflow
-        .plan(&order)
-        .expect("workflow should be admitted");
+    let verified = workflow.plan(&order).expect("workflow should be admitted");
 
-    assert!(verified.batches().len() > 0, "plan must have at least one batch");
+    assert!(
+        verified.batches().len() > 0,
+        "plan must have at least one batch"
+    );
     println!(
         "✓ Fulfillment workflow generated plan with {} batches",
         verified.batches().len()
     );
     for batch in verified.batches() {
-        println!(
-            "  tick {}: {} actions",
-            batch.tick(),
-            batch.actions().len()
-        );
+        println!("  tick {}: {} actions", batch.tick(), batch.actions().len());
     }
 }
 
@@ -144,11 +143,9 @@ fn g5_03_choice_domain_plan_and_receipt() {
       (:init (ready))
       (:goal (and (left) (right))))";
 
-    let execution = execute_cognitive_pddl(domain, problem)
-        .expect("choice domain must execute");
+    let execution = execute_cognitive_pddl(domain, problem).expect("choice domain must execute");
 
-    execution.verify()
-        .expect("execution receipt must verify");
+    execution.verify().expect("execution receipt must verify");
 
     let receipt_root = execution.execution_root();
     println!("✓ Choice domain receipt: {}", receipt_root);
@@ -164,13 +161,11 @@ fn g5_04_receipt_replay_determinism_choice() {
       (:goal (and (left) (right))))";
 
     // First execution
-    let execution1 = execute_cognitive_pddl(domain, problem)
-        .expect("choice domain must execute");
+    let execution1 = execute_cognitive_pddl(domain, problem).expect("choice domain must execute");
     let receipt1 = execution1.execution_root().to_string();
 
     // Second execution with identical inputs
-    let execution2 = execute_cognitive_pddl(domain, problem)
-        .expect("choice domain must execute");
+    let execution2 = execute_cognitive_pddl(domain, problem).expect("choice domain must execute");
     let receipt2 = execution2.execution_root().to_string();
 
     // Receipts must be byte-exact
@@ -178,24 +173,25 @@ fn g5_04_receipt_replay_determinism_choice() {
         receipt1, receipt2,
         "receipts must be identical for identical inputs (determinism check)"
     );
-    println!(
-        "✓ Receipt replay is deterministic: {}",
-        receipt1
-    );
+    println!("✓ Receipt replay is deterministic: {}", receipt1);
 }
 
 #[test]
 fn g5_05_sequential_domain_plan() {
-    let workflow = EmbeddedWorkflow::new(SEQUENTIAL_DOMAIN)
-        .expect("sequential domain must parse");
-    println!("✓ Sequential domain parsed: {}", workflow.domain_source_root());
+    let workflow = EmbeddedWorkflow::new(SEQUENTIAL_DOMAIN).expect("sequential domain must parse");
+    println!(
+        "✓ Sequential domain parsed: {}",
+        workflow.domain_source_root()
+    );
 }
 
 #[test]
 fn g5_06_delivery_domain_plan() {
-    let workflow = EmbeddedWorkflow::new(DELIVERY_DOMAIN)
-        .expect("delivery domain must parse");
-    println!("✓ Delivery domain parsed: {}", workflow.domain_source_root());
+    let workflow = EmbeddedWorkflow::new(DELIVERY_DOMAIN).expect("delivery domain must parse");
+    println!(
+        "✓ Delivery domain parsed: {}",
+        workflow.domain_source_root()
+    );
 }
 
 #[test]
@@ -206,46 +202,57 @@ fn g5_07_resource_domain_execution() {
       (:init (available))
       (:goal (goal-reached)))";
 
-    let execution = execute_cognitive_pddl(domain, problem)
-        .expect("resource domain must execute");
+    let execution = execute_cognitive_pddl(domain, problem).expect("resource domain must execute");
 
-    execution.verify()
-        .expect("execution receipt must verify");
+    execution.verify().expect("execution receipt must verify");
 
-    println!("✓ Resource domain execution verified: {}", execution.execution_root());
+    println!(
+        "✓ Resource domain execution verified: {}",
+        execution.execution_root()
+    );
 }
 
 #[test]
 fn g5_08_multiple_domains_deterministic_replay() {
     let test_cases = vec![
-        (FULFILLMENT_DOMAIN, "(define (problem order-test)
+        (
+            FULFILLMENT_DOMAIN,
+            "(define (problem order-test)
           (:domain fulfillment)
           (:init (paid))
-          (:goal (and (reserved) (customer-notified))))"),
-        (CHOICE_DOMAIN, "(define (problem demo-one)
+          (:goal (and (reserved) (customer-notified))))",
+        ),
+        (
+            CHOICE_DOMAIN,
+            "(define (problem demo-one)
           (:domain demo)
           (:init (ready))
-          (:goal (and (left) (right))))"),
-        (RESOURCE_DOMAIN, "(define (problem resource-test)
+          (:goal (and (left) (right))))",
+        ),
+        (
+            RESOURCE_DOMAIN,
+            "(define (problem resource-test)
           (:domain resource)
           (:init (available))
-          (:goal (goal-reached)))"),
+          (:goal (goal-reached)))",
+        ),
     ];
 
     for (domain, problem) in test_cases {
         // Execute twice
-        let exec1 = execute_cognitive_pddl(domain, problem)
-            .expect("domain must execute");
+        let exec1 = execute_cognitive_pddl(domain, problem).expect("domain must execute");
         exec1.verify().expect("receipt must verify");
         let receipt1 = exec1.execution_root().to_string();
 
-        let exec2 = execute_cognitive_pddl(domain, problem)
-            .expect("domain must execute");
+        let exec2 = execute_cognitive_pddl(domain, problem).expect("domain must execute");
         exec2.verify().expect("receipt must verify");
         let receipt2 = exec2.execution_root().to_string();
 
         // Compare receipts
-        assert_eq!(receipt1, receipt2, "receipts must match for identical inputs");
+        assert_eq!(
+            receipt1, receipt2,
+            "receipts must match for identical inputs"
+        );
         println!("✓ Domain deterministic: {}", receipt1);
     }
 }
@@ -258,39 +265,35 @@ fn g5_09_powl_v2_compilation_verified() {
       (:init (ready))
       (:goal (and (left) (right))))";
 
-    let execution = execute_cognitive_pddl(domain, problem)
-        .expect("choice domain must execute");
+    let execution = execute_cognitive_pddl(domain, problem).expect("choice domain must execute");
 
-    execution.verify()
+    execution
+        .verify()
         .expect("POWL v2 execution receipt must verify");
 
-    let summary = execution.summary()
-        .expect("summary must be available");
+    let summary = execution.summary().expect("summary must be available");
 
     println!(
         "✓ POWL v2 compiled: {} batches, standing: {:?}",
-        summary.batches.len(), summary.standing
+        summary.batches.len(),
+        summary.standing
     );
 }
 
 #[test]
 fn g5_10_embedded_workflow_standing() {
-    let mut workflow = EmbeddedWorkflow::new(FULFILLMENT_DOMAIN)
-        .expect("fulfillment domain must parse");
+    let mut workflow =
+        EmbeddedWorkflow::new(FULFILLMENT_DOMAIN).expect("fulfillment domain must parse");
     let order = TestOrder { id: 42, paid: true };
 
-    let verified = workflow
-        .plan(&order)
-        .expect("workflow should be admitted");
+    let verified = workflow.plan(&order).expect("workflow should be admitted");
 
     let standing = verified.standing();
     println!("✓ Workflow standing: {:?}", standing);
 
     // Verify that standing is deterministic across runs
     let order2 = TestOrder { id: 43, paid: true };
-    let verified2 = workflow
-        .plan(&order2)
-        .expect("workflow should be admitted");
+    let verified2 = workflow.plan(&order2).expect("workflow should be admitted");
 
     let standing2 = verified2.standing();
     assert_eq!(

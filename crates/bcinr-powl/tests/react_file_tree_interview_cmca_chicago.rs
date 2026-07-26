@@ -714,7 +714,9 @@ impl CandidateSelector {
     /// Select a candidate that passes all lenses (frontier).
     /// Same frontier: returns the same candidate for DataStructure, Complexity, and ReactPatterns lenses
     /// when all 4 lenses have different filtered observations.
-    pub fn select_frontier_all_lenses(&self) -> (Option<usize>, Option<usize>, Option<usize>, Option<usize>) {
+    pub fn select_frontier_all_lenses(
+        &self,
+    ) -> (Option<usize>, Option<usize>, Option<usize>, Option<usize>) {
         // Return candidates for 4 different lenses (all different selections)
         let ds_select = self.select_with_coverage_lens(); // Candidate 2
         let cx_select = self.select_with_exploitation_lens(); // Candidate 2
@@ -780,7 +782,10 @@ mod tests {
         harness.record_observation(InterviewObservation::IntroduceFlatFiles);
         let filtered = harness.observations_for_lens();
         assert_eq!(filtered.len(), 1);
-        assert_eq!(filtered[0], InterviewObservation::CandidateUsesRepeatedArraySearch);
+        assert_eq!(
+            filtered[0],
+            InterviewObservation::CandidateUsesRepeatedArraySearch
+        );
     });
 
     chicago_tdd_tools::test!(interview_harness_switches_lens, {
@@ -806,10 +811,7 @@ mod tests {
         let _pf = QLens::Performance;
         let _cv = QLens::Coverage;
         // Just verify all variants are accessible
-        assert_eq!(
-            std::mem::size_of::<QLens>(),
-            std::mem::size_of::<u8>()
-        );
+        assert_eq!(std::mem::size_of::<QLens>(), std::mem::size_of::<u8>());
     });
 
     // ============================================================================
@@ -838,37 +840,40 @@ mod tests {
         );
     });
 
-    chicago_tdd_tools::test!(test_2_exploitation_lens_finds_repeated_array_inefficiency, {
-        let mut selector = CandidateSelector::new();
+    chicago_tdd_tools::test!(
+        test_2_exploitation_lens_finds_repeated_array_inefficiency,
+        {
+            let mut selector = CandidateSelector::new();
 
-        // Record the observation: candidate uses repeated array search
-        selector.record_observation(InterviewObservation::CandidateUsesRepeatedArraySearch);
+            // Record the observation: candidate uses repeated array search
+            selector.record_observation(InterviewObservation::CandidateUsesRepeatedArraySearch);
 
-        // Exploitation/Complexity lens should select candidate 2 (repeated_search)
-        let selected = selector.select_with_exploitation_lens();
+            // Exploitation/Complexity lens should select candidate 2 (repeated_search)
+            let selected = selector.select_with_exploitation_lens();
 
-        assert_eq!(
-            selected,
-            Some(2),
-            "Exploitation lens should select candidate 2 (repeated_search inefficiency)"
-        );
+            assert_eq!(
+                selected,
+                Some(2),
+                "Exploitation lens should select candidate 2 (repeated_search inefficiency)"
+            );
 
-        // Hostile mutant check: ensure timing_score is NOT ignored
-        // A selector that ignores timing would incorrectly select indexed_access.
-        // Our implementation must respect performance constraints.
-        assert!(
-            selector.has_timing_score_observation(),
-            "Selector must respect timing_score metrics; ignoring them is a hostile mutant"
-        );
+            // Hostile mutant check: ensure timing_score is NOT ignored
+            // A selector that ignores timing would incorrectly select indexed_access.
+            // Our implementation must respect performance constraints.
+            assert!(
+                selector.has_timing_score_observation(),
+                "Selector must respect timing_score metrics; ignoring them is a hostile mutant"
+            );
 
-        // Verify candidate 2 has the inefficiency we recorded
-        assert!(
-            selector
-                .observations
-                .contains(&InterviewObservation::CandidateUsesRepeatedArraySearch),
-            "Recorded observation should be present"
-        );
-    });
+            // Verify candidate 2 has the inefficiency we recorded
+            assert!(
+                selector
+                    .observations
+                    .contains(&InterviewObservation::CandidateUsesRepeatedArraySearch),
+                "Recorded observation should be present"
+            );
+        }
+    );
 
     chicago_tdd_tools::test!(test_3_coverage_lens_prevents_repeat_assessment, {
         let mut selector = CandidateSelector::new();
@@ -931,11 +936,13 @@ mod tests {
 
         // Verify coverage and exploitation both select candidate 2
         assert_eq!(
-            ds_select, Some(2),
+            ds_select,
+            Some(2),
             "Coverage lens should select candidate 2 (tree model)"
         );
         assert_eq!(
-            cx_select, Some(2),
+            cx_select,
+            Some(2),
             "Exploitation lens should select candidate 2 (inefficiency)"
         );
 
@@ -998,51 +1005,59 @@ mod tests {
 
         // Verify selection succeeds with permissive authority
         let selection = selector.select_with_authority(1, &permissive_authority);
-        assert_eq!(selection, Some(1), "Selection should succeed with permissive authority");
+        assert_eq!(
+            selection,
+            Some(1),
+            "Selection should succeed with permissive authority"
+        );
     });
 
-    chicago_tdd_tools::test!(test_9_rare_lens_askfilefolderconflict_enables_candidate_6, {
-        let mut selector = CandidateSelector::new();
+    chicago_tdd_tools::test!(
+        test_9_rare_lens_askfilefolderconflict_enables_candidate_6,
+        {
+            let mut selector = CandidateSelector::new();
 
-        // Phase 1: WITHOUT AskFileFolderConflict observation
-        let rare_select_no_obs = selector.select_with_rare_lens();
-        assert_eq!(
-            rare_select_no_obs, None,
-            "Rare lens should NOT select candidate 6 without AskFileFolderConflict observation"
-        );
+            // Phase 1: WITHOUT AskFileFolderConflict observation
+            let rare_select_no_obs = selector.select_with_rare_lens();
+            assert_eq!(
+                rare_select_no_obs, None,
+                "Rare lens should NOT select candidate 6 without AskFileFolderConflict observation"
+            );
 
-        // Phase 2: Record AskFileFolderConflict observation
-        selector.record_observation(InterviewObservation::AskFileFolderConflict);
+            // Phase 2: Record AskFileFolderConflict observation
+            selector.record_observation(InterviewObservation::AskFileFolderConflict);
 
-        // Phase 3: WITH AskFileFolderConflict observation
-        let rare_select_with_obs = selector.select_with_rare_lens();
-        assert_eq!(
-            rare_select_with_obs, Some(6),
-            "Rare lens SHOULD select candidate 6 when AskFileFolderConflict is observed"
-        );
+            // Phase 3: WITH AskFileFolderConflict observation
+            let rare_select_with_obs = selector.select_with_rare_lens();
+            assert_eq!(
+                rare_select_with_obs,
+                Some(6),
+                "Rare lens SHOULD select candidate 6 when AskFileFolderConflict is observed"
+            );
 
-        // Phase 4: Verify candidate 6 is the add_file_conflict snippet
-        // (which handles the exceptional case we observed)
-        let registry = CandidateRegistry::new();
-        let snippet = registry.get("add_file_conflict");
-        assert!(
-            snippet.is_some(),
-            "Candidate 6 should correspond to add_file_conflict snippet"
-        );
-        let code = snippet.unwrap();
-        assert!(
-            code.contains("child_index.contains_key"),
-            "Candidate 6 code should contain conflict detection"
-        );
+            // Phase 4: Verify candidate 6 is the add_file_conflict snippet
+            // (which handles the exceptional case we observed)
+            let registry = CandidateRegistry::new();
+            let snippet = registry.get("add_file_conflict");
+            assert!(
+                snippet.is_some(),
+                "Candidate 6 should correspond to add_file_conflict snippet"
+            );
+            let code = snippet.unwrap();
+            assert!(
+                code.contains("child_index.contains_key"),
+                "Candidate 6 code should contain conflict detection"
+            );
 
-        // Phase 5: Mark candidate 6 as covered, verify it's no longer selected
-        selector.mark_covered(6);
-        let rare_select_covered = selector.select_with_rare_lens();
-        assert_eq!(
-            rare_select_covered, None,
-            "Rare lens should NOT re-select candidate 6 after it's marked covered"
-        );
-    });
+            // Phase 5: Mark candidate 6 as covered, verify it's no longer selected
+            selector.mark_covered(6);
+            let rare_select_covered = selector.select_with_rare_lens();
+            assert_eq!(
+                rare_select_covered, None,
+                "Rare lens should NOT re-select candidate 6 after it's marked covered"
+            );
+        }
+    );
 
     chicago_tdd_tools::test!(test_10_replay_log_records_and_verifies_selections, {
         let mut harness = InterviewHarness::new(QLens::Coverage);
@@ -1076,7 +1091,12 @@ mod tests {
 
         // Phase 4: Verify each snippet corresponds to a real candidate
         let registry = harness.candidate_registry();
-        let expected_keys = vec!["nested_tree", "indexed_access", "add_file_conflict", "flat_files"];
+        let expected_keys = vec![
+            "nested_tree",
+            "indexed_access",
+            "add_file_conflict",
+            "flat_files",
+        ];
 
         for key in expected_keys.iter() {
             assert!(

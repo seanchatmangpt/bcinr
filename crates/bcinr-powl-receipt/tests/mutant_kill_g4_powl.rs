@@ -50,8 +50,8 @@ fn oracle_powl_baseline_passes() {
     let guards = ConcurrencyGuardTable::empty();
 
     // Execute and seal
-    let receipt = execute_and_seal_v2(&compiled.tape, &guards, 8)
-        .expect("execution should succeed");
+    let receipt =
+        execute_and_seal_v2(&compiled.tape, &guards, 8).expect("execution should succeed");
 
     // Oracle check: verify must pass
     verify_execution_v2(&receipt, &compiled.tape, &guards, 8)
@@ -68,8 +68,8 @@ fn mutant_1_wrong_firing_mask_is_killed() {
     let guards = ConcurrencyGuardTable::empty();
 
     // Get a clean receipt
-    let mut receipt = execute_and_seal_v2(&compiled.tape, &guards, 8)
-        .expect("execution should succeed");
+    let mut receipt =
+        execute_and_seal_v2(&compiled.tape, &guards, 8).expect("execution should succeed");
 
     // MUTATE: flip one bit in the first fired mask
     // This represents a scheduler error: firing wrong action
@@ -104,8 +104,8 @@ fn mutant_2_action_order_wrong_is_killed() {
     let guards = ConcurrencyGuardTable::empty();
 
     // Get a clean receipt (should have 3 ticks: A, B, C)
-    let mut receipt = execute_and_seal_v2(&compiled.tape, &guards, 8)
-        .expect("execution should succeed");
+    let mut receipt =
+        execute_and_seal_v2(&compiled.tape, &guards, 8).expect("execution should succeed");
 
     // MUTATE: swap first two firing masks (swap A and B execution)
     if receipt.fired_masks.len() >= 2 {
@@ -130,8 +130,8 @@ fn mutant_3_chain_root_corruption_is_killed() {
     let guards = ConcurrencyGuardTable::empty();
 
     // Get a clean receipt
-    let mut receipt = execute_and_seal_v2(&compiled.tape, &guards, 8)
-        .expect("execution should succeed");
+    let mut receipt =
+        execute_and_seal_v2(&compiled.tape, &guards, 8).expect("execution should succeed");
 
     // MUTATE: flip one byte in chain_root (BLAKE3 hash)
     if receipt.chain_root.len() > 0 {
@@ -154,8 +154,8 @@ fn mutant_1b_tape_root_mutation_is_killed() {
     let compiled = simple_sequence();
     let guards = ConcurrencyGuardTable::empty();
 
-    let mut receipt = execute_and_seal_v2(&compiled.tape, &guards, 8)
-        .expect("execution should succeed");
+    let mut receipt =
+        execute_and_seal_v2(&compiled.tape, &guards, 8).expect("execution should succeed");
 
     // MUTATE: corrupt tape root
     if receipt.tape_root.len() > 0 {
@@ -177,8 +177,8 @@ fn mutant_2b_final_state_mutation_is_killed() {
     let compiled = simple_sequence();
     let guards = ConcurrencyGuardTable::empty();
 
-    let mut receipt = execute_and_seal_v2(&compiled.tape, &guards, 8)
-        .expect("execution should succeed");
+    let mut receipt =
+        execute_and_seal_v2(&compiled.tape, &guards, 8).expect("execution should succeed");
 
     // MUTATE: XOR final_done_mask (wrong final state)
     receipt.final_done_mask ^= 1;
@@ -197,8 +197,8 @@ fn all_powl_mutants_killed_by_oracle() {
     let compiled = simple_sequence();
     let guards = ConcurrencyGuardTable::empty();
 
-    let receipt = execute_and_seal_v2(&compiled.tape, &guards, 8)
-        .expect("clean execution should work");
+    let receipt =
+        execute_and_seal_v2(&compiled.tape, &guards, 8).expect("clean execution should work");
 
     verify_execution_v2(&receipt, &compiled.tape, &guards, 8)
         .expect("oracle must verify clean receipt");

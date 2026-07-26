@@ -7,8 +7,7 @@
 //! Mutation 2: Precedence inference flip (reverse action ordering)
 //! Mutation 3: Search depth +1 (exceed max_search_ticks)
 
-use bcinr_pddl::production::{execute_pddl_to_powl, PddlPowlConfig, PddlPowlError};
-use bcinr_mfw_ir::EpochBounds;
+use bcinr_pddl::production::execute_pddl_to_powl;
 
 /// Basic domain: setup → action1 → action2 → goal
 const DOMAIN: &str = "(define (domain test)
@@ -27,15 +26,16 @@ const PROBLEM: &str = "(define (problem test-p)
 /// Oracle 1: Baseline — verify normal execution passes oracle
 #[test]
 fn oracle_baseline_execution_passes() {
-    let execution = execute_pddl_to_powl(DOMAIN, PROBLEM)
-        .expect("baseline plan should succeed");
+    let execution = execute_pddl_to_powl(DOMAIN, PROBLEM).expect("baseline plan should succeed");
 
     // Oracle check: verify() must pass
     execution.verify().expect("baseline should verify");
 
     // Assertions: final state must contain goal
-    assert!(execution.contains_fact("goal", &[]),
-        "final state must contain (goal)");
+    assert!(
+        execution.contains_fact("goal", &[]),
+        "final state must contain (goal)"
+    );
 }
 
 /// Mutant 1: Grounding off-by-one — inject wrong action index
@@ -45,8 +45,7 @@ fn oracle_baseline_execution_passes() {
 #[test]
 fn mutant_1_grounding_off_by_one_is_killed() {
     // Normal execution first
-    let normal = execute_pddl_to_powl(DOMAIN, PROBLEM)
-        .expect("normal plan should succeed");
+    let normal = execute_pddl_to_powl(DOMAIN, PROBLEM).expect("normal plan should succeed");
     let normal_goal = normal.contains_fact("goal", &[]);
     assert!(normal_goal, "normal plan should reach goal");
 
@@ -57,14 +56,16 @@ fn mutant_1_grounding_off_by_one_is_killed() {
     // 2. Final state does NOT match sequential semantics
     // 3. verify() FAILS with StateReceiptMismatch
 
-    let execution = execute_pddl_to_powl(DOMAIN, PROBLEM)
-        .expect("plan should admit despite mutation attempt");
+    let execution =
+        execute_pddl_to_powl(DOMAIN, PROBLEM).expect("plan should admit despite mutation attempt");
 
     // A successful verify() here is the test passing (oracle caught tampering)
     // We're testing that the oracle WOULD catch it if we had actually
     // mutated the grounding. Since we can't mutate internals without
     // recompiling, we verify the oracle is armed.
-    execution.verify().expect("oracle should verify clean execution");
+    execution
+        .verify()
+        .expect("oracle should verify clean execution");
 }
 
 /// Mutant 2: Precedence inference flip
@@ -130,13 +131,14 @@ fn mutant_3_search_depth_overflow_is_killed() {
 #[test]
 fn all_pddl_mutants_killed_by_oracle() {
     // Run baseline oracle
-    let execution = execute_pddl_to_powl(DOMAIN, PROBLEM)
-        .expect("baseline must execute");
+    let execution = execute_pddl_to_powl(DOMAIN, PROBLEM).expect("baseline must execute");
 
     // Verify succeeds = oracle armed
     execution.verify().expect("oracle must be ready");
 
     // Test facts about final state (oracle checks this internally)
-    assert!(execution.contains_fact("goal", &[]),
-        "PDDL oracle verifies final state facts");
+    assert!(
+        execution.contains_fact("goal", &[]),
+        "PDDL oracle verifies final state facts"
+    );
 }
