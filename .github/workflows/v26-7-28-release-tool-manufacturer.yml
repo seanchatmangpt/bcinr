@@ -1,4 +1,4 @@
-name: v26.7.28 Release Tool Manufacturer
+name: v26.7.28 Release Tool Rustfmt Manufacturer
 
 on:
   push:
@@ -10,18 +10,17 @@ permissions:
   contents: write
 
 concurrency:
-  group: v26-7-28-release-tool-manufacturer
+  group: v26-7-28-release-tool-rustfmt
   cancel-in-progress: true
 
 env:
-  CARGO_INCREMENTAL: 0
   RUSTUP_TOOLCHAIN: nightly-2026-07-25
 
 jobs:
   manufacture:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
       - name: Checkout exact branch head
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -30,21 +29,18 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Install exact nightly toolchain
+      - name: Install exact rustfmt
         uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
         with:
           toolchain: nightly-2026-07-25
           components: rustfmt
 
-      - name: Format source and resolve the workspace lock graph
+      - name: Manufacture canonical Rust formatting
         shell: bash
         run: |
           set -euo pipefail
           cargo fmt --all
-          cargo metadata --format-version 1 > /tmp/bcinr-v26-7-28-metadata.json
           cargo fmt --all -- --check
-          test -s /tmp/bcinr-v26-7-28-metadata.json
-          test -f Cargo.lock
 
       - name: Refuse unexpected manufacturer mutations
         shell: bash
@@ -53,11 +49,6 @@ jobs:
           python3 - <<'PY'
           import subprocess
 
-          allowed_exact = {
-              'Cargo.lock',
-              '.github/workflows/v26-7-28-release-tool-manufacturer.yml',
-          }
-          allowed_prefixes = ('tools/bcinr-release/src/',)
           output = subprocess.check_output(
               ['git', 'status', '--porcelain=v1', '--untracked-files=all'],
               text=True,
@@ -67,25 +58,21 @@ jobs:
               path = raw[3:]
               if ' -> ' in path:
                   path = path.split(' -> ', 1)[1]
-              if path not in allowed_exact and not path.startswith(allowed_prefixes):
+              if not path.startswith('tools/bcinr-release/src/'):
                   unexpected.append(raw)
           if unexpected:
-              raise SystemExit('unexpected manufacturer mutations:\n' + '\n'.join(unexpected))
+              raise SystemExit('unexpected rustfmt mutations:\n' + '\n'.join(unexpected))
           PY
 
-      - name: Publish formatted source and lockfile, then delete manufacturer
+      - name: Publish canonical source and delete manufacturer
         shell: bash
         run: |
           set -euo pipefail
           rm .github/workflows/v26-7-28-release-tool-manufacturer.yml
           git diff --check
-          git add Cargo.lock tools/bcinr-release/src \
+          git add tools/bcinr-release/src \
             .github/workflows/v26-7-28-release-tool-manufacturer.yml
-          if git diff --cached --quiet; then
-            echo 'manufacturer produced no changes' >&2
-            exit 1
-          fi
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git commit -m 'chore(v26.7.28): materialize hardened release tool'
+          git commit -m 'chore(v26.7.28): rustfmt hardened release tool'
           git push origin HEAD:agent/v26.7.28-production-admission
