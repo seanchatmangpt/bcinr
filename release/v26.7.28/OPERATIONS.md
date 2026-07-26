@@ -126,6 +126,22 @@ The production rail also requires:
 
 The permanent production workflow has read-only repository permissions. Any temporary write-capable manufacturer must be branch-scoped, mutation-bounded, independently verified, and self-deleting.
 
+## Observed release-tool closure
+
+A bounded temporary closure workflow executed against the hardened crate and observed:
+
+- exact nightly `nightly-2026-07-25`;
+- canonical crate-local formatting;
+- Cargo lockfile materialisation;
+- `cargo check -p bcinr-release --all-targets`;
+- `cargo check --locked -p bcinr-release --all-targets`;
+- 15 passing unit tests;
+- `cargo clippy --locked -p bcinr-release --all-targets -- -D warnings`;
+- an admitted mutation set limited to release-tool source, policy documentation, and `Cargo.lock`;
+- successful publication followed by self-deletion of the write-capable workflow.
+
+This establishes crate-local `ALIVE` standing for compile, unit, and lint. It does not establish release-level `ALIVE` standing. The permanent read-only workflow must still execute Miri, security, SBOM, reproducible-build, ggen identity, workspace, E2E, cross-target, FFI, and benchmark rails against the exact final candidate.
+
 ## Promotion preconditions
 
 Promotion is refused unless:
