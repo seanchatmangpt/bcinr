@@ -104,7 +104,10 @@ impl fmt::Display for TemporalProductionError {
                 "temporal step {step} duration {actual} is outside [{minimum}, {maximum}]"
             ),
             Self::UnknownAction { step, action } => {
-                write!(f, "temporal step {step} references unknown action {action:?}")
+                write!(
+                    f,
+                    "temporal step {step} references unknown action {action:?}"
+                )
             }
             Self::OverlappingDuplicate {
                 left,
@@ -200,14 +203,9 @@ impl TemporalPowlRuntime {
         let powl_ops = temporal_plan_to_powl_tape(&plan).map_err(map_projection_error)?;
         validate_powl_geometry(&plan, &powl_ops)?;
 
-        let (receipt, mut ocel) = execute_temporal_plan(
-            &plan,
-            &domain,
-            &problem,
-            case_id,
-            policy_rules,
-        )
-        .map_err(TemporalProductionError::Execution)?;
+        let (receipt, mut ocel) =
+            execute_temporal_plan(&plan, &domain, &problem, case_id, policy_rules)
+                .map_err(TemporalProductionError::Execution)?;
 
         if !receipt.goal_reached {
             return Err(TemporalProductionError::GoalNotReached);
@@ -268,8 +266,8 @@ pub fn validate_temporal_plan_shape(
             })?;
 
         let below_minimum = step.duration + TIME_EPSILON < action.duration_min;
-        let above_maximum = action.duration_max.is_finite()
-            && step.duration > action.duration_max + TIME_EPSILON;
+        let above_maximum =
+            action.duration_max.is_finite() && step.duration > action.duration_max + TIME_EPSILON;
         if below_minimum || above_maximum {
             return Err(TemporalProductionError::DurationOutOfBounds {
                 step: index,

@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use bcinr_pddl::{
-    run_all_manufactured_scenarios, run_manufactured_scenario, SwarmStanding,
-    SwarmValidationError, MANUFACTURED_SCENARIOS,
+    run_all_manufactured_scenarios, run_manufactured_scenario, SwarmStanding, SwarmValidationError,
+    MANUFACTURED_SCENARIOS,
 };
 
 #[test]
@@ -45,8 +45,7 @@ fn receipt_tampering_is_refused() {
 
     assert!(matches!(
         receipt.verify(),
-        Err(SwarmValidationError::EventOrder { .. })
-            | Err(SwarmValidationError::ReceiptMismatch)
+        Err(SwarmValidationError::EventOrder { .. }) | Err(SwarmValidationError::ReceiptMismatch)
     ));
 }
 

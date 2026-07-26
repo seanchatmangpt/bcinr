@@ -87,10 +87,9 @@ impl SwarmScenarioReceipt {
     /// Recompute the receipt and enforce the scenario's load-bearing invariant.
     pub fn verify(&self) -> Result<(), SwarmValidationError> {
         verify_order(&self.events)?;
-        let expected = SwarmStanding::from_manufactured(self.descriptor.expected_standing)
-            .ok_or(SwarmValidationError::UnknownStanding(
-                self.descriptor.expected_standing,
-            ))?;
+        let expected = SwarmStanding::from_manufactured(self.descriptor.expected_standing).ok_or(
+            SwarmValidationError::UnknownStanding(self.descriptor.expected_standing),
+        )?;
         if expected != self.standing {
             return Err(SwarmValidationError::StandingMismatch {
                 expected,
@@ -151,9 +150,7 @@ impl fmt::Display for SwarmValidationError {
 impl std::error::Error for SwarmValidationError {}
 
 /// Execute one ggen-manufactured scenario by stable identifier.
-pub fn run_manufactured_scenario(
-    id: &str,
-) -> Result<SwarmScenarioReceipt, SwarmValidationError> {
+pub fn run_manufactured_scenario(id: &str) -> Result<SwarmScenarioReceipt, SwarmValidationError> {
     let descriptor = MANUFACTURED_SCENARIOS
         .iter()
         .copied()
@@ -173,8 +170,7 @@ pub fn run_manufactured_scenario(
 }
 
 /// Execute every manufactured descriptor and return one verified receipt each.
-pub fn run_all_manufactured_scenarios(
-) -> Result<Vec<SwarmScenarioReceipt>, SwarmValidationError> {
+pub fn run_all_manufactured_scenarios() -> Result<Vec<SwarmScenarioReceipt>, SwarmValidationError> {
     MANUFACTURED_SCENARIOS
         .iter()
         .map(|descriptor| run_manufactured_scenario(descriptor.id))
@@ -305,19 +301,19 @@ fn execute_descriptor(
                     None,
                     SwarmEventKind::InvalidReportObserved,
                 ),
-                event(
-                    1,
-                    "admission",
-                    None,
-                    SwarmEventKind::WorkerRefused,
-                ),
+                event(1, "admission", None, SwarmEventKind::WorkerRefused),
             ]),
         ),
         "human_approval_simulation" => (
             SwarmStanding::Alive,
             ordered(vec![
                 event(0, "broker", None, SwarmEventKind::ApprovalRequested),
-                event(2, "approval-simulator", None, SwarmEventKind::ApprovalGranted),
+                event(
+                    2,
+                    "approval-simulator",
+                    None,
+                    SwarmEventKind::ApprovalGranted,
+                ),
                 event(3, "broker", None, SwarmEventKind::ActuationCommitted),
             ]),
         ),
@@ -375,7 +371,9 @@ fn verify_scenario_invariant(
             let threshold = position(events, SwarmEventKind::CapacityThresholdObserved)?;
             let allocation = position(events, SwarmEventKind::CapacityAllocated)?;
             if threshold >= allocation {
-                return Err(fail("capacity may be added only after a threshold observation"));
+                return Err(fail(
+                    "capacity may be added only after a threshold observation",
+                ));
             }
         }
         "worker_substitution" => {
@@ -401,14 +399,18 @@ fn verify_scenario_invariant(
                 || !has(SwarmEventKind::LeaseRenewed)
                 || !has(SwarmEventKind::ResourceReleased)
             {
-                return Err(fail("long-running work must retain and release a supervised lease"));
+                return Err(fail(
+                    "long-running work must retain and release a supervised lease",
+                ));
             }
         }
         "speculative_execution" => {
             if count(SwarmEventKind::CommitSelected) != 1
                 || count(SwarmEventKind::WorkerCancelled) != 1
             {
-                return Err(fail("speculation must select exactly one commit and cancel losers"));
+                return Err(fail(
+                    "speculation must select exactly one commit and cancel losers",
+                ));
             }
         }
         "adversarial_worker" => {
@@ -416,7 +418,9 @@ fn verify_scenario_invariant(
                 || !has(SwarmEventKind::WorkerRefused)
                 || has(SwarmEventKind::ActuationCommitted)
             {
-                return Err(fail("invalid worker evidence must be refused before actuation"));
+                return Err(fail(
+                    "invalid worker evidence must be refused before actuation",
+                ));
             }
         }
         "human_approval_simulation" => {
@@ -431,7 +435,9 @@ fn verify_scenario_invariant(
             if count(SwarmEventKind::TransportEventObserved) != 3
                 || count(SwarmEventKind::TraceReconstructed) != 1
             {
-                return Err(fail("all transported events must be reconstructed exactly once"));
+                return Err(fail(
+                    "all transported events must be reconstructed exactly once",
+                ));
             }
         }
         _ => return Err(SwarmValidationError::UnknownScenario(scenario.to_string())),
@@ -489,17 +495,13 @@ fn verify_order(events: &[SwarmEvent]) -> Result<(), SwarmValidationError> {
     Ok(())
 }
 
-fn position(
-    events: &[SwarmEvent],
-    kind: SwarmEventKind,
-) -> Result<usize, SwarmValidationError> {
-    events
-        .iter()
-        .position(|event| event.kind == kind)
-        .ok_or(SwarmValidationError::InvariantViolation {
+fn position(events: &[SwarmEvent], kind: SwarmEventKind) -> Result<usize, SwarmValidationError> {
+    events.iter().position(|event| event.kind == kind).ok_or(
+        SwarmValidationError::InvariantViolation {
             scenario: "manufactured",
             invariant: "required event is absent",
-        })
+        },
+    )
 }
 
 fn event(
