@@ -1,0 +1,38 @@
+name: Publish Verified Post-Integration Tree
+
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-post-integration-final
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    if: github.event.pull_request.head.ref == 'agent/repair-post-integration-verification-ci' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/repair-post-integration-verification-ci
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - name: Materialize the already-verified source tree
+        run: |
+          python3 scripts/repair_post_integration_verification.py
+          python3 scripts/repair_cmca_all_features_composition.py
+          python3 scripts/repair_mcp_transport.py
+          cargo fmt --all
+          git diff --check
+      - name: Publish and self-delete
+        shell: bash
+        run: bash -x scripts/finalize_post_integration_verification.sh
