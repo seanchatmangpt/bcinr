@@ -1,4 +1,4 @@
-name: CMCA All-Features Diagnostic
+name: CMCA Mutant Diagnostic
 
 on:
   pull_request:
@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: cmca-all-features-diagnostic
+  group: cmca-mutant-diagnostic
   cancel-in-progress: true
 
 jobs:
@@ -28,16 +28,16 @@ jobs:
       - run: python3 scripts/repair_post_integration_verification.py
       - run: python3 scripts/repair_cmca_all_features_composition.py
       - run: cargo fmt --all
-      - name: Execute and capture CMCA all-features
+      - name: Execute and capture isolated mutant 7
         shell: bash
         run: |
           set -o pipefail
-          cargo test -p bcinr-cmca --all-features 2>&1 | tee cmca-all-features.log
-      - name: Upload CMCA transcript
+          cargo test -p bcinr-cmca --features mutant_7 --test hostile_mutants 2>&1 | tee cmca-mutant-7.log
+      - name: Upload mutant 7 transcript
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cmca-all-features-${{ github.run_id }}
-          path: cmca-all-features.log
+          name: cmca-mutant-7-${{ github.run_id }}
+          path: cmca-mutant-7.log
           if-no-files-found: error
           retention-days: 7
