@@ -78,5 +78,9 @@ harness = false
 name = "cmca_execution_bench"
 harness = false
 
+[[test]]
+name = "cmca_challenger_use_cases"
+path = "tests/cmca_challenger_use_cases.rs"
+
 [[example]]
 name = "timing"
