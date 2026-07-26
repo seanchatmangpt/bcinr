@@ -60,6 +60,7 @@ pub mod schedule_analysis;
 pub mod search;
 mod semantic_features;
 mod sexpr;
+pub mod swarm_validation;
 #[cfg(feature = "mfw-planner")]
 pub mod task;
 pub mod temporal_production;
@@ -126,6 +127,11 @@ pub use schedule_analysis::{
 pub use search::{
     ExactBfsRail, ExactSearchRail, ExactStepOutcome, ExploitSearchRail, ExploitStepOutcome,
     FairRailScheduler, MfwPortfolio, PortfolioOutcome, QLensRail, RailSelection,
+};
+pub use swarm_validation::{
+    run_all_manufactured_scenarios, run_manufactured_scenario, ManufacturedScenarioDescriptor,
+    SwarmEvent, SwarmEventKind, SwarmScenarioReceipt, SwarmStanding, SwarmValidationError,
+    MANUFACTURED_SCENARIOS,
 };
 #[cfg(feature = "mfw-planner")]
 pub use task::{execute_cognitive_task, OwnedPddlTask, PddlTask};
