@@ -52,7 +52,7 @@ rm -f scripts/integration_adapt_current_apis.py
 rm -f scripts/normalize_recovered_tests.py
 rm -f scripts/publish-semantic-integration-v5.sh
 rm -f scripts/run-semantic-integration-v4.sh
-rm -f rustfmt-repair.log clippy.log workspace.log
+rm -f rustfmt-repair.log clippy.log workspace.log final-publication.log
 
 git config user.name 'OpenAI Repair Agent'
 git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
