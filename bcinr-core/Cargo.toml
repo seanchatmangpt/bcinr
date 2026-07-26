@@ -10,6 +10,25 @@ keywords = ["branchless", "simd", "performance"]
 categories = ["algorithms", "no-std"]
 
 readme = "../README.md"
+include = [
+    "Cargo.toml",
+    "Cargo.lock",
+    "src/**/*",
+    "benches/**/*",
+    "../README.md",
+    "../CONTRACT.md",
+    "../HOARE_TRIPLES.md",
+    "../COMMAND_TRANSCRIPT.md",
+    "../MUTANT_KILL_MATRIX.md",
+    "../OBJECT_CODE_AUDIT.md",
+    "../RELEASE_NOTES.md",
+    "../docs/contracts/HOARE_TRIPLES.md",
+    "../docs/contracts/PDDL_CONTRACT.md",
+    "../docs/contracts/POWL_CONTRACT.md",
+    "../docs/contracts/CMCA_CONTRACT.md",
+    "../docs/gates/ORACLE_INDEPENDENCE.md"
+]
+
 [dependencies]
 bcinr-api = { path = "../crates/bcinr-api", version = "26.4.22" }
 bcinr-logic = { path = "../crates/bcinr-logic", version = "26.4.22" }
