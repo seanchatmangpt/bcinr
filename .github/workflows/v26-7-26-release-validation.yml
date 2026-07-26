@@ -19,76 +19,30 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  materialize-release-tree:
-    name: Materialize lockfile and rustfmt outputs
-    permissions:
-      contents: write
+  preflight:
+    name: Verify materialized release tree
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    outputs:
-      updated: ${{ steps.materialize.outputs.updated }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
           fetch-depth: 0
-          persist-credentials: true
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
-      - name: Materialize tool-owned outputs
-        id: materialize
+      - name: Verify lockfile and formatting are materialized
         shell: bash
         run: |
           set -euo pipefail
-          cargo check -p bcinr-ffi
-          cargo fmt --all
+          cargo check -p bcinr-ffi --locked
+          cargo fmt --all -- --check
+          git diff --exit-code -- Cargo.lock '*.rs'
           git diff --check
-
-          mapfile -t changed < <(git diff --name-only)
-          if [[ ${#changed[@]} -eq 0 ]]; then
-            echo "updated=false" >> "${GITHUB_OUTPUT}"
-            : > release-tree.patch
-            exit 0
-          fi
-
-          printf '%s\n' "${changed[@]}" | tee release-tree-files.txt
-          if [[ ${#changed[@]} -gt 40 ]]; then
-            echo "REFUSED: formatter/lock materialization changed more than 40 files" >&2
-            exit 1
-          fi
-          for file in "${changed[@]}"; do
-            case "${file}" in
-              Cargo.lock|*.rs) ;;
-              *) echo "REFUSED: unexpected tool-owned output ${file}" >&2; exit 1 ;;
-            esac
-          done
-
-          git diff --stat
-          git diff --binary > release-tree.patch
-          git config user.name "BCINR Release Verifier"
-          git config user.email "actions@users.noreply.github.com"
-          git add -- Cargo.lock '*.rs'
-          git commit -m "chore(release): materialize v26.7.26 lock and formatting"
-          git push origin HEAD:"${{ github.event.pull_request.head.ref || github.ref_name }}"
-          echo "updated=true" >> "${GITHUB_OUTPUT}"
-      - name: Upload materialization receipt
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: v26-7-26-materialized-tree-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            Cargo.lock
-            release-tree.patch
-            release-tree-files.txt
-          if-no-files-found: warn
-          retention-days: 7
 
   validate:
     name: Execute release verifier
-    needs: materialize-release-tree
-    if: needs.materialize-release-tree.outputs.updated != 'true'
+    needs: preflight
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
