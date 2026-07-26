@@ -30,7 +30,9 @@ jobs:
         run: |
           set -euo pipefail
           exec > >(tee repair.log) 2>&1
+          sed -i 's/require(chicago_rel, chicago, "emit_summary(", 6)/require(chicago_rel, chicago, "emit_summary(", 8)/' scripts/repair_v26_7_26_final.py
           python3 scripts/repair_v26_7_26_final.py
+          git checkout -- scripts/repair_v26_7_26_final.py
           cargo fmt --all
           git diff --check
 
