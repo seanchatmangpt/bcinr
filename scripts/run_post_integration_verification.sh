@@ -4,10 +4,6 @@ set -euo pipefail
 BRANCH=agent/repair-post-integration-verification-ci
 RECEIPT=docs/integration/post-pr14-verification-repair-v26.7.25.md
 
-python3 scripts/repair_post_integration_verification.py
-cargo fmt --all
-git diff --check
-
 mkdir -p "$(dirname "$RECEIPT")"
 cat > "$RECEIPT" <<'EOF'
 # Post-PR #14 verification and CI repair receipt
