@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - tools/bcinr-release/**
+      - release/v26.7.28/**
       - Cargo.toml
       - Cargo.lock
       - .github/workflows/v26-7-28-release-tool-closure.yml
@@ -50,36 +51,65 @@ jobs:
           toolchain: nightly-2026-07-25
           components: rustfmt,clippy
 
-      - name: Wire the pure standing law
+      - name: Apply observed compiler repairs and wire standing law
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
 
-          path = Path('tools/bcinr-release/src/main.rs')
-          source = path.read_text()
+          def replace_once(source: str, old: str, new: str, label: str) -> str:
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label} boundary changed: observed {count}')
+              return source.replace(old, new, 1)
 
-          module_marker = 'mod provenance;\n'
-          if source.count(module_marker) != 1 or 'mod standing;' in source:
-              raise SystemExit('standing module boundary changed')
-          source = source.replace(module_marker, module_marker + 'mod standing;\n', 1)
-
-          import_marker = 'use serde::Serialize;\n'
-          if source.count(import_marker) != 1 or 'StandingInputs' in source:
-              raise SystemExit('standing import boundary changed')
-          source = source.replace(
-              import_marker,
-              'use crate::standing::{calculate as calculate_standing, StandingInputs};\n' + import_marker,
-              1,
+          main_path = Path('tools/bcinr-release/src/main.rs')
+          main = main_path.read_text()
+          main = replace_once(
+              main,
+              '#![cfg_attr(unix, feature(unix_kill_process_group))]\n',
+              '#![cfg_attr(unix, feature(unix_send_signal))]\n',
+              'unix signal feature',
+          )
+          main = replace_once(main, 'mod provenance;\n', 'mod provenance;\nmod standing;\n', 'standing module')
+          main = replace_once(
+              main,
+              'use serde::Serialize;\n',
+              'use crate::standing::{calculate as calculate_standing, StandingInputs};\nuse serde::Serialize;\n',
+              'standing import',
+          )
+          main = replace_once(
+              main,
+              '        let mut stop_reason = None;\n',
+              "        let mut stop_reason: Option<&'static str> = None;\n",
+              'stop reason type',
+          )
+          main = replace_once(
+              main,
+              '            if let Some(reason) = &stop_reason {\n',
+              '            if let Some(reason) = stop_reason {\n',
+              'stop reason admission',
+          )
+          main = replace_once(
+              main,
+              '                    stop_reason =\n                        Some("execution authority changed during verification".to_owned());\n',
+              '                    stop_reason =\n                        Some("execution authority changed during verification");\n',
+              'executable change reason',
+          )
+          main = replace_once(
+              main,
+              '                    stop_reason = Some("repository mutation stopped subsequent rails".to_owned());\n',
+              '                    stop_reason = Some("repository mutation stopped subsequent rails");\n',
+              'repository mutation reason',
           )
 
           start_marker = '    let standing = if blocked {'
           end_marker = '\n\n    let evidence_material = EvidenceMaterial {'
-          if source.count(start_marker) != 1 or source.count(end_marker) != 1:
+          if main.count(start_marker) != 1 or main.count(end_marker) != 1:
               raise SystemExit('standing calculation boundary changed')
-          start = source.index(start_marker)
-          end = source.index(end_marker, start)
+          start = main.index(start_marker)
+          end = main.index(end_marker, start)
           replacement = '''    let standing = calculate_standing(StandingInputs {
               blocked,
               required_rail_failure,
@@ -89,8 +119,44 @@ jobs:
               optional_artifact_failure,
               optional_identity_failure,
           });'''
-          source = source[:start] + replacement + source[end:]
-          path.write_text(source)
+          main = main[:start] + replacement + main[end:]
+          main_path.write_text(main)
+
+          executor_path = Path('tools/bcinr-release/src/executor.rs')
+          executor = executor_path.read_text()
+          executor = replace_once(
+              executor,
+              '            let candidate = directory.join(format!("{program}{extension}"));\n',
+              '            let mut file_name = OsString::from(program);\n            file_name.push(extension);\n            let candidate = directory.join(file_name);\n',
+              'executable suffix construction',
+          )
+          executor_path.write_text(executor)
+
+          profile_path = Path('release/v26.7.28/production.json')
+          profile = profile_path.read_text()
+          profile = replace_once(
+              profile,
+              'allow-features=linux_pidfd,unix_kill_process_group',
+              'allow-features=linux_pidfd,unix_send_signal',
+              'nightly allow-features policy',
+          )
+          profile_path.write_text(profile)
+
+          readme_path = Path('tools/bcinr-release/README.md')
+          readme = readme_path.read_text()
+          readme = replace_once(
+              readme,
+              '- `unix_kill_process_group` for descendant-complete timeout termination.',
+              '- `unix_send_signal` for descendant-complete process-group signal delivery.',
+              'nightly feature documentation',
+          )
+          readme = replace_once(
+              readme,
+              'allow-features=linux_pidfd,unix_kill_process_group',
+              'allow-features=linux_pidfd,unix_send_signal',
+              'nightly feature fence documentation',
+          )
+          readme_path.write_text(readme)
           PY
 
       - name: Format release crate
@@ -168,6 +234,9 @@ jobs:
           allowed = {
               'Cargo.lock',
               'tools/bcinr-release/src/main.rs',
+              'tools/bcinr-release/src/executor.rs',
+              'tools/bcinr-release/README.md',
+              'release/v26.7.28/production.json',
               '.github/workflows/v26-7-28-release-tool-closure.yml',
           }
           output = subprocess.check_output(
@@ -191,7 +260,11 @@ jobs:
           set -euo pipefail
           rm .github/workflows/v26-7-28-release-tool-closure.yml
           git diff --check
-          git add Cargo.lock tools/bcinr-release/src/main.rs \
+          git add Cargo.lock \
+            tools/bcinr-release/src/main.rs \
+            tools/bcinr-release/src/executor.rs \
+            tools/bcinr-release/README.md \
+            release/v26.7.28/production.json \
             .github/workflows/v26-7-28-release-tool-closure.yml
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
