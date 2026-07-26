@@ -175,4 +175,24 @@ jobs:
 
       - name: Compile Divan temporal benchmarks
         working-directory: bcinr
-        run: cargo bench -p bcinr-pddl --bench temporal_swarm_v26_7_28 --no-run
+        shell: bash
+        run: |
+          set +e
+          cargo bench -p bcinr-pddl --bench temporal_swarm_v26_7_28 --no-run \
+            > /tmp/v26-7-28-bench.log 2>&1
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            tail -n 160 /tmp/v26-7-28-bench.log
+            exit "$status"
+          fi
+          tail -n 30 /tmp/v26-7-28-bench.log
+
+      - name: Retain benchmark diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v26-7-28-benchmark-diagnostic
+          path: /tmp/v26-7-28-bench.log
+          if-no-files-found: ignore
+          retention-days: 7
