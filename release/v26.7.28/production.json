@@ -38,7 +38,7 @@
         "bcinr-release",
         "--",
         "-Z",
-        "allow-features=linux_pidfd,unix_kill_process_group"
+        "allow-features=linux_pidfd,unix_kill_process_group,unix_send_signal"
       ],
       "timeout_seconds": 1200
     },

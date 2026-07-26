@@ -77,9 +77,10 @@ Evidence is emitted only under a new, empty `target/` directory. The engine:
 The crate intentionally uses two narrowly fenced standard-library nightly features:
 
 - `linux_pidfd` for race-free Linux child supervision;
-- `unix_kill_process_group` for descendant-complete timeout termination.
+- `unix_kill_process_group` for descendant-complete timeout termination;
+- `unix_send_signal` for the process-group signal operation used by that termination path.
 
-The release profile compiles the crate through `-Z allow-features=linux_pidfd,unix_kill_process_group`, preventing unrelated unstable features from entering the verifier.
+The release profile compiles the crate through `-Z allow-features=linux_pidfd,unix_kill_process_group,unix_send_signal`, preventing unrelated unstable features from entering the verifier.
 
 Cargo nightly rails additionally produce SBOM precursor files and two independently built, path-trimmed release binaries whose bytes must match.
 

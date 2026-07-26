@@ -211,9 +211,7 @@ pub fn execute_rail(
 
     let outcome = if timed_out {
         RailOutcome::TimedOut
-    } else if execution_error.is_some() {
-        RailOutcome::EvidenceFailure
-    } else if log_failed {
+    } else if execution_error.is_some() || log_failed {
         RailOutcome::EvidenceFailure
     } else if executable_changed {
         RailOutcome::ExecutableChanged
@@ -444,6 +442,10 @@ fn join_log_pump(handle: JoinHandle<LogCapture>, path: &Path) -> LogReceipt {
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "failure receipt construction preserves explicit bounded evidence fields"
+)]
 fn failed_receipt(
     spec: &RailSpec,
     command: Vec<String>,
@@ -555,7 +557,9 @@ fn search_path(program: &str) -> Result<PathBuf, String> {
             continue;
         }
         for extension in &extensions {
-            let candidate = directory.join(format!("{program}{extension}"));
+            let mut file_name = OsString::from(program);
+            file_name.push(extension);
+            let candidate = directory.join(file_name);
             if fs::symlink_metadata(&candidate).is_ok() {
                 return Ok(candidate);
             }

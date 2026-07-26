@@ -344,6 +344,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bcinr-release"
+version = "26.7.28"
+dependencies = [
+ "blake3",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "bcinr-reporter"
 version = "26.7.25"
 dependencies = [

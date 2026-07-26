@@ -133,10 +133,8 @@ pub fn normalize_remote_repository(remote: &str) -> Option<String> {
         value
     } else if let Some(value) = trimmed.strip_prefix("https://github.com/") {
         value
-    } else if let Some(value) = trimmed.strip_prefix("http://github.com/") {
-        value
     } else {
-        return None;
+        trimmed.strip_prefix("http://github.com/")?
     };
 
     let mut parts = path.split('/');

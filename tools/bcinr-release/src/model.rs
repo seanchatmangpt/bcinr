@@ -92,7 +92,15 @@ pub enum Standing {
     PartialAlive,
     Blocked,
     BuildBroken,
+    #[expect(
+        dead_code,
+        reason = "reserved receipt standing for incomplete observations"
+    )]
     Unknown,
+    #[expect(
+        dead_code,
+        reason = "reserved receipt standing for unsupported verifier boundaries"
+    )]
     Unsupported,
 }
 
@@ -122,7 +130,6 @@ pub enum IssueCode {
     ProvenanceIncomplete,
     ExecutableChanged,
     RepositoryMutated,
-    EvidenceWriteFailed,
 }
 
 #[derive(Debug, Clone, Serialize)]

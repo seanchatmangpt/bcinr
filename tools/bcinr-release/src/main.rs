@@ -1,5 +1,6 @@
 #![cfg_attr(target_os = "linux", feature(linux_pidfd))]
 #![cfg_attr(unix, feature(unix_kill_process_group))]
+#![cfg_attr(unix, feature(unix_send_signal))]
 #![forbid(unsafe_code)]
 
 mod config;
@@ -7,6 +8,7 @@ mod executor;
 mod fs_safety;
 mod model;
 mod provenance;
+mod standing;
 
 use crate::config::{load_profile, validate_output_directory, validate_repo_relative};
 use crate::executor::{
@@ -21,6 +23,7 @@ use crate::model::{
     AdmissionIssue, ArtifactEntryReceipt, ArtifactReceipt, ByteIdentityReceipt, IssueCode,
     RailOutcome, RailReceipt, ReleaseReceipt, Standing, RECEIPT_SCHEMA_VERSION,
 };
+use crate::standing::{calculate as calculate_standing, StandingInputs};
 use serde::Serialize;
 use std::collections::BTreeSet;
 use std::env;
@@ -131,9 +134,9 @@ fn run() -> Result<Standing, String> {
         );
     } else {
         let source_date_epoch = provenance_before.commit_unix_seconds;
-        let mut stop_reason = None;
+        let mut stop_reason: Option<&'static str> = None;
         for rail in &profile.rails {
-            if let Some(reason) = &stop_reason {
+            if let Some(reason) = stop_reason {
                 rails.push(skipped_receipt(rail, reason));
                 continue;
             }
@@ -152,8 +155,7 @@ fn run() -> Result<Standing, String> {
                         message: format!("rail {} executable changed during execution", rail.id),
                         blocking: true,
                     });
-                    stop_reason =
-                        Some("execution authority changed during verification".to_owned());
+                    stop_reason = Some("execution authority changed during verification");
                 }
                 RailOutcome::RepositoryMutated => {
                     issues.push(AdmissionIssue {
@@ -161,7 +163,7 @@ fn run() -> Result<Standing, String> {
                         message: format!("rail {} mutated repository state", rail.id),
                         blocking: true,
                     });
-                    stop_reason = Some("repository mutation stopped subsequent rails".to_owned());
+                    stop_reason = Some("repository mutation stopped subsequent rails");
                 }
                 _ => {}
             }
@@ -199,17 +201,15 @@ fn run() -> Result<Standing, String> {
         .any(|identity| !identity.required && !identity.identical);
     let blocked = issues.iter().any(|issue| issue.blocking);
 
-    let standing = if blocked {
-        Standing::Blocked
-    } else if required_rail_failure {
-        Standing::BuildBroken
-    } else if required_artifact_failure || required_identity_failure {
-        Standing::Blocked
-    } else if optional_rail_failure || optional_artifact_failure || optional_identity_failure {
-        Standing::PartialAlive
-    } else {
-        Standing::Alive
-    };
+    let standing = calculate_standing(StandingInputs {
+        blocked,
+        required_rail_failure,
+        required_artifact_failure,
+        required_identity_failure,
+        optional_rail_failure,
+        optional_artifact_failure,
+        optional_identity_failure,
+    });
 
     let evidence_material = EvidenceMaterial {
         profile_blake3: &loaded.blake3,
