@@ -1,8 +1,22 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "release": "26.7.28",
   "repository": "seanchatmangpt/bcinr",
-  "output_directory": "target/release-evidence/v26.7.28",
+  "output_directory": "target/release-evidence/v26.7.28/local",
+  "max_log_bytes": 33554432,
+  "inherited_environment": [
+    "PATH",
+    "HOME",
+    "USER",
+    "TMPDIR",
+    "CARGO_HOME",
+    "RUSTUP_HOME",
+    "RUSTUP_TOOLCHAIN",
+    "SCCACHE_DIR",
+    "CI",
+    "GITHUB_ACTIONS",
+    "GITHUB_WORKSPACE"
+  ],
   "rails": [
     {
       "id": "format",
@@ -12,11 +26,121 @@
       "timeout_seconds": 600
     },
     {
+      "id": "release-tool-nightly-feature-fence",
+      "phase": "static",
+      "program": "cargo",
+      "args": [
+        "rustc",
+        "--locked",
+        "-p",
+        "bcinr-release",
+        "--bin",
+        "bcinr-release",
+        "--",
+        "-Z",
+        "allow-features=linux_pidfd,unix_kill_process_group"
+      ],
+      "timeout_seconds": 1200
+    },
+    {
       "id": "release-tool-tests",
       "phase": "unit",
       "program": "cargo",
       "args": ["test", "--locked", "-p", "bcinr-release"],
       "timeout_seconds": 900
+    },
+    {
+      "id": "release-tool-miri",
+      "phase": "verification",
+      "program": "cargo",
+      "args": ["miri", "test", "--locked", "-p", "bcinr-release"],
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "release-tool-clippy",
+      "phase": "static",
+      "program": "cargo",
+      "args": [
+        "clippy",
+        "--locked",
+        "-p",
+        "bcinr-release",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "timeout_seconds": 1200
+    },
+    {
+      "id": "nightly-sbom-precursors",
+      "phase": "supply-chain",
+      "program": "cargo",
+      "args": ["-Z", "sbom", "build", "--locked", "-p", "bcinr-release"],
+      "timeout_seconds": 1800,
+      "environment": {
+        "CARGO_TARGET_DIR": "target/sbom"
+      }
+    },
+    {
+      "id": "reproducible-release-build-a",
+      "phase": "reproducibility",
+      "program": "cargo",
+      "args": [
+        "-Z",
+        "trim-paths",
+        "build",
+        "--locked",
+        "--release",
+        "-p",
+        "bcinr-release"
+      ],
+      "timeout_seconds": 1800,
+      "environment": {
+        "CARGO_PROFILE_RELEASE_TRIM_PATHS": "all",
+        "CARGO_TARGET_DIR": "target/repro-a"
+      }
+    },
+    {
+      "id": "reproducible-release-build-b",
+      "phase": "reproducibility",
+      "program": "cargo",
+      "args": [
+        "-Z",
+        "trim-paths",
+        "build",
+        "--locked",
+        "--release",
+        "-p",
+        "bcinr-release"
+      ],
+      "timeout_seconds": 1800,
+      "environment": {
+        "CARGO_PROFILE_RELEASE_TRIM_PATHS": "all",
+        "CARGO_TARGET_DIR": "target/repro-b"
+      }
+    },
+    {
+      "id": "cargo-audit",
+      "phase": "supply-chain",
+      "program": "cargo",
+      "args": ["audit", "--file", "Cargo.lock", "--deny", "warnings"],
+      "timeout_seconds": 1200
+    },
+    {
+      "id": "cargo-deny",
+      "phase": "supply-chain",
+      "program": "cargo",
+      "args": [
+        "deny",
+        "--config",
+        "release/v26.7.28/deny.toml",
+        "check",
+        "advisories",
+        "licenses",
+        "sources"
+      ],
+      "timeout_seconds": 1800
     },
     {
       "id": "locked-metadata",
@@ -36,7 +160,15 @@
       "id": "workspace-clippy",
       "phase": "static",
       "program": "cargo",
-      "args": ["clippy", "--locked", "--workspace", "--all-targets", "--", "-D", "warnings"],
+      "args": [
+        "clippy",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
       "timeout_seconds": 3600
     },
     {
@@ -50,42 +182,91 @@
       "id": "temporal-swarm-tests",
       "phase": "e2e",
       "program": "cargo",
-      "args": ["test", "--locked", "-p", "bcinr-pddl", "--test", "temporal_swarm_v26_7_28", "--", "--nocapture"],
+      "args": [
+        "test",
+        "--locked",
+        "-p",
+        "bcinr-pddl",
+        "--test",
+        "temporal_swarm_v26_7_28",
+        "--",
+        "--nocapture"
+      ],
       "timeout_seconds": 1800
     },
     {
       "id": "manufactured-scenario-tests",
       "phase": "e2e",
       "program": "cargo",
-      "args": ["test", "--locked", "-p", "bcinr-pddl", "--test", "manufactured_swarm_scenarios_v26_7_28", "--", "--nocapture"],
+      "args": [
+        "test",
+        "--locked",
+        "-p",
+        "bcinr-pddl",
+        "--test",
+        "manufactured_swarm_scenarios_v26_7_28",
+        "--",
+        "--nocapture"
+      ],
       "timeout_seconds": 1800
     },
     {
       "id": "wasm-target-check",
       "phase": "cross-target",
       "program": "cargo",
-      "args": ["check", "--locked", "-p", "bcinr-pddl", "--target", "wasm32-unknown-unknown"],
+      "args": [
+        "check",
+        "--locked",
+        "-p",
+        "bcinr-pddl",
+        "--target",
+        "wasm32-unknown-unknown"
+      ],
       "timeout_seconds": 1800
     },
     {
       "id": "ffi-c11-smoke",
       "phase": "ffi",
       "program": "cc",
-      "args": ["-std=c11", "-Wall", "-Wextra", "-Werror", "-I", "contracts/v26.7.28", "-fsyntax-only", "release/v26.7.28/smoke/ffi.c"],
+      "args": [
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-I",
+        "contracts/v26.7.28",
+        "-fsyntax-only",
+        "release/v26.7.28/smoke/ffi.c"
+      ],
       "timeout_seconds": 300
     },
     {
       "id": "temporal-benchmark-compile",
       "phase": "benchmark",
       "program": "cargo",
-      "args": ["bench", "--locked", "-p", "bcinr-pddl", "--bench", "temporal_swarm_v26_7_28", "--no-run"],
+      "args": [
+        "bench",
+        "--locked",
+        "-p",
+        "bcinr-pddl",
+        "--bench",
+        "temporal_swarm_v26_7_28",
+        "--no-run"
+      ],
       "timeout_seconds": 3600
     },
     {
       "id": "temporal-benchmark-execute",
       "phase": "benchmark",
       "program": "cargo",
-      "args": ["bench", "--locked", "-p", "bcinr-pddl", "--bench", "temporal_swarm_v26_7_28"],
+      "args": [
+        "bench",
+        "--locked",
+        "-p",
+        "bcinr-pddl",
+        "--bench",
+        "temporal_swarm_v26_7_28"
+      ],
       "timeout_seconds": 3600
     }
   ],
@@ -113,9 +294,29 @@
     {
       "id": "conformance-vectors",
       "path": "contracts/v26.7.28/conformance_vectors.json"
+    },
+    {
+      "id": "nightly-sbom-files",
+      "path": "target/sbom",
+      "recursive": true,
+      "suffix": ".cargo-sbom.json",
+      "minimum_files": 1
+    },
+    {
+      "id": "reproducible-binary-a",
+      "path": "target/repro-a/release/bcinr-release"
+    },
+    {
+      "id": "reproducible-binary-b",
+      "path": "target/repro-b/release/bcinr-release"
     }
   ],
   "byte_identity": [
+    {
+      "id": "release-tool-reproducibility",
+      "left": "target/repro-a/release/bcinr-release",
+      "right": "target/repro-b/release/bcinr-release"
+    },
     {
       "id": "runtime-profile-identity",
       "left": "target/release-input/ggen/examples/bcinr-v26-7-28/generated/temporal_contract.rs",
