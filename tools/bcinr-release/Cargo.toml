@@ -11,3 +11,15 @@ description = "Fail-closed release admission and evidence aggregation for BCINR"
 blake3 = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+[lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+
+[lints.clippy]
+dbg_macro = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+unwrap_used = "deny"
