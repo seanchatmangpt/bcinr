@@ -43,8 +43,53 @@ jobs:
       - name: Compile CMCA Divan target
         run: cargo check -p bcinr-bench --bench cmca_execution_bench
 
+      - name: Commit normalized source and lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Cargo.lock bcinr-bench/Cargo.toml bcinr-bench/benches/cmca_execution_bench.rs
+          if git diff --cached --quiet; then
+            echo 'No normalization changes to commit.'
+          else
+            git commit -m 'bench(cmca): normalize Divan execution suite'
+            git push
+          fi
+
       - name: Lint CMCA Divan target
-        run: cargo clippy -p bcinr-bench --bench cmca_execution_bench -- -D warnings
+        id: clippy
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo clippy -p bcinr-bench --bench cmca_execution_bench -- -D warnings 2>&1 | tee /tmp/cmca-divan-clippy.txt
+
+      - name: Persist Clippy diagnostic
+        if: steps.clippy.outcome == 'failure'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs/testing
+          {
+            echo '# CMCA Divan Clippy Diagnostic'
+            echo
+            echo '- Workflow run: `${{ github.run_id }}`'
+            echo '- Source commit: `${{ github.sha }}`'
+            echo
+            echo '```text'
+            cat /tmp/cmca-divan-clippy.txt
+            echo '```'
+          } > docs/testing/cmca-divan-clippy-diagnostic.md
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/testing/cmca-divan-clippy-diagnostic.md
+          git commit -m 'test(cmca): receipt Divan Clippy diagnostic'
+          git push
+
+      - name: Enforce Clippy result
+        if: steps.clippy.outcome == 'failure'
+        run: exit 1
 
       - name: Execute CMCA Divan baseline
         shell: bash
@@ -79,19 +124,15 @@ jobs:
             echo '```'
           } > docs/testing/cmca-divan-execution-v26.7.25.md
 
-      - name: Commit normalized benchmark and receipt
+      - name: Commit benchmark receipt
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add \
-            Cargo.lock \
-            bcinr-bench/Cargo.toml \
-            bcinr-bench/benches/cmca_execution_bench.rs \
-            docs/testing/cmca-divan-execution-v26.7.25.md
+          git add docs/testing/cmca-divan-execution-v26.7.25.md
           if git diff --cached --quiet; then
-            echo 'No generated changes to commit.'
+            echo 'No benchmark receipt to commit.'
           else
             git commit -m 'bench(cmca): receipt Divan execution baseline'
             git push
