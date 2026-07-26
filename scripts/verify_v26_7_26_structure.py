@@ -58,17 +58,37 @@ def extract_block(text: str, marker: str) -> str:
     return ""
 
 
-def rust_code_lines(text: str) -> str:
-    """Return executable-looking Rust lines, excluding comment-only evidence.
+def rust_tokens(text: str) -> str:
+    """Return Rust syntax tokens while excluding comments and string payloads.
 
-    The swarm scenarios intentionally document the zero-LLM invariant and show
-    forbidden grep examples in doc comments. Those mentions are evidence, not
-    calls. Admission therefore scans code and manifests for actuation surfaces
-    rather than rejecting negative documentation.
+    Negative documentation and assertion messages may name forbidden providers.
+    Actual calls still expose import/path identifiers such as `reqwest::Client`
+    or `std::net::TcpStream`, which remain after this normalization.
     """
-    return "\n".join(
+    code = "\n".join(
         line for line in text.splitlines() if not line.lstrip().startswith("//")
     )
+    return re.sub(r'"(?:\\.|[^"\\])*"', '""', code)
+
+
+def dependency_keys(manifest: str) -> set[str]:
+    keys: set[str] = set()
+    in_dependencies = False
+    for raw_line in manifest.splitlines():
+        line = raw_line.strip()
+        if line.startswith("[") and line.endswith("]"):
+            in_dependencies = line in {
+                "[dependencies]",
+                "[dev-dependencies]",
+                "[build-dependencies]",
+            }
+            continue
+        if not in_dependencies or not line or line.startswith("#"):
+            continue
+        match = re.match(r"([A-Za-z0-9_-]+)\s*=", line)
+        if match:
+            keys.add(match.group(1).lower().replace("-", "_"))
+    return keys
 
 
 def phase1() -> None:
@@ -137,20 +157,29 @@ def phase5() -> None:
     if len(tests) != 10:
         fail(f"expected exactly 10 swarm scenario files, found {len(tests)}")
 
-    # Zero LLM calls means zero executable network/model actuation surfaces.
-    # Negative documentation such as "grep openai" is deliberately excluded.
-    forbidden_actuation = re.compile(
+    forbidden_crates = {
+        "async_openai",
+        "anthropic",
+        "openai",
+        "reqwest",
+        "ureq",
+        "hyper",
+        "tonic",
+    }
+    forbidden_tokens = re.compile(
         r"\b(?:async_openai|anthropic|openai|reqwest|ureq|hyper|"
         r"TcpStream|UdpSocket|std::net|tokio::net|std::process::Command)\b",
         re.IGNORECASE,
     )
     manifest = require_file("crates/bcinr-powl/Cargo.toml")
-    if forbidden_actuation.search(rust_code_lines(manifest)):
-        fail("crates/bcinr-powl/Cargo.toml: contains an LLM/network actuation dependency")
+    dependencies = dependency_keys(manifest)
+    present = sorted(dependencies & forbidden_crates)
+    if present:
+        fail(f"crates/bcinr-powl/Cargo.toml: forbidden actuation dependencies {present}")
 
     for test in tests:
         text = test.read_text(encoding="utf-8")
-        if forbidden_actuation.search(rust_code_lines(text)):
+        if forbidden_tokens.search(rust_tokens(text)):
             fail(f"{test.relative_to(ROOT)}: contains an executable LLM/network actuation token")
         if not re.search(r"\bassert(?:_eq|_ne)?!", text):
             fail(f"{test.relative_to(ROOT)}: contains no executable assertion")
