@@ -62,6 +62,7 @@ mod semantic_features;
 mod sexpr;
 #[cfg(feature = "mfw-planner")]
 pub mod task;
+pub mod temporal_production;
 #[cfg(feature = "mfw-planner")]
 pub mod workflow_cmd;
 pub use capability::{
@@ -128,6 +129,10 @@ pub use search::{
 };
 #[cfg(feature = "mfw-planner")]
 pub use task::{execute_cognitive_task, OwnedPddlTask, PddlTask};
+pub use temporal_production::{
+    execute_temporal_pddl_to_powl, validate_temporal_plan_shape, TemporalPowlExecution,
+    TemporalPowlRuntime, TemporalProductionError,
+};
 #[cfg(feature = "mfw-planner")]
 pub use workflow_cmd::*;
 
