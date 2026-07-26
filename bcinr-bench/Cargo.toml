@@ -15,6 +15,7 @@ readme = "../README.md"
 criterion = "0.5"
 divan = "0.1"
 bcinr-core = { path = "../bcinr-core", version = "26.7.25" }
+bcinr-cmca = { path = "../crates/bcinr-cmca", version = "26.7.25" }
 bcinr-logic = { path = "../crates/bcinr-logic", version = "26.7.25", features = ["bench", "alloc"] }
 bcinr-pddl = { path = "../crates/bcinr-pddl" }
 bcinr-mcp = { path = "../crates/bcinr-mcp" }
@@ -71,6 +72,10 @@ harness = false
 
 [[bench]]
 name = "mfw_hotpath_bench"
+harness = false
+
+[[bench]]
+name = "cmca_execution_bench"
 harness = false
 
 [[example]]
