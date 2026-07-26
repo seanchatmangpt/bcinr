@@ -1,470 +1,248 @@
-#!/bin/bash
-set -euo pipefail
+#!/usr/bin/env bash
+set -uo pipefail
 
-# generate_v26_7_26_report.sh — v26.7.26 Verification Report Generator
-# Aggregates test, benchmark, and mutation results for verification
-# Exit: 0 if all phases ALIVE, 1 if any BLOCKED
+# BCINR v26.7.26 executable verifier.
+# Every ALIVE state is derived from an observed command exit code. The script
+# never embeds expected test counts, benchmark timings, or mutation outcomes.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REPORT_DIR="${REPO_ROOT}/docs/verification"
-REPORT_FILE="${REPORT_DIR}/v26_7_26_verification_report.md"
+RUN_ID="${BCINR_VERIFICATION_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
+EVIDENCE_ROOT="${BCINR_VERIFICATION_DIR:-${REPO_ROOT}/target/v26.7.26-verification/${RUN_ID}}"
+LOG_DIR="${EVIDENCE_ROOT}/logs"
+LEDGER="${EVIDENCE_ROOT}/ledger.tsv"
+REPORT="${EVIDENCE_ROOT}/v26_7_26_verification_report.md"
+mkdir -p "${LOG_DIR}"
+printf 'phase\tcheck\tlabel\texit_code\tduration_seconds\ttest_summary\tlog\tcommand\n' > "${LEDGER}"
 
-mkdir -p "${REPORT_DIR}"
-
-# Phase tracking (bash-4.3 compatible without associative arrays)
-PHASE_1_STATUS="ALIVE"
-PHASE_2_STATUS="ALIVE"
-PHASE_3_STATUS="ALIVE"
-PHASE_4_STATUS="ALIVE"
-PHASE_5_STATUS="PARTIAL_ALIVE"
-PHASE_6_STATUS="PARTIAL_ALIVE"
-
-PHASE_1_CMD=""
-PHASE_2_CMD=""
-PHASE_3_CMD=""
-PHASE_4_CMD=""
-PHASE_5_CMD=""
-PHASE_6_CMD=""
-
-# Quick verification helper
-verify_workspace() {
-    cd "${REPO_ROOT}" && cargo check --quiet 2>&1 >/dev/null && return 0 || return 1
-}
-
-log_info() {
-    echo "[INFO] $*" >&2
-}
-
-log_error() {
-    echo "[ERROR] $*" >&2
-}
-
-# Verify workspace compiles
-log_info "Verifying workspace..."
-if verify_workspace; then
-    log_info "Workspace verified"
-else
-    log_error "Workspace verification failed"
-    PHASE_1_STATUS="BLOCKED"
-    PHASE_1_CMD="cargo check"
+STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+HEAD_SHA="$(git -C "${REPO_ROOT}" rev-parse HEAD 2>/dev/null || printf 'UNKNOWN')"
+TREE_STATE="clean"
+if ! git -C "${REPO_ROOT}" diff --quiet --ignore-submodules -- 2>/dev/null || \
+   ! git -C "${REPO_ROOT}" diff --cached --quiet --ignore-submodules -- 2>/dev/null; then
+    TREE_STATE="dirty"
 fi
 
-# Generate comprehensive markdown report
-generate_report() {
-    log_info "Generating v26.7.26 verification report..."
-
-    cat > "${REPORT_FILE}" << 'EOF'
-# v26.7.26 Verification Report
-
-**Generated:** 2026-07-26
-**Version:** 26.7.26
-**Repository:** bcinr (BranchlessCInRust)
-**Build Status:** ✓ All phases complete
-
----
-
-## Executive Summary
-
-Comprehensive verification of v26.7.26 across six phases: unit tests, integration tests, benchmarks, MCP integration, mutation testing, and chaos injection. System ready for release.
-
----
-
-## Phase Status Overview
-
-| Phase | Status | Description | Failing Command |
-|-------|--------|-------------|-----------------|
-| Phase 1 | ALIVE | Unit Tests | — |
-| Phase 2 | ALIVE | Integration Tests | — |
-| Phase 3 | ALIVE | Benchmarks (Criterion) | — |
-| Phase 4 | ALIVE | MCP Integration Tests | — |
-| Phase 5 | PARTIAL_ALIVE | Mutation Testing | Baseline established |
-| Phase 6 | PARTIAL_ALIVE | Chaos Injection | Known edge cases |
-
----
-
-## Phase 1: Unit Tests
-
-**Status:** ALIVE
-
-All core algorithm unit tests passing across bcinr-logic, bcinr-api, and dependent crates.
-
-### Test Summary
-
-```
-bcinr-core:        ✓ 0 tests
-bcinr-logic:       ✓ 156 tests passed
-bcinr-api:         ✓ 48 tests passed
-bcinr-pddl:        ✓ 89 tests passed
-bcinr-powl:        ✓ 124 tests passed
-bcinr-mcp:         ✓ 23 integration tests passed
-
-Total: 440/440 tests passed (100%)
-Duration: 4.2 minutes
-```
-
-### Coverage by Module
-
-| Module | Tests | Pass Rate | Critical Paths |
-|--------|-------|-----------|-----------------|
-| mask_operations | 18 | 100% | AND, OR, XOR, NAND, NOR |
-| bitset_operations | 24 | 100% | popcount, leading_zeros, trailing_zeros, msb, lsb |
-| utf8_validate | 16 | 100% | Valid/invalid sequences, boundary conditions |
-| dfa_scan | 22 | 100% | State transitions, pattern matching |
-| simd_string | 20 | 100% | SIMD bounds, count bytes |
-| reduce_sequence | 18 | 100% | Accumulator semantics |
-| pddl_parse | 89 | 100% | Domain, problem, grammar rules |
-| powl_compile | 79 | 100% | Sequence, choice, context |
-| receipt_verify | 16 | 100% | BLAKE3 verification |
-
-### Key Findings
-
-- ✓ All algorithm critical paths exercised
-- ✓ No unsafe code violations
-- ✓ Memory safety checks passing
-- ✓ Deterministic ordering verified
-- ✓ O(1)/O(log n) complexity maintained
-
----
-
-## Phase 2: Integration Tests
-
-**Status:** ALIVE
-
-Cross-crate integration verified via test harness and MCP interface.
-
-### Test Targets Passing
-
-```
-bcinr::e2e_main                          ✓ 8 cases
-bcinr-mcp::integration_tests             ✓ 23 tools
-bcinr-mcp::adversarial                   ✓ 12 adversarial cases
-bcinr-mcp::case_studies                  ✓ 6 real-world scenarios
-bcinr-pddl::brce_loop                    ✓ PDDL→Prolog8→BFS→POWL→execute
-```
-
-### MCP Tool Integration (23/23)
-
-| Category | Tools | Status |
-|----------|-------|--------|
-| PDDL | pddl_parse_domain, pddl_parse_problem, pddl_plan, pddl_admit_domain, pddl_domain_info, pddl_temporal_plan_info, manufacture_world | ALIVE |
-| POWL | powl_compile_sequence, powl_compile_choice, powl_admit_context, powl_capability_check, powl_plan_to_tape | ALIVE |
-| Core | bcinr_library_info, bcinr_mask_ops, bcinr_powl_info | ALIVE |
-| Algorithms | utf8_validate, bitset_operations, mcp__bcinr__pddl_plan | ALIVE |
-| Receipts | receipt_inspect | ALIVE |
-
----
-
-## Phase 3: Benchmarks
-
-**Status:** ALIVE
-
-Criterion benchmarks compiled and baseline established for 6 algorithm phases.
-
-### Benchmark Configuration
-
-#### Phase 1: Branchless Primitives
-```
-bitset_operations      [BASELINE]  0.142 µs/op (±0.8%)
-mask_operations        [BASELINE]  0.089 µs/op (±0.6%)
-utf8_validate          [BASELINE]  0.234 µs/op (±1.2%)
-```
-
-#### Phase 2: DFA & String Scanning
-```
-dfa_scan_pattern       [BASELINE]  0.456 µs/op (±1.1%)
-scan_patterns          [BASELINE]  0.523 µs/op (±0.9%)
-deterministic_matching [BASELINE]  0.412 µs/op (±1.3%)
-```
-
-#### Phase 3: SIMD Operations
-```
-simd_string_bounds     [BASELINE]  0.178 µs/op (±0.7%)
-simd_count_bytes       [BASELINE]  0.156 µs/op (±0.5%)
-```
-
-#### Phase 4: Reduce & Collect
-```
-reduce_sequence        [BASELINE]  0.289 µs/op (±0.9%)
-collect_sorted         [BASELINE]  0.334 µs/op (±1.1%)
-```
-
-#### Phase 5: PDDL Planning
-```
-pddl_parse_domain      [BASELINE]  1.234 ms/op (±2.3%)
-pddl_plan_search       [BASELINE]  2.456 ms/op (±3.1%)
-```
-
-#### Phase 6: POWL & Receipts
-```
-powl_compile           [BASELINE]  0.890 µs/op (±0.8%)
-blake3_receipt         [BASELINE]  0.523 µs/op (±0.4%)
-```
-
-### Performance Metrics
-
-| Metric | Target | Actual | Status |
-|--------|--------|--------|--------|
-| Throughput | >= baseline | ✓ | ALIVE |
-| Latency (critical path) | < 5ms | ✓ 2.456ms | ALIVE |
-| Memory regressions | none | ✓ | ALIVE |
-| Branch misprediction rate | < 0.1% | ✓ 0.08% | ALIVE |
-
----
-
-## Phase 4: MCP Integration Tests
-
-**Status:** ALIVE
-
-All 23 MCP tools tested for correctness, completeness, and error handling.
-
-### Tool Categories
-
-| Category | Count | Status | Coverage |
-|----------|-------|--------|----------|
-| PDDL (7 tools) | 7 | ALIVE | 100% |
-| POWL (5 tools) | 5 | ALIVE | 100% |
-| Core (3 tools) | 3 | ALIVE | 100% |
-| Algorithms (6 tools) | 6 | ALIVE | 100% |
-| Receipts (1 tool) | 1 | ALIVE | 100% |
-| Cross-crate (1 tool) | 1 | ALIVE | 100% |
-
-### Tool Test Results
-
-```
-✓ pddl_parse_domain           Input validation, grammar rules
-✓ pddl_parse_problem          Object declarations, initial state
-✓ pddl_plan                   Search, plan validity
-✓ pddl_admit_domain           Type checking, requirement validation
-✓ pddl_domain_info            Metadata extraction
-✓ pddl_temporal_plan_info     Durative action info
-✓ manufacture_world           BLAKE3 receipt generation
-
-✓ powl_compile_sequence       Action sequencing
-✓ powl_compile_choice         Branching logic
-✓ powl_admit_context          Topology routing
-✓ powl_capability_check       Capability masking
-✓ powl_plan_to_tape           Plan compilation
-
-✓ bcinr_library_info          Metadata queries
-✓ bcinr_mask_ops              Bitwise operations
-✓ bcinr_powl_info             POWL runtime info
-
-✓ utf8_validate               Byte sequence validation
-✓ bitset_operations           Bit manipulation
-✓ pddl_plan                   Action planning
-
-✓ receipt_inspect             BLAKE3 verification
-
-✓ system_capabilities         Cross-crate system info
-```
-
----
-
-## Phase 5: Mutation Testing
-
-**Status:** PARTIAL_ALIVE
-
-Mutant test baseline established (11 sentinel mutants tracked).
-
-### Mutant Kill Matrix
-
-| Mutant | Target | Type | Kill Status | Notes |
-|--------|--------|------|-------------|-------|
-| 1 | bitset::popcount | Branch removal | Killed | Boundary detection |
-| 2 | mask_ops::and | Operator swap | Killed | AND→OR mutation caught |
-| 3 | utf8_validate | Bound check | Killed | UTF-8 sequence validation |
-| 4 | dfa_scan::transition | State mutation | Killed | DFA determinism verified |
-| 5 | simd_string::count | Loop mutation | Killed | SIMD operation semantics |
-| 6 | reduce::accumulator | Semantics | Killed | Associativity verified |
-| 7 | pddl::parse | Grammar rule | Killed | Grammar completeness |
-| 8 | powl::compile | Instruction | Killed | Compilation correctness |
-| 9 | receipt::verify | Hash comparison | Killed | Cryptographic integrity |
-| 10 | mask_ops::xor | Operator swap | Killed | XOR→AND mutation caught |
-| 11 | boundary::check | Off-by-one | Killed | Boundary conditions |
-
-**Summary:** 11/11 mutants killed (100% kill rate)
-
-### Mutation Coverage
-
-- **Algorithm coverage:** 100% (all 11 critical paths tested)
-- **Semantic mutations:** All killed
-- **Operator mutations:** All killed
-- **Boundary mutations:** All killed
-
----
-
-## Phase 6: Chaos Injection
-
-**Status:** PARTIAL_ALIVE
-
-System behavior verified under fault injection scenarios.
-
-### Chaos Scenario Results
-
-| Scenario | Passed | Failed | Total | Status |
-|----------|--------|--------|-------|--------|
-| Crash Recovery | 5 | 0 | 5 | ALIVE |
-| Delay Injection | 4 | 1 | 5 | PARTIAL_ALIVE |
-| Duplicate Handling | 4 | 1 | 5 | PARTIAL_ALIVE |
-
-### Crash Recovery (5/5 ✓)
-
-```
-✓ Process crash → recovery via state restoration
-✓ Timeout condition → circuit breaker activation
-✓ Memory pressure → graceful degradation
-✓ Network partition → fallback logic engagement
-✓ Resource exhaustion → backpressure applied
-```
-
-### Delay Injection (4/5)
-
-```
-✓ 10ms delay → SLA met (baseline)
-✓ 50ms delay → SLA met (baseline)
-✓ 100ms delay → SLA met (baseline)
-✗ 500ms delay → SLA exceeded (target: 400ms)
-✓ 1s delay → Fallback successful
-```
-
-**Finding:** 500ms scenario exceeds 400ms SLA by 100ms. Investigated in Phase 7.
-
-### Duplicate Handling (4/5)
-
-```
-✓ Duplicate request → idempotency verified
-✗ Duplicate state update → one path not caught
-✓ Duplicate completion → handled correctly
-✓ Concurrent duplicate → serialized safely
-✓ Out-of-order duplicate → sequencing maintained
-```
-
-**Finding:** Edge case in state machine path for duplicate updates. Catalogued as low-priority issue.
-
----
-
-## Test Summary
-
-### Overall Statistics
-
-| Metric | Value |
-|--------|-------|
-| Total Test Cases | 440 |
-| Passed | 436 |
-| Failed | 0 |
-| Partial/Known Issues | 4 |
-| Pass Rate | 99.1% |
-| Duration | ~5.1 minutes |
-
-### Crate-by-Crate Breakdown
-
-```
-bcinr-core:           100% (0/0 tests, compiles)
-bcinr-logic:          100% (156/156 tests)
-bcinr-api:            100% (48/48 tests)
-bcinr-pddl:           100% (89/89 tests)
-bcinr-powl:           100% (124/124 tests)
-bcinr-mcp:            100% (23/23 integration tests)
-bcinr-bench:          100% (baseline established)
-```
-
-### Issues Catalogued
-
-| ID | Category | Severity | Status |
-|----|----------|----------|--------|
-| CHAOS-001 | Delay SLA | Low | Documented; 500ms scenario marginal |
-| CHAOS-002 | Duplicate edge case | Low | State machine path; rare codepath |
-| PHASE-5-001 | Mutation baseline | Info | 100% kill rate established |
-
----
-
-## Exit Code Determination
-
-```
-Phases Status:
-  Phase 1: ALIVE
-  Phase 2: ALIVE
-  Phase 3: ALIVE
-  Phase 4: ALIVE
-  Phase 5: PARTIAL_ALIVE (acceptable)
-  Phase 6: PARTIAL_ALIVE (acceptable)
-
-No BLOCKED phases detected.
-Exit code: 0 (SUCCESS)
-```
-
----
-
-## Verification Metadata
-
-- **Report Generated:** 2026-07-26T00:52:00Z
-- **CI/CD System:** Local verification
-- **Rust Toolchain:** nightly (MSRV 1.70)
-- **Test Framework:** cargo test, Criterion, cargo-mutants
-- **Timestamp:** 2026-07-26 00:52 UTC
-- **Hash:** BLAKE3(verification_state)
-
----
-
-## Recommendations
-
-1. **Phase 6 (Chaos):** Monitor 500ms delay scenario; consider SLA adjustment or optimization
-2. **Phase 6 (Chaos):** Address duplicate state update edge case in future iteration
-3. **All Phases:** Continue tracking mutation kill rate (target: ≥ 99%)
-4. **All Phases:** Maintain BLAKE3 receipt verification for all releases
-
----
-
-## Next Steps
-
-- [ ] Monitor Phase 6 delay scenario in production
-- [ ] Plan optimization pass for 500ms SLA edge case
-- [ ] File issue for duplicate state update edge case
-- [ ] Continue mutation testing in v26.7.27
-
----
-
-**Status: READY FOR RELEASE** ✅
-
-All critical verification phases ALIVE. Non-critical chaos scenarios partial with documented edge cases. System passes go/no-go criteria for v26.7.26 release.
-
-EOF
-
-    log_info "Report generated: ${REPORT_FILE}"
+sanitize() {
+    printf '%s' "$1" | tr '\t\r\n' '   '
 }
 
-# Main execution
-main() {
-    log_info "v26.7.26 Verification Report Generator"
-    log_info "Report directory: ${REPORT_DIR}"
+summarize_tests() {
+    python3 - "$1" <<'PY'
+import re
+import sys
+from pathlib import Path
+text = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
+rows = re.findall(r"test result: (?:ok|FAILED)\. (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", text)
+if not rows:
+    print("n/a")
+else:
+    totals = [sum(int(row[i]) for row in rows) for i in range(5)]
+    print(f"passed={totals[0]},failed={totals[1]},ignored={totals[2]},measured={totals[3]},filtered={totals[4]}")
+PY
+}
 
-    # Generate report
-    generate_report
+run_check() {
+    local phase="$1"
+    local check="$2"
+    local label="$3"
+    local command="$4"
+    local log="${LOG_DIR}/${check}.log"
+    local start end rc duration summary
 
-    # Summary
-    echo ""
-    log_info "Phase Status Summary:"
-    echo "  Phase 1 (Unit Tests): $PHASE_1_STATUS"
-    echo "  Phase 2 (Integration Tests): $PHASE_2_STATUS"
-    echo "  Phase 3 (Benchmarks): $PHASE_3_STATUS"
-    echo "  Phase 4 (MCP Integration): $PHASE_4_STATUS"
-    echo "  Phase 5 (Mutation Testing): $PHASE_5_STATUS"
-    echo "  Phase 6 (Chaos Injection): $PHASE_6_STATUS"
-    echo ""
+    start="$(date +%s)"
+    printf '[RUN] phase=%s check=%s command=%s\n' "${phase}" "${check}" "${command}" | tee "${log}"
+    (
+        cd "${REPO_ROOT}" || exit 125
+        bash -lc "${command}"
+    ) >> "${log}" 2>&1
+    rc=$?
+    end="$(date +%s)"
+    duration=$((end - start))
+    summary="$(summarize_tests "${log}")"
+    printf '[RECEIPT] exit=%s duration_seconds=%s tests=%s\n' "${rc}" "${duration}" "${summary}" | tee -a "${log}"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+        "$(sanitize "${phase}")" \
+        "$(sanitize "${check}")" \
+        "$(sanitize "${label}")" \
+        "${rc}" \
+        "${duration}" \
+        "$(sanitize "${summary}")" \
+        "$(sanitize "${log#${REPO_ROOT}/}")" \
+        "$(sanitize "${command}")" >> "${LEDGER}"
+    return 0
+}
 
-    # Check for blocked phases
-    if [ "$PHASE_1_STATUS" = "BLOCKED" ] || \
-       [ "$PHASE_2_STATUS" = "BLOCKED" ] || \
-       [ "$PHASE_3_STATUS" = "BLOCKED" ] || \
-       [ "$PHASE_4_STATUS" = "BLOCKED" ]; then
-        log_error "One or more critical phases BLOCKED"
-        echo "Report: ${REPORT_FILE}"
-        return 1
+phase_status() {
+    local phase="$1"
+    python3 - "${LEDGER}" "${phase}" <<'PY'
+import csv
+import sys
+from pathlib import Path
+ledger, phase = sys.argv[1:]
+rows = [row for row in csv.DictReader(Path(ledger).open(), delimiter="\t") if row["phase"] == phase]
+if not rows:
+    print("UNKNOWN")
+elif any(int(row["exit_code"]) != 0 for row in rows):
+    print("BLOCKED")
+else:
+    print("ALIVE")
+PY
+}
+
+# Phase 1 — Temporal Core
+run_check "1" "p1-structure" "Temporal source admission" \
+    "python3 scripts/verify_v26_7_26_structure.py --phase 1"
+run_check "1" "p1-tests" "Temporal conditions and deadlines" \
+    "cargo test -p bcinr-pddl --test temporal_conditions --test temporal_deadlines -- --nocapture"
+
+# Phase 2 — Resource Intervals
+run_check "2" "p2-structure" "Resource interval source admission" \
+    "python3 scripts/verify_v26_7_26_structure.py --phase 2"
+run_check "2" "p2-tests" "Resource lease integration" \
+    "cargo test -p bcinr-pddl --test resource_leases -- --nocapture"
+
+# Phase 3 — Temporal Scheduler
+run_check "3" "p3-structure" "Scheduler lifecycle source admission" \
+    "python3 scripts/verify_v26_7_26_structure.py --phase 3"
+run_check "3" "p3-tests" "Scheduler lifecycle and resource conflicts" \
+    "cargo test -p bcinr-powl --test scheduler_lifecycle --test scheduler_resource_conflict -- --nocapture"
+
+# Phase 4 — Evidence / OCEL
+run_check "4" "p4-structure" "Temporal evidence source admission" \
+    "python3 scripts/verify_v26_7_26_structure.py --phase 4"
+run_check "4" "p4-tests" "OCEL temporal conformance" \
+    "cargo test -p bcinr-powl --test ocel_temporal --test ocel_conformance_temporal -- --nocapture"
+
+# Phase 5 — Swarm Scenarios
+run_check "5" "p5-structure" "Ten-scenario and zero-LLM admission" \
+    "python3 scripts/verify_v26_7_26_structure.py --phase 5"
+mapfile -t SWARM_TESTS < <(cd "${REPO_ROOT}" && printf '%s\n' crates/bcinr-powl/tests/usecase_swarm_*.rs 2>/dev/null | sort)
+if [[ "${#SWARM_TESTS[@]}" -eq 0 || "${SWARM_TESTS[0]}" == *'*'* ]]; then
+    run_check "5" "p5-tests-missing" "Swarm scenario execution" "false"
+else
+    for file in "${SWARM_TESTS[@]}"; do
+        target="$(basename "${file}" .rs)"
+        run_check "5" "p5-${target}" "Swarm scenario ${target}" \
+            "cargo test -p bcinr-powl --test '${target}' -- --nocapture"
+    done
+fi
+
+# Phase 6 — External FFI Contract
+run_check "6" "p6-structure" "FFI contract and version admission" \
+    "python3 scripts/verify_v26_7_26_structure.py --phase 6"
+run_check "6" "p6-tests" "FFI conformance" \
+    "cargo test -p bcinr-ffi --test ffi_conformance -- --nocapture"
+run_check "6" "p6-native" "FFI native build" \
+    "cargo check -p bcinr-ffi --locked"
+run_check "6" "p6-wasm" "FFI wasm32 build" \
+    "cargo check -p bcinr-ffi --target wasm32-unknown-unknown --locked"
+
+# Phase 7a — Hostile Mutants 6–11
+run_check "7a" "p7a-structure" "Performance closure source admission" \
+    "python3 scripts/verify_v26_7_26_structure.py --phase 7"
+for mutant in 6 7 8 9 10 11; do
+    run_check "7a" "p7a-mutant-${mutant}" "Isolated hostile mutant ${mutant}" \
+        "cargo test -p bcinr-cmca --features 'mutant_${mutant}' --test hostile_mutants -- --nocapture"
+done
+
+# Phase 7b — Chaos Harness
+run_check "7b" "p7b-chaos" "Chaos scenarios" \
+    "cargo test -p bcinr-powl --test chaos_scenarios -- --nocapture"
+
+# Phase 7c — Benchmarks
+run_check "7c" "p7c-temporal-bench" "Temporal core benchmark" \
+    "cargo bench -p bcinr-pddl --bench phase1_temporal -- --noplot"
+run_check "7c" "p7c-scheduler-bench" "Temporal scheduler benchmark" \
+    "cargo bench -p bcinr-powl --bench phase3_scheduler -- --noplot"
+
+# Phase 7d — Release hygiene and report integrity
+run_check "7d" "p7d-format" "Formatting" \
+    "cargo fmt --all -- --check"
+run_check "7d" "p7d-clippy" "Release crates clippy" \
+    "cargo clippy -p bcinr-pddl -p bcinr-powl -p bcinr-ffi --all-targets -- -D warnings"
+run_check "7d" "p7d-lock" "Locked dependency graph" \
+    "cargo metadata --locked --format-version 1 --no-deps >/dev/null"
+run_check "7d" "p7d-tree" "Tracked tree remains unchanged" \
+    "git diff --exit-code -- ."
+
+PHASE_KEYS=("1" "2" "3" "4" "5" "6" "7a" "7b" "7c" "7d")
+PHASE_NAMES=(
+    "Temporal Core"
+    "Resource Intervals"
+    "Temporal Scheduler"
+    "Evidence / OCEL"
+    "Swarm Scenarios"
+    "External FFI"
+    "Mutants 6-11"
+    "Chaos Harness"
+    "Benchmarks"
+    "Report and Release Hygiene"
+)
+
+FINISHED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+{
+    printf '# BCINR v26.7.26 Verification Report\n\n'
+    printf -- '- **Run ID:** `%s`\n' "${RUN_ID}"
+    printf -- '- **Started:** `%s`\n' "${STARTED_AT}"
+    printf -- '- **Finished:** `%s`\n' "${FINISHED_AT}"
+    printf -- '- **Commit:** `%s`\n' "${HEAD_SHA}"
+    printf -- '- **Initial tree state:** `%s`\n' "${TREE_STATE}"
+    printf -- '- **Rust:** `%s`\n' "$(rustc --version 2>/dev/null || printf 'UNAVAILABLE')"
+    printf -- '- **Cargo:** `%s`\n\n' "$(cargo --version 2>/dev/null || printf 'UNAVAILABLE')"
+    printf '## Phase Status\n\n'
+    printf '| Phase | Status |\n|---|---|\n'
+    blocked=0
+    alive=0
+    for index in "${!PHASE_KEYS[@]}"; do
+        key="${PHASE_KEYS[$index]}"
+        status="$(phase_status "${key}")"
+        printf '| %s. %s | **%s** |\n' "${key}" "${PHASE_NAMES[$index]}" "${status}"
+        if [[ "${status}" == "ALIVE" ]]; then
+            alive=$((alive + 1))
+        else
+            blocked=$((blocked + 1))
+        fi
+    done
+    printf '\n## Executed Checks\n\n'
+    printf '| Phase | Check | Exit | Seconds | Tests | Log | Command |\n'
+    printf '|---|---|---:|---:|---|---|---|\n'
+    python3 - "${LEDGER}" <<'PY'
+import csv
+import sys
+from pathlib import Path
+for row in csv.DictReader(Path(sys.argv[1]).open(), delimiter="\t"):
+    command = row["command"].replace("|", "\\|")
+    label = row["label"].replace("|", "\\|")
+    summary = row["test_summary"].replace("|", "\\|")
+    log = row["log"].replace("|", "\\|")
+    print(f'| {row["phase"]} | {label} | {row["exit_code"]} | {row["duration_seconds"]} | {summary} | `{log}` | `{command}` |')
+PY
+    printf '\n## Receipt\n\n'
+    printf 'This report is derived from `%s`; every row maps to a retained command log.\n\n' "${LEDGER#${REPO_ROOT}/}"
+    if [[ "${blocked}" -eq 0 ]]; then
+        printf '**BCINR v26.7.26: %s/10 release rails ALIVE. Ready for release.**\n' "${alive}"
     else
-        log_info "All critical phases ALIVE - verification successful"
-        echo "Report: ${REPORT_FILE}"
-        return 0
+        printf '**BCINR v26.7.26: %s/10 release rails ALIVE; %s BLOCKED/UNKNOWN. Cannot ship.**\n' "${alive}" "${blocked}"
     fi
-}
+} > "${REPORT}"
 
-main "$@"
+# Hash the actual evidence after the report exists. SHA-256 is used only as an
+# artifact transport checksum; semantic standing comes from the command ledger.
+(
+    cd "${EVIDENCE_ROOT}" || exit 1
+    find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+)
+
+printf 'Report: %s\n' "${REPORT}"
+printf 'Evidence: %s\n' "${EVIDENCE_ROOT}"
+if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+    printf 'report=%s\n' "${REPORT}" >> "${GITHUB_OUTPUT}"
+    printf 'evidence_root=%s\n' "${EVIDENCE_ROOT}" >> "${GITHUB_OUTPUT}"
+fi
+
+for key in "${PHASE_KEYS[@]}"; do
+    if [[ "$(phase_status "${key}")" != "ALIVE" ]]; then
+        exit 1
+    fi
+done
+exit 0
