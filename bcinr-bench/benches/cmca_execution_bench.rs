@@ -471,7 +471,7 @@ mod end_to_end {
             ModeDelta::ProposeDelta,
         );
         let observatory_result = evaluate(divan::black_box(&artifact));
-        divan::black_box(observatory_result);
+        let _ = divan::black_box(observatory_result);
 
         AllocatorHarness::new().run(
             NonNegativeFixed::ZERO,
