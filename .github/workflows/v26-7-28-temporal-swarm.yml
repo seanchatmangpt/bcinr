@@ -45,7 +45,18 @@ jobs:
 
       - name: Manufacture language-neutral contracts with real ggen
         working-directory: ggen/examples/bcinr-v26-7-28
-        run: cargo run --manifest-path ../../Cargo.toml -p ggen-cli-lib --bin ggen -- sync run
+        shell: bash
+        run: |
+          set +e
+          cargo run --manifest-path ../../Cargo.toml -p ggen-cli-lib --bin ggen -- sync run \
+            > /tmp/bcinr-v26-7-28-ggen.log 2>&1
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            tail -n 120 /tmp/bcinr-v26-7-28-ggen.log
+            exit "$status"
+          fi
+          tail -n 30 /tmp/bcinr-v26-7-28-ggen.log
 
       - name: Project manufactured contracts into BCINR
         run: |
@@ -62,20 +73,28 @@ jobs:
           cp ggen/examples/bcinr-v26-7-28/generated/conformance_vectors.json \
              bcinr/contracts/v26.7.28/conformance_vectors.json
 
-      - name: Publish manufactured projections to the BCINR branch
+      - name: Format source without rewriting generated projections
+        working-directory: bcinr
+        run: |
+          cargo fmt --all
+          if ! git diff --quiet -- crates/bcinr-pddl/src/generated; then
+            echo "ggen Rust projections are not rustfmt-stable" >&2
+            git diff -- crates/bcinr-pddl/src/generated
+            exit 1
+          fi
+
+      - name: Publish manufactured and formatted bytes to the BCINR branch
         if: github.event_name == 'push'
         working-directory: bcinr
         run: |
           git diff --check
-          git add crates/bcinr-pddl/src/generated/temporal_contract.rs
-          git add crates/bcinr-pddl/src/generated/swarm_scenarios.rs
-          git add contracts/v26.7.28
+          git add crates/bcinr-pddl contracts/v26.7.28
           if git diff --cached --quiet; then
-            echo "manufactured projections already match"
+            echo "manufactured projections and source already match"
           else
             git config user.name github-actions[bot]
             git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-            git commit -m "chore(v26.7.28): materialize ggen temporal contracts"
+            git commit -m "chore(v26.7.28): materialize and format temporal runtime"
             git push
           fi
 
