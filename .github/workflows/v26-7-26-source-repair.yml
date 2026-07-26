@@ -1,0 +1,69 @@
+name: v26.7.26 Source Repair Bootstrap
+
+"on":
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  repair-and-prove:
+    if: github.head_ref == 'agent/close-v26-7-26-release-gaps'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Install pinned benchmark compiler
+        run: rustup toolchain install nightly-2026-07-24 --profile minimal
+      - name: Repair source and execute proof ladder
+        shell: bash
+        run: |
+          set -euo pipefail
+          exec > >(tee repair.log) 2>&1
+          python3 scripts/repair_v26_7_26_final.py
+          cargo fmt --all
+          git diff --check
+
+          cargo clippy --workspace --all-targets --all-features -- -D warnings
+          CARGO_PROFILE_BENCH_CODEGEN_UNITS=1 cargo +nightly-2026-07-24 bench -p bcinr-pddl --bench phase1_temporal -- --noplot
+          CARGO_PROFILE_BENCH_CODEGEN_UNITS=1 cargo +nightly-2026-07-24 bench -p bcinr-powl --bench phase3_scheduler -- --noplot
+
+          mapfile -t changed < <(git diff --name-only)
+          allowed=(
+            crates/bcinr-cmca/tests/usecase_ml_fairness_audit.rs
+            crates/bcinr-cmca/tests/usecase_radiation_hardened.rs
+            crates/bcinr-powl/tests/chaos_harness.rs
+            crates/bcinr-powl/tests/chaos_scenarios.rs
+            crates/bcinr-powl/tests/usecase_compliance_audit.rs
+            crates/bcinr-powl/tests/usecase_swarm_02_parallel_independent_workers.rs
+            scripts/generate_v26_7_26_report.sh
+          )
+          printf 'CHANGED FILES\n%s\n' "${changed[*]}"
+          test "${#changed[@]}" -eq "${#allowed[@]}"
+          for expected in "${allowed[@]}"; do
+            printf '%s\n' "${changed[@]}" | grep -Fxq "${expected}"
+          done
+
+          git config user.name 'BCINR Release Verifier'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -- "${allowed[@]}"
+          git commit -m 'fix(release): close final clippy and benchmark blockers'
+          git push origin HEAD:${{ github.head_ref }}
+      - name: Upload source repair receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v26-7-26-source-repair-${{ github.run_id }}-${{ github.run_attempt }}
+          path: repair.log
+          if-no-files-found: warn
+          retention-days: 7
