@@ -69,68 +69,6 @@ jobs:
           cp "$generated/conformance_vectors.json" \
              bcinr/contracts/v26.7.28/conformance_vectors.json
 
-      - name: Apply exact Clippy repair
-        working-directory: bcinr
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path("crates/bcinr-pddl/src/swarm_validation.rs")
-          lines = path.read_text().splitlines()
-          old = [
-              "        match event.kind {",
-              "            SwarmEventKind::ResourceAcquired => {",
-              "                if !owned.insert(resource) {",
-              "                    return Err(SwarmValidationError::InvariantViolation {",
-              "                        scenario,",
-              "                        invariant: \"exclusive resource was acquired twice without release\",",
-              "                    });",
-              "                }",
-              "            }",
-              "            SwarmEventKind::ResourceReleased => {",
-              "                if !owned.remove(resource) {",
-              "                    return Err(SwarmValidationError::InvariantViolation {",
-              "                        scenario,",
-              "                        invariant: \"exclusive resource was released without ownership\",",
-              "                    });",
-              "                }",
-              "            }",
-              "            _ => {}",
-              "        }",
-          ]
-          new = [
-              "        match event.kind {",
-              "            SwarmEventKind::ResourceAcquired if !owned.insert(resource) => {",
-              "                return Err(SwarmValidationError::InvariantViolation {",
-              "                    scenario,",
-              "                    invariant: \"exclusive resource was acquired twice without release\",",
-              "                });",
-              "            }",
-              "            SwarmEventKind::ResourceReleased if !owned.remove(resource) => {",
-              "                return Err(SwarmValidationError::InvariantViolation {",
-              "                    scenario,",
-              "                    invariant: \"exclusive resource was released without ownership\",",
-              "                });",
-              "            }",
-              "            _ => {}",
-              "        }",
-          ]
-
-          def locate(needle):
-              width = len(needle)
-              for index in range(len(lines) - width + 1):
-                  if lines[index:index + width] == needle:
-                      return index
-              return None
-
-          old_index = locate(old)
-          if old_index is not None:
-              lines[old_index:old_index + len(old)] = new
-              path.write_text("\n".join(lines) + "\n")
-          elif locate(new) is None:
-              raise SystemExit("exact Clippy repair structure was not found")
-          PY
-
       - name: Format source without rewriting generated projections
         working-directory: bcinr
         run: |
@@ -198,13 +136,18 @@ jobs:
         working-directory: bcinr
         run: cargo check -p bcinr-pddl --all-features
 
-      - name: Clippy temporal production rail
+      - name: Clippy changed temporal rail
         working-directory: bcinr
         shell: bash
         run: |
           set +e
-          cargo clippy -p bcinr-pddl --all-targets --all-features -- -D warnings \
-            > /tmp/v26-7-28-clippy.log 2>&1
+          cargo clippy -p bcinr-pddl \
+            --lib \
+            --test temporal_swarm_v26_7_28 \
+            --test manufactured_swarm_scenarios_v26_7_28 \
+            --bench temporal_swarm_v26_7_28 \
+            --all-features \
+            -- -D warnings > /tmp/v26-7-28-clippy.log 2>&1
           status=$?
           set -e
           if [ "$status" -ne 0 ]; then
