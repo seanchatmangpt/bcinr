@@ -22,216 +22,168 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt
-      - name: Apply exact observed repairs
+      - name: Apply observed repairs and prove postconditions
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
+          python3 - <<'PY' 2>&1 | tee repair.log
           from pathlib import Path
+          import re
 
-          def replace(path: str, old: str, new: str, expected: int = 1) -> None:
+          def edit(path: str, transform) -> str:
               file = Path(path)
-              text = file.read_text(encoding="utf-8")
-              count = text.count(old)
-              if count != expected:
+              before = file.read_text(encoding="utf-8")
+              after = transform(before)
+              if before == after:
+                  print(f"UNCHANGED {path}")
+              else:
+                  print(f"CHANGED {path}")
+                  file.write_text(after, encoding="utf-8")
+              return after
+
+          def require(path: str, text: str, needle: str, count: int | None = None) -> None:
+              actual = text.count(needle)
+              if actual == 0 or (count is not None and actual != count):
                   raise SystemExit(
-                      f"REPAIR_REFUSED: {path}: expected {expected} occurrence(s), found {count}: {old!r}"
+                      f"REPAIR_REFUSED: {path}: postcondition {needle!r} count={actual}, expected={count or '>=1'}"
                   )
-              file.write_text(text.replace(old, new), encoding="utf-8")
+              print(f"ADMITTED {path}: {needle!r} count={actual}")
 
-          replace(
-              "crates/bcinr-cmca/tests/mutant_kill_g4_cmca.rs",
-              "gd_ok = gd_ok & (lhs <= rhs);",
-              "gd_ok &= lhs <= rhs;",
-              expected=2,
+          mutant_path = "crates/bcinr-cmca/tests/mutant_kill_g4_cmca.rs"
+          mutant = edit(
+              mutant_path,
+              lambda text: text
+                  .replace("gd_ok = gd_ok & (lhs <= rhs);", "gd_ok &= lhs <= rhs;")
+                  .replace("normal_ok = normal_ok & (lhs <= rhs);", "normal_ok &= lhs <= rhs;")
+                  .replace("inverted_ok = inverted_ok & (lhs > rhs);", "inverted_ok &= lhs > rhs;"),
           )
-          replace(
-              "crates/bcinr-cmca/tests/mutant_kill_g4_cmca.rs",
-              "normal_ok = normal_ok & (lhs <= rhs);",
-              "normal_ok &= lhs <= rhs;",
-          )
-          replace(
-              "crates/bcinr-cmca/tests/mutant_kill_g4_cmca.rs",
-              "inverted_ok = inverted_ok & (lhs > rhs);",
-              "inverted_ok &= lhs > rhs;",
-          )
+          require(mutant_path, mutant, "gd_ok &= lhs <= rhs;", 2)
+          require(mutant_path, mutant, "normal_ok &= lhs <= rhs;", 1)
+          require(mutant_path, mutant, "inverted_ok &= lhs > rhs;", 1)
 
-          replace(
-              "crates/bcinr-cmca/tests/usecase_trading_determinism.rs",
-              '''    for i in 0..N {
-                  assert_eq!(
-                      results[0][i], results[1][i],
-                      "identical market state must produce identical allocation for exchange {}",
-                      i
-                  );
-              }''',
-              '''    for (i, (first, second)) in results[0].iter().zip(&results[1]).enumerate() {
-                  assert_eq!(
-                      first, second,
-                      "identical market state must produce identical allocation for exchange {}",
-                      i
-                  );
-              }''',
-          )
-          replace(
-              "crates/bcinr-cmca/tests/usecase_trading_determinism.rs",
-              '''    for i in 0..N {
+          trading_path = "crates/bcinr-cmca/tests/usecase_trading_determinism.rs"
+          def repair_trading(text: str) -> str:
+              text = re.sub(
+                  r"    for i in 0\.\.N \{\n        assert_eq!\(\n            results\[0\]\[i\], results\[1\]\[i\],\n            (\"identical market state[^\n]+\"),\n            i\n        \);\n    \}",
+                  r"    for (i, (first, second)) in results[0].iter().zip(&results[1]).enumerate() {\n        assert_eq!(\n            first, second,\n            \1,\n            i\n        );\n    }",
+                  text,
+                  count=1,
+              )
+              text = re.sub(
+                  r"    for i in 0\.\.N \{\n        assert!\(\n            alloc\[i\]\.val > 0,\n            (\"exchange[^\n]+\"),\n            i\n        \);\n        sum \+= alloc\[i\]\.val as u64;\n    \}",
+                  r"    for (i, allocation) in alloc.iter().enumerate().take(N) {\n        assert!(\n            allocation.val > 0,\n            \1,\n            i\n        );\n        sum += allocation.val as u64;\n    }",
+                  text,
+                  count=1,
+              )
+              text = re.sub(
+                  r"        for i in 0\.\.N \{\n            assert!\(\n                alloc\[i\]\.val > 0,\n                (\"round[^\n]+\"),\n                round,\n                i\n            \);\n        \}",
+                  r"        for (i, allocation) in alloc.iter().enumerate().take(N) {\n            assert!(\n                allocation.val > 0,\n                \1,\n                round,\n                i\n            );\n        }",
+                  text,
+                  count=1,
+              )
+              return text
+          trading = edit(trading_path, repair_trading)
+          require(trading_path, trading, "results[0].iter().zip(&results[1]).enumerate()", 1)
+          require(trading_path, trading, "alloc.iter().enumerate().take(N)", 2)
+
+          consensus_path = "crates/bcinr-powl/tests/usecase_consensus_termination.rs"
+          def repair_consensus(text: str) -> str:
+              replacements = {
+                  "log.record_op_fired(run_id, op_idx, 0).unwrap();":
+                      "log.record_op_fired(run_id, op_idx, ticks, 1).unwrap();",
+                  "log.record_run_sealed(run_id, op_trace).unwrap();":
+                      "log.record_run_sealed(run_id, op_trace, ticks).unwrap();",
+                  "log_correct.record_op_fired(run_id, 0, 0).unwrap();":
+                      "log_correct.record_op_fired(run_id, 0, 0, 1).unwrap();",
+                  "log_correct.record_op_fired(run_id, 1, 0).unwrap();":
+                      "log_correct.record_op_fired(run_id, 1, 1, 1).unwrap();",
+                  "log_correct.record_op_fired(run_id, 2, 0).unwrap();":
+                      "log_correct.record_op_fired(run_id, 2, 2, 1).unwrap();",
+                  "log_correct.record_run_sealed(run_id, 0b111).unwrap();":
+                      "log_correct.record_run_sealed(run_id, 0b111, 3).unwrap();",
+                  "log_reordered.record_op_fired(run_id, 1, 0).unwrap();":
+                      "log_reordered.record_op_fired(run_id, 1, 0, 1).unwrap();",
+                  "log_reordered.record_op_fired(run_id, 0, 0).unwrap();":
+                      "log_reordered.record_op_fired(run_id, 0, 1, 1).unwrap();",
+                  "log_reordered.record_op_fired(run_id, 2, 0).unwrap();":
+                      "log_reordered.record_op_fired(run_id, 2, 2, 1).unwrap();",
+                  "log_reordered.record_run_sealed(run_id, 0b111).unwrap();":
+                      "log_reordered.record_run_sealed(run_id, 0b111, 3).unwrap();",
+              }
+              for old, new in replacements.items():
+                  text = text.replace(old, new)
+              return text
+          consensus = edit(consensus_path, repair_consensus)
+          require(consensus_path, consensus, "record_op_fired(run_id, op_idx, ticks, 1)", 1)
+          require(consensus_path, consensus, "record_run_sealed(run_id, op_trace, ticks)", 1)
+          if re.search(r"record_op_fired\([^\n]+, 0\)\.unwrap", consensus):
+              raise SystemExit(f"REPAIR_REFUSED: {consensus_path}: stale three-argument OCEL call remains")
+
+          react_path = "crates/bcinr-powl/tests/react_file_tree_interview_cmca_chicago.rs"
+          def repair_react(text: str) -> str:
+              text = re.sub(
+                  r"        for &candidate in &self\.candidate_index \{\n            if !self\.covered\.contains\(&candidate\) && candidate == 2 \{\n                return Some\(candidate\);\n            \}\n        \}\n        None",
+                  "        self.candidate_index\n            .iter()\n            .find(|&&candidate| !self.covered.contains(&candidate) && candidate == 2)\n            .copied()",
+                  text,
+                  count=1,
+              )
+              if "impl Default for CandidateSelector" not in text:
+                  marker = "\n// Test harness skeleton"
+                  default_impl = "\nimpl Default for CandidateSelector {\n    fn default() -> Self {\n        Self::new()\n    }\n}\n"
+                  if text.count(marker) != 1:
+                      raise SystemExit(f"REPAIR_REFUSED: {react_path}: test-harness marker drift")
+                  text = text.replace(marker, default_impl + marker, 1)
+              text = text.replace("let expected_keys = vec![", "let expected_keys = [", 1)
+              return text
+          react = edit(react_path, repair_react)
+          require(react_path, react, "impl Default for CandidateSelector", 1)
+          require(react_path, react, ".find(|&&candidate|", 1)
+          require(react_path, react, "let expected_keys = [", 1)
+
+          byzantine_path = "crates/bcinr-powl/tests/usecase_swarm_08_byzantine_fault_tolerance.rs"
+          def repair_byzantine(text: str) -> str:
+              replacement = '''fn test_no_llm_api_calls_in_consensus() {
+              let imports = include_str!("usecase_swarm_08_byzantine_fault_tolerance.rs")
+                  .lines()
+                  .filter(|line| line.trim_start().starts_with("use "))
+                  .collect::<Vec<_>>()
+                  .join("\\n")
+                  .to_ascii_lowercase();
+              for forbidden in ["anthropic", "openai", "reqwest", "std::net", "tokio::net"] {
                   assert!(
-                      alloc[i].val > 0,
-                      "exchange {} must not be starved of capital",
-                      i
+                      !imports.contains(forbidden),
+                      "forbidden LLM/network import found: {}",
+                      forbidden
                   );
-                  sum += alloc[i].val as u64;
-              }''',
-              '''    for (i, allocation) in alloc.iter().enumerate().take(N) {
-                  assert!(
-                      allocation.val > 0,
-                      "exchange {} must not be starved of capital",
-                      i
-                  );
-                  sum += allocation.val as u64;
-              }''',
-          )
-          replace(
-              "crates/bcinr-cmca/tests/usecase_trading_determinism.rs",
-              '''        for i in 0..N {
-                      assert!(
-                          alloc[i].val > 0,
-                          "round {} must not starve exchange {}",
-                          round,
-                          i
-                      );
-                  }''',
-              '''        for (i, allocation) in alloc.iter().enumerate().take(N) {
-                      assert!(
-                          allocation.val > 0,
-                          "round {} must not starve exchange {}",
-                          round,
-                          i
-                      );
-                  }''',
-          )
-
-          replace(
-              "crates/bcinr-powl/tests/usecase_consensus_termination.rs",
-              "log.record_op_fired(run_id, op_idx, 0).unwrap();",
-              "log.record_op_fired(run_id, op_idx, ticks, 1).unwrap();",
-          )
-          replace(
-              "crates/bcinr-powl/tests/usecase_consensus_termination.rs",
-              "log.record_run_sealed(run_id, op_trace).unwrap();",
-              "log.record_run_sealed(run_id, op_trace, ticks).unwrap();",
-          )
-          replacements = {
-              "log_correct.record_op_fired(run_id, 0, 0).unwrap();":
-                  "log_correct.record_op_fired(run_id, 0, 0, 1).unwrap();",
-              "log_correct.record_op_fired(run_id, 1, 0).unwrap();":
-                  "log_correct.record_op_fired(run_id, 1, 1, 1).unwrap();",
-              "log_correct.record_op_fired(run_id, 2, 0).unwrap();":
-                  "log_correct.record_op_fired(run_id, 2, 2, 1).unwrap();",
-              "log_correct.record_run_sealed(run_id, 0b111).unwrap();":
-                  "log_correct.record_run_sealed(run_id, 0b111, 3).unwrap();",
-              "log_reordered.record_op_fired(run_id, 1, 0).unwrap();":
-                  "log_reordered.record_op_fired(run_id, 1, 0, 1).unwrap();",
-              "log_reordered.record_op_fired(run_id, 0, 0).unwrap();":
-                  "log_reordered.record_op_fired(run_id, 0, 1, 1).unwrap();",
-              "log_reordered.record_op_fired(run_id, 2, 0).unwrap();":
-                  "log_reordered.record_op_fired(run_id, 2, 2, 1).unwrap();",
-              "log_reordered.record_run_sealed(run_id, 0b111).unwrap();":
-                  "log_reordered.record_run_sealed(run_id, 0b111, 3).unwrap();",
+              }
           }
-          for old, new in replacements.items():
-              replace("crates/bcinr-powl/tests/usecase_consensus_termination.rs", old, new)
+          '''
+              return re.sub(
+                  r"fn test_no_llm_api_calls_in_consensus\(\) \{.*?\n\}\s*\Z",
+                  replacement,
+                  text,
+                  count=1,
+                  flags=re.DOTALL,
+              )
+          byzantine = edit(byzantine_path, repair_byzantine)
+          require(byzantine_path, byzantine, "let imports = include_str!", 1)
+          if "assert!(\n        true," in byzantine:
+              raise SystemExit(f"REPAIR_REFUSED: {byzantine_path}: vacuous assertion remains")
 
-          replace(
-              "crates/bcinr-powl/tests/react_file_tree_interview_cmca_chicago.rs",
-              '''        for &candidate in &self.candidate_index {
-                      if !self.covered.contains(&candidate) && candidate == 2 {
-                          return Some(candidate);
-                      }
-                  }
-                  None''',
-              '''        self.candidate_index
-                      .iter()
-                      .find(|&&candidate| !self.covered.contains(&candidate) && candidate == 2)
-                      .copied()''',
+          verifier_path = "scripts/generate_v26_7_26_report.sh"
+          verifier = edit(
+              verifier_path,
+              lambda text: text
+                  .replace(
+                      '"cargo bench -p bcinr-pddl --bench phase1_temporal -- --noplot"',
+                      '"CARGO_PROFILE_BENCH_CODEGEN_UNITS=1 cargo bench -p bcinr-pddl --bench phase1_temporal -- --noplot"',
+                  )
+                  .replace(
+                      '"cargo bench -p bcinr-powl --bench phase3_scheduler -- --noplot"',
+                      '"CARGO_PROFILE_BENCH_CODEGEN_UNITS=1 cargo bench -p bcinr-powl --bench phase3_scheduler -- --noplot"',
+                  ),
           )
-          replace(
-              "crates/bcinr-powl/tests/react_file_tree_interview_cmca_chicago.rs",
-              '''        (ds_select, cx_select, rp_select, pf_select)
-                  }
-              }
-
-              // Test harness skeleton''',
-              '''        (ds_select, cx_select, rp_select, pf_select)
-                  }
-              }
-
-              impl Default for CandidateSelector {
-                  fn default() -> Self {
-                      Self::new()
-                  }
-              }
-
-              // Test harness skeleton''',
-          )
-          replace(
-              "crates/bcinr-powl/tests/react_file_tree_interview_cmca_chicago.rs",
-              '''        let expected_keys = vec![
-                      "nested_tree",
-                      "indexed_access",
-                      "add_file_conflict",
-                      "flat_files",
-                  ];''',
-              '''        let expected_keys = [
-                      "nested_tree",
-                      "indexed_access",
-                      "add_file_conflict",
-                      "flat_files",
-                  ];''',
-          )
-
-          replace(
-              "crates/bcinr-powl/tests/usecase_swarm_08_byzantine_fault_tolerance.rs",
-              '''    // This is a runtime check, not a compile-time check. To properly verify,
-                  // we would instrument the network layer or parse the binary. For now,
-                  // we rely on code inspection: the test uses only:
-                  // - bcinr_powl::compiler (compile_powl)
-                  // - bcinr_powl::scheduler (scheduler_tick)
-                  // - bcinr_powl::ocel (OcelLog)
-                  // - std library (HashSet, Vec)
-                  //
-                  // None of these modules depend on anthropic, openai, or other LLM SDKs.
-                  // We assert this is true by construction.
-                  assert!(
-                      true,
-                      "no anthropic/openai/llm API dependencies are imported in this test file"
-                  );''',
-              '''    let imports = include_str!("usecase_swarm_08_byzantine_fault_tolerance.rs")
-                      .lines()
-                      .filter(|line| line.trim_start().starts_with("use "))
-                      .collect::<Vec<_>>()
-                      .join("\\n")
-                      .to_ascii_lowercase();
-                  for forbidden in ["anthropic", "openai", "reqwest", "std::net", "tokio::net"] {
-                      assert!(
-                          !imports.contains(forbidden),
-                          "forbidden LLM/network import found: {}",
-                          forbidden
-                      );
-                  }''',
-          )
-
-          replace(
-              "scripts/generate_v26_7_26_report.sh",
-              '"cargo bench -p bcinr-pddl --bench phase1_temporal -- --noplot"',
-              '"CARGO_PROFILE_BENCH_CODEGEN_UNITS=1 cargo bench -p bcinr-pddl --bench phase1_temporal -- --noplot"',
-          )
-          replace(
-              "scripts/generate_v26_7_26_report.sh",
-              '"cargo bench -p bcinr-powl --bench phase3_scheduler -- --noplot"',
-              '"CARGO_PROFILE_BENCH_CODEGEN_UNITS=1 cargo bench -p bcinr-powl --bench phase3_scheduler -- --noplot"',
-          )
+          require(verifier_path, verifier, "CARGO_PROFILE_BENCH_CODEGEN_UNITS=1 cargo bench", 2)
           PY
 
           cargo fmt --all
@@ -246,14 +198,14 @@ jobs:
             crates/bcinr-powl/tests/usecase_swarm_08_byzantine_fault_tolerance.rs
             scripts/generate_v26_7_26_report.sh
           )
+          printf 'CHANGED FILES\n%s\n' "${changed[*]}" | tee -a repair.log
           if [[ ${#changed[@]} -ne ${#allowed[@]} ]]; then
-            printf 'REPAIR_REFUSED: expected %s changed files, found %s\n' "${#allowed[@]}" "${#changed[@]}" >&2
-            printf '%s\n' "${changed[@]}" >&2
+            echo "REPAIR_REFUSED: changed-file cardinality mismatch" | tee -a repair.log >&2
             exit 1
           fi
           for expected in "${allowed[@]}"; do
             printf '%s\n' "${changed[@]}" | grep -Fxq "${expected}" || {
-              echo "REPAIR_REFUSED: missing expected change ${expected}" >&2
+              echo "REPAIR_REFUSED: missing expected change ${expected}" | tee -a repair.log >&2
               exit 1
             }
           done
@@ -263,3 +215,11 @@ jobs:
           git add -- "${allowed[@]}"
           git commit -m "fix(release): close observed v26.7.26 verifier failures"
           git push origin HEAD:${{ github.head_ref }}
+      - name: Upload repair receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v26-7-26-known-repair-${{ github.run_id }}-${{ github.run_attempt }}
+          path: repair.log
+          if-no-files-found: warn
+          retention-days: 7
