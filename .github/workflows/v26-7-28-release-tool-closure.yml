@@ -42,6 +42,7 @@ jobs:
           set -euo pipefail
           test "${{ github.event.pull_request.head.ref }}" = 'agent/v26.7.28-production-admission'
           test "$(git rev-parse HEAD)" = '${{ github.event.pull_request.head.sha }}'
+          mkdir -p /tmp/bcinr-release-closure
 
       - name: Install exact nightly toolchain
         uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
@@ -92,16 +93,70 @@ jobs:
           path.write_text(source)
           PY
 
-      - name: Materialize lockfile and verify release crate
+      - name: Format release crate
         shell: bash
         run: |
           set -euo pipefail
-          cargo fmt --all
-          cargo check -p bcinr-release --all-targets
-          cargo check --locked -p bcinr-release --all-targets
-          cargo test --locked -p bcinr-release
-          cargo clippy --locked -p bcinr-release --all-targets -- -D warnings
-          cargo fmt --all -- --check
+          mapfile -d '' files < <(
+            find tools/bcinr-release/src -type f -name '*.rs' -print0 | sort -z
+          )
+          test "${#files[@]}" -gt 0
+          rustfmt --edition 2021 "${files[@]}"
+          rustfmt --edition 2021 --check "${files[@]}"
+
+      - name: Materialize lockfile and check release crate
+        shell: bash
+        run: |
+          set +e
+          cargo check -p bcinr-release --all-targets \
+            > /tmp/bcinr-release-closure/check.log 2>&1
+          status=$?
+          set -e
+          tail -n 200 /tmp/bcinr-release-closure/check.log
+          exit "$status"
+
+      - name: Replay locked check
+        shell: bash
+        run: |
+          set +e
+          cargo check --locked -p bcinr-release --all-targets \
+            > /tmp/bcinr-release-closure/check-locked.log 2>&1
+          status=$?
+          set -e
+          tail -n 200 /tmp/bcinr-release-closure/check-locked.log
+          exit "$status"
+
+      - name: Execute release-crate tests
+        shell: bash
+        run: |
+          set +e
+          cargo test --locked -p bcinr-release \
+            > /tmp/bcinr-release-closure/test.log 2>&1
+          status=$?
+          set -e
+          tail -n 200 /tmp/bcinr-release-closure/test.log
+          exit "$status"
+
+      - name: Lint release crate
+        shell: bash
+        run: |
+          set +e
+          cargo clippy --locked -p bcinr-release --all-targets -- -D warnings \
+            > /tmp/bcinr-release-closure/clippy.log 2>&1
+          status=$?
+          set -e
+          tail -n 200 /tmp/bcinr-release-closure/clippy.log
+          exit "$status"
+
+      - name: Retain closure diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: v26-7-28-release-tool-closure-${{ github.event.pull_request.head.sha }}-${{ github.run_id }}
+          path: /tmp/bcinr-release-closure
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 9
 
       - name: Refuse unexpected closure mutations
         shell: bash
