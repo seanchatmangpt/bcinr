@@ -1,11 +1,79 @@
-name: CI (staged)
+name: CI
 
 on:
-  workflow_dispatch:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0
 
 jobs:
-  staged:
-    name: Automatic CI withheld pending repair receipt
+  pr-fast:
+    name: PR Fast Semantic Gate
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - run: echo 'Ordinary CI is intentionally withheld until the repair rail publishes an ALIVE source tree.'
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Formatting
+        run: cargo fmt --all -- --check
+      - name: Workspace compile
+        run: cargo check --workspace --all-features
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: CMCA all-features baseline
+        run: cargo test -p bcinr-cmca --all-features
+      - name: CMCA calibration
+        run: cargo test -p bcinr-cmca --test calibration
+      - name: CMCA differential
+        run: cargo test -p bcinr-cmca --test differential
+      - name: CMCA hostile-mutant baseline
+        run: cargo test -p bcinr-cmca --test hostile_mutants
+      - name: CMCA compile-fail contracts
+        run: cargo test -p bcinr-cmca --test compile_fail_tests
+      - name: PDDL canonical IPC
+        run: cargo test -p bcinr-pddl --all-features --test canonical_ipc
+      - name: PDDL v2 grounding
+        run: cargo test -p bcinr-pddl --all-features ground_v2
+      - name: POWL 2.0
+        run: cargo test -p bcinr-powl --all-features powl2
+      - name: POWL scheduler v2
+        run: cargo test -p bcinr-powl --all-features scheduler_v2
+      - name: POWL receipt execution v2
+        run: cargo test -p bcinr-powl-receipt --all-features execution_v2
+      - name: Locked dependency graph
+        run: cargo metadata --locked --format-version 1 --no-deps > /dev/null
+
+  main-linux:
+    name: Main Linux Production Rail
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Formatting
+        run: cargo fmt --all -- --check
+      - name: Workspace compile
+        run: cargo check --workspace --all-features
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Full Linux workspace
+        run: cargo test --workspace --all-features --all-targets --no-fail-fast
+      - name: Documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --no-deps --all-features
