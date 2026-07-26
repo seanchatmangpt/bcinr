@@ -4,17 +4,20 @@ on:
   push:
     branches:
       - agent/cmca-divan-execution-benchmarks
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
 
 concurrency:
-  group: cmca-divan-manufacturer-${{ github.ref }}
+  group: cmca-divan-manufacturer-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   manufacture:
-    if: github.actor != 'github-actions[bot]'
+    if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -93,3 +96,31 @@ jobs:
             git commit -m 'bench(cmca): receipt Divan execution baseline'
             git push
           fi
+
+  verify:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout pull request
+        uses: actions/checkout@v4
+
+      - name: Install repository toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo state
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: cmca-divan
+
+      - name: Compile CMCA Divan target
+        run: cargo check -p bcinr-bench --bench cmca_execution_bench
+
+      - name: Lint CMCA Divan target
+        run: cargo clippy -p bcinr-bench --bench cmca_execution_bench -- -D warnings
+
+      - name: Execute CMCA Divan baseline
+        run: cargo bench -p bcinr-bench --bench cmca_execution_bench
