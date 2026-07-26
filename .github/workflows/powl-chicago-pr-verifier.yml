@@ -54,6 +54,9 @@ jobs:
 
           run_step manufacture python3 scripts/implement_powl_chicago_closure.py
           if [ "${overall}" -eq 0 ]; then
+            run_step context-fix python3 scripts/fix_powl_chicago_context.py
+          fi
+          if [ "${overall}" -eq 0 ]; then
             run_step format cargo fmt --all
             run_step diff-check git diff --check
             run_step powl-ocel-unit cargo test -p bcinr-powl --features std ocel
@@ -91,6 +94,8 @@ jobs:
 
           if [ "${status}" -eq 0 ]; then
             rm -f scripts/implement_powl_chicago_closure.py
+            rm -f scripts/fix_powl_chicago_context.py
+            rm -f docs/testing/powl-chicago-verifier-trigger.txt
             git add -A
             git diff --cached --check
             git commit -m 'fix(powl): close Chicago conformance and receipt gaps'
