@@ -34,5 +34,16 @@ jobs:
           cargo fmt --all
           git diff --check
       - name: Publish and self-delete
+        id: publish
         shell: bash
-        run: bash -x scripts/finalize_post_integration_verification.sh
+        run: |
+          set -o pipefail
+          bash -x scripts/finalize_post_integration_verification.sh 2>&1 | tee final-publication.log
+      - name: Upload final publication diagnostics
+        if: failure() && steps.publish.conclusion == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: post-integration-publication-${{ github.run_id }}
+          path: final-publication.log
+          if-no-files-found: error
+          retention-days: 7
