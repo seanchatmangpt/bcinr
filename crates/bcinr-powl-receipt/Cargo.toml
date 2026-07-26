@@ -1,6 +1,6 @@
 [package]
 name = "bcinr-powl-receipt"
-version = "26.7.24"
+version = "26.7.25"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Projection, execution, planning, and replay receipts for executable POWL v2"
@@ -10,9 +10,9 @@ categories = ["algorithms"]
 readme = "../../README.md"
 
 [dependencies]
-bcinr-powl = { path = "../bcinr-powl", version = "26.7.24" }
-bcinr-logic = { path = "../bcinr-logic", version = "26.6.24" }
-bcinr-mfw-ir = { path = "../bcinr-mfw-ir", version = "26.6.26" }
+bcinr-powl = { path = "../bcinr-powl", version = "26.7.25" }
+bcinr-logic = { path = "../bcinr-logic", version = "26.7.25" }
+bcinr-mfw-ir = { path = "../bcinr-mfw-ir", version = "26.7.25" }
 blake3 = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
