@@ -28,16 +28,16 @@ jobs:
       - run: python3 scripts/repair_post_integration_verification.py
       - run: python3 scripts/repair_cmca_all_features_composition.py
       - run: cargo fmt --all
-      - name: Execute and capture isolated mutant 7
+      - name: Execute and capture isolated mutant 9
         shell: bash
         run: |
           set -o pipefail
-          cargo test -p bcinr-cmca --features mutant_7 --test hostile_mutants 2>&1 | tee cmca-mutant-7.log
-      - name: Upload mutant 7 transcript
+          cargo test -p bcinr-cmca --features mutant_9 --test hostile_mutants 2>&1 | tee cmca-mutant-9.log
+      - name: Upload mutant 9 transcript
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cmca-mutant-7-${{ github.run_id }}
-          path: cmca-mutant-7.log
+          name: cmca-mutant-9-${{ github.run_id }}
+          path: cmca-mutant-9.log
           if-no-files-found: error
           retention-days: 7
