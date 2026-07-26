@@ -15,6 +15,7 @@ use wasm4pm_compat::pddl::{
 use crate::capability::PddlFeature;
 
 /// Derive all capability-relevant features actually present in the parsed task.
+#[allow(dead_code)]
 pub(crate) fn content_features(
     domain: &Pddl31Domain,
     problem: &Pddl31Problem,
@@ -98,6 +99,7 @@ pub(crate) fn content_features(
     features
 }
 
+#[allow(dead_code)]
 fn collect_condition_features(condition: &PddlCondition, features: &mut BTreeSet<PddlFeature>) {
     match condition {
         PddlCondition::Atom(atom) => {
@@ -146,6 +148,7 @@ fn collect_condition_features(condition: &PddlCondition, features: &mut BTreeSet
     }
 }
 
+#[allow(dead_code)]
 fn collect_effect_features(effect: &PddlEffect, features: &mut BTreeSet<PddlFeature>) {
     match effect {
         PddlEffect::Add(_) | PddlEffect::Del(_) => {}
@@ -173,6 +176,7 @@ fn collect_effect_features(effect: &PddlEffect, features: &mut BTreeSet<PddlFeat
     }
 }
 
+#[allow(dead_code)]
 fn collect_trajectory_features(
     constraint: &TrajectoryConstraint,
     features: &mut BTreeSet<PddlFeature>,
