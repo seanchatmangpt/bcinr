@@ -455,21 +455,17 @@ fn verify_exclusive_resource(
             continue;
         };
         match event.kind {
-            SwarmEventKind::ResourceAcquired => {
-                if !owned.insert(resource) {
-                    return Err(SwarmValidationError::InvariantViolation {
-                        scenario,
-                        invariant: "exclusive resource was acquired twice without release",
-                    });
-                }
+            SwarmEventKind::ResourceAcquired if !owned.insert(resource) => {
+                return Err(SwarmValidationError::InvariantViolation {
+                    scenario,
+                    invariant: "exclusive resource was acquired twice without release",
+                });
             }
-            SwarmEventKind::ResourceReleased => {
-                if !owned.remove(resource) {
-                    return Err(SwarmValidationError::InvariantViolation {
-                        scenario,
-                        invariant: "exclusive resource was released without ownership",
-                    });
-                }
+            SwarmEventKind::ResourceReleased if !owned.remove(resource) => {
+                return Err(SwarmValidationError::InvariantViolation {
+                    scenario,
+                    invariant: "exclusive resource was released without ownership",
+                });
             }
             _ => {}
         }
