@@ -59,6 +59,7 @@ jobs:
             run_step context-fix python3 scripts/fix_powl_chicago_context.py
             run_step xor-conformance-fix python3 scripts/fix_powl_xor_conformance.py
             run_step ocel-schema-fix python3 scripts/fix_powl_ocel_schema.py
+            run_step clippy-source-fix python3 scripts/fix_powl_clippy.py
           fi
           if [ "${overall}" -eq 0 ]; then
             run_step format cargo fmt --all
@@ -105,6 +106,7 @@ jobs:
             rm -f scripts/fix_powl_chicago_context.py
             rm -f scripts/fix_powl_xor_conformance.py
             rm -f scripts/fix_powl_ocel_schema.py
+            rm -f scripts/fix_powl_clippy.py
             rm -f docs/testing/powl-chicago-verifier-trigger.txt
             rm -f docs/testing/powl-chicago-closure-latest.log
             git add -A
