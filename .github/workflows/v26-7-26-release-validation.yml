@@ -80,6 +80,8 @@ jobs:
           components: rustfmt, clippy
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
+      - name: Install pinned benchmark compiler
+        run: rustup toolchain install nightly-2026-07-24 --profile minimal
       - name: Validate verifier syntax
         run: |
           bash -n scripts/generate_v26_7_26_report.sh
