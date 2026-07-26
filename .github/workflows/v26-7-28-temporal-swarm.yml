@@ -69,6 +69,56 @@ jobs:
           cp "$generated/conformance_vectors.json" \
              bcinr/contracts/v26.7.28/conformance_vectors.json
 
+      - name: Apply exact Clippy repair
+        working-directory: bcinr
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("crates/bcinr-pddl/src/swarm_validation.rs")
+          source = path.read_text()
+          before = '''        match event.kind {
+              SwarmEventKind::ResourceAcquired => {
+                  if !owned.insert(resource) {
+                      return Err(SwarmValidationError::InvariantViolation {
+                          scenario,
+                          invariant: "exclusive resource was acquired twice without release",
+                      });
+                  }
+              }
+              SwarmEventKind::ResourceReleased => {
+                  if !owned.remove(resource) {
+                      return Err(SwarmValidationError::InvariantViolation {
+                          scenario,
+                          invariant: "exclusive resource was released without ownership",
+                      });
+                  }
+              }
+              _ => {}
+          }
+          '''
+          after = '''        match event.kind {
+              SwarmEventKind::ResourceAcquired if !owned.insert(resource) => {
+                  return Err(SwarmValidationError::InvariantViolation {
+                      scenario,
+                      invariant: "exclusive resource was acquired twice without release",
+                  });
+              }
+              SwarmEventKind::ResourceReleased if !owned.remove(resource) => {
+                  return Err(SwarmValidationError::InvariantViolation {
+                      scenario,
+                      invariant: "exclusive resource was released without ownership",
+                  });
+              }
+              _ => {}
+          }
+          '''
+          if before in source:
+              path.write_text(source.replace(before, after, 1))
+          elif after not in source:
+              raise SystemExit("exact Clippy repair pattern was not found")
+          PY
+
       - name: Format source without rewriting generated projections
         working-directory: bcinr
         run: |
