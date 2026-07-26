@@ -36,11 +36,6 @@ Every required command completed with exit code 0 in GitHub Actions run \`301862
 \`ALIVE\` for the observed Linux verification ladder. Permanent PR CI is restored in the published source tree.
 EOF
 
-rm -f .github/workflows/repair-post-integration-verification-v2.yml
-rm -f .github/workflows/cmca-all-features-diagnostic.yml
-rm -f .github/workflows/publish-post-integration-final.yml
-rm -f .github/workflows/post-pr13-audit.yml
-rm -f .github/workflows/post-pr13-pr-audit.yml
 rm -f scripts/repair_post_integration_verification.py
 rm -f scripts/repair_cmca_all_features_composition.py
 rm -f scripts/repair_mcp_transport.py
@@ -52,11 +47,16 @@ rm -f scripts/integration_adapt_current_apis.py
 rm -f scripts/normalize_recovered_tests.py
 rm -f scripts/publish-semantic-integration-v5.sh
 rm -f scripts/run-semantic-integration-v4.sh
-rm -f rustfmt-repair.log clippy.log workspace.log final-publication.log
+rm -f rustfmt-repair.log clippy.log workspace.log final-publication.log verified-final.patch verified-final-stat.txt
+
+# The Actions token cannot modify workflow files. Keep the workflow directory
+# unchanged in this source commit; the GitHub connector restores permanent CI
+# and removes temporary workflows in the immediately following commit.
+git restore --source=HEAD -- .github/workflows
 
 git config user.name 'OpenAI Repair Agent'
 git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 git add -A
 git diff --cached --check
-git commit -m 'fix: close post-integration verification and CI defects'
+git commit -m 'fix: close post-integration source verification defects'
 git push origin "HEAD:${BRANCH}"
