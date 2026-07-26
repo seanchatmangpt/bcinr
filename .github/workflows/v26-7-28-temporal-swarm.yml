@@ -53,6 +53,8 @@ jobs:
           mkdir -p bcinr/contracts/v26.7.28
           cp ggen/examples/bcinr-v26-7-28/generated/temporal_contract.rs \
              bcinr/crates/bcinr-pddl/src/generated/temporal_contract.rs
+          cp ggen/examples/bcinr-v26-7-28/generated/swarm_scenarios.rs \
+             bcinr/crates/bcinr-pddl/src/generated/swarm_scenarios.rs
           cp ggen/examples/bcinr-v26-7-28/generated/bcinr_temporal.h \
              bcinr/contracts/v26.7.28/bcinr_temporal.h
           cp ggen/examples/bcinr-v26-7-28/generated/bcinr-temporal.wit \
@@ -65,7 +67,9 @@ jobs:
         working-directory: bcinr
         run: |
           git diff --check
-          git add crates/bcinr-pddl/src/generated/temporal_contract.rs contracts/v26.7.28
+          git add crates/bcinr-pddl/src/generated/temporal_contract.rs
+          git add crates/bcinr-pddl/src/generated/swarm_scenarios.rs
+          git add contracts/v26.7.28
           if git diff --cached --quiet; then
             echo "manufactured projections already match"
           else
@@ -81,6 +85,7 @@ jobs:
           cargo run --manifest-path ../../Cargo.toml -p ggen-cli-lib --bin ggen -- sync run
           git diff --exit-code -- generated
           cmp generated/temporal_contract.rs ../../../bcinr/crates/bcinr-pddl/src/generated/temporal_contract.rs
+          cmp generated/swarm_scenarios.rs ../../../bcinr/crates/bcinr-pddl/src/generated/swarm_scenarios.rs
           cmp generated/bcinr_temporal.h ../../../bcinr/contracts/v26.7.28/bcinr_temporal.h
           cmp generated/bcinr-temporal.wit ../../../bcinr/contracts/v26.7.28/bcinr-temporal.wit
           cmp generated/conformance_vectors.json ../../../bcinr/contracts/v26.7.28/conformance_vectors.json
@@ -90,7 +95,9 @@ jobs:
         run: |
           if grep -RniE 'openai|anthropic|ollama|language.model|llm.call' \
             crates/bcinr-pddl/src/temporal_production.rs \
+            crates/bcinr-pddl/src/swarm_validation.rs \
             crates/bcinr-pddl/tests/temporal_swarm_v26_7_28.rs \
+            crates/bcinr-pddl/tests/manufactured_swarm_scenarios_v26_7_28.rs \
             crates/bcinr-pddl/benches/temporal_swarm_v26_7_28.rs \
             contracts/v26.7.28; then
             echo "LLM dependency detected in deterministic temporal rail" >&2
@@ -109,9 +116,13 @@ jobs:
         working-directory: bcinr
         run: cargo clippy -p bcinr-pddl --all-targets --all-features -- -D warnings
 
-      - name: Execute deterministic swarm scenarios
+      - name: Execute temporal PDDL swarm scenarios
         working-directory: bcinr
         run: cargo test -p bcinr-pddl --test temporal_swarm_v26_7_28 -- --nocapture
+
+      - name: Execute all ggen-manufactured swarm scenarios
+        working-directory: bcinr
+        run: cargo test -p bcinr-pddl --test manufactured_swarm_scenarios_v26_7_28 -- --nocapture
 
       - name: Compile Divan temporal benchmarks
         working-directory: bcinr
