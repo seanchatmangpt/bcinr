@@ -1,6 +1,6 @@
 [package]
 name = "bcinr-cheat-scanner"
-version = "26.7.25"
+version = "26.4.22"
 edition = "2021"
 description = "Detects algorithmic cheats and anti-patterns in branchless code"
 license = "MIT OR Apache-2.0"

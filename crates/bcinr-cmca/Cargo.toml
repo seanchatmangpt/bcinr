@@ -1,6 +1,6 @@
 [package]
 name = "bcinr-cmca"
-version = "26.7.25"
+version = "26.4.22"
 edition = "2021"
 description = "CMCA-RDF deterministic substrate crate"
 license = "MIT OR Apache-2.0"
@@ -11,7 +11,7 @@ categories = ["algorithms"]
 readme = "../../README.md"
 
 [dependencies]
-bcinr-logic = { path = "../bcinr-logic", version = "26.7.25" }
+bcinr-logic = { path = "../bcinr-logic", version = "26.4.22" }
 
 [dev-dependencies]
 trybuild = "1.0"

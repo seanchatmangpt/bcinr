@@ -1,0 +1,7 @@
+    Updating crates.io index
+warning: crate bcinr-core@26.4.22 already exists on crates.io index
+error: 1 files in the working directory contain changes that were not yet committed into git:
+
+bcinr-core/Cargo.toml
+
+to proceed despite this and include the uncommitted changes, pass the `--allow-dirty` flag
