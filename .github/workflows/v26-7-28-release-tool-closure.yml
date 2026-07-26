@@ -1,0 +1,155 @@
+name: v26.7.28 Release Tool Closure
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - tools/bcinr-release/**
+      - Cargo.toml
+      - Cargo.lock
+      - .github/workflows/v26-7-28-release-tool-closure.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: v26-7-28-release-tool-closure-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  CARGO_INCREMENTAL: 0
+  RUSTUP_TOOLCHAIN: nightly-2026-07-25
+
+jobs:
+  close:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact PR branch head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Refuse stale or unexpected branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ github.event.pull_request.head.ref }}" = 'agent/v26.7.28-production-admission'
+          test "$(git rev-parse HEAD)" = '${{ github.event.pull_request.head.sha }}'
+
+      - name: Install exact nightly toolchain
+        uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
+        with:
+          toolchain: nightly-2026-07-25
+          components: rustfmt,clippy
+
+      - name: Wire the pure standing law
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('tools/bcinr-release/src/main.rs')
+          source = path.read_text()
+
+          module_old = 'mod provenance;\n'
+          module_new = 'mod provenance;\nmod standing;\n'
+          if source.count(module_old) != 1 or 'mod standing;' in source:
+              raise SystemExit('standing module insertion boundary changed')
+          source = source.replace(module_old, module_new, 1)
+
+          import_old = '''use crate::model::{
+              AdmissionIssue, ArtifactEntryReceipt, ArtifactReceipt, ByteIdentityReceipt, IssueCode,
+              RailOutcome, RailReceipt, ReleaseReceipt, Standing, RECEIPT_SCHEMA_VERSION,
+          };
+          '''
+          import_new = import_old + 'use crate::standing::{calculate as calculate_standing, StandingInputs};\n'
+          if source.count(import_old) != 1:
+              raise SystemExit('standing import boundary changed')
+          source = source.replace(import_old, import_new, 1)
+
+          standing_old = '''    let standing = if blocked {
+              Standing::Blocked
+          } else if required_rail_failure {
+              Standing::BuildBroken
+          } else if required_artifact_failure || required_identity_failure {
+              Standing::Blocked
+          } else if optional_rail_failure || optional_artifact_failure || optional_identity_failure {
+              Standing::PartialAlive
+          } else {
+              Standing::Alive
+          };
+          '''
+          standing_new = '''    let standing = calculate_standing(StandingInputs {
+              blocked,
+              required_rail_failure,
+              required_artifact_failure,
+              required_identity_failure,
+              optional_rail_failure,
+              optional_artifact_failure,
+              optional_identity_failure,
+          });
+          '''
+          if source.count(standing_old) != 1:
+              raise SystemExit('standing calculation boundary changed')
+          source = source.replace(standing_old, standing_new, 1)
+          path.write_text(source)
+          PY
+
+      - name: Materialize lockfile and verify release crate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all
+          cargo check -p bcinr-release --all-targets
+          cargo check --locked -p bcinr-release --all-targets
+          cargo test --locked -p bcinr-release
+          cargo clippy --locked -p bcinr-release --all-targets -- -D warnings
+          cargo fmt --all -- --check
+
+      - name: Refuse unexpected closure mutations
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import subprocess
+
+          allowed = {
+              'Cargo.lock',
+              'tools/bcinr-release/src/main.rs',
+              '.github/workflows/v26-7-28-release-tool-closure.yml',
+          }
+          output = subprocess.check_output(
+              ['git', 'status', '--porcelain=v1', '--untracked-files=all'],
+              text=True,
+          )
+          unexpected = []
+          for raw in output.splitlines():
+              path = raw[3:]
+              if ' -> ' in path:
+                  path = path.split(' -> ', 1)[1]
+              if path not in allowed:
+                  unexpected.append(raw)
+          if unexpected:
+              raise SystemExit('unexpected closure mutations:\n' + '\n'.join(unexpected))
+          PY
+
+      - name: Publish verified closure and delete workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/v26-7-28-release-tool-closure.yml
+          git diff --check
+          git add Cargo.lock tools/bcinr-release/src/main.rs \
+            .github/workflows/v26-7-28-release-tool-closure.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m 'chore(v26.7.28): close hardened release tool'
+          git push origin HEAD:agent/v26.7.28-production-admission
