@@ -1,0 +1,91 @@
+name: CMCA Divan Manufacturer
+
+on:
+  push:
+    branches:
+      - agent/cmca-divan-execution-benchmarks
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cmca-divan-manufacturer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  manufacture:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout benchmark branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install repository toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo state
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: cmca-divan
+
+      - name: Verify formatting
+        run: cargo fmt --all -- --check
+
+      - name: Compile CMCA Divan target
+        run: cargo check -p bcinr-bench --bench cmca_execution_bench
+
+      - name: Lint CMCA Divan target
+        run: cargo clippy -p bcinr-bench --bench cmca_execution_bench -- -D warnings
+
+      - name: Execute CMCA Divan baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs/testing
+          cargo bench -p bcinr-bench --bench cmca_execution_bench 2>&1 | tee /tmp/cmca-divan-output.txt
+          {
+            echo '# CMCA Divan Execution Baseline — v26.7.25'
+            echo
+            echo '- Workflow run: `${{ github.run_id }}`'
+            echo '- Source commit: `${{ github.sha }}`'
+            echo '- Runner: `ubuntu-latest`'
+            echo '- Kernel: `'
+            uname -a
+            echo '`'
+            echo '- Rust toolchain:'
+            echo '```text'
+            rustc -Vv
+            echo '```'
+            echo
+            echo '## Command'
+            echo
+            echo '```bash'
+            echo 'cargo bench -p bcinr-bench --bench cmca_execution_bench'
+            echo '```'
+            echo
+            echo '## Divan output'
+            echo
+            echo '```text'
+            cat /tmp/cmca-divan-output.txt
+            echo '```'
+          } > docs/testing/cmca-divan-execution-v26.7.25.md
+
+      - name: Commit generated lock and benchmark receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Cargo.lock docs/testing/cmca-divan-execution-v26.7.25.md
+          if git diff --cached --quiet; then
+            echo 'No generated changes to commit.'
+          else
+            git commit -m 'bench(cmca): receipt Divan execution baseline'
+            git push
+          fi
