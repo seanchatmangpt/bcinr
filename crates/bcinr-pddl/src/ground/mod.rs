@@ -760,7 +760,13 @@ impl GroundTemporalProblem {
 
                     // Apply at-start effects
                     for eff in &da.effects {
-                        apply_effect_at_start(eff, &mut state, &mut fn_vals);
+                        apply_effect_at_start(
+                            eff,
+                            &mut state,
+                            &mut fn_vals,
+                            &self.quant_domain,
+                            &self.derived_predicates,
+                        );
                     }
 
                     steps.push(TemporalPlanStep {
@@ -863,7 +869,13 @@ impl GroundTemporalProblem {
                     let (_, idx, _) = pending.remove(min_pos);
                     let da = &self.durative_actions[idx];
                     for eff in &da.effects {
-                        apply_effect_at_end(eff, &mut state, &mut fn_vals);
+                        apply_effect_at_end(
+                            eff,
+                            &mut state,
+                            &mut fn_vals,
+                            &self.quant_domain,
+                            &self.derived_predicates,
+                        );
                     }
                 }
             } else if !scheduled {
@@ -1131,14 +1143,16 @@ fn apply_effect_at_start(
     eff: &PddlEffect,
     state: &mut BTreeSet<Pddl8GroundAtom>,
     fn_vals: &mut HashMap<String, f64>,
+    quant_domain: &QuantifierDomain,
+    derived: &[GroundDerivedPredicate],
 ) {
     use wasm4pm_compat::pddl::TimeSpecifier;
     match eff {
         PddlEffect::Timed(TimeSpecifier::AtStart, inner) => {
-            apply_effect_ground(inner, state, fn_vals)
+            apply_effect_ground(inner, state, fn_vals, quant_domain, derived)
         }
         PddlEffect::Timed(_, _) => {}
-        other => apply_effect_ground(other, state, fn_vals),
+        other => apply_effect_ground(other, state, fn_vals, quant_domain, derived),
     }
 }
 
@@ -1146,10 +1160,12 @@ fn apply_effect_at_end(
     eff: &PddlEffect,
     state: &mut BTreeSet<Pddl8GroundAtom>,
     fn_vals: &mut HashMap<String, f64>,
+    quant_domain: &QuantifierDomain,
+    derived: &[GroundDerivedPredicate],
 ) {
     use wasm4pm_compat::pddl::TimeSpecifier;
     if let PddlEffect::Timed(TimeSpecifier::AtEnd, inner) = eff {
-        apply_effect_ground(inner, state, fn_vals);
+        apply_effect_ground(inner, state, fn_vals, quant_domain, derived);
     }
 }
 
@@ -1157,6 +1173,8 @@ fn apply_effect_ground(
     eff: &PddlEffect,
     state: &mut BTreeSet<Pddl8GroundAtom>,
     fn_vals: &mut HashMap<String, f64>,
+    quant_domain: &QuantifierDomain,
+    derived: &[GroundDerivedPredicate],
 ) {
     match eff {
         PddlEffect::Add(a) => {
@@ -1172,17 +1190,59 @@ fn apply_effect_ground(
             });
         }
         PddlEffect::Numeric(ne) => apply_numeric_effect(ne, fn_vals),
-        PddlEffect::When { effects, .. } => {
-            for e in effects {
-                apply_effect_ground(e, state, fn_vals);
+        PddlEffect::When { condition, effects } => {
+            // Evaluate the condition in the current state before applying effects
+            if eval_condition(condition, state, fn_vals, quant_domain) {
+                for e in effects {
+                    apply_effect_ground(e, state, fn_vals, quant_domain, derived);
+                }
             }
         }
-        PddlEffect::Forall { effects, .. } => {
-            for e in effects {
-                apply_effect_ground(e, state, fn_vals);
+        PddlEffect::Forall { vars, effects } => {
+            // Iterate over all possible bindings and apply effects for each
+            fn apply_forall_effects(
+                idx: usize,
+                vars: &[(String, String)],
+                binding: &mut HashMap<String, String>,
+                effects: &[PddlEffect],
+                state: &mut BTreeSet<Pddl8GroundAtom>,
+                fn_vals: &mut HashMap<String, f64>,
+                quant_domain: &QuantifierDomain,
+                derived: &[GroundDerivedPredicate],
+            ) {
+                if idx == vars.len() {
+                    // Apply effects with current binding
+                    for e in effects {
+                        let bound_e = subst_effect(e, binding);
+                        apply_effect_ground(&bound_e, state, fn_vals, quant_domain, derived);
+                    }
+                    return;
+                }
+                let (var_name, required_type) = &vars[idx];
+                let candidates = quant_domain.candidates(required_type);
+                for obj in candidates {
+                    binding.insert(var_name.clone(), obj.clone());
+                    apply_forall_effects(
+                        idx + 1,
+                        vars,
+                        binding,
+                        effects,
+                        state,
+                        fn_vals,
+                        quant_domain,
+                        derived,
+                    );
+                    binding.remove(var_name);
+                }
             }
+            let mut binding = HashMap::new();
+            apply_forall_effects(
+                0, vars, &mut binding, effects, state, fn_vals, quant_domain, derived,
+            );
         }
-        PddlEffect::Timed(_, inner) => apply_effect_ground(inner, state, fn_vals),
+        PddlEffect::Timed(_, inner) => {
+            apply_effect_ground(inner, state, fn_vals, quant_domain, derived)
+        }
     }
 }
 
@@ -1710,7 +1770,18 @@ fn ground_derived_schema(
                 *ts,
                 Box::new(ground_condition(c, binding)?),
             )),
-            _ => None,
+            PddlCondition::Forall { vars, body } => {
+                Some(PddlCondition::Forall {
+                    vars: vars.clone(),
+                    body: Box::new(ground_condition(body, binding)?),
+                })
+            }
+            PddlCondition::Exists { vars, body } => {
+                Some(PddlCondition::Exists {
+                    vars: vars.clone(),
+                    body: Box::new(ground_condition(body, binding)?),
+                })
+            }
         }
     }
 
