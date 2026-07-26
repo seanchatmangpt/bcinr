@@ -20,14 +20,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install benchmark toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@nightly-2026-07-24
         with:
           components: rustfmt, clippy
 
       - name: Cache Cargo state
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: cmca-divan-isolated-stable
+          shared-key: cmca-divan-isolated-nightly-2026-07-24
 
       - name: Isolate benchmark in CMCA package
         shell: bash
@@ -50,10 +50,10 @@ jobs:
           cargo fmt --all
 
       - name: Compile isolated CMCA Divan target
-        run: cargo +stable check -p bcinr-cmca --bench cmca_execution_bench
+        run: cargo +nightly-2026-07-24 check -p bcinr-cmca --bench cmca_execution_bench
 
       - name: Lint isolated CMCA Divan target
-        run: cargo +stable clippy -p bcinr-cmca --bench cmca_execution_bench -- -D warnings
+        run: cargo +nightly-2026-07-24 clippy -p bcinr-cmca --bench cmca_execution_bench -- -D warnings
 
       - name: Execute isolated CMCA Divan baseline
         id: bench
@@ -61,7 +61,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          cargo +stable bench -p bcinr-cmca --bench cmca_execution_bench 2>&1 | tee cmca-divan-isolated-output.txt
+          cargo +nightly-2026-07-24 bench -p bcinr-cmca --bench cmca_execution_bench 2>&1 | tee cmca-divan-isolated-output.txt
 
       - name: Upload complete Divan output
         if: always()
