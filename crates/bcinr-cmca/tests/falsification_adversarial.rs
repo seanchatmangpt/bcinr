@@ -10,7 +10,7 @@
 //! If any test passes when it should fail, CMCA is proven incorrect at that point.
 
 use bcinr_cmca::allocator::{allocate, AllocatorConfig};
-use bcinr_cmca::allocator::{Q16_16, NonNegativeFixed};
+use bcinr_cmca::allocator::{NonNegativeFixed, Q16_16};
 
 // ============================================================================
 // FALSIFICATION SET 1: Q16.16 Fixed-Point Precision Violations
@@ -52,8 +52,12 @@ fn falsify_q16_16_division_precision_loss() {
     // If it's lossy, three_result != numerator
     let loss = numerator.to_fixed().saturating_sub(three_result.to_fixed());
 
-    if loss > (1 << 0) { // More than 1 ULP of loss
-        panic!("FALSIFIED: Q16.16 division loses more than 1 ULP precision! Loss: {}", loss);
+    if loss > (1 << 0) {
+        // More than 1 ULP of loss
+        panic!(
+            "FALSIFIED: Q16.16 division loses more than 1 ULP precision! Loss: {}",
+            loss
+        );
     }
 }
 
@@ -66,13 +70,16 @@ fn falsify_q16_16_multiplication_distributive() {
     let b = NonNegativeFixed::from_fixed(200 << 16); // 200.0
     let c = NonNegativeFixed::from_fixed(0x00008000); // 0.5
 
-    let left = (a.saturating_add(b)).saturating_mul(c);  // (a+b)*c
+    let left = (a.saturating_add(b)).saturating_mul(c); // (a+b)*c
     let right = a.saturating_mul(c).saturating_add(b.saturating_mul(c)); // a*c + b*c
 
     let diff = left.to_fixed().saturating_sub(right.to_fixed());
 
     if diff != 0 {
-        panic!("FALSIFIED: Distributive law fails! (a+b)*c != a*c + b*c. Diff: {}", diff);
+        panic!(
+            "FALSIFIED: Distributive law fails! (a+b)*c != a*c + b*c. Diff: {}",
+            diff
+        );
     }
 }
 

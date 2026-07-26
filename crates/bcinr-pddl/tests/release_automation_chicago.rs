@@ -183,8 +183,8 @@ const RELEASE_PROBLEM_INIT: &str = "\
 /// JTBD: Start a new release and create PRD file
 #[test]
 fn lifecycle_01_intent_captured_to_prd_exists() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
     execution.verify().expect("plan should verify");
 
     // Postcondition: prd_exists is true
@@ -204,8 +204,8 @@ fn lifecycle_01_intent_captured_to_prd_exists() {
 /// JTBD: Admit PRD for architectural review
 #[test]
 fn lifecycle_02_prd_exists_to_prd_admitted() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
     execution.verify().expect("plan should verify");
 
     // Postcondition: prd_admitted and prd_admitted_check
@@ -223,8 +223,8 @@ fn lifecycle_02_prd_exists_to_prd_admitted() {
 /// JTBD: Derive ARD from PRD
 #[test]
 fn lifecycle_03_prd_admitted_to_ard_exists() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
     execution.verify().expect("plan should verify");
 
     // Postcondition: ard_exists
@@ -243,8 +243,8 @@ fn lifecycle_03_prd_admitted_to_ard_exists() {
 /// JTBD: Admit ARD for implementation
 #[test]
 fn lifecycle_04_ard_exists_to_ard_admitted() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
     execution.verify().expect("plan should verify");
 
     // Postcondition: ard_admitted and ard_admitted_check
@@ -262,8 +262,8 @@ fn lifecycle_04_ard_exists_to_ard_admitted() {
 /// JTBD: Record ADR (Architecture Decision Record)
 #[test]
 fn lifecycle_05_ard_admitted_to_adr_recorded() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
     execution.verify().expect("plan should verify");
 
     // Postcondition: adr_recorded
@@ -282,8 +282,8 @@ fn lifecycle_05_ard_admitted_to_adr_recorded() {
 /// JTBD: Generate work units from ADR
 #[test]
 fn lifecycle_06_adr_recorded_to_work_units_generated() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
     execution.verify().expect("plan should verify");
 
     // Postcondition: work_units_generated
@@ -302,8 +302,8 @@ fn lifecycle_06_adr_recorded_to_work_units_generated() {
 /// JTBD: Implement all work units
 #[test]
 fn lifecycle_07_work_units_to_implementation_complete() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
     execution.verify().expect("plan should verify");
 
     // Postcondition: implementation_complete and check
@@ -321,8 +321,8 @@ fn lifecycle_07_work_units_to_implementation_complete() {
 /// JTBD: Run full test suite and verify passing
 #[test]
 fn lifecycle_08_implementation_to_tests_passed() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
     execution.verify().expect("plan should verify");
 
     // Postcondition: tests_passed and check
@@ -340,8 +340,8 @@ fn lifecycle_08_implementation_to_tests_passed() {
 /// JTBD: Project and finalize documentation
 #[test]
 fn lifecycle_09_tests_to_docs_projected() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
     execution.verify().expect("plan should verify");
 
     // Postcondition: docs_projected and check
@@ -359,8 +359,8 @@ fn lifecycle_09_tests_to_docs_projected() {
 /// JTBD: Prepare release and mark ready
 #[test]
 fn lifecycle_10_docs_to_release_ready() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
     execution.verify().expect("plan should verify");
 
     // Postcondition: release_ready and check
@@ -378,8 +378,8 @@ fn lifecycle_10_docs_to_release_ready() {
 /// JTBD: Publish release to registry
 #[test]
 fn lifecycle_11_release_ready_to_published() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
     execution.verify().expect("plan should verify");
 
     // Postcondition: published
@@ -426,8 +426,8 @@ fn lifecycle_11_release_ready_to_published() {
 /// JTBD: Complete entire release lifecycle to published state
 #[test]
 fn lifecycle_12_full_goal_published() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
     execution.verify().expect("baseline verification must pass");
 
     // Final goal: published
@@ -446,8 +446,8 @@ fn lifecycle_12_full_goal_published() {
 /// Postcondition: prd_exists
 #[test]
 fn action_01_create_prd() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     // Precondition check
     assert!(
@@ -467,8 +467,8 @@ fn action_01_create_prd() {
 /// Postcondition: prd_admitted, prd_admitted_check
 #[test]
 fn action_02_admit_prd() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     // Precondition check
     assert!(
@@ -492,8 +492,8 @@ fn action_02_admit_prd() {
 /// Postcondition: ard_exists
 #[test]
 fn action_03_derive_ard() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     // Precondition check
     assert!(
@@ -513,8 +513,8 @@ fn action_03_derive_ard() {
 /// Postcondition: ard_admitted, ard_admitted_check
 #[test]
 fn action_04_admit_ard() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     assert!(
         execution.contains_fact("ard-exists", &[]),
@@ -535,8 +535,8 @@ fn action_04_admit_ard() {
 /// Postcondition: adr_recorded
 #[test]
 fn action_05_record_adr() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     assert!(
         execution.contains_fact("ard-admitted", &[]),
@@ -553,8 +553,8 @@ fn action_05_record_adr() {
 /// Postcondition: work_units_generated
 #[test]
 fn action_06_generate_work_units() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     assert!(
         execution.contains_fact("adr-recorded", &[]),
@@ -571,8 +571,8 @@ fn action_06_generate_work_units() {
 /// Postcondition: implementation_complete, implementation_complete_check
 #[test]
 fn action_07_implement_work_units() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     assert!(
         execution.contains_fact("work-units-generated", &[]),
@@ -593,8 +593,8 @@ fn action_07_implement_work_units() {
 /// Postcondition: tests_passed, tests_passed_check
 #[test]
 fn action_08_run_tests() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     assert!(
         execution.contains_fact("implementation-complete", &[]),
@@ -615,8 +615,8 @@ fn action_08_run_tests() {
 /// Postcondition: docs_projected, docs_projected_check
 #[test]
 fn action_09_project_docs() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     assert!(
         execution.contains_fact("tests-passed", &[]),
@@ -637,8 +637,8 @@ fn action_09_project_docs() {
 /// Postcondition: release_ready, release_ready_check
 #[test]
 fn action_10_prepare_release() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     assert!(
         execution.contains_fact("docs-projected", &[]),
@@ -667,8 +667,8 @@ fn action_10_prepare_release() {
 /// Postcondition: published
 #[test]
 fn action_11_publish_release() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     // All 8 preconditions
     assert!(
@@ -716,8 +716,8 @@ fn action_11_publish_release() {
 /// Postcondition: build_slot_requested
 #[test]
 fn action_12_request_build_slot() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     assert!(
         execution.contains_fact("work-units-generated", &[]),
@@ -734,8 +734,8 @@ fn action_12_request_build_slot() {
 /// Postcondition: build_slot_acquired
 #[test]
 fn action_13_acquire_build_slot() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     assert!(
         execution.contains_fact("build-slot-requested", &[]),
@@ -752,8 +752,8 @@ fn action_13_acquire_build_slot() {
 /// Postcondition: build_ocel_recorded
 #[test]
 fn action_14_record_build_ocel() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     assert!(
         execution.contains_fact("build-slot-acquired", &[]),
@@ -770,8 +770,8 @@ fn action_14_record_build_ocel() {
 /// Postcondition: receipt_present, ocel_present
 #[test]
 fn action_15_emit_receipt() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     assert!(
         execution.contains_fact("build-ocel-recorded", &[]),
@@ -794,8 +794,8 @@ fn action_15_emit_receipt() {
 /// Test 28: Precondition 1 — prd_admitted_check must hold
 #[test]
 fn precondition_01_prd_admitted_check() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     // If published is reached, prd_admitted_check must be true
     if execution.contains_fact("published", &[]) {
@@ -809,8 +809,8 @@ fn precondition_01_prd_admitted_check() {
 /// Test 29: Precondition 2 — ard_admitted_check must hold
 #[test]
 fn precondition_02_ard_admitted_check() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     if execution.contains_fact("published", &[]) {
         assert!(
@@ -823,8 +823,8 @@ fn precondition_02_ard_admitted_check() {
 /// Test 30: Precondition 3 — implementation_complete_check must hold
 #[test]
 fn precondition_03_implementation_complete_check() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     if execution.contains_fact("published", &[]) {
         assert!(
@@ -837,8 +837,8 @@ fn precondition_03_implementation_complete_check() {
 /// Test 31: Precondition 4 — tests_passed_check must hold
 #[test]
 fn precondition_04_tests_passed_check() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     if execution.contains_fact("published", &[]) {
         assert!(
@@ -851,8 +851,8 @@ fn precondition_04_tests_passed_check() {
 /// Test 32: Precondition 5 — docs_projected_check must hold
 #[test]
 fn precondition_05_docs_projected_check() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     if execution.contains_fact("published", &[]) {
         assert!(
@@ -865,8 +865,8 @@ fn precondition_05_docs_projected_check() {
 /// Test 33: Precondition 6 — release_ready_check must hold
 #[test]
 fn precondition_06_release_ready_check() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     if execution.contains_fact("published", &[]) {
         assert!(
@@ -879,8 +879,8 @@ fn precondition_06_release_ready_check() {
 /// Test 34: Precondition 7 — receipt_present must hold
 #[test]
 fn precondition_07_receipt_present() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     if execution.contains_fact("published", &[]) {
         assert!(
@@ -893,8 +893,8 @@ fn precondition_07_receipt_present() {
 /// Test 35: Precondition 8 — ocel_present must hold
 #[test]
 fn precondition_08_ocel_present() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     if execution.contains_fact("published", &[]) {
         assert!(
@@ -912,11 +912,13 @@ fn precondition_08_ocel_present() {
 /// Expected: Plan should succeed normally (oracle catches issue via OCEL trace)
 #[test]
 fn mutant_01_missing_prd_admitted_check() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     // Oracle should verify successfully if implementation is correct
-    execution.verify().expect("oracle must catch precondition violations");
+    execution
+        .verify()
+        .expect("oracle must catch precondition violations");
 
     // But if prd_admitted_check is missing, published should not be reachable
     // (This test validates the schema enforces it)
@@ -932,8 +934,8 @@ fn mutant_01_missing_prd_admitted_check() {
 /// Expected: Should fail or reach published without all checks
 #[test]
 fn mutant_02_missing_tests_passed_check() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     // Verify the plan
     execution.verify().expect("oracle must verify");
@@ -951,8 +953,8 @@ fn mutant_02_missing_tests_passed_check() {
 /// Expected: publish_release should fail (missing ocel_present precondition)
 #[test]
 fn mutant_03_skip_record_build_ocel() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     // If we reach published, ocel_present must be true
     if execution.contains_fact("published", &[]) {
@@ -967,8 +969,8 @@ fn mutant_03_skip_record_build_ocel() {
 /// Expected: publish_release precondition should fail
 #[test]
 fn mutant_04_publish_without_release_ready() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     // If published, release_ready must have been true
     if execution.contains_fact("published", &[]) {
@@ -987,8 +989,8 @@ fn mutant_04_publish_without_release_ready() {
 /// Expected: Plan should reach published in minimum steps
 #[test]
 fn qlens_exploitation_shortest_path() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     // Should reach published state
     assert!(
@@ -1005,30 +1007,66 @@ fn qlens_exploitation_shortest_path() {
 /// Expected: Plan should touch all states en route to published
 #[test]
 fn qlens_coverage_all_stages() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     // All 12 stages must be visited
-    assert!(execution.contains_fact("intent-captured", &[]), "stage 1: intent-captured");
-    assert!(execution.contains_fact("prd-exists", &[]), "stage 2: prd-exists");
-    assert!(execution.contains_fact("prd-admitted", &[]), "stage 3: prd-admitted");
-    assert!(execution.contains_fact("ard-exists", &[]), "stage 4: ard-exists");
-    assert!(execution.contains_fact("ard-admitted", &[]), "stage 5: ard-admitted");
-    assert!(execution.contains_fact("adr-recorded", &[]), "stage 6: adr-recorded");
-    assert!(execution.contains_fact("work-units-generated", &[]), "stage 7: work-units-generated");
-    assert!(execution.contains_fact("implementation-complete", &[]), "stage 8: implementation-complete");
-    assert!(execution.contains_fact("tests-passed", &[]), "stage 9: tests-passed");
-    assert!(execution.contains_fact("docs-projected", &[]), "stage 10: docs-projected");
-    assert!(execution.contains_fact("release-ready", &[]), "stage 11: release-ready");
-    assert!(execution.contains_fact("published", &[]), "stage 12: published");
+    assert!(
+        execution.contains_fact("intent-captured", &[]),
+        "stage 1: intent-captured"
+    );
+    assert!(
+        execution.contains_fact("prd-exists", &[]),
+        "stage 2: prd-exists"
+    );
+    assert!(
+        execution.contains_fact("prd-admitted", &[]),
+        "stage 3: prd-admitted"
+    );
+    assert!(
+        execution.contains_fact("ard-exists", &[]),
+        "stage 4: ard-exists"
+    );
+    assert!(
+        execution.contains_fact("ard-admitted", &[]),
+        "stage 5: ard-admitted"
+    );
+    assert!(
+        execution.contains_fact("adr-recorded", &[]),
+        "stage 6: adr-recorded"
+    );
+    assert!(
+        execution.contains_fact("work-units-generated", &[]),
+        "stage 7: work-units-generated"
+    );
+    assert!(
+        execution.contains_fact("implementation-complete", &[]),
+        "stage 8: implementation-complete"
+    );
+    assert!(
+        execution.contains_fact("tests-passed", &[]),
+        "stage 9: tests-passed"
+    );
+    assert!(
+        execution.contains_fact("docs-projected", &[]),
+        "stage 10: docs-projected"
+    );
+    assert!(
+        execution.contains_fact("release-ready", &[]),
+        "stage 11: release-ready"
+    );
+    assert!(
+        execution.contains_fact("published", &[]),
+        "stage 12: published"
+    );
 }
 
 /// Q-Lens: Rare — Discover no invalid action sequences
 /// Expected: All action sequences in plan should be valid (preconditions satisfied)
 #[test]
 fn qlens_rare_valid_sequences() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     // Verify catches all invalid sequences
     execution
@@ -1048,8 +1086,8 @@ fn qlens_rare_valid_sequences() {
 /// - BLAKE3 chaining proves tamper-evidence
 #[test]
 fn ocel_logging_tamper_evidence() {
-    let execution = execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT)
-        .expect("plan should execute");
+    let execution =
+        execute_pddl_to_powl(RELEASE_DOMAIN, RELEASE_PROBLEM_INIT).expect("plan should execute");
 
     // Verification includes OCEL receipt validation
     execution
