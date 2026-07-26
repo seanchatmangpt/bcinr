@@ -40,7 +40,19 @@ jobs:
       - name: Install strict MCP stdio transport
         run: python3 scripts/repair_mcp_transport.py
       - name: Normalize repaired Rust sources
-        run: cargo fmt --all
+        id: normalize
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo fmt --all 2>&1 | tee rustfmt-repair.log
+      - name: Upload rustfmt parser diagnostics
+        if: failure() && steps.normalize.conclusion == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: post-integration-rustfmt-${{ github.run_id }}
+          path: rustfmt-repair.log
+          if-no-files-found: error
+          retention-days: 7
       - name: Validate repaired patch shape
         run: git diff --check
       - name: Formatting
