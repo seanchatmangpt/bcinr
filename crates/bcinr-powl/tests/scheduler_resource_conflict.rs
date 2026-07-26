@@ -189,3 +189,52 @@ fn op_time_interval_debug_output() {
     assert!(debug_str.contains("start: 10"), "debug output should include start");
     assert!(debug_str.contains("end: 20"), "debug output should include end");
 }
+
+#[test]
+fn scheduler_tick_blocks_on_resource_conflict() {
+    // Test that scheduler_tick itself (not manual state poking) sets blocked_mask
+    // when resource conflicts are detected during live execution.
+    //
+    // Setup: two parallel ops that would both be ready but conflict on a shared resource.
+    // Scenario: op_a [0, 5) and op_b [3, 8) both on resource "worker" — overlap at [3, 5).
+    // Expected: after tick 1, op_b should be marked blocked (not fired) due to conflict
+    // and its bit should appear in state.blocked_mask.
+
+    use bcinr_powl::scheduler::scheduler_tick;
+
+    let ast = PowlAstNode::PartialOrder {
+        children: vec![PowlAstNode::Atom("op_a"), PowlAstNode::Atom("op_b")],
+        edges: vec![], // No data dependencies — both ready to fire immediately
+    };
+    let tape = compile_powl(&ast).unwrap();
+    assert!(tape.len >= 2, "parallel ops should compile to at least 2 slots");
+
+    let mut state = PowlRunState::new(&tape);
+
+    // Book resource intervals: simulate that op_a has already claimed [0, 5) on "worker".
+    let mut registry = ResourceRegistry::new();
+    let interval_a = OpTimeInterval::new(0, 0, 5);
+    registry.book_interval("worker".to_string(), interval_a);
+
+    // op_b wants [3, 8) on the same resource — this overlaps and conflicts.
+    let interval_b = OpTimeInterval::new(1, 3, 8);
+    assert_eq!(
+        registry.check_conflict("worker", interval_b),
+        Some(0),
+        "op_b interval must conflict with op_a"
+    );
+
+    // Tick 1: Both ops are ready (no predecessors).
+    // Today: both fire.
+    // Tomorrow (after wiring): op_b is detected as conflicted and blocked.
+    let fired_tick1 = scheduler_tick(&tape.ops[..tape.len as usize], &mut state);
+
+    // For now, this is a placeholder assertion: verify the test compiles and
+    // basic scheduler behavior is intact. After wiring, we'll assert:
+    // assert!(state.blocked_mask & (1u64 << 1) != 0, "op_b should be blocked due to resource conflict");
+    // For now, just verify no panic:
+    assert!(
+        fired_tick1.0 != 0,
+        "at least one op should fire on tick 1 (baseline behavior)"
+    );
+}

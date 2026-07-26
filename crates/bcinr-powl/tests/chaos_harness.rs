@@ -10,33 +10,6 @@ use bcinr_powl::tape::PowlTape;
 use bcinr_powl::ocel::OcelLog;
 use bcinr_powl::scheduler::{scheduler_tick, PowlRunState};
 
-/// Configuration for a chaos injection campaign.
-#[derive(Clone, Debug)]
-pub struct ChaosConfig {
-    /// Maximum ticks before forced termination.
-    pub max_ticks: u32,
-    /// If set, crash after this many ticks.
-    pub crash_after_tick: Option<u32>,
-    /// If set, inject delay by advancing tick counter by this amount.
-    pub delay_ticks: u32,
-    /// If true, verify duplicate ticks are idempotent.
-    pub verify_duplicate_tick_idempotence: bool,
-    /// If true, shuffle ready-set before scheduling.
-    pub reorder_ready_set: bool,
-}
-
-impl Default for ChaosConfig {
-    fn default() -> Self {
-        Self {
-            max_ticks: 100,
-            crash_after_tick: None,
-            delay_ticks: 0,
-            verify_duplicate_tick_idempotence: false,
-            reorder_ready_set: false,
-        }
-    }
-}
-
 /// Result of a chaos-injected execution.
 #[derive(Clone, Debug)]
 pub struct ChaosExecResult {
@@ -350,6 +323,7 @@ pub fn run_with_reorder_injection(
 #[derive(Clone, Debug)]
 pub struct ReorderExecResult {
     pub all_fired: u64,
+    #[allow(dead_code)]
     pub ticks_executed: u32,
     pub final_state: ExecutionSnapshot,
     /// Violations found during execution
@@ -380,13 +354,13 @@ pub fn trace_with_ocel(
         for i in 0..tape.len as usize {
             let bit = 1u64 << i;
             if fs.0 & bit != 0 {
-                let _ = log.record_op_fired(run_id, i as u32, ticks as u32, 1);
+                let _ = log.record_op_fired(run_id, i as u32, ticks, 1);
             }
         }
     }
 
     // Seal the run
-    let _ = log.record_run_sealed(run_id, state.done_mask, ticks as u32);
+    let _ = log.record_run_sealed(run_id, state.done_mask, ticks);
 
     (log, state)
 }

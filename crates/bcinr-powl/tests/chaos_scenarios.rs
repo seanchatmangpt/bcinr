@@ -260,6 +260,13 @@ fn test_reorder_ready_set_preserves_dependency_validity() {
         (result.all_fired.count_ones()) as usize, tape.len as usize,
         "All ops must eventually fire despite reordering"
     );
+
+    // Verify execution bounded by tick limit (reorder injection doesn't exceed bounds)
+    assert!(
+        result.ticks_executed <= 50,
+        "Reorder injection must not exceed tick budget (got {})",
+        result.ticks_executed
+    );
 }
 
 /// Sanity check: Uninjected execution produces baseline.
