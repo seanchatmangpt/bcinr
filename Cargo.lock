@@ -163,7 +163,7 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "bcinr"
-version = "26.6.24"
+version = "26.7.25"
 dependencies = [
  "bcinr-api",
  "bcinr-core",
@@ -173,14 +173,14 @@ dependencies = [
 
 [[package]]
 name = "bcinr-api"
-version = "26.6.24"
+version = "26.7.25"
 dependencies = [
  "bcinr-logic",
 ]
 
 [[package]]
 name = "bcinr-bench"
-version = "26.6.24"
+version = "26.7.25"
 dependencies = [
  "bcinr-core",
  "bcinr-logic",
@@ -198,7 +198,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-bench-auditor"
-version = "26.6.24"
+version = "26.7.25"
 dependencies = [
  "syn 2.0.119",
  "walkdir",
@@ -206,7 +206,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-cheat-scanner"
-version = "26.6.24"
+version = "26.7.25"
 dependencies = [
  "quote",
  "serde_json",
@@ -216,7 +216,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-cmca"
-version = "26.6.24"
+version = "26.7.25"
 dependencies = [
  "bcinr-logic",
  "proptest",
@@ -225,7 +225,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-contract-gate"
-version = "26.6.24"
+version = "26.7.25"
 dependencies = [
  "quote",
  "syn 2.0.119",
@@ -234,7 +234,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-core"
-version = "26.6.24"
+version = "26.7.25"
 dependencies = [
  "bcinr-api",
  "bcinr-logic",
@@ -244,7 +244,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-logic"
-version = "26.6.24"
+version = "26.7.25"
 dependencies = [
  "criterion",
  "proptest",
@@ -274,14 +274,14 @@ dependencies = [
 
 [[package]]
 name = "bcinr-mfw-ir"
-version = "26.6.26"
+version = "26.7.25"
 dependencies = [
  "blake3",
 ]
 
 [[package]]
 name = "bcinr-pddl"
-version = "26.7.24"
+version = "26.7.25"
 dependencies = [
  "bcinr-mfw-ir",
  "bcinr-powl",
@@ -299,7 +299,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-powl"
-version = "26.7.24"
+version = "26.7.25"
 dependencies = [
  "bcinr-logic",
  "bcinr-mfw-ir",
@@ -315,7 +315,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-powl-receipt"
-version = "26.7.24"
+version = "26.7.25"
 dependencies = [
  "bcinr-logic",
  "bcinr-mfw-ir",
@@ -328,7 +328,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-reporter"
-version = "26.6.24"
+version = "26.7.25"
 dependencies = [
  "prettytable-rs",
  "regex",
