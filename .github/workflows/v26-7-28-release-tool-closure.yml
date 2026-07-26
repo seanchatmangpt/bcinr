@@ -51,7 +51,7 @@ jobs:
           toolchain: nightly-2026-07-25
           components: rustfmt,clippy
 
-      - name: Apply observed compiler repairs and wire standing law
+      - name: Apply observed compiler and lint repairs
         shell: bash
         run: |
           set -euo pipefail
@@ -130,7 +130,45 @@ jobs:
               '            let mut file_name = OsString::from(program);\n            file_name.push(extension);\n            let candidate = directory.join(file_name);\n',
               'executable suffix construction',
           )
+          executor = replace_once(
+              executor,
+              '    } else if execution_error.is_some() {\n        RailOutcome::EvidenceFailure\n    } else if log_failed {\n        RailOutcome::EvidenceFailure\n',
+              '    } else if execution_error.is_some() || log_failed {\n        RailOutcome::EvidenceFailure\n',
+              'evidence failure branches',
+          )
+          executor = replace_once(
+              executor,
+              'fn failed_receipt(\n',
+              '#[expect(\n    clippy::too_many_arguments,\n    reason = "failure receipt construction preserves explicit bounded evidence fields"\n)]\nfn failed_receipt(\n',
+              'failure receipt lint expectation',
+          )
           executor_path.write_text(executor)
+
+          model_path = Path('tools/bcinr-release/src/model.rs')
+          model = model_path.read_text()
+          model = replace_once(
+              model,
+              '    Unknown,\n    Unsupported,\n',
+              '    #[expect(\n        dead_code,\n        reason = "reserved receipt standing for incomplete observations"\n    )]\n    Unknown,\n    #[expect(\n        dead_code,\n        reason = "reserved receipt standing for unsupported verifier boundaries"\n    )]\n    Unsupported,\n',
+              'reserved standing variants',
+          )
+          model = replace_once(
+              model,
+              '    EvidenceWriteFailed,\n',
+              '',
+              'unused evidence issue code',
+          )
+          model_path.write_text(model)
+
+          provenance_path = Path('tools/bcinr-release/src/provenance.rs')
+          provenance = provenance_path.read_text()
+          provenance = replace_once(
+              provenance,
+              '    } else if let Some(value) = trimmed.strip_prefix("http://github.com/") {\n        value\n    } else {\n        return None;\n    };\n',
+              '    } else {\n        trimmed.strip_prefix("http://github.com/")?\n    };\n',
+              'remote normalization question-mark path',
+          )
+          provenance_path.write_text(provenance)
 
           profile_path = Path('release/v26.7.28/production.json')
           profile = profile_path.read_text()
@@ -235,6 +273,8 @@ jobs:
               'Cargo.lock',
               'tools/bcinr-release/src/main.rs',
               'tools/bcinr-release/src/executor.rs',
+              'tools/bcinr-release/src/model.rs',
+              'tools/bcinr-release/src/provenance.rs',
               'tools/bcinr-release/README.md',
               'release/v26.7.28/production.json',
               '.github/workflows/v26-7-28-release-tool-closure.yml',
@@ -263,6 +303,8 @@ jobs:
           git add Cargo.lock \
             tools/bcinr-release/src/main.rs \
             tools/bcinr-release/src/executor.rs \
+            tools/bcinr-release/src/model.rs \
+            tools/bcinr-release/src/provenance.rs \
             tools/bcinr-release/README.md \
             release/v26.7.28/production.json \
             .github/workflows/v26-7-28-release-tool-closure.yml
