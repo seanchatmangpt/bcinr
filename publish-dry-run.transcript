@@ -1,7 +1,10 @@
     Updating crates.io index
 warning: crate bcinr-core@26.4.22 already exists on crates.io index
-error: 1 files in the working directory contain changes that were not yet committed into git:
-
-bcinr-core/Cargo.toml
-
-to proceed despite this and include the uncommitted changes, pass the `--allow-dirty` flag
+   Packaging bcinr-core v26.4.22 (/Users/sac/bcinr/bcinr-core)
+    Updating crates.io index
+    Packaged 17 files, 2.1MiB (843.1KiB compressed)
+   Verifying bcinr-core v26.4.22 (/Users/sac/bcinr/bcinr-core)
+   Compiling bcinr-core v26.4.22 (/Users/sac/bcinr/target/package/bcinr-core-26.4.22)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.44s
+   Uploading bcinr-core v26.4.22 (/Users/sac/bcinr/bcinr-core)
+warning: aborting upload due to dry run
