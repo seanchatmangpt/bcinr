@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fence multi-mutant feature composition without weakening isolated mutant rails."""
+"""Fence multi-mutant composition and remove the legacy LSP fallback."""
 
 from pathlib import Path
 import re
@@ -43,3 +43,29 @@ for test in (
         raise RuntimeError(f"{test}: composition guard insertion failed")
 
 path.write_text(source)
+
+e2e = Path("bcinr/tests/e2e_main.rs")
+source = e2e.read_text()
+legacy = '''pub fn run_lsp_cmd(dir: &str) -> std::process::Output {
+    ensure_lsp_built();
+    let target_dir = std::env::temp_dir().join("bcinr-e2e-target");
+    let lsp_binary = target_dir.join("debug/anti-llm-cheat-lsp");
+    if !lsp_binary.exists() {
+        eprintln!(
+            "anti-llm-cheat-lsp binary not found at {:?}, returning empty output",
+            lsp_binary
+        );
+        // Return a dummy output that indicates the test should be skipped
+        return std::process::Command::new("true").output().unwrap();
+    }
+    let mut cmd = Command::new(&lsp_binary);
+    cmd.arg("scan");
+    cmd.args(["--dir", dir]);
+    cmd.current_dir(get_repo_root());
+    cmd.output().unwrap()
+}
+
+'''
+if source.count(legacy) != 1:
+    raise RuntimeError("legacy dummy-success run_lsp_cmd implementation missing")
+e2e.write_text(source.replace(legacy, "", 1))
