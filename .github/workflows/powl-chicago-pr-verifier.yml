@@ -1,4 +1,4 @@
-name: POWL Chicago PR Verifier
+name: POWL Chicago Final Tree Verifier
 
 on:
   pull_request:
@@ -7,20 +7,20 @@ on:
     types: [opened, synchronize, reopened]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: powl-chicago-pr-verifier
+  group: powl-chicago-final-tree-verifier
   cancel-in-progress: true
 
 env:
-  CARGO_TERM_COLOR: never
+  CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
   RUST_BACKTRACE: 1
 
 jobs:
   verify:
-    name: Manufacture and verify complete Chicago closure
+    name: Verify final rebased Chicago tree
     if: github.event.pull_request.head.ref == 'agent/cmca-chicago-jtbd-validation-v26.7.25' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 180
@@ -29,94 +29,25 @@ jobs:
         with:
           ref: agent/cmca-chicago-jtbd-validation-v26.7.25
           fetch-depth: 0
-          persist-credentials: true
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-
-      - name: Execute verification ladder
-        shell: bash
-        run: |
-          set +e
-          set -o pipefail
-          : > /tmp/powl-chicago-closure.log
-          : > /tmp/powl-chicago-closure.statuses
-          overall=0
-          run_step() {
-            name="$1"
-            shift
-            echo "===== ${name} =====" | tee -a /tmp/powl-chicago-closure.log
-            "$@" 2>&1 | tee -a /tmp/powl-chicago-closure.log
-            status=${PIPESTATUS[0]}
-            echo "exit=${status}" | tee -a /tmp/powl-chicago-closure.log
-            echo "${name}=${status}" >> /tmp/powl-chicago-closure.statuses
-            if [ "${status}" -ne 0 ]; then overall=1; fi
-          }
-
-          run_step manufacture python3 scripts/implement_powl_chicago_closure.py
-          if [ "${overall}" -eq 0 ]; then
-            run_step context-fix python3 scripts/fix_powl_chicago_context.py
-            run_step xor-conformance-fix python3 scripts/fix_powl_xor_conformance.py
-            run_step ocel-schema-fix python3 scripts/fix_powl_ocel_schema.py
-            run_step clippy-source-fix python3 scripts/fix_powl_clippy.py
-          fi
-          if [ "${overall}" -eq 0 ]; then
-            run_step format cargo fmt --all
-            run_step diff-check git diff --check
-            run_step powl-ocel-unit cargo test -p bcinr-powl --features std ocel
-            run_step powl-chicago cargo test -p bcinr-powl --test chicago_tdd_integration --features std
-            run_step powl-all cargo test -p bcinr-powl --all-features
-            run_step powl-receipt cargo test -p bcinr-powl-receipt --all-features
-            run_step cmca-chicago cargo test -p bcinr-cmca --test jtbd_certified_actuation_chicago
-            run_step workspace-check cargo check --workspace --all-features
-            run_step powl-clippy cargo clippy -p bcinr-powl --all-targets --all-features -- -D warnings
-            run_step format-check cargo fmt --all -- --check
-          fi
-          echo "${overall}" > /tmp/powl-chicago-closure.status
-          exit 0
-
-      - name: Publish source or diagnostic
-        shell: bash
-        run: |
-          status=$(cat /tmp/powl-chicago-closure.status)
-          mkdir -p docs/testing
-          cp /tmp/powl-chicago-closure.log docs/testing/powl-chicago-closure-latest.log
-          {
-            echo '# POWL Chicago closure execution receipt'
-            echo
-            echo "- Workflow run: ${GITHUB_RUN_ID}"
-            echo "- Verified input commit: ${GITHUB_SHA}"
-            echo "- Verification status: $([ "${status}" -eq 0 ] && echo ALIVE || echo BUILD_BROKEN)"
-            echo '- Runner: Ubuntu 24.04 / nightly Rust'
-            echo
-            echo '## Command receipts'
-            echo
-            while IFS='=' read -r name exit_code; do
-              printf -- '- `%s`: exit `%s`\n' "${name}" "${exit_code}"
-            done < /tmp/powl-chicago-closure.statuses
-          } > docs/testing/powl-chicago-closure-v26.7.25.md
-
-          rm -f .github/workflows/powl-chicago-closure.yml
-          git config user.name 'OpenAI Test Agent'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-
-          if [ "${status}" -eq 0 ]; then
-            rm -f scripts/implement_powl_chicago_closure.py
-            rm -f scripts/fix_powl_chicago_context.py
-            rm -f scripts/fix_powl_xor_conformance.py
-            rm -f scripts/fix_powl_ocel_schema.py
-            rm -f scripts/fix_powl_clippy.py
-            rm -f docs/testing/powl-chicago-verifier-trigger.txt
-            rm -f docs/testing/powl-chicago-closure-latest.log
-            git add -A
-            git diff --cached --check
-            git commit -m 'fix(powl): close Chicago conformance and receipt gaps'
-          else
-            sed -i 's/[[:space:]]*$//' docs/testing/powl-chicago-closure-latest.log
-            git restore --worktree --staged crates Cargo.lock 2>/dev/null || true
-            git add docs/testing/powl-chicago-closure-latest.log docs/testing/powl-chicago-closure-v26.7.25.md
-            git add -u .github/workflows/powl-chicago-closure.yml 2>/dev/null || true
-            git commit -m 'test(powl): capture Chicago closure diagnostic'
-          fi
-          git push origin HEAD:agent/cmca-chicago-jtbd-validation-v26.7.25
+      - name: Diff integrity
+        run: git diff --check origin/agent/repair-post-integration-verification-ci...HEAD
+      - name: POWL OCEL unit rail
+        run: cargo test -p bcinr-powl --features std ocel
+      - name: POWL Chicago integration
+        run: cargo test -p bcinr-powl --test chicago_tdd_integration --features std
+      - name: POWL all features
+        run: cargo test -p bcinr-powl --all-features
+      - name: POWL receipt regression
+        run: cargo test -p bcinr-powl-receipt --all-features
+      - name: CMCA Chicago JTBDs
+        run: cargo test -p bcinr-cmca --test jtbd_certified_actuation_chicago
+      - name: Workspace compile
+        run: cargo check --workspace --all-features
+      - name: POWL Clippy
+        run: cargo clippy -p bcinr-powl --all-targets --all-features -- -D warnings
+      - name: Formatting
+        run: cargo fmt --all -- --check
