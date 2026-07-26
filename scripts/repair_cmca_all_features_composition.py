@@ -69,3 +69,21 @@ legacy = '''pub fn run_lsp_cmd(dir: &str) -> std::process::Output {
 if source.count(legacy) != 1:
     raise RuntimeError("legacy dummy-success run_lsp_cmd implementation missing")
 e2e.write_text(source.replace(legacy, "", 1))
+
+lib = Path("crates/bcinr-cmca/src/lib.rs")
+source = lib.read_text()
+old = '''//! // The calibration succeeds, proposing recertification
+//! assert!(status.is_ok());'''
+new = '''//! // The production calibration succeeds, proposing recertification. Hostile
+//! // mutation features intentionally alter this semantic surface and are verified
+//! // by the dedicated isolated-mutant rails instead of this production example.
+//! # if cfg!(any(
+//! #     feature = "mutant_1", feature = "mutant_2", feature = "mutant_3",
+//! #     feature = "mutant_4", feature = "mutant_5", feature = "mutant_6",
+//! #     feature = "mutant_7", feature = "mutant_8", feature = "mutant_9",
+//! #     feature = "mutant_10", feature = "mutant_11"
+//! # )) { return; }
+//! assert!(status.is_ok());'''
+if source.count(old) != 1:
+    raise RuntimeError("CMCA production doctest assertion missing")
+lib.write_text(source.replace(old, new, 1))
