@@ -1,0 +1,88 @@
+name: v26.7.26 Release Validation
+
+"on":
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v26-7-26-release-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: 1
+
+jobs:
+  lockfile-receipt:
+    name: Materialize lockfile receipt
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - name: Resolve the FFI package into Cargo.lock
+        run: cargo check -p bcinr-ffi
+      - name: Record lockfile delta
+        if: always()
+        shell: bash
+        run: git diff -- Cargo.lock | tee cargo-lock.patch
+      - name: Upload resolved lockfile
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v26-7-26-resolved-lock-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            Cargo.lock
+            cargo-lock.patch
+          if-no-files-found: error
+          retention-days: 7
+
+  validate:
+    name: Execute release verifier
+    needs: lockfile-receipt
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Validate verifier syntax and source admission
+        run: |
+          bash -n scripts/generate_v26_7_26_report.sh
+          python3 -m py_compile scripts/verify_v26_7_26_structure.py
+          python3 scripts/verify_v26_7_26_structure.py --phase all
+      - name: Execute all v26.7.26 release rails
+        id: verify
+        shell: bash
+        run: bash scripts/generate_v26_7_26_report.sh
+      - name: Publish report to job summary
+        if: always()
+        shell: bash
+        run: |
+          report="$(find target/v26.7.26-verification -name v26_7_26_verification_report.md -type f | sort | tail -1)"
+          if [[ -n "${report}" && -f "${report}" ]]; then
+            cat "${report}" >> "${GITHUB_STEP_SUMMARY}"
+          else
+            echo "Release verifier did not produce a report." >> "${GITHUB_STEP_SUMMARY}"
+            exit 1
+          fi
+      - name: Upload executable receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v26-7-26-release-receipts-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/v26.7.26-verification/
+          if-no-files-found: error
+          retention-days: 30
