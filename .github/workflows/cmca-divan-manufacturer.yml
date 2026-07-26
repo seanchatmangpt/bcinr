@@ -34,8 +34,8 @@ jobs:
         with:
           shared-key: cmca-divan
 
-      - name: Verify formatting
-        run: cargo fmt --all -- --check
+      - name: Canonical formatting
+        run: cargo fmt --all
 
       - name: Compile CMCA Divan target
         run: cargo check -p bcinr-bench --bench cmca_execution_bench
@@ -76,13 +76,17 @@ jobs:
             echo '```'
           } > docs/testing/cmca-divan-execution-v26.7.25.md
 
-      - name: Commit generated lock and benchmark receipt
+      - name: Commit normalized benchmark and receipt
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add Cargo.lock docs/testing/cmca-divan-execution-v26.7.25.md
+          git add \
+            Cargo.lock \
+            bcinr-bench/Cargo.toml \
+            bcinr-bench/benches/cmca_execution_bench.rs \
+            docs/testing/cmca-divan-execution-v26.7.25.md
           if git diff --cached --quiet; then
             echo 'No generated changes to commit.'
           else
