@@ -176,6 +176,9 @@ jobs:
       - name: Compile Divan temporal benchmarks
         working-directory: bcinr
         shell: bash
+        env:
+          CARGO_PROFILE_BENCH_OPT_LEVEL: 2
+          CARGO_PROFILE_BENCH_CODEGEN_UNITS: 1
         run: |
           set +e
           cargo bench -p bcinr-pddl --bench temporal_swarm_v26_7_28 --no-run \
