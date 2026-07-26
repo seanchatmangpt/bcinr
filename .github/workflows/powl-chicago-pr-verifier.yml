@@ -110,7 +110,7 @@ jobs:
             sed -i 's/[[:space:]]*$//' docs/testing/powl-chicago-closure-latest.log
             git restore --worktree --staged crates Cargo.lock 2>/dev/null || true
             git add docs/testing/powl-chicago-closure-latest.log docs/testing/powl-chicago-closure-v26.7.25.md
-            git add -u .github/workflows/powl-chicago-closure.yml
+            git add -u .github/workflows/powl-chicago-closure.yml 2>/dev/null || true
             git commit -m 'test(powl): capture Chicago closure diagnostic'
           fi
           git push origin HEAD:agent/cmca-chicago-jtbd-validation-v26.7.25
