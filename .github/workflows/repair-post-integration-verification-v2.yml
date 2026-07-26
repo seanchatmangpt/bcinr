@@ -1,9 +1,9 @@
 name: Repair Post-Integration Verification V2
 
 on:
-  push:
-    branches:
-      - agent/repair-post-integration-verification-ci
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
@@ -20,6 +20,7 @@ env:
 jobs:
   repair-verify-publish:
     name: Repair, verify, and publish final tree
+    if: github.event.pull_request.head.ref == 'agent/repair-post-integration-verification-ci' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
