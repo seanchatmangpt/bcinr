@@ -46,12 +46,16 @@ jobs:
           toolchain: nightly-2026-07-25
           components: rustfmt
 
-      - name: Manufacture canonical Rust formatting
+      - name: Manufacture canonical release-crate formatting
         shell: bash
         run: |
           set -euo pipefail
-          cargo fmt --all
-          cargo fmt --all -- --check
+          mapfile -d '' files < <(
+            find tools/bcinr-release/src -type f -name '*.rs' -print0 | sort -z
+          )
+          test "${#files[@]}" -gt 0
+          rustfmt --edition 2021 "${files[@]}"
+          rustfmt --edition 2021 --check "${files[@]}"
 
       - name: Refuse unexpected manufacturer mutations
         shell: bash
