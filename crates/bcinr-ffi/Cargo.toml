@@ -1,6 +1,6 @@
 [package]
 name = "bcinr-ffi"
-version = "26.7.25"
+version = "26.7.26"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "C FFI and WASM bindings for bcinr PDDL/POWL planning, receipts, and algorithms"
@@ -13,11 +13,11 @@ readme = "../../README.md"
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
-bcinr-pddl = { path = "../bcinr-pddl", version = "26.7.25" }
-bcinr-powl = { path = "../bcinr-powl", version = "26.7.25" }
-bcinr-powl-receipt = { path = "../bcinr-powl-receipt", version = "26.7.25" }
-bcinr-logic = { path = "../bcinr-logic", version = "26.7.25" }
-bcinr-api = { path = "../bcinr-api", version = "26.7.25" }
+bcinr-pddl = { path = "../bcinr-pddl", version = "26.7" }
+bcinr-powl = { path = "../bcinr-powl", version = "26.7" }
+bcinr-powl-receipt = { path = "../bcinr-powl-receipt", version = "26.7" }
+bcinr-logic = { path = "../bcinr-logic", version = "26.7" }
+bcinr-api = { path = "../bcinr-api", version = "26.7" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 blake3 = "1"
