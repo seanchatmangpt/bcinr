@@ -33,5 +33,11 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Execute bounded repair and verification
+      - name: Apply bounded source and CI repair
+        run: python3 scripts/repair_post_integration_verification.py
+      - name: Normalize repaired Rust sources
+        run: cargo fmt --all
+      - name: Validate repaired patch shape
+        run: git diff --check
+      - name: Execute complete receipted verification ladder
         run: bash scripts/run_post_integration_verification.sh
