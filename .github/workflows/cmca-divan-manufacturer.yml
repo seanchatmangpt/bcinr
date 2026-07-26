@@ -19,50 +19,55 @@ jobs:
       - name: Checkout pull request
         uses: actions/checkout@v4
 
-      - name: Install benchmark toolchain
-        uses: dtolnay/rust-toolchain@master
+      - name: Install repository toolchain
+        uses: dtolnay/rust-toolchain@nightly
         with:
-          toolchain: nightly-2026-07-24
           components: rustfmt, clippy
 
       - name: Cache Cargo state
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: cmca-divan-isolated-nightly-2026-07-24
+          shared-key: cmca-divan-ephemeral-runner
 
-      - name: Isolate benchmark in CMCA package
+      - name: Manufacture independent CMCA benchmark crate
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p crates/bcinr-cmca/benches
+          runner="$RUNNER_TEMP/cmca-divan-runner"
+          mkdir -p "$runner/benches"
           cp bcinr-bench/benches/cmca_execution_bench.rs \
-            crates/bcinr-cmca/benches/cmca_execution_bench.rs
-          python - <<'PY'
-          from pathlib import Path
+            "$runner/benches/cmca_execution_bench.rs"
+          cat > "$runner/Cargo.toml" <<EOF
+          [package]
+          name = "cmca-divan-runner"
+          version = "0.1.0"
+          edition = "2021"
+          publish = false
 
-          cmca = Path('crates/bcinr-cmca/Cargo.toml')
-          text = cmca.read_text()
-          if 'divan = "0.1"' not in text:
-              text = text.replace('proptest = "1.2.0"\n', 'proptest = "1.2.0"\ndivan = "0.1"\n')
-          if 'name = "cmca_execution_bench"' not in text:
-              text = text.rstrip() + '\n\n[[bench]]\nname = "cmca_execution_bench"\nharness = false\n'
-          cmca.write_text(text)
-          PY
-          cargo fmt --all
+          [dependencies]
+          bcinr-cmca = { path = "$GITHUB_WORKSPACE/crates/bcinr-cmca" }
+          divan = "0.1"
 
-      - name: Compile isolated CMCA Divan target
-        run: cargo +nightly-2026-07-24 check -p bcinr-cmca --bench cmca_execution_bench
+          [[bench]]
+          name = "cmca_execution_bench"
+          harness = false
 
-      - name: Lint isolated CMCA Divan target
-        run: cargo +nightly-2026-07-24 clippy -p bcinr-cmca --bench cmca_execution_bench -- -D warnings
+          [workspace]
+          EOF
 
-      - name: Execute isolated CMCA Divan baseline
+      - name: Compile independent CMCA Divan target
+        run: cargo check --manifest-path "$RUNNER_TEMP/cmca-divan-runner/Cargo.toml" --bench cmca_execution_bench
+
+      - name: Lint independent CMCA Divan target
+        run: cargo clippy --manifest-path "$RUNNER_TEMP/cmca-divan-runner/Cargo.toml" --bench cmca_execution_bench -- -D warnings
+
+      - name: Execute independent CMCA Divan baseline
         id: bench
         continue-on-error: true
         shell: bash
         run: |
           set -o pipefail
-          cargo +nightly-2026-07-24 bench -p bcinr-cmca --bench cmca_execution_bench 2>&1 | tee cmca-divan-isolated-output.txt
+          cargo bench --manifest-path "$RUNNER_TEMP/cmca-divan-runner/Cargo.toml" --bench cmca_execution_bench 2>&1 | tee cmca-divan-isolated-output.txt
 
       - name: Upload complete Divan output
         if: always()
