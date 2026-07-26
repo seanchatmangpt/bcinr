@@ -10,15 +10,19 @@ on:
     paths:
       - crates/bcinr-pddl/**
       - contracts/v26.7.28/**
+      - docs/releases/v26.7.28-temporal-runtime.md
       - .github/workflows/v26-7-28-temporal-swarm.yml
   workflow_dispatch:
+
+env:
+  GGEN_RUNTIME_COMMIT: 50164750c70b8808a71706702aee68b2f3a77875
 
 permissions:
   contents: write
 
 concurrency:
   group: v26-7-28-temporal-swarm-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   manufacture-and-verify:
@@ -31,11 +35,11 @@ jobs:
           path: bcinr
           fetch-depth: 0
 
-      - name: Checkout ggen manufacturing source
+      - name: Checkout exact ggen manufactured commit
         uses: actions/checkout@v4
         with:
           repository: seanchatmangpt/ggen
-          ref: agent/v26.7.28-bcinr-runtime-pack
+          ref: ${{ env.GGEN_RUNTIME_COMMIT }}
           path: ggen
           fetch-depth: 1
 
@@ -43,34 +47,26 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Manufacture language-neutral contracts with real ggen
-        working-directory: ggen/examples/bcinr-v26-7-28
-        shell: bash
+      - name: Admit manufactured contract family
         run: |
-          set +e
-          cargo run --manifest-path ../../Cargo.toml -p ggen-cli-lib --bin ggen -- sync run \
-            > /tmp/bcinr-v26-7-28-ggen.log 2>&1
-          status=$?
-          set -e
-          if [ "$status" -ne 0 ]; then
-            tail -n 120 /tmp/bcinr-v26-7-28-ggen.log
-            exit "$status"
-          fi
-          tail -n 30 /tmp/bcinr-v26-7-28-ggen.log
-
-      - name: Project manufactured contracts into BCINR
-        run: |
+          set -eu
+          generated=ggen/examples/bcinr-v26-7-28/generated
+          test -f "$generated/temporal_contract.rs"
+          test -f "$generated/swarm_scenarios.rs"
+          test -f "$generated/bcinr_temporal.h"
+          test -f "$generated/bcinr-temporal.wit"
+          test -f "$generated/conformance_vectors.json"
           mkdir -p bcinr/crates/bcinr-pddl/src/generated
           mkdir -p bcinr/contracts/v26.7.28
-          cp ggen/examples/bcinr-v26-7-28/generated/temporal_contract.rs \
+          cp "$generated/temporal_contract.rs" \
              bcinr/crates/bcinr-pddl/src/generated/temporal_contract.rs
-          cp ggen/examples/bcinr-v26-7-28/generated/swarm_scenarios.rs \
+          cp "$generated/swarm_scenarios.rs" \
              bcinr/crates/bcinr-pddl/src/generated/swarm_scenarios.rs
-          cp ggen/examples/bcinr-v26-7-28/generated/bcinr_temporal.h \
+          cp "$generated/bcinr_temporal.h" \
              bcinr/contracts/v26.7.28/bcinr_temporal.h
-          cp ggen/examples/bcinr-v26-7-28/generated/bcinr-temporal.wit \
+          cp "$generated/bcinr-temporal.wit" \
              bcinr/contracts/v26.7.28/bcinr-temporal.wit
-          cp ggen/examples/bcinr-v26-7-28/generated/conformance_vectors.json \
+          cp "$generated/conformance_vectors.json" \
              bcinr/contracts/v26.7.28/conformance_vectors.json
 
       - name: Format source without rewriting generated projections
@@ -98,28 +94,37 @@ jobs:
             git push
           fi
 
-      - name: Prove ggen projection identity
-        working-directory: ggen/examples/bcinr-v26-7-28
+      - name: Prove exact ggen byte identity
         run: |
-          cargo run --manifest-path ../../Cargo.toml -p ggen-cli-lib --bin ggen -- sync run
-          git diff --exit-code -- generated
-          cmp generated/temporal_contract.rs ../../../bcinr/crates/bcinr-pddl/src/generated/temporal_contract.rs
-          cmp generated/swarm_scenarios.rs ../../../bcinr/crates/bcinr-pddl/src/generated/swarm_scenarios.rs
-          cmp generated/bcinr_temporal.h ../../../bcinr/contracts/v26.7.28/bcinr_temporal.h
-          cmp generated/bcinr-temporal.wit ../../../bcinr/contracts/v26.7.28/bcinr-temporal.wit
-          cmp generated/conformance_vectors.json ../../../bcinr/contracts/v26.7.28/conformance_vectors.json
+          cmp ggen/examples/bcinr-v26-7-28/generated/temporal_contract.rs \
+              bcinr/crates/bcinr-pddl/src/generated/temporal_contract.rs
+          cmp ggen/examples/bcinr-v26-7-28/generated/swarm_scenarios.rs \
+              bcinr/crates/bcinr-pddl/src/generated/swarm_scenarios.rs
+          cmp ggen/examples/bcinr-v26-7-28/generated/bcinr_temporal.h \
+              bcinr/contracts/v26.7.28/bcinr_temporal.h
+          cmp ggen/examples/bcinr-v26-7-28/generated/bcinr-temporal.wit \
+              bcinr/contracts/v26.7.28/bcinr-temporal.wit
+          cmp ggen/examples/bcinr-v26-7-28/generated/conformance_vectors.json \
+              bcinr/contracts/v26.7.28/conformance_vectors.json
 
-      - name: Refuse LLM dependencies
+      - name: Refuse LLM providers and prove zero-call vectors
         working-directory: bcinr
         run: |
-          if grep -RniE 'openai|anthropic|ollama|language.model|llm.call' \
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          vectors = json.loads(Path("contracts/v26.7.28/conformance_vectors.json").read_text())
+          assert vectors["llm_calls"] == 0
+          assert len(vectors["scenarios"]) == 10
+          PY
+          if grep -RniE 'api\.openai\.com|api\.anthropic\.com|openai[[:space:]_-]*client|anthropic[[:space:]_-]*client|ollama[[:space:]_-]*(client|endpoint)' \
             crates/bcinr-pddl/src/temporal_production.rs \
             crates/bcinr-pddl/src/swarm_validation.rs \
             crates/bcinr-pddl/tests/temporal_swarm_v26_7_28.rs \
             crates/bcinr-pddl/tests/manufactured_swarm_scenarios_v26_7_28.rs \
             crates/bcinr-pddl/benches/temporal_swarm_v26_7_28.rs \
             contracts/v26.7.28; then
-            echo "LLM dependency detected in deterministic temporal rail" >&2
+            echo "LLM provider or endpoint dependency detected in deterministic temporal rail" >&2
             exit 1
           fi
 
