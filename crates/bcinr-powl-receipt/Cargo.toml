@@ -20,6 +20,10 @@ serde_json = "1"
 [dev-dependencies]
 criterion = "0.5"
 
+[[test]]
+name = "mutant_kill_g4_powl"
+path = "tests/mutant_kill_g4_powl.rs"
+
 [[bench]]
 name = "receipt_bench"
 harness = false

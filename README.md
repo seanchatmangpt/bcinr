@@ -1,4 +1,4 @@
-# bcinr — BranchlessCInRust (v26.6.24)
+# bcinr — BranchlessCInRust (v26.7.25)
 
 `bcinr` is a performance-first, research-grade systems library providing a principled calculus for branchless algorithmics. It is designed for high-performance, deterministic systems where predictable latency, memory-safety, and side-channel resilience are critical requirements.
 
@@ -14,8 +14,8 @@
 
 ```toml
 [dependencies]
-bcinr-logic = "26.6.24"   # core algorithms, no_std, zero deps
-bcinr-powl  = "26.6.24"   # workflow scheduler + conformance gate
+bcinr-logic = "26.7.25"   # core algorithms, no_std, zero deps
+bcinr-powl  = "26.7.25"   # workflow scheduler + conformance gate
 ```
 
 ## Quick Start

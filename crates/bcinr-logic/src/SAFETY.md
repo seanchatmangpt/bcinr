@@ -1,6 +1,6 @@
 # SAFETY.md — Unsafe Code Audit Trail
 
-**Version:** 26.4.22  
+**Version:** 26.7.25  
 **Last Audited:** June 13, 2026  
 **Status:** All unsafe blocks formally verified
 

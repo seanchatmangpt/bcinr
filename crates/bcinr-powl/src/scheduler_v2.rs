@@ -70,26 +70,26 @@ pub fn scheduler_tick_v2<S: ConcurrencySelector>(
     selector: &mut S,
     guards: &ConcurrencyGuardTable,
 ) -> PowlV2TickOutcome {
+    // Early exit for completion (unavoidable check)
     if state.is_complete(tape) {
         return PowlV2TickOutcome::Complete;
     }
 
+    // Compute readiness unconditionally (no branch on result)
     let ready_mask = state.ready_mask(tape);
-    if ready_mask == 0 {
-        return PowlV2TickOutcome::Deadlock {
-            remaining_mask: valid_mask(tape.len) & !state.done_mask,
-        };
-    }
-
     let ready = mask_to_event_set(ready_mask);
     let selected = selector.select_checked(&ready, guards);
     let fired = event_set_to_mask(&selected);
-    if fired == 0 {
+
+    // Combine both empty conditions: if either ready_mask or fired is zero, deadlock
+    // This reduces two separate if statements into one conditional check
+    if ready_mask == 0 || fired == 0 {
         return PowlV2TickOutcome::Deadlock {
             remaining_mask: valid_mask(tape.len) & !state.done_mask,
         };
     }
 
+    // Only reachable if both ready_mask and fired are nonzero
     state.done_mask |= fired;
     state.tick = state.tick.saturating_add(1);
     PowlV2TickOutcome::Fired(fired)
