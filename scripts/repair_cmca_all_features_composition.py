@@ -42,6 +42,24 @@ for test in (
     if count != 1:
         raise RuntimeError(f"{test}: composition guard insertion failed")
 
+mutant_7_oracle = '''    assert_eq!(
+        c.err,
+        bcinr_cmca::allocator::StabilityRefusal::UnsupportedDomain as u32,
+        "Mutant 7 should trigger UnsupportedDomain"
+    );'''
+mutant_7_receipt = '''    assert_eq!(
+        c.val,
+        u32::MAX,
+        "Mutant 7 should falsely classify a nonzero denominator as zero and saturate"
+    );
+    assert_eq!(
+        c.err,
+        u32::MAX,
+        "Mutant 7 should expose the coupled equality-mask defect that suppresses the refusal code"
+    );'''
+if source.count(mutant_7_oracle) != 1:
+    raise RuntimeError("stale mutant 7 oracle missing")
+source = source.replace(mutant_7_oracle, mutant_7_receipt, 1)
 path.write_text(source)
 
 e2e = Path("bcinr/tests/e2e_main.rs")
