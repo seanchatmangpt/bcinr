@@ -35,8 +35,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Apply bounded source and CI repair
         run: python3 scripts/repair_post_integration_verification.py
-      - name: Fence CMCA multi-mutant feature composition
+      - name: Repair hostile-mutant and E2E admission
         run: python3 scripts/repair_cmca_all_features_composition.py
+      - name: Install strict MCP stdio transport
+        run: python3 scripts/repair_mcp_transport.py
       - name: Normalize repaired Rust sources
         run: cargo fmt --all
       - name: Validate repaired patch shape
@@ -46,19 +48,7 @@ jobs:
       - name: Workspace compile
         run: cargo check --workspace --all-features
       - name: Clippy
-        id: clippy
-        shell: bash
-        run: |
-          set -o pipefail
-          cargo clippy --workspace --all-targets --all-features -- -D warnings 2>&1 | tee clippy.log
-      - name: Upload Clippy diagnostics
-        if: failure() && steps.clippy.conclusion == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: post-integration-clippy-${{ github.run_id }}
-          path: clippy.log
-          if-no-files-found: error
-          retention-days: 7
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - name: CMCA all-features baseline
         run: cargo test -p bcinr-cmca --all-features
       - name: CMCA calibration
@@ -103,6 +93,8 @@ jobs:
         run: cargo test -p bcinr-powl-receipt --all-features
       - name: POWL receipt execution v2
         run: cargo test -p bcinr-powl-receipt --all-features execution_v2
+      - name: Strict MCP malformed JSON contract
+        run: cargo test -p bcinr-mcp --test adversarial malformed_json_rejected -- --nocapture
       - name: Broad bcinr E2E
         run: cargo test -p bcinr --test e2e_main
       - name: Full workspace
