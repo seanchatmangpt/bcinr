@@ -161,7 +161,24 @@ jobs:
         run: cargo check -p bcinr-bench --bench cmca_execution_bench
 
       - name: Lint CMCA Divan target
-        run: cargo clippy -p bcinr-bench --bench cmca_execution_bench -- -D warnings
+        id: verify_clippy
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo clippy -p bcinr-bench --bench cmca_execution_bench -- -D warnings 2>&1 | tee cmca-divan-clippy.txt
+
+      - name: Upload Clippy diagnostic
+        if: steps.verify_clippy.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmca-divan-clippy-${{ github.run_id }}
+          path: cmca-divan-clippy.txt
+          if-no-files-found: error
+
+      - name: Enforce Clippy result
+        if: steps.verify_clippy.outcome == 'failure'
+        run: exit 1
 
       - name: Execute CMCA Divan baseline
         run: cargo bench -p bcinr-bench --bench cmca_execution_bench
