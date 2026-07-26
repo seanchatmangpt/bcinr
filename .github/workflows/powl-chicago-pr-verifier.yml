@@ -41,6 +41,7 @@ jobs:
           set +e
           set -o pipefail
           : > /tmp/powl-chicago-closure.log
+          : > /tmp/powl-chicago-closure.statuses
           overall=0
           run_step() {
             name="$1"
@@ -49,6 +50,7 @@ jobs:
             "$@" 2>&1 | tee -a /tmp/powl-chicago-closure.log
             status=${PIPESTATUS[0]}
             echo "exit=${status}" | tee -a /tmp/powl-chicago-closure.log
+            echo "${name}=${status}" >> /tmp/powl-chicago-closure.statuses
             if [ "${status}" -ne 0 ]; then overall=1; fi
           }
 
@@ -77,16 +79,20 @@ jobs:
           status=$(cat /tmp/powl-chicago-closure.status)
           mkdir -p docs/testing
           cp /tmp/powl-chicago-closure.log docs/testing/powl-chicago-closure-latest.log
-          cat > docs/testing/powl-chicago-closure-v26.7.25.md <<EOF
-          # POWL Chicago closure execution receipt
-
-          - Workflow run: ${GITHUB_RUN_ID}
-          - Verified input commit: ${GITHUB_SHA}
-          - Verification status: $([ "${status}" -eq 0 ] && echo ALIVE || echo BUILD_BROKEN)
-          - Runner: Ubuntu 24.04 / nightly Rust
-
-          The retained log records the manufacturer, temporal validator unit tests, strengthened Chicago integration suite, independent OCEL importer/validator, POWL and receipt regressions, CMCA regression, workspace compile, formatting, and clippy.
-          EOF
+          {
+            echo '# POWL Chicago closure execution receipt'
+            echo
+            echo "- Workflow run: ${GITHUB_RUN_ID}"
+            echo "- Verified input commit: ${GITHUB_SHA}"
+            echo "- Verification status: $([ "${status}" -eq 0 ] && echo ALIVE || echo BUILD_BROKEN)"
+            echo '- Runner: Ubuntu 24.04 / nightly Rust'
+            echo
+            echo '## Command receipts'
+            echo
+            while IFS='=' read -r name exit_code; do
+              printf -- '- `%s`: exit `%s`\n' "${name}" "${exit_code}"
+            done < /tmp/powl-chicago-closure.statuses
+          } > docs/testing/powl-chicago-closure-v26.7.25.md
 
           rm -f .github/workflows/powl-chicago-closure.yml
           git config user.name 'OpenAI Test Agent'
@@ -96,10 +102,12 @@ jobs:
             rm -f scripts/implement_powl_chicago_closure.py
             rm -f scripts/fix_powl_chicago_context.py
             rm -f docs/testing/powl-chicago-verifier-trigger.txt
+            rm -f docs/testing/powl-chicago-closure-latest.log
             git add -A
             git diff --cached --check
             git commit -m 'fix(powl): close Chicago conformance and receipt gaps'
           else
+            sed -i 's/[[:space:]]*$//' docs/testing/powl-chicago-closure-latest.log
             git restore --worktree --staged crates Cargo.lock 2>/dev/null || true
             git add docs/testing/powl-chicago-closure-latest.log docs/testing/powl-chicago-closure-v26.7.25.md
             git add -u .github/workflows/powl-chicago-closure.yml
