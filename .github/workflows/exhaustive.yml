@@ -1,0 +1,67 @@
+name: Exhaustive Validation
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '41 8 * * 6'
+  push:
+    branches: [main]
+    paths:
+      - 'crates/bcinr-cmca/src/generated/**'
+      - 'crates/bcinr-cmca/generated-artifact/**'
+      - 'crates/bcinr-cmca/quarantine/**'
+      - 'scripts/gates/**'
+
+concurrency:
+  group: exhaustive-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  linux-exhaustive:
+    name: Linux Exhaustive Semantic Rail
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Full workspace
+        run: cargo test --workspace --all-features --all-targets --no-fail-fast
+      - name: Isolated CMCA mutants
+        run: |
+          for mutant in $(seq 1 11); do
+            cargo test -p bcinr-cmca --features "mutant_${mutant}" --test hostile_mutants
+          done
+      - name: Compile-fail snapshots remain compiler-owned
+        run: |
+          TRYBUILD=overwrite cargo test -p bcinr-cmca --test compile_fail_tests
+          git diff --exit-code -- crates/bcinr-cmca/tests/ui
+      - name: Generated-artifact standing
+        run: |
+          cargo test -p bcinr-cmca --features artifact-verification
+          bash scripts/gates/check-generated-staleness.sh
+      - name: Security database and policy refresh
+        run: |
+          cargo install cargo-audit cargo-deny --locked
+          cargo audit
+          cargo deny check
+
+  cross-platform:
+    name: Full Workspace (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace --all-features --all-targets --no-fail-fast
