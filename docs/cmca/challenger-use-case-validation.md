@@ -67,3 +67,9 @@ This ordering prevents nanosecond measurements from becoming the sales story. Pe
 ## Implementation
 
 The executable scenarios live in `bcinr-bench/tests/cmca_challenger_use_cases.rs`. They use the same public CMCA surfaces as the benchmark suite and intentionally avoid mocks, private functions, and narrative-only assertions.
+
+Run the layer directly with:
+
+```bash
+cargo test -p bcinr-bench --test cmca_challenger_use_cases
+```
