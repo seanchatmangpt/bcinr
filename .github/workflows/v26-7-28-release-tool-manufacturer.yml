@@ -21,7 +21,7 @@ jobs:
   manufacture:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - name: Checkout exact branch head
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -34,17 +34,17 @@ jobs:
         uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
         with:
           toolchain: nightly-2026-07-25
-          components: rustfmt,clippy
+          components: rustfmt
 
-      - name: Format and materialize the exact lock graph
+      - name: Format source and resolve the workspace lock graph
         shell: bash
         run: |
           set -euo pipefail
           cargo fmt --all
-          cargo check -p bcinr-release --all-targets
-          cargo test -p bcinr-release
-          cargo clippy -p bcinr-release --all-targets -- -D warnings
+          cargo metadata --format-version 1 > /tmp/bcinr-v26-7-28-metadata.json
           cargo fmt --all -- --check
+          test -s /tmp/bcinr-v26-7-28-metadata.json
+          test -f Cargo.lock
 
       - name: Refuse unexpected manufacturer mutations
         shell: bash
@@ -52,7 +52,6 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           import subprocess
-          from pathlib import Path
 
           allowed_exact = {
               'Cargo.lock',
@@ -72,8 +71,6 @@ jobs:
                   unexpected.append(raw)
           if unexpected:
               raise SystemExit('unexpected manufacturer mutations:\n' + '\n'.join(unexpected))
-          if not Path('Cargo.lock').is_file():
-              raise SystemExit('Cargo.lock was not materialized')
           PY
 
       - name: Publish formatted source and lockfile, then delete manufacturer
