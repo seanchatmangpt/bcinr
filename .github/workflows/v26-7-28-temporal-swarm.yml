@@ -76,47 +76,59 @@ jobs:
           from pathlib import Path
 
           path = Path("crates/bcinr-pddl/src/swarm_validation.rs")
-          source = path.read_text()
-          before = '''        match event.kind {
-              SwarmEventKind::ResourceAcquired => {
-                  if !owned.insert(resource) {
-                      return Err(SwarmValidationError::InvariantViolation {
-                          scenario,
-                          invariant: "exclusive resource was acquired twice without release",
-                      });
-                  }
-              }
-              SwarmEventKind::ResourceReleased => {
-                  if !owned.remove(resource) {
-                      return Err(SwarmValidationError::InvariantViolation {
-                          scenario,
-                          invariant: "exclusive resource was released without ownership",
-                      });
-                  }
-              }
-              _ => {}
-          }
-          '''
-          after = '''        match event.kind {
-              SwarmEventKind::ResourceAcquired if !owned.insert(resource) => {
-                  return Err(SwarmValidationError::InvariantViolation {
-                      scenario,
-                      invariant: "exclusive resource was acquired twice without release",
-                  });
-              }
-              SwarmEventKind::ResourceReleased if !owned.remove(resource) => {
-                  return Err(SwarmValidationError::InvariantViolation {
-                      scenario,
-                      invariant: "exclusive resource was released without ownership",
-                  });
-              }
-              _ => {}
-          }
-          '''
-          if before in source:
-              path.write_text(source.replace(before, after, 1))
-          elif after not in source:
-              raise SystemExit("exact Clippy repair pattern was not found")
+          lines = path.read_text().splitlines()
+          old = [
+              "        match event.kind {",
+              "            SwarmEventKind::ResourceAcquired => {",
+              "                if !owned.insert(resource) {",
+              "                    return Err(SwarmValidationError::InvariantViolation {",
+              "                        scenario,",
+              "                        invariant: \"exclusive resource was acquired twice without release\",",
+              "                    });",
+              "                }",
+              "            }",
+              "            SwarmEventKind::ResourceReleased => {",
+              "                if !owned.remove(resource) {",
+              "                    return Err(SwarmValidationError::InvariantViolation {",
+              "                        scenario,",
+              "                        invariant: \"exclusive resource was released without ownership\",",
+              "                    });",
+              "                }",
+              "            }",
+              "            _ => {}",
+              "        }",
+          ]
+          new = [
+              "        match event.kind {",
+              "            SwarmEventKind::ResourceAcquired if !owned.insert(resource) => {",
+              "                return Err(SwarmValidationError::InvariantViolation {",
+              "                    scenario,",
+              "                    invariant: \"exclusive resource was acquired twice without release\",",
+              "                });",
+              "            }",
+              "            SwarmEventKind::ResourceReleased if !owned.remove(resource) => {",
+              "                return Err(SwarmValidationError::InvariantViolation {",
+              "                    scenario,",
+              "                    invariant: \"exclusive resource was released without ownership\",",
+              "                });",
+              "            }",
+              "            _ => {}",
+              "        }",
+          ]
+
+          def locate(needle):
+              width = len(needle)
+              for index in range(len(lines) - width + 1):
+                  if lines[index:index + width] == needle:
+                      return index
+              return None
+
+          old_index = locate(old)
+          if old_index is not None:
+              lines[old_index:old_index + len(old)] = new
+              path.write_text("\n".join(lines) + "\n")
+          elif locate(new) is None:
+              raise SystemExit("exact Clippy repair structure was not found")
           PY
 
       - name: Format source without rewriting generated projections
