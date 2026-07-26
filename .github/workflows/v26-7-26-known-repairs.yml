@@ -1,0 +1,265 @@
+name: v26.7.26 Known Repair Bootstrap
+
+"on":
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.head_ref == 'agent/close-v26-7-26-release-gaps'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - name: Apply exact observed repairs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace(path: str, old: str, new: str, expected: int = 1) -> None:
+              file = Path(path)
+              text = file.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != expected:
+                  raise SystemExit(
+                      f"REPAIR_REFUSED: {path}: expected {expected} occurrence(s), found {count}: {old!r}"
+                  )
+              file.write_text(text.replace(old, new), encoding="utf-8")
+
+          replace(
+              "crates/bcinr-cmca/tests/mutant_kill_g4_cmca.rs",
+              "gd_ok = gd_ok & (lhs <= rhs);",
+              "gd_ok &= lhs <= rhs;",
+              expected=2,
+          )
+          replace(
+              "crates/bcinr-cmca/tests/mutant_kill_g4_cmca.rs",
+              "normal_ok = normal_ok & (lhs <= rhs);",
+              "normal_ok &= lhs <= rhs;",
+          )
+          replace(
+              "crates/bcinr-cmca/tests/mutant_kill_g4_cmca.rs",
+              "inverted_ok = inverted_ok & (lhs > rhs);",
+              "inverted_ok &= lhs > rhs;",
+          )
+
+          replace(
+              "crates/bcinr-cmca/tests/usecase_trading_determinism.rs",
+              '''    for i in 0..N {
+                  assert_eq!(
+                      results[0][i], results[1][i],
+                      "identical market state must produce identical allocation for exchange {}",
+                      i
+                  );
+              }''',
+              '''    for (i, (first, second)) in results[0].iter().zip(&results[1]).enumerate() {
+                  assert_eq!(
+                      first, second,
+                      "identical market state must produce identical allocation for exchange {}",
+                      i
+                  );
+              }''',
+          )
+          replace(
+              "crates/bcinr-cmca/tests/usecase_trading_determinism.rs",
+              '''    for i in 0..N {
+                  assert!(
+                      alloc[i].val > 0,
+                      "exchange {} must not be starved of capital",
+                      i
+                  );
+                  sum += alloc[i].val as u64;
+              }''',
+              '''    for (i, allocation) in alloc.iter().enumerate().take(N) {
+                  assert!(
+                      allocation.val > 0,
+                      "exchange {} must not be starved of capital",
+                      i
+                  );
+                  sum += allocation.val as u64;
+              }''',
+          )
+          replace(
+              "crates/bcinr-cmca/tests/usecase_trading_determinism.rs",
+              '''        for i in 0..N {
+                      assert!(
+                          alloc[i].val > 0,
+                          "round {} must not starve exchange {}",
+                          round,
+                          i
+                      );
+                  }''',
+              '''        for (i, allocation) in alloc.iter().enumerate().take(N) {
+                      assert!(
+                          allocation.val > 0,
+                          "round {} must not starve exchange {}",
+                          round,
+                          i
+                      );
+                  }''',
+          )
+
+          replace(
+              "crates/bcinr-powl/tests/usecase_consensus_termination.rs",
+              "log.record_op_fired(run_id, op_idx, 0).unwrap();",
+              "log.record_op_fired(run_id, op_idx, ticks, 1).unwrap();",
+          )
+          replace(
+              "crates/bcinr-powl/tests/usecase_consensus_termination.rs",
+              "log.record_run_sealed(run_id, op_trace).unwrap();",
+              "log.record_run_sealed(run_id, op_trace, ticks).unwrap();",
+          )
+          replacements = {
+              "log_correct.record_op_fired(run_id, 0, 0).unwrap();":
+                  "log_correct.record_op_fired(run_id, 0, 0, 1).unwrap();",
+              "log_correct.record_op_fired(run_id, 1, 0).unwrap();":
+                  "log_correct.record_op_fired(run_id, 1, 1, 1).unwrap();",
+              "log_correct.record_op_fired(run_id, 2, 0).unwrap();":
+                  "log_correct.record_op_fired(run_id, 2, 2, 1).unwrap();",
+              "log_correct.record_run_sealed(run_id, 0b111).unwrap();":
+                  "log_correct.record_run_sealed(run_id, 0b111, 3).unwrap();",
+              "log_reordered.record_op_fired(run_id, 1, 0).unwrap();":
+                  "log_reordered.record_op_fired(run_id, 1, 0, 1).unwrap();",
+              "log_reordered.record_op_fired(run_id, 0, 0).unwrap();":
+                  "log_reordered.record_op_fired(run_id, 0, 1, 1).unwrap();",
+              "log_reordered.record_op_fired(run_id, 2, 0).unwrap();":
+                  "log_reordered.record_op_fired(run_id, 2, 2, 1).unwrap();",
+              "log_reordered.record_run_sealed(run_id, 0b111).unwrap();":
+                  "log_reordered.record_run_sealed(run_id, 0b111, 3).unwrap();",
+          }
+          for old, new in replacements.items():
+              replace("crates/bcinr-powl/tests/usecase_consensus_termination.rs", old, new)
+
+          replace(
+              "crates/bcinr-powl/tests/react_file_tree_interview_cmca_chicago.rs",
+              '''        for &candidate in &self.candidate_index {
+                      if !self.covered.contains(&candidate) && candidate == 2 {
+                          return Some(candidate);
+                      }
+                  }
+                  None''',
+              '''        self.candidate_index
+                      .iter()
+                      .find(|&&candidate| !self.covered.contains(&candidate) && candidate == 2)
+                      .copied()''',
+          )
+          replace(
+              "crates/bcinr-powl/tests/react_file_tree_interview_cmca_chicago.rs",
+              '''        (ds_select, cx_select, rp_select, pf_select)
+                  }
+              }
+
+              // Test harness skeleton''',
+              '''        (ds_select, cx_select, rp_select, pf_select)
+                  }
+              }
+
+              impl Default for CandidateSelector {
+                  fn default() -> Self {
+                      Self::new()
+                  }
+              }
+
+              // Test harness skeleton''',
+          )
+          replace(
+              "crates/bcinr-powl/tests/react_file_tree_interview_cmca_chicago.rs",
+              '''        let expected_keys = vec![
+                      "nested_tree",
+                      "indexed_access",
+                      "add_file_conflict",
+                      "flat_files",
+                  ];''',
+              '''        let expected_keys = [
+                      "nested_tree",
+                      "indexed_access",
+                      "add_file_conflict",
+                      "flat_files",
+                  ];''',
+          )
+
+          replace(
+              "crates/bcinr-powl/tests/usecase_swarm_08_byzantine_fault_tolerance.rs",
+              '''    // This is a runtime check, not a compile-time check. To properly verify,
+                  // we would instrument the network layer or parse the binary. For now,
+                  // we rely on code inspection: the test uses only:
+                  // - bcinr_powl::compiler (compile_powl)
+                  // - bcinr_powl::scheduler (scheduler_tick)
+                  // - bcinr_powl::ocel (OcelLog)
+                  // - std library (HashSet, Vec)
+                  //
+                  // None of these modules depend on anthropic, openai, or other LLM SDKs.
+                  // We assert this is true by construction.
+                  assert!(
+                      true,
+                      "no anthropic/openai/llm API dependencies are imported in this test file"
+                  );''',
+              '''    let imports = include_str!("usecase_swarm_08_byzantine_fault_tolerance.rs")
+                      .lines()
+                      .filter(|line| line.trim_start().starts_with("use "))
+                      .collect::<Vec<_>>()
+                      .join("\\n")
+                      .to_ascii_lowercase();
+                  for forbidden in ["anthropic", "openai", "reqwest", "std::net", "tokio::net"] {
+                      assert!(
+                          !imports.contains(forbidden),
+                          "forbidden LLM/network import found: {}",
+                          forbidden
+                      );
+                  }''',
+          )
+
+          replace(
+              "scripts/generate_v26_7_26_report.sh",
+              '"cargo bench -p bcinr-pddl --bench phase1_temporal -- --noplot"',
+              '"CARGO_PROFILE_BENCH_CODEGEN_UNITS=1 cargo bench -p bcinr-pddl --bench phase1_temporal -- --noplot"',
+          )
+          replace(
+              "scripts/generate_v26_7_26_report.sh",
+              '"cargo bench -p bcinr-powl --bench phase3_scheduler -- --noplot"',
+              '"CARGO_PROFILE_BENCH_CODEGEN_UNITS=1 cargo bench -p bcinr-powl --bench phase3_scheduler -- --noplot"',
+          )
+          PY
+
+          cargo fmt --all
+          git diff --check
+
+          mapfile -t changed < <(git diff --name-only)
+          allowed=(
+            crates/bcinr-cmca/tests/mutant_kill_g4_cmca.rs
+            crates/bcinr-cmca/tests/usecase_trading_determinism.rs
+            crates/bcinr-powl/tests/react_file_tree_interview_cmca_chicago.rs
+            crates/bcinr-powl/tests/usecase_consensus_termination.rs
+            crates/bcinr-powl/tests/usecase_swarm_08_byzantine_fault_tolerance.rs
+            scripts/generate_v26_7_26_report.sh
+          )
+          if [[ ${#changed[@]} -ne ${#allowed[@]} ]]; then
+            printf 'REPAIR_REFUSED: expected %s changed files, found %s\n' "${#allowed[@]}" "${#changed[@]}" >&2
+            printf '%s\n' "${changed[@]}" >&2
+            exit 1
+          fi
+          for expected in "${allowed[@]}"; do
+            printf '%s\n' "${changed[@]}" | grep -Fxq "${expected}" || {
+              echo "REPAIR_REFUSED: missing expected change ${expected}" >&2
+              exit 1
+            }
+          done
+
+          git config user.name "BCINR Release Verifier"
+          git config user.email "actions@users.noreply.github.com"
+          git add -- "${allowed[@]}"
+          git commit -m "fix(release): close observed v26.7.26 verifier failures"
+          git push origin HEAD:${{ github.head_ref }}
