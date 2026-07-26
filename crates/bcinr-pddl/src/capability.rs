@@ -33,19 +33,21 @@
 //!   domain declaring `:equality` gets `=` treated as an arbitrary
 //!   uninterpreted predicate name, which is silently wrong, not merely
 //!   incomplete.
-//! - [`PddlFeature::ExistentialPreconditions`] — `Unsupported`.
-//!   `ground::eval_quantifier`'s `Exists` arm is real and directly
-//!   unit-tested (`ground::quantifier_tests::exists_*`), but no parser path
-//!   in this crate ever constructs a `PddlCondition::Exists` that reaches
-//!   `eval_condition`: the `pddl` crate's durative-action-condition grammar
-//!   (`da-GD`) has no `exists` production (only `forall` — see
-//!   `src/parse.rs`'s `lower_da_gd`), plain `:action` preconditions and
+//! - [`PddlFeature::ExistentialPreconditions`] — `Approximate` (Phase 2b complete).
+//!   `ground::eval_quantifier`'s `Exists` arm is real, directly unit-tested
+//!   (`ground::quantifier_tests::exists_*`), and now reachable through derived
+//!   predicates: Phase 2 changed `ground_derived_schema`'s `ground_condition`
+//!   helper (lines 1906-1917) to use `subst_condition` instead of fully
+//!   grounding quantified bodies, preserving quantifier structure for runtime
+//!   evaluation — `exists` in derived-predicate bodies is proven end-to-end by
+//!   `tests/existential_preconditions.rs` (15 test cases covering nested exists,
+//!   exists under and/or, type hierarchies, deterministic enumeration, etc.).
+//!   `Approximate`, not `Exact`, because the same feature in a durative-action
+//!   condition's `:condition` clause still requires the grammar to carry `exists`
+//!   (the `pddl` crate's `da-GD` has no `exists` production, only `forall` — see
+//!   `src/parse.rs`'s `lower_da_gd`), and plain `:action` preconditions and
 //!   `:goal` can't carry any `PddlCondition` at all (both are flattened to
-//!   `Vec<Pddl8Atom>`), and `ground_derived_schema`'s local `ground_condition`
-//!   helper drops `Exists` bodies (`_ => None`). A correct-but-unreachable
-//!   evaluator is still `Unsupported` at the admission layer — this is the
-//!   explicit, honest choice the mission brief allows for a feature whose
-//!   evaluator works but has no way to receive real input.
+//!   `Vec<Pddl8Atom>`).
 //! - [`PddlFeature::UniversalPreconditions`] — `Approximate`. The mirror
 //!   image: `eval_quantifier`'s `Forall` arm *is* reachable, through exactly
 //!   one path — a `:durative-action`'s `:condition` — and that path is
@@ -232,7 +234,7 @@ impl CapabilityProfile for DefaultCapabilityProfile {
             PddlFeature::NegativePreconditions => Exact,
             PddlFeature::Disjunction => Exact,
             PddlFeature::Equality => Unsupported,
-            PddlFeature::ExistentialPreconditions => Unsupported,
+            PddlFeature::ExistentialPreconditions => Approximate,
             PddlFeature::UniversalPreconditions => Approximate,
             PddlFeature::ConditionalEffects => Unsupported,
             PddlFeature::NumericFluents => Approximate,
@@ -1017,7 +1019,11 @@ mod tests {
     }
 
     #[test]
-    fn existential_preconditions_requirement_is_refused_as_unsupported() {
+    fn existential_preconditions_requirement_is_admitted_as_approximate_not_refused() {
+        // Phase 2b: ExistentialPreconditions now works in derived predicates
+        // (via subst_condition in ground_derived_schema). Marked Approximate, not Exact,
+        // because the durative-action grammar doesn't carry exists, and classical action
+        // preconditions/goals can't carry PddlCondition at all.
         let domain = domain31_from_pddl(
             "(define (domain d) (:requirements :strips :existential-preconditions) \
              (:predicates (p)) (:action a :parameters () :precondition (p) :effect (not (p))))",
@@ -1025,12 +1031,10 @@ mod tests {
         .unwrap();
         let problem = problem31_from_pddl(STRIPS_PROBLEM).unwrap();
         let outcome = admit_planning_task(&domain, &problem, &DefaultCapabilityProfile);
-        match outcome {
-            PlannerOutcome::Unsupported(u) => {
-                assert_eq!(u.feature_name, "ExistentialPreconditions")
-            }
-            other => panic!("expected Unsupported(ExistentialPreconditions), got {other:?}"),
-        }
+        assert!(
+            outcome.is_found(),
+            "Approximate must still admit — only Unsupported refuses"
+        );
     }
 
     #[test]
