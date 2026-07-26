@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "release": "26.7.28",
+  "repository": "seanchatmangpt/bcinr",
+  "output_directory": "target/release-evidence/v26.7.28",
+  "rails": [
+    {
+      "id": "format",
+      "phase": "static",
+      "program": "cargo",
+      "args": ["fmt", "--all", "--", "--check"],
+      "timeout_seconds": 600
+    },
+    {
+      "id": "release-tool-tests",
+      "phase": "unit",
+      "program": "cargo",
+      "args": ["test", "--locked", "-p", "bcinr-release"],
+      "timeout_seconds": 900
+    },
+    {
+      "id": "locked-metadata",
+      "phase": "supply-chain",
+      "program": "cargo",
+      "args": ["metadata", "--locked", "--format-version", "1"],
+      "timeout_seconds": 600
+    },
+    {
+      "id": "workspace-check",
+      "phase": "integration",
+      "program": "cargo",
+      "args": ["check", "--locked", "--workspace", "--all-targets"],
+      "timeout_seconds": 3600
+    },
+    {
+      "id": "workspace-clippy",
+      "phase": "static",
+      "program": "cargo",
+      "args": ["clippy", "--locked", "--workspace", "--all-targets", "--", "-D", "warnings"],
+      "timeout_seconds": 3600
+    },
+    {
+      "id": "workspace-tests",
+      "phase": "integration",
+      "program": "cargo",
+      "args": ["test", "--locked", "--workspace"],
+      "timeout_seconds": 5400
+    },
+    {
+      "id": "temporal-swarm-tests",
+      "phase": "e2e",
+      "program": "cargo",
+      "args": ["test", "--locked", "-p", "bcinr-pddl", "--test", "temporal_swarm_v26_7_28", "--", "--nocapture"],
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "manufactured-scenario-tests",
+      "phase": "e2e",
+      "program": "cargo",
+      "args": ["test", "--locked", "-p", "bcinr-pddl", "--test", "manufactured_swarm_scenarios_v26_7_28", "--", "--nocapture"],
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "wasm-target-check",
+      "phase": "cross-target",
+      "program": "cargo",
+      "args": ["check", "--locked", "-p", "bcinr-pddl", "--target", "wasm32-unknown-unknown"],
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "ffi-c11-smoke",
+      "phase": "ffi",
+      "program": "cc",
+      "args": ["-std=c11", "-Wall", "-Wextra", "-Werror", "-I", "contracts/v26.7.28", "-fsyntax-only", "release/v26.7.28/smoke/ffi.c"],
+      "timeout_seconds": 300
+    },
+    {
+      "id": "temporal-benchmark-compile",
+      "phase": "benchmark",
+      "program": "cargo",
+      "args": ["bench", "--locked", "-p", "bcinr-pddl", "--bench", "temporal_swarm_v26_7_28", "--no-run"],
+      "timeout_seconds": 3600
+    },
+    {
+      "id": "temporal-benchmark-execute",
+      "phase": "benchmark",
+      "program": "cargo",
+      "args": ["bench", "--locked", "-p", "bcinr-pddl", "--bench", "temporal_swarm_v26_7_28"],
+      "timeout_seconds": 3600
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "lockfile",
+      "path": "Cargo.lock"
+    },
+    {
+      "id": "runtime-profile",
+      "path": "crates/bcinr-pddl/src/generated/temporal_contract.rs"
+    },
+    {
+      "id": "scenario-descriptors",
+      "path": "crates/bcinr-pddl/src/generated/swarm_scenarios.rs"
+    },
+    {
+      "id": "c-abi",
+      "path": "contracts/v26.7.28/bcinr_temporal.h"
+    },
+    {
+      "id": "wit-contract",
+      "path": "contracts/v26.7.28/bcinr-temporal.wit"
+    },
+    {
+      "id": "conformance-vectors",
+      "path": "contracts/v26.7.28/conformance_vectors.json"
+    }
+  ],
+  "byte_identity": [
+    {
+      "id": "runtime-profile-identity",
+      "left": "target/release-input/ggen/examples/bcinr-v26-7-28/generated/temporal_contract.rs",
+      "right": "crates/bcinr-pddl/src/generated/temporal_contract.rs"
+    },
+    {
+      "id": "scenario-descriptor-identity",
+      "left": "target/release-input/ggen/examples/bcinr-v26-7-28/generated/swarm_scenarios.rs",
+      "right": "crates/bcinr-pddl/src/generated/swarm_scenarios.rs"
+    },
+    {
+      "id": "c-abi-identity",
+      "left": "target/release-input/ggen/examples/bcinr-v26-7-28/generated/bcinr_temporal.h",
+      "right": "contracts/v26.7.28/bcinr_temporal.h"
+    },
+    {
+      "id": "wit-identity",
+      "left": "target/release-input/ggen/examples/bcinr-v26-7-28/generated/bcinr-temporal.wit",
+      "right": "contracts/v26.7.28/bcinr-temporal.wit"
+    },
+    {
+      "id": "conformance-vector-identity",
+      "left": "target/release-input/ggen/examples/bcinr-v26-7-28/generated/conformance_vectors.json",
+      "right": "contracts/v26.7.28/conformance_vectors.json"
+    }
+  ]
+}
