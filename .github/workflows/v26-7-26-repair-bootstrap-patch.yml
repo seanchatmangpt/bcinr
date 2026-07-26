@@ -1,0 +1,51 @@
+name: v26.7.26 Repair Bootstrap Patch
+
+"on":
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.head_ref == 'agent/close-v26-7-26-release-gaps'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Correct final repair postcondition
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=.github/workflows/v26-7-26-final-repairs.yml
+          old='require(chaos_scenarios_path, chaos_scenarios, "result.ticks_executed > 0", 1)'
+          new='require(chaos_scenarios_path, chaos_scenarios, "result.ticks_executed > 0", 2)'
+          [[ "$(grep -Fxc "          ${old}" "${file}")" -eq 1 ]] || {
+            echo 'PATCH_REFUSED: exact stale postcondition not found once' >&2
+            exit 1
+          }
+          python3 - "${file}" "${old}" "${new}" <<'PY'
+          from pathlib import Path
+          import sys
+          path, old, new = sys.argv[1:]
+          file = Path(path)
+          text = file.read_text(encoding="utf-8")
+          if text.count(old) != 1:
+              raise SystemExit("PATCH_REFUSED: unexpected source cardinality")
+          file.write_text(text.replace(old, new), encoding="utf-8")
+          PY
+          grep -Fq "${new}" "${file}"
+          git diff --check
+          [[ "$(git diff --name-only | wc -l)" -eq 1 ]]
+          [[ "$(git diff --name-only)" == "${file}" ]]
+          git config user.name 'BCINR Release Verifier'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -- "${file}"
+          git commit -m 'ci: correct final repair admission cardinality'
+          git push origin HEAD:${{ github.head_ref }}
