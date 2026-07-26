@@ -1,14 +1,14 @@
 # CMCA Divan Clippy Diagnostic
 
-- Workflow run: `30189231249`
-- Source commit: `40084bbc72330226d6ffe82e100f3bc4b4d76da1`
+- Workflow run: `30189273165`
+- Source commit: `04be9137ca40e1798ed12f995963b488444b37d7`
 
 ```text
 [1m[92m    Checking[0m bcinr-logic v26.7.25 (/home/runner/work/bcinr/bcinr/crates/bcinr-logic)
 [1m[92m    Checking[0m bcinr-mfw-ir v26.7.25 (/home/runner/work/bcinr/bcinr/crates/bcinr-mfw-ir)
 [1m[92m    Checking[0m encode_unicode v1.0.1 (/home/runner/work/bcinr/bcinr/crates/encode_unicode_patch)
-[1m[92m    Checking[0m bcinr-pddl v26.7.25 (/home/runner/work/bcinr/bcinr/crates/bcinr-pddl)
 [1m[92m    Checking[0m prettytable-rs v0.10.0
+[1m[92m    Checking[0m bcinr-pddl v26.7.25 (/home/runner/work/bcinr/bcinr/crates/bcinr-pddl)
 [1m[92m    Checking[0m bcinr-powl v26.7.25 (/home/runner/work/bcinr/bcinr/crates/bcinr-powl)
 [1m[92m    Checking[0m bcinr-api v26.7.25 (/home/runner/work/bcinr/bcinr/crates/bcinr-api)
 [1m[92m    Checking[0m bcinr-cmca v26.7.25 (/home/runner/work/bcinr/bcinr/crates/bcinr-cmca)
