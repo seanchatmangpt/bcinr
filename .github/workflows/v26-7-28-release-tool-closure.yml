@@ -69,8 +69,8 @@ jobs:
           main = replace_once(
               main,
               '#![cfg_attr(unix, feature(unix_kill_process_group))]\n',
-              '#![cfg_attr(unix, feature(unix_send_signal))]\n',
-              'unix signal feature',
+              '#![cfg_attr(unix, feature(unix_kill_process_group))]\n#![cfg_attr(unix, feature(unix_send_signal))]\n',
+              'unix signal features',
           )
           main = replace_once(main, 'mod provenance;\n', 'mod provenance;\nmod standing;\n', 'standing module')
           main = replace_once(
@@ -137,7 +137,7 @@ jobs:
           profile = replace_once(
               profile,
               'allow-features=linux_pidfd,unix_kill_process_group',
-              'allow-features=linux_pidfd,unix_send_signal',
+              'allow-features=linux_pidfd,unix_kill_process_group,unix_send_signal',
               'nightly allow-features policy',
           )
           profile_path.write_text(profile)
@@ -147,13 +147,13 @@ jobs:
           readme = replace_once(
               readme,
               '- `unix_kill_process_group` for descendant-complete timeout termination.',
-              '- `unix_send_signal` for descendant-complete process-group signal delivery.',
+              '- `unix_kill_process_group` for descendant-complete timeout termination;\n- `unix_send_signal` for the process-group signal operation used by that termination path.',
               'nightly feature documentation',
           )
           readme = replace_once(
               readme,
               'allow-features=linux_pidfd,unix_kill_process_group',
-              'allow-features=linux_pidfd,unix_send_signal',
+              'allow-features=linux_pidfd,unix_kill_process_group,unix_send_signal',
               'nightly feature fence documentation',
           )
           readme_path.write_text(readme)
