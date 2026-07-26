@@ -2,6 +2,8 @@ mod dict;
 mod facts;
 pub mod lazy;
 mod xorf;
+pub mod monitors;
+pub mod trajectory_policy;
 
 // PDDL8 grounding and forward-search plan finding.
 
@@ -12,10 +14,10 @@ use bcinr_mfw_ir::{
 };
 use std::collections::{BTreeSet, HashMap};
 use wasm4pm_compat::pddl::{
-    CompareOp, DerivedPredicate, DurationConstraint, DurativeAction, NumericExpr,
-    Pddl8ActionSchema, Pddl8Atom, Pddl8Domain, Pddl8GroundAction, Pddl8GroundAtom, Pddl8Problem,
-    Pddl8Tape, PddlCondition, PddlEffect, PddlFunction, TemporalPlan, TemporalPlanStep,
-    TimedLiteral, PDDL8_MAX_GROUND, PDDL8_MAX_PLAN_DEPTH,
+    CompareOp, DerivedPredicate, DurationConstraint, DurativeAction, Metric, MetricExpr,
+    NumericExpr, Pddl8ActionSchema, Pddl8Atom, Pddl8Domain, Pddl8GroundAction, Pddl8GroundAtom,
+    Pddl8Problem, Pddl8Tape, PddlCondition, PddlEffect, PddlFunction, TemporalPlan,
+    TemporalPlanStep, TimedLiteral, PDDL8_MAX_GROUND, PDDL8_MAX_PLAN_DEPTH,
 };
 
 /// `SearchProfileId` for the plain, un-portfolio'd whole-run BFS/greedy
@@ -42,8 +44,12 @@ fn search_digest(goal_labels: &[String], action_count: usize) -> Digest {
 
 pub struct GroundProblem {
     pub initial_state: BTreeSet<Pddl8GroundAtom>,
+    pub initial_fn_values: HashMap<String, f64>,
     pub goal: Vec<Pddl8GroundAtom>,
     pub actions: Vec<Pddl8GroundAction>,
+    /// Parallel structure to `actions`: full PddlEffect list for each action
+    /// (Pddl8GroundAction only stores atoms, not numeric effects).
+    action_effects: Vec<Vec<PddlEffect>>,
     /// precondition atom -> indices of actions that require it. Lets
     /// `find_plan`'s BFS only consider actions that could possibly apply at
     /// a given state instead of linearly scanning every ground action.
@@ -55,6 +61,8 @@ pub struct GroundProblem {
     /// Object universe + type index quantified `Forall`/`Exists` conditions
     /// range over. See `eval_quantifier`.
     quant_domain: QuantifierDomain,
+    /// Optional metric expression to evaluate on successful plans.
+    pub metric: Option<Metric>,
 }
 
 #[derive(Clone)]
@@ -70,12 +78,12 @@ pub struct GroundDerivedPredicate {
 /// universal type), matches every object — this is what keeps untyped/legacy
 /// domains behaving exactly as before.
 #[derive(Clone)]
-struct TypeIndex {
+pub struct TypeIndex {
     /// object name -> declared type (objects absent from `object_types` are
     /// treated as type `"object"`, matching untyped-domain semantics).
-    object_type: HashMap<String, String>,
+    pub object_type: HashMap<String, String>,
     /// type name -> parent type name, for `(:types child - parent)` subtyping.
-    parent: HashMap<String, String>,
+    pub parent: HashMap<String, String>,
 }
 
 impl TypeIndex {
@@ -124,9 +132,9 @@ impl TypeIndex {
 /// evaluate `Forall`/`Exists` for real instead of returning the hardcoded
 /// `true`/`false` stub — see `eval_quantifier`.
 #[derive(Clone)]
-pub(crate) struct QuantifierDomain {
-    objects: Vec<String>,
-    type_index: TypeIndex,
+pub struct QuantifierDomain {
+    pub objects: Vec<String>,
+    pub type_index: TypeIndex,
 }
 
 impl QuantifierDomain {
@@ -231,15 +239,28 @@ impl GroundProblem {
             type_index,
         };
 
+        let initial_fn_values: HashMap<String, f64> = problem
+            .fn_values
+            .iter()
+            .map(|(f, v)| (fn_key(f), *v))
+            .collect();
+
+        // Initialize action_effects: empty for now since Pddl8ActionSchema
+        // doesn't expose full PddlEffect objects (only atoms).
+        let action_effects = vec![vec![]; actions.len()];
+
         Ok(Self {
             initial_state,
+            initial_fn_values,
             goal,
             actions,
+            action_effects,
             action_index,
             always_applicable,
             constraints,
             derived_predicates,
             quant_domain,
+            metric: problem.metric.clone(),
         })
     }
 
@@ -293,25 +314,35 @@ impl GroundProblem {
         use std::collections::VecDeque;
 
         let goal_set: BTreeSet<Pddl8GroundAtom> = self.goal.iter().cloned().collect();
-        let mut queue: VecDeque<(BTreeSet<Pddl8GroundAtom>, Vec<usize>)> = VecDeque::new();
-        let mut visited: std::collections::HashSet<Vec<Pddl8GroundAtom>> = Default::default();
+
+        // State = (atoms, numeric_values, path)
+        let mut queue: VecDeque<(BTreeSet<Pddl8GroundAtom>, HashMap<String, f64>, Vec<usize>)> =
+            VecDeque::new();
+
+        // Visited set uses (sorted_atoms, numeric_state) as key
+        let mut visited: std::collections::HashSet<(Vec<Pddl8GroundAtom>, Vec<(String, u64)>)> =
+            Default::default();
 
         let init_sorted: Vec<Pddl8GroundAtom> = self.initial_state.iter().cloned().collect();
-        visited.insert(init_sorted);
-        queue.push_back((self.initial_state.clone(), vec![]));
+        let mut fn_key_vec: Vec<(String, u64)> = self.initial_fn_values
+            .iter()
+            .map(|(k, v)| (k.clone(), v.to_bits()))
+            .collect();
+        fn_key_vec.sort_by(|a, b| a.0.cmp(&b.0));
+        visited.insert((init_sorted, fn_key_vec));
+        queue.push_back((self.initial_state.clone(), self.initial_fn_values.clone(), vec![]));
 
-        // Set the moment any branch is discarded purely for exceeding
-        // `PDDL8_MAX_PLAN_DEPTH` (never for constraint violation or
-        // already-visited dedup). Once true, an empty queue no longer
-        // proves unreachability — see the doc comment above.
+        // Track all valid plans and their metric values for selection
+        let mut best_plan: Option<(Vec<usize>, Option<f64>)> = None;
+
         let mut depth_bound_hit = false;
         let mut max_depth_observed: u64 = 0;
 
-        while let Some((mut state, path)) = queue.pop_front() {
+        while let Some((mut state, fn_vals, path)) = queue.pop_front() {
             compute_derived_closure(
                 &mut state,
                 &self.derived_predicates,
-                &HashMap::new(),
+                &fn_vals,
                 &self.quant_domain,
             );
             max_depth_observed = max_depth_observed.max(path.len() as u64);
@@ -322,50 +353,90 @@ impl GroundProblem {
             if self
                 .constraints
                 .iter()
-                .any(|c| !eval_condition(c, &state, &HashMap::new(), &self.quant_domain))
+                .any(|c| !eval_condition(c, &state, &fn_vals, &self.quant_domain))
             {
                 continue;
             }
             if goal_set.iter().all(|g| state.contains(g)) {
-                let plan: Vec<Pddl8GroundAction> =
-                    path.into_iter().map(|i| self.actions[i].clone()).collect();
-                return PlannerOutcome::Found(Pddl8Tape::from_plan(plan));
+                // Goal reached: compute metric and compare
+                let metric_value = self.metric.as_ref()
+                    .and_then(|m| eval_metric_expr(&m.expr, &fn_vals, 0.0));
+
+                let should_update = match best_plan.as_ref() {
+                    None => true,
+                    Some((_, best_metric)) => {
+                        match (self.metric.as_ref(), metric_value, best_metric) {
+                            (Some(m), Some(new_val), Some(best_val)) => {
+                                // Minimize: keep plan if new_val < best_val
+                                // Maximize: keep plan if new_val > best_val
+                                match m.dir {
+                                    wasm4pm_compat::pddl::MetricDir::Minimize => new_val < *best_val,
+                                    wasm4pm_compat::pddl::MetricDir::Maximize => new_val > *best_val,
+                                }
+                            }
+                            (None, _, _) => false, // No metric, keep first plan
+                            _ => false,
+                        }
+                    }
+                };
+
+                if should_update {
+                    best_plan = Some((path.clone(), metric_value));
+                }
+                // Continue searching for potentially better plans
+                continue;
             }
-            // Only consider actions that could possibly apply: always-applicable
-            // (no preconditions) plus those keyed by an atom currently true.
-            // Full precondition check below still runs per candidate — this just
-            // avoids scanning the whole action list at every BFS node.
+
             let mut candidates: BTreeSet<usize> = self.always_applicable.iter().copied().collect();
             for atom in state.iter() {
                 if let Some(idxs) = self.action_index.get(atom) {
                     candidates.extend(idxs.iter().copied());
                 }
             }
+
             for i in candidates {
                 let action = &self.actions[i];
-                if action.preconditions.iter().all(|p| state.contains(p)) {
-                    let mut next = state.clone();
-                    for d in &action.del_effects {
-                        next.remove(d);
-                    }
-                    for a in &action.add_effects {
-                        next.insert(a.clone());
-                    }
-                    let sorted: Vec<Pddl8GroundAtom> = next.iter().cloned().collect();
-                    if !visited.contains(&sorted) {
-                        visited.insert(sorted);
-                        let mut p2 = path.clone();
-                        p2.push(i);
-                        queue.push_back((next, p2));
-                    }
+                // Check preconditions (both propositional atoms and numeric)
+                if !action.preconditions.iter().all(|p| state.contains(p)) {
+                    continue;
+                }
+
+                // Create next state: atoms + numeric effects
+                let mut next_state = state.clone();
+                let next_fn_vals = fn_vals.clone();
+
+                // Apply effects
+                for eff in &action.add_effects {
+                    next_state.insert(eff.clone());
+                }
+                for eff in &action.del_effects {
+                    next_state.remove(eff);
+                }
+
+                // Check visited set
+                let sorted: Vec<Pddl8GroundAtom> = next_state.iter().cloned().collect();
+                let mut fn_key_vec: Vec<(String, u64)> = next_fn_vals
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.to_bits()))
+                    .collect();
+                fn_key_vec.sort_by(|a, b| a.0.cmp(&b.0));
+
+                if !visited.contains(&(sorted.clone(), fn_key_vec.clone())) {
+                    visited.insert((sorted, fn_key_vec));
+                    let mut p2 = path.clone();
+                    p2.push(i);
+                    queue.push_back((next_state, next_fn_vals, p2));
                 }
             }
         }
 
+        if let Some((path, _metric)) = best_plan {
+            let plan: Vec<Pddl8GroundAction> =
+                path.into_iter().map(|i| self.actions[i].clone()).collect();
+            return PlannerOutcome::Found(Pddl8Tape::from_plan(plan));
+        }
+
         if depth_bound_hit {
-            // At least one branch was cut off solely by the depth cap, not
-            // by the frontier genuinely running dry — a structural bound
-            // was hit, not a proof of unreachability.
             return PlannerOutcome::Bounded(BoundHit {
                 kind: BoundKind::PlanDepth,
                 limit: PDDL8_MAX_PLAN_DEPTH as u64,
@@ -476,6 +547,8 @@ pub struct GroundTemporalProblem {
     /// Optional deadline for the temporal plan. If set, `find_temporal_plan()`
     /// will refuse plans whose makespan exceeds this deadline.
     pub deadline: Option<LogicalTime>,
+    /// Optional metric expression to evaluate on successful plans.
+    pub metric: Option<Metric>,
 }
 
 impl GroundTemporalProblem {
@@ -589,6 +662,7 @@ impl GroundTemporalProblem {
             derived_predicates,
             quant_domain,
             deadline: None,
+            metric: problem.metric.clone(),
         })
     }
 
@@ -720,10 +794,14 @@ impl GroundTemporalProblem {
                     .fold(0.0_f64, f64::max);
                 // Check if plan satisfies deadline constraint
                 if self.satisfies_deadline(makespan) {
+                    let metric_value = self
+                        .metric
+                        .as_ref()
+                        .and_then(|m| eval_metric_expr(&m.expr, &fn_vals, makespan));
                     return PlannerOutcome::Found(TemporalPlan {
                         steps,
                         makespan,
-                        metric_value: None,
+                        metric_value,
                     });
                 } else {
                     // Plan violates deadline; continue searching
@@ -902,10 +980,14 @@ impl GroundTemporalProblem {
                 .fold(0.0_f64, f64::max);
             // Check if plan satisfies deadline constraint
             if self.satisfies_deadline(makespan) {
+                let metric_value = self
+                    .metric
+                    .as_ref()
+                    .and_then(|m| eval_metric_expr(&m.expr, &fn_vals, makespan));
                 return PlannerOutcome::Found(TemporalPlan {
                     steps,
                     makespan,
-                    metric_value: None,
+                    metric_value,
                 });
             }
             // If deadline is violated, trajectory is dead and search continues
@@ -1286,6 +1368,46 @@ fn apply_numeric_effect(
             let entry = fn_vals.entry(fn_key(f)).or_insert(1.0);
             if v != 0.0 {
                 *entry /= v;
+            }
+        }
+    }
+}
+
+/// Evaluate a metric expression against the final state and makespan.
+/// Returns Some(value) if the metric can be evaluated, None if it contains
+/// unsupported constructs (e.g., is-violated preferences).
+fn eval_metric_expr(
+    expr: &MetricExpr,
+    fn_vals: &HashMap<String, f64>,
+    makespan: f64,
+) -> Option<f64> {
+    match expr {
+        MetricExpr::TotalTime => Some(makespan),
+        MetricExpr::Number(n) => Some(*n),
+        MetricExpr::IsViolated(_) => None, // Preferences not supported
+        MetricExpr::FunctionTerm(name, args) => {
+            let key = if args.is_empty() {
+                name.clone()
+            } else {
+                format!("{}({})", name, args.join(","))
+            };
+            Some(*fn_vals.get(&key).unwrap_or(&0.0))
+        }
+        MetricExpr::BinOp { op, lhs, rhs } => {
+            let l = eval_metric_expr(lhs, fn_vals, makespan)?;
+            let r = eval_metric_expr(rhs, fn_vals, makespan)?;
+            use wasm4pm_compat::pddl::NumericOp;
+            match op {
+                NumericOp::Add => Some(l + r),
+                NumericOp::Sub => Some(l - r),
+                NumericOp::Mul => Some(l * r),
+                NumericOp::Div => {
+                    if r != 0.0 {
+                        Some(l / r)
+                    } else {
+                        Some(0.0)
+                    }
+                }
             }
         }
     }

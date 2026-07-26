@@ -151,6 +151,11 @@ pub use error::{Pddl8Error, PlannerOutcome};
 pub use execute::{
     compute_plan_chain, execute_tape, execute_temporal_plan_instrumented, SubstageNs,
 };
-pub use ground::{GroundDurativeAction, GroundProblem, GroundTemporalProblem};
+pub use ground::{
+    monitors::{ConstraintMonitor, MonitorFactory, MonitorState},
+    trajectory_policy::{ConstraintViolation, TrajectoryPolicy},
+    GroundDerivedPredicate, GroundDurativeAction, GroundProblem, GroundTemporalProblem,
+    QuantifierDomain, TypeIndex,
+};
 pub use logical_time::LogicalTime;
 pub use parse::{domain31_from_pddl, domain_from_pddl, problem31_from_pddl, problem_from_pddl};
