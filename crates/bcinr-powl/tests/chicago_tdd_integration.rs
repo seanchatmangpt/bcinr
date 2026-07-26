@@ -473,9 +473,9 @@ fn jtbd_04_refuse_hostile_candidate_array_index_react_key() {
 
     // admitted_mask should exclude the hostile candidate
     let admitted_mask = stable_mask;
-    assert_ne!(
-        admitted_mask & hostile_mask, 0u64,
-        "setup: hostile_mask must be within the full range"
+    assert!(
+        hostile_mask != 0u64,
+        "setup: hostile_mask must be non-zero"
     );
     assert_eq!(
         admitted_mask & hostile_mask,
@@ -535,18 +535,14 @@ fn jtbd_05_selection_stability_with_dwell() {
     let candidate_id = 2u64;
     let dwell_threshold = 3u64;
     let mut dwell_counter = 0u64;
-    let mut state_candidate = false; // CANDIDATE state flag
-    let mut state_admitted = false;  // ADMITTED state flag
-    let mut state_selected = false;  // SELECTED state flag
+    let mut state_admitted = false; // ADMITTED state flag
 
     // Simulate single event
     dwell_counter += 1;
-    state_candidate = true;
     assert_eq!(
         dwell_counter, 1,
         "after single event, dwell_counter should be 1"
     );
-    assert!(state_candidate, "after single event, state should be CANDIDATE");
     assert!(!state_admitted, "after single event, state should not yet be ADMITTED");
 
     // Simulate second event (no change in candidate)
@@ -555,7 +551,6 @@ fn jtbd_05_selection_stability_with_dwell() {
         dwell_counter, 2,
         "after two events, dwell_counter should be 2"
     );
-    assert!(state_candidate, "state should remain CANDIDATE");
 
     // Simulate third event (dwell threshold reached)
     dwell_counter += 1;
@@ -565,7 +560,7 @@ fn jtbd_05_selection_stability_with_dwell() {
 
     // Simulate fourth event (selection finalizes)
     dwell_counter += 1;
-    state_selected = state_admitted && dwell_counter > dwell_threshold;
+    let state_selected = state_admitted && dwell_counter > dwell_threshold;
     assert!(
         state_selected,
         "after exceeding dwell_threshold, state transitions to SELECTED"
@@ -669,7 +664,7 @@ fn jtbd_06_end_to_end_complete_transcript_with_selections() {
     for (i, &candidate_idx) in expected_selections.iter().enumerate() {
         // Record each selection as an operation firing
         ocel_log
-            .record_op_fired(run_id, candidate_idx as u32, i as u32)
+            .record_op_fired(run_id, candidate_idx as u32, i as u8)
             .expect("record_op_fired must succeed");
     }
 
@@ -732,7 +727,7 @@ fn jtbd_06_end_to_end_complete_transcript_with_selections() {
         8000,
     );
 
-    let (_receipted_v2, digest_v2) =
+    let (_receipted_v2, _digest_v2) =
         seal_run(&collector2, "jtbd-06-complete".to_string()).expect("seal must succeed");
     // Note: UUIDs in event_id are random, so digests may differ slightly.
     // For true determinism, we verify the event count is consistent.
