@@ -1,0 +1,13 @@
+[package]
+name = "bcinr-release"
+version = "26.7.28"
+edition = "2021"
+publish = false
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/seanchatmangpt/bcinr"
+description = "Fail-closed release admission and evidence aggregation for BCINR"
+
+[dependencies]
+blake3 = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
