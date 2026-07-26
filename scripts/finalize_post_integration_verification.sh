@@ -69,6 +69,7 @@ EOF
 
 rm -f .github/workflows/repair-post-integration-verification-v2.yml
 rm -f scripts/repair_post_integration_verification.py
+rm -f scripts/repair_cmca_all_features_composition.py
 rm -f scripts/run_post_integration_verification.sh
 rm -f scripts/finalize_post_integration_verification.sh
 
