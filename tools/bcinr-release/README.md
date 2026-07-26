@@ -74,7 +74,7 @@ Evidence is emitted only under a new, empty `target/` directory. The engine:
 
 ## Nightly boundary
 
-The crate intentionally uses two narrowly fenced standard-library nightly features:
+The crate intentionally uses three narrowly fenced standard-library nightly features:
 
 - `linux_pidfd` for race-free Linux child supervision;
 - `unix_kill_process_group` for descendant-complete timeout termination;
@@ -140,6 +140,21 @@ target/release-evidence/v26.7.28/<head>/<run>/
 ```
 
 `receipt.json` records command vectors, admitted environment names, canonical executable identity, process outcome, exit signal, timeout, duration, complete-stream log hashes, retained-byte bounds, repository-state hashes, artifact trees, identity comparisons, exact provenance, admission issues, verifier identity, and final standing.
+
+## Observed crate-local standing
+
+The bounded closure run for this PR observed all of the following on `nightly-2026-07-25`:
+
+- canonical Rust formatting;
+- workspace lockfile materialization;
+- `cargo check -p bcinr-release --all-targets`;
+- locked check replay;
+- 15 passing unit tests;
+- `cargo clippy --locked -p bcinr-release --all-targets -- -D warnings`;
+- mutation-bounded publication of only the admitted source and lockfile;
+- self-deletion of the temporary write-capable closure workflow.
+
+Therefore the release-admission crate is `ALIVE` at the crate-local compile, unit, and lint boundary. This does not grant `ALIVE` standing to the complete v26.7.28 release, which still requires the permanent production profile, capability integration, Miri, supply-chain, reproducible-build, generated-byte identity, E2E, cross-target, and benchmark receipts.
 
 ## Version policy
 
