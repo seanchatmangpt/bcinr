@@ -33,7 +33,7 @@ entry = '''// ─── Entry point ──────────────�
 
 #[tokio::main]
 async fn main() {'''
-strict_transport = '''// ─── Entry point ─────────────────────────────────────────────────────────────
+strict_transport = r'''// ─── Entry point ─────────────────────────────────────────────────────────────
 
 /// Build a strict newline-delimited stdio ingress.
 ///
