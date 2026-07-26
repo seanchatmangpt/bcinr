@@ -190,9 +190,9 @@ fn validate_release(release: &str) -> Result<(), String> {
     validate_bounded_string(release, "release")?;
     let components = release.split('.').collect::<Vec<_>>();
     if components.len() != 3
-        || components
-            .iter()
-            .any(|component| component.is_empty() || !component.bytes().all(|byte| byte.is_ascii_digit()))
+        || components.iter().any(|component| {
+            component.is_empty() || !component.bytes().all(|byte| byte.is_ascii_digit())
+        })
     {
         return Err("release must have numeric YEAR.MONTH.DAY form".to_owned());
     }
@@ -233,9 +233,12 @@ fn validate_program(program: &str, rail_id: &str) -> Result<(), String> {
     validate_bounded_string(program, "program")?;
     let path = Path::new(program);
     if path.is_absolute()
-        || path
-            .components()
-            .any(|part| matches!(part, Component::ParentDir | Component::RootDir | Component::Prefix(_)))
+        || path.components().any(|part| {
+            matches!(
+                part,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
+        })
     {
         return Err(format!(
             "rail {rail_id} program must be a system command or repository-relative path"
@@ -303,7 +306,7 @@ fn validate_bounded_string(value: &str, label: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{ReleaseProfile, RailSpec};
+    use crate::model::{RailSpec, ReleaseProfile};
     use std::collections::BTreeMap;
 
     fn profile() -> ReleaseProfile {

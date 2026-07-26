@@ -10,7 +10,11 @@ pub struct EvidenceLock {
 }
 
 impl EvidenceLock {
-    pub fn acquire(output_directory: &Path, head_sha: &str, started_unix_ms: u128) -> io::Result<Self> {
+    pub fn acquire(
+        output_directory: &Path,
+        head_sha: &str,
+        started_unix_ms: u128,
+    ) -> io::Result<Self> {
         let path = output_directory.join("admission.lock");
         let mut file = create_new_evidence_file(&path)?;
         writeln!(file, "pid={}", std::process::id())?;
@@ -91,11 +95,17 @@ pub fn create_new_evidence_file(path: &Path) -> io::Result<File> {
 
 pub fn atomic_write(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let parent = path.parent().ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidInput, "atomic-write path has no parent")
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "atomic-write path has no parent",
+        )
     })?;
     let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
     let file_name = path.file_name().ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidInput, "atomic-write path has no file name")
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "atomic-write path has no file name",
+        )
     })?;
     let temporary = parent.join(format!(
         ".{}.{}.{}.tmp",

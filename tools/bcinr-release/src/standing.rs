@@ -12,10 +12,7 @@ pub struct StandingInputs {
 }
 
 pub const fn calculate(inputs: StandingInputs) -> Standing {
-    if inputs.blocked
-        || inputs.required_artifact_failure
-        || inputs.required_identity_failure
-    {
+    if inputs.blocked || inputs.required_artifact_failure || inputs.required_identity_failure {
         Standing::Blocked
     } else if inputs.required_rail_failure {
         Standing::BuildBroken

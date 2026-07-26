@@ -49,24 +49,22 @@ pub fn execute_rail(
         .chain(spec.args.iter().cloned())
         .collect::<Vec<_>>();
 
-    let working_directory = match resolve_existing_directory(
-        repository_root,
-        Path::new(&spec.working_directory),
-    ) {
-        Ok(path) => path,
-        Err(error) => {
-            return failed_receipt(
-                spec,
-                command_vector,
-                started_unix_ms,
-                started.elapsed().as_millis(),
-                &stdout_path,
-                &stderr_path,
-                RailOutcome::SpawnRefused,
-                format!("working directory refused: {error}"),
-            );
-        }
-    };
+    let working_directory =
+        match resolve_existing_directory(repository_root, Path::new(&spec.working_directory)) {
+            Ok(path) => path,
+            Err(error) => {
+                return failed_receipt(
+                    spec,
+                    command_vector,
+                    started_unix_ms,
+                    started.elapsed().as_millis(),
+                    &stdout_path,
+                    &stderr_path,
+                    RailOutcome::SpawnRefused,
+                    format!("working directory refused: {error}"),
+                );
+            }
+        };
 
     let resolved = match resolve_program(repository_root, &spec.program, inherited_environment) {
         Ok(value) => value,
@@ -200,11 +198,8 @@ pub fn execute_rail(
 
     let stdout_receipt = join_log_pump(stdout_handle, &stdout_path);
     let stderr_receipt = join_log_pump(stderr_handle, &stderr_path);
-    let executable_blake3_after = hash_file_with_context(
-        &resolved.target_path,
-        "bcinr.release.executable.v2",
-    )
-    .ok();
+    let executable_blake3_after =
+        hash_file_with_context(&resolved.target_path, "bcinr.release.executable.v2").ok();
     let repository_state_after = repository_state_digest(repository_root).ok();
     let executable_changed = executable_blake3_after
         .as_deref()
@@ -335,11 +330,7 @@ fn terminate_process_tree(child: &mut Child) -> io::Result<()> {
     child.kill()
 }
 
-fn spawn_log_pump<R>(
-    mut reader: R,
-    path: PathBuf,
-    max_log_bytes: u64,
-) -> JoinHandle<LogCapture>
+fn spawn_log_pump<R>(mut reader: R, path: PathBuf, max_log_bytes: u64) -> JoinHandle<LogCapture>
 where
     R: Read + Send + 'static,
 {
@@ -514,8 +505,12 @@ fn resolve_program(
         }
         search_path(program)?
     };
-    let metadata = fs::symlink_metadata(&invocation_path)
-        .map_err(|error| format!("failed to inspect executable {}: {error}", invocation_path.display()))?;
+    let metadata = fs::symlink_metadata(&invocation_path).map_err(|error| {
+        format!(
+            "failed to inspect executable {}: {error}",
+            invocation_path.display()
+        )
+    })?;
     if !(metadata.is_file() || metadata.file_type().is_symlink()) {
         return Err(format!(
             "executable {} is not a file or symlink",
@@ -566,7 +561,9 @@ fn search_path(program: &str) -> Result<PathBuf, String> {
             }
         }
     }
-    Err(format!("executable {program:?} was not found in admitted PATH"))
+    Err(format!(
+        "executable {program:?} was not found in admitted PATH"
+    ))
 }
 
 fn executable_extensions() -> Vec<OsString> {

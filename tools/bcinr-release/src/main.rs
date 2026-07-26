@@ -114,18 +114,11 @@ fn run() -> Result<Standing, String> {
     let verifier_path = env::current_exe()
         .and_then(|path| path.canonicalize())
         .map_err(|error| format!("failed to resolve verifier executable: {error}"))?;
-    let verifier_blake3 = hash_file_with_context(
-        &verifier_path,
-        "bcinr.release.verifier.v2",
-    )
-    .map_err(|error| format!("failed to hash verifier executable: {error}"))?;
+    let verifier_blake3 = hash_file_with_context(&verifier_path, "bcinr.release.verifier.v2")
+        .map_err(|error| format!("failed to hash verifier executable: {error}"))?;
 
     let provenance_before = provenance::capture(&repository_root);
-    let mut issues = preflight_issues(
-        &profile.repository,
-        &cli.expected_head,
-        &provenance_before,
-    );
+    let mut issues = preflight_issues(&profile.repository, &cli.expected_head, &provenance_before);
     let preflight_blocked = issues.iter().any(|issue| issue.blocking);
 
     let mut rails = Vec::with_capacity(profile.rails.len());
@@ -159,7 +152,8 @@ fn run() -> Result<Standing, String> {
                         message: format!("rail {} executable changed during execution", rail.id),
                         blocking: true,
                     });
-                    stop_reason = Some("execution authority changed during verification".to_owned());
+                    stop_reason =
+                        Some("execution authority changed during verification".to_owned());
                 }
                 RailOutcome::RepositoryMutated => {
                     issues.push(AdmissionIssue {
@@ -187,11 +181,7 @@ fn run() -> Result<Standing, String> {
         .collect::<Vec<_>>();
 
     let provenance_after = provenance::capture(&repository_root);
-    append_postflight_issues(
-        &provenance_before,
-        &provenance_after,
-        &mut issues,
-    );
+    append_postflight_issues(&provenance_before, &provenance_after, &mut issues);
 
     let required_rail_failure = rails.iter().any(|rail| rail.required && !rail.passed);
     let optional_rail_failure = rails.iter().any(|rail| !rail.required && !rail.passed);
@@ -329,10 +319,7 @@ fn preflight_issues(
     if !provenance.capture_errors.is_empty() {
         issues.push(AdmissionIssue {
             code: IssueCode::ProvenanceIncomplete,
-            message: format!(
-                "provenance capture failed: {:?}",
-                provenance.capture_errors
-            ),
+            message: format!("provenance capture failed: {:?}", provenance.capture_errors),
             blocking: true,
         });
     }
@@ -368,7 +355,10 @@ fn preflight_issues(
     if provenance.dirty {
         issues.push(AdmissionIssue {
             code: IssueCode::TreeDirtyBeforeVerification,
-            message: format!("repository is dirty before verification: {:?}", provenance.status),
+            message: format!(
+                "repository is dirty before verification: {:?}",
+                provenance.status
+            ),
             blocking: true,
         });
     }
@@ -431,10 +421,7 @@ fn append_postflight_issues(
     }
 }
 
-fn inspect_artifact(
-    repository_root: &Path,
-    spec: &crate::model::ArtifactSpec,
-) -> ArtifactReceipt {
+fn inspect_artifact(repository_root: &Path, spec: &crate::model::ArtifactSpec) -> ArtifactReceipt {
     let result = if spec.recursive {
         inspect_artifact_tree(repository_root, spec)
     } else {
@@ -453,12 +440,8 @@ fn inspect_artifact(
                 present,
                 entries,
                 aggregate_blake3,
-                error: (!present).then(|| {
-                    format!(
-                        "expected at least {} admitted files",
-                        spec.minimum_files
-                    )
-                }),
+                error: (!present)
+                    .then(|| format!("expected at least {} admitted files", spec.minimum_files)),
             }
         }
         Err(error) => ArtifactReceipt {
@@ -603,8 +586,14 @@ fn identity_error(
         right: spec.right.clone(),
         required: spec.required,
         identical: false,
-        left_size_bytes: left.as_ref().and_then(|path| fs::metadata(path).ok()).map(|value| value.len()),
-        right_size_bytes: right.as_ref().and_then(|path| fs::metadata(path).ok()).map(|value| value.len()),
+        left_size_bytes: left
+            .as_ref()
+            .and_then(|path| fs::metadata(path).ok())
+            .map(|value| value.len()),
+        right_size_bytes: right
+            .as_ref()
+            .and_then(|path| fs::metadata(path).ok())
+            .map(|value| value.len()),
         left_blake3: left.as_ref().and_then(|path| hash_file(path).ok()),
         right_blake3: right.as_ref().and_then(|path| hash_file(path).ok()),
         error: Some(error),
