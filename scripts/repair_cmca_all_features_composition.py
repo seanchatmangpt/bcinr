@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fence multi-mutant composition and remove the legacy LSP fallback."""
+"""Fence hostile-mutant composition and remove the legacy LSP fallback."""
 
 from pathlib import Path
 import re
@@ -9,12 +9,12 @@ source = path.read_text()
 
 anchor = '\n#[cfg(feature = "mutant_1")]\n'
 helper = '''
-fn require_uncomposed_mutant(test: &str) -> bool {
-    if ACTIVE_MUTANT_COUNT <= 1 {
+fn require_production_semantics(test: &str) -> bool {
+    if ACTIVE_MUTANT_COUNT == 0 {
         true
     } else {
         eprintln!(
-            "BCINR_TYPED_SKIP[cmca-mutant-composition]: {test} requires zero or one active mutant feature; observed {ACTIVE_MUTANT_COUNT}"
+            "BCINR_TYPED_SKIP[cmca-mutant-composition]: {test} is a handcrafted wrapper rail and requires zero crate-level mutant features; observed {ACTIVE_MUTANT_COUNT}"
         );
         false
     }
@@ -34,7 +34,7 @@ for test in (
 ):
     pattern = re.compile(rf"(fn {test}\(\) \{{\n)")
     guard = (
-        rf'\1    if !require_uncomposed_mutant("{test}") {{\n'
+        rf'\1    if !require_production_semantics("{test}") {{\n'
         "        return;\n"
         "    }\n"
     )
