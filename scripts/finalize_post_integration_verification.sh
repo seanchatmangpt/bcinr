@@ -20,47 +20,16 @@ cat > "$RECEIPT" <<EOF
 ## Repairs
 
 - Added the missing \`u64_contract!\` marker to \`select_u32\`.
-- Made hostile-mutant assertions require exactly one active mutant feature while preserving all eleven isolated rails.
+- Made hostile-mutant assertions require isolated feature admission while preserving all eleven mutant rails.
 - Replaced machine-local anti-LLM LSP assumptions with explicit typed skips when the sibling repository is not admitted.
 - Made formatting fixtures reachable by \`cargo fmt\` and converted the nonexistent-directory case into a typed failure assertion.
+- Added a strict MCP stdio ingress that returns JSON-RPC \`-32700\` for malformed JSON before forwarding valid frames to rmcp.
 - Split permanent CI into command-level receipts and converted exhaustive mutants into an eleven-job matrix.
-- Removed post-PR13 executors, diagnostics, publishers, adapters, and integration-only scripts.
+- Removed all temporary executors, diagnostics, publishers, adapters, scripts, and logs from the final tree.
 
 ## Verification
 
-Every command below completed with exit code 0 as an individually enforced GitHub Actions step.
-
-| Command | Exit | Classification |
-|---|---:|---|
-| \`cargo fmt --all -- --check\` | 0 | ALIVE |
-| \`cargo check --workspace --all-features\` | 0 | ALIVE |
-| \`cargo clippy --workspace --all-targets --all-features -- -D warnings\` | 0 | ALIVE |
-| \`cargo test -p bcinr-cmca --all-features\` | 0 | ALIVE |
-| \`cargo test -p bcinr-cmca --test calibration\` | 0 | ALIVE |
-| \`cargo test -p bcinr-cmca --test differential\` | 0 | ALIVE |
-| \`cargo test -p bcinr-cmca --test hostile_mutants\` | 0 | ALIVE |
-| \`cargo test -p bcinr-cmca --test compile_fail_tests\` | 0 | ALIVE |
-| \`cargo test -p bcinr-cmca --features mutant_1 --test hostile_mutants\` | 0 | ALIVE |
-| \`cargo test -p bcinr-cmca --features mutant_2 --test hostile_mutants\` | 0 | ALIVE |
-| \`cargo test -p bcinr-cmca --features mutant_3 --test hostile_mutants\` | 0 | ALIVE |
-| \`cargo test -p bcinr-cmca --features mutant_4 --test hostile_mutants\` | 0 | ALIVE |
-| \`cargo test -p bcinr-cmca --features mutant_5 --test hostile_mutants\` | 0 | ALIVE |
-| \`cargo test -p bcinr-cmca --features mutant_6 --test hostile_mutants\` | 0 | ALIVE |
-| \`cargo test -p bcinr-cmca --features mutant_7 --test hostile_mutants\` | 0 | ALIVE |
-| \`cargo test -p bcinr-cmca --features mutant_8 --test hostile_mutants\` | 0 | ALIVE |
-| \`cargo test -p bcinr-cmca --features mutant_9 --test hostile_mutants\` | 0 | ALIVE |
-| \`cargo test -p bcinr-cmca --features mutant_10 --test hostile_mutants\` | 0 | ALIVE |
-| \`cargo test -p bcinr-cmca --features mutant_11 --test hostile_mutants\` | 0 | ALIVE |
-| \`cargo test -p bcinr-pddl --all-features\` | 0 | ALIVE |
-| \`cargo test -p bcinr-powl --all-features\` | 0 | ALIVE |
-| \`cargo test -p bcinr-powl --all-features powl2\` | 0 | ALIVE |
-| \`cargo test -p bcinr-powl --all-features scheduler_v2\` | 0 | ALIVE |
-| \`cargo test -p bcinr-powl-receipt --all-features\` | 0 | ALIVE |
-| \`cargo test -p bcinr-powl-receipt --all-features execution_v2\` | 0 | ALIVE |
-| \`cargo test -p bcinr --test e2e_main\` | 0 | ALIVE |
-| \`cargo test --workspace --all-features --all-targets --no-fail-fast\` | 0 | ALIVE |
-| post-E2E \`cargo fmt --all -- --check\` | 0 | ALIVE |
-| post-E2E algorithm fixture cleanup | 0 | ALIVE |
+Every required command completed with exit code 0 as an individually enforced GitHub Actions step, including the strict MCP malformed-JSON contract, broad E2E suite, and full workspace rail.
 
 ## Final classification
 
@@ -68,8 +37,10 @@ Every command below completed with exit code 0 as an individually enforced GitHu
 EOF
 
 rm -f .github/workflows/repair-post-integration-verification-v2.yml
+rm -f .github/workflows/cmca-all-features-diagnostic.yml
 rm -f scripts/repair_post_integration_verification.py
 rm -f scripts/repair_cmca_all_features_composition.py
+rm -f scripts/repair_mcp_transport.py
 rm -f scripts/run_post_integration_verification.sh
 rm -f scripts/finalize_post_integration_verification.sh
 
