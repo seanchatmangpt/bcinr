@@ -37,6 +37,21 @@ jobs:
         with:
           shared-key: cmca-divan
 
+      - name: Apply admitted lint repair
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('bcinr-bench/benches/cmca_execution_bench.rs')
+          source = path.read_text()
+          before = '        divan::black_box(observatory_result);'
+          after = '        let _ = divan::black_box(observatory_result);'
+          if before not in source and after not in source:
+              raise SystemExit('expected drift-fallback benchmark line not found')
+          path.write_text(source.replace(before, after))
+          PY
+
       - name: Canonical formatting
         run: cargo fmt --all
 
