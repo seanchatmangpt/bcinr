@@ -80,6 +80,10 @@ name = "mutant_kill_g4"
 path = "tests/mutant_kill_g4.rs"
 required-features = ["mfw-planner"]
 
+[[test]]
+name = "temporal_swarm_v26_7_28"
+path = "tests/temporal_swarm_v26_7_28.rs"
+
 [[bench]]
 name = "pddl_80_20"
 path = "benches/pddl_80_20.rs"
@@ -88,4 +92,9 @@ harness = false
 [[bench]]
 name = "scaling"
 path = "benches/scaling.rs"
+harness = false
+
+[[bench]]
+name = "temporal_swarm_v26_7_28"
+path = "benches/temporal_swarm_v26_7_28.rs"
 harness = false
