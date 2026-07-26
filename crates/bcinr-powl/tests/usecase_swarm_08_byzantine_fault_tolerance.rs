@@ -445,18 +445,20 @@ fn test_scheduler_progress_despite_byzantine_delays() {
 /// anywhere in this test file's compiled binary or source.
 #[test]
 fn test_no_llm_api_calls_in_consensus() {
-    // This is a runtime check, not a compile-time check. To properly verify,
-    // we would instrument the network layer or parse the binary. For now,
-    // we rely on code inspection: the test uses only:
-    // - bcinr_powl::compiler (compile_powl)
-    // - bcinr_powl::scheduler (scheduler_tick)
-    // - bcinr_powl::ocel (OcelLog)
-    // - std library (HashSet, Vec)
-    //
-    // None of these modules depend on anthropic, openai, or other LLM SDKs.
-    // We assert this is true by construction.
-    assert!(
-        true,
-        "no anthropic/openai/llm API dependencies are imported in this test file"
-    );
+    let imports = include_str!("usecase_swarm_08_byzantine_fault_tolerance.rs")
+        .lines()
+        .filter(|line| line.trim_start().starts_with("use "))
+        .collect::<Vec<_>>()
+        .join(
+            "
+",
+        )
+        .to_ascii_lowercase();
+    for forbidden in ["anthropic", "openai", "reqwest", "std::net", "tokio::net"] {
+        assert!(
+            !imports.contains(forbidden),
+            "forbidden LLM/network import found: {}",
+            forbidden
+        );
+    }
 }

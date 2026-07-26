@@ -151,9 +151,9 @@ run_check "7b" "p7b-chaos" "Chaos scenarios" \
 
 # Phase 7c — Benchmarks
 run_check "7c" "p7c-temporal-bench" "Temporal core benchmark" \
-    "cargo bench -p bcinr-pddl --bench phase1_temporal -- --noplot"
+    "CARGO_PROFILE_BENCH_CODEGEN_UNITS=1 cargo bench -p bcinr-pddl --bench phase1_temporal -- --noplot"
 run_check "7c" "p7c-scheduler-bench" "Temporal scheduler benchmark" \
-    "cargo bench -p bcinr-powl --bench phase3_scheduler -- --noplot"
+    "CARGO_PROFILE_BENCH_CODEGEN_UNITS=1 cargo bench -p bcinr-powl --bench phase3_scheduler -- --noplot"
 
 # Phase 7d — Release hygiene and report integrity
 run_check "7d" "p7d-format" "Formatting" \

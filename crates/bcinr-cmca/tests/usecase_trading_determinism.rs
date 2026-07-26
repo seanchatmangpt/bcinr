@@ -84,9 +84,9 @@ fn test_allocation_reproducible_same_market_state() {
 
     // Verify: identical market state -> identical allocations, checked
     // per exchange, not merely that both calls returned Ok.
-    for i in 0..N {
+    for (i, (first, second)) in results[0].iter().zip(&results[1]).enumerate() {
         assert_eq!(
-            results[0][i], results[1][i],
+            first, second,
             "identical market state must produce identical allocation for exchange {}",
             i
         );
@@ -286,13 +286,13 @@ fn test_multi_strategy_competitive_fair_optimal() {
     // positive share) and the total allocated is conserved to ~1.0 in
     // Q16.16 (65536), i.e. capital is distributed, not created or lost.
     let mut sum: u64 = 0;
-    for i in 0..N {
+    for (i, allocation) in alloc.iter().enumerate().take(N) {
         assert!(
-            alloc[i].val > 0,
+            allocation.val > 0,
             "exchange {} must not be starved of capital",
             i
         );
-        sum += alloc[i].val as u64;
+        sum += allocation.val as u64;
     }
     let total = NonNegativeFixed::ONE.val as u64; // 65536 == 1.0 in Q16.16
     let diff = sum.abs_diff(total);
@@ -349,9 +349,9 @@ fn test_allocation_fairness_distribution_auditable() {
         )
         .unwrap_or_else(|e| panic!("allocation round {} must succeed: {:?}", round, e));
 
-        for i in 0..N {
+        for (i, allocation) in alloc.iter().enumerate().take(N) {
             assert!(
-                alloc[i].val > 0,
+                allocation.val > 0,
                 "round {} must not starve exchange {}",
                 round,
                 i
