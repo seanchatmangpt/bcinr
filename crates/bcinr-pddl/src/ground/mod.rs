@@ -212,10 +212,15 @@ impl GroundProblem {
             }
         }
         let mut derived_predicates = Vec::new();
+        let object_pairs: Vec<(String, String)> = problem
+            .objects
+            .iter()
+            .map(|obj| (obj.clone(), "object".to_string()))
+            .collect();
         for dp in &domain.derived {
             ground_derived_schema(
                 dp,
-                &problem.object_types,
+                &object_pairs,
                 &type_index,
                 &mut derived_predicates,
             )?;
@@ -554,10 +559,15 @@ impl GroundTemporalProblem {
             }
         }
         let mut derived_predicates = Vec::new();
+        let object_pairs: Vec<(String, String)> = problem
+            .objects
+            .iter()
+            .map(|obj| (obj.clone(), "object".to_string()))
+            .collect();
         for dp in &domain.derived {
             ground_derived_schema(
                 dp,
-                &problem.object_types,
+                &object_pairs,
                 &type_index,
                 &mut derived_predicates,
             )?;
@@ -941,6 +951,9 @@ pub(crate) fn eval_condition(
     quant_domain: &QuantifierDomain,
 ) -> bool {
     match cond {
+        PddlCondition::Atom(a) if a.pred == "=" && a.args.len() == 2 => {
+            a.args[0] == a.args[1]
+        }
         PddlCondition::Atom(a) => state.contains(&Pddl8GroundAtom {
             pred: a.pred.clone(),
             args: a.args.clone(),
@@ -1773,13 +1786,13 @@ fn ground_derived_schema(
             PddlCondition::Forall { vars, body } => {
                 Some(PddlCondition::Forall {
                     vars: vars.clone(),
-                    body: Box::new(ground_condition(body, binding)?),
+                    body: Box::new(subst_condition(body, binding)),
                 })
             }
             PddlCondition::Exists { vars, body } => {
                 Some(PddlCondition::Exists {
                     vars: vars.clone(),
-                    body: Box::new(ground_condition(body, binding)?),
+                    body: Box::new(subst_condition(body, binding)),
                 })
             }
         }
