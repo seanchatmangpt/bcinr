@@ -22,26 +22,36 @@ jobs:
       - name: Correct final repair postcondition
         shell: bash
         run: |
-          set -euo pipefail
-          file=.github/workflows/v26-7-26-final-repairs.yml
-          old='require(chaos_scenarios_path, chaos_scenarios, "result.ticks_executed > 0", 1)'
-          new='require(chaos_scenarios_path, chaos_scenarios, "result.ticks_executed > 0", 2)'
-          python3 - "${file}" "${old}" "${new}" <<'PY'
+          set -euxo pipefail
+          exec > >(tee patch.log) 2>&1
+          python3 <<'PY'
           from pathlib import Path
-          import sys
-          path, old, new = sys.argv[1:]
-          file = Path(path)
-          text = file.read_text(encoding="utf-8")
-          if text.count(old) != 1:
-              raise SystemExit("PATCH_REFUSED: unexpected source cardinality")
-          file.write_text(text.replace(old, new), encoding="utf-8")
+          file = Path('.github/workflows/v26-7-26-final-repairs.yml')
+          old = 'require(chaos_scenarios_path, chaos_scenarios, "result.ticks_executed > 0", 1)'
+          new = 'require(chaos_scenarios_path, chaos_scenarios, "result.ticks_executed > 0", 2)'
+          text = file.read_text(encoding='utf-8')
+          print('old_count=', text.count(old))
+          print('new_count=', text.count(new))
+          if text.count(old) != 1 or text.count(new) != 0:
+              raise SystemExit('PATCH_REFUSED: unexpected source cardinality')
+          file.write_text(text.replace(old, new), encoding='utf-8')
+          updated = file.read_text(encoding='utf-8')
+          if updated.count(old) != 0 or updated.count(new) != 1:
+              raise SystemExit('PATCH_REFUSED: postcondition failed')
           PY
-          grep -Fq "${new}" "${file}"
           git diff --check
-          [[ "$(git diff --name-only | wc -l)" -eq 1 ]]
-          [[ "$(git diff --name-only)" == "${file}" ]]
+          test "$(git diff --name-only | wc -l)" -eq 1
+          test "$(git diff --name-only)" = '.github/workflows/v26-7-26-final-repairs.yml'
           git config user.name 'BCINR Release Verifier'
           git config user.email 'actions@users.noreply.github.com'
-          git add -- "${file}"
+          git add -- .github/workflows/v26-7-26-final-repairs.yml
           git commit -m 'ci: correct final repair admission cardinality'
           git push origin HEAD:${{ github.head_ref }}
+      - name: Upload patch receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v26-7-26-repair-bootstrap-patch-${{ github.run_id }}-${{ github.run_attempt }}
+          path: patch.log
+          if-no-files-found: warn
+          retention-days: 7
