@@ -1,0 +1,122 @@
+name: v26.7.28 Production Admission
+
+on:
+  push:
+    branches:
+      - agent/v26.7.28-production-admission
+  pull_request:
+    branches:
+      - main
+    paths:
+      - Cargo.toml
+      - Cargo.lock
+      - tools/bcinr-release/**
+      - release/v26.7.28/**
+      - crates/bcinr-pddl/**
+      - contracts/v26.7.28/**
+      - .github/workflows/v26-7-28-production-admission.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v26-7-28-production-admission-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_INCREMENTAL: 0
+  GGEN_COMMIT: 50164750c70b8808a71706702aee68b2f3a77875
+  EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  production-admission:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - name: Checkout exact BCINR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+
+      - name: Checkout exact ggen manufacturer
+        uses: actions/checkout@v4
+        with:
+          repository: seanchatmangpt/ggen
+          ref: ${{ env.GGEN_COMMIT }}
+          path: target/release-input/ggen
+          fetch-depth: 1
+
+      - name: Install BCINR nightly toolchain
+        uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
+        with:
+          toolchain: nightly
+          components: rustfmt,clippy
+          targets: wasm32-unknown-unknown
+
+      - name: Install ggen pinned toolchain and sccache
+        run: |
+          set -euo pipefail
+          rustup toolchain install nightly-2026-06-22 --profile minimal --component rustfmt --component clippy
+
+      - name: Install pinned sccache binary
+        uses: taiki-e/install-action@81ecf985428d5c2ea81dbf079bceca32bc9604ab
+        with:
+          tool: sccache
+
+      - name: Provision exact ggen sibling dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$GITHUB_WORKSPACE/target/release-input"
+          org="https://github.com/seanchatmangpt"
+          repos=(lsp-max lsp-types-max wasm4pm wasm4pm-compat)
+          shas=(7bcc1e16dec71ef5fb2cedea2dfd6cb5cde37f59 6773e6017ca83c565785d0ec39d75304f62c3237 0bb134b29245517ac4969a9f1916f5432931c5d0 e46155e209a750fda0218532d96ae17a9e10903e)
+          for index in "${!repos[@]}"; do
+            repo="${repos[$index]}"
+            sha="${shas[$index]}"
+            destination="$root/$repo"
+            git init -q "$destination"
+            git -C "$destination" remote add origin "$org/$repo"
+            git -C "$destination" fetch -q --depth 1 origin "$sha"
+            git -C "$destination" checkout -q --detach FETCH_HEAD
+            test "$(git -C "$destination" rev-parse HEAD)" = "$sha"
+          done
+
+      - name: Build exact ggen CLI
+        working-directory: target/release-input/ggen
+        run: cargo build --locked -p ggen-cli-lib --bin ggen
+
+      - name: Prove two-pass ggen byte stability
+        working-directory: target/release-input/ggen/examples/bcinr-v26-7-28
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 600 ../../target/debug/ggen sync run
+          git -C ../.. diff --exit-code -- examples/bcinr-v26-7-28/generated
+          timeout 600 ../../target/debug/ggen sync run
+          git -C ../.. diff --exit-code -- examples/bcinr-v26-7-28/generated
+
+      - name: Execute fail-closed production admission
+        shell: bash
+        run: |
+          set +e
+          cargo run --locked -p bcinr-release -- \
+            verify \
+            --profile release/v26.7.28/production.json \
+            --expected-head "$EXPECTED_HEAD" \
+            --output target/release-evidence/v26.7.28
+          status=$?
+          set -e
+          echo "BCINR_RELEASE_EXIT=$status" >> "$GITHUB_ENV"
+          exit "$status"
+
+      - name: Retain production evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v26-7-28-production-evidence-${{ env.EXPECTED_HEAD }}
+          path: target/release-evidence/v26.7.28
+          if-no-files-found: error
+          retention-days: 30
