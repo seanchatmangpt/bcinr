@@ -245,7 +245,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-ffi"
-version = "26.7.25"
+version = "26.7.26"
 dependencies = [
  "bcinr-api",
  "bcinr-logic",

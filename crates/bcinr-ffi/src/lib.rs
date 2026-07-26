@@ -29,8 +29,8 @@
 //! println!("Status: {:?}", resp.status);
 //! ```
 
-use serde::{Deserialize, Serialize};
 use bcinr_pddl::{domain_from_pddl, problem_from_pddl, GroundProblem};
+use serde::{Deserialize, Serialize};
 
 // ─── Versioned Request/Response Types ────────────────────────────────────────
 
@@ -93,24 +93,22 @@ pub struct PowlExecutionResponse {
 /// Returns an error string if parsing or planning fails.
 pub fn pddl_execute_rust(req: &PddlExecutionRequest) -> Result<PddlExecutionResponse, String> {
     if req.version != 1 {
-        return Err(format!(
-            "unsupported version: {} (expected 1)",
-            req.version
-        ));
+        return Err(format!("unsupported version: {} (expected 1)", req.version));
     }
 
     // Parse domain and problem using bcinr-pddl
-    let domain = domain_from_pddl(&req.domain_text)
-        .map_err(|e| format!("domain parse error: {}", e))?;
+    let domain =
+        domain_from_pddl(&req.domain_text).map_err(|e| format!("domain parse error: {}", e))?;
 
-    let problem = problem_from_pddl(&req.problem_text)
-        .map_err(|e| format!("problem parse error: {}", e))?;
+    let problem =
+        problem_from_pddl(&req.problem_text).map_err(|e| format!("problem parse error: {}", e))?;
 
     // Ground and plan using GroundProblem
     let ground = GroundProblem::build(&domain, &problem, None)
         .map_err(|e| format!("grounding failed: {}", e))?;
 
-    let tape = ground.find_plan()
+    let tape = ground
+        .find_plan()
         .into_result()
         .map_err(|e| format!("planning failed: {}", e))?;
 
@@ -141,10 +139,7 @@ pub fn pddl_execute_rust(req: &PddlExecutionRequest) -> Result<PddlExecutionResp
 /// Returns an error string if execution fails.
 pub fn powl_execute_rust(req: &PowlExecutionRequest) -> Result<PowlExecutionResponse, String> {
     if req.version != 1 {
-        return Err(format!(
-            "unsupported version: {} (expected 1)",
-            req.version
-        ));
+        return Err(format!("unsupported version: {} (expected 1)", req.version));
     }
 
     // Parse tape JSON

@@ -12,10 +12,7 @@ use bcinr_powl::ocel::{validate_against_tape, ConformanceResult, OcelLog};
 /// Test 1: Duration check passes when operation stays within limit.
 #[test]
 fn duration_check_passes_under_limit() {
-    let ast = PowlAstNode::Sequence(vec![
-        PowlAstNode::Atom("a"),
-        PowlAstNode::Atom("b"),
-    ]);
+    let ast = PowlAstNode::Sequence(vec![PowlAstNode::Atom("a"), PowlAstNode::Atom("b")]);
     let mut tape = compile_powl(&ast).unwrap();
 
     // Set max_duration for op_idx 0 to 10 time units
@@ -39,10 +36,7 @@ fn duration_check_passes_under_limit() {
 /// Test 2: Duration check fails when operation exceeds limit.
 #[test]
 fn duration_check_fails_over_limit() {
-    let ast = PowlAstNode::Sequence(vec![
-        PowlAstNode::Atom("a"),
-        PowlAstNode::Atom("b"),
-    ]);
+    let ast = PowlAstNode::Sequence(vec![PowlAstNode::Atom("a"), PowlAstNode::Atom("b")]);
     let mut tape = compile_powl(&ast).unwrap();
 
     // Set max_duration for op_idx 0 to 10 time units
@@ -76,10 +70,7 @@ fn duration_check_fails_over_limit() {
 /// Test 3: Deadline check passes when run completes within deadline.
 #[test]
 fn deadline_check_passes_under_limit() {
-    let ast = PowlAstNode::Sequence(vec![
-        PowlAstNode::Atom("a"),
-        PowlAstNode::Atom("b"),
-    ]);
+    let ast = PowlAstNode::Sequence(vec![PowlAstNode::Atom("a"), PowlAstNode::Atom("b")]);
     let mut tape = compile_powl(&ast).unwrap();
 
     // Set overall workflow deadline to 100 time units
@@ -102,10 +93,7 @@ fn deadline_check_passes_under_limit() {
 /// Test 4: Deadline check fails when run exceeds deadline.
 #[test]
 fn deadline_check_fails_over_limit() {
-    let ast = PowlAstNode::Sequence(vec![
-        PowlAstNode::Atom("a"),
-        PowlAstNode::Atom("b"),
-    ]);
+    let ast = PowlAstNode::Sequence(vec![PowlAstNode::Atom("a"), PowlAstNode::Atom("b")]);
     let mut tape = compile_powl(&ast).unwrap();
 
     // Set overall workflow deadline to 50 time units
@@ -175,10 +163,7 @@ fn duration_violation_on_second_op_in_sequence() {
 /// Test 6: No constraints set (zero values) should not trigger violations.
 #[test]
 fn zero_constraints_mean_no_limits() {
-    let ast = PowlAstNode::Sequence(vec![
-        PowlAstNode::Atom("a"),
-        PowlAstNode::Atom("b"),
-    ]);
+    let ast = PowlAstNode::Sequence(vec![PowlAstNode::Atom("a"), PowlAstNode::Atom("b")]);
     let tape = compile_powl(&ast).unwrap();
 
     // Leave all constraints at zero (default, no limits)
@@ -221,10 +206,7 @@ fn deadline_zero_means_no_constraint() {
 /// Test 8: Temporal constraints coexist with structural checks.
 #[test]
 fn temporal_and_structural_checks_together() {
-    let ast = PowlAstNode::Sequence(vec![
-        PowlAstNode::Atom("a"),
-        PowlAstNode::Atom("b"),
-    ]);
+    let ast = PowlAstNode::Sequence(vec![PowlAstNode::Atom("a"), PowlAstNode::Atom("b")]);
     let mut tape = compile_powl(&ast).unwrap();
 
     tape.deadline = 100u32;
@@ -257,10 +239,7 @@ fn temporal_and_structural_checks_together() {
 /// Test 9: Both duration and deadline violations possible (duration checked first).
 #[test]
 fn duration_violation_detected_before_deadline() {
-    let ast = PowlAstNode::Sequence(vec![
-        PowlAstNode::Atom("a"),
-        PowlAstNode::Atom("b"),
-    ]);
+    let ast = PowlAstNode::Sequence(vec![PowlAstNode::Atom("a"), PowlAstNode::Atom("b")]);
     let mut tape = compile_powl(&ast).unwrap();
 
     tape.deadline = 50u32;

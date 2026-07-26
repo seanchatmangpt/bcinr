@@ -80,8 +80,7 @@ fn test_pddl_response_round_trip() {
         version: 1,
         status: "ok".to_string(),
         plan_or_refusal: "0: action-a, 1: action-b, 2: action-c".to_string(),
-        receipt: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-            .to_string(),
+        receipt: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef".to_string(),
     };
 
     let json_resp = serde_json::to_string(&resp).expect("serialization failed");
@@ -103,7 +102,9 @@ fn test_powl_native_rust_api() {
   {"kind": "XorChoice", "lane": 1, "branches": 2, "scope": 0}
 ]"#
         .to_string(),
-        context_json: r#"{"tenant_class": 1, "urgency_tier": 5, "resource_load": 3, "has_sla_token": false}"#.to_string(),
+        context_json:
+            r#"{"tenant_class": 1, "urgency_tier": 5, "resource_load": 3, "has_sla_token": false}"#
+                .to_string(),
     };
 
     let result = powl_execute_rust(&req);
@@ -113,8 +114,8 @@ fn test_powl_native_rust_api() {
             assert!(!resp.receipt.is_empty());
             assert!(resp.status == "ok" || resp.status == "error");
             // OCEL log must be valid JSON
-            let _: serde_json::Value = serde_json::from_str(&resp.ocel_log_json)
-                .expect("OCEL log must be valid JSON");
+            let _: serde_json::Value =
+                serde_json::from_str(&resp.ocel_log_json).expect("OCEL log must be valid JSON");
         }
         Err(e) => {
             assert!(!e.is_empty(), "error message must be descriptive");
@@ -146,8 +147,7 @@ fn test_powl_response_round_trip() {
         status: "ok".to_string(),
         result: "executed 5 ops".to_string(),
         ocel_log_json: r#"{"ocel:version":"1.0","ocel:events":[]}"#.to_string(),
-        receipt: "fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321"
-            .to_string(),
+        receipt: "fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321".to_string(),
     };
 
     let json_resp = serde_json::to_string(&resp).expect("serialization failed");
@@ -171,9 +171,7 @@ fn test_request_version_mismatch() {
 
     let result = pddl_execute_rust(&req);
     assert!(result.is_err(), "mismatched version should error");
-    assert!(result
-        .unwrap_err()
-        .contains("unsupported version"));
+    assert!(result.unwrap_err().contains("unsupported version"));
 }
 
 #[test]

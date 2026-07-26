@@ -7,8 +7,8 @@
 
 #[cfg(feature = "mfw-planner")]
 mod deadline_tests {
-    use bcinr_pddl::{domain_from_pddl, problem_from_pddl, LogicalTime, GroundTemporalProblem};
     use bcinr_mfw_ir::PlannerOutcome;
+    use bcinr_pddl::{domain_from_pddl, problem_from_pddl, GroundTemporalProblem, LogicalTime};
 
     /// Simple one-action temporal domain with known duration.
     const DOMAIN_PDDL: &str = r#"
@@ -58,13 +58,11 @@ mod deadline_tests {
 
     #[test]
     fn plan_meets_generous_deadline() {
-        let domain = domain_from_pddl(DOMAIN_PDDL)
-            .expect("domain should parse");
-        let problem = problem_from_pddl(PROBLEM_PDDL)
-            .expect("problem should parse");
+        let domain = domain_from_pddl(DOMAIN_PDDL).expect("domain should parse");
+        let problem = problem_from_pddl(PROBLEM_PDDL).expect("problem should parse");
 
-        let mut gtp = GroundTemporalProblem::build(&domain, &problem)
-            .expect("problem should ground");
+        let mut gtp =
+            GroundTemporalProblem::build(&domain, &problem).expect("problem should ground");
 
         // Set a generous deadline: 5 seconds
         // The plan should take 2 seconds (1 action, 2.0s duration)
@@ -74,7 +72,11 @@ mod deadline_tests {
         match outcome {
             PlannerOutcome::Found(plan) => {
                 // Verify the plan's makespan is within the deadline
-                assert!(plan.makespan <= 2.1, "expected makespan ~2.0s, got {}", plan.makespan);
+                assert!(
+                    plan.makespan <= 2.1,
+                    "expected makespan ~2.0s, got {}",
+                    plan.makespan
+                );
                 assert_eq!(plan.steps.len(), 1, "expected 1 action in plan");
                 // Verify step duration
                 assert!((plan.steps[0].duration - 2.0).abs() < 0.01);
@@ -85,13 +87,11 @@ mod deadline_tests {
 
     #[test]
     fn plan_violates_tight_deadline() {
-        let domain = domain_from_pddl(DOMAIN_TWO_PDDL)
-            .expect("domain should parse");
-        let problem = problem_from_pddl(PROBLEM_TWO_PDDL)
-            .expect("problem should parse");
+        let domain = domain_from_pddl(DOMAIN_TWO_PDDL).expect("domain should parse");
+        let problem = problem_from_pddl(PROBLEM_TWO_PDDL).expect("problem should parse");
 
-        let mut gtp = GroundTemporalProblem::build(&domain, &problem)
-            .expect("problem should ground");
+        let mut gtp =
+            GroundTemporalProblem::build(&domain, &problem).expect("problem should ground");
 
         // Set a tight deadline: 1.0 seconds
         // The plan requires 2.5 seconds (1.0s + 1.5s), so it violates the deadline
@@ -112,13 +112,11 @@ mod deadline_tests {
 
     #[test]
     fn deadline_at_exact_makespan_boundary() {
-        let domain = domain_from_pddl(DOMAIN_TWO_PDDL)
-            .expect("domain should parse");
-        let problem = problem_from_pddl(PROBLEM_TWO_PDDL)
-            .expect("problem should parse");
+        let domain = domain_from_pddl(DOMAIN_TWO_PDDL).expect("domain should parse");
+        let problem = problem_from_pddl(PROBLEM_TWO_PDDL).expect("problem should parse");
 
-        let mut gtp = GroundTemporalProblem::build(&domain, &problem)
-            .expect("problem should ground");
+        let mut gtp =
+            GroundTemporalProblem::build(&domain, &problem).expect("problem should ground");
 
         // First, find the plan without deadline to know the actual makespan
         let baseline_plan = match gtp.find_temporal_plan() {
@@ -132,8 +130,11 @@ mod deadline_tests {
         let outcome = gtp.find_temporal_plan();
         match outcome {
             PlannerOutcome::Found(plan) => {
-                assert!(plan.makespan <= baseline_plan.makespan + 0.02,
-                    "expected makespan <= baseline, got {}", plan.makespan);
+                assert!(
+                    plan.makespan <= baseline_plan.makespan + 0.02,
+                    "expected makespan <= baseline, got {}",
+                    plan.makespan
+                );
             }
             other => panic!("expected Found when deadline >= makespan, got {:?}", other),
         }
@@ -141,13 +142,10 @@ mod deadline_tests {
 
     #[test]
     fn plan_without_deadline() {
-        let domain = domain_from_pddl(DOMAIN_TWO_PDDL)
-            .expect("domain should parse");
-        let problem = problem_from_pddl(PROBLEM_TWO_PDDL)
-            .expect("problem should parse");
+        let domain = domain_from_pddl(DOMAIN_TWO_PDDL).expect("domain should parse");
+        let problem = problem_from_pddl(PROBLEM_TWO_PDDL).expect("problem should parse");
 
-        let gtp = GroundTemporalProblem::build(&domain, &problem)
-            .expect("problem should ground");
+        let gtp = GroundTemporalProblem::build(&domain, &problem).expect("problem should ground");
 
         // No deadline is set; the plan should be found normally
         let outcome = gtp.find_temporal_plan();
@@ -162,21 +160,22 @@ mod deadline_tests {
 
     #[test]
     fn clear_deadline() {
-        let domain = domain_from_pddl(DOMAIN_TWO_PDDL)
-            .expect("domain should parse");
-        let problem = problem_from_pddl(PROBLEM_TWO_PDDL)
-            .expect("problem should parse");
+        let domain = domain_from_pddl(DOMAIN_TWO_PDDL).expect("domain should parse");
+        let problem = problem_from_pddl(PROBLEM_TWO_PDDL).expect("problem should parse");
 
-        let mut gtp = GroundTemporalProblem::build(&domain, &problem)
-            .expect("problem should ground");
+        let mut gtp =
+            GroundTemporalProblem::build(&domain, &problem).expect("problem should ground");
 
         // Set a very tight deadline that no plan can meet
         gtp.set_deadline(LogicalTime::from_seconds_f64(0.1));
 
         // Verify plan is not found with tight deadline
         let outcome_with_deadline = gtp.find_temporal_plan();
-        assert!(matches!(outcome_with_deadline, PlannerOutcome::Exhausted(_)),
-            "expected Exhausted with tight deadline, got {:?}", outcome_with_deadline);
+        assert!(
+            matches!(outcome_with_deadline, PlannerOutcome::Exhausted(_)),
+            "expected Exhausted with tight deadline, got {:?}",
+            outcome_with_deadline
+        );
 
         // Clear the deadline
         gtp.clear_deadline();

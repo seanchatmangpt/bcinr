@@ -31,7 +31,10 @@ use std::collections::HashSet;
 
 /// Helper: execute a POWL workflow to completion, recording all operations
 /// via OCEL and tracking ticks consumed.
-fn execute_byzantine_protocol(ast: &PowlAstNode<'_>, run_id: u64) -> (PowlTape, PowlRunState, OcelLog, u32) {
+fn execute_byzantine_protocol(
+    ast: &PowlAstNode<'_>,
+    run_id: u64,
+) -> (PowlTape, PowlRunState, OcelLog, u32) {
     let tape = compile_powl(ast).expect("POWL model must compile");
     let mut state = PowlRunState::new(&tape);
     let mut log = OcelLog::new();
@@ -107,7 +110,10 @@ fn test_five_nodes_one_faulty_reaches_consensus() {
     let (_tape, state, log, ticks) = execute_byzantine_protocol(&ast, 100);
 
     // Termination: no livelock even with 1 Byzantine node
-    assert_eq!(state.check_mask, 0, "protocol must terminate despite Byzantine node");
+    assert_eq!(
+        state.check_mask, 0,
+        "protocol must terminate despite Byzantine node"
+    );
     assert!(ticks <= 256, "termination must occur within bounded loop");
 
     // All 15 ops must fire (5 propose + 5 vote + 5 commit)
@@ -198,12 +204,24 @@ fn test_byzantine_vote_reorder_breaks_receipt_chain() {
 
     // Byzantine reorder: same votes, but in order 2, 0, 4, 1, 3
     let mut log_byzantine = OcelLog::new();
-    log_byzantine.record_op_fired(reordered_id, 2, 0, 1).unwrap(); // node_2_vote (moved first)
-    log_byzantine.record_op_fired(reordered_id, 0, 1, 1).unwrap(); // node_0_vote (moved second)
-    log_byzantine.record_op_fired(reordered_id, 4, 2, 1).unwrap(); // node_4_vote
-    log_byzantine.record_op_fired(reordered_id, 1, 3, 1).unwrap(); // node_1_vote
-    log_byzantine.record_op_fired(reordered_id, 3, 4, 1).unwrap(); // node_3_vote (moved last)
-    log_byzantine.record_run_sealed(reordered_id, 0b11111, 5).unwrap();
+    log_byzantine
+        .record_op_fired(reordered_id, 2, 0, 1)
+        .unwrap(); // node_2_vote (moved first)
+    log_byzantine
+        .record_op_fired(reordered_id, 0, 1, 1)
+        .unwrap(); // node_0_vote (moved second)
+    log_byzantine
+        .record_op_fired(reordered_id, 4, 2, 1)
+        .unwrap(); // node_4_vote
+    log_byzantine
+        .record_op_fired(reordered_id, 1, 3, 1)
+        .unwrap(); // node_1_vote
+    log_byzantine
+        .record_op_fired(reordered_id, 3, 4, 1)
+        .unwrap(); // node_3_vote (moved last)
+    log_byzantine
+        .record_run_sealed(reordered_id, 0b11111, 5)
+        .unwrap();
     let digest_byzantine = log_byzantine.seal_receipt().digest();
 
     assert_ne!(
@@ -361,7 +379,9 @@ fn test_byzantine_injection_attempt_detected_via_receipt_mismatch() {
     log_injected.record_op_fired(inject_id, 1, 1, 1).unwrap(); // vote
     log_injected.record_op_fired(inject_id, 2, 2, 1).unwrap(); // commit
     log_injected.record_op_fired(inject_id, 3, 3, 1).unwrap(); // fake "rollback" (Byzantine injection)
-    log_injected.record_run_sealed(inject_id, 0b1111, 4).unwrap();
+    log_injected
+        .record_run_sealed(inject_id, 0b1111, 4)
+        .unwrap();
     let digest_injected = log_injected.seal_receipt().digest();
 
     assert_ne!(
@@ -406,7 +426,10 @@ fn test_scheduler_progress_despite_byzantine_delays() {
     let (_tape, state, log, _ticks) = execute_byzantine_protocol(&ast, 106);
 
     // Termination despite Byzantine delays
-    assert_eq!(state.check_mask, 0, "protocol must terminate even with Byzantine delays");
+    assert_eq!(
+        state.check_mask, 0,
+        "protocol must terminate even with Byzantine delays"
+    );
 
     // All ops must eventually fire
     let fired: HashSet<u32> = log.events().iter().map(|e| e.op_idx).collect();

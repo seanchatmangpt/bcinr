@@ -5,9 +5,7 @@
 //! detected and blocked.
 
 use bcinr_powl::compiler::{compile_powl, PowlAstNode};
-use bcinr_powl::scheduler::{
-    intervals_conflict, OpTimeInterval, ResourceRegistry, PowlRunState,
-};
+use bcinr_powl::scheduler::{intervals_conflict, OpTimeInterval, PowlRunState, ResourceRegistry};
 
 #[test]
 fn two_ops_same_resource_overlapping_intervals_detected() {
@@ -120,17 +118,26 @@ fn interval_overlap_boundary_cases() {
     // [0, 5) and [5, 10) — meet but don't overlap (half-open intervals)
     let a = OpTimeInterval::new(0, 0, 5);
     let b = OpTimeInterval::new(1, 5, 10);
-    assert!(!intervals_conflict(&tape, 0, a, 1, b, "res"), "touching intervals must not conflict");
+    assert!(
+        !intervals_conflict(&tape, 0, a, 1, b, "res"),
+        "touching intervals must not conflict"
+    );
 
     // [0, 5) and [4, 5) — b is a strict subset of a
     let a = OpTimeInterval::new(0, 0, 5);
     let b = OpTimeInterval::new(1, 4, 5);
-    assert!(intervals_conflict(&tape, 0, a, 1, b, "res"), "subset intervals must conflict");
+    assert!(
+        intervals_conflict(&tape, 0, a, 1, b, "res"),
+        "subset intervals must conflict"
+    );
 
     // [3, 8) and [0, 3) — a.start > b.end, disjoint
     let a = OpTimeInterval::new(0, 3, 8);
     let b = OpTimeInterval::new(1, 0, 3);
-    assert!(!intervals_conflict(&tape, 0, a, 1, b, "res"), "separated intervals must not conflict");
+    assert!(
+        !intervals_conflict(&tape, 0, a, 1, b, "res"),
+        "separated intervals must not conflict"
+    );
 }
 
 #[test]
@@ -143,7 +150,10 @@ fn parallel_ops_via_tape_compile_with_manual_conflict_check() {
         edges: vec![],
     };
     let tape = compile_powl(&ast).unwrap();
-    assert!(tape.len >= 2, "parallel ops should compile to at least 2 slots");
+    assert!(
+        tape.len >= 2,
+        "parallel ops should compile to at least 2 slots"
+    );
 
     // Hypothetical: op_a runs [0, 5) and op_b runs [3, 8) on shared resource "worker"
     // They're ready to fire in parallel (no data dependencies), but conflict on the resource.
@@ -161,10 +171,7 @@ fn scheduler_state_tracks_blocked_reasons_for_resource_conflicts() {
     // Verify that PowlRunState can store blocked reasons corresponding to resource conflicts.
     // (This is a setup test for future scheduler_tick_with_resource integration.)
 
-    let ast = PowlAstNode::Sequence(vec![
-        PowlAstNode::Atom("op_a"),
-        PowlAstNode::Atom("op_b"),
-    ]);
+    let ast = PowlAstNode::Sequence(vec![PowlAstNode::Atom("op_a"), PowlAstNode::Atom("op_b")]);
     let tape = compile_powl(&ast).unwrap();
     let mut state = PowlRunState::new(&tape);
 
@@ -173,9 +180,16 @@ fn scheduler_state_tracks_blocked_reasons_for_resource_conflicts() {
     state.blocked_mask |= 1u64 << 1; // op_b (slot 1)
     state.blocked_reasons.push((1, reason.clone()));
 
-    assert_eq!(state.blocked_mask & (1u64 << 1), 1u64 << 1, "blocked_mask must mark op_b");
+    assert_eq!(
+        state.blocked_mask & (1u64 << 1),
+        1u64 << 1,
+        "blocked_mask must mark op_b"
+    );
     assert!(
-        state.blocked_reasons.iter().any(|(idx, r)| *idx == 1 && *r == reason),
+        state
+            .blocked_reasons
+            .iter()
+            .any(|(idx, r)| *idx == 1 && *r == reason),
         "blocked_reasons must record the conflict"
     );
 }
@@ -185,7 +199,16 @@ fn op_time_interval_debug_output() {
     // Verify OpTimeInterval displays useful debug info.
     let interval = OpTimeInterval::new(5, 10, 20);
     let debug_str = format!("{:?}", interval);
-    assert!(debug_str.contains("op_idx: 5"), "debug output should include op_idx");
-    assert!(debug_str.contains("start: 10"), "debug output should include start");
-    assert!(debug_str.contains("end: 20"), "debug output should include end");
+    assert!(
+        debug_str.contains("op_idx: 5"),
+        "debug output should include op_idx"
+    );
+    assert!(
+        debug_str.contains("start: 10"),
+        "debug output should include start"
+    );
+    assert!(
+        debug_str.contains("end: 20"),
+        "debug output should include end"
+    );
 }

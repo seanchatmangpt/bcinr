@@ -58,11 +58,13 @@ fn execute(ast: &PowlAstNode<'_>, run_id: u64) -> (PowlTape, PowlRunState, OcelL
         while bits != 0 {
             let op_idx = bits.trailing_zeros() as u32;
             bits &= bits - 1;
-            log.record_op_fired(run_id, op_idx, ticks as u32, 1u32).unwrap();
+            log.record_op_fired(run_id, op_idx, ticks as u32, 1u32)
+                .unwrap();
             op_trace |= 1u64 << op_idx;
         }
     }
-    log.record_run_sealed(run_id, op_trace, ticks as u32).unwrap();
+    log.record_run_sealed(run_id, op_trace, ticks as u32)
+        .unwrap();
     (tape, state, log, ticks)
 }
 
@@ -322,10 +324,7 @@ fn test_no_llm_provider_calls_in_powl_execution() {
     // 2. No panics or errors occur (proof that no I/O exceptions fired).
     // 3. check_mask == 0 proves termination without external dependencies.
 
-    let ast = PowlAstNode::Sequence(vec![
-        PowlAstNode::Atom("op_a"),
-        PowlAstNode::Atom("op_b"),
-    ]);
+    let ast = PowlAstNode::Sequence(vec![PowlAstNode::Atom("op_a"), PowlAstNode::Atom("op_b")]);
 
     let (_tape, state, _log, _ticks) = execute(&ast, 999);
 
@@ -416,7 +415,7 @@ fn test_lease_renewal_timeout_detection_via_scheduler() {
     let ast = PowlAstNode::Sequence(vec![
         PowlAstNode::Atom("w1_acquire"),
         PowlAstNode::Atom("w1_work"),
-        PowlAstNode::Atom("w1_renew"),   // Must fire within bounded ticks
+        PowlAstNode::Atom("w1_renew"), // Must fire within bounded ticks
         PowlAstNode::Atom("w1_release"), // Only fires after renewal
     ]);
 

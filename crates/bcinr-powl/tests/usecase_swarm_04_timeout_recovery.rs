@@ -42,7 +42,10 @@ use bcinr_powl::ocel::OcelLog;
 use bcinr_powl::scheduler::{scheduler_tick, PowlRunState};
 use bcinr_powl::tape::PowlTape;
 
-fn execute_with_timeout_recovery(ast: &PowlAstNode<'_>, run_id: u64) -> (PowlTape, PowlRunState, OcelLog, u32) {
+fn execute_with_timeout_recovery(
+    ast: &PowlAstNode<'_>,
+    run_id: u64,
+) -> (PowlTape, PowlRunState, OcelLog, u32) {
     let tape = compile_powl(ast).expect("POWL timeout recovery model must compile");
     let mut state = PowlRunState::new(&tape);
     let mut log = OcelLog::new();
@@ -59,12 +62,14 @@ fn execute_with_timeout_recovery(ast: &PowlAstNode<'_>, run_id: u64) -> (PowlTap
         while bits != 0 {
             let op_idx = bits.trailing_zeros();
             bits &= bits - 1;
-            log.record_op_fired(run_id, op_idx, logical_time, 1).unwrap();
+            log.record_op_fired(run_id, op_idx, logical_time, 1)
+                .unwrap();
             op_trace |= 1u64 << op_idx;
             logical_time += 1;
         }
     }
-    log.record_run_sealed(run_id, op_trace, logical_time).unwrap();
+    log.record_run_sealed(run_id, op_trace, logical_time)
+        .unwrap();
     (tape, state, log, ticks)
 }
 
@@ -267,7 +272,10 @@ fn test_timeout_handler_isolation_no_cascading() {
 
     let (_tape, state, log, ticks) = execute_with_timeout_recovery(&ast, 500);
 
-    assert_eq!(state.check_mask, 0, "timeout handler sequence must complete");
+    assert_eq!(
+        state.check_mask, 0,
+        "timeout handler sequence must complete"
+    );
 
     let fired_ops: std::collections::HashSet<u32> = log.events().iter().map(|e| e.op_idx).collect();
     // Verify at least 5 ops (request + 4 handler steps) fired.
@@ -277,7 +285,11 @@ fn test_timeout_handler_isolation_no_cascading() {
         "all timeout handler steps must fire without cascading; fired {} ops",
         fired_ops.len()
     );
-    assert!(ticks <= 64, "timeout handler must be bounded; used {} ticks", ticks);
+    assert!(
+        ticks <= 64,
+        "timeout handler must be bounded; used {} ticks",
+        ticks
+    );
 }
 
 /// Test 6: No LLM API Calls
@@ -305,7 +317,10 @@ fn test_timeout_recovery_no_llm_calls() {
     //    no network access to external services.
 
     // If this test runs to completion without error, no LLM calls occurred.
-    assert!(true, "timeout recovery execution completed without API calls");
+    assert!(
+        true,
+        "timeout recovery execution completed without API calls"
+    );
 }
 
 /// Test 7: Timeout Recovery Conformance Against Tape
@@ -330,7 +345,10 @@ fn test_timeout_recovery_ocel_conformance() {
 
     let (tape, state, log, _ticks) = execute_with_timeout_recovery(&ast, 700);
 
-    assert_eq!(state.check_mask, 0, "workflow must complete before validation");
+    assert_eq!(
+        state.check_mask, 0,
+        "workflow must complete before validation"
+    );
 
     // Validate the recorded execution against the compiled tape.
     // This uses the deterministic SRBCG (Symmetric Run-Bounded Conformance Gating)

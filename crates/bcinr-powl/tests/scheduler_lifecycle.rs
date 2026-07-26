@@ -19,8 +19,16 @@ fn op_fires_transitions_eligible_active_completed() {
     let slot_0 = 1u64 << 0;
 
     // Initial state: slot 0 is Eligible (in check_mask).
-    assert_eq!(state.check_mask & slot_0, slot_0, "Slot 0 must start in Eligible state (check_mask)");
-    assert_eq!(state.done_mask & slot_0, 0, "Slot 0 must not be Completed yet");
+    assert_eq!(
+        state.check_mask & slot_0,
+        slot_0,
+        "Slot 0 must start in Eligible state (check_mask)"
+    );
+    assert_eq!(
+        state.done_mask & slot_0,
+        0,
+        "Slot 0 must not be Completed yet"
+    );
     assert_eq!(state.cancelled_mask, 0, "No cancellations yet");
     assert_eq!(state.timed_out_mask, 0, "No timeouts yet");
 
@@ -30,13 +38,21 @@ fn op_fires_transitions_eligible_active_completed() {
     // After firing, slot 0 is Completed (in done_mask).
     assert_eq!(fired_set.0 & slot_0, slot_0, "Slot 0 must fire on tick 1");
     assert_eq!(
-        state.done_mask & slot_0, slot_0,
+        state.done_mask & slot_0,
+        slot_0,
         "Slot 0 must transition to Completed state (done_mask)"
     );
-    assert_eq!(state.check_mask & slot_0, 0, "Slot 0 must leave Eligible state");
+    assert_eq!(
+        state.check_mask & slot_0,
+        0,
+        "Slot 0 must leave Eligible state"
+    );
 
     // Verify no spurious state transitions.
-    assert_eq!(state.cancelled_mask, 0, "No cancellations should have occurred");
+    assert_eq!(
+        state.cancelled_mask, 0,
+        "No cancellations should have occurred"
+    );
     assert_eq!(state.timed_out_mask, 0, "No timeouts should have occurred");
     assert_eq!(state.refused_mask, 0, "No refusals should have occurred");
     assert_eq!(state.blocked_mask, 0, "No blocking should have occurred");
@@ -85,7 +101,8 @@ fn timeout_on_loop_exceeding_max_iters_sets_timed_out_state() {
     );
     // At minimum, the loop body (slot 0) and redo (slot 1) must have fired once.
     assert_ne!(
-        total_fired & 0b11, 0,
+        total_fired & 0b11,
+        0,
         "At least loop body or redo must have fired"
     );
     // No operation should be stuck in a spurious state.

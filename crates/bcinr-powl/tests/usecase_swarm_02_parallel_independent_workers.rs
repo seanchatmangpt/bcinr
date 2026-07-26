@@ -81,13 +81,9 @@ fn test_five_workers_all_fire_parallel() {
         ticks <= 128,
         "scheduler must terminate within bounded 128-tick loop"
     );
-    assert!(
-        ticks >= 1,
-        "at least 1 tick needed to fire ready workers"
-    );
+    assert!(ticks >= 1, "at least 1 tick needed to fire ready workers");
 
-    let fired: std::collections::HashSet<u32> =
-        log.events().iter().map(|e| e.op_idx).collect();
+    let fired: std::collections::HashSet<u32> = log.events().iter().map(|e| e.op_idx).collect();
     for worker_id in 0..5u32 {
         assert!(
             fired.contains(&worker_id),
@@ -120,19 +116,11 @@ fn test_parallel_workers_deterministic_completion() {
     let (_tape1, state1, log1, _) = execute(&ast, 10);
     let (_tape2, state2, log2, _) = execute(&ast, 10);
 
-    assert_eq!(
-        state1.check_mask, 0,
-        "first run must complete all workers"
-    );
-    assert_eq!(
-        state2.check_mask, 0,
-        "second run must complete all workers"
-    );
+    assert_eq!(state1.check_mask, 0, "first run must complete all workers");
+    assert_eq!(state2.check_mask, 0, "second run must complete all workers");
 
-    let fired1: std::collections::HashSet<u32> =
-        log1.events().iter().map(|e| e.op_idx).collect();
-    let fired2: std::collections::HashSet<u32> =
-        log2.events().iter().map(|e| e.op_idx).collect();
+    let fired1: std::collections::HashSet<u32> = log1.events().iter().map(|e| e.op_idx).collect();
+    let fired2: std::collections::HashSet<u32> = log2.events().iter().map(|e| e.op_idx).collect();
 
     assert_eq!(
         fired1, fired2,
@@ -180,7 +168,9 @@ fn test_swarm_receipt_integrity_ocel_chain() {
     // Verify tampering is detected: a different run_id changes the digest
     let mut log_tampered = OcelLog::new();
     for e in log_correct.events() {
-        log_tampered.record_op_fired(e.run_id + 1, e.op_idx, e.start_time, 1).unwrap();
+        log_tampered
+            .record_op_fired(e.run_id + 1, e.op_idx, e.start_time, 1)
+            .unwrap();
     }
     log_tampered.record_run_sealed(101, 0x1F, 100).unwrap();
     let digest_tampered = log_tampered.seal_receipt().digest();
@@ -250,12 +240,8 @@ fn test_single_worker_edge_case() {
         "single worker must fire within bounded ticks"
     );
 
-    let fired: std::collections::HashSet<u32> =
-        log.events().iter().map(|e| e.op_idx).collect();
-    assert!(
-        fired.contains(&0),
-        "the only worker (op 0) must fire"
-    );
+    let fired: std::collections::HashSet<u32> = log.events().iter().map(|e| e.op_idx).collect();
+    assert!(fired.contains(&0), "the only worker (op 0) must fire");
 }
 
 /// Test 6: Large swarm — verify O(1) termination
@@ -295,10 +281,6 @@ fn test_larger_swarm_termination_bounded() {
         "even a larger swarm must terminate within bounded ticks"
     );
 
-    let fired: std::collections::HashSet<u32> =
-        log.events().iter().map(|e| e.op_idx).collect();
-    assert!(
-        fired.len() >= 10,
-        "all 10 declared workers must fire"
-    );
+    let fired: std::collections::HashSet<u32> = log.events().iter().map(|e| e.op_idx).collect();
+    assert!(fired.len() >= 10, "all 10 declared workers must fire");
 }

@@ -881,8 +881,9 @@ pub fn validate_against_tape(log: &OcelLog, tape: &crate::tape::PowlTape) -> Con
                                 ..
                             } = prev_event.event_kind
                             {
-                                if let EventKind::ResourceReleased { resource_id: rel_rid } =
-                                    event.event_kind
+                                if let EventKind::ResourceReleased {
+                                    resource_id: rel_rid,
+                                } = event.event_kind
                                 {
                                     if acq_rid == rel_rid {
                                         lease_expiry = expiry;
@@ -894,8 +895,7 @@ pub fn validate_against_tape(log: &OcelLog, tape: &crate::tape::PowlTape) -> Con
 
                     // Check if release exceeds lease expiry.
                     if lease_expiry > 0 && event.start_time > lease_expiry {
-                        let exceeded_by =
-                            event.start_time.saturating_sub(lease_expiry);
+                        let exceeded_by = event.start_time.saturating_sub(lease_expiry);
                         if let EventKind::ResourceReleased { resource_id } = event.event_kind {
                             return ConformanceResult::LeaseViolation {
                                 resource_id,
@@ -1457,8 +1457,10 @@ mod tests {
         let fired_branch_mask = first | second;
         let mut log = OcelLog::new();
         log.record_op_fired(71, 0, 0, 0).unwrap();
-        log.record_op_fired(71, first.trailing_zeros(), 0, 0).unwrap();
-        log.record_op_fired(71, second.trailing_zeros(), 0, 0).unwrap();
+        log.record_op_fired(71, first.trailing_zeros(), 0, 0)
+            .unwrap();
+        log.record_op_fired(71, second.trailing_zeros(), 0, 0)
+            .unwrap();
         log.record_op_fired(71, 1, 0, 0).unwrap();
         log.record_run_sealed(71, 1u64 | (1u64 << 1) | fired_branch_mask, 0)
             .unwrap();

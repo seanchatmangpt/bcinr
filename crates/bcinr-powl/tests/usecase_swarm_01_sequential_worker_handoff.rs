@@ -109,14 +109,16 @@ fn test_audit_log_captures_handoff_order() {
 
     let events = log.events();
     assert_eq!(
-        events.len(), 4,
+        events.len(),
+        4,
         "log must contain exactly 4 events: 3 op_fired + 1 run_sealed"
     );
 
     // Extract the op_fired events (skip the run_sealed event at the end).
     let op_events: Vec<u32> = events[..3].iter().map(|e| e.op_idx).collect();
     assert_eq!(
-        op_events, vec![0, 1, 2],
+        op_events,
+        vec![0, 1, 2],
         "workers must fire in program order: A (op 0), B (op 1), C (op 2)"
     );
 }
@@ -139,30 +141,17 @@ fn test_repeated_handoff_produces_same_order() {
 
     // First execution.
     let (_tape1, _state1, log1, _ticks1) = execute(&ast, run_id);
-    let order1: Vec<u32> = log1
-        .events()
-        .iter()
-        .take(3)
-        .map(|e| e.op_idx)
-        .collect();
+    let order1: Vec<u32> = log1.events().iter().take(3).map(|e| e.op_idx).collect();
 
     // Second independent execution (same run_id for consistency check).
     let (_tape2, _state2, log2, _ticks2) = execute(&ast, run_id);
-    let order2: Vec<u32> = log2
-        .events()
-        .iter()
-        .take(3)
-        .map(|e| e.op_idx)
-        .collect();
+    let order2: Vec<u32> = log2.events().iter().take(3).map(|e| e.op_idx).collect();
 
     assert_eq!(
         order1, order2,
         "independent executions of the same workflow must produce identical event traces"
     );
-    assert_eq!(
-        order1, vec![0, 1, 2],
-        "order must always be A, B, C"
-    );
+    assert_eq!(order1, vec![0, 1, 2], "order must always be A, B, C");
 }
 
 /// Test 4: Audit log integrity via BLAKE3 receipt
@@ -267,12 +256,8 @@ fn test_no_worker_starvation_in_handoff_loop() {
 
     let (_tape, _state, log, _ticks) = execute(&ast, 7);
 
-    let fired: std::collections::HashSet<u32> = log
-        .events()
-        .iter()
-        .take(3)
-        .map(|e| e.op_idx)
-        .collect();
+    let fired: std::collections::HashSet<u32> =
+        log.events().iter().take(3).map(|e| e.op_idx).collect();
 
     // Each of the 3 workers (ops 0, 1, 2) must fire exactly once.
     for worker_idx in 0..3u32 {
@@ -284,7 +269,8 @@ fn test_no_worker_starvation_in_handoff_loop() {
     }
 
     assert_eq!(
-        fired.len(), 3,
+        fired.len(),
+        3,
         "exactly 3 distinct workers must fire (0, 1, 2)"
     );
 }

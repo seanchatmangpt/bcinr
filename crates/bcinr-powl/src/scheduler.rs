@@ -196,11 +196,7 @@ impl ResourceRegistry {
     }
 
     /// Record an operation's interval on a resource.
-    pub fn book_interval(
-        &mut self,
-        resource_id: String,
-        interval: OpTimeInterval,
-    ) {
+    pub fn book_interval(&mut self, resource_id: String, interval: OpTimeInterval) {
         self.resources
             .entry(resource_id)
             .or_default()
@@ -211,15 +207,18 @@ impl ResourceRegistry {
 
     /// Check if an operation's interval conflicts with any existing allocation on a resource.
     /// Returns the first conflicting operation index, or None if no conflict.
-    pub fn check_conflict(
-        &self,
-        resource_id: &str,
-        interval: OpTimeInterval,
-    ) -> Option<u32> {
+    pub fn check_conflict(&self, resource_id: &str, interval: OpTimeInterval) -> Option<u32> {
         self.resources.get(resource_id).and_then(|allocations| {
             allocations.iter().find_map(|(&op_idx, intervals)| {
                 if intervals.iter().any(|existing| {
-                    intervals_conflict(&PowlTape::new(), interval.op_idx, interval, op_idx, *existing, resource_id)
+                    intervals_conflict(
+                        &PowlTape::new(),
+                        interval.op_idx,
+                        interval,
+                        op_idx,
+                        *existing,
+                        resource_id,
+                    )
                 }) {
                     Some(op_idx)
                 } else {

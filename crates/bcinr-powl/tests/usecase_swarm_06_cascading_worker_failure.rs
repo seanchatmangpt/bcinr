@@ -85,18 +85,9 @@ fn test_linear_cascade_upstream_failure_blocks_downstream() {
     // B and C remain pred-blocked and never fire.
     //
     // This test checks the happy path: all ops fire in sequence.
-    assert!(
-        fired.contains(&0),
-        "worker A must fire (no upstream deps)"
-    );
-    assert!(
-        fired.contains(&1),
-        "worker B must fire (A completed)"
-    );
-    assert!(
-        fired.contains(&2),
-        "worker C must fire (B completed)"
-    );
+    assert!(fired.contains(&0), "worker A must fire (no upstream deps)");
+    assert!(fired.contains(&1), "worker B must fire (A completed)");
+    assert!(fired.contains(&2), "worker C must fire (B completed)");
 }
 
 /// Test 2: Fan-out cascade: A -> {B, C}
@@ -234,16 +225,8 @@ fn test_diamond_join_waits_for_both_branches() {
     let ops = &tape.ops[..tape.len as usize];
 
     // D's pred_mask must include both B (bit 1) and C (bit 2)
-    assert_ne!(
-        ops[3].pred_mask & (1u64 << 1),
-        0,
-        "D must depend on B"
-    );
-    assert_ne!(
-        ops[3].pred_mask & (1u64 << 2),
-        0,
-        "D must depend on C"
-    );
+    assert_ne!(ops[3].pred_mask & (1u64 << 1), 0, "D must depend on B");
+    assert_ne!(ops[3].pred_mask & (1u64 << 2), 0, "D must depend on C");
 
     // Verify D does not fire until both B and C have fired
     let order: Vec<u32> = log.events().iter().map(|e| e.op_idx).collect();
@@ -280,20 +263,13 @@ fn test_asymmetric_independent_branches_no_interference() {
 
     // All three must fire
     for op_idx in 0..3u32 {
-        assert!(
-            fired.contains(&op_idx),
-            "worker {} must fire",
-            op_idx
-        );
+        assert!(fired.contains(&op_idx), "worker {} must fire", op_idx);
     }
 
     // Verify C fires without waiting for A or B
     // C (op 2) can appear anywhere in the order; it has no constraints
     // The property under test: the presence of A -> B does not serialize C
-    assert!(
-        fired.contains(&2),
-        "C must fire independently of A/B chain"
-    );
+    assert!(fired.contains(&2), "C must fire independently of A/B chain");
 }
 
 /// Test 6: Receipt chain records exact cancellation trace
@@ -318,8 +294,10 @@ fn test_cascading_failure_creates_auditable_receipt_chain() {
     let run_id_failed = 7u64;
     let mut log_cascade = OcelLog::new();
     log_cascade.record_op_fired(run_id_failed, 0, 0, 1).unwrap(); // A fires
-    // B and C are *not* recorded (simulating: they never fired because A failed)
-    log_cascade.record_run_sealed(run_id_failed, 0b001, 1).unwrap(); // trace: only op 0 executed
+                                                                  // B and C are *not* recorded (simulating: they never fired because A failed)
+    log_cascade
+        .record_run_sealed(run_id_failed, 0b001, 1)
+        .unwrap(); // trace: only op 0 executed
     let digest_cascade = log_cascade.seal_receipt().digest();
 
     // The receipts must differ: cancellation changes the audit log
@@ -356,7 +334,10 @@ fn test_scheduler_terminates_despite_cascading_cancellation() {
 
     // The key property: even if some ops are cancelled, the scheduler
     // terminates in bounded ticks (not an infinite loop).
-    assert_eq!(state.check_mask, 0, "scheduler must terminate in bounded time");
+    assert_eq!(
+        state.check_mask, 0,
+        "scheduler must terminate in bounded time"
+    );
     assert!(
         ticks <= 128,
         "scheduler must terminate within 128 ticks (bounded forward progress)"
