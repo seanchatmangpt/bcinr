@@ -1,0 +1,36 @@
+name: Repair Post-Integration Verification V2
+
+on:
+  push:
+    branches:
+      - agent/repair-post-integration-verification-ci
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-post-integration-verification-v2
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: 1
+
+jobs:
+  repair-verify-publish:
+    name: Repair, verify, and publish final tree
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/repair-post-integration-verification-ci
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Execute bounded repair and verification
+        run: bash scripts/run_post_integration_verification.sh
