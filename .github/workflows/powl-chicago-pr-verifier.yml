@@ -57,6 +57,7 @@ jobs:
           run_step manufacture python3 scripts/implement_powl_chicago_closure.py
           if [ "${overall}" -eq 0 ]; then
             run_step context-fix python3 scripts/fix_powl_chicago_context.py
+            run_step xor-conformance-fix python3 scripts/fix_powl_xor_conformance.py
           fi
           if [ "${overall}" -eq 0 ]; then
             run_step format cargo fmt --all
@@ -101,6 +102,7 @@ jobs:
           if [ "${status}" -eq 0 ]; then
             rm -f scripts/implement_powl_chicago_closure.py
             rm -f scripts/fix_powl_chicago_context.py
+            rm -f scripts/fix_powl_xor_conformance.py
             rm -f docs/testing/powl-chicago-verifier-trigger.txt
             rm -f docs/testing/powl-chicago-closure-latest.log
             git add -A
