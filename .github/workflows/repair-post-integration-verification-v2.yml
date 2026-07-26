@@ -1,0 +1,121 @@
+name: Repair Post-Integration Verification V2
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-post-integration-verification-v2
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: 1
+
+jobs:
+  repair-verify-publish:
+    name: Repair, verify, and publish final tree
+    if: github.event.pull_request.head.ref == 'agent/repair-post-integration-verification-ci' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/repair-post-integration-verification-ci
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Apply bounded source and CI repair
+        run: python3 scripts/repair_post_integration_verification.py
+      - name: Repair hostile-mutant and E2E admission
+        run: python3 scripts/repair_cmca_all_features_composition.py
+      - name: Install strict MCP stdio transport
+        run: python3 scripts/repair_mcp_transport.py
+      - name: Normalize repaired Rust sources
+        id: normalize
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo fmt --all 2>&1 | tee rustfmt-repair.log
+      - name: Upload rustfmt parser diagnostics
+        if: failure() && steps.normalize.conclusion == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: post-integration-rustfmt-${{ github.run_id }}
+          path: rustfmt-repair.log
+          if-no-files-found: error
+          retention-days: 7
+      - name: Validate repaired patch shape
+        run: git diff --check
+      - name: Formatting
+        run: cargo fmt --all -- --check
+      - name: Workspace compile
+        run: cargo check --workspace --all-features
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: CMCA all-features baseline
+        run: cargo test -p bcinr-cmca --all-features
+      - name: CMCA calibration
+        run: cargo test -p bcinr-cmca --test calibration
+      - name: CMCA differential
+        run: cargo test -p bcinr-cmca --test differential
+      - name: CMCA hostile-mutant baseline
+        run: cargo test -p bcinr-cmca --test hostile_mutants
+      - name: CMCA compile-fail contracts
+        run: cargo test -p bcinr-cmca --test compile_fail_tests
+      - name: CMCA isolated mutant 1
+        run: cargo test -p bcinr-cmca --features mutant_1 --test hostile_mutants
+      - name: CMCA isolated mutant 2
+        run: cargo test -p bcinr-cmca --features mutant_2 --test hostile_mutants
+      - name: CMCA isolated mutant 3
+        run: cargo test -p bcinr-cmca --features mutant_3 --test hostile_mutants
+      - name: CMCA isolated mutant 4
+        run: cargo test -p bcinr-cmca --features mutant_4 --test hostile_mutants
+      - name: CMCA isolated mutant 5
+        run: cargo test -p bcinr-cmca --features mutant_5 --test hostile_mutants
+      - name: CMCA isolated mutant 6
+        run: cargo test -p bcinr-cmca --features mutant_6 --test hostile_mutants
+      - name: CMCA isolated mutant 7
+        run: cargo test -p bcinr-cmca --features mutant_7 --test hostile_mutants
+      - name: CMCA isolated mutant 8
+        run: cargo test -p bcinr-cmca --features mutant_8 --test hostile_mutants
+      - name: CMCA isolated mutant 9
+        run: cargo test -p bcinr-cmca --features mutant_9 --test hostile_mutants
+      - name: CMCA isolated mutant 10
+        run: cargo test -p bcinr-cmca --features mutant_10 --test hostile_mutants
+      - name: CMCA isolated mutant 11
+        run: cargo test -p bcinr-cmca --features mutant_11 --test hostile_mutants
+      - name: PDDL all features
+        run: cargo test -p bcinr-pddl --all-features
+      - name: POWL all features
+        run: cargo test -p bcinr-powl --all-features
+      - name: POWL 2.0
+        run: cargo test -p bcinr-powl --all-features powl2
+      - name: POWL scheduler v2
+        run: cargo test -p bcinr-powl --all-features scheduler_v2
+      - name: POWL receipt all features
+        run: cargo test -p bcinr-powl-receipt --all-features
+      - name: POWL receipt execution v2
+        run: cargo test -p bcinr-powl-receipt --all-features execution_v2
+      - name: Strict MCP malformed JSON contract
+        run: cargo test -p bcinr-mcp --test adversarial malformed_json_rejected -- --nocapture
+      - name: Broad bcinr E2E
+        run: cargo test -p bcinr --test e2e_main
+      - name: Full workspace
+        run: cargo test --workspace --all-features --all-targets --no-fail-fast
+      - name: Post-E2E formatting
+        run: cargo fmt --all -- --check
+      - name: Post-E2E algorithm module integrity
+        run: git diff --exit-code -- crates/bcinr-logic/src/algorithms/mod.rs
+      - name: Post-E2E fixture cleanup
+        run: test -z "$(find crates/bcinr-logic/src/algorithms -maxdepth 1 -type f -name 'temp_*' -print -quit)"
+      - name: Publish final repaired tree and receipt
+        run: bash scripts/finalize_post_integration_verification.sh

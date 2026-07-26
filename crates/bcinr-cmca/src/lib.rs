@@ -70,7 +70,15 @@
 //!     s_leaf,
 //! );
 //!
-//! // The calibration succeeds, proposing recertification
+//! // The production calibration succeeds, proposing recertification. Hostile
+//! // mutation features intentionally alter this semantic surface and are verified
+//! // by the dedicated isolated-mutant rails instead of this production example.
+//! # if cfg!(any(
+//! #     feature = "mutant_1", feature = "mutant_2", feature = "mutant_3",
+//! #     feature = "mutant_4", feature = "mutant_5", feature = "mutant_6",
+//! #     feature = "mutant_7", feature = "mutant_8", feature = "mutant_9",
+//! #     feature = "mutant_10", feature = "mutant_11"
+//! # )) { return; }
 //! assert!(status.is_ok());
 //! ```
 
