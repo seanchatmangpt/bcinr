@@ -88,6 +88,14 @@ pub mod observatory;
 
 pub use allocator::StabilityRefusal;
 
+// INTEGRATION NOTE (v26.7.24): Recovery-only authority modules (CertifiedLearning,
+// CertifiedSelectionOnly, AdmittedControlState, CertificateReceipt, EnvelopeReceipt,
+// OutcomeReceipt, AdaptiveUpdate) are defined in allocator.rs but intentionally NOT
+// exported publicly. This fence preserves production behavior while recovery's authority
+// chain is validated. Exports will be added in a future PR after formal Hoare-logic
+// verification. Recovery's new typed refusals (CMCA_LEARNING_FROZEN, etc.) will be
+// added to StabilityRefusal as new enum variants once dependency closure is proven.
+
 /// A branchless mock/dummy function utilized in tests and contract validation.
 ///
 /// Under release profiles, this function compiles to a single wrapping addition
