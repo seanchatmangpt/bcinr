@@ -1,4 +1,4 @@
-name: CMCA Mutant Diagnostic
+name: Workspace Hang Diagnostic
 
 on:
   pull_request:
@@ -9,14 +9,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: cmca-mutant-diagnostic
+  group: workspace-hang-diagnostic
   cancel-in-progress: true
 
 jobs:
   diagnose:
     if: github.event.pull_request.head.ref == 'agent/repair-post-integration-verification-ci' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,16 +28,16 @@ jobs:
       - run: python3 scripts/repair_post_integration_verification.py
       - run: python3 scripts/repair_cmca_all_features_composition.py
       - run: cargo fmt --all
-      - name: Execute and capture isolated mutant 9
+      - name: Execute bounded malformed JSON transport test
         shell: bash
         run: |
           set -o pipefail
-          cargo test -p bcinr-cmca --features mutant_9 --test hostile_mutants 2>&1 | tee cmca-mutant-9.log
-      - name: Upload mutant 9 transcript
+          cargo test -p bcinr-mcp --test adversarial malformed_json_rejected -- --nocapture 2>&1 | tee malformed-json.log
+      - name: Upload malformed JSON transcript
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cmca-mutant-9-${{ github.run_id }}
-          path: cmca-mutant-9.log
+          name: malformed-json-${{ github.run_id }}
+          path: malformed-json.log
           if-no-files-found: error
           retention-days: 7
