@@ -35,3 +35,11 @@ testing = []
 [[bench]]
 name = "powl_quick_bench"
 harness = false
+
+[[bench]]
+name = "powl_pipeline_bench"
+harness = false
+
+[[bench]]
+name = "phase3_scheduler"
+harness = false

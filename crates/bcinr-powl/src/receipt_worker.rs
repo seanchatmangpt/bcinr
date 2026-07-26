@@ -285,9 +285,12 @@ impl ReceiptWorker {
             // look like the run's completion by itself, firing the
             // seal/refuse check once per fired op instead of once per tick.
             self.pending[slot].op_trace |= item.op_trace_so_far;
-            let _ = self
-                .ocel
-                .record_op_fired(item.run_id, item.op_idx, item.kind_tag);
+            let _ = self.ocel.record_op_fired(
+                item.run_id,
+                item.op_idx,
+                0u32, // start_time: placeholder (no explicit timing in EventWorkItem)
+                0u32, // duration: placeholder (no explicit timing in EventWorkItem)
+            );
 
             // If all ops have fired, finalise (or refuse) the receipt.
             if self.pending[slot].op_trace & full_mask == full_mask {

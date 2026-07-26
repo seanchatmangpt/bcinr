@@ -1,3 +1,5 @@
+#[cfg(feature = "mfw-planner")]
+use bcinr_pddl::production::PddlPowlRuntime;
 use bcinr_pddl::{
     domain_from_pddl, powl_bridge::temporal_plan_to_powl_tape, problem_from_pddl, GroundProblem,
     GroundTemporalProblem,
@@ -48,16 +50,23 @@ fn measure_and_prove_times(domain_pddl: &str, problem_pddl: &str, is_temporal: b
         let plan = plan_res.unwrap();
         t_solve = t2.elapsed();
 
-        let t3 = Instant::now();
-        // POWL projection for classical
-        // Since we don't have classical_plan_to_powl_tape, we can mock it or use an empty operation
-        // to satisfy the requirement if it's missing. Let's just do a mock iteration over tape ops.
-        let mut powl_ops = 0;
-        for _op in &plan.ops {
-            powl_ops += 1;
-        }
-        divan::black_box(powl_ops);
-        t3.elapsed()
+        // Unlike the temporal path, there is no standalone
+        // `plan.ops -> POWL tape` projection function for classical
+        // (STRIPS) plans in the public API — `temporal_plan_to_powl_tape`
+        // has no classical counterpart. The only POWL-producing path for a
+        // classical domain is `production::PddlPowlRuntime`, which re-parses
+        // and re-plans internally through a different planner
+        // (`ProductionMfwPlanner`, not `GroundProblem::find_plan()`), so it
+        // cannot honestly be spliced in here as "the POWL sub-stage of the
+        // plan already computed above" without double-counting IR/ground/solve
+        // under a misleading `t_powl` label. `plan` is consumed above to
+        // prove `t_total` reflects real solve work; there is genuinely no
+        // isolated classical projection stage to time, so `t_powl` is
+        // reported as zero rather than measuring a meaningless loop. See
+        // `production_pipeline` below for real, honestly-labeled timing of
+        // the actual classical->POWL production rail.
+        divan::black_box(&plan);
+        std::time::Duration::ZERO
     };
 
     let t_total = t0.elapsed();
@@ -130,8 +139,8 @@ pub mod classical {
     use super::*;
     use divan::Bencher;
 
-    const DOMAIN: &str = "(define (domain todo-dependencies) (:requirements :strips) (:predicates (todo-done ?x) (todo-ready ?x)) (:action complete :parameters (?x) :precondition (todo-ready ?x) :effect (and (todo-done ?x) (not (todo-ready ?x)))))";
-    const PROBLEM: &str = "(define (problem complete-task) (:domain todo-dependencies) (:objects task1) (:init (todo-ready task1)) (:goal (todo-done task1)))";
+    pub(crate) const DOMAIN: &str = "(define (domain todo-dependencies) (:requirements :strips) (:predicates (todo-done ?x) (todo-ready ?x)) (:action complete :parameters (?x) :precondition (todo-ready ?x) :effect (and (todo-done ?x) (not (todo-ready ?x)))))";
+    pub(crate) const PROBLEM: &str = "(define (problem complete-task) (:domain todo-dependencies) (:objects task1) (:init (todo-ready task1)) (:goal (todo-done task1)))";
 
     #[divan::bench]
     fn todo_dependencies(bencher: Bencher) {
@@ -145,8 +154,8 @@ pub mod temporal {
     use super::*;
     use divan::Bencher;
 
-    const DOMAIN: &str = "(define (domain deploy-independent-services) (:requirements :durative-actions :typing) (:types service) (:predicates (deployed ?s - service)) (:durative-action deploy :parameters (?s - service) :duration (= ?duration 10) :condition () :effect (and (at end (deployed ?s)))))";
-    const PROBLEM: &str = "(define (problem deploy-2) (:domain deploy-independent-services) (:objects s1 s2 - service) (:init) (:goal (and (deployed s1) (deployed s2))))";
+    pub(crate) const DOMAIN: &str = "(define (domain deploy-independent-services) (:requirements :durative-actions :typing) (:types service) (:predicates (deployed ?s - service)) (:durative-action deploy :parameters (?s - service) :duration (= ?duration 10) :condition () :effect (and (at end (deployed ?s)))))";
+    pub(crate) const PROBLEM: &str = "(define (problem deploy-2) (:domain deploy-independent-services) (:objects s1 s2 - service) (:init) (:goal (and (deployed s1) (deployed s2))))";
 
     #[divan::bench]
     fn deploy_independent_services(bencher: Bencher) {
@@ -241,6 +250,79 @@ pub mod composed {
     fn composed_crown_5_feature(bencher: Bencher) {
         bencher.bench_local(|| {
             measure_and_prove_times(CROWN_DOMAIN, CROWN_PROBLEM, true);
+        });
+    }
+}
+
+/// Real timing for `production::PddlPowlRuntime` — the actual, complete
+/// text-PDDL -> POWL-v2-execution production rail (its own admission,
+/// its own planner (`ProductionMfwPlanner`, distinct from
+/// `GroundProblem::find_plan()`), POWL v2 compile, execute, verify, and
+/// state-transition replay, all behind one call). This is deliberately a
+/// *separate* benchmark group from `measure_and_prove_times`'s IR/ground/
+/// solve/POWL stage breakdown above — the two pipelines are not directly
+/// comparable stage-for-stage (see the comment in `measure_and_prove_times`
+/// explaining why the classical branch's `t_powl` is zero rather than
+/// spliced from this runtime). This closes the actual coverage gap: no
+/// benchmark in the repo previously timed this production entry point at
+/// all, for either classical or temporal domains.
+///
+/// Gated on `mfw-planner` (the feature `bcinr_pddl::production` itself
+/// requires) so the rest of this file keeps compiling and running without
+/// it, matching this bench's existing no-extra-features validation
+/// invocation (`cargo bench -p bcinr-pddl --bench pddl_80_20`).
+#[cfg(feature = "mfw-planner")]
+pub mod production_pipeline {
+    use super::*;
+    use divan::Bencher;
+
+    const CLASSICAL_DOMAIN: &str = crate::classical::DOMAIN;
+    const CLASSICAL_PROBLEM: &str = crate::classical::PROBLEM;
+    const TEMPORAL_DOMAIN: &str = crate::temporal::DOMAIN;
+    const TEMPORAL_PROBLEM: &str = crate::temporal::PROBLEM;
+
+    #[divan::bench]
+    fn classical_end_to_end(bencher: Bencher) {
+        bencher.bench_local(|| {
+            let mut runtime = PddlPowlRuntime::default();
+            let execution = runtime
+                .execute(
+                    divan::black_box(CLASSICAL_DOMAIN),
+                    divan::black_box(CLASSICAL_PROBLEM),
+                )
+                .expect("classical production pipeline must execute for an admitted domain");
+            assert!(
+                execution.contains_fact("todo-done", &["task1"]),
+                "production execution must reach the declared goal state"
+            );
+            divan::black_box(execution);
+        });
+    }
+
+    /// The production rail's `ProductionCapabilityProfile` marks
+    /// `PddlFeature::DurativeActions` `Unsupported` unconditionally
+    /// (verified empirically: `execute()` on `TEMPORAL_DOMAIN` returns
+    /// `Err(Plan(Admission(Unsupported(UnsupportedFeature { feature_name:
+    /// "DurativeActions", .. }))))`, not a successful execution) — so there
+    /// is no successful temporal production-pipeline run to benchmark.
+    /// Rather than force a fake "temporal end-to-end" success measurement
+    /// that cannot occur, this benchmarks the real typed-refusal path,
+    /// matching this repo's established pattern of treating refusal as a
+    /// first-class production outcome (see
+    /// `bcinr-bench/benches/cmca_execution_bench.rs`'s refusal benchmarks).
+    #[divan::bench]
+    fn temporal_unsupported_refusal(bencher: Bencher) {
+        bencher.bench_local(|| {
+            let mut runtime = PddlPowlRuntime::default();
+            let result = runtime.execute(
+                divan::black_box(TEMPORAL_DOMAIN),
+                divan::black_box(TEMPORAL_PROBLEM),
+            );
+            assert!(
+                result.is_err(),
+                "durative-action content must be refused by the production admission profile, not silently executed"
+            );
+            let _ = divan::black_box(result);
         });
     }
 }

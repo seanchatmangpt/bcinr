@@ -160,8 +160,108 @@ fn test_case_study_3_downstream_consequence() {
     assert!(result[7].val > 0, "Obj_Value should receive allocation");
 }
 
+/// Case Study 4: Generalization (see `docs/cmca-rdf/ARCHITECTURE.md`, "Case
+/// Study 4: Generalization").
+///
+/// The claim under test: a *second* ontology configuration
+/// (`crates/bcinr-cmca/ontology/generalization.ttl`, compiled to
+/// `crates/bcinr-cmca/src/generated/generalization.rs`) with different
+/// global coefficients (`eta = 0.3` vs. this file's `eta = 0.5`) and a
+/// different problem shape (9 objects / 5 measures / 5 lenses vs. this
+/// file's 8/4/4) compiles through the *same* generator and core allocator
+/// types without any handwritten per-schema code.
+///
+/// `allocate()` itself is monomorphized against `case_studies`'s N=8/Q=4/K=4
+/// (see `crates/bcinr-cmca/src/allocator.rs`'s `use
+/// crate::generated::case_studies::{N, Q, K, F, ...}`), so the
+/// generalization registry cannot be fed through it directly — the
+/// generalization claim is that the *schema and generator* produce a
+/// structurally different, internally consistent registry, which we assert
+/// against directly.
 #[test]
-fn test_case_study_4_generalization() {}
+fn test_case_study_4_generalization() {
+    use bcinr_cmca::generated::generalization::{
+        ETA as GEN_ETA, LAMBDA as GEN_LAMBDA, LENS_REGISTRY as GEN_LENS_REGISTRY, N as GEN_N,
+        OBJECT_REGISTRY as GEN_OBJECT_REGISTRY, Q as GEN_Q,
+    };
+
+    // The generated shape must genuinely differ from case_studies — a
+    // schema that "generalizes" by re-emitting the same N/Q/K would prove
+    // nothing about the generator handling new topologies.
+    assert_eq!(
+        GEN_N, 9,
+        "generalization config must have a distinct object count from case_studies (N=8)"
+    );
+    assert_eq!(
+        GEN_Q, 5,
+        "generalization config must have a distinct lens count from case_studies (Q=4)"
+    );
+    assert_ne!(
+        GEN_N, N,
+        "generalization registry must not just alias case_studies's N"
+    );
+    assert_ne!(
+        GEN_Q, Q,
+        "generalization registry must not just alias case_studies's Q"
+    );
+
+    // The global coefficient must genuinely differ (0.3 vs. case_studies's
+    // 0.5), proving the generator threads per-config coefficients through
+    // rather than hardcoding one value across all compiled schemas.
+    assert_eq!(
+        GEN_ETA.val, 19661,
+        "generalization eta must be 0.3 (19661/65536), distinct from case_studies eta=0.5"
+    );
+    assert_ne!(
+        GEN_ETA.val, ETA.val,
+        "generalization eta must differ from case_studies eta"
+    );
+
+    // The registry must be internally consistent: every object has the
+    // expected factor-vector width (F=10, same across schemas), and every
+    // lens id is unique and in range — real structural checks on the
+    // generated data, not a placeholder.
+    assert_eq!(GEN_OBJECT_REGISTRY.len(), GEN_N);
+    for (i, obj) in GEN_OBJECT_REGISTRY.iter().enumerate() {
+        assert_eq!(
+            obj.id as usize, i,
+            "object {} must have self-consistent id",
+            i
+        );
+        assert_eq!(
+            obj.factors.len(),
+            10,
+            "object {} must carry all 10 factors",
+            i
+        );
+    }
+
+    assert_eq!(GEN_LENS_REGISTRY.len(), GEN_Q);
+    let mut seen_lens_ids = std::collections::HashSet::new();
+    for lens in GEN_LENS_REGISTRY.iter() {
+        assert!(
+            seen_lens_ids.insert(lens.id),
+            "lens id {} must be unique within the generalization registry",
+            lens.id
+        );
+    }
+
+    // LAMBDA must be a real K x Q table sized to the generalization
+    // schema's own K=5/Q=5, not left at case_studies's 4x4 shape.
+    assert_eq!(
+        GEN_LAMBDA.len(),
+        5,
+        "generalization LAMBDA must have K=5 measure rows"
+    );
+    for row in GEN_LAMBDA.iter() {
+        assert_eq!(
+            row.len(),
+            GEN_Q,
+            "each LAMBDA row must have Q={} lens weights",
+            GEN_Q
+        );
+    }
+}
 
 #[test]
 fn test_stability_refusals_and_graceful_fallback() {

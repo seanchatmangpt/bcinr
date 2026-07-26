@@ -279,4 +279,10 @@ script = [
     "cargo test -p bcinr-cmca --features mutant_3",
     "cargo test -p bcinr-cmca --features mutant_4",
     "cargo test -p bcinr-cmca --features mutant_5",
+    "cargo test -p bcinr-cmca --features mutant_6",
+    "cargo test -p bcinr-cmca --features mutant_7",
+    "cargo test -p bcinr-cmca --features mutant_8",
+    "cargo test -p bcinr-cmca --features mutant_9",
+    "cargo test -p bcinr-cmca --features mutant_10",
+    "cargo test -p bcinr-cmca --features mutant_11",
 ]

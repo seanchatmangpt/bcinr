@@ -302,19 +302,12 @@ fn g5_10_embedded_workflow_standing() {
     );
 }
 
-#[test]
-fn g5_summary_all_gates_passing() {
-    println!("\n=== GATE G5 INTEGRATION TEST SUMMARY ===");
-    println!("✓ G5-01: PDDL domain parsing");
-    println!("✓ G5-02: Plan generation from domain");
-    println!("✓ G5-03: Choice domain receipt generation");
-    println!("✓ G5-04: Receipt replay determinism");
-    println!("✓ G5-05: Sequential domain support");
-    println!("✓ G5-06: Delivery domain support");
-    println!("✓ G5-07: Resource allocation domain");
-    println!("✓ G5-08: Multi-domain deterministic replay");
-    println!("✓ G5-09: POWL v2 compilation and verification");
-    println!("✓ G5-10: Embedded workflow standing");
-    println!("\nAll Gate G5 integration tests PASSED");
-    println!("========================================\n");
-}
+// NOTE: a former `g5_summary_all_gates_passing` test lived here. It only
+// printed "PASSED" for every gate unconditionally and asserted nothing —
+// Rust test functions run independently and cannot observe whether sibling
+// tests passed, so a "summary" test can only ever be theater (it prints
+// success even if g5_01..g5_10 above are all failing or don't exist). It has
+// been removed rather than kept as vacuous coverage. The real, individually
+// asserting tests are g5_01_fulfillment_domain_parses_correctly through
+// g5_10_embedded_workflow_standing above; `cargo test` reports their actual
+// pass/fail status per-gate, which is the only trustworthy summary.

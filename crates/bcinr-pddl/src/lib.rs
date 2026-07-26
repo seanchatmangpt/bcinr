@@ -40,6 +40,7 @@ pub mod execute;
 pub mod ground;
 pub mod ground_v2;
 pub mod llm_bridge;
+pub mod logical_time;
 pub mod mfw;
 // The parser deliberately mirrors the canonical external predicate declaration
 // tuple so admission does not introduce a second shadow AST.
@@ -56,6 +57,7 @@ pub mod problem_builder;
 #[allow(clippy::needless_lifetimes)]
 pub mod production;
 pub mod production_capability;
+pub mod resource_ledger;
 pub mod schedule_analysis;
 pub mod search;
 mod semantic_features;
@@ -118,6 +120,7 @@ pub use production::{
     PddlPowlRuntime, PddlPowlStateReceipt, ProductionMfwPlanner,
 };
 pub use production_capability::ProductionCapabilityProfile;
+pub use resource_ledger::{Resource, ResourceLease, ResourceLedger, ResourceMode, ResourceRefusal};
 pub use schedule_analysis::{
     analyze_schedule, analyze_schedule_instrumented, AnalysisSubstageNs, CapacityDelta,
     ScheduleAnalysis64,
@@ -149,4 +152,5 @@ pub use execute::{
     compute_plan_chain, execute_tape, execute_temporal_plan_instrumented, SubstageNs,
 };
 pub use ground::{GroundDurativeAction, GroundProblem, GroundTemporalProblem};
+pub use logical_time::LogicalTime;
 pub use parse::{domain31_from_pddl, domain_from_pddl, problem31_from_pddl, problem_from_pddl};

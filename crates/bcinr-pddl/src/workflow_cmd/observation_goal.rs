@@ -1,6 +1,5 @@
-/// Deterministic logical time supplied by the application boundary.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct LogicalTime(pub u64);
+// LogicalTime is imported from the canonical location in the crate root (logical_time.rs)
+// and re-exported via crate::LogicalTime in workflow_cmd.rs.
 
 /// Version of the application state source used for stale-observation checks.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]

@@ -6,6 +6,7 @@ mod xorf;
 // PDDL8 grounding and forward-search plan finding.
 
 use crate::error::Pddl8Error;
+use crate::logical_time::LogicalTime;
 use bcinr_mfw_ir::{
     BoundHit, BoundKind, Digest, ExhaustionWitness, PlannerOutcome, SearchProfileId,
 };
@@ -467,6 +468,9 @@ pub struct GroundTemporalProblem {
     /// Object universe + type index quantified `Forall`/`Exists` conditions
     /// range over. See `eval_quantifier`.
     quant_domain: QuantifierDomain,
+    /// Optional deadline for the temporal plan. If set, `find_temporal_plan()`
+    /// will refuse plans whose makespan exceeds this deadline.
+    pub deadline: Option<LogicalTime>,
 }
 
 impl GroundTemporalProblem {
@@ -574,7 +578,32 @@ impl GroundTemporalProblem {
             constraints,
             derived_predicates,
             quant_domain,
+            deadline: None,
         })
+    }
+
+    /// Set a deadline for the temporal plan. Plans exceeding this deadline will be refused.
+    pub fn set_deadline(&mut self, deadline: LogicalTime) {
+        self.deadline = Some(deadline);
+    }
+
+    /// Clear the deadline constraint.
+    pub fn clear_deadline(&mut self) {
+        self.deadline = None;
+    }
+
+    /// Check if a temporal plan satisfies the deadline constraint.
+    ///
+    /// Returns `true` if no deadline is set, or if the makespan (in seconds) is
+    /// less than or equal to the deadline (in milliseconds, converted to seconds).
+    fn satisfies_deadline(&self, makespan: f64) -> bool {
+        match self.deadline {
+            None => true,
+            Some(deadline) => {
+                let deadline_seconds = deadline.as_seconds_f64();
+                makespan <= deadline_seconds
+            }
+        }
     }
 
     /// Executes a forward-chaining temporal state-space search to find a valid `TemporalPlan`.
@@ -582,6 +611,12 @@ impl GroundTemporalProblem {
     /// The planner maintains a priority queue of scheduled events ordered by time.
     /// It greedily schedules actions that satisfy preconditions, applying start effects immediately
     /// and end effects upon completion.
+    ///
+    /// # Deadline Checking
+    ///
+    /// If a deadline has been set via `set_deadline()`, only plans whose makespan does not exceed
+    /// the deadline are returned. Plans violating the deadline are treated as infeasible, and the
+    /// search continues or reports exhaustion accordingly.
     ///
     /// # Complexity
     ///
@@ -630,8 +665,9 @@ impl GroundTemporalProblem {
             }
         }
 
-        // Pending completions: (end_time, action_idx)
-        let mut pending: Vec<(f64, usize)> = Vec::new();
+        // Pending completions: (end_time, action_idx, over_all_conditions)
+        // OverAll conditions are checked continuously during [start_time, end_time)
+        let mut pending: Vec<(f64, usize, Vec<PddlCondition>)> = Vec::new();
 
         // True once this planner's single greedy trajectory has died — either
         // no durative action could be scheduled and no future TIL/completion
@@ -672,11 +708,18 @@ impl GroundTemporalProblem {
                     .iter()
                     .map(|s| s.start_time + s.duration)
                     .fold(0.0_f64, f64::max);
-                return PlannerOutcome::Found(TemporalPlan {
-                    steps,
-                    makespan,
-                    metric_value: None,
-                });
+                // Check if plan satisfies deadline constraint
+                if self.satisfies_deadline(makespan) {
+                    return PlannerOutcome::Found(TemporalPlan {
+                        steps,
+                        makespan,
+                        metric_value: None,
+                    });
+                } else {
+                    // Plan violates deadline; continue searching
+                    trajectory_dead = true;
+                    break;
+                }
             }
 
             // Try to schedule every applicable durative action at this tick.
@@ -701,7 +744,7 @@ impl GroundTemporalProblem {
                     // numeric fluent): only its *finished* effect blocks a
                     // restart, so without this guard the same grounded
                     // instance can be scheduled concurrently with itself.
-                    if pending.iter().any(|(_, idx)| *idx == i) {
+                    if pending.iter().any(|(_, idx, _)| *idx == i) {
                         continue;
                     }
                     let applicable = da
@@ -726,7 +769,14 @@ impl GroundTemporalProblem {
                         action_name: da.schema_name.clone(),
                         args: da.args.clone(),
                     });
-                    pending.push((end, i));
+
+                    // Extract OverAll conditions to be checked continuously during [current_time, end)
+                    let mut over_all_conditions = Vec::new();
+                    for cond in &da.conditions {
+                        collect_over_all_conditions(cond, &mut over_all_conditions);
+                    }
+
+                    pending.push((end, i, over_all_conditions));
                     scheduled = true;
                     started_this_pass = true;
                     started_this_tick.insert(i);
@@ -741,7 +791,7 @@ impl GroundTemporalProblem {
                 .iter()
                 .enumerate()
                 .min_by(|(_, a), (_, b)| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
-                .map(|(p, (t, _))| (p, *t));
+                .map(|(p, (t, _, _))| (p, *t));
 
             let next_til_time = self
                 .timed_inits
@@ -776,6 +826,28 @@ impl GroundTemporalProblem {
                             }
                         }
                     }
+
+                    // After TILs are applied, check OverAll conditions for all in-flight actions.
+                    // OverAll conditions must be satisfied throughout the action's interval [start, end).
+                    // If any action's OverAll condition is violated at current_time, the trajectory is dead.
+                    for (end_time, _idx, over_all_conds) in &pending {
+                        if current_time < *end_time {
+                            // Action is still in flight at current_time
+                            for cond in over_all_conds {
+                                if !eval_condition(cond, &state, &fn_vals, &self.quant_domain) {
+                                    // OverAll condition violated during active interval
+                                    trajectory_dead = true;
+                                    break;
+                                }
+                            }
+                            if trajectory_dead {
+                                break;
+                            }
+                        }
+                    }
+                    if trajectory_dead {
+                        break;
+                    }
                 }
 
                 // If the next event is a completion at `current_time`, process ONE completion.
@@ -784,11 +856,11 @@ impl GroundTemporalProblem {
                 if let Some(min_pos) = pending
                     .iter()
                     .enumerate()
-                    .filter(|(_, (t, _))| *t == current_time)
+                    .filter(|(_, (t, _, _))| *t == current_time)
                     .map(|(p, _)| p)
                     .next()
                 {
-                    let (_, idx) = pending.remove(min_pos);
+                    let (_, idx, _) = pending.remove(min_pos);
                     let da = &self.durative_actions[idx];
                     for eff in &da.effects {
                         apply_effect_at_end(eff, &mut state, &mut fn_vals);
@@ -806,11 +878,15 @@ impl GroundTemporalProblem {
                 .iter()
                 .map(|s| s.start_time + s.duration)
                 .fold(0.0_f64, f64::max);
-            return PlannerOutcome::Found(TemporalPlan {
-                steps,
-                makespan,
-                metric_value: None,
-            });
+            // Check if plan satisfies deadline constraint
+            if self.satisfies_deadline(makespan) {
+                return PlannerOutcome::Found(TemporalPlan {
+                    steps,
+                    makespan,
+                    metric_value: None,
+                });
+            }
+            // If deadline is violated, trajectory is dead and search continues
         }
 
         let goal_labels = vec![format!("{:?}", self.goal)];
@@ -868,7 +944,15 @@ pub(crate) fn eval_condition(
             !eval_condition(lhs, state, fn_vals, quant_domain)
                 || eval_condition(rhs, state, fn_vals, quant_domain)
         }
-        PddlCondition::Timed(_, inner) => eval_condition(inner, state, fn_vals, quant_domain),
+        PddlCondition::Timed(_ts, inner) => {
+            // Route timed conditions through appropriate check:
+            // - AtStart/AtEnd are checked only at scheduling/completion
+            // - OverAll are checked at scheduling and then routed to continuous verification
+            // For now, we evaluate the inner condition regardless of timing;
+            // the planning loop will separately track and re-check OverAll conditions
+            // at each time step during the action's active interval.
+            eval_condition(inner, state, fn_vals, quant_domain)
+        }
         PddlCondition::Forall { vars, body } => {
             eval_quantifier(vars, body, state, fn_vals, quant_domain, true)
         }
@@ -998,6 +1082,49 @@ fn eval_quantifier(
         quant_domain,
         require_all,
     )
+}
+
+/// Collect all OverAll conditions from a (possibly timed) condition.
+/// Recursively unwraps nested And/Or/Imply/Not/Forall/Exists and TimeSpec(OverAll, ...)
+/// Each collected condition is the inner content of an OverAll wrapper.
+fn collect_over_all_conditions(cond: &PddlCondition, out: &mut Vec<PddlCondition>) {
+    use wasm4pm_compat::pddl::TimeSpecifier;
+    match cond {
+        PddlCondition::Timed(TimeSpecifier::OverAll, inner) => {
+            // Found an OverAll condition; add its inner condition to the collection
+            out.push(*inner.clone());
+        }
+        PddlCondition::Timed(_, _) => {
+            // AtStart/AtEnd: skip, not continuous
+        }
+        PddlCondition::And(subs) => {
+            for s in subs {
+                collect_over_all_conditions(s, out);
+            }
+        }
+        PddlCondition::Or(subs) => {
+            // For Or, we still collect OverAll conditions but they will be checked
+            // at each time step (disjunction of OverAll conditions still needs all disjuncts checked)
+            for s in subs {
+                collect_over_all_conditions(s, out);
+            }
+        }
+        PddlCondition::Not(inner) => {
+            collect_over_all_conditions(inner, out);
+        }
+        PddlCondition::Imply(lhs, rhs) => {
+            collect_over_all_conditions(lhs, out);
+            collect_over_all_conditions(rhs, out);
+        }
+        PddlCondition::Forall { body, .. } => {
+            collect_over_all_conditions(body, out);
+        }
+        PddlCondition::Exists { body, .. } => {
+            collect_over_all_conditions(body, out);
+        }
+        // Atom and Compare don't contain OverAll conditions
+        PddlCondition::Atom(_) | PddlCondition::Compare(_, _, _) => {}
+    }
 }
 
 fn apply_effect_at_start(

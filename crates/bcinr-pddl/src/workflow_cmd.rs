@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     ActionInvocation, CognitiveExecutionStanding, EmbeddedWorkflow, EmbeddedWorkflowError,
-    TypedWorkflowPlan, VerifiedWorkflowPlan, WorkflowProblem,
+    LogicalTime, TypedWorkflowPlan, VerifiedWorkflowPlan, WorkflowProblem,
 };
 
 include!("workflow_cmd/identity_domain.rs");

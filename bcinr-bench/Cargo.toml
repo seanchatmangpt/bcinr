@@ -38,7 +38,23 @@ name = "all_300_bench"
 harness = false
 
 [[bench]]
+name = "algorithms_1_100"
+harness = false
+
+[[bench]]
 name = "algorithms_101_200"
+harness = false
+
+[[bench]]
+name = "algorithms_201_300"
+harness = false
+
+[[bench]]
+name = "algorithms_301_307"
+harness = false
+
+[[bench]]
+name = "missing_bench"
 harness = false
 
 [[bench]]

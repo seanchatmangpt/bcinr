@@ -247,6 +247,28 @@ mod tests {
         ContractViolation,
     }
 
+    /// Scheduler operation state enum: 8-state lifecycle for POWL ops.
+    /// Mirrors StabilityRefusal pattern for contract verification in tests.
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub enum SchedulerRefusal {
+        /// Operation not yet eligible to run (dependencies unsatisfied).
+        Pending,
+        /// Operation eligible for execution (dependencies satisfied, not yet fired).
+        Eligible,
+        /// Operation currently executing.
+        Active,
+        /// Operation has completed execution.
+        Completed,
+        /// Operation was cancelled before execution.
+        Cancelled,
+        /// Operation exceeded time/iteration limit.
+        TimedOut,
+        /// Operation execution was explicitly refused (user-supplied reason).
+        Refused(String),
+        /// Operation is blocked by external constraint (user-supplied reason).
+        Blocked(String),
+    }
+
     /// Construct an AdmissionContext from its fields.
     const fn make_ctx(
         tenant_class: u64,

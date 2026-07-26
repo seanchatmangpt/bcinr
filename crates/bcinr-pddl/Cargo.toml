@@ -89,3 +89,8 @@ harness = false
 name = "scaling"
 path = "benches/scaling.rs"
 harness = false
+
+[[bench]]
+name = "phase1_temporal"
+path = "benches/phase1_temporal.rs"
+harness = false

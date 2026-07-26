@@ -8,6 +8,8 @@
 //! `PowlTape` with `entry_op`/`exit_op`, `LabelSlab`, `PowlTapeLarge`) live
 //! in the [`v2`] submodule.
 
+use crate::scheduler::LogicalTime;
+
 /// Discriminant for each slot in the tape.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
@@ -67,6 +69,12 @@ pub struct PowlTape {
     pub len: u8,
     /// Bitmask of entry-point slots (no predecessors in the DAG sense).
     pub entry_mask: u64,
+    /// Optional deadline for the entire workflow run (in logical time units).
+    /// Zero indicates no deadline constraint.
+    pub deadline: LogicalTime,
+    /// Maximum allowed duration for each op (in time units).
+    /// Zero indicates no duration constraint for that op.
+    pub max_durations: [u32; 64],
 }
 
 impl PowlTape {
@@ -75,6 +83,8 @@ impl PowlTape {
             ops: [Powl64Op::new(OpKind::Silent, 0); 64],
             len: 0,
             entry_mask: 0,
+            deadline: 0,
+            max_durations: [0u32; 64],
         }
     }
 
@@ -115,6 +125,7 @@ impl Default for PowlTape {
 pub mod v2 {
     use core::mem;
     use core::str;
+    use crate::scheduler::LogicalTime;
 
     // =========================================================================
     // OpKind v2
@@ -340,6 +351,12 @@ pub mod v2 {
         pub exit_op: u8,
         /// Interned activity label storage.
         pub label_slab: LabelSlab,
+        /// Optional deadline for the entire workflow run (in logical time units).
+        /// Zero indicates no deadline constraint.
+        pub deadline: LogicalTime,
+        /// Maximum allowed duration for each op (in time units).
+        /// Zero indicates no duration constraint for that op.
+        pub max_durations: [u32; 64],
     }
 
     impl PowlTape {
@@ -351,6 +368,8 @@ pub mod v2 {
                 entry_op: 0,
                 exit_op: 0,
                 label_slab: LabelSlab::new(),
+                deadline: 0,
+                max_durations: [0u32; 64],
             }
         }
 
