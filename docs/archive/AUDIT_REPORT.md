@@ -1,3 +1,16 @@
+> **Superseded (2026-07-27).** Re-checked against current `crates/bcinr-cmca/src/allocator.rs`
+> during a CMCA documentation-cleanup pass: the `is_mutant_active(id: u32)` function this report's
+> §1 describes no longer exists anywhere in the crate; the panic-trap division (`1 / (valid as
+> u32)`) §2 describes is not present; and `wrap_result` (still present, `allocator.rs:650`) is now
+> branchless (no `if`/`else if`), contradicting §2's "Contract Gate Bypass" claim. These three
+> specific, falsifiable findings are resolved in current source. Findings §3 (circular reference
+> oracle in `tests/reference.rs`), §4 (log-domain normalization), and §5 (state mutation on
+> rejected updates) were **not** independently re-verified in this pass — moved here as a
+> historical record rather than left readable as a current-state report; re-audit §3-§5 against
+> current source before treating them as either open or resolved.
+
+---
+
 # CMCA-RDF Hyper-Adversarial Audit Report
 
 ## 1. Tautological Mutant Tests

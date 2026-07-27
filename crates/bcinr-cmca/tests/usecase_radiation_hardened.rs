@@ -21,12 +21,16 @@
 //! - Deterministic allocation (identical output for identical bit patterns,
 //!   the property that matters when a cosmic-ray bit-flip is possible)
 
+#![allow(clippy::needless_range_loop)]
+
 use bcinr_cmca::allocator::{
     allocate, AdaptiveUpdate, AdmittedControlState, CertificateReceipt, CertifiedLearning,
     EnvelopeReceipt, OutcomeReceipt,
 };
 use bcinr_cmca::fixed::NonNegativeFixed;
-use bcinr_cmca::generated::case_studies::{ETA, LAMBDA, LENS_REGISTRY, N, OBJECT_REGISTRY, Q};
+use bcinr_cmca::generated::consequence_mass::case_studies::{
+    ETA, LAMBDA, LENS_REGISTRY, N, OBJECT_REGISTRY, Q,
+};
 use bcinr_cmca::generated::stability_profile::CERTIFICATE_DIGEST;
 
 fn get_proof() -> Option<AdaptiveUpdate<CertifiedLearning>> {

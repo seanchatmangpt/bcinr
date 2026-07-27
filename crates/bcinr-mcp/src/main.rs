@@ -1,13 +1,14 @@
 //! bcinr-mcp — MCP server exposing the ENTIRE bcinr library as MCP tools over stdio.
 //!
 //! Tools:
-//!  Group 1 — PDDL (8 tools):
+//!  Group 1 — PDDL (10 tools):
 //!    pddl_domain_info, pddl_parse_domain, pddl_parse_problem, pddl_plan,
 //!    manufacture_world, pddl_admit_domain, pddl_temporal_plan_info,
-//!    route_capability_plan
-//!  Group 2 — POWL (6 tools):
+//!    route_capability_plan, pddl_validate_plan, rdf_pddl_bridge
+//!  Group 2 — POWL (7 tools):
 //!    powl_compile_sequence, powl_compile_choice, powl_admit_context,
-//!    powl_capability_check, powl_plan_to_tape, analyze_schedule64
+//!    powl_capability_check, powl_plan_to_tape, analyze_schedule64,
+//!    wf_net_to_powl
 //!  Group 3 — Core bcinr (3 tools):
 //!    bcinr_library_info, bcinr_mask_ops, bcinr_powl_info
 //!  Group 4 — bcinr-logic Algorithms (6 tools):
@@ -175,6 +176,205 @@ pub struct PatternInput {
 pub struct ReceiptInput {
     /// Receipt data as JSON string
     pub receipt_data: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ValidatePlanInput {
+    /// PDDL domain text (define (domain ...))
+    pub domain_text: String,
+    /// PDDL problem text (define (problem ...))
+    pub problem_text: String,
+    /// Ordered ground-action labels forming the candidate plan (e.g. "pick-up(a,b)") —
+    /// each must exactly match a grounded action's label for this domain+problem
+    pub plan: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct RdfTripleInput {
+    pub subject: String,
+    pub predicate: String,
+    pub object: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct RdfPddlBridgeInput {
+    /// RDF-shaped-PDDL fact triples (fixed "pddl:" predicate vocabulary, see bcinr_pddl::rdf_pddl)
+    pub triples: Vec<RdfTripleInput>,
+    /// Domain name — must match the domain: IRI the triples declare
+    pub domain_name: String,
+    /// Problem name — must match the problem: IRI the triples declare (its pddl:problemDomain
+    /// object must equal domain_name)
+    pub problem_name: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct WfTransitionInput {
+    /// Transition name (unique within the net)
+    pub name: String,
+    /// Activity label; absent/null means a silent (tau) transition
+    pub label: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct WfNetToPowlInput {
+    /// Place names
+    pub places: Vec<String>,
+    /// Transitions: name + optional activity label (absent/null = silent tau)
+    pub transitions: Vec<WfTransitionInput>,
+    /// Place -> transition arcs (input flow), each [place_name, transition_name]
+    pub place_to_transition: Vec<(String, String)>,
+    /// Transition -> place arcs (output flow), each [transition_name, place_name]
+    pub transition_to_place: Vec<(String, String)>,
+    /// The net's unique source place (empty pre-set)
+    pub source: String,
+    /// The net's unique sink place (empty post-set)
+    pub sink: String,
+    /// Bounded recursion depth budget for the Algorithm 3 decomposition
+    #[serde(deserialize_with = "de_u64_flex")]
+    pub budget: u64,
+    /// Max plan length checked for the Theorem-1 language-preservation verification
+    #[serde(deserialize_with = "de_u64_flex")]
+    pub max_len: u64,
+}
+
+// ─── Minimal PDDL 3.1 text renderer ──────────────────────────────────────────
+//
+// No Pddl31Domain/Pddl31Problem -> PDDL-text renderer exists elsewhere in this
+// workspace (bcinr-pddl only ever parses PDDL text, it never re-emits it), so
+// this is a small one written for rdf_pddl_bridge's output. Deliberately
+// scoped to exactly what bcinr_pddl::rdf_pddl's compile_domain/compile_problem
+// ever produce: flat conjunctions of positive atoms for preconditions/goals,
+// and Add/Del-only effects (see rdf_pddl.rs's own module docs on scope) —
+// richer condition/effect shapes render as "(and)" rather than being guessed at.
+
+fn render_pddl_atom(atom: &wasm4pm_compat::pddl::Pddl8Atom) -> String {
+    if atom.args.is_empty() {
+        format!("({})", atom.pred)
+    } else {
+        format!("({} {})", atom.pred, atom.args.join(" "))
+    }
+}
+
+fn render_pddl_flat_condition(cond: &wasm4pm_compat::pddl::PddlCondition) -> String {
+    use wasm4pm_compat::pddl::PddlCondition;
+    let atoms: Vec<String> = match cond {
+        PddlCondition::And(items) => items
+            .iter()
+            .filter_map(|c| match c {
+                PddlCondition::Atom(a) => Some(render_pddl_atom(a)),
+                _ => None,
+            })
+            .collect(),
+        PddlCondition::Atom(a) => vec![render_pddl_atom(a)],
+        _ => Vec::new(),
+    };
+    if atoms.is_empty() {
+        "(and)".to_string()
+    } else {
+        format!("(and {})", atoms.join(" "))
+    }
+}
+
+fn render_pddl_flat_effects(effects: &[wasm4pm_compat::pddl::PddlEffect]) -> String {
+    use wasm4pm_compat::pddl::PddlEffect;
+    let parts: Vec<String> = effects
+        .iter()
+        .filter_map(|e| match e {
+            PddlEffect::Add(a) => Some(render_pddl_atom(a)),
+            PddlEffect::Del(a) => Some(format!("(not {})", render_pddl_atom(a))),
+            _ => None,
+        })
+        .collect();
+    if parts.is_empty() {
+        "(and)".to_string()
+    } else {
+        format!("(and {})", parts.join(" "))
+    }
+}
+
+fn render_pddl31_domain(d: &wasm4pm_compat::pddl::Pddl31Domain) -> String {
+    let mut out = format!("(define (domain {})\n", d.name);
+    if !d.requirements.is_empty() {
+        out.push_str(&format!("  (:requirements {})\n", d.requirements.join(" ")));
+    }
+    if !d.types.is_empty() {
+        let types: Vec<String> = d
+            .types
+            .iter()
+            .map(|t| match &t.parent {
+                Some(p) => format!("{} - {}", t.name, p),
+                None => t.name.clone(),
+            })
+            .collect();
+        out.push_str(&format!("  (:types {})\n", types.join(" ")));
+    }
+    if !d.predicates.is_empty() {
+        out.push_str("  (:predicates\n");
+        for (name, params) in &d.predicates {
+            let ps: Vec<String> = params.iter().map(|(v, t)| format!("{v} - {t}")).collect();
+            out.push_str(&format!("    ({name} {})\n", ps.join(" ")));
+        }
+        out.push_str("  )\n");
+    }
+    for a in &d.actions {
+        let ps: Vec<String> = a.params.iter().map(|(v, t)| format!("{v} - {t}")).collect();
+        out.push_str(&format!(
+            "  (:action {}\n    :parameters ({})\n    :precondition {}\n    :effect {}\n  )\n",
+            a.name,
+            ps.join(" "),
+            render_pddl_flat_condition(&a.precondition),
+            render_pddl_flat_effects(&a.effect),
+        ));
+    }
+    out.push_str(")\n");
+    out
+}
+
+fn render_pddl31_problem(p: &wasm4pm_compat::pddl::Pddl31Problem) -> String {
+    let mut out = format!("(define (problem {})\n  (:domain {})\n", p.name, p.domain);
+    if !p.objects.is_empty() {
+        let objs: Vec<String> = p.objects.iter().map(|(n, t)| format!("{n} - {t}")).collect();
+        out.push_str(&format!("  (:objects {})\n", objs.join(" ")));
+    }
+    if !p.init_atoms.is_empty() {
+        let inits: Vec<String> = p.init_atoms.iter().map(render_pddl_atom).collect();
+        out.push_str(&format!("  (:init {})\n", inits.join(" ")));
+    }
+    out.push_str(&format!("  (:goal {})\n", render_pddl_flat_condition(&p.goal)));
+    out.push_str(")\n");
+    out
+}
+
+// ─── Recursive Powl2Model -> JSON (no serde precedent for this recursive enum) ─
+
+fn powl2_model_to_json(m: &bcinr_powl::powl2::Powl2Model) -> serde_json::Value {
+    use bcinr_powl::powl2::Powl2Model as M;
+    match m {
+        M::Activity(label) => serde_json::json!({ "kind": "Activity", "label": label }),
+        M::Silent => serde_json::json!({ "kind": "Silent" }),
+        M::Sequence(children) => serde_json::json!({
+            "kind": "Sequence",
+            "children": children.iter().map(powl2_model_to_json).collect::<Vec<_>>(),
+        }),
+        M::PartialOrder { children, edges } => serde_json::json!({
+            "kind": "PartialOrder",
+            "children": children.iter().map(powl2_model_to_json).collect::<Vec<_>>(),
+            "edges": edges,
+        }),
+        M::ChoiceGraph { children, edges, start, end } => serde_json::json!({
+            "kind": "ChoiceGraph",
+            "children": children.iter().map(powl2_model_to_json).collect::<Vec<_>>(),
+            "edges": edges,
+            "start": start,
+            "end": end,
+        }),
+        M::DoRedo { body, redo, max_redos } => serde_json::json!({
+            "kind": "DoRedo",
+            "body": powl2_model_to_json(body),
+            "redo": powl2_model_to_json(redo),
+            "max_redos": max_redos,
+        }),
+    }
 }
 
 // ─── Server ──────────────────────────────────────────────────────────────────
@@ -489,6 +689,151 @@ impl BcinrServer {
         out
     }
 
+    /// Independently replay a candidate plan (ordered ground-action labels) against a
+    /// PDDL 3.1 domain+problem and report the first violation, if any.
+    #[tool(
+        description = "Validate a candidate plan (ordered ground-action labels) against a PDDL 3.1 domain+problem using a from-scratch, solver-independent replay. Returns JSON with ok, valid, step_count, violation (text or null), violation_kind."
+    )]
+    async fn pddl_validate_plan(&self, Parameters(input): Parameters<ValidatePlanInput>) -> String {
+        use std::collections::HashMap;
+
+        let domain = match bcinr_pddl::domain31_from_pddl(&input.domain_text) {
+            Ok(d) => d,
+            Err(e) => {
+                return serde_json::json!({ "ok": false, "error": format!("domain parse: {e}") })
+                    .to_string()
+            }
+        };
+        let problem = match bcinr_pddl::problem31_from_pddl(&input.problem_text) {
+            Ok(p) => p,
+            Err(e) => {
+                return serde_json::json!({ "ok": false, "error": format!("problem parse: {e}") })
+                    .to_string()
+            }
+        };
+        let grounded = match bcinr_pddl::ExactClassicalProblem::build(
+            &domain,
+            &problem,
+            bcinr_pddl::ground_v2::EXACT_MAX_GROUND_ACTIONS,
+        ) {
+            Ok(g) => g,
+            Err(e) => {
+                return serde_json::json!({ "ok": false, "error": format!("grounding: {e}") })
+                    .to_string()
+            }
+        };
+
+        // Look up each requested plan step among the actually-grounded actions so the
+        // tape carries real preconditions/effects (not fabricated empty ones).
+        let by_label: HashMap<&str, &bcinr_pddl::Pddl8GroundAction> = grounded
+            .actions
+            .iter()
+            .map(|a| (a.label.as_str(), &a.legacy_action))
+            .collect();
+
+        let mut ground_actions = Vec::with_capacity(input.plan.len());
+        for label in &input.plan {
+            match by_label.get(label.as_str()) {
+                Some(ga) => ground_actions.push((*ga).clone()),
+                None => {
+                    return serde_json::json!({
+                        "ok": false,
+                        "error": format!(
+                            "plan step '{label}' does not match any grounded action for this domain+problem"
+                        ),
+                    })
+                    .to_string()
+                }
+            }
+        }
+
+        let tape = bcinr_pddl::Pddl8Tape::from_plan(ground_actions);
+        let step_count = tape.len();
+
+        match bcinr_pddl::validate_plan(&domain, &problem, &tape) {
+            Ok(()) => serde_json::json!({
+                "ok": true,
+                "valid": true,
+                "step_count": step_count,
+                "violation": null,
+                "violation_kind": null,
+            })
+            .to_string(),
+            Err(v) => {
+                let kind = match &v {
+                    bcinr_pddl::PlanViolation::PreconditionUnsatisfied { .. } => {
+                        "PreconditionUnsatisfied"
+                    }
+                    bcinr_pddl::PlanViolation::GoalNotReached => "GoalNotReached",
+                    bcinr_pddl::PlanViolation::ActionRepeated { .. } => "ActionRepeated",
+                    bcinr_pddl::PlanViolation::NumericConditionUnchecked => {
+                        "NumericConditionUnchecked"
+                    }
+                    bcinr_pddl::PlanViolation::TemporalConditionUnchecked => {
+                        "TemporalConditionUnchecked"
+                    }
+                    bcinr_pddl::PlanViolation::NumericPreconditionUnsatisfied { .. } => {
+                        "NumericPreconditionUnsatisfied"
+                    }
+                    bcinr_pddl::PlanViolation::UndefinedFunction { .. } => "UndefinedFunction",
+                    bcinr_pddl::PlanViolation::DivisionByZero { .. } => "DivisionByZero",
+                };
+                serde_json::json!({
+                    "ok": true,
+                    "valid": false,
+                    "step_count": step_count,
+                    "violation": v.to_string(),
+                    "violation_kind": kind,
+                })
+                .to_string()
+            }
+        }
+    }
+
+    /// Compile RDF-shaped-PDDL triples into a real PDDL domain+problem and render both
+    /// back to PDDL text.
+    #[tool(
+        description = "Compile a JSON array of (subject,predicate,object) triples in the fixed RDF-shaped-PDDL vocabulary into a Pddl31Domain/Pddl31Problem, then render both back to PDDL text. Returns JSON with ok, domain_text, problem_text, type_count, predicate_count, action_count, object_count, init_count."
+    )]
+    async fn rdf_pddl_bridge(&self, Parameters(input): Parameters<RdfPddlBridgeInput>) -> String {
+        use bcinr_pddl::rdf_pddl::{compile_domain, compile_problem, Triple};
+
+        let facts: Vec<Triple> = input
+            .triples
+            .iter()
+            .map(|t| Triple::new(t.subject.clone(), t.predicate.clone(), t.object.clone()))
+            .collect();
+
+        let domain = match compile_domain(&facts, &input.domain_name) {
+            Ok(d) => d,
+            Err(e) => {
+                return serde_json::json!({ "ok": false, "error": format!("compile_domain: {e}") })
+                    .to_string()
+            }
+        };
+        let problem = match compile_problem(&facts, &input.problem_name, &input.domain_name) {
+            Ok(p) => p,
+            Err(e) => {
+                return serde_json::json!({ "ok": false, "error": format!("compile_problem: {e}") })
+                    .to_string()
+            }
+        };
+
+        serde_json::json!({
+            "ok": true,
+            "domain_name": domain.name,
+            "type_count": domain.types.len(),
+            "predicate_count": domain.predicates.len(),
+            "action_count": domain.actions.len(),
+            "domain_text": render_pddl31_domain(&domain),
+            "problem_name": problem.name,
+            "object_count": problem.objects.len(),
+            "init_count": problem.init_atoms.len(),
+            "problem_text": render_pddl31_problem(&problem),
+        })
+        .to_string()
+    }
+
     // ── Group 2: POWL Tools ──────────────────────────────────────────────────
 
     /// Compile comma-separated labels into a POWL Sequence tape.
@@ -702,6 +1047,57 @@ impl BcinrServer {
             "ops": ops_arr,
         })
         .to_string()
+    }
+
+    /// Decompose a WF-net into a POWL 2.0 model (Algorithm 3), gated by the
+    /// Theorem-1 language-preservation check.
+    #[tool(
+        description = "Convert a safe & sound WF-net (places, labelled transitions, arcs, source, sink) into an equivalent POWL 2.0 model, verified against Theorem 1 (denotational language == token-game replay). Returns JSON with ok, refused, net_hash, model (recursive Activity/Silent/Sequence/PartialOrder/ChoiceGraph/DoRedo JSON) or refusal_reason."
+    )]
+    async fn wf_net_to_powl(&self, Parameters(input): Parameters<WfNetToPowlInput>) -> String {
+        use bcinr_powl::wf_net::WfNet;
+        use bcinr_powl::wf_to_powl::convert_and_verify;
+
+        let transitions: Vec<(String, Option<String>)> = input
+            .transitions
+            .iter()
+            .map(|t| (t.name.clone(), t.label.clone()))
+            .collect();
+
+        let net = match WfNet::new(
+            input.places.clone(),
+            transitions,
+            input.place_to_transition.clone(),
+            input.transition_to_place.clone(),
+            input.source.clone(),
+            input.sink.clone(),
+        ) {
+            Ok(n) => n,
+            Err(e) => {
+                return serde_json::json!({
+                    "ok": false,
+                    "error": format!("WF-net construction: {e}"),
+                })
+                .to_string()
+            }
+        };
+
+        match convert_and_verify(&net, input.budget as usize, input.max_len as usize) {
+            Ok(model) => serde_json::json!({
+                "ok": true,
+                "refused": false,
+                "net_hash": net.content_hash(),
+                "model": powl2_model_to_json(&model),
+            })
+            .to_string(),
+            Err(refusal) => serde_json::json!({
+                "ok": false,
+                "refused": true,
+                "net_hash": refusal.net_hash,
+                "refusal_reason": refusal.reason.to_string(),
+            })
+            .to_string(),
+        }
     }
 
     #[tool(
@@ -1171,13 +1567,13 @@ impl BcinrServer {
             "system": "bcinr unified execution platform",
             "version": "26.6.30",
             "crates": {
-                "bcinr-pddl": { "status": "ready", "tools": 7, "capability": "Planning (PDDL 3.1 → STRIPS → temporal plans)" },
-                "bcinr-powl": { "status": "ready", "tools": 5, "capability": "Workflow (AST → tape → execution)" },
+                "bcinr-pddl": { "status": "ready", "tools": 9, "capability": "Planning (PDDL 3.1 → STRIPS → temporal plans)" },
+                "bcinr-powl": { "status": "ready", "tools": 6, "capability": "Workflow (AST → tape → execution)" },
                 "bcinr-logic": { "status": "ready", "tools": 6, "capability": "Algorithms (branchless, SIMD, O(1/log n))" },
                 "bcinr-powl-receipt": { "status": "ready", "tools": 1, "capability": "Receipt verification and inspection" },
             },
             "pipeline": "PDDL domain+problem → ground & plan → POWL tape → branchless execute → receipt",
-            "total_tools": 23,
+            "total_tools": 26,
             "admission_model": "Prolog8 (R ⊢ A gate) with SLA tokens",
             "isolation": "zero-trust, branchless, deterministic",
         })
@@ -1250,7 +1646,7 @@ async fn main() {
         .with_writer(std::io::stderr)
         .init();
 
-    tracing::info!("bcinr-mcp starting — 25 tools ready (PDDL:8 + POWL:6 + core:3 + algorithms:6 + receipts:1 + cross-crate:1)");
+    tracing::info!("bcinr-mcp starting — 28 tools ready (PDDL:10 + POWL:7 + core:3 + algorithms:6 + receipts:1 + cross-crate:1)");
 
     let server = BcinrServer::default();
     let running = match server.serve(strict_stdio()).await {

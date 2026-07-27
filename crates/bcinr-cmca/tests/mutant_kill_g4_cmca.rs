@@ -32,7 +32,7 @@ fn oracle_cmca_baseline_passes() {
         let delta_raw = CONTRACTION_MARGIN.raw as u128;
         let rhs = d_i_raw - (delta_raw * d_i_raw / 1_000_000_000);
 
-        gd_ok = gd_ok & (lhs <= rhs);
+        gd_ok &= lhs <= rhs;
     }
 
     assert!(gd_ok, "baseline profile must satisfy contraction mapping");
@@ -93,7 +93,7 @@ fn mutant_2_inverted_inequality_would_be_killed() {
         let d_i_raw = WEIGHT_VECTOR[i].raw as u128;
         let delta_raw = CONTRACTION_MARGIN.raw as u128;
         let rhs = d_i_raw - (delta_raw * d_i_raw / 1_000_000_000);
-        normal_ok = normal_ok & (lhs <= rhs);
+        normal_ok &= lhs <= rhs;
     }
 
     // Run INVERTED check
@@ -110,7 +110,7 @@ fn mutant_2_inverted_inequality_would_be_killed() {
         let delta_raw = CONTRACTION_MARGIN.raw as u128;
         let rhs = d_i_raw - (delta_raw * d_i_raw / 1_000_000_000);
         // MUTATED: > instead of <=
-        inverted_ok = inverted_ok & (lhs > rhs);
+        inverted_ok &= lhs > rhs;
     }
 
     // The normal check should pass, inverted should fail
@@ -160,7 +160,7 @@ fn all_cmca_mutants_killed_by_oracle() {
         let d_i_raw = WEIGHT_VECTOR[i].raw as u128;
         let delta_raw = CONTRACTION_MARGIN.raw as u128;
         let rhs = d_i_raw - (delta_raw * d_i_raw / 1_000_000_000);
-        gd_ok = gd_ok & (lhs <= rhs);
+        gd_ok &= lhs <= rhs;
     }
 
     // All three mutations must fail oracle

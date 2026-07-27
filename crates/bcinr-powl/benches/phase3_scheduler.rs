@@ -40,9 +40,15 @@ fn complex_dependencies() -> PowlAstNode<'static> {
             PowlAstNode::Atom("finalize"),
         ],
         edges: vec![
-            (0, 1), (0, 2), (0, 3),  // init → all validators
-            (1, 4), (2, 4), (3, 5),  // validators → parallel ops
-            (4, 7), (5, 7), (6, 7),  // parallel ops → finalize
+            (0, 1),
+            (0, 2),
+            (0, 3), // init → all validators
+            (1, 4),
+            (2, 4),
+            (3, 5), // validators → parallel ops
+            (4, 7),
+            (5, 7),
+            (6, 7), // parallel ops → finalize
         ],
     }
 }
@@ -132,10 +138,9 @@ mod phase3_scheduler {
                 PowlAstNode::Atom("p6"),
                 PowlAstNode::Atom("p7"),
             ],
-            edges: vec![],  // No dependencies: all ops can run in parallel
+            edges: vec![], // No dependencies: all ops can run in parallel
         };
-        let tape = compile_powl(divan::black_box(&wide))
-            .expect("wide parallelism must compile");
+        let tape = compile_powl(divan::black_box(&wide)).expect("wide parallelism must compile");
         run_to_completion(divan::black_box(&tape))
     }
 }
@@ -147,8 +152,7 @@ mod phase4_validation {
     /// Tests conformance checking on a simple, structured execution.
     #[divan::bench]
     fn validate_linear_sequence() -> bool {
-        let tape = compile_powl(&linear_sequence())
-            .expect("linear sequence must compile");
+        let tape = compile_powl(&linear_sequence()).expect("linear sequence must compile");
         let log = run_and_log(divan::black_box(&tape));
         let _receipt = log.seal_receipt();
         let result = divan::black_box(&log).validate_against_tape(divan::black_box(&tape));
@@ -159,8 +163,8 @@ mod phase4_validation {
     /// Tests conformance checking with dependencies and parallelism.
     #[divan::bench]
     fn validate_complex_dependencies() -> bool {
-        let tape = compile_powl(&complex_dependencies())
-            .expect("complex dependencies must compile");
+        let tape =
+            compile_powl(&complex_dependencies()).expect("complex dependencies must compile");
         let log = run_and_log(divan::black_box(&tape));
         let _receipt = log.seal_receipt();
         let result = divan::black_box(&log).validate_against_tape(divan::black_box(&tape));
@@ -171,8 +175,7 @@ mod phase4_validation {
     /// Tests receipt generation (BLAKE3 hashing of execution trace).
     #[divan::bench]
     fn seal_receipt_linear() -> [u8; 32] {
-        let tape = compile_powl(&linear_sequence())
-            .expect("linear sequence must compile");
+        let tape = compile_powl(&linear_sequence()).expect("linear sequence must compile");
         let log = run_and_log(divan::black_box(&tape));
         divan::black_box(&log).seal_receipt().digest()
     }
@@ -190,4 +193,3 @@ mod phase4_validation {
         result == bcinr_powl::ocel::ConformanceResult::Conforms
     }
 }
-

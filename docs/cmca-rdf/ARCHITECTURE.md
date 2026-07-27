@@ -1,6 +1,6 @@
 # CMCA-RDF Architecture & Projection Specification
 
-This document details the architecture and projection rules for the **Cross-Measure Cognitive Allocation (CMCA)** model over RDF-aligned semantic state within the deterministic substrate of `bcinr`.
+This document details the architecture and projection rules for the **Chatman Multifractal Consequence Allocation (CMCA)** model over RDF-aligned semantic state within the deterministic substrate of `bcinr`. ("Cross-Measure Cognitive Allocation" was this document's earlier, unreconciled expansion of the acronym — see `../CMCA_EXPLANATION.md` for the canonical name and the full list of superseded backronyms.)
 
 ---
 

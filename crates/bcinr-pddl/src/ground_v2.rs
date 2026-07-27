@@ -17,7 +17,8 @@ use wasm4pm_compat::pddl::{
     PddlEffect, PddlFunction, PddlType,
 };
 
-use crate::capability::{CapabilityProfile, PddlFeature, SemanticSupport};
+use crate::capability::{admit_planning_task, CapabilityProfile, PddlFeature, SemanticSupport};
+use bcinr_mfw_ir::PlannerFailure;
 
 /// Default structural bounds for exact classical search.
 pub const EXACT_MAX_GROUND_ACTIONS: usize = 65_536;
@@ -38,13 +39,33 @@ pub enum ExactClassicalError {
     TimedEffectUnsupported,
     ContinuousEffectUnsupported,
     ObjectFluentUnsupported,
-    GroundActionBoundExceeded { limit: usize, observed: usize },
-    PlanDepthBoundExceeded { limit: usize },
-    SearchStateBoundExceeded { limit: usize },
+    GroundActionBoundExceeded {
+        limit: usize,
+        observed: usize,
+    },
+    PlanDepthBoundExceeded {
+        limit: usize,
+    },
+    SearchStateBoundExceeded {
+        limit: usize,
+    },
     NoPlan,
-    ConflictingNumericEffects { function: String },
-    DivisionByZero { function: String },
+    ConflictingNumericEffects {
+        function: String,
+    },
+    DivisionByZero {
+        function: String,
+    },
     TapeFull,
+    /// `capability::admit_planning_task` refused the domain/problem pair --
+    /// e.g. `problem.domain != domain.name` (a check `validate_scope` never
+    /// performs), an empty/malformed domain, or a requirement the domain's
+    /// own `:requirements` declares that `ExactClassicalCapabilityProfile`
+    /// marks unsupported but that has no corresponding empty-AST check in
+    /// `validate_scope` (a domain can declare a requirement without using
+    /// it). Distinct from `validate_scope`'s content-based checks above,
+    /// which this does not replace -- both run.
+    Admission(PlannerFailure),
 }
 
 impl std::fmt::Display for ExactClassicalError {
@@ -93,6 +114,7 @@ impl std::fmt::Display for ExactClassicalError {
                 write!(f, "numeric scale-down by zero for {function}")
             }
             Self::TapeFull => write!(f, "plan exceeds the 64-slot PDDL tape bound"),
+            Self::Admission(failure) => write!(f, "admission refused: {failure}"),
         }
     }
 }
@@ -198,6 +220,15 @@ impl ExactClassicalProblem {
         max_ground_actions: usize,
     ) -> Result<Self, ExactClassicalError> {
         validate_scope(domain, problem)?;
+        // Complements `validate_scope` above rather than replacing it: this
+        // catches what a pure AST-content scan cannot, chiefly
+        // `problem.domain != domain.name` (never checked anywhere else on
+        // this rail) plus a small set of domain/problem well-formedness and
+        // declared-but-possibly-unused-requirement checks. See
+        // `ExactClassicalError::Admission`'s doc comment.
+        admit_planning_task(domain, problem, &ExactClassicalCapabilityProfile)
+            .into_result()
+            .map_err(ExactClassicalError::Admission)?;
         let objects = problem
             .objects
             .iter()

@@ -629,7 +629,10 @@ impl CandidateSelector {
     pub fn select_with_coverage_lens(&self) -> Option<usize> {
         // Coverage lens prioritizes uncovered tree model candidates (nested_tree = index 2)
         // In order: 2 (nested_tree), then others
-        self.candidate_index.iter().find(|&&candidate| !self.covered.contains(&candidate) && candidate == 2).copied()
+        self.candidate_index
+            .iter()
+            .find(|&&candidate| !self.covered.contains(&candidate) && candidate == 2)
+            .copied()
     }
 
     /// Select a candidate based on Exploitation/Complexity lens.
@@ -1092,10 +1095,12 @@ mod tests {
 
         // Phase 4: Verify each snippet corresponds to a real candidate
         let registry = harness.candidate_registry();
-        let expected_keys = ["nested_tree",
+        let expected_keys = [
+            "nested_tree",
             "indexed_access",
             "add_file_conflict",
-            "flat_files"];
+            "flat_files",
+        ];
 
         for key in expected_keys.iter() {
             assert!(

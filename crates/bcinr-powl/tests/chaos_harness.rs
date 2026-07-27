@@ -6,9 +6,9 @@
 //! - Duplicate injection: tick idempotence verification
 //! - Reorder injection: ready-set shuffling with validity checks
 
-use bcinr_powl::tape::PowlTape;
 use bcinr_powl::ocel::OcelLog;
 use bcinr_powl::scheduler::{scheduler_tick, PowlRunState};
+use bcinr_powl::tape::PowlTape;
 
 /// Result of a chaos-injected execution.
 #[derive(Clone, Debug)]
@@ -202,7 +202,9 @@ pub fn run_with_duplicate_tick_injection(
         duplicate_checks.push((ticks_executed, fs1.0, fs2.0, is_idempotent));
     }
 
-    let all_passed = duplicate_checks.iter().all(|(_, _, _, is_idempotent)| *is_idempotent);
+    let all_passed = duplicate_checks
+        .iter()
+        .all(|(_, _, _, is_idempotent)| *is_idempotent);
     let verification = DuplicateTickVerification {
         checks: duplicate_checks,
         all_passed,
@@ -255,9 +257,13 @@ impl ReadySet {
             return;
         }
         // Simple LCG-based shuffle seeded by (seed, operation count).
-        let mut rng_state = seed.wrapping_mul(6364136223846793005u64).wrapping_add(1442695040888963407u64);
+        let mut rng_state = seed
+            .wrapping_mul(6364136223846793005u64)
+            .wrapping_add(1442695040888963407u64);
         for i in 0..self.indices.len() {
-            rng_state = rng_state.wrapping_mul(6364136223846793005u64).wrapping_add(1442695040888963407u64);
+            rng_state = rng_state
+                .wrapping_mul(6364136223846793005u64)
+                .wrapping_add(1442695040888963407u64);
             let j = (rng_state as usize) % self.indices.len();
             self.indices.swap(i, j);
         }
@@ -302,7 +308,10 @@ pub fn run_with_reorder_injection(
                 if missing_pred != 0 {
                     validity_violations.push((
                         ticks_executed,
-                        format!("Op {} fired with missing predecessors: {:#064b}", i, missing_pred),
+                        format!(
+                            "Op {} fired with missing predecessors: {:#064b}",
+                            i, missing_pred
+                        ),
                     ));
                 }
             }
@@ -333,11 +342,7 @@ pub struct ReorderExecResult {
 }
 
 /// Wrap a tape in an OcelLog and record execution trace.
-pub fn trace_with_ocel(
-    tape: &PowlTape,
-    run_id: u64,
-    max_ticks: u32,
-) -> (OcelLog, PowlRunState) {
+pub fn trace_with_ocel(tape: &PowlTape, run_id: u64, max_ticks: u32) -> (OcelLog, PowlRunState) {
     let mut state = PowlRunState::new(tape);
     let mut log = OcelLog::new();
     let mut ticks = 0u32;

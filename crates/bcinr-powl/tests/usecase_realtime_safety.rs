@@ -42,12 +42,12 @@ fn execute(ast: &PowlAstNode<'_>, run_id: u64) -> (PowlTape, PowlRunState, OcelL
         while bits != 0 {
             let op_idx = bits.trailing_zeros();
             bits &= bits - 1;
-            log.record_op_fired(run_id, op_idx, 0).unwrap();
+            log.record_op_fired(run_id, op_idx, 0, 0).unwrap();
             op_trace |= 1u64 << op_idx;
         }
     }
     assert_eq!(state.check_mask, 0, "bounded scheduler must complete");
-    log.record_run_sealed(run_id, op_trace).unwrap();
+    log.record_run_sealed(run_id, op_trace, 0).unwrap();
     (tape, state, log, ticks)
 }
 

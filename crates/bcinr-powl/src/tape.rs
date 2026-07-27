@@ -123,9 +123,9 @@ impl Default for PowlTape {
 /// concurrent firing of the ops right above them), not because they share
 /// the `no_std` property.
 pub mod v2 {
+    use crate::scheduler::LogicalTime;
     use core::mem;
     use core::str;
-    use crate::scheduler::LogicalTime;
 
     // =========================================================================
     // OpKind v2

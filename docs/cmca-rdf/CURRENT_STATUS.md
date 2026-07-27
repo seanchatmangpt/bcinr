@@ -2,7 +2,7 @@
 
 ## 1. Executive Summary
 
-This report certifies the successful final integration and verification of the **CMCA-RDF (Constrained Multi-measure Co-allocation for Resource Decision Fields)** decision surface on the **BCINR (Branchless C in Rust)** deterministic systems substrate. 
+This report certifies the successful final integration and verification of the **CMCA-RDF (Chatman Multifractal Consequence Allocation, RDF-projected)** decision surface on the **BCINR (Branchless C in Rust)** deterministic systems substrate. ("Constrained Multi-measure Co-allocation for Resource Decision Fields" was this report's earlier, unreconciled expansion — see `../CMCA_EXPLANATION.md` for the canonical name.)
 
 All core mathematical components, tree-allocation flows, and online learning algorithms have been implemented under the strict constraints of the **Radon Law ($CC=1$)** and the **Zero-Allocation Boundary**. Timing side-channels and branching hazards are eliminated in the hot-path, replacing data-dependent branches with branchless conditional selection logic at the instruction level.
 

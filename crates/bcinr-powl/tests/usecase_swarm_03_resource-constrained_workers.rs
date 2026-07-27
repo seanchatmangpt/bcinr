@@ -86,8 +86,7 @@ fn test_three_workers_exclusive_resource_mutual_exclusion() {
     );
 
     // Verify all 9 operations fired (3 workers × 3 ops each)
-    let fired: std::collections::HashSet<u32> =
-        log.events().iter().map(|e| e.op_idx).collect();
+    let fired: std::collections::HashSet<u32> = log.events().iter().map(|e| e.op_idx).collect();
     for op_idx in 0..9u32 {
         assert!(
             fired.contains(&op_idx),
@@ -132,8 +131,7 @@ fn test_three_workers_no_starvation() {
 
     assert_eq!(state.check_mask, 0, "all acquire operations must complete");
 
-    let acquired: std::collections::HashSet<u32> =
-        log.events().iter().map(|e| e.op_idx).collect();
+    let acquired: std::collections::HashSet<u32> = log.events().iter().map(|e| e.op_idx).collect();
 
     for worker_id in 0..3u32 {
         assert!(
@@ -185,8 +183,7 @@ fn test_workers_partial_order_with_exclusion_edges() {
 
     assert_eq!(state.check_mask, 0, "all workers must complete");
 
-    let fired: std::collections::HashSet<u32> =
-        log.events().iter().map(|e| e.op_idx).collect();
+    let fired: std::collections::HashSet<u32> = log.events().iter().map(|e| e.op_idx).collect();
 
     // All 9 ops (0..9) must fire: 3 workers × 3 ops each
     for op_idx in 0..9u32 {

@@ -1,8 +1,25 @@
-# CMCA: Cascade Multifractal Cascade Allocation
+# CMCA: Chatman Multifractal Consequence Allocation
 ## A Guide from ELI5 to PhD
 
 **Version:** 26.7.25  
 **Document Status:** ALIVE (formal specification + verification strategy)
+
+**Canonical name:** "Chatman Multifractal Consequence Allocation" is the one ecosystem-wide
+canonical expansion of CMCA, spanning this repo and `/Users/sac/mfw`. "Consequence" names the
+allocated quantity (`cmca:consequence_mass` in both repos' ontologies); "Cascade" (used in
+`docs/contracts/CMCA_CONTRACT.md`) names the allocation *mechanism*, not a competing meaning.
+Four other backronyms have appeared in this repo's docs over time and are now superseded/historical,
+not additional live meanings:
+- "Covariance Monitoring and Calibration Assessment" — `crates/bcinr-cmca/src/lib.rs` (predates
+  this reconciliation; the crate's calibration/telemetry role, `observatory.rs`, is real and part
+  of this same crate, just not the whole of what "CMCA" names).
+- "Cross-Measure Cognitive Allocation" — `docs/cmca-rdf/ARCHITECTURE.md`.
+- "Constrained Multi-measure Co-allocation (for Resource Decision Fields)" —
+  `docs/cmca-rdf/CURRENT_STATUS.md`, `docs/innovations/multi_measure_autonomic_feedback.md`.
+- "Cascade Multifractal Cascade Allocation" — this document's own prior title (self-referential
+  drift, corrected above).
+
+See `/Users/sac/mfw/mfw-ontology/cmca/PROVENANCE.md` for the cross-repo disambiguation record.
 
 ---
 
@@ -537,58 +554,67 @@ Min Contraction: 0.099 (meets ρ=0.1 threshold)
 
 ```
 crates/bcinr-cmca/
+├── generator.py                # RDF ontology -> generated Rust fixture compiler
+├── ontology/
+│   ├── cmca-rdf.ttl             # N=8, K=4, Q=4 fixture source
+│   └── generalization.ttl       # N=9, K=5, Q=5 fixture source
 ├── src/
-│   ├── allocator.rs          # Core allocation algorithm (branchless CC=1)
-│   ├── certification.rs       # Certificate validation (witness checking)
-│   ├── proposal.rs            # Mode proposal + dwell-time enforcement
-│   ├── artifact.rs            # Generated manifest + BLAKE3 verification
-│   ├── q_lens/
-│   │   ├── exploitation.rs    # Exploitation q-lens
-│   │   ├── coverage.rs        # Coverage q-lens
-│   │   └── rare.rs            # Rare-edge-case q-lens
-│   └── SAFETY.md              # Unsafe code audit (3 justified blocks)
-├── tests/
-│   ├── differential.rs        # Q16.16 oracle vs decimal
-│   ├── hostile_mutants.rs     # Mutant kill protocol
-│   ├── stability.rs           # Eigenvalue verification
-│   └── falsification_adversarial.rs  # Adversarial probe suite
-└── docs/
-    └── STABILITY_CERTIFICATE.md     # Formal proofs (eigenvalues, Lyapunov)
+│   ├── lib.rs                   # crate root, MAPE-K framing doc-comment
+│   ├── allocator.rs             # Cascade allocation algorithm (branchless CC=1)
+│   ├── certification.rs         # Certificate validation (witness checking)
+│   ├── proposal.rs              # Mode proposal handling
+│   ├── artifact.rs              # Generated manifest + BLAKE3 verification
+│   ├── observatory.rs           # evaluate_calibration / calibration safety flags
+│   ├── fixed.rs                 # Q16.16 fixed-point arithmetic
+│   ├── lrc.rs
+│   ├── stability_theorem.rs     # Stability/eigenvalue theorem support
+│   └── generated/
+│       ├── stability_profile.rs
+│       └── consequence_mass/
+│           ├── generalization.rs  # compiled fixture, N=9 K=5 Q=5
+│           └── case_studies.rs    # compiled fixture, N=8 K=4 Q=4
+└── tests/
+    ├── differential.rs, reference.rs, calibration.rs, case_studies.rs
+    ├── hostile_mutants.rs, mutant_kill_g4_cmca.rs
+    ├── falsification_adversarial.rs, compile_fail_tests.rs
+    └── usecase_*.rs, jtbd_certified_actuation_chicago.rs
 ```
+
+(There is no `q_lens/` submodule, `SAFETY.md`, or `docs/STABILITY_CERTIFICATE.md` inside the
+crate — an earlier version of this document described an aspirational structure that was never
+built; the tree above reflects the actual crate as of this writing.)
 
 ### Hot-Path Algorithm (Branchless)
 
+The real entry point is (`src/allocator.rs:1383`):
+
 ```rust
-pub fn allocate(config: &AllocatorConfig, ready_mask: u64, authority_mask: u64) -> u64 {
-    // Line 1250: Single linear execution path (CC=1)
-    
-    // Step 1: Compute gain scores (bitwise operations only)
-    let scores = config.gain_matrix[config.current_mode];  // lookup table, no branch
-    let weighted = unroll_8_static!(|i| scores[i] * config.value[i]);  // macro-unrolled
-    
-    // Step 2: Admission gate (branchless AND of masks)
-    let valid_mask = ready_mask & config.preconditions & authority_mask;  // all bitwise
-    
-    // Step 3: Selection via branchless max (CMOV-like)
-    let selected_idx = select_max_branchless(weighted, valid_mask);  // conditional move
-    
-    // Step 4: Update state (unconditional)
-    self.done_mask |= 1 << selected_idx;  // bitwise OR
-    self.dwell_counter = self.dwell_counter.saturating_add(1);  // no branch
-    
-    // Step 5: Seal receipt (BLAKE3 hash)
-    self.receipt = BLAKE3(self.receipt || self.state || selected_idx);  // deterministic
-    
-    1 << selected_idx  // Return single bit
+pub fn allocate(
+    states: &[PackedSemanticState; N],
+    lenses: &[LensSpec; Q],
+    lambda: &[[NonNegativeFixed; K]; Q],
+    // ...additional cascade/forest parameters
+) -> /* allocation result */ {
+    // Cascade allocation over the semantic-object forest: root weights
+    // W_root(i) = exp2(q * log2(M_k,i) - A_max), propagated down N nodes
+    // via `flow_step`, using branchless selection primitives
+    // `const_select_u32` / `const_select_bool` (allocator.rs:683, 763)
+    // in place of conditional branches.
 }
 ```
 
+The illustrative pseudocode this section previously showed (`config.gain_matrix`,
+`select_max_branchless`, `dwell_counter`) does not correspond to any function in this crate —
+that framing belonged to a different, unbuilt design. See `allocator.rs` directly for the exact
+signature and cascade-propagation logic.
+
 **Properties:**
-- No `if`, `match`, loops in hot path
-- All operations are branchless primitives: bitwise AND/OR/XOR, shifts, CMOV
+- No `if`, `match`, loops in the hot path
+- All operations are branchless primitives: bitwise AND/OR/XOR, shifts, `const_select_u32`/
+  `const_select_bool`
 - Cyclomatic complexity = 1
 - Constant execution time: O(1) regardless of candidate set size
-- Object code audit (arm64 disassembly) confirms zero conditional jumps
+- Object code audit (arm64 disassembly, `OBJECT_CODE_AUDIT.md`) confirms zero conditional jumps
 
 ---
 

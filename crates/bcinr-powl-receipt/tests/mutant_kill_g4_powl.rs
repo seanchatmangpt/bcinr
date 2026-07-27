@@ -7,6 +7,8 @@
 //! Mutation 2: State-transition wrong order (reorder fired actions)
 //! Mutation 3: Receipt generation bit flip (corrupt chain_root)
 
+#![allow(clippy::len_zero)]
+
 use bcinr_powl::powl2::{compile_powl2, LowestIndexPolicy, Powl2Model};
 use bcinr_powl::tape::v2::ConcurrencyGuardTable;
 use bcinr_powl_receipt::execution_v2::{

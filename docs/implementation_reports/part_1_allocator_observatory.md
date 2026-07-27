@@ -1,6 +1,6 @@
 # Implementation Report: Cascade Allocation, Stable Projectors, and Observatory Telemetry
 
-This report details the implementation of the Cascade Allocation, Stable Projectors, and Observatory Telemetry logic within the `bcinr-cmca` crate. The systems outlined here are core components of the Covariance Monitoring and Calibration Assessment (CMCA) substrate, adhering to the strict architectural laws of BCINR: zero heap allocations (`no_alloc`) and constant-time execution with no branches (`CC=1`).
+This report details the implementation of the Cascade Allocation, Stable Projectors, and Observatory Telemetry logic within the `bcinr-cmca` crate. The systems outlined here are core components of the Chatman Multifractal Consequence Allocation (CMCA) substrate — "Covariance Monitoring and Calibration Assessment" was this report's earlier, unreconciled expansion (see `../CMCA_EXPLANATION.md` for the canonical name) — adhering to the strict architectural laws of BCINR: zero heap allocations (`no_alloc`) and constant-time execution with no branches (`CC=1`).
 
 ---
 

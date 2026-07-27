@@ -234,6 +234,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "bcinr-controller"
+version = "26.7.25"
+dependencies = [
+ "bcinr-pddl",
+]
+
+[[package]]
 name = "bcinr-core"
 version = "26.7.25"
 dependencies = [
@@ -278,6 +285,7 @@ dependencies = [
  "bcinr-powl-receipt",
  "blake3",
  "chicago-tdd-mcp",
+ "chrono",
  "moka",
  "rmcp",
  "serde",

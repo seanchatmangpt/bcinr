@@ -45,11 +45,11 @@ fn execute(ast: &PowlAstNode<'_>, run_id: u64) -> (PowlTape, PowlRunState, OcelL
             let op_idx = bits.trailing_zeros();
             bits &= bits - 1;
             // Record with a duration approximation: each op takes ~10 time units
-            log.record_op_fired(run_id, op_idx, ticks as u32 * 10, 10).unwrap();
+            log.record_op_fired(run_id, op_idx, ticks * 10, 10).unwrap();
             op_trace |= 1u64 << op_idx;
         }
     }
-    log.record_run_sealed(run_id, op_trace, ticks as u32 * 10).unwrap();
+    log.record_run_sealed(run_id, op_trace, ticks * 10).unwrap();
     (tape, state, log, ticks)
 }
 
@@ -146,7 +146,11 @@ fn test_partial_order_deadline_validation_fails() {
 
     // Expect deadline violation.
     match result {
-        ConformanceResult::DeadlineViolation { actual_time, deadline, .. } => {
+        ConformanceResult::DeadlineViolation {
+            actual_time,
+            deadline,
+            ..
+        } => {
             assert!(
                 actual_time > deadline,
                 "violation: {} > {}",
@@ -154,10 +158,7 @@ fn test_partial_order_deadline_validation_fails() {
                 deadline
             );
         }
-        _ => panic!(
-            "expected deadline violation, got {:?}",
-            result
-        ),
+        _ => panic!("expected deadline violation, got {:?}", result),
     }
 }
 
@@ -227,7 +228,11 @@ fn test_nested_sequence_deadline_violation() {
     // Validate and expect deadline violation.
     let result = log.validate_against_tape(&tape);
     match result {
-        ConformanceResult::DeadlineViolation { actual_time, deadline, .. } => {
+        ConformanceResult::DeadlineViolation {
+            actual_time,
+            deadline,
+            ..
+        } => {
             assert!(
                 actual_time > deadline,
                 "actual_time {} must exceed deadline {}",
@@ -321,10 +326,7 @@ fn test_deadline_logic_no_external_api_calls() {
     );
 
     // Log must have recorded the ops.
-    assert!(
-        !log.events().is_empty(),
-        "log should record events"
-    );
+    assert!(!log.events().is_empty(), "log should record events");
 }
 
 /// Test 7: ConformanceResult provides diagnostic information

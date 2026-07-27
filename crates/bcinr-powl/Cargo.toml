@@ -13,6 +13,10 @@ categories = ["algorithms", "data-structures"]
 bcinr-logic = { version = "26.7.25", path = "../bcinr-logic" }
 # Shared IR types/trait contracts for multifractal planning. This edge is one-way.
 bcinr-mfw-ir = { version = "26.7.25", path = "../bcinr-mfw-ir" }
+# Multifractal consequence allocation over the POWL process hierarchy
+# (`crate::multifractal`). One-way: bcinr-cmca is `no_std` and knows nothing
+# about POWL, so the join lives here, on the side that already has the tree.
+bcinr-cmca = { version = "26.7.25", path = "../bcinr-cmca", features = ["alloc"] }
 blake3 = "1"
 wasm4pm-compat = "26.6.29"
 serde = { version = "1", features = ["derive"], optional = true }

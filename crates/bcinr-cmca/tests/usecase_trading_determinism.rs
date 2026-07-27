@@ -18,12 +18,16 @@
 //! - BLAKE3 receipts (auditable, tamper-evident records)
 //! - Identical execution on any hardware, any CPU vendor
 
+#![allow(clippy::needless_range_loop)]
+
 use bcinr_cmca::allocator::{
     allocate, AdaptiveUpdate, AdmittedControlState, CertificateReceipt, CertifiedLearning,
     EnvelopeReceipt, OutcomeReceipt,
 };
 use bcinr_cmca::fixed::NonNegativeFixed;
-use bcinr_cmca::generated::case_studies::{ETA, LAMBDA, LENS_REGISTRY, N, OBJECT_REGISTRY, Q};
+use bcinr_cmca::generated::consequence_mass::case_studies::{
+    ETA, LAMBDA, LENS_REGISTRY, N, OBJECT_REGISTRY, Q,
+};
 use bcinr_cmca::generated::stability_profile::CERTIFICATE_DIGEST;
 
 fn get_proof() -> Option<AdaptiveUpdate<CertifiedLearning>> {
@@ -286,13 +290,9 @@ fn test_multi_strategy_competitive_fair_optimal() {
     // positive share) and the total allocated is conserved to ~1.0 in
     // Q16.16 (65536), i.e. capital is distributed, not created or lost.
     let mut sum: u64 = 0;
-    for i in 0..N {
-        assert!(
-            alloc[i].val > 0,
-            "exchange {} must not be starved of capital",
-            i
-        );
-        sum += alloc[i].val as u64;
+    for (i, a) in alloc.iter().enumerate().take(N) {
+        assert!(a.val > 0, "exchange {} must not be starved of capital", i);
+        sum += a.val as u64;
     }
     let total = NonNegativeFixed::ONE.val as u64; // 65536 == 1.0 in Q16.16
     let diff = sum.abs_diff(total);
@@ -349,13 +349,8 @@ fn test_allocation_fairness_distribution_auditable() {
         )
         .unwrap_or_else(|e| panic!("allocation round {} must succeed: {:?}", round, e));
 
-        for i in 0..N {
-            assert!(
-                alloc[i].val > 0,
-                "round {} must not starve exchange {}",
-                round,
-                i
-            );
+        for (i, a) in alloc.iter().enumerate().take(N) {
+            assert!(a.val > 0, "round {} must not starve exchange {}", round, i);
         }
 
         match &baseline {

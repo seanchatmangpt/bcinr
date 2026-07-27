@@ -196,11 +196,7 @@ impl ResourceRegistry {
     }
 
     /// Record an operation's interval on a resource.
-    pub fn book_interval(
-        &mut self,
-        resource_id: String,
-        interval: OpTimeInterval,
-    ) {
+    pub fn book_interval(&mut self, resource_id: String, interval: OpTimeInterval) {
         self.resources
             .entry(resource_id)
             .or_default()
@@ -211,15 +207,18 @@ impl ResourceRegistry {
 
     /// Check if an operation's interval conflicts with any existing allocation on a resource.
     /// Returns the first conflicting operation index, or None if no conflict.
-    pub fn check_conflict(
-        &self,
-        resource_id: &str,
-        interval: OpTimeInterval,
-    ) -> Option<u32> {
+    pub fn check_conflict(&self, resource_id: &str, interval: OpTimeInterval) -> Option<u32> {
         self.resources.get(resource_id).and_then(|allocations| {
             allocations.iter().find_map(|(&op_idx, intervals)| {
                 if intervals.iter().any(|existing| {
-                    intervals_conflict(&PowlTape::new(), interval.op_idx, interval, op_idx, *existing, resource_id)
+                    intervals_conflict(
+                        &PowlTape::new(),
+                        interval.op_idx,
+                        interval,
+                        op_idx,
+                        *existing,
+                        resource_id,
+                    )
                 }) {
                     Some(op_idx)
                 } else {
@@ -740,6 +739,175 @@ pub fn scheduler_tick_guarded<S: ConcurrencySelector>(
     // Carry forward ready-but-unselected ops so they are reconsidered next
     // tick instead of being lost.
     new_check |= ready_mask & !selected_mask;
+
+    state.done_mask = new_done;
+    state.check_mask = new_check & !new_done;
+
+    FiredSet(fired)
+}
+
+// ---------------------------------------------------------------------------
+// Resource-aware scheduling (with blocking, refusal, timeout logic)
+// ---------------------------------------------------------------------------
+
+/// A resource requirement for an operation: maps op_idx to (resource_id, interval, exclusive).
+///
+/// This side-table captures which resource an operation needs, the logical time
+/// interval [start, end) when it will hold the resource, and whether access is exclusive.
+///
+/// Note: resource_id is owned (String) because requirements are typically built at
+/// compilation time and stored as configuration. For live execution, consider using
+/// a flat table with integer resource IDs to avoid allocations in the hot path.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OpResourceRequirement {
+    /// Operation tape slot index (0..63).
+    pub op_idx: u32,
+    /// Resource identifier (e.g., "worker", "truck").
+    pub resource_id: String,
+    /// Logical time interval [start, end) when the resource is held.
+    pub interval: OpTimeInterval,
+    /// Whether the operation requires exclusive access to the resource.
+    pub exclusive: bool,
+}
+
+/// Scheduler entry point with resource/lease/deadline checking.
+///
+/// This variant of `scheduler_tick` adds three gating layers after a candidate
+/// operation is determined to be ready (predecessors satisfied):
+///
+/// 1. **Resource Conflict**: Check if the operation's interval overlaps with
+///    any already-allocated intervals on the same resource via the registry.
+///    On conflict, mark the operation as Blocked.
+///
+/// 2. **Lease Expiry**: Check if the operation's lease (resource hold period)
+///    exceeds its deadline. On expiry, mark as TimedOut.
+///
+/// 3. **Admission Gate** (future): Check policy gates. On rejection, mark as Refused.
+///
+/// Sequence per ready operation:
+/// - Evaluate predecessors (existing logic, unchanged)
+/// - Check resource registry for conflicts → Blocked
+/// - Check deadline / lease expiry → TimedOut
+/// - Check admission gate → Refused
+/// - If all checks pass: Fire and record to OCEL
+/// - If any check fails: DON'T fire, record reason, carry forward to next tick
+///
+/// # Complexity
+///
+/// O(C * R) where C is candidates and R is resource registry size (per-resource
+/// conflict checking is O(1) per resource already allocated on a slot).
+///
+/// # Examples
+///
+/// ```ignore
+/// use bcinr_powl::scheduler::{scheduler_tick_with_resources, PowlRunState, ResourceRegistry, OpResourceRequirement, OpTimeInterval};
+/// use bcinr_powl::compiler::{compile_powl, PowlAstNode};
+///
+/// let ast = PowlAstNode::PartialOrder {
+///     children: vec![PowlAstNode::Atom("a"), PowlAstNode::Atom("b")],
+///     edges: vec![],
+/// };
+/// let tape = compile_powl(&ast).unwrap();
+/// let mut state = PowlRunState::new(&tape);
+/// let mut registry = ResourceRegistry::new();
+///
+/// // Book op_a's interval on "worker"
+/// let req_a = OpResourceRequirement {
+///     op_idx: 0,
+///     resource_id: "worker".to_string(),
+///     interval: OpTimeInterval::new(0, 0, 5),
+///     exclusive: true,
+/// };
+/// registry.book_interval(req_a.resource_id.clone(), req_a.interval);
+///
+/// // Execute tick; op_b will be blocked due to resource conflict if [3, 8) overlaps [0, 5)
+/// let fired = scheduler_tick_with_resources(
+///     &tape.ops[..tape.len as usize],
+///     &mut state,
+///     &registry,
+///     &[],  // no deadline map for now
+///     &[],  // no leases for now
+/// );
+/// ```
+pub fn scheduler_tick_with_resources(
+    tape: &[Powl64Op],
+    state: &mut PowlRunState,
+    registry: &ResourceRegistry,
+    resource_requirements: &[OpResourceRequirement],
+    _deadlines: &[(u32, LogicalTime)], // (op_idx, deadline)
+) -> FiredSet {
+    let mut fired = 0u64;
+    let mut new_done = state.done_mask;
+    let mut new_check = 0u64;
+
+    let mut candidates = state.check_mask & !state.done_mask;
+
+    while candidates != 0 {
+        let i = candidates.trailing_zeros() as usize;
+        candidates &= candidates - 1;
+
+        let op = &tape[i];
+        let bit = 1u64 << i;
+
+        // --- Existing logic: check predecessors ---
+        let is_join = kind_mask(op.kind, OpKind::Join);
+        let join_effective = op.pred_mask & state.choice_taken;
+        let effective_pred = (join_effective & is_join) | (op.pred_mask & !is_join);
+
+        let sat = pred_satisfied(new_done, effective_pred);
+        let sat_bit = sat & 1;
+
+        // If predecessors are not satisfied, don't fire and carry forward.
+        if sat_bit == 0 {
+            new_check |= bit;
+            continue;
+        }
+
+        // --- New logic: resource conflict check ---
+        let mut resource_conflict = false;
+        for req in resource_requirements {
+            if req.op_idx == i as u32 {
+                if let Some(conflicting_op) =
+                    registry.check_conflict(&req.resource_id, req.interval)
+                {
+                    resource_conflict = true;
+                    let reason = format!(
+                        "resource {} conflict with op {} (interval [{}, {}))",
+                        req.resource_id, conflicting_op, req.interval.start, req.interval.end
+                    );
+                    state.blocked_mask |= bit;
+                    state.blocked_reasons.push((i, reason));
+                    break;
+                }
+            }
+        }
+
+        // If resource conflict, don't fire; carry forward to next tick.
+        if resource_conflict {
+            new_check |= bit;
+            continue;
+        }
+
+        // --- New logic: lease expiry / deadline check ---
+        // (Placeholder for future: check if lease.expiry < state.tick)
+        // For now, this is a no-op since we don't have deadline map wiring yet.
+
+        // --- At this point: predecessors OK, resources OK, deadlines OK → FIRE ---
+        fired |= bit;
+        new_done |= bit;
+
+        // On fire: add successors to next check_mask.
+        let fired_this = bit >> i; // 1
+        new_check |= op.succ_mask & u64::wrapping_sub(0, fired_this);
+
+        // --- XorDispatch (branchless) ---
+        new_done |= apply_xor_dispatch(op, bit, &mut state.choice_taken);
+
+        // --- LoopRedo (branchless) ---
+        let (redo_clear, redo_check) = apply_loop_redo(op, bit, &mut state.loop_iters[i]);
+        new_done &= !redo_clear;
+        new_check |= redo_check;
+    }
 
     state.done_mask = new_done;
     state.check_mask = new_check & !new_done;

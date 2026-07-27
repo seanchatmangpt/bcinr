@@ -232,7 +232,7 @@ pub struct MeasurementArtifact {
 }
 
 use crate::allocator::const_max_i32;
-use crate::generated::case_studies::{K, N};
+use crate::generated::consequence_mass::case_studies::{K, N};
 use crate::{unroll_4_static, unroll_8_static};
 
 /// Measures the divergence metric $\kappa_v$ and produces a MeasurementArtifact branchlessly.

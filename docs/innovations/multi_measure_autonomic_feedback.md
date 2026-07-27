@@ -2,7 +2,7 @@
 
 ## 1. Executive Summary
 
-This proposal introduces **Multi-Measure Autonomic Feedback Adaptation (MMAFA)**, a significant architectural enhancement and performance optimization for the autonomic managing loops in the Constrained Multi-measure Co-allocation (CMCA) decision substrate.
+This proposal introduces **Multi-Measure Autonomic Feedback Adaptation (MMAFA)**, a significant architectural enhancement and performance optimization for the autonomic managing loops in the Chatman Multifractal Consequence Allocation (CMCA) decision substrate (see `../CMCA_EXPLANATION.md` for the canonical name; this proposal previously used an unreconciled "Constrained Multi-measure Co-allocation" expansion).
 
 The primary objective is to resolve a structural limitation in how co-allocation routing weights are dynamically updated. Currently, the autonomic feedback loop relies exclusively on a single hardcoded measure head (Cache Value, $k=0$) to calculate the subtree Kullback-Leibler divergence (stability metric $\kappa$). As a result, when other measure heads (Search, Retrieval, and Scheduling) dominate the active co-allocation, the routing weights fail to adapt to their distributions. 
 

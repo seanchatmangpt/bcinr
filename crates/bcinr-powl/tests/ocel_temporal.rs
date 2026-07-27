@@ -3,9 +3,9 @@
 //! These tests verify that OCEL events correctly record and serialize
 //! temporal information including start_time and duration.
 
-use bcinr_powl::ocel::{OcelLog, OcelEvent, EventKind, ConformanceResult, Duration};
-use bcinr_powl::scheduler::LogicalTime;
 use bcinr_powl::compiler::{compile_powl, PowlAstNode};
+use bcinr_powl::ocel::{ConformanceResult, Duration, EventKind, OcelLog};
+use bcinr_powl::scheduler::LogicalTime;
 
 /// Test 1: record_op_fired with start_time and duration, verify OcelEvent carries them.
 ///
@@ -119,10 +119,7 @@ fn test_sealed_receipt_includes_temporal_events() {
 #[test]
 fn test_temporal_conformance_with_tape() {
     // Compile a simple two-op sequence
-    let ast = PowlAstNode::Sequence(vec![
-        PowlAstNode::Atom("a"),
-        PowlAstNode::Atom("b"),
-    ]);
+    let ast = PowlAstNode::Sequence(vec![PowlAstNode::Atom("a"), PowlAstNode::Atom("b")]);
     let tape = compile_powl(&ast).expect("Tape should compile");
 
     let mut log = OcelLog::new();
@@ -243,5 +240,8 @@ fn test_duration_edge_cases() {
 
     let events = log.events();
     assert_eq!(events[0].duration, 0, "Zero duration should be preserved");
-    assert_eq!(events[1].duration, max_duration, "Max duration should be preserved");
+    assert_eq!(
+        events[1].duration, max_duration,
+        "Max duration should be preserved"
+    );
 }

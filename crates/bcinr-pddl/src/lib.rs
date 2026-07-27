@@ -25,6 +25,7 @@ pub mod alloc_counter;
 pub mod capability;
 pub mod capability_router;
 pub mod causal;
+pub mod causal_numeric;
 pub mod causal_v2;
 #[cfg(feature = "mfw-planner")]
 pub mod cognitive;
@@ -36,6 +37,9 @@ pub mod downstream;
 #[cfg(feature = "mfw-planner")]
 pub mod embedded;
 pub mod error;
+/// Real verifier output becomes admitted planning facts. Unconditional: it
+/// depends only on `blake3` and `serde`, both non-optional here.
+pub mod evidence;
 pub mod execute;
 pub mod ground;
 pub mod ground_v2;
@@ -59,11 +63,17 @@ pub mod production;
 pub mod production_capability;
 pub mod resource_ledger;
 pub mod schedule_analysis;
+pub mod rdf_pddl;
 pub mod search;
 mod semantic_features;
 mod sexpr;
+pub mod validate;
 #[cfg(feature = "mfw-planner")]
 pub mod task;
+#[cfg(feature = "mfw-planner")]
+pub mod wf_net_bridge;
+#[cfg(feature = "mfw-planner")]
+pub mod wf_net_bridge_temporal;
 #[cfg(feature = "mfw-planner")]
 pub mod workflow_cmd;
 pub use capability::{
@@ -78,6 +88,7 @@ pub use causal_v2::PddlCausalAnalyzerV2;
 #[cfg(feature = "mfw-planner")]
 pub use cognitive::{
     plan_exact_cognitive_workflow, plan_exact_cognitive_workflow_bounded,
+    plan_exact_cognitive_workflow_hierarchical, plan_exact_cognitive_workflow_hierarchical_bounded,
     CognitiveProjectionStanding, ExactCognitiveError, ExactCognitiveWorkflow,
 };
 pub use concurrency::{ConcurrencyAnalysisError, PddlConcurrencyAnalyzer};
@@ -159,3 +170,4 @@ pub use ground::{
 };
 pub use logical_time::LogicalTime;
 pub use parse::{domain31_from_pddl, domain_from_pddl, problem31_from_pddl, problem_from_pddl};
+pub use validate::{validate_plan, validate_temporal_plan_shape, PlanViolation, TemporalShapeViolation};

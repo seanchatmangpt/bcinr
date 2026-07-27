@@ -86,19 +86,59 @@
 //!   realistically implies in this crate (paired with `:durative-actions`,
 //!   the classical `Pddl8GroundAction` has no numeric-effect field at all —
 //!   a structural, advertised STRIPS8 scope limit, not a silent gap).
-//! - [`PddlFeature::DurativeActions`] — `Exact`. `GroundTemporalProblem` is
-//!   the best-tested part of this crate (`tests/capacity.rs`,
-//!   `tests/proposer_substrate.rs`, `capability_router`, the DfCM crown
-//!   suite all exercise it).
+//! - [`PddlFeature::DurativeActions`] — `Approximate`, not `Exact`.
+//!   `GroundTemporalProblem` is the best-tested part of this crate
+//!   (`tests/capacity.rs`, `tests/proposer_substrate.rs`, `capability_router`,
+//!   the DfCM crown suite all exercise it), and the common case — constant
+//!   duration, `at start`/`over all` conditions, effects applied at the
+//!   correct start/end event — is genuinely correct. Three concrete gaps
+//!   keep this from `Exact`, all found by reading
+//!   `ground::GroundTemporalProblem::find_temporal_plan_with_fn_overrides`
+//!   and its helpers directly:
+//!   - **`at end` conditions are checked at the wrong time.** The
+//!     scheduling-time `applicable` check evaluates every entry in
+//!     `da.conditions` — including any wrapped `PddlCondition::Timed(AtEnd,
+//!     _)` — against the state *at the moment the action is scheduled*, not
+//!     the state when it actually completes; `eval_condition`'s `Timed` arm
+//!     even says so directly ("we evaluate the inner condition regardless of
+//!     timing"). `collect_over_all_conditions` explicitly skips `AtEnd`
+//!     ("not continuous"), and `apply_effect_at_end`'s completion handler
+//!     only applies effects — nothing re-checks an `at end` condition against
+//!     the state at completion. A condition that holds at start but goes
+//!     false before the action's actual end (or vice versa) is silently
+//!     misjudged.
+//!   - **Fluent-valued durations are silently wrong.** `resolve_duration`
+//!     computes a schema's `(min, max)` duration bounds by calling
+//!     `eval_numeric(expr, &HashMap::new())` — an always-empty fluent map,
+//!     at grounding time, before any initial numeric fluent value is even in
+//!     scope. A `:duration (= ?duration (speed))`-shaped fluent-valued
+//!     duration therefore always resolves to `0.0` (via `eval_numeric`'s
+//!     `FunctionTerm` arm's `unwrap_or(&0.0)`) regardless of `(speed)`'s
+//!     real value, instead of being rejected or evaluated correctly.
+//!   - **`duration_max` is computed but never enforced.** `ground_durative_schema`
+//!     stores both `duration_min`/`duration_max` on every `GroundDurativeAction`,
+//!     but `find_temporal_plan_with_fn_overrides` only ever reads
+//!     `da.duration_min` when scheduling (`let dur = da.duration_min;`) —
+//!     `duration_max` has no reader anywhere in this crate. A `(<= ?duration
+//!     n)`-shaped upper-bound-only constraint (`DurationConstraint::Lte`,
+//!     which `resolve_duration` resolves to `(0.0, n)`) silently executes
+//!     with duration `0.0` rather than any duration a caller might expect to
+//!     be chosen from the valid range.
 //! - [`PddlFeature::TimedInitialLiterals`] — `Exact`.
 //!   `tests/semantic_falsifier.rs`'s `test_til_schedule` passes and directly
 //!   checks TIL-driven makespan values.
-//! - [`PddlFeature::DerivedPredicates`] — `Approximate`.
+//! - [`PddlFeature::DerivedPredicates`] — `Exact`.
 //!   `compute_derived_closure`'s fixpoint iteration is real and
-//!   `test_derived_predicates` passes — but `ground_derived_schema`'s
-//!   `ground_condition` helper has no `Forall`/`Exists` arm, so a derived
-//!   predicate whose body quantifies is silently dropped in full (not
-//!   partially evaluated), never appearing in `derived_predicates` at all.
+//!   `test_derived_predicates` passes. `ground_derived_schema`'s
+//!   `ground_condition` helper now has `Forall`/`Exists` arms (grounding the
+//!   head's own bound variables, then substituting into the quantified body
+//!   via `subst_condition` for the quantifier's own variable enumeration to
+//!   resolve at evaluation time) — a derived predicate whose body quantifies
+//!   is grounded and enforced correctly, confirmed directly: a
+//!   `(:derived (all-ready) (forall (?i - item) (ready ?i)))`-shaped predicate
+//!   both fires when every item is ready and correctly refuses to when one
+//!   isn't. This corrects an earlier claim in this doc that the arm did not
+//!   exist and the predicate was silently dropped.
 //! - [`PddlFeature::TrajectoryConstraints`] — `Unsupported`.
 //!   `crate::parse::problem_from_pddl` and `problem31_from_pddl` both
 //!   hardcode `preferences: vec![]` — `(:constraints ...)` is never parsed
@@ -110,12 +150,23 @@
 //! - [`PddlFeature::Preferences`] — `Unsupported`. Same root cause
 //!   (`preferences: vec![]`, always), and even setting that aside, nothing
 //!   in this crate computes soft-constraint violation cost against a metric.
-//! - [`PddlFeature::Metrics`] — `Unsupported`. `problem.metric: Option<Metric>`
-//!   is parsed but never consulted: both `GroundProblem::find_plan` and
-//!   `GroundTemporalProblem::find_temporal_plan_with_fn_overrides`
-//!   hardcode `metric_value: None` on every `TemporalPlan` they return, and
-//!   classical `find_plan` has no metric field on `Pddl8Tape` to populate at
-//!   all — no plan is ever selected or ranked by a metric.
+//! - [`PddlFeature::Metrics`] — `Approximate`. `problem.metric` is genuinely
+//!   consulted, asymmetrically, on each rail -- neither rail does both
+//!   halves of what a metric-optimizing planner needs (select the best plan
+//!   *and* report what it won by). Classical `find_plan` explores every
+//!   goal-reaching path within its bounded search and keeps the
+//!   metric-best one (`best_plan`'s `MetricDir::Minimize`/`Maximize`
+//!   comparison) — real selection — but the winning value itself is
+//!   discarded on return, since `Pddl8Tape` has no metric field to carry it.
+//!   Temporal `find_temporal_plan_with_fn_overrides` computes and reports a
+//!   real `metric_value` on the `TemporalPlan` it returns (via
+//!   `eval_metric_expr`, not a hardcoded `None`) — real reporting — but
+//!   never searches for a better trajectory once one is found, since it is a
+//!   single greedy forward-chaining scheduler, not a search over multiple
+//!   candidate plans. This corrects an earlier claim in this doc that no
+//!   plan is ever selected or ranked by a metric and that the temporal rail
+//!   hardcodes `metric_value: None`; both were checked directly against the
+//!   current code and found false.
 //!
 //! None of the above bugs (`ConditionalEffects`, the two `preferences: vec![]`
 //! sites, `metric_value: None`) were introduced by this phase — they're
@@ -239,12 +290,12 @@ impl CapabilityProfile for DefaultCapabilityProfile {
             PddlFeature::ConditionalEffects => Unsupported,
             PddlFeature::NumericFluents => Approximate,
             PddlFeature::NumericEffects => Exact,
-            PddlFeature::DurativeActions => Exact,
+            PddlFeature::DurativeActions => Approximate,
             PddlFeature::TimedInitialLiterals => Exact,
-            PddlFeature::DerivedPredicates => Approximate,
+            PddlFeature::DerivedPredicates => Exact,
             PddlFeature::TrajectoryConstraints => Unsupported,
             PddlFeature::Preferences => Unsupported,
-            PddlFeature::Metrics => Unsupported,
+            PddlFeature::Metrics => Approximate,
         }
     }
 }

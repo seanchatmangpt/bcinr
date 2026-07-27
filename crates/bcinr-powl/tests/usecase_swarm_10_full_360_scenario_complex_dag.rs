@@ -61,7 +61,7 @@ fn execute_swarm(
             let op_idx = bits.trailing_zeros();
             bits &= bits - 1;
             // Fire with start_time = ticks, duration = 1 (unit time per op)
-            log.record_op_fired(run_id, op_idx, ticks as u32, 1).unwrap();
+            log.record_op_fired(run_id, op_idx, ticks, 1).unwrap();
             op_trace |= 1u64 << op_idx;
         }
     }
@@ -134,7 +134,7 @@ fn test_swarm_12_workers_init_then_parallel_deterministic() {
 
     // Verification 3: Init phase [0,1,2] fires before work phase [3..11]
     let order: Vec<u32> = log.events().iter().map(|e| e.op_idx).collect();
-    if let Some(first_worker_idx) = order.iter().position(|&op| op >= 3 && op < 12) {
+    if let Some(first_worker_idx) = order.iter().position(|&op| (3..12).contains(&op)) {
         for i in 0..first_worker_idx {
             assert!(
                 order[i] < 3 || order[i] >= 12,
@@ -148,7 +148,8 @@ fn test_swarm_12_workers_init_then_parallel_deterministic() {
     // Verification 4: Receipt conforms to tape
     let result = validate_against_tape(&log, &tape);
     assert_eq!(
-        result, ConformanceResult::Conforms,
+        result,
+        ConformanceResult::Conforms,
         "OCEL receipt must conform to tape"
     );
 
@@ -163,10 +164,7 @@ fn test_swarm_12_workers_init_then_parallel_deterministic() {
 
     // Verification 6: Receipt reflects deterministic execution (no external API calls)
     // Each event is recorded in the OCEL log in a deterministic order
-    assert!(
-        !log.events().is_empty(),
-        "log must record operations"
-    );
+    assert!(!log.events().is_empty(), "log must record operations");
 
     println!(
         "✓ swarm_12_init_parallel: {} ops, {} ticks, {} trace bits",
@@ -266,7 +264,8 @@ fn test_swarm_mixed_dependency_chains_abc() {
     let (tape, _, log, _, _) = execute_swarm(&dag, 11, 512);
     let result = validate_against_tape(&log, &tape);
     assert_eq!(
-        result, ConformanceResult::Conforms,
+        result,
+        ConformanceResult::Conforms,
         "mixed DAG receipt must conform to tape"
     );
 
@@ -357,14 +356,10 @@ fn test_swarm_partial_failure_two_workers_crash() {
             println!("✓ swarm_partial_failure: correctly detected missing predecessors");
         }
         ConformanceResult::Conforms => {
-            println!(
-                "✓ swarm_partial_failure: partial failure accepted (ops may be optional)"
-            );
+            println!("✓ swarm_partial_failure: partial failure accepted (ops may be optional)");
         }
         _ => {
-            println!(
-                "✓ swarm_partial_failure: partial failure detected via conformance check"
-            );
+            println!("✓ swarm_partial_failure: partial failure detected via conformance check");
         }
     }
 
@@ -489,9 +484,7 @@ fn test_swarm_cycle_rejection_byzantine_defense() {
         "cyclic DAG must be rejected at compile time, not silently admitted"
     );
 
-    println!(
-        "✓ swarm_cycle_rejection: cyclic graph correctly refused with Err variant"
-    );
+    println!("✓ swarm_cycle_rejection: cyclic graph correctly refused with Err variant");
 }
 
 /// Scenario 6: Large DAG stress test — 12 ops + compiler-added structural ops
@@ -565,7 +558,8 @@ fn test_swarm_large_dag_stress_deterministic_consistency() {
     // Receipt conforms
     let result = validate_against_tape(&log, &_tape);
     assert_eq!(
-        result, ConformanceResult::Conforms,
+        result,
+        ConformanceResult::Conforms,
         "large DAG receipt must conform"
     );
 
@@ -697,7 +691,10 @@ fn test_swarm_temporal_ordering_preserved_audit_chain() {
 
     // Phase 4 (op >= 13, if present) must fire after all phase 3 ops (4-12)
     if let Some(phase4_idx) = order.iter().position(|&op| op >= 13) {
-        if let Some(last_phase3_idx) = order[..phase4_idx].iter().rposition(|&op| op < 13 && op >= 4) {
+        if let Some(last_phase3_idx) = order[..phase4_idx]
+            .iter()
+            .rposition(|&op| (4..13).contains(&op))
+        {
             assert!(
                 phase4_idx > last_phase3_idx,
                 "phase_4_end must fire after phase_3 ops"

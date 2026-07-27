@@ -1,3 +1,2 @@
-pub mod case_studies;
-pub mod generalization;
+pub mod consequence_mass;
 pub mod stability_profile;

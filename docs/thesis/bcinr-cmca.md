@@ -1,4 +1,9 @@
-# Chatman Multifractal Cascade Allocation (CMCA): A Deterministic Branchless Substrate for Semantic Resource Economics
+# Chatman Multifractal Consequence Allocation (CMCA): A Deterministic Branchless Substrate for Semantic Resource Economics
+
+*(Titled "Chatman Multifractal Cascade Allocation" in earlier drafts of this dissertation;
+"Consequence" is now this ecosystem's canonical acronym expansion — see `../CMCA_EXPLANATION.md`.
+Remaining uses of "cascade" throughout this document name the allocation mechanism, not a
+competing meaning of the acronym.)*
 
 **A Dissertation Submitted for the Advancement of the BCINR Protocol**
 **Target**: CMCA v26.7.17 (CMCA-Cache Projection)

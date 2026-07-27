@@ -1,9 +1,9 @@
 mod dict;
 mod facts;
 pub mod lazy;
-mod xorf;
 pub mod monitors;
 pub mod trajectory_policy;
+mod xorf;
 
 // PDDL8 grounding and forward-search plan finding.
 
@@ -17,7 +17,7 @@ use wasm4pm_compat::pddl::{
     CompareOp, DerivedPredicate, DurationConstraint, DurativeAction, Metric, MetricExpr,
     NumericExpr, Pddl8ActionSchema, Pddl8Atom, Pddl8Domain, Pddl8GroundAction, Pddl8GroundAtom,
     Pddl8Problem, Pddl8Tape, PddlCondition, PddlEffect, PddlFunction, TemporalPlan,
-    TemporalPlanStep, TimedLiteral, PDDL8_MAX_GROUND, PDDL8_MAX_PLAN_DEPTH,
+    TemporalPlanStep, TimedLiteral, TrajectoryConstraint, PDDL8_MAX_GROUND, PDDL8_MAX_PLAN_DEPTH,
 };
 
 /// `SearchProfileId` for the plain, un-portfolio'd whole-run BFS/greedy
@@ -226,12 +226,7 @@ impl GroundProblem {
             .map(|obj| (obj.clone(), "object".to_string()))
             .collect();
         for dp in &domain.derived {
-            ground_derived_schema(
-                dp,
-                &object_pairs,
-                &type_index,
-                &mut derived_predicates,
-            )?;
+            ground_derived_schema(dp, &object_pairs, &type_index, &mut derived_predicates)?;
         }
 
         let quant_domain = QuantifierDomain {
@@ -324,13 +319,18 @@ impl GroundProblem {
             Default::default();
 
         let init_sorted: Vec<Pddl8GroundAtom> = self.initial_state.iter().cloned().collect();
-        let mut fn_key_vec: Vec<(String, u64)> = self.initial_fn_values
+        let mut fn_key_vec: Vec<(String, u64)> = self
+            .initial_fn_values
             .iter()
             .map(|(k, v)| (k.clone(), v.to_bits()))
             .collect();
         fn_key_vec.sort_by(|a, b| a.0.cmp(&b.0));
         visited.insert((init_sorted, fn_key_vec));
-        queue.push_back((self.initial_state.clone(), self.initial_fn_values.clone(), vec![]));
+        queue.push_back((
+            self.initial_state.clone(),
+            self.initial_fn_values.clone(),
+            vec![],
+        ));
 
         // Track all valid plans and their metric values for selection
         let mut best_plan: Option<(Vec<usize>, Option<f64>)> = None;
@@ -359,7 +359,9 @@ impl GroundProblem {
             }
             if goal_set.iter().all(|g| state.contains(g)) {
                 // Goal reached: compute metric and compare
-                let metric_value = self.metric.as_ref()
+                let metric_value = self
+                    .metric
+                    .as_ref()
                     .and_then(|m| eval_metric_expr(&m.expr, &fn_vals, 0.0));
 
                 let should_update = match best_plan.as_ref() {
@@ -370,8 +372,12 @@ impl GroundProblem {
                                 // Minimize: keep plan if new_val < best_val
                                 // Maximize: keep plan if new_val > best_val
                                 match m.dir {
-                                    wasm4pm_compat::pddl::MetricDir::Minimize => new_val < *best_val,
-                                    wasm4pm_compat::pddl::MetricDir::Maximize => new_val > *best_val,
+                                    wasm4pm_compat::pddl::MetricDir::Minimize => {
+                                        new_val < *best_val
+                                    }
+                                    wasm4pm_compat::pddl::MetricDir::Maximize => {
+                                        new_val > *best_val
+                                    }
                                 }
                             }
                             (None, _, _) => false, // No metric, keep first plan
@@ -540,6 +546,40 @@ pub struct GroundTemporalProblem {
     pub actions: Vec<Pddl8GroundAction>,
     pub durative_actions: Vec<GroundDurativeAction>,
     pub constraints: Vec<PddlCondition>,
+    /// Domain-level hard `:constraints` (`domain.constraints`, populated by
+    /// `crate::parse::domain31_from_pddl`'s `:constraints` section handling —
+    /// distinct from `constraints` above, which is derived from
+    /// `problem.preferences` and only ever recognizes an `Always`/
+    /// `And`-of-`Always` shape). Flattened through any top-level `and` (the
+    /// ordinary way a PDDL 3.1 domain combines more than one trajectory
+    /// constraint) and validated against
+    /// `monitors::MonitorFactory::create_monitor` at [`GroundTemporalProblem::build`]
+    /// time — a constraint kind the factory has no monitor for is refused
+    /// there via [`Pddl8Error::UnsupportedTrajectoryConstraint`] instead of
+    /// being silently dropped the way `trajectory_policy::TrajectoryPolicy::new`
+    /// drops whatever `create_monitor` returns `None` for. Checked for real,
+    /// per step, in [`GroundTemporalProblem::find_temporal_plan_with_fn_overrides`]
+    /// via a fresh `trajectory_policy::TrajectoryPolicy`.
+    trajectory_constraints: Vec<TrajectoryConstraint>,
+    /// Problem-level hard constraints (`problem.preferences`'s `.constraint`
+    /// field). This is the real counterpart to the legacy `constraints:
+    /// Vec<PddlCondition>` field above: that field is *also* derived from
+    /// `problem.preferences`, but its ad hoc population loop only ever
+    /// recognizes an `Always`/`And`-of-`Always` shape and silently drops
+    /// every other `TrajectoryConstraint` variant (`Sometime`, `AtMostOnce`,
+    /// `SometimeBefore`, `SometimeAfter`, `Within`, `AlwaysWithin`) — a plan
+    /// could violate one of those and still be reported `Found`.
+    /// `problem_trajectory_constraints` is flattened through `and` and
+    /// validated against `monitors::MonitorFactory::create_monitor` exactly
+    /// like `trajectory_constraints` (domain `:constraints`) is, at
+    /// [`GroundTemporalProblem::build`] time, and is merged into the *same*
+    /// `trajectory_policy::TrajectoryPolicy` instance as
+    /// `trajectory_constraints` in
+    /// [`GroundTemporalProblem::find_temporal_plan_with_fn_overrides`] — one
+    /// combined hard-constraint list, not a second policy — since
+    /// `TrajectoryPolicy::new` already takes a flat `&[TrajectoryConstraint]`
+    /// slice and has no per-source bookkeeping to keep two lists apart for.
+    problem_trajectory_constraints: Vec<TrajectoryConstraint>,
     pub derived_predicates: Vec<GroundDerivedPredicate>,
     /// Object universe + type index quantified `Forall`/`Exists` conditions
     /// range over. See `eval_quantifier`.
@@ -549,6 +589,31 @@ pub struct GroundTemporalProblem {
     pub deadline: Option<LogicalTime>,
     /// Optional metric expression to evaluate on successful plans.
     pub metric: Option<Metric>,
+}
+
+/// Recursively flattens `TrajectoryConstraint::And` into its leaf
+/// constraints. `monitors::MonitorFactory::create_monitor`'s own `And` arm
+/// deliberately returns `None` with the comment "Conjunction should be
+/// handled at the constraint collection level" — this function *is* that
+/// collection level. Without it, a domain's ordinary
+/// `(:constraints (and (always ...) (sometime ...)))` — the standard way a
+/// PDDL 3.1 domain combines more than one trajectory constraint — would
+/// present `create_monitor` with a single top-level `And(...)`, which it
+/// correctly refuses to interpret itself, and naively passing that straight
+/// to `trajectory_policy::TrajectoryPolicy::new` would silently drop the
+/// entire constraint list instead of monitoring what is inside it.
+///
+/// # Complexity
+/// O(n) in the number of `TrajectoryConstraint` nodes reachable from `c`.
+fn flatten_trajectory_constraint(c: &TrajectoryConstraint, out: &mut Vec<TrajectoryConstraint>) {
+    match c {
+        TrajectoryConstraint::And(parts) => {
+            for p in parts {
+                flatten_trajectory_constraint(p, out);
+            }
+        }
+        other => out.push(other.clone()),
+    }
 }
 
 impl GroundTemporalProblem {
@@ -638,12 +703,47 @@ impl GroundTemporalProblem {
             .map(|obj| (obj.clone(), "object".to_string()))
             .collect();
         for dp in &domain.derived {
-            ground_derived_schema(
-                dp,
-                &object_pairs,
-                &type_index,
-                &mut derived_predicates,
-            )?;
+            ground_derived_schema(dp, &object_pairs, &type_index, &mut derived_predicates)?;
+        }
+
+        // Domain-level hard `:constraints` — see the `trajectory_constraints`
+        // field's doc comment for why this is flattened through `and` and
+        // validated against `monitors::MonitorFactory` here, at admission
+        // time, rather than silently dropped by
+        // `trajectory_policy::TrajectoryPolicy::new` later.
+        let mut trajectory_constraints = Vec::new();
+        for pc in &domain.constraints {
+            flatten_trajectory_constraint(&pc.constraint, &mut trajectory_constraints);
+        }
+        for tc in &trajectory_constraints {
+            if monitors::MonitorFactory::create_monitor(tc).is_none() {
+                return Err(Pddl8Error::UnsupportedTrajectoryConstraint(format!(
+                    "domain :constraints uses {tc:?}, which ground::monitors::MonitorFactory \
+                     has no monitor for (HoldDuring/HoldAfter are the only kinds currently \
+                     unimplemented) — refusing rather than silently proceeding as if the \
+                     constraint did not exist"
+                )));
+            }
+        }
+
+        // Problem-level hard constraints — see the
+        // `problem_trajectory_constraints` field's doc comment for why this
+        // mirrors the `trajectory_constraints` (domain `:constraints`)
+        // handling immediately above instead of the legacy `constraints`
+        // loop's `Always`-only pattern match.
+        let mut problem_trajectory_constraints = Vec::new();
+        for pref in &problem.preferences {
+            flatten_trajectory_constraint(&pref.constraint, &mut problem_trajectory_constraints);
+        }
+        for tc in &problem_trajectory_constraints {
+            if monitors::MonitorFactory::create_monitor(tc).is_none() {
+                return Err(Pddl8Error::UnsupportedTrajectoryConstraint(format!(
+                    "problem preferences use {tc:?}, which ground::monitors::MonitorFactory \
+                     has no monitor for (HoldDuring/HoldAfter are the only kinds currently \
+                     unimplemented) — refusing rather than silently proceeding as if the \
+                     constraint did not exist"
+                )));
+            }
         }
 
         let quant_domain = QuantifierDomain {
@@ -659,6 +759,8 @@ impl GroundTemporalProblem {
             actions,
             durative_actions,
             constraints,
+            trajectory_constraints,
+            problem_trajectory_constraints,
             derived_predicates,
             quant_domain,
             deadline: None,
@@ -749,9 +851,51 @@ impl GroundTemporalProblem {
             }
         }
 
+        // Real trajectory-constraint enforcement for both `domain.constraints`
+        // and problem-level `problem.preferences` (see the
+        // `trajectory_constraints` and `problem_trajectory_constraints`
+        // fields' doc comments) — merged into one combined hard-constraint
+        // list and one `TrajectoryPolicy` instance rather than a second,
+        // separately-stepped policy: `TrajectoryPolicy::new` already takes a
+        // flat `&[TrajectoryConstraint]` slice for its `hard_constraints`
+        // argument, so concatenating both hard lists is the direct fit, and
+        // it means every call site below that gates on `policy` already
+        // covers both sources for free. A fresh policy per call, since its
+        // monitor states are mutable and this function may be invoked more
+        // than once (e.g. `schedule_analysis::replan_with_perturbed_capacity`
+        // calling this repeatedly with different `overrides`).
+        // `policy_prev_state` is updated once per outer-loop tick.
+        let hard_constraints: Vec<TrajectoryConstraint> = self
+            .trajectory_constraints
+            .iter()
+            .cloned()
+            .chain(self.problem_trajectory_constraints.iter().cloned())
+            .collect();
+        let mut policy = trajectory_policy::TrajectoryPolicy::new(&[], &hard_constraints);
+        let mut policy_prev_state = state.clone();
+        let mut policy_prev_fn_vals = fn_vals.clone();
+
         // Pending completions: (end_time, action_idx, over_all_conditions)
         // OverAll conditions are checked continuously during [start_time, end_time)
         let mut pending: Vec<(f64, usize, Vec<PddlCondition>)> = Vec::new();
+
+        // Grounded durative-action indices that have already run to completion
+        // once in this trajectory. `pending`'s in-flight check alone only
+        // blocks *concurrent* re-starts -- once an instance completes and is
+        // removed from `pending`, nothing stopped the very next outer-loop
+        // iteration from re-scheduling the identical instance again if its
+        // own at-end effects left its precondition satisfied (the common case
+        // for an action whose effects don't negate what enabled it). Without
+        // this guard a degenerate instance can re-fire indefinitely with no
+        // other action interleaved, producing a repeating plan that never
+        // makes progress toward the goal. This is a single-trajectory greedy
+        // scheduler (see `trajectory_dead`'s doc comment below), not a
+        // backtracking search, so "already completed once" is the right
+        // conservative bound here: a domain that genuinely needs the same
+        // grounded instance to fire more than once should express that via a
+        // distinct parameter (e.g. an iteration/counter object), not rely on
+        // this scheduler re-visiting an already-achieved instance.
+        let mut completed: std::collections::BTreeSet<usize> = std::collections::BTreeSet::new();
 
         // True once this planner's single greedy trajectory has died — either
         // no durative action could be scheduled and no future TIL/completion
@@ -778,22 +922,53 @@ impl GroundTemporalProblem {
                 &fn_vals,
                 &self.quant_domain,
             );
-            if self
-                .constraints
-                .iter()
-                .any(|c| !eval_condition(c, &state, &fn_vals, &self.quant_domain))
+            // Domain- and problem-level hard `:constraints`, checked for real
+            // via the merged `trajectory_policy::TrajectoryPolicy` built
+            // above from `trajectory_constraints` + `problem_trajectory_constraints`
+            // (see those fields' doc comments). This replaces the old ad hoc
+            // `self.constraints.iter().any(|c| !eval_condition(...))` check
+            // that used to live here — that check only ever recognized an
+            // `Always`/`And`-of-`Always` shape drawn from `problem.preferences`
+            // and silently ignored every other `TrajectoryConstraint` variant;
+            // every constraint it correctly caught is still caught here (an
+            // `Always` leaf gets an `AlwaysMonitor` from the same
+            // `problem_trajectory_constraints` list), and every kind it
+            // silently dropped is now checked too. A hard-constraint
+            // violation here is unrecoverable for this single greedy
+            // trajectory — so this trajectory is dead exactly like every
+            // other `trajectory_dead = true` site in this loop.
+            if policy
+                .step(
+                    &policy_prev_state,
+                    None,
+                    &state,
+                    &fn_vals,
+                    &self.quant_domain,
+                    &self.derived_predicates,
+                )
+                .is_err()
             {
                 trajectory_dead = true;
                 break;
             }
+            policy_prev_state = state.clone();
+            policy_prev_fn_vals = fn_vals.clone();
             // Check goal
             if eval_condition(&self.goal, &state, &fn_vals, &self.quant_domain) {
                 let makespan = steps
                     .iter()
                     .map(|s| s.start_time + s.duration)
                     .fold(0.0_f64, f64::max);
-                // Check if plan satisfies deadline constraint
-                if self.satisfies_deadline(makespan) {
+                // Check if plan satisfies deadline constraint.
+                let deadline_ok = self.satisfies_deadline(makespan);
+                // `policy.finalize()` catches a hard constraint that can only
+                // be judged at the end of the trajectory (e.g. `sometime`,
+                // still `Pending`) — a true violation would already have set
+                // `trajectory_dead` via `policy.step` above, so the only way
+                // `finalize()` fails here is a constraint that simply hasn't
+                // been witnessed *yet*; skip returning `Found` and let the
+                // loop keep looking rather than treating that as fatal.
+                if deadline_ok && policy.finalize().is_ok() {
                     let metric_value = self
                         .metric
                         .as_ref()
@@ -803,7 +978,7 @@ impl GroundTemporalProblem {
                         makespan,
                         metric_value,
                     });
-                } else {
+                } else if !deadline_ok {
                     // Plan violates deadline; continue searching
                     trajectory_dead = true;
                     break;
@@ -833,6 +1008,11 @@ impl GroundTemporalProblem {
                     // restart, so without this guard the same grounded
                     // instance can be scheduled concurrently with itself.
                     if pending.iter().any(|(_, idx, _)| *idx == i) {
+                        continue;
+                    }
+                    // Already ran to completion once in this trajectory --
+                    // see the `completed` set's doc comment above.
+                    if completed.contains(&i) {
                         continue;
                     }
                     let applicable = da
@@ -965,6 +1145,7 @@ impl GroundTemporalProblem {
                             &self.derived_predicates,
                         );
                     }
+                    completed.insert(idx);
                 }
             } else if !scheduled {
                 trajectory_dead = true;
@@ -972,14 +1153,39 @@ impl GroundTemporalProblem {
             }
         }
 
-        // Final goal check after last completion
+        // Final goal check after last completion. One last `policy.step` call
+        // brings the monitors up to date with whatever the loop's final
+        // iteration changed after its own `policy.step` call ran (a newly
+        // scheduled action's at-start effects, or a completion's at-end
+        // effects) before `finalize()` judges the whole trajectory. Guarded
+        // on an actual state/fn_vals change since the last recorded
+        // observation: re-stepping with an unchanged (prev_state ==
+        // next_state) transition is not a no-op for every monitor —
+        // `AtMostOnceMonitor` in particular treats "the condition holds
+        // again" as a second occurrence and would flip an already-`Satisfied`
+        // monitor to `Violated` purely from being asked about the same
+        // state twice.
+        let policy_final_ok = if state != policy_prev_state || fn_vals != policy_prev_fn_vals {
+            policy
+                .step(
+                    &policy_prev_state,
+                    None,
+                    &state,
+                    &fn_vals,
+                    &self.quant_domain,
+                    &self.derived_predicates,
+                )
+                .is_ok()
+        } else {
+            true
+        };
         if eval_condition(&self.goal, &state, &fn_vals, &self.quant_domain) {
             let makespan = steps
                 .iter()
                 .map(|s| s.start_time + s.duration)
                 .fold(0.0_f64, f64::max);
             // Check if plan satisfies deadline constraint
-            if self.satisfies_deadline(makespan) {
+            if self.satisfies_deadline(makespan) && policy_final_ok && policy.finalize().is_ok() {
                 let metric_value = self
                     .metric
                     .as_ref()
@@ -990,7 +1196,10 @@ impl GroundTemporalProblem {
                     metric_value,
                 });
             }
-            // If deadline is violated, trajectory is dead and search continues
+            // If the deadline or a hard trajectory constraint is violated,
+            // trajectory is dead and search continues (falls through to the
+            // `Exhausted`/`Bounded` decision below, matching every other
+            // fatal-but-not-yet-classified path in this function).
         }
 
         let goal_labels = vec![format!("{:?}", self.goal)];
@@ -1033,9 +1242,7 @@ pub(crate) fn eval_condition(
     quant_domain: &QuantifierDomain,
 ) -> bool {
     match cond {
-        PddlCondition::Atom(a) if a.pred == "=" && a.args.len() == 2 => {
-            a.args[0] == a.args[1]
-        }
+        PddlCondition::Atom(a) if a.pred == "=" && a.args.len() == 2 => a.args[0] == a.args[1],
         PddlCondition::Atom(a) => state.contains(&Pddl8GroundAtom {
             pred: a.pred.clone(),
             args: a.args.clone(),
@@ -1332,7 +1539,14 @@ fn apply_effect_ground(
             }
             let mut binding = HashMap::new();
             apply_forall_effects(
-                0, vars, &mut binding, effects, state, fn_vals, quant_domain, derived,
+                0,
+                vars,
+                &mut binding,
+                effects,
+                state,
+                fn_vals,
+                quant_domain,
+                derived,
             );
         }
         PddlEffect::Timed(_, inner) => {
@@ -1837,16 +2051,67 @@ fn instantiate(
     })
 }
 
+/// Strips `DERIVED_PARAM_TYPE_SENTINEL_PRED` guard conjuncts that
+/// `crate::parse::parse_derived` smuggled into a derived predicate's body to
+/// carry each parameter's declared type. `DerivedPredicate` (external crate)
+/// has no `typed_params` field the way `Pddl8ActionSchema` does, so the type
+/// can't travel as struct data — these guards are the only surviving record
+/// of it by the time grounding runs. Returns the recovered `var -> type` map
+/// and the body with the guards removed (so they never reach a
+/// `GroundDerivedPredicate` or `eval_condition`).
+fn extract_derived_param_types(body: &PddlCondition) -> (HashMap<String, String>, PddlCondition) {
+    let mut types = HashMap::new();
+    let cleaned = match body {
+        PddlCondition::And(parts) => {
+            let mut kept = Vec::with_capacity(parts.len());
+            for part in parts {
+                if let PddlCondition::Atom(a) = part {
+                    if a.pred == crate::parse::DERIVED_PARAM_TYPE_SENTINEL_PRED && a.args.len() == 2
+                    {
+                        types.insert(a.args[0].clone(), a.args[1].clone());
+                        continue;
+                    }
+                }
+                kept.push(part.clone());
+            }
+            if kept.len() == 1 {
+                kept.into_iter().next().unwrap()
+            } else {
+                PddlCondition::And(kept)
+            }
+        }
+        other => other.clone(),
+    };
+    (types, cleaned)
+}
+
 fn ground_derived_schema(
     dp: &DerivedPredicate,
     objects: &[(String, String)],
     type_index: &TypeIndex,
     out: &mut Vec<GroundDerivedPredicate>,
 ) -> Result<(), crate::error::Pddl8Error> {
+    // Per-parameter candidate lists, restricted to type-compatible objects
+    // when the derived predicate declares a type for that parameter — this
+    // is what shrinks grounding from |objects|^n to ∏ᵢ |objects_of_type(paramᵢ)|,
+    // mirroring `ground_schema`'s `typed_params`-based filtering for actions.
+    // A parameter with no recovered type falls back to "object" (matches
+    // every object), preserving exact behavior for untyped/legacy domains.
+    let (param_types, clean_body) = extract_derived_param_types(&dp.body);
+    let dp_owned = DerivedPredicate {
+        head: dp.head.clone(),
+        body: clean_body,
+    };
+    let dp = &dp_owned;
+
     let mut vars = Vec::new();
     for arg in &dp.head.args {
         if arg.starts_with('?') && !vars.iter().any(|(v, _)| v == arg) {
-            vars.push((arg.clone(), "object".to_string()));
+            let req_type = param_types
+                .get(arg)
+                .cloned()
+                .unwrap_or_else(|| "object".to_string());
+            vars.push((arg.clone(), req_type));
         }
     }
 
@@ -1905,18 +2170,14 @@ fn ground_derived_schema(
                 *ts,
                 Box::new(ground_condition(c, binding)?),
             )),
-            PddlCondition::Forall { vars, body } => {
-                Some(PddlCondition::Forall {
-                    vars: vars.clone(),
-                    body: Box::new(subst_condition(body, binding)),
-                })
-            }
-            PddlCondition::Exists { vars, body } => {
-                Some(PddlCondition::Exists {
-                    vars: vars.clone(),
-                    body: Box::new(subst_condition(body, binding)),
-                })
-            }
+            PddlCondition::Forall { vars, body } => Some(PddlCondition::Forall {
+                vars: vars.clone(),
+                body: Box::new(subst_condition(body, binding)),
+            }),
+            PddlCondition::Exists { vars, body } => Some(PddlCondition::Exists {
+                vars: vars.clone(),
+                body: Box::new(subst_condition(body, binding)),
+            }),
         }
     }
 

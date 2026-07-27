@@ -347,7 +347,7 @@ macro_rules! unroll_5_static {
 }
 
 use crate::fixed::{NonNegativeFixed, SignedFixed};
-use crate::generated::case_studies::{
+use crate::generated::consequence_mass::case_studies::{
     LensSpec, PackedSemanticState, FACTOR_ACCESS_FREQUENCY, FACTOR_BUSINESS_VALUE,
     FACTOR_DOWNSTREAM_CONSEQUENCE, FACTOR_RECOMPUTATION_COST, FACTOR_RETRIEVAL_DEMAND,
     FACTOR_SCHEDULING_DEMAND, FACTOR_SEARCH_DEMAND, FACTOR_STANDING, FACTOR_VERIFICATION_COST, K,
@@ -473,6 +473,139 @@ const REFUSALS: [StabilityRefusal; 32] = [
     StabilityRefusal::CertificateMissing,
     StabilityRefusal::CertificateMissing,
 ];
+
+/// Typed refusal for hierarchy-shape validation (`CMCA_CONTRACT.md` §9,
+/// "Hierarchy Acyclicity"), distinct from [`StabilityRefusal`] (which covers
+/// stability/certificate/numeric refusals raised *during* [`allocate`]'s
+/// branchless flow). See [`check_hierarchy_acyclic`].
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum HierarchyRefusal {
+    /// `parent` contains a cycle (or a chain deeper than `N - 1` hops
+    /// permits on a well-formed forest) -- the same ancestor-doubling
+    /// witness `allocate` already checks internally (folded there into the
+    /// generic [`StabilityRefusal::ContractViolation`]).
+    Cyclic,
+}
+
+/// Ancestor-doubling table over `parent`: `P[level][j]` is `j`'s ancestor
+/// `2^level` hops up the `parent` forest (`-1` once a chain reaches a root).
+/// Shared by [`allocate`] (which needs the full table for its
+/// `is_descendant` computation) and [`check_hierarchy_acyclic`] (which only
+/// needs the cycle witness `P[7][j] != -1`) so the two never compute this
+/// independently and risk drifting apart.
+#[allow(non_snake_case)]
+fn ancestor_doubling_table(parent: &[i32; N]) -> [[i32; N]; 8] {
+    let mut P = [[-1i32; N]; 8];
+    unroll_8_static!(j, {
+        P[0][j] = parent[j];
+    });
+
+    // Level 1
+    unroll_8_static!(j, {
+        let parent_node = P[0][j];
+        let mut p_next = -1i32;
+        unroll_8_static!(p_idx, {
+            let matches = const_eq_u32(parent_node as u32, p_idx as u32);
+            p_next = const_select_u32(matches, parent[p_idx] as u32, p_next as u32) as i32;
+        });
+        P[1][j] = p_next;
+    });
+
+    // Level 2
+    unroll_8_static!(j, {
+        let parent_node = P[1][j];
+        let mut p_next = -1i32;
+        unroll_8_static!(p_idx, {
+            let matches = const_eq_u32(parent_node as u32, p_idx as u32);
+            p_next = const_select_u32(matches, parent[p_idx] as u32, p_next as u32) as i32;
+        });
+        P[2][j] = p_next;
+    });
+
+    // Level 3
+    unroll_8_static!(j, {
+        let parent_node = P[2][j];
+        let mut p_next = -1i32;
+        unroll_8_static!(p_idx, {
+            let matches = const_eq_u32(parent_node as u32, p_idx as u32);
+            p_next = const_select_u32(matches, parent[p_idx] as u32, p_next as u32) as i32;
+        });
+        P[3][j] = p_next;
+    });
+
+    // Level 4
+    unroll_8_static!(j, {
+        let parent_node = P[3][j];
+        let mut p_next = -1i32;
+        unroll_8_static!(p_idx, {
+            let matches = const_eq_u32(parent_node as u32, p_idx as u32);
+            p_next = const_select_u32(matches, parent[p_idx] as u32, p_next as u32) as i32;
+        });
+        P[4][j] = p_next;
+    });
+
+    // Level 5
+    unroll_8_static!(j, {
+        let parent_node = P[4][j];
+        let mut p_next = -1i32;
+        unroll_8_static!(p_idx, {
+            let matches = const_eq_u32(parent_node as u32, p_idx as u32);
+            p_next = const_select_u32(matches, parent[p_idx] as u32, p_next as u32) as i32;
+        });
+        P[5][j] = p_next;
+    });
+
+    // Level 6
+    unroll_8_static!(j, {
+        let parent_node = P[5][j];
+        let mut p_next = -1i32;
+        unroll_8_static!(p_idx, {
+            let matches = const_eq_u32(parent_node as u32, p_idx as u32);
+            p_next = const_select_u32(matches, parent[p_idx] as u32, p_next as u32) as i32;
+        });
+        P[6][j] = p_next;
+    });
+
+    // Level 7
+    unroll_8_static!(j, {
+        let parent_node = P[6][j];
+        let mut p_next = -1i32;
+        unroll_8_static!(p_idx, {
+            let matches = const_eq_u32(parent_node as u32, p_idx as u32);
+            p_next = const_select_u32(matches, parent[p_idx] as u32, p_next as u32) as i32;
+        });
+        P[7][j] = p_next;
+    });
+
+    P
+}
+
+/// Validate that `parent` describes an acyclic forest on `N` nodes, per
+/// `CMCA_CONTRACT.md` §9 ("Hierarchy Acyclicity (DAG Property)"): a
+/// well-formed forest always reaches a root (`-1`) within `N` hops from any
+/// node, so `P[7][j] != -1` for any `j` (`P` from [`ancestor_doubling_table`])
+/// is exactly the branchless witness of a cycle -- the same check
+/// [`allocate`] already performs internally before it would otherwise
+/// silently degrade to `root_w_sum == 0` and an all-`eta` output. Callers
+/// that want the `CMCA_CONTRACT.md`-documented `Err(HierarchyRefusal::Cyclic)`
+/// distinguished from `allocate`'s other, unrelated `ContractViolation`
+/// causes should call this first.
+///
+/// # Complexity
+/// $O(1)$: bounded, unrolled `N`-node ancestor doubling, no data-dependent
+/// loops.
+pub fn check_hierarchy_acyclic(parent: &[i32; N]) -> Result<(), HierarchyRefusal> {
+    let p = ancestor_doubling_table(parent);
+    let mut has_cycle = false;
+    unroll_8_static!(j, {
+        has_cycle |= p[7][j] != -1;
+    });
+    if has_cycle {
+        Err(HierarchyRefusal::Cyclic)
+    } else {
+        Ok(())
+    }
+}
 
 // Bounded leaf reciprocal lookup table (nl from 1 to 8)
 const LEAF_RECIP: [NonNegativeFixed; 9] = [
@@ -1202,7 +1335,7 @@ fn compute_pi_kq_for_kq(
 /// ```rust
 /// use bcinr_cmca::fixed::NonNegativeFixed;
 /// use bcinr_cmca::allocator::{allocate, AdaptiveUpdate, AdmittedControlState, CertificateReceipt, EnvelopeReceipt, OutcomeReceipt, CertifiedLearning};
-/// use bcinr_cmca::generated::case_studies::{OBJECT_REGISTRY, LENS_REGISTRY, LAMBDA, ETA, N, Q};
+/// use bcinr_cmca::generated::consequence_mass::case_studies::{OBJECT_REGISTRY, LENS_REGISTRY, LAMBDA, ETA, N, Q};
 /// use bcinr_cmca::generated::stability_profile::CERTIFICATE_DIGEST;
 ///
 /// let mut weights = [[NonNegativeFixed::ONE; 2 * Q]; N];
@@ -1345,86 +1478,19 @@ pub fn allocate(
     });
 
     #[allow(non_snake_case)]
-    let mut P = [[-1i32; N]; 8];
-    unroll_8_static!(j, {
-        P[0][j] = parent[j];
-    });
+    let P = ancestor_doubling_table(parent);
 
-    // Level 1
+    // A well-formed parent forest on N=8 nodes always reaches a root (-1) within
+    // N hops from any node: P[6] already covers the deepest possible chain (7
+    // edges), and once a node's ancestor is -1 it stays -1 (no p_idx in 0..7
+    // matches parent_node == -1). So P[7][j] != -1 for any j is exactly the
+    // branchless witness of a cycle (or a chain deeper than N-1 permits) that
+    // would otherwise silently degrade to root_w_sum == 0 and an all-eta output.
+    // Same witness [`check_hierarchy_acyclic`] exposes under its
+    // `CMCA_CONTRACT.md`-documented `HierarchyRefusal::Cyclic` name.
+    let mut has_cycle = false;
     unroll_8_static!(j, {
-        let parent_node = P[0][j];
-        let mut p_next = -1i32;
-        unroll_8_static!(p_idx, {
-            let matches = const_eq_u32(parent_node as u32, p_idx as u32);
-            p_next = const_select_u32(matches, parent[p_idx] as u32, p_next as u32) as i32;
-        });
-        P[1][j] = p_next;
-    });
-
-    // Level 2
-    unroll_8_static!(j, {
-        let parent_node = P[1][j];
-        let mut p_next = -1i32;
-        unroll_8_static!(p_idx, {
-            let matches = const_eq_u32(parent_node as u32, p_idx as u32);
-            p_next = const_select_u32(matches, parent[p_idx] as u32, p_next as u32) as i32;
-        });
-        P[2][j] = p_next;
-    });
-
-    // Level 3
-    unroll_8_static!(j, {
-        let parent_node = P[2][j];
-        let mut p_next = -1i32;
-        unroll_8_static!(p_idx, {
-            let matches = const_eq_u32(parent_node as u32, p_idx as u32);
-            p_next = const_select_u32(matches, parent[p_idx] as u32, p_next as u32) as i32;
-        });
-        P[3][j] = p_next;
-    });
-
-    // Level 4
-    unroll_8_static!(j, {
-        let parent_node = P[3][j];
-        let mut p_next = -1i32;
-        unroll_8_static!(p_idx, {
-            let matches = const_eq_u32(parent_node as u32, p_idx as u32);
-            p_next = const_select_u32(matches, parent[p_idx] as u32, p_next as u32) as i32;
-        });
-        P[4][j] = p_next;
-    });
-
-    // Level 5
-    unroll_8_static!(j, {
-        let parent_node = P[4][j];
-        let mut p_next = -1i32;
-        unroll_8_static!(p_idx, {
-            let matches = const_eq_u32(parent_node as u32, p_idx as u32);
-            p_next = const_select_u32(matches, parent[p_idx] as u32, p_next as u32) as i32;
-        });
-        P[5][j] = p_next;
-    });
-
-    // Level 6
-    unroll_8_static!(j, {
-        let parent_node = P[5][j];
-        let mut p_next = -1i32;
-        unroll_8_static!(p_idx, {
-            let matches = const_eq_u32(parent_node as u32, p_idx as u32);
-            p_next = const_select_u32(matches, parent[p_idx] as u32, p_next as u32) as i32;
-        });
-        P[6][j] = p_next;
-    });
-
-    // Level 7
-    unroll_8_static!(j, {
-        let parent_node = P[6][j];
-        let mut p_next = -1i32;
-        unroll_8_static!(p_idx, {
-            let matches = const_eq_u32(parent_node as u32, p_idx as u32);
-            p_next = const_select_u32(matches, parent[p_idx] as u32, p_next as u32) as i32;
-        });
-        P[7][j] = p_next;
+        has_cycle |= P[7][j] != -1;
     });
 
     #[allow(non_snake_case)]
@@ -1690,6 +1756,17 @@ pub fn allocate(
         ));
     });
 
+    // Numeric refusals accumulated through the Q16.16 arithmetic chain (overflow,
+    // underflow, division by zero) were previously discarded here: `wrap_result`
+    // only ever saw `err_val` below, never `pi_res[x].err`. Fold them in so
+    // `NumericRangeExceeded`/`UnsupportedDomain` become reachable.
+    let mut numeric_err = u32::MAX;
+    unroll_8_static!(x, {
+        numeric_err = crate::fixed::branchless_err_acc(numeric_err, pi_res[x & 7].err);
+    });
+    let numeric_has_err = const_eq_u32(numeric_err, u32::MAX) == 0;
+
+    let has_error = has_error | has_cycle | numeric_has_err;
     let has_refusal = has_error & !degrade_to_certified_selection;
     unroll_8_static!(v, {
         unroll_8_static!(e, {
@@ -1704,18 +1781,26 @@ pub fn allocate(
     *prev_mode = const_select_u32(has_refusal as u32, *prev_mode, local_prev_mode);
 
     let err_val = const_select_u32(
-        q_err as u32,
-        5,
+        has_cycle as u32,
+        StabilityRefusal::ContractViolation as u32,
         const_select_u32(
-            dwell_err as u32,
-            4,
+            q_err as u32,
+            5,
             const_select_u32(
-                (lr_err | beta_err | eta_err) as u32,
-                3,
+                dwell_err as u32,
+                4,
                 const_select_u32(
-                    (!gd_ok) as u32,
-                    1,
-                    const_select_u32(digest_err as u32, 10, 7),
+                    (lr_err | beta_err | eta_err) as u32,
+                    3,
+                    const_select_u32(
+                        (!gd_ok) as u32,
+                        1,
+                        const_select_u32(
+                            digest_err as u32,
+                            10,
+                            const_select_u32(numeric_has_err as u32, numeric_err, 7),
+                        ),
+                    ),
                 ),
             ),
         ),

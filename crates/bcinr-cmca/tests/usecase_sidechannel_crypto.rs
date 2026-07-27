@@ -20,12 +20,16 @@
 //! - No power draw variations that leak information
 //! - Deterministic Q16.16 fixed-point (no IEEE 754 non-determinism)
 
+#![allow(clippy::needless_range_loop)]
+
 use bcinr_cmca::allocator::{
     allocate, AdaptiveUpdate, AdmittedControlState, CertificateReceipt, CertifiedLearning,
     EnvelopeReceipt, OutcomeReceipt,
 };
 use bcinr_cmca::fixed::NonNegativeFixed;
-use bcinr_cmca::generated::case_studies::{ETA, LAMBDA, LENS_REGISTRY, N, OBJECT_REGISTRY, Q};
+use bcinr_cmca::generated::consequence_mass::case_studies::{
+    ETA, LAMBDA, LENS_REGISTRY, N, OBJECT_REGISTRY, Q,
+};
 use bcinr_cmca::generated::stability_profile::CERTIFICATE_DIGEST;
 
 fn get_proof() -> Option<AdaptiveUpdate<CertifiedLearning>> {
@@ -133,7 +137,7 @@ fn test_timing_constant_across_candidate_sets() {
 /// - Denormalized numbers
 /// - Rounding modes
 /// - Flush-to-zero optimizations
-/// These vary by CPU, compiler, and timing, leaking information.
+/// - These vary by CPU, compiler, and timing, leaking information.
 ///
 /// Q16.16 fixed-point arithmetic is deterministic:
 /// - All operations are saturating integer arithmetic

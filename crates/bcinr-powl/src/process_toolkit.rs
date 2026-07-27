@@ -4,7 +4,7 @@
 //! manufacture new process values, structural witnesses, metrics, and projections
 //! that callers can validate and receipt before execution.
 
-use std::collections::{BTreeSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt;
 
 use bcinr_mfw_ir::Digest;
@@ -52,9 +52,17 @@ impl ProcessNodeRef {
 pub enum ProcessToolkitError {
     InvalidModel(Powl2Error),
     InvalidNode(ProcessNodeRef),
-    InvalidEdge { from: usize, to: usize, len: usize },
+    InvalidEdge {
+        from: usize,
+        to: usize,
+        len: usize,
+    },
     Cycle,
     NodeIndexOverflow(usize),
+    /// A static dispatch schedule was requested for a model whose control flow
+    /// is decided at runtime (`ChoiceGraph`: which branch; `DoRedo`: how many
+    /// repetitions). See [`dispatch_waves`].
+    NotStaticallySchedulable,
 }
 
 impl fmt::Display for ProcessToolkitError {
@@ -345,6 +353,126 @@ pub fn critical_path_length(
         }
     }
     Ok(distance.into_iter().max().unwrap_or(0))
+}
+
+/// The set of nodes dispatchable **right now**, given what has already
+/// completed: every node not yet completed whose precedence predecessors are
+/// all completed.
+///
+/// This is the runtime counterpart to [`topological_layers`] (which precomputes
+/// a static wave decomposition): a caller that dispatches work to agents and
+/// learns of completions out of order asks this after each completion, rather
+/// than replaying a fixed schedule. Both agree when completions arrive
+/// wave-by-wave; this one also stays correct when they do not.
+///
+/// The returned set is an **antichain**: no two of its members are ordered
+/// relative to each other, so all of them may run simultaneously on separate
+/// agents with no coordination protocol -- the precedence structure already
+/// encodes everything that must wait on what. Correct whether `edges` is a
+/// Hasse diagram or transitively closed (`order⁺`, which
+/// `wf_to_powl::execution_order` produces): "all predecessors completed" is
+/// the same predicate either way.
+pub fn ready_set(
+    node_count: usize,
+    edges: &[(usize, usize)],
+    completed: &BTreeSet<usize>,
+) -> Result<Vec<usize>, ProcessToolkitError> {
+    let edges = canonical_edges(node_count, edges)?;
+    // Reject cyclic precedence: a "ready set" over a cycle is meaningless, and
+    // silently returning an empty set would look like "nothing left to do".
+    topological_layers(node_count, &edges)?;
+    for &node in completed {
+        if node >= node_count {
+            return Err(ProcessToolkitError::InvalidEdge {
+                from: node,
+                to: node,
+                len: node_count,
+            });
+        }
+    }
+    let mut predecessors = vec![Vec::<usize>::new(); node_count];
+    for (from, to) in edges {
+        predecessors[to].push(from);
+    }
+    Ok((0..node_count)
+        .filter(|node| !completed.contains(node))
+        .filter(|node| {
+            predecessors[*node]
+                .iter()
+                .all(|predecessor| completed.contains(predecessor))
+        })
+        .collect())
+}
+
+/// The full wave-by-wave dispatch schedule of a model's top-level children:
+/// each inner `Vec` is an antichain safely dispatchable to separate agents at
+/// the same time, and waves run in order.
+///
+/// Silent (tau) children are retired for free rather than emitted: they carry
+/// no work, existing only as the structural scaffolding
+/// `recompose`/`Normalize` insert (`po_init`, `po_go`, `po_fin`, `po_fini`,
+/// `seq_gate`, ...). Retiring them before each wave is measured is what keeps
+/// scaffolding from serializing genuinely concurrent work into separate waves.
+///
+/// Indices are into the model's own `children`, so a child that is itself a
+/// nested submodel is returned as one unit -- correct under POWL semantics,
+/// where a nested model is a single node of its parent. Recurse into it with
+/// `dispatch_waves` again to schedule its interior.
+///
+/// Refuses `ChoiceGraph` and `DoRedo` with
+/// [`ProcessToolkitError::NotStaticallySchedulable`]: which branch of a choice
+/// runs, and how many times a redo repeats, are runtime decisions. A static
+/// schedule over them would have to either guess a branch or claim all of them
+/// run, and both are wrong -- so this refuses rather than fabricating one.
+pub fn dispatch_waves(model: &Powl2Model) -> Result<Vec<Vec<usize>>, ProcessToolkitError> {
+    validate_powl2(model)?;
+    match model {
+        Powl2Model::Activity(_) => Ok(vec![vec![0]]),
+        Powl2Model::Silent => Ok(Vec::new()),
+        // A sequence is a total order: one child per wave, in order, with
+        // silent children carrying no work and so contributing no wave.
+        Powl2Model::Sequence(children) => Ok(children
+            .iter()
+            .enumerate()
+            .filter(|(_, child)| !matches!(child, Powl2Model::Silent))
+            .map(|(index, _)| vec![index])
+            .collect()),
+        Powl2Model::PartialOrder { children, edges } => {
+            let node_count = children.len();
+            let edges = canonical_edges(node_count, edges)?;
+            topological_layers(node_count, &edges)?;
+
+            let mut completed = BTreeSet::new();
+            let mut waves = Vec::new();
+            loop {
+                // Retire every currently-ready silent child, repeatedly: one
+                // retirement can unblock another silent, and a chain of
+                // scaffolding taus must collapse fully before the next real
+                // wave is measured.
+                loop {
+                    let freed = ready_set(node_count, &edges, &completed)?
+                        .into_iter()
+                        .filter(|&node| matches!(children[node], Powl2Model::Silent))
+                        .collect::<Vec<_>>();
+                    if freed.is_empty() {
+                        break;
+                    }
+                    completed.extend(freed);
+                }
+
+                let wave = ready_set(node_count, &edges, &completed)?;
+                if wave.is_empty() {
+                    break;
+                }
+                completed.extend(wave.iter().copied());
+                waves.push(wave);
+            }
+            Ok(waves)
+        }
+        Powl2Model::ChoiceGraph { .. } | Powl2Model::DoRedo { .. } => {
+            Err(ProcessToolkitError::NotStaticallySchedulable)
+        }
+    }
 }
 
 /// Compare exact process identity and activity vocabulary.
@@ -700,6 +828,124 @@ fn render_mermaid(
         Powl2Model::Activity(_) | Powl2Model::Silent => {}
     }
     Ok(())
+}
+
+/// Per-node annotations for [`process_to_mermaid_annotated`]. Every field is
+/// optional so a caller can render whichever layers it has computed.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MermaidAnnotations {
+    /// Dispatch wave index per top-level child, from [`dispatch_waves`].
+    /// Index `i` is the wave containing child `i`, or `None` if that child is
+    /// silent scaffolding (retired for free, never dispatched).
+    pub wave_of_child: Vec<Option<usize>>,
+    /// Consequence mass per node, keyed by the node's stable id (see
+    /// [`ProcessNodeRef::stable_id`]), rendered as a fixed-point decimal.
+    /// Produced by `crate::multifractal::consequence_mass`.
+    pub mass_by_id: BTreeMap<String, String>,
+}
+
+/// Render a process as mermaid, annotated with what the rest of the pipeline
+/// derived about it: which dispatch wave each top-level child belongs to, and
+/// each node's consequence mass.
+///
+/// This is the diagram of a *derived* process, not a hand-drawn one -- the
+/// waves come from [`dispatch_waves`] (antichains safely runnable in
+/// parallel) and the masses from the multifractal cascade, so the picture
+/// shows the concurrency and the allocation that were inferred rather than
+/// declared. [`process_to_mermaid`] is left untouched for callers that want
+/// the bare structure.
+pub fn process_to_mermaid_annotated(
+    model: &Powl2Model,
+    annotations: &MermaidAnnotations,
+) -> Result<String, ProcessToolkitError> {
+    validate_powl2(model)?;
+    let mut lines = vec!["flowchart TD".to_string()];
+    render_mermaid_annotated(model, &ProcessNodeRef::root(), annotations, &mut lines)?;
+    Ok(lines.join("\n"))
+}
+
+fn render_mermaid_annotated(
+    model: &Powl2Model,
+    node: &ProcessNodeRef,
+    annotations: &MermaidAnnotations,
+    lines: &mut Vec<String>,
+) -> Result<(), ProcessToolkitError> {
+    let id = node.stable_id();
+    let mut label = mermaid_label(model);
+    if let Some(mass) = annotations.mass_by_id.get(&id) {
+        label.push_str(&format!("<br/>pi={mass}"));
+    }
+    // Wave indices are only meaningful for the top level, which is the level
+    // `dispatch_waves` scheduled; a nested submodel is one unit there.
+    if node.path().len() == 1 {
+        if let Some(Some(wave)) = annotations.wave_of_child.get(node.path()[0] as usize) {
+            label.push_str(&format!("<br/>wave {wave}"));
+        }
+    }
+    lines.push(format!("    {id}[\"{label}\"]"));
+
+    let child_models = children(model);
+    for (index, child) in child_models.iter().enumerate() {
+        let child_ref = node.child(index)?;
+        render_mermaid_annotated(child, &child_ref, annotations, lines)?;
+        lines.push(format!(
+            "    {id} -. contains .-> {}",
+            child_ref.stable_id()
+        ));
+    }
+    match model {
+        Powl2Model::Sequence(children) => {
+            for index in 0..children.len().saturating_sub(1) {
+                lines.push(format!(
+                    "    {} --> {}",
+                    node.child(index)?.stable_id(),
+                    node.child(index + 1)?.stable_id()
+                ));
+            }
+        }
+        Powl2Model::PartialOrder { edges, .. } => {
+            for &(from, to) in edges {
+                lines.push(format!(
+                    "    {} --> {}",
+                    node.child(from)?.stable_id(),
+                    node.child(to)?.stable_id()
+                ));
+            }
+        }
+        Powl2Model::ChoiceGraph { edges, .. } => {
+            for &(from, to) in edges {
+                lines.push(format!(
+                    "    {} -. choice .-> {}",
+                    node.child(from)?.stable_id(),
+                    node.child(to)?.stable_id()
+                ));
+            }
+        }
+        Powl2Model::DoRedo { .. } => {
+            lines.push(format!(
+                "    {} -. redo .-> {}",
+                node.child(1)?.stable_id(),
+                node.child(0)?.stable_id()
+            ));
+        }
+        Powl2Model::Activity(_) | Powl2Model::Silent => {}
+    }
+    Ok(())
+}
+
+/// Invert [`dispatch_waves`] into the per-child lookup
+/// [`MermaidAnnotations::wave_of_child`] expects.
+#[must_use]
+pub fn wave_of_child(child_count: usize, waves: &[Vec<usize>]) -> Vec<Option<usize>> {
+    let mut lookup = vec![None; child_count];
+    for (wave_index, wave) in waves.iter().enumerate() {
+        for &child in wave {
+            if child < child_count {
+                lookup[child] = Some(wave_index);
+            }
+        }
+    }
+    lookup
 }
 
 fn mermaid_label(model: &Powl2Model) -> String {

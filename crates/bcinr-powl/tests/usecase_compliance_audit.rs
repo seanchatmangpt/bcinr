@@ -35,11 +35,11 @@ fn execute(ast: &PowlAstNode<'_>, run_id: u64) -> (PowlTape, PowlRunState, OcelL
         while bits != 0 {
             let op_idx = bits.trailing_zeros();
             bits &= bits - 1;
-            log.record_op_fired(run_id, op_idx, 0).unwrap();
+            log.record_op_fired(run_id, op_idx, 0, 0).unwrap();
             op_trace |= 1u64 << op_idx;
         }
     }
-    log.record_run_sealed(run_id, op_trace).unwrap();
+    log.record_run_sealed(run_id, op_trace, 0).unwrap();
     (tape, state, log)
 }
 
@@ -65,10 +65,10 @@ fn test_blake3_receipt_chain_tamper_evident() {
     // fired (a forged approval step that never actually ran through the
     // scheduler).
     let mut log_tampered = OcelLog::new();
-    log_tampered.record_op_fired(run_id, 0, 0).unwrap();
-    log_tampered.record_op_fired(run_id, 1, 0).unwrap();
-    log_tampered.record_op_fired(run_id, 99, 0).unwrap(); // forged op
-    log_tampered.record_run_sealed(run_id, 0b111).unwrap();
+    log_tampered.record_op_fired(run_id, 0, 0, 0).unwrap();
+    log_tampered.record_op_fired(run_id, 1, 0, 0).unwrap();
+    log_tampered.record_op_fired(run_id, 99, 0, 0).unwrap(); // forged op
+    log_tampered.record_run_sealed(run_id, 0b111, 0).unwrap();
 
     let digest_tampered = log_tampered.seal_receipt().digest();
 
@@ -168,8 +168,8 @@ fn test_precondition_recording_for_audit() {
     // Fabricate an incomplete log: only the second op is recorded, its
     // predecessor (check_budget) never fired. This must NOT conform.
     let mut incomplete_log = OcelLog::new();
-    incomplete_log.record_op_fired(1, 1, 0).unwrap();
-    incomplete_log.record_run_sealed(1, 0b10).unwrap();
+    incomplete_log.record_op_fired(1, 1, 0, 0).unwrap();
+    incomplete_log.record_run_sealed(1, 0b10, 0).unwrap();
 
     assert_ne!(
         incomplete_log.validate_against_tape(&tape),

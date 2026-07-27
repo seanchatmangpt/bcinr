@@ -21,7 +21,9 @@ use bcinr_cmca::allocator::{
     EnvelopeReceipt, OutcomeReceipt, StabilityRefusal,
 };
 use bcinr_cmca::fixed::NonNegativeFixed;
-use bcinr_cmca::generated::case_studies::{ETA, LAMBDA, LENS_REGISTRY, N, OBJECT_REGISTRY, Q};
+use bcinr_cmca::generated::consequence_mass::case_studies::{
+    ETA, LAMBDA, LENS_REGISTRY, N, OBJECT_REGISTRY, Q,
+};
 use bcinr_cmca::generated::stability_profile::CERTIFICATE_DIGEST;
 use bcinr_cmca::observatory::{
     evaluate_calibration, MeasurementArtifact, ModeDelta, ObservatoryFlag, SupportStanding,

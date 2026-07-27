@@ -43,10 +43,7 @@ impl TrajectoryPolicy {
     ///
     /// * `preferences` - Soft preferences (violations contribute to cost)
     /// * `hard_constraints` - Hard constraints (violations refuse the plan)
-    pub fn new(
-        preferences: &[PddlPreference],
-        hard_constraints: &[TrajectoryConstraint],
-    ) -> Self {
+    pub fn new(preferences: &[PddlPreference], hard_constraints: &[TrajectoryConstraint]) -> Self {
         let mut hard_monitors = Vec::new();
         let mut soft_monitors = Vec::new();
 
@@ -135,12 +132,18 @@ impl TrajectoryPolicy {
     /// Check all hard constraints at the end of the plan.
     ///
     /// Some constraints (like `sometime`) can only be fully checked at the end.
+    /// `Pending` is not uniformly a violation here: each monitor's own
+    /// `pending_is_satisfied_at_finalize` says whether ending `Pending` means
+    /// "never witnessed" (a violation, e.g. `sometime`) or "held throughout
+    /// without ever failing" (satisfied, e.g. `always`) -- see that method's
+    /// doc comment.
     pub fn finalize(&self) -> Result<(), ConstraintViolation> {
-        for state in &self.hard_states {
+        for (state, (_, monitor)) in self.hard_states.iter().zip(&self.hard_monitors) {
             match state {
                 MonitorState::Pending => {
-                    // Plan ended with a pending constraint (e.g., `sometime` never saw the event)
-                    return Err(ConstraintViolation::HardConstraint);
+                    if !monitor.pending_is_satisfied_at_finalize() {
+                        return Err(ConstraintViolation::HardConstraint);
+                    }
                 }
                 MonitorState::Violated | MonitorState::IrrecoverablyViolated => {
                     return Err(ConstraintViolation::HardConstraint);

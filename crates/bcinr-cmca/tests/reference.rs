@@ -1,4 +1,8 @@
-use bcinr_cmca::generated::case_studies::{LensSpec, PackedSemanticState, K, N, Q};
+#![allow(clippy::needless_range_loop)]
+
+use bcinr_cmca::generated::consequence_mass::case_studies::{
+    LensSpec, PackedSemanticState, K, N, Q,
+};
 
 pub fn compute_measures_f64(state: &PackedSemanticState) -> [f64; K] {
     let factors: Vec<f64> = state

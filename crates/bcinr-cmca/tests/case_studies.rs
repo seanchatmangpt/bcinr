@@ -11,7 +11,9 @@ use bcinr_cmca::allocator::{
     EnvelopeReceipt, OutcomeReceipt, StabilityRefusal,
 };
 use bcinr_cmca::fixed::NonNegativeFixed;
-use bcinr_cmca::generated::case_studies::{ETA, LAMBDA, LENS_REGISTRY, N, OBJECT_REGISTRY, Q};
+use bcinr_cmca::generated::consequence_mass::case_studies::{
+    ETA, LAMBDA, LENS_REGISTRY, N, OBJECT_REGISTRY, Q,
+};
 
 fn get_proof() -> Option<AdaptiveUpdate<CertifiedLearning>> {
     AdaptiveUpdate::admit_adaptive_update(
@@ -173,14 +175,14 @@ fn test_case_study_3_downstream_consequence() {
 ///
 /// `allocate()` itself is monomorphized against `case_studies`'s N=8/Q=4/K=4
 /// (see `crates/bcinr-cmca/src/allocator.rs`'s `use
-/// crate::generated::case_studies::{N, Q, K, F, ...}`), so the
+/// crate::generated::consequence_mass::case_studies::{N, Q, K, F, ...}`), so the
 /// generalization registry cannot be fed through it directly — the
 /// generalization claim is that the *schema and generator* produce a
 /// structurally different, internally consistent registry, which we assert
 /// against directly.
 #[test]
 fn test_case_study_4_generalization() {
-    use bcinr_cmca::generated::generalization::{
+    use bcinr_cmca::generated::consequence_mass::generalization::{
         ETA as GEN_ETA, LAMBDA as GEN_LAMBDA, LENS_REGISTRY as GEN_LENS_REGISTRY, N as GEN_N,
         OBJECT_REGISTRY as GEN_OBJECT_REGISTRY, Q as GEN_Q,
     };

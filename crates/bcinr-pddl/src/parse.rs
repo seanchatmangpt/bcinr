@@ -25,6 +25,17 @@ pub const CONTINUOUS_EFFECT_SENTINEL_PRED: &str = "__bcinr_unsupported_continuou
 /// canonical external effect enum models numeric fluents only.
 pub const OBJECT_FLUENT_SENTINEL_PRED: &str = "__bcinr_unsupported_object_fluent";
 
+/// Carries a `:derived` parameter's declared type from `parse_derived` to
+/// `ground::ground_derived_schema`. Unlike `Pddl8ActionSchema`, the external
+/// `DerivedPredicate` has no `typed_params` field, so a type parsed here
+/// (via `parse_typed_names`, the same routine every other typed parameter
+/// list in this file uses) can't survive as struct data. `parse_derived`
+/// smuggles it instead as a leading `PddlCondition::Atom(pred = this
+/// sentinel, args = [var, type])` conjunct in the body; `ground_derived_schema`
+/// strips those guards back out before grounding or emitting any
+/// `GroundDerivedPredicate`.
+pub(crate) const DERIVED_PARAM_TYPE_SENTINEL_PRED: &str = "__bcinr_derived_param_type";
+
 pub fn domain_from_pddl(text: &str) -> Result<Pddl8Domain, Pddl8Error> {
     let full = domain31_from_pddl(text)?;
     let actions = full
@@ -479,9 +490,56 @@ fn parse_derived(expr: &SExpr) -> Result<DerivedPredicate, Pddl8Error> {
             ":derived requires a head and body".into(),
         ));
     }
+    // The head is a typed parameter list, not an atom. Parsing it with
+    // `parse_atom` would store the `-` separators and type names as arguments,
+    // so `(ok ?x - obj)` became the 3-ary atom `ok(?x, -, obj)`; grounding then
+    // emitted `ok(o1, -, obj)`, which can never match a use site `(ok ?x)`.
+    // Parameterized derived predicates silently never fired, and any head with
+    // three typed parameters tripped the arity bound outright.
+    let head_list = list[1].list()?;
+    let pred = head_list
+        .first()
+        .ok_or_else(|| Pddl8Error::ParseError(":derived head is empty".into()))?
+        .atom()?
+        .to_string();
+    let params = parse_typed_names(&head_list[1..])?;
+    if params.len() > PDDL8_MAX_ARITY {
+        return Err(Pddl8Error::BoundExceeded {
+            what: "derived head arity",
+            limit: PDDL8_MAX_ARITY,
+            got: params.len(),
+        });
+    }
+    // `DerivedPredicate` has no field to carry each parameter's declared
+    // type through to grounding (see `DERIVED_PARAM_TYPE_SENTINEL_PRED`), so
+    // smuggle it as a leading guard conjunct per typed parameter. Untyped
+    // ("object") parameters get no guard -- `object` matches every object
+    // anyway, so this preserves exact behavior for untyped/legacy domains.
+    let type_guards: Vec<PddlCondition> = params
+        .iter()
+        .filter(|(_, typ)| typ != "object")
+        .map(|(name, typ)| {
+            PddlCondition::Atom(Pddl8Atom {
+                pred: DERIVED_PARAM_TYPE_SENTINEL_PRED.to_string(),
+                args: vec![name.clone(), typ.clone()],
+            })
+        })
+        .collect();
+    let body = parse_condition(&list[2])?;
+    let body = if type_guards.is_empty() {
+        body
+    } else {
+        let mut parts = type_guards;
+        parts.push(body);
+        PddlCondition::And(parts)
+    };
+
     Ok(DerivedPredicate {
-        head: parse_atom(&list[1])?,
-        body: parse_condition(&list[2])?,
+        head: Pddl8Atom {
+            pred,
+            args: params.into_iter().map(|(name, _type)| name).collect(),
+        },
+        body,
     })
 }
 

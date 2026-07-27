@@ -2,7 +2,7 @@
 //!
 //! These tests are designed to DISPROVE claims of correctness, using only the
 //! crate's real, externally-visible public API (`allocator`, `fixed`,
-//! `generated::case_studies`, `observatory`) and real generated fixtures —
+//! `generated::consequence_mass::case_studies`, `observatory`) and real generated fixtures —
 //! no mocks, no doubles. Every assertion is against an actual returned
 //! value or `Result` variant, never a comment describing what a value
 //! "should" be.
@@ -24,12 +24,16 @@
 //! If any test here passes when it should fail, CMCA is proven incorrect at
 //! that point.
 
+#![allow(clippy::needless_range_loop)]
+
 use bcinr_cmca::allocator::{
     allocate, AdaptiveUpdate, AdmittedControlState, CertificateReceipt, CertifiedLearning,
     EnvelopeReceipt, OutcomeReceipt,
 };
 use bcinr_cmca::fixed::NonNegativeFixed;
-use bcinr_cmca::generated::case_studies::{ETA, LAMBDA, LENS_REGISTRY, N, OBJECT_REGISTRY, Q};
+use bcinr_cmca::generated::consequence_mass::case_studies::{
+    ETA, LAMBDA, LENS_REGISTRY, N, OBJECT_REGISTRY, Q,
+};
 use bcinr_cmca::generated::stability_profile::CERTIFICATE_DIGEST;
 use bcinr_cmca::observatory::{
     evaluate_calibration, MeasurementArtifact, ModeDelta, ObservatoryFlag, SupportStanding,

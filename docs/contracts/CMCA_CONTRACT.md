@@ -1,7 +1,10 @@
 # CMCA Subsystem Contract
 
 **Version:** 26.7.17-c2  
-**Scope:** Chatman Multifractal Cascade Allocation (CMCA) — deterministic branchless semantic resource allocation  
+**Scope:** Chatman Multifractal Consequence Allocation (CMCA) — deterministic branchless semantic
+resource allocation. The term "cascade" below names the allocation mechanism (flow propagation
+down a semantic-object forest); "Consequence" is this document's canonical acronym expansion —
+see `../CMCA_EXPLANATION.md`.  
 **Responsibility:** Fixed-point MWU routing, hierarchy-respecting cascade, saturation-safe arithmetic, stability verification
 
 ## Preconditions
@@ -247,7 +250,18 @@ decision ∈ RoutingDecision ⟹
 
 ## Refusal Conditions
 
-Typed refusal enumeration: `enum StabilityRefusal { ... }`, `enum AllocationError { ... }`
+> **Naming note (2026-07-27):** the `SpecError`/`AllocationError` variant names below, and the
+> specific `StabilityRefusal` variant names below, do not match current source. The real
+> `StabilityRefusal` enum (`allocator.rs:362`) uses a different, non-overlapping variant set
+> (`CertificateMissing`, `BlockGainBoundExceeded`, `ContractionMarginInsufficient`,
+> `ModeDwellTimeViolated`, `RuntimeEnvelopeViolated`, `LearningFrozen`, `ContractViolation`, etc.),
+> and no `AllocationError` or `SpecError` type exists anywhere in the crate (only
+> `StabilityRefusal`, `HierarchyRefusal` in `allocator.rs`, and `CertificationRefusal` in
+> `certification.rs`). Treat this section as the original design target/intent, not an
+> as-built API reference — check `allocator.rs`/`certification.rs` directly for the real refusal
+> taxonomy.
+
+Typed refusal enumeration (design target, see note above): `enum StabilityRefusal { ... }`, `enum AllocationError { ... }`
 
 ### Specification Errors (SpecError::*)
 ```

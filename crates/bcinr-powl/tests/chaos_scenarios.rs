@@ -109,7 +109,8 @@ fn test_delay_1000_ticks_dependent_order_preserved() {
 
     // Verify all three ops eventually completed
     assert_eq!(
-        (result.all_fired as u64).count_ones(), 3,
+        (result.all_fired as u64).count_ones(),
+        3,
         "All 3 ops must have fired despite delay"
     );
 
@@ -118,7 +119,8 @@ fn test_delay_1000_ticks_dependent_order_preserved() {
     // So op 0 must be in done_mask before op 1 fires, etc.
     let expected_all_fired = 0b111u64; // ops 0, 1, 2
     assert_eq!(
-        result.all_fired & expected_all_fired, expected_all_fired,
+        result.all_fired & expected_all_fired,
+        expected_all_fired,
         "All sequential ops must complete"
     );
 
@@ -219,10 +221,7 @@ fn test_reorder_ready_set_preserves_dependency_validity() {
     // This has parallel branches that could be reordered.
     let ast = PowlAstNode::Sequence(vec![
         PowlAstNode::PartialOrder {
-            children: vec![
-                PowlAstNode::Atom("branch_A"),
-                PowlAstNode::Atom("branch_C"),
-            ],
+            children: vec![PowlAstNode::Atom("branch_A"), PowlAstNode::Atom("branch_C")],
             edges: vec![], // No dependencies; all can run concurrently
         },
         PowlAstNode::Atom("join_E"),
@@ -257,7 +256,8 @@ fn test_reorder_ready_set_preserves_dependency_validity() {
 
     // Verify all ops eventually completed
     assert_eq!(
-        (result.all_fired.count_ones()) as usize, tape.len as usize,
+        (result.all_fired.count_ones()) as usize,
+        tape.len as usize,
         "All ops must eventually fire despite reordering"
     );
 
@@ -285,7 +285,8 @@ fn test_uninjected_execution_baseline() {
 
     // All 3 ops must fire
     assert_eq!(
-        (result.all_fired.count_ones()), 3,
+        (result.all_fired.count_ones()),
+        3,
         "All 3 sequential ops must fire"
     );
 

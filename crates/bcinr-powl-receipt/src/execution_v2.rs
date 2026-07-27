@@ -22,6 +22,14 @@ pub struct PowlV2ExecutionReceipt {
     pub final_done_mask: u64,
     pub tick_count: u32,
     pub chain_root: String,
+    /// Operations blocked by external constraints (resource conflicts, etc.)
+    pub final_blocked_mask: u64,
+    /// Operations refused by admission gates
+    pub final_refused_mask: u64,
+    /// Operations that timed out (exceeded iteration/deadline limits)
+    pub final_timed_out_mask: u64,
+    /// Digest of reasons for blocked/refused/timed_out operations
+    pub reasons_digest: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,6 +42,10 @@ pub enum PowlV2ReceiptError {
     FinalStateMismatch,
     ChainRootMismatch,
     UnsupportedVersion { found: u16 },
+    BlockedMaskMismatch { expected: u64, found: u64 },
+    RefusedMaskMismatch { expected: u64, found: u64 },
+    TimedOutMaskMismatch { expected: u64, found: u64 },
+    ReasonsDigestMismatch,
 }
 
 impl std::fmt::Display for PowlV2ReceiptError {
@@ -60,6 +72,25 @@ impl std::fmt::Display for PowlV2ReceiptError {
             Self::UnsupportedVersion { found } => {
                 write!(f, "unsupported POWL v2 receipt version {found}")
             }
+            Self::BlockedMaskMismatch { expected, found } => {
+                write!(
+                    f,
+                    "POWL v2 blocked mask mismatch: expected {expected:#x}, found {found:#x}"
+                )
+            }
+            Self::RefusedMaskMismatch { expected, found } => {
+                write!(
+                    f,
+                    "POWL v2 refused mask mismatch: expected {expected:#x}, found {found:#x}"
+                )
+            }
+            Self::TimedOutMaskMismatch { expected, found } => {
+                write!(
+                    f,
+                    "POWL v2 timed out mask mismatch: expected {expected:#x}, found {found:#x}"
+                )
+            }
+            Self::ReasonsDigestMismatch => write!(f, "POWL v2 reasons digest mismatch"),
         }
     }
 }
@@ -99,6 +130,11 @@ pub fn execute_and_seal_v2(
     }
 
     let chain_root = digest_chain(&tape_root, &guard_root, &fired_masks, state.done_mask);
+
+    // Compute reasons digest (currently empty since blocked/refused/timed_out tracking
+    // is populated by scheduler_tick_with_resources, not standard scheduler_tick_v2)
+    let reasons_digest = digest_reasons(&[], &[], &[]);
+
     Ok(PowlV2ExecutionReceipt {
         version: EXECUTION_V2_RECEIPT_VERSION,
         tape_root,
@@ -107,6 +143,10 @@ pub fn execute_and_seal_v2(
         final_done_mask: state.done_mask,
         tick_count: state.tick,
         chain_root,
+        final_blocked_mask: 0,
+        final_refused_mask: 0,
+        final_timed_out_mask: 0,
+        reasons_digest,
     })
 }
 
@@ -137,6 +177,27 @@ pub fn verify_execution_v2(
     }
     if replay.chain_root != receipt.chain_root {
         return Err(PowlV2ReceiptError::ChainRootMismatch);
+    }
+    if replay.final_blocked_mask != receipt.final_blocked_mask {
+        return Err(PowlV2ReceiptError::BlockedMaskMismatch {
+            expected: receipt.final_blocked_mask,
+            found: replay.final_blocked_mask,
+        });
+    }
+    if replay.final_refused_mask != receipt.final_refused_mask {
+        return Err(PowlV2ReceiptError::RefusedMaskMismatch {
+            expected: receipt.final_refused_mask,
+            found: replay.final_refused_mask,
+        });
+    }
+    if replay.final_timed_out_mask != receipt.final_timed_out_mask {
+        return Err(PowlV2ReceiptError::TimedOutMaskMismatch {
+            expected: receipt.final_timed_out_mask,
+            found: replay.final_timed_out_mask,
+        });
+    }
+    if replay.reasons_digest != receipt.reasons_digest {
+        return Err(PowlV2ReceiptError::ReasonsDigestMismatch);
     }
     Ok(())
 }
@@ -170,6 +231,42 @@ pub fn digest_guards(guards: &ConcurrencyGuardTable) -> String {
         hasher.update(&[0xff]);
         hasher.update(nonface.witness_digest.as_bytes());
     }
+    hasher.finalize().to_hex().to_string()
+}
+
+/// Deterministic commitment to blocked/refused/timed_out reasons.
+fn digest_reasons(
+    blocked_reasons: &[(usize, String)],
+    refused_reasons: &[(usize, String)],
+    timed_out_reasons: &[(usize, String)],
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"bcinr:powl-v2:reasons:v1");
+
+    // Digest blocked reasons
+    hasher.update(&(blocked_reasons.len() as u64).to_le_bytes());
+    for (idx, reason) in blocked_reasons {
+        hasher.update(&(*idx as u64).to_le_bytes());
+        hasher.update(reason.as_bytes());
+        hasher.update(&[0xff]); // separator
+    }
+
+    // Digest refused reasons
+    hasher.update(&(refused_reasons.len() as u64).to_le_bytes());
+    for (idx, reason) in refused_reasons {
+        hasher.update(&(*idx as u64).to_le_bytes());
+        hasher.update(reason.as_bytes());
+        hasher.update(&[0xff]); // separator
+    }
+
+    // Digest timed_out reasons
+    hasher.update(&(timed_out_reasons.len() as u64).to_le_bytes());
+    for (idx, reason) in timed_out_reasons {
+        hasher.update(&(*idx as u64).to_le_bytes());
+        hasher.update(reason.as_bytes());
+        hasher.update(&[0xff]); // separator
+    }
+
     hasher.finalize().to_hex().to_string()
 }
 

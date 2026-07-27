@@ -229,7 +229,12 @@ fn test_multiple_constraints() {
 
 #[test]
 fn test_within_constraint() {
-    /// A condition must be achieved within a certain time limit.
+    /// `within` is refused, not silently mis-monitored: `ConstraintMonitor::step`
+    /// has no access to the current time/tick, so a `WithinMonitor` could only
+    /// ever compute a wrong answer that looks like a real one (see
+    /// `MonitorFactory::create_monitor`'s doc comment). `build` must report
+    /// `Pddl8Error::UnsupportedTrajectoryConstraint` rather than silently
+    /// admitting a constraint it cannot actually check.
     const DOMAIN: &str = r#"
 (define (domain within-test)
   (:requirements :durative-actions)
@@ -252,16 +257,19 @@ fn test_within_constraint() {
     let domain = domain_from_pddl(DOMAIN).expect("domain must parse");
     let problem = problem_from_pddl(PROBLEM).expect("problem must parse");
 
-    let gtp = GroundTemporalProblem::build(&domain, &problem).expect("must ground");
-    let outcome = gtp.find_temporal_plan();
-
-    // Plan should succeed: goal-reached is achieved within 5 time units
-    assert!(matches!(outcome, PlannerOutcome::Found(_)));
+    let result = GroundTemporalProblem::build(&domain, &problem);
+    let err = result.err();
+    assert!(
+        matches!(err, Some(bcinr_pddl::Pddl8Error::UnsupportedTrajectoryConstraint(_))),
+        "expected UnsupportedTrajectoryConstraint, got {err:?}"
+    );
 }
 
 #[test]
 fn test_always_within_constraint() {
-    /// Whenever condition C1 holds, condition C2 must hold within N time units.
+    /// Same reasoning as `test_within_constraint`: `always-within` also needs
+    /// a time/window the monitor's `step` signature cannot see, so it is
+    /// refused rather than silently mis-monitored.
     const DOMAIN: &str = r#"
 (define (domain always-within-test)
   (:requirements :durative-actions)
@@ -289,16 +297,21 @@ fn test_always_within_constraint() {
     let domain = domain_from_pddl(DOMAIN).expect("domain must parse");
     let problem = problem_from_pddl(PROBLEM).expect("problem must parse");
 
-    let gtp = GroundTemporalProblem::build(&domain, &problem).expect("must ground");
-    let outcome = gtp.find_temporal_plan();
-
-    // Plan should succeed: whenever monitoring holds, safe is established quickly
-    assert!(matches!(outcome, PlannerOutcome::Found(_)));
+    let result = GroundTemporalProblem::build(&domain, &problem);
+    let err = result.err();
+    assert!(
+        matches!(err, Some(bcinr_pddl::Pddl8Error::UnsupportedTrajectoryConstraint(_))),
+        "expected UnsupportedTrajectoryConstraint, got {err:?}"
+    );
 }
 
 #[test]
 fn test_monitor_factory_all_types() {
-    /// Verify that MonitorFactory can create monitors for all 7 constraint types.
+    /// Verify `MonitorFactory` creates a real monitor for the 5 constraint
+    /// types it can actually check, and honestly refuses (`None`) the 2 timed
+    /// types (`within`/`always-within`) whose semantics `ConstraintMonitor::
+    /// step`'s time-blind signature cannot support -- see
+    /// `MonitorFactory::create_monitor`'s doc comment.
     use bcinr_pddl::ground::monitors::MonitorFactory;
     use wasm4pm_compat::pddl::{Pddl8Atom, PddlCondition, TrajectoryConstraint};
 
@@ -312,19 +325,24 @@ fn test_monitor_factory_all_types() {
         args: vec![],
     }));
 
-    // Test all 7 constraint types
-    let constraints = vec![
+    let monitored = vec![
         TrajectoryConstraint::Always(cond.clone()),
         TrajectoryConstraint::Sometime(cond.clone()),
-        TrajectoryConstraint::Within(5.0, cond.clone()),
         TrajectoryConstraint::AtMostOnce(cond.clone()),
         TrajectoryConstraint::SometimeBefore(cond.clone(), cond2.clone()),
         TrajectoryConstraint::SometimeAfter(cond.clone(), cond2.clone()),
-        TrajectoryConstraint::AlwaysWithin(3.0, cond.clone(), cond2.clone()),
     ];
-
-    for constraint in &constraints {
+    for constraint in &monitored {
         let monitor = MonitorFactory::create_monitor(constraint);
         assert!(monitor.is_some(), "Failed to create monitor for {:?}", constraint);
+    }
+
+    let refused = vec![
+        TrajectoryConstraint::Within(5.0, cond.clone()),
+        TrajectoryConstraint::AlwaysWithin(3.0, cond.clone(), cond2.clone()),
+    ];
+    for constraint in &refused {
+        let monitor = MonitorFactory::create_monitor(constraint);
+        assert!(monitor.is_none(), "Expected refusal (None) for {:?}", constraint);
     }
 }

@@ -233,7 +233,9 @@ use bcinr_cmca::allocator::{
     allocate, AdaptiveUpdate, AdmittedControlState, CertifiedLearning, EnvelopeReceipt,
     OutcomeReceipt,
 };
-use bcinr_cmca::generated::case_studies::{ETA, LAMBDA, LENS_REGISTRY, N, OBJECT_REGISTRY, Q};
+use bcinr_cmca::generated::consequence_mass::case_studies::{
+    ETA, LAMBDA, LENS_REGISTRY, N, OBJECT_REGISTRY, Q,
+};
 use bcinr_cmca::generated::stability_profile::CERTIFICATE_DIGEST;
 
 fn get_proof() -> Option<AdaptiveUpdate<CertifiedLearning>> {

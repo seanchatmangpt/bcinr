@@ -31,7 +31,7 @@
 
 use bcinr_powl::compiler::{compile_powl, PowlAstNode};
 use bcinr_powl::ocel::OcelLog;
-use bcinr_powl::scheduler::{scheduler_tick, OpTimeInterval, ResourceRegistry, PowlRunState};
+use bcinr_powl::scheduler::{scheduler_tick, OpTimeInterval, PowlRunState, ResourceRegistry};
 use bcinr_powl::tape::PowlTape;
 use std::collections::HashSet;
 
@@ -86,7 +86,10 @@ fn adversarial_malformed_interval_start_gte_end_rejected() {
     // The malformed [10, 5) doesn't overlap with any real interval (start > end breaks overlap logic),
     // so it won't report a conflict. The check should either return None (no conflict found)
     // or Some(0) if op_1 is checking against itself; the key property is NO PANIC.
-    assert!(check.is_none() || check == Some(1), "malformed interval must not cause panic or corruption");
+    assert!(
+        check.is_none() || check == Some(1),
+        "malformed interval must not cause panic or corruption"
+    );
 }
 
 /// Test 2: Overlapping intervals for the same op are detected as adversarial
@@ -116,7 +119,8 @@ fn adversarial_double_booking_same_resource_same_op_detected() {
 
     // interval_3 overlaps with interval_1 ([5, 15) overlaps [0, 10) at [5, 10))
     assert_eq!(
-        conflict, Some(0),
+        conflict,
+        Some(0),
         "interval_3 must conflict with op_0's first booking (interval_1)"
     );
 }
@@ -141,7 +145,10 @@ fn adversarial_huge_interval_no_overflow_panic() {
     let conflict = registry.check_conflict("resource", normal);
 
     // Whether it conflicts or not is less important than no panic occurring
-    assert!(conflict.is_none() || conflict == Some(0), "must not panic on huge interval comparison");
+    assert!(
+        conflict.is_none() || conflict == Some(0),
+        "must not panic on huge interval comparison"
+    );
 }
 
 /// Test 4: Multiple conflicting requests in parallel (partial order) all execute
@@ -162,7 +169,10 @@ fn adversarial_partial_order_resource_contention_no_starvation() {
     let (_tape, state, log, _ticks) = execute(&ast, 1);
 
     // All three ops must eventually fire (no starvation)
-    assert_eq!(state.check_mask, 0, "all workers must complete (no infinite wait)");
+    assert_eq!(
+        state.check_mask, 0,
+        "all workers must complete (no infinite wait)"
+    );
 
     let fired: HashSet<u32> = log.events().iter().map(|e| e.op_idx).collect();
     for op_idx in 0..3u32 {
@@ -190,7 +200,10 @@ fn adversarial_malformed_request_in_sequence_workflow_continues() {
     let (_tape, state, log, ticks) = execute(&ast, 2);
 
     // The sequence must complete (no deadlock or panic)
-    assert_eq!(state.check_mask, 0, "sequence must complete despite malformed middle op");
+    assert_eq!(
+        state.check_mask, 0,
+        "sequence must complete despite malformed middle op"
+    );
 
     let fired: Vec<u32> = log.events().iter().map(|e| e.op_idx).collect();
     // All ops should fire, even if op_1 (op_b_malformed_request) is handled specially
@@ -291,7 +304,10 @@ fn adversarial_scheduling_no_llm_calls_made() {
     // If the compiler called an LLM, the results would differ (randomness).
     // Same length + same order is evidence of determinism, hence no LLM.
     assert!(
-        tape1.ops[..tape1.len as usize].iter().zip(&tape2.ops[..tape2.len as usize]).all(|(a, b)| a == b),
+        tape1.ops[..tape1.len as usize]
+            .iter()
+            .zip(&tape2.ops[..tape2.len as usize])
+            .all(|(a, b)| a == b),
         "compiled ops must be identical (deterministic, no LLM randomness)"
     );
 }

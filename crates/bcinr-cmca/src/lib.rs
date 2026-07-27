@@ -1,8 +1,12 @@
-//! # CMCA: Covariance Monitoring and Calibration Assessment
+//! # CMCA: Chatman Multifractal Consequence Allocation
 //!
 //! `bcinr-cmca` is an authoritative systems library implementing deterministic,
 //! branchless, and allocation-free algorithms for runtime telemetry, calibration,
-//! and monitoring of bounded computational systems.
+//! monitoring, and cascade allocation (see [`allocator`]) of bounded computational
+//! systems. "Covariance Monitoring and Calibration Assessment" was this crate's
+//! earlier, calibration-only framing; see `docs/CMCA_EXPLANATION.md` for the
+//! canonical-name reconciliation across this crate's calibration (`observatory`)
+//! and cascade-allocation (`allocator`) responsibilities.
 //!
 //! Under the strict constraints of the **Radon Law** (Cyclomatic Complexity $CC=1$),
 //! this module provides tools to audit the health and stability of mathematical
@@ -89,12 +93,19 @@
 extern crate std;
 
 pub mod allocator;
+/// Arbitrary-shape multifractal cascade with a lens per level. Requires
+/// `alloc`: unlike [`allocator`], it sizes to the tree rather than to a fixed
+/// `N = 8`, so it cannot be allocation-free. See the module docs for why both
+/// exist.
+#[cfg(feature = "alloc")]
+pub mod cascade;
 pub mod fixed;
 pub mod generated;
 pub mod lrc;
 pub mod observatory;
+pub mod stability_theorem;
 
-pub use allocator::StabilityRefusal;
+pub use allocator::{check_hierarchy_acyclic, HierarchyRefusal, StabilityRefusal};
 
 // INTEGRATION NOTE (v26.7.24): Recovery-only authority modules (CertifiedLearning,
 // CertifiedSelectionOnly, AdmittedControlState, CertificateReceipt, EnvelopeReceipt,

@@ -54,6 +54,12 @@ pub enum Pddl8Error {
     ReceiptIntegrity(String),
     /// case_id contains disallowed characters or is out of the 1-64 char range.
     InvalidCaseId(String),
+    /// Numeric effect caused arithmetic error (division by zero, NaN, etc).
+    /// Function name and reason for the failure.
+    NumericError {
+        function: String,
+        reason: String,
+    },
     /// A bounded search/analysis stage (`PlannerOutcome<T>`) did not produce
     /// `Found` — carries the *full* typed witness
     /// (`bcinr_mfw_ir::PlannerFailure`: `Exhausted`/`Bounded`/`Unsupported`/
@@ -64,6 +70,14 @@ pub enum Pddl8Error {
     /// (via `?`, see the `From` impl below) over hand-mapping to
     /// `NoAdmittedPlan`.
     PlanningFailed(bcinr_mfw_ir::PlannerFailure),
+    /// A domain's `:constraints` uses a trajectory-constraint kind
+    /// `ground::monitors::MonitorFactory` has no monitor for (currently
+    /// `HoldDuring`/`HoldAfter` — see that factory's `create_monitor`).
+    /// Refused at `GroundTemporalProblem::build` time rather than silently
+    /// admitted and then silently dropped by
+    /// `ground::trajectory_policy::TrajectoryPolicy::new`, which only skips
+    /// whatever `create_monitor` returns `None` for instead of refusing.
+    UnsupportedTrajectoryConstraint(String),
 }
 
 impl std::fmt::Display for Pddl8Error {
@@ -81,7 +95,13 @@ impl std::fmt::Display for Pddl8Error {
             Self::GoalNotReached => write!(f, "goal not reached after plan execution"),
             Self::ReceiptIntegrity(s) => write!(f, "receipt integrity failure: {s}"),
             Self::InvalidCaseId(s) => write!(f, "invalid case_id: {s}"),
+            Self::NumericError { function, reason } => {
+                write!(f, "numeric error in function '{function}': {reason}")
+            }
             Self::PlanningFailed(w) => write!(f, "planning stage did not find a value: {w}"),
+            Self::UnsupportedTrajectoryConstraint(s) => {
+                write!(f, "unsupported trajectory constraint: {s}")
+            }
         }
     }
 }

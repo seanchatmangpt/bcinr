@@ -1,3 +1,4 @@
+#![allow(clippy::needless_range_loop)]
 #![cfg(not(any(
     feature = "mutant_1",
     feature = "mutant_2",
@@ -13,7 +14,9 @@ use bcinr_cmca::allocator::{
     EnvelopeReceipt, OutcomeReceipt,
 };
 use bcinr_cmca::fixed::{NonNegativeFixed, SignedFixed};
-use bcinr_cmca::generated::case_studies::{LensSpec, PackedSemanticState, K, N, Q};
+use bcinr_cmca::generated::consequence_mass::case_studies::{
+    LensSpec, PackedSemanticState, K, N, Q,
+};
 use bcinr_cmca::generated::stability_profile::CERTIFICATE_DIGEST;
 use reference::allocate_f64;
 

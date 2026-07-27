@@ -22,9 +22,7 @@ use std::collections::BTreeSet;
 
 use wasm4pm_compat::pddl::{Pddl8GroundAtom, PddlCondition, TrajectoryConstraint};
 
-use crate::ground::{
-    eval_condition, QuantifierDomain, GroundDerivedPredicate,
-};
+use crate::ground::{eval_condition, GroundDerivedPredicate, QuantifierDomain};
 use std::collections::HashMap;
 
 /// State of a constraint monitor after processing one step.
@@ -43,12 +41,18 @@ pub enum MonitorState {
 impl MonitorState {
     /// Check if the constraint is violated (either now or irrecoverably).
     pub fn is_violated(&self) -> bool {
-        matches!(self, MonitorState::Violated | MonitorState::IrrecoverablyViolated)
+        matches!(
+            self,
+            MonitorState::Violated | MonitorState::IrrecoverablyViolated
+        )
     }
 
     /// Check if the constraint is in a terminal state.
     pub fn is_terminal(&self) -> bool {
-        matches!(self, MonitorState::Satisfied | MonitorState::IrrecoverablyViolated)
+        matches!(
+            self,
+            MonitorState::Satisfied | MonitorState::IrrecoverablyViolated
+        )
     }
 }
 
@@ -72,6 +76,24 @@ pub trait ConstraintMonitor: Send + Sync {
         quant_domain: &QuantifierDomain,
         derived_predicates: &[GroundDerivedPredicate],
     ) -> MonitorState;
+
+    /// Whether the trajectory ending with this monitor still in
+    /// `MonitorState::Pending` counts as satisfied, not violated.
+    ///
+    /// `Pending` means two different things depending on the constraint:
+    /// for a "must eventually happen" monitor (e.g. `Sometime`, whose own
+    /// `step` only leaves `Pending` for "haven't witnessed it yet"), ending
+    /// `Pending` means the required event never occurred -- a genuine
+    /// violation, and the default (`false`) here is correct. For a "must
+    /// never be falsified" monitor (e.g. `Always`, whose `step` has no
+    /// terminal `Satisfied` transition at all -- it only ever holds
+    /// `Pending` while unfalsified, or moves to `Violated`), reaching the
+    /// end of the trajectory still `Pending` means the condition held
+    /// throughout without ever failing, which for that constraint's own
+    /// semantics *is* satisfaction.
+    fn pending_is_satisfied_at_finalize(&self) -> bool {
+        false
+    }
 }
 
 /// `(always (c))`: Condition `c` must hold in every state.
@@ -86,6 +108,10 @@ impl AlwaysMonitor {
 }
 
 impl ConstraintMonitor for AlwaysMonitor {
+    fn pending_is_satisfied_at_finalize(&self) -> bool {
+        true
+    }
+
     fn step(
         &self,
         monitor_state: MonitorState,
@@ -147,55 +173,6 @@ impl ConstraintMonitor for SometimeMonitor {
         } else {
             MonitorState::Pending
         }
-    }
-}
-
-/// `(within n (c))`: Condition `c` must hold within n time steps.
-pub struct WithinMonitor {
-    steps_remaining: i64,
-    condition: PddlCondition,
-}
-
-impl WithinMonitor {
-    pub fn new(time_limit: f64, condition: PddlCondition) -> Self {
-        Self {
-            steps_remaining: time_limit.ceil() as i64,
-            condition,
-        }
-    }
-}
-
-impl ConstraintMonitor for WithinMonitor {
-    fn step(
-        &self,
-        monitor_state: MonitorState,
-        _prev_state: &BTreeSet<Pddl8GroundAtom>,
-        _action_taken: Option<&str>,
-        next_state: &BTreeSet<Pddl8GroundAtom>,
-        fn_values: &HashMap<String, f64>,
-        quant_domain: &QuantifierDomain,
-        _derived_predicates: &[GroundDerivedPredicate],
-    ) -> MonitorState {
-        // Once satisfied, always satisfied
-        if monitor_state == MonitorState::Satisfied {
-            return MonitorState::Satisfied;
-        }
-
-        let new_remaining = self.steps_remaining - 1;
-
-        // Check if condition holds
-        if eval_condition(&self.condition, next_state, fn_values, quant_domain) {
-            return MonitorState::Satisfied;
-        }
-
-        // If time ran out, irrecoverably violated
-        if new_remaining <= 0 {
-            return MonitorState::IrrecoverablyViolated;
-        }
-
-        // Still waiting (but this won't work for state machines that need to track steps)
-        // For a real implementation, step() would need to know the current time
-        MonitorState::Pending
     }
 }
 
@@ -292,7 +269,8 @@ impl ConstraintMonitor for SometimeBeforeMonitor {
             return monitor_state;
         }
 
-        let after_holds = eval_condition(&self.condition_after, next_state, fn_values, quant_domain);
+        let after_holds =
+            eval_condition(&self.condition_after, next_state, fn_values, quant_domain);
         let before_holds =
             eval_condition(&self.condition_before, next_state, fn_values, quant_domain);
 
@@ -343,8 +321,10 @@ impl ConstraintMonitor for SometimeAfterMonitor {
             return monitor_state;
         }
 
-        let before_holds = eval_condition(&self.condition_before, next_state, fn_values, quant_domain);
-        let after_holds = eval_condition(&self.condition_after, next_state, fn_values, quant_domain);
+        let before_holds =
+            eval_condition(&self.condition_before, next_state, fn_values, quant_domain);
+        let after_holds =
+            eval_condition(&self.condition_after, next_state, fn_values, quant_domain);
 
         match monitor_state {
             MonitorState::Pending => {
@@ -368,61 +348,6 @@ impl ConstraintMonitor for SometimeAfterMonitor {
     }
 }
 
-/// `(always-within n (c1) (c2))`: c2 must hold within n time steps of c1.
-pub struct AlwaysWithinMonitor {
-    time_limit: f64,
-    condition_trigger: PddlCondition,
-    condition_target: PddlCondition,
-    triggered_at: Option<f64>,
-}
-
-impl AlwaysWithinMonitor {
-    pub fn new(
-        time_limit: f64,
-        condition_trigger: PddlCondition,
-        condition_target: PddlCondition,
-    ) -> Self {
-        Self {
-            time_limit,
-            condition_trigger,
-            condition_target,
-            triggered_at: None,
-        }
-    }
-}
-
-impl ConstraintMonitor for AlwaysWithinMonitor {
-    fn step(
-        &self,
-        monitor_state: MonitorState,
-        _prev_state: &BTreeSet<Pddl8GroundAtom>,
-        _action_taken: Option<&str>,
-        next_state: &BTreeSet<Pddl8GroundAtom>,
-        fn_values: &HashMap<String, f64>,
-        quant_domain: &QuantifierDomain,
-        _derived_predicates: &[GroundDerivedPredicate],
-    ) -> MonitorState {
-        if monitor_state.is_terminal() {
-            return monitor_state;
-        }
-
-        let trigger_holds =
-            eval_condition(&self.condition_trigger, next_state, fn_values, quant_domain);
-        let target_holds =
-            eval_condition(&self.condition_target, next_state, fn_values, quant_domain);
-
-        // This implementation would need access to current time to properly track the window
-        // For now, check if target holds when trigger holds
-        if trigger_holds && !target_holds {
-            MonitorState::Violated
-        } else if trigger_holds && target_holds {
-            MonitorState::Satisfied
-        } else {
-            MonitorState::Pending
-        }
-    }
-}
-
 /// Factory for creating monitors from TrajectoryConstraint.
 pub struct MonitorFactory;
 
@@ -438,39 +363,31 @@ impl MonitorFactory {
             TrajectoryConstraint::Sometime(cond) => {
                 Some(Box::new(SometimeMonitor::new((**cond).clone())))
             }
-            TrajectoryConstraint::Within(time_limit, cond) => {
-                Some(Box::new(WithinMonitor::new(*time_limit, (**cond).clone())))
-            }
             TrajectoryConstraint::AtMostOnce(cond) => {
                 Some(Box::new(AtMostOnceMonitor::new((**cond).clone())))
             }
-            TrajectoryConstraint::SometimeBefore(c1, c2) => {
-                Some(Box::new(SometimeBeforeMonitor::new(
-                    (**c1).clone(),
-                    (**c2).clone(),
-                )))
-            }
-            TrajectoryConstraint::SometimeAfter(c1, c2) => {
-                Some(Box::new(SometimeAfterMonitor::new(
-                    (**c1).clone(),
-                    (**c2).clone(),
-                )))
-            }
-            TrajectoryConstraint::AlwaysWithin(time_limit, c1, c2) => {
-                Some(Box::new(AlwaysWithinMonitor::new(
-                    *time_limit,
-                    (**c1).clone(),
-                    (**c2).clone(),
-                )))
-            }
+            TrajectoryConstraint::SometimeBefore(c1, c2) => Some(Box::new(
+                SometimeBeforeMonitor::new((**c1).clone(), (**c2).clone()),
+            )),
+            TrajectoryConstraint::SometimeAfter(c1, c2) => Some(Box::new(
+                SometimeAfterMonitor::new((**c1).clone(), (**c2).clone()),
+            )),
             TrajectoryConstraint::And(_parts) => {
                 // Conjunction should be handled at the constraint collection level
                 None
             }
-            TrajectoryConstraint::HoldDuring(_, _, _) | TrajectoryConstraint::HoldAfter(_, _) => {
-                // These are extensions beyond the core 7 types
-                None
-            }
+            // `within`/`always-within` are refused rather than monitored: a real
+            // implementation needs step() to know the current time/tick to track
+            // a countdown or window, which ConstraintMonitor::step's signature
+            // does not provide -- there is no way to compute the correct answer
+            // here, only a wrong one that looks like an answer (see git history
+            // for the removed WithinMonitor/AlwaysWithinMonitor, whose own
+            // comments admitted this). Grouped with HoldDuring/HoldAfter, the
+            // other two operators this factory already refuses outright.
+            TrajectoryConstraint::Within(_, _)
+            | TrajectoryConstraint::AlwaysWithin(_, _, _)
+            | TrajectoryConstraint::HoldDuring(_, _, _)
+            | TrajectoryConstraint::HoldAfter(_, _) => None,
         }
     }
 }

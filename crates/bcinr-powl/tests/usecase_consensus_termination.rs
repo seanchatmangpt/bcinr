@@ -43,11 +43,11 @@ fn execute(ast: &PowlAstNode<'_>, run_id: u64) -> (PowlTape, PowlRunState, OcelL
         while bits != 0 {
             let op_idx = bits.trailing_zeros();
             bits &= bits - 1;
-            log.record_op_fired(run_id, op_idx, 0).unwrap();
+            log.record_op_fired(run_id, op_idx, 0, 0).unwrap();
             op_trace |= 1u64 << op_idx;
         }
     }
-    log.record_run_sealed(run_id, op_trace).unwrap();
+    log.record_run_sealed(run_id, op_trace, 0).unwrap();
     (tape, state, log, ticks)
 }
 
@@ -119,17 +119,17 @@ fn test_event_ordering_preserved_ocel_chain() {
     let run_id = 1u64;
 
     let mut log_correct = OcelLog::new();
-    log_correct.record_op_fired(run_id, 0, 0).unwrap(); // A proposes X
-    log_correct.record_op_fired(run_id, 1, 0).unwrap(); // B votes X
-    log_correct.record_op_fired(run_id, 2, 0).unwrap(); // C votes X
-    log_correct.record_run_sealed(run_id, 0b111).unwrap();
+    log_correct.record_op_fired(run_id, 0, 0, 0).unwrap(); // A proposes X
+    log_correct.record_op_fired(run_id, 1, 0, 0).unwrap(); // B votes X
+    log_correct.record_op_fired(run_id, 2, 0, 0).unwrap(); // C votes X
+    log_correct.record_run_sealed(run_id, 0b111, 0).unwrap();
     let digest_correct = log_correct.seal_receipt().digest();
 
     let mut log_reordered = OcelLog::new();
-    log_reordered.record_op_fired(run_id, 1, 0).unwrap(); // B votes X (moved first)
-    log_reordered.record_op_fired(run_id, 0, 0).unwrap(); // A proposes X (moved second)
-    log_reordered.record_op_fired(run_id, 2, 0).unwrap();
-    log_reordered.record_run_sealed(run_id, 0b111).unwrap();
+    log_reordered.record_op_fired(run_id, 1, 0, 0).unwrap(); // B votes X (moved first)
+    log_reordered.record_op_fired(run_id, 0, 0, 0).unwrap(); // A proposes X (moved second)
+    log_reordered.record_op_fired(run_id, 2, 0, 0).unwrap();
+    log_reordered.record_run_sealed(run_id, 0b111, 0).unwrap();
     let digest_reordered = log_reordered.seal_receipt().digest();
 
     assert_ne!(

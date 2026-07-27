@@ -69,9 +69,9 @@
 //! let run_id = 99u64;
 //!
 //! // "a" (op_idx 0) fires, followed by "b" (op_idx 1)
-//! log.record_op_fired(run_id, 0, 0).unwrap();
-//! log.record_op_fired(run_id, 1, 0).unwrap();
-//! log.record_run_sealed(run_id, 0b11).unwrap();
+//! log.record_op_fired(run_id, 0, 0, 10).unwrap();
+//! log.record_op_fired(run_id, 1, 10, 5).unwrap();
+//! log.record_run_sealed(run_id, 0b11, 20).unwrap();
 //!
 //! // 3. Validate
 //! assert_eq!(log.validate_against_tape(&tape), ConformanceResult::Conforms);
@@ -132,6 +132,20 @@ pub enum EventKind {
         stage: u8,
         /// Policy boundary index.
         policy_boundary: u8,
+    },
+    /// Operation blocked by external constraint (e.g., resource conflict).
+    OpBlocked {
+        /// Logical time when blocking occurred.
+        blocked_time: LogicalTime,
+        /// Blocking reason (e.g., "resource conflict", "lease expired").
+        reason: u8,
+    },
+    /// Operation timed out (exceeded iteration/time limit).
+    OpTimedOut {
+        /// Logical time when timeout occurred.
+        timeout_time: LogicalTime,
+        /// Timeout reason code (0=iteration limit, 1=deadline exceeded).
+        reason: u8,
     },
 }
 
@@ -441,6 +455,132 @@ impl OcelLog {
         Ok(())
     }
 
+    /// Records that operation `op_idx` was blocked by an external constraint.
+    ///
+    /// # Arguments
+    ///
+    /// * `run_id` - The identifier of the execution run.
+    /// * `op_idx` - The index of the operation that was blocked.
+    /// * `blocked_time` - Wall/logical time when blocking occurred.
+    /// * `reason` - Blocking reason code (0=resource conflict, 1=lease expired, etc.).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OcelError::Overflow`] when the log is full; the event is
+    /// NOT silently dropped — callers must handle the error.
+    pub fn record_op_blocked(
+        &mut self,
+        run_id: u64,
+        op_idx: u32,
+        blocked_time: LogicalTime,
+        reason: u8,
+    ) -> Result<(), OcelError> {
+        if self.count >= 512 {
+            return Err(OcelError::Overflow);
+        }
+        self.tick += 1;
+        self.events[self.count] = OcelEvent {
+            event_id: self.count as u64,
+            activity: "op_blocked",
+            start_time: blocked_time,
+            duration: 0,
+            run_id,
+            op_idx,
+            op_trace: 0,
+            event_kind: EventKind::OpBlocked {
+                blocked_time,
+                reason,
+            },
+        };
+        self.count += 1;
+        Ok(())
+    }
+
+    /// Records that operation `op_idx` was refused (e.g., admission gate rejection).
+    ///
+    /// # Arguments
+    ///
+    /// * `run_id` - The identifier of the execution run.
+    /// * `op_idx` - The index of the operation that was refused.
+    /// * `refusal_class` - Refusal classification code.
+    /// * `stage` - Execution stage where refusal occurred.
+    /// * `policy_boundary` - Policy boundary index that rejected the operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OcelError::Overflow`] when the log is full; the event is
+    /// NOT silently dropped — callers must handle the error.
+    pub fn record_op_refused(
+        &mut self,
+        run_id: u64,
+        op_idx: u32,
+        refusal_class: u8,
+        stage: u8,
+        policy_boundary: u8,
+    ) -> Result<(), OcelError> {
+        if self.count >= 512 {
+            return Err(OcelError::Overflow);
+        }
+        self.tick += 1;
+        self.events[self.count] = OcelEvent {
+            event_id: self.count as u64,
+            activity: "op_refused",
+            start_time: 0,
+            duration: 0,
+            run_id,
+            op_idx,
+            op_trace: 0,
+            event_kind: EventKind::Refused {
+                refusal_class,
+                stage,
+                policy_boundary,
+            },
+        };
+        self.count += 1;
+        Ok(())
+    }
+
+    /// Records that operation `op_idx` timed out (exceeded iteration/time limit).
+    ///
+    /// # Arguments
+    ///
+    /// * `run_id` - The identifier of the execution run.
+    /// * `op_idx` - The index of the operation that timed out.
+    /// * `timeout_time` - Wall/logical time when timeout occurred.
+    /// * `reason` - Timeout reason code (0=iteration limit, 1=deadline exceeded).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OcelError::Overflow`] when the log is full; the event is
+    /// NOT silently dropped — callers must handle the error.
+    pub fn record_op_timed_out(
+        &mut self,
+        run_id: u64,
+        op_idx: u32,
+        timeout_time: LogicalTime,
+        reason: u8,
+    ) -> Result<(), OcelError> {
+        if self.count >= 512 {
+            return Err(OcelError::Overflow);
+        }
+        self.tick += 1;
+        self.events[self.count] = OcelEvent {
+            event_id: self.count as u64,
+            activity: "op_timed_out",
+            start_time: timeout_time,
+            duration: 0,
+            run_id,
+            op_idx,
+            op_trace: 0,
+            event_kind: EventKind::OpTimedOut {
+                timeout_time,
+                reason,
+            },
+        };
+        self.count += 1;
+        Ok(())
+    }
+
     /// Returns the slice of recorded events.
     pub fn events(&self) -> &[OcelEvent] {
         &self.events[..self.count]
@@ -475,6 +615,8 @@ impl OcelLog {
                 EventKind::ResourceAcquired { .. } => 2u8,
                 EventKind::ResourceReleased { .. } => 3u8,
                 EventKind::Refused { .. } => 4u8,
+                EventKind::OpBlocked { .. } => 5u8,
+                EventKind::OpTimedOut { .. } => 6u8,
             };
             hasher.update(&[kind_byte]);
         }
@@ -736,9 +878,9 @@ pub fn process_event_srbcg(
 ///
 /// // Conforming log
 /// let mut log = OcelLog::new();
-/// log.record_op_fired(10, 0, 0).unwrap(); // op 0 fired in run 10
-/// log.record_op_fired(10, 1, 0).unwrap(); // op 1 fired in run 10
-/// log.record_run_sealed(10, 0b11).unwrap(); // sealed with both
+/// log.record_op_fired(10, 0, 0, 10).unwrap(); // op 0 fired in run 10
+/// log.record_op_fired(10, 1, 10, 5).unwrap(); // op 1 fired in run 10
+/// log.record_run_sealed(10, 0b11, 20).unwrap(); // sealed with both
 ///
 /// let result = validate_against_tape(&log, &tape);
 /// assert_eq!(result, ConformanceResult::Conforms);
@@ -881,8 +1023,9 @@ pub fn validate_against_tape(log: &OcelLog, tape: &crate::tape::PowlTape) -> Con
                                 ..
                             } = prev_event.event_kind
                             {
-                                if let EventKind::ResourceReleased { resource_id: rel_rid } =
-                                    event.event_kind
+                                if let EventKind::ResourceReleased {
+                                    resource_id: rel_rid,
+                                } = event.event_kind
                                 {
                                     if acq_rid == rel_rid {
                                         lease_expiry = expiry;
@@ -894,8 +1037,7 @@ pub fn validate_against_tape(log: &OcelLog, tape: &crate::tape::PowlTape) -> Con
 
                     // Check if release exceeds lease expiry.
                     if lease_expiry > 0 && event.start_time > lease_expiry {
-                        let exceeded_by =
-                            event.start_time.saturating_sub(lease_expiry);
+                        let exceeded_by = event.start_time.saturating_sub(lease_expiry);
                         if let EventKind::ResourceReleased { resource_id } = event.event_kind {
                             return ConformanceResult::LeaseViolation {
                                 resource_id,
@@ -1457,8 +1599,10 @@ mod tests {
         let fired_branch_mask = first | second;
         let mut log = OcelLog::new();
         log.record_op_fired(71, 0, 0, 0).unwrap();
-        log.record_op_fired(71, first.trailing_zeros(), 0, 0).unwrap();
-        log.record_op_fired(71, second.trailing_zeros(), 0, 0).unwrap();
+        log.record_op_fired(71, first.trailing_zeros(), 0, 0)
+            .unwrap();
+        log.record_op_fired(71, second.trailing_zeros(), 0, 0)
+            .unwrap();
         log.record_op_fired(71, 1, 0, 0).unwrap();
         log.record_run_sealed(71, 1u64 | (1u64 << 1) | fired_branch_mask, 0)
             .unwrap();
@@ -1477,7 +1621,7 @@ mod tests {
     #[test]
     fn ocel_export_declares_every_emitted_run_sealed_attribute() {
         let mut log = OcelLog::new();
-        log.record_run_sealed(81, 1).unwrap();
+        log.record_run_sealed(81, 1, 0).unwrap();
         let exported = log.to_ocel_2_0();
         let run_sealed = exported
             .event_types
