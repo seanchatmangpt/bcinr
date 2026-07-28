@@ -962,10 +962,13 @@ impl AdaptiveUpdate<CertifiedLearning> {
 pub fn power(base: NonNegativeFixed, exponent: SignedFixed) -> NonNegativeFixed {
     let base_is_zero = const_eq_u32(base.val, 0);
     let log_val = base.log2();
-    let exp_signed = exponent.val;
-    let log_signed = log_val.val;
-    let product = (((exp_signed as i64).wrapping_mul(log_signed as i64)) >> 16) as i32;
-    let pow_val = SignedFixed::from_bits(product).exp2();
+    // `saturating_mul`, not a raw `wrapping_mul` + truncating `as i32` cast:
+    // the manual version this replaced discarded overflow silently (product
+    // could wrap past i32::MAX/MIN with no signal) and `from_bits` then
+    // manufactured a fresh `err = u32::MAX`, erasing `log_val.err` too.
+    // `saturating_mul` clamps on overflow and propagates both operands' err.
+    let product = exponent.saturating_mul(log_val);
+    let pow_val = product.exp2();
     let exp_val = exponent.val;
     let exp_gt_zero = (((0i32.wrapping_sub(exp_val)) >> 31) & 1) as u32;
     let exp_eq_zero = const_eq_u32(exponent.val as u32, 0);
@@ -974,7 +977,15 @@ pub fn power(base: NonNegativeFixed, exponent: SignedFixed) -> NonNegativeFixed 
         NonNegativeFixed::ONE.val,
         const_select_u32(exp_gt_zero, 0, u32::MAX),
     );
-    NonNegativeFixed::from_bits(const_select_u32(base_is_zero, zero_res, pow_val.val))
+    // The zero-base branch is exact (no `exp2` approximation involved), so
+    // it reports no fault regardless of `pow_val.err`; the base != 0 branch
+    // must carry `pow_val.err` through rather than discarding it via
+    // `from_bits`, or `exp2`'s own overflow/underflow detection becomes
+    // unreachable dead code from every caller's perspective.
+    NonNegativeFixed {
+        val: const_select_u32(base_is_zero, zero_res, pow_val.val),
+        err: const_select_u32(base_is_zero, u32::MAX, pow_val.err),
+    }
 }
 
 /// Clamps a fixed-point value within `[min_val, max_val]` branchlessly.
