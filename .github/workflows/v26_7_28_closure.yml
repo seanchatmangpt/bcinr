@@ -12,6 +12,10 @@ jobs:
   closure:
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    env:
+      CARGO_INCREMENTAL: "0"
+      RUSTFLAGS: "-D warnings"
+      PROPTEST_CASES: "32"
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
@@ -22,11 +26,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Prepare evidence directory
         run: mkdir -p verification-artifacts
-      - name: Install cargo-make
-        shell: bash
-        run: |
-          set -o pipefail
-          cargo install cargo-make --locked 2>&1 | tee verification-artifacts/cargo-make-install.log
       - name: Build exact ggen CLI source
         shell: bash
         run: |
@@ -42,11 +41,36 @@ jobs:
           git rev-parse HEAD | tee verification-artifacts/source-revision.txt
           rustc -Vv | tee verification-artifacts/rust-toolchain.txt
           ggen --version | tee verification-artifacts/ggen-version.txt
-      - name: Execute closure ladder
+      - name: Execute fail-closed closure ladder
         shell: bash
         run: |
-          set -o pipefail
-          cargo make closure 2>&1 | tee verification-artifacts/closure.log
+          set -euo pipefail
+          exec > >(tee verification-artifacts/closure.log) 2>&1
+
+          ggen graph validate \
+            --files ontology/bcinr.ttl \
+            --files ontology/taxonomies.ttl \
+            --files ontology/profile.ttl \
+            --shapes ontology/shapes.ttl
+          ggen sync
+          python3 scripts/verify_ggen_receipt.py .ggen-v2/receipt.json
+          git diff --exit-code -- \
+            crates/bcinr-cmca/src/generated_profile.rs \
+            crates/bcinr-guarded/src/powl2_case.rs \
+            crates/bcinr-guarded/src/runtime_binding.rs \
+            crates/bcinr-guarded/src/taxonomy.rs \
+            crates/bcinr-guarded/tests/generated_falsifiers.rs \
+            crates/bcinr-powl/src/generated_arity.rs \
+            docs/contracts/REFUSAL_LEDGER.md
+
+          cargo fmt --all -- --check
+          cargo check --workspace --all-targets --all-features
+          cargo clippy --workspace --all-targets --all-features -- -D warnings
+          cargo test --workspace --all-features --all-targets --no-fail-fast
+          cargo run --manifest-path tools/bcinr-contract-gate/Cargo.toml --release --quiet
+          cargo run --manifest-path tools/bcinr-cheat-scanner/Cargo.toml --release --quiet
+          cargo run --manifest-path tools/ggen/Cargo.toml --release --quiet
+          cargo doc --workspace --all-features --no-deps --document-private-items
       - name: Upload exact-run evidence
         if: always()
         uses: actions/upload-artifact@v4
