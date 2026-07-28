@@ -1,3 +1,22 @@
+//! Crown report SCHEMA FIXTURE -- NOT a release verifier.
+//!
+//! This file builds a crown-report JSON document with the right *shape*. Most
+//! of its rungs are literals: unit/integration counts, benchmark timings,
+//! scenario hashes, mutant kills and chaos outcomes are hard-coded rather than
+//! collected from executions. Only the MCP invocation is meaningfully live.
+//!
+//! It was previously named `crown_verifier` and treated as a release gate,
+//! which let a report carrying `final_state_classification: PARTIAL_ALIVE`
+//! also carry `release_ready: true`, with `receipt_verified`,
+//! `signature_valid` and `deterministic` all asserted without being performed.
+//! A cached count cannot confer standing.
+//!
+//! A real crown verifier must execute and ingest: an exact repository SHA ->
+//! cargo test output -> integration output -> benchmark artifacts -> isolated
+//! mutant rails -> chaos rails -> MCP execution -> replay verification ->
+//! retained logs -> computed standing. Until that exists, this fixture asserts
+//! schema only, and the committed report is UNSUPPORTED as evidence.
+
 //! Crown Verifier: Phase 7 end-to-end machine-readable verification report
 //!
 //! This test runs the complete verification ladder (7 rungs) against one concrete
@@ -10,8 +29,8 @@
 use chicago_tdd_mcp::{McpServerHarnessBuilder, McpSession};
 use rmcp::model::ContentBlock;
 use serde_json::json;
-use tokio::process::Command;
 use std::time::Instant;
+use tokio::process::Command;
 
 fn bcinr_mcp_cmd() -> Command {
     Command::new(env!("CARGO_BIN_EXE_bcinr-mcp"))
@@ -405,14 +424,21 @@ fn generate_crown_report(
             "CHAOS-001: 500ms delay SLA edge case (acceptable)",
             "CHAOS-002: Duplicate state update rare path (acceptable)"
         ]),
+        // NOT PERFORMED. These were asserted as literals without any receipt
+        // being verified, any signature being checked, or any run being
+        // repeated. A cached constant cannot confer standing, so they are
+        // reported as unperformed rather than as passing.
         "replay_result": json!({
-            "receipt_verified": true,
-            "signature_valid": true,
-            "ocel_events_replayed": mcp.get("plan_step_count"),
-            "deterministic": true
-        }),
+            "receipt_verified": "NOT_PERFORMED",
+            "signature_valid": "NOT_PERFORMED",
+            "deterministic": "NOT_PERFORMED",
+            "standing": "UNSUPPORTED"}),
         "final_state_classification": final_state,
-        "release_ready": !has_blocked,
+        // Only ALIVE is releasable. `!has_blocked` admitted PARTIAL_ALIVE,
+        // UNKNOWN and BUILD_BROKEN, which is how the committed report carried
+        // `final_state_classification: PARTIAL_ALIVE` alongside
+        // `release_ready: true`.
+        "release_ready": final_state == "ALIVE",
         "notes": "All critical phases ALIVE. Non-critical chaos scenarios partial with documented edge cases. System passes go/no-go criteria for v26.7.26 release.",
         "phases": json!({
             "1": unit,
@@ -521,7 +547,9 @@ async fn test_crown_verifier_complete_ladder() {
          ║ Release Ready: {}                             ║\n\
          ║ Total Verification Time: {}s                       ║\n\
          ╚══════════════════════════════════════════════════════════╝\n",
-        crown_report["final_state_classification"].as_str().unwrap_or("UNKNOWN"),
+        crown_report["final_state_classification"]
+            .as_str()
+            .unwrap_or("UNKNOWN"),
         crown_report["release_ready"].as_bool().unwrap_or(false),
         total_duration
     );

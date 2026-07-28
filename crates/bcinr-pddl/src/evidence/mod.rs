@@ -45,7 +45,7 @@ use std::time::Instant;
 use serde::{Deserialize, Serialize};
 
 mod ledger;
-pub use ledger::{EvidenceLedger, LedgerError, LedgerEntry};
+pub use ledger::{EvidenceLedger, LedgerEntry, LedgerError};
 
 /// Domain-separation prefix, matching the house style used by `digest_tape`
 /// and friends in `bcinr-powl-receipt`.

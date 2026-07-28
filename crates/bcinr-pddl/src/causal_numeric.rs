@@ -100,7 +100,9 @@ fn walk_numeric_effects<'a>(
     }
 }
 
-fn numeric_effects_by_function(action: &ExactGroundAction) -> BTreeMap<String, Vec<&NumericEffect>> {
+fn numeric_effects_by_function(
+    action: &ExactGroundAction,
+) -> BTreeMap<String, Vec<&NumericEffect>> {
     let mut out = BTreeMap::new();
     for effect in &action.effects {
         walk_numeric_effects(effect, &mut out);
@@ -148,8 +150,10 @@ fn pairwise_numeric_commute(function: &str, a: &NumericEffect, b: &NumericEffect
         return false;
     }
 
-    let is_scale = |op: NumericOpKind| matches!(op, NumericOpKind::ScaleUp | NumericOpKind::ScaleDown);
-    let is_incdec = |op: NumericOpKind| matches!(op, NumericOpKind::Increase | NumericOpKind::Decrease);
+    let is_scale =
+        |op: NumericOpKind| matches!(op, NumericOpKind::ScaleUp | NumericOpKind::ScaleDown);
+    let is_incdec =
+        |op: NumericOpKind| matches!(op, NumericOpKind::Increase | NumericOpKind::Decrease);
 
     // Rule: a scale-up/scale-down paired with an increase/decrease on the
     // same function does NOT commute (multiplication and addition do not

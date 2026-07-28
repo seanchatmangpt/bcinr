@@ -16,9 +16,9 @@
 //! `status-alive`, `status-blocked`, ...), and `status-unknown` is the admitted
 //! initial state. Only an admitted completion receipt may produce `status-alive`.
 
+use bcinr_mfw_ir::PlannerOutcome;
 use bcinr_pddl::ground::GroundTemporalProblem;
 use bcinr_pddl::{domain_from_pddl, problem_from_pddl, TemporalPlan};
-use bcinr_mfw_ir::PlannerOutcome;
 
 /// The coding-swarm domain, expressed with durative actions.
 ///
@@ -509,7 +509,10 @@ fn plan_length_matches_the_causal_core() {
     // now enforces this for every action, not just the two (`claim-lease`,
     // `seal-receipt`) whose own effects happened to negate their precondition.
     for (action, count) in &counts {
-        assert_eq!(*count, 1, "{action} should fire exactly once, fired {count}x");
+        assert_eq!(
+            *count, 1,
+            "{action} should fire exactly once, fired {count}x"
+        );
     }
     assert_eq!(
         counts.get("commit-change"),

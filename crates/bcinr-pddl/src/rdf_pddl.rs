@@ -168,12 +168,18 @@ impl std::fmt::Display for RdfPddlError {
                 predicate,
                 object,
                 detail,
-            } => write!(f, "malformed triple ({subject}, {predicate}, {object}): {detail}"),
+            } => write!(
+                f,
+                "malformed triple ({subject}, {predicate}, {object}): {detail}"
+            ),
             Self::UnknownPredicate { predicate } => write!(
                 f,
                 "unknown predicate '{predicate}' is outside the RDF-shaped-PDDL vocabulary"
             ),
-            Self::DomainMismatch { declared, requested } => write!(
+            Self::DomainMismatch {
+                declared,
+                requested,
+            } => write!(
                 f,
                 "problem declares domain '{declared}' but caller requested domain '{requested}'"
             ),
@@ -341,7 +347,9 @@ pub fn compile_domain(facts: &FactSet, domain_name: &str) -> Result<Pddl31Domain
             .filter(|p| &p.subject == pred_iri && p.predicate == PDDL_PREDICATE_ARG)
             .map(decode_typed)
             .collect::<Result<Vec<_>, _>>()?;
-        domain.predicates.push((local_name(pred_iri).to_string(), params));
+        domain
+            .predicates
+            .push((local_name(pred_iri).to_string(), params));
     }
 
     for triple in facts
@@ -430,7 +438,9 @@ pub fn compile_problem(
             .find(|p| &p.subject == object_iri && p.predicate == PDDL_OBJECT_TYPE)
             .map(|p| p.object.clone())
             .unwrap_or_else(|| "object".to_string());
-        problem.objects.push((local_name(object_iri).to_string(), obj_type));
+        problem
+            .objects
+            .push((local_name(object_iri).to_string(), obj_type));
     }
 
     for triple in facts
@@ -480,7 +490,11 @@ pub fn domain_to_facts(domain: &Pddl31Domain, domain_name: &str) -> FactSet {
         let p_iri = predicate_iri(domain_name, pred_name);
         facts.push(Triple::new(&d_iri, PDDL_PREDICATE, &p_iri));
         for (var, typ) in params {
-            facts.push(Triple::new(&p_iri, PDDL_PREDICATE_ARG, encode_typed(var, typ)));
+            facts.push(Triple::new(
+                &p_iri,
+                PDDL_PREDICATE_ARG,
+                encode_typed(var, typ),
+            ));
         }
     }
 
@@ -517,11 +531,7 @@ pub fn domain_to_facts(domain: &Pddl31Domain, domain_name: &str) -> FactSet {
 /// Emit `problem` as facts under `problem_name`, declaring domain
 /// `domain_name`. As with `domain_to_facts`, a goal outside a flat positive
 /// conjunction is dropped rather than encoded lossily.
-pub fn problem_to_facts(
-    problem: &Pddl31Problem,
-    problem_name: &str,
-    domain_name: &str,
-) -> FactSet {
+pub fn problem_to_facts(problem: &Pddl31Problem, problem_name: &str, domain_name: &str) -> FactSet {
     let mut facts = FactSet::new();
     let p_iri = problem_iri(problem_name);
 

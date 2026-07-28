@@ -264,7 +264,10 @@ fn test_within_constraint() {
     let result = GroundTemporalProblem::build(&domain, &problem);
     let err = result.err();
     assert!(
-        matches!(err, Some(bcinr_pddl::Pddl8Error::UnsupportedTrajectoryConstraint(_))),
+        matches!(
+            err,
+            Some(bcinr_pddl::Pddl8Error::UnsupportedTrajectoryConstraint(_))
+        ),
         "expected UnsupportedTrajectoryConstraint, got {err:?}"
     );
 }
@@ -304,7 +307,10 @@ fn test_always_within_constraint() {
     let result = GroundTemporalProblem::build(&domain, &problem);
     let err = result.err();
     assert!(
-        matches!(err, Some(bcinr_pddl::Pddl8Error::UnsupportedTrajectoryConstraint(_))),
+        matches!(
+            err,
+            Some(bcinr_pddl::Pddl8Error::UnsupportedTrajectoryConstraint(_))
+        ),
         "expected UnsupportedTrajectoryConstraint, got {err:?}"
     );
 }
@@ -338,7 +344,11 @@ fn test_monitor_factory_all_types() {
     ];
     for constraint in &monitored {
         let monitor = MonitorFactory::create_monitor(constraint);
-        assert!(monitor.is_some(), "Failed to create monitor for {:?}", constraint);
+        assert!(
+            monitor.is_some(),
+            "Failed to create monitor for {:?}",
+            constraint
+        );
     }
 
     let refused = vec![
@@ -347,6 +357,10 @@ fn test_monitor_factory_all_types() {
     ];
     for constraint in &refused {
         let monitor = MonitorFactory::create_monitor(constraint);
-        assert!(monitor.is_none(), "Expected refusal (None) for {:?}", constraint);
+        assert!(
+            monitor.is_none(),
+            "Expected refusal (None) for {:?}",
+            constraint
+        );
     }
 }

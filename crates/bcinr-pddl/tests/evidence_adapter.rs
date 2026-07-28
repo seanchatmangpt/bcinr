@@ -58,7 +58,13 @@ fn observe(stdout: &str, exit: Option<i32>) -> (SuiteOutcome, Option<Observation
 fn passing_suite_emits_test_pass() {
     let (outcome, observation) = observe(PASSING_STDOUT, Some(0));
 
-    assert_eq!(outcome, SuiteOutcome::Passed { passed: 1, ignored: 0 });
+    assert_eq!(
+        outcome,
+        SuiteOutcome::Passed {
+            passed: 1,
+            ignored: 0
+        }
+    );
     let observation = observation.expect("a passing suite must produce a fact");
     assert_eq!(
         observation.fact,
@@ -77,7 +83,13 @@ fn passing_suite_emits_test_pass() {
 fn failing_suite_emits_test_fail() {
     let (outcome, observation) = observe(FAILING_STDOUT, Some(101));
 
-    assert_eq!(outcome, SuiteOutcome::Failed { passed: 1, failed: 1 });
+    assert_eq!(
+        outcome,
+        SuiteOutcome::Failed {
+            passed: 1,
+            failed: 1
+        }
+    );
     let observation = observation.expect("a failing suite must produce a fact");
     assert_eq!(
         observation.fact.render_atom(),
@@ -129,7 +141,10 @@ fn informational_timeout_event_does_not_fabricate_a_failure() {
 
     assert_eq!(
         outcome,
-        SuiteOutcome::Passed { passed: 1, ignored: 0 },
+        SuiteOutcome::Passed {
+            passed: 1,
+            ignored: 0
+        },
         "libtest's informational `timeout` event must not become a failure"
     );
     assert!(matches!(
@@ -177,7 +192,13 @@ fn model_authored_claim_of_success_cannot_override_a_failing_command() {
 
     let (outcome, observation) = observe(FAILING_STDOUT, Some(101));
 
-    assert_eq!(outcome, SuiteOutcome::Failed { passed: 1, failed: 1 });
+    assert_eq!(
+        outcome,
+        SuiteOutcome::Failed {
+            passed: 1,
+            failed: 1
+        }
+    );
     let observation = observation.expect("the command failed, so a fact is owed");
     assert!(
         matches!(observation.fact, EvidenceFact::TestFail { .. }),
@@ -232,7 +253,10 @@ fn ledger_verify_rejects_tampering() {
         suite: "alpha".into(),
     };
     assert!(
-        matches!(forged.verify(), Err(LedgerError::RootMismatch { sequence: 0, .. })),
+        matches!(
+            forged.verify(),
+            Err(LedgerError::RootMismatch { sequence: 0, .. })
+        ),
         "rewriting an admitted fact must break the chain, got {:?}",
         forged.verify()
     );
@@ -244,7 +268,10 @@ fn ledger_verify_rejects_tampering() {
         failed: 9,
     };
     assert!(
-        matches!(forged.verify(), Err(LedgerError::RootMismatch { sequence: 1, .. })),
+        matches!(
+            forged.verify(),
+            Err(LedgerError::RootMismatch { sequence: 1, .. })
+        ),
         "the outcome is part of the commitment"
     );
 
@@ -279,7 +306,9 @@ fn appending_after_reading_the_root_changes_the_root() {
         sealed_root, ledger.root,
         "an append after sealing must change the head root"
     );
-    ledger.verify().expect("the extended ledger is still internally consistent");
+    ledger
+        .verify()
+        .expect("the extended ledger is still internally consistent");
 }
 
 /// End-to-end against a real cargo invocation, so the parser is exercised

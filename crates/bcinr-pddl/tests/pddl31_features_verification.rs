@@ -1,9 +1,9 @@
 //! Final verification tests for PDDL 3.1 features
 //! Tests that the three features parse, ground, and work correctly.
 
+use bcinr_mfw_ir::PlannerOutcome;
 use bcinr_pddl::ground::GroundTemporalProblem;
 use bcinr_pddl::{domain_from_pddl, problem_from_pddl};
-use bcinr_mfw_ir::PlannerOutcome;
 
 /// Phase 1: Equality in preconditions
 /// Verify equality operators work in preconditions
@@ -97,8 +97,10 @@ fn feature_conditional_effects_work() {
 
     let ground = GroundTemporalProblem::build(&domain, &problem).unwrap();
     let outcome = ground.find_temporal_plan();
-    assert!(matches!(outcome, PlannerOutcome::Found(_)),
-        "conditional effect that satisfies condition should enable plan");
+    assert!(
+        matches!(outcome, PlannerOutcome::Found(_)),
+        "conditional effect that satisfies condition should enable plan"
+    );
 }
 
 /// Phase 3b: Conditional effects blocking
@@ -126,8 +128,10 @@ fn feature_conditional_effects_can_block() {
 
     let ground = GroundTemporalProblem::build(&domain, &problem).unwrap();
     let outcome = ground.find_temporal_plan();
-    assert!(matches!(outcome, PlannerOutcome::Exhausted(_)),
-        "conditional effect without satisfied condition should block plan");
+    assert!(
+        matches!(outcome, PlannerOutcome::Exhausted(_)),
+        "conditional effect without satisfied condition should block plan"
+    );
 }
 
 /// Phase 3c: Conditional effects with forall
@@ -157,8 +161,10 @@ fn feature_conditional_effects_with_forall() {
 
     let ground = GroundTemporalProblem::build(&domain, &problem).unwrap();
     let outcome = ground.find_temporal_plan();
-    assert!(matches!(outcome, PlannerOutcome::Found(_)),
-        "forall with conditional effects should work");
+    assert!(
+        matches!(outcome, PlannerOutcome::Found(_)),
+        "forall with conditional effects should work"
+    );
 }
 
 /// Integration test: all three features together
@@ -188,6 +194,8 @@ fn all_three_features_together() {
 
     let ground = GroundTemporalProblem::build(&domain, &problem).unwrap();
     let outcome = ground.find_temporal_plan();
-    assert!(matches!(outcome, PlannerOutcome::Found(_)),
-        "all three PDDL 3.1 features should work together");
+    assert!(
+        matches!(outcome, PlannerOutcome::Found(_)),
+        "all three PDDL 3.1 features should work together"
+    );
 }

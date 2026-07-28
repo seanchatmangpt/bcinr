@@ -1,8 +1,8 @@
 // Minimal tests for PDDL 3.1 features - debugging version
 
+use bcinr_mfw_ir::PlannerOutcome;
 use bcinr_pddl::ground::GroundTemporalProblem;
 use bcinr_pddl::{domain_from_pddl, problem_from_pddl};
-use bcinr_mfw_ir::PlannerOutcome;
 
 /// Simplest possible durative action test - based on working capacity.rs pattern
 #[test]
@@ -27,8 +27,7 @@ fn simplest_durative_action_test() {
     )
     .expect("failed to parse");
 
-    let ground = GroundTemporalProblem::build(&domain, &problem)
-        .expect("failed to ground");
+    let ground = GroundTemporalProblem::build(&domain, &problem).expect("failed to ground");
 
     println!("Durative actions: {}", ground.durative_actions.len());
     let outcome = ground.find_temporal_plan();
@@ -59,8 +58,7 @@ fn durative_with_multiple_effects() {
     )
     .expect("failed to parse");
 
-    let ground = GroundTemporalProblem::build(&domain, &problem)
-        .expect("failed to ground");
+    let ground = GroundTemporalProblem::build(&domain, &problem).expect("failed to ground");
 
     let outcome = ground.find_temporal_plan();
     println!("Multi effects outcome: {:?}", outcome);

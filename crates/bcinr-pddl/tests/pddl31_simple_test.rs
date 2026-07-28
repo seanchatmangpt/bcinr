@@ -12,7 +12,8 @@ fn test_equality_parses() {
                :parameters ()
                :precondition ()
                :effect (p)))"#,
-    ).unwrap();
+    )
+    .unwrap();
     assert_eq!(domain.actions.len(), 1);
 }
 
@@ -26,7 +27,8 @@ fn test_conditional_effects_parse() {
                :parameters ()
                :precondition ()
                :effect (when (p) (q))))"#,
-    ).unwrap();
+    )
+    .unwrap();
     assert_eq!(domain.actions.len(), 1);
 }
 
@@ -41,6 +43,7 @@ fn test_derived_predicates_parse() {
                :parameters ()
                :precondition ()
                :effect (p)))"#,
-    ).unwrap();
+    )
+    .unwrap();
     assert_eq!(domain.derived.len(), 1);
 }

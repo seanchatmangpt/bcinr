@@ -1,10 +1,10 @@
 {
   "phase": 7,
   "name": "Crown Verification Report",
-  "generated": "2026-07-27T16:23:09.825674-07:00",
+  "generated": "2026-07-27T20:30:08.822927-07:00",
   "version": "26.7.26",
   "repository": "bcinr",
-  "source_revision": "17e6d4703bd85a490ab4f698ae04a49edf92ea3c",
+  "source_revision": "20302ba77a8c86e42c580a8d7d3d2e841048e318",
   "capability_matrix": {
     "phase_1_unit": "ALIVE",
     "phase_2_integration": "ALIVE",
@@ -67,13 +67,13 @@
     "CHAOS-002: Duplicate state update rare path (acceptable)"
   ],
   "replay_result": {
-    "receipt_verified": true,
-    "signature_valid": true,
-    "ocel_events_replayed": 7,
-    "deterministic": true
+    "receipt_verified": "NOT_PERFORMED",
+    "signature_valid": "NOT_PERFORMED",
+    "deterministic": "NOT_PERFORMED",
+    "standing": "UNSUPPORTED"
   },
   "final_state_classification": "PARTIAL_ALIVE",
-  "release_ready": true,
+  "release_ready": false,
   "notes": "All critical phases ALIVE. Non-critical chaos scenarios partial with documented edge cases. System passes go/no-go criteria for v26.7.26 release.",
   "phases": {
     "1": {

@@ -2,9 +2,7 @@
 //! Verifies that OverAll conditions are checked continuously during action intervals,
 //! not just at scheduling time.
 
-use bcinr_pddl::{
-    domain_from_pddl, problem_from_pddl, PlannerOutcome, GroundTemporalProblem,
-};
+use bcinr_pddl::{domain_from_pddl, problem_from_pddl, GroundTemporalProblem, PlannerOutcome};
 
 #[test]
 fn over_all_invariant_becomes_false_mid_interval() {
@@ -41,8 +39,8 @@ fn over_all_invariant_becomes_false_mid_interval() {
     let domain = domain_from_pddl(domain_str).expect("Failed to parse domain");
     let problem = problem_from_pddl(problem_str).expect("Failed to parse problem");
 
-    let temporal_problem = GroundTemporalProblem::build(&domain, &problem)
-        .expect("Failed to build temporal problem");
+    let temporal_problem =
+        GroundTemporalProblem::build(&domain, &problem).expect("Failed to build temporal problem");
     let result = temporal_problem.find_temporal_plan();
 
     // The plan should be exhausted because the OverAll condition (flag) is violated at t=5
@@ -54,7 +52,9 @@ fn over_all_invariant_becomes_false_mid_interval() {
         PlannerOutcome::Found(_) => {
             panic!("Expected plan to be exhausted due to OverAll condition violation, but found a plan");
         }
-        PlannerOutcome::Bounded(_) | PlannerOutcome::Unsupported(_) | PlannerOutcome::Inconsistent(_) => {
+        PlannerOutcome::Bounded(_)
+        | PlannerOutcome::Unsupported(_)
+        | PlannerOutcome::Inconsistent(_) => {
             // These outcomes are acceptable for this test; could indicate search limits
         }
     }
@@ -93,8 +93,8 @@ fn over_all_condition_held_through_interval() {
     let domain = domain_from_pddl(domain_str).expect("Failed to parse domain");
     let problem = problem_from_pddl(problem_str).expect("Failed to parse problem");
 
-    let temporal_problem = GroundTemporalProblem::build(&domain, &problem)
-        .expect("Failed to build temporal problem");
+    let temporal_problem =
+        GroundTemporalProblem::build(&domain, &problem).expect("Failed to build temporal problem");
     let result = temporal_problem.find_temporal_plan();
 
     // The plan should be found because flag remains true throughout [0, 5).
@@ -106,7 +106,9 @@ fn over_all_condition_held_through_interval() {
         PlannerOutcome::Exhausted(_) => {
             panic!("Expected to find a plan, but planner exhausted");
         }
-        PlannerOutcome::Bounded(_) | PlannerOutcome::Unsupported(_) | PlannerOutcome::Inconsistent(_) => {
+        PlannerOutcome::Bounded(_)
+        | PlannerOutcome::Unsupported(_)
+        | PlannerOutcome::Inconsistent(_) => {
             panic!("Expected to find a plan, but got {:?}", result);
         }
     }
@@ -154,8 +156,8 @@ fn multiple_actions_all_over_all_conditions() {
     let domain = domain_from_pddl(domain_str).expect("Failed to parse domain");
     let problem = problem_from_pddl(problem_str).expect("Failed to parse problem");
 
-    let temporal_problem = GroundTemporalProblem::build(&domain, &problem)
-        .expect("Failed to build temporal problem");
+    let temporal_problem =
+        GroundTemporalProblem::build(&domain, &problem).expect("Failed to build temporal problem");
     let result = temporal_problem.find_temporal_plan();
 
     // Should exhaust because action-b's OverAll condition (flag-b) is violated at t=5
@@ -167,7 +169,9 @@ fn multiple_actions_all_over_all_conditions() {
         PlannerOutcome::Found(_) => {
             panic!("Expected plan to be exhausted due to OverAll condition violation, but found a plan");
         }
-        PlannerOutcome::Bounded(_) | PlannerOutcome::Unsupported(_) | PlannerOutcome::Inconsistent(_) => {
+        PlannerOutcome::Bounded(_)
+        | PlannerOutcome::Unsupported(_)
+        | PlannerOutcome::Inconsistent(_) => {
             // These outcomes are acceptable for this test; could indicate search limits
         }
     }

@@ -61,15 +61,15 @@ pub mod problem_builder;
 #[allow(clippy::needless_lifetimes)]
 pub mod production;
 pub mod production_capability;
+pub mod rdf_pddl;
 pub mod resource_ledger;
 pub mod schedule_analysis;
-pub mod rdf_pddl;
 pub mod search;
 mod semantic_features;
 mod sexpr;
-pub mod validate;
 #[cfg(feature = "mfw-planner")]
 pub mod task;
+pub mod validate;
 #[cfg(feature = "mfw-planner")]
 pub mod wf_net_bridge;
 #[cfg(feature = "mfw-planner")]
@@ -170,4 +170,6 @@ pub use ground::{
 };
 pub use logical_time::LogicalTime;
 pub use parse::{domain31_from_pddl, domain_from_pddl, problem31_from_pddl, problem_from_pddl};
-pub use validate::{validate_plan, validate_temporal_plan_shape, PlanViolation, TemporalShapeViolation};
+pub use validate::{
+    validate_plan, validate_temporal_plan_shape, PlanViolation, TemporalShapeViolation,
+};

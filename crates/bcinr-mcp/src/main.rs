@@ -333,14 +333,21 @@ fn render_pddl31_domain(d: &wasm4pm_compat::pddl::Pddl31Domain) -> String {
 fn render_pddl31_problem(p: &wasm4pm_compat::pddl::Pddl31Problem) -> String {
     let mut out = format!("(define (problem {})\n  (:domain {})\n", p.name, p.domain);
     if !p.objects.is_empty() {
-        let objs: Vec<String> = p.objects.iter().map(|(n, t)| format!("{n} - {t}")).collect();
+        let objs: Vec<String> = p
+            .objects
+            .iter()
+            .map(|(n, t)| format!("{n} - {t}"))
+            .collect();
         out.push_str(&format!("  (:objects {})\n", objs.join(" ")));
     }
     if !p.init_atoms.is_empty() {
         let inits: Vec<String> = p.init_atoms.iter().map(render_pddl_atom).collect();
         out.push_str(&format!("  (:init {})\n", inits.join(" ")));
     }
-    out.push_str(&format!("  (:goal {})\n", render_pddl_flat_condition(&p.goal)));
+    out.push_str(&format!(
+        "  (:goal {})\n",
+        render_pddl_flat_condition(&p.goal)
+    ));
     out.push_str(")\n");
     out
 }
@@ -361,14 +368,23 @@ fn powl2_model_to_json(m: &bcinr_powl::powl2::Powl2Model) -> serde_json::Value {
             "children": children.iter().map(powl2_model_to_json).collect::<Vec<_>>(),
             "edges": edges,
         }),
-        M::ChoiceGraph { children, edges, start, end } => serde_json::json!({
+        M::ChoiceGraph {
+            children,
+            edges,
+            start,
+            end,
+        } => serde_json::json!({
             "kind": "ChoiceGraph",
             "children": children.iter().map(powl2_model_to_json).collect::<Vec<_>>(),
             "edges": edges,
             "start": start,
             "end": end,
         }),
-        M::DoRedo { body, redo, max_redos } => serde_json::json!({
+        M::DoRedo {
+            body,
+            redo,
+            max_redos,
+        } => serde_json::json!({
             "kind": "DoRedo",
             "body": powl2_model_to_json(body),
             "redo": powl2_model_to_json(redo),

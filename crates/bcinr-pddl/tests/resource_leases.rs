@@ -45,7 +45,8 @@ fn two_actions_exclusive_resource_overlapping_intervals_one_refused() {
         }) => {
             assert_eq!(resource_id, "cpu");
             assert_eq!(
-                overlap_interval, (5.0, 10.0),
+                overlap_interval,
+                (5.0, 10.0),
                 "conflict region is intersection of [0, 10) and [5, 15)"
             );
         }
@@ -152,7 +153,10 @@ fn shared_resource_capacity_limits_concurrent_leases() {
 
     // Request 2: [5, 15) — overlaps at [5, 10), but total capacity is 2, so OK
     let req_2 = ledger.request_lease(workers.clone(), 5.0, 15.0);
-    assert!(req_2.is_ok(), "Request 2 should be admitted (total capacity is 2)");
+    assert!(
+        req_2.is_ok(),
+        "Request 2 should be admitted (total capacity is 2)"
+    );
 
     // Request 3: [7, 12) — would need 3 concurrent at [7, 10) where requests 1 and 2 overlap
     let req_3 = ledger.request_lease(workers.clone(), 7.0, 12.0);
@@ -199,7 +203,10 @@ fn multiple_resources_tracked_independently() {
 
     // Action 2: request [5, 15) on disk (different resource, no conflict)
     let action_2_disk = ledger.request_lease(disk.clone(), 5.0, 15.0);
-    assert!(action_2_disk.is_ok(), "disk request should succeed independently");
+    assert!(
+        action_2_disk.is_ok(),
+        "disk request should succeed independently"
+    );
 
     // Action 3: request [0, 10) on disk (overlaps with Action 2's disk lease)
     let action_3_disk = ledger.request_lease(disk.clone(), 0.0, 10.0);
@@ -208,16 +215,8 @@ fn multiple_resources_tracked_independently() {
         "disk request [0, 10) should be refused (overlaps with [5, 15))"
     );
 
-    assert_eq!(
-        ledger.lease_count("cpu"),
-        1,
-        "cpu should have 1 lease"
-    );
-    assert_eq!(
-        ledger.lease_count("disk"),
-        1,
-        "disk should have 1 lease"
-    );
+    assert_eq!(ledger.lease_count("cpu"), 1, "cpu should have 1 lease");
+    assert_eq!(ledger.lease_count("disk"), 1, "disk should have 1 lease");
 }
 
 /// Test 5: Renewal via re-admission (mirror of admit_proposal pattern).

@@ -402,13 +402,11 @@ async fn tool_list_has_expected_tools() {
             "tool {name:?} missing from tool list; present: {name_refs:?}"
         );
     }
-    assert_eq!(
-        tools.len(),
-        expected.len(),
-        "tool count changed: expected {}, got {}; list: {name_refs:?}",
-        expected.len(),
-        tools.len()
-    );
+    // Deliberately NOT an exact-count assertion. `tools.len() == expected.len()`
+    // fails whenever anyone adds a tool, and the only way to "fix" it is to bump
+    // the number -- at which point the test has stopped testing anything. The
+    // loop above already asserts the structural property that matters: every
+    // tool this suite depends on is present. Additions are not regressions.
 }
 
 // ── route_capability_plan determinism ─────────────────────────────────────────

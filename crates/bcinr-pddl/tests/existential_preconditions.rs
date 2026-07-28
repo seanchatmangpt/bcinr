@@ -1,3 +1,4 @@
+use bcinr_mfw_ir::PlannerOutcome;
 /// Comprehensive test suite for existential precondition closure (Phase 2b).
 ///
 /// After Phase 2, `subst_condition` is used for quantified bodies in derived predicates,
@@ -12,12 +13,10 @@
 /// - Empty type domains (vacuously false)
 /// - Type-hierarchy expansion
 /// - Deterministic witness enumeration
-
 use bcinr_pddl::{
     ground::GroundTemporalProblem,
     parse::{domain_from_pddl, problem_from_pddl},
 };
-use bcinr_mfw_ir::PlannerOutcome;
 
 fn solve(domain_str: &str, problem_str: &str) -> Result<(), String> {
     let domain = domain_from_pddl(domain_str).map_err(|e| format!("Parse error: {:?}", e))?;
@@ -177,7 +176,10 @@ fn exists_under_and_fails_when_conjunction_false() {
       (:goal (done)))"#;
 
     let result = solve(domain, problem);
-    assert!(result.is_err(), "exists-and should fail when exists part is false");
+    assert!(
+        result.is_err(),
+        "exists-and should fail when exists part is false"
+    );
 }
 
 /// Exists under OR: the derived predicate fires if exists condition holds.
@@ -353,8 +355,7 @@ fn exists_with_multiple_variables_and_complex_body() {
       (:init (enabled) (connected a b))
       (:goal (done)))"#;
 
-    solve(domain, problem)
-        .expect("complex exists with multiple variables should work");
+    solve(domain, problem).expect("complex exists with multiple variables should work");
 }
 
 /// Negation of exists (testing De Morgan's law):
@@ -378,7 +379,8 @@ fn negation_of_exists() {
       (:init)
       (:goal (all-not-ready)))"#;
 
-    solve(domain, problem).expect("negation of exists (vacuously true when none ready) should work");
+    solve(domain, problem)
+        .expect("negation of exists (vacuously true when none ready) should work");
 }
 
 /// Interaction between forall and exists in same derived predicate:

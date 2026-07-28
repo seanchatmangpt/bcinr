@@ -11,15 +11,72 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::powl2::Powl2Model;
 use crate::wf_net::{Label, NetError, WfNet};
 
+/// Why a model could not be recomposed into an equivalent WF-net.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RecomposeError {
+    /// The recomposition algorithm produced a candidate failing
+    /// `WfNet::new`'s well-formedness check -- algorithm-internal, surfaced
+    /// as a typed error rather than a panic.
+    NetConstruction(NetError),
+    /// The model contains a `DoRedo` bounded by `max_redos`, and a WF-net
+    /// cycle has no counter.
+    ///
+    /// Recomposing it as an unbounded cycle would WIDEN the language: a model
+    /// admitting at most `max_redos` repetitions would become a net admitting
+    /// arbitrarily many. Round-tripping through that net is not
+    /// language-preserving, so it must not be used as a differential oracle.
+    /// Refusing is the lawful option; the other is bounded unrolling into
+    /// `max_redos` nested choices, which preserves the exact finite language.
+    BoundedLoopNotRepresentable { max_redos: u8 },
+}
+
+impl std::fmt::Display for RecomposeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NetConstruction(e) => write!(f, "net construction failed: {e}"),
+            Self::BoundedLoopNotRepresentable { max_redos } => write!(
+                f,
+                "DoRedo bounded at {max_redos} redos cannot be recomposed: a WF-net \
+                 cycle is unbounded, so the recomposed net would admit a strictly \
+                 larger language than the model"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for RecomposeError {}
+
+impl From<NetError> for RecomposeError {
+    fn from(e: NetError) -> Self {
+        Self::NetConstruction(e)
+    }
+}
+
+/// Walk the model for constructors whose recomposition would not preserve the
+/// language. Checked before building, because the builder is infallible.
+fn check_recomposable(model: &Powl2Model) -> Result<(), RecomposeError> {
+    match model {
+        Powl2Model::Activity(_) | Powl2Model::Silent => Ok(()),
+        Powl2Model::Sequence(children) => children.iter().try_for_each(check_recomposable),
+        Powl2Model::PartialOrder { children, .. } | Powl2Model::ChoiceGraph { children, .. } => {
+            children.iter().try_for_each(check_recomposable)
+        }
+        Powl2Model::DoRedo { max_redos, .. } => Err(RecomposeError::BoundedLoopNotRepresentable {
+            max_redos: *max_redos,
+        }),
+    }
+}
+
 /// Recompose a `Powl2Model` into an equivalent safe & sound WF-net. Errs if
 /// the recomposition algorithm produces a candidate that fails `WfNet::new`'s
 /// own well-formedness check -- an algorithm-internal inconsistency rather
 /// than a property of `model`, but surfaced as a typed error instead of a
 /// panic so it cannot crash a caller on adversarial-but-valid input.
-pub fn recompose(model: &Powl2Model) -> Result<WfNet, NetError> {
+pub fn recompose(model: &Powl2Model) -> Result<WfNet, RecomposeError> {
+    check_recomposable(model)?;
     let mut b = Builder::default();
     let (src, snk) = b.build(model);
-    b.finish(src, snk)
+    Ok(b.finish(src, snk)?)
 }
 
 #[derive(Default)]

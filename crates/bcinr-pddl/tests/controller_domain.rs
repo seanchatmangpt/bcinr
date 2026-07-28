@@ -13,8 +13,7 @@
 use bcinr_pddl::ground_v2::{ExactClassicalError, ExactClassicalProblem};
 use bcinr_pddl::{domain31_from_pddl, problem31_from_pddl};
 
-const CONTROLLER_DOMAIN: &str =
-    include_str!("fixtures/claude-v26728-controller-domain.pddl");
+const CONTROLLER_DOMAIN: &str = include_str!("fixtures/claude-v26728-controller-domain.pddl");
 
 /// One phase of the release: a name, the phases it depends on, and its required
 /// verification suites.
@@ -110,7 +109,10 @@ fn render_problem(phase_count: usize, goal: &str, complete: &[&str]) -> String {
     let phases = &V26_7_28[..phase_count.min(V26_7_28.len())];
     let names: Vec<&str> = phases.iter().map(|p| p.name).collect();
 
-    let mut suites: Vec<&str> = phases.iter().flat_map(|p| p.suites.iter().copied()).collect();
+    let mut suites: Vec<&str> = phases
+        .iter()
+        .flat_map(|p| p.suites.iter().copied())
+        .collect();
     suites.sort_unstable();
     suites.dedup();
 
@@ -233,7 +235,10 @@ fn single_phase_episode_reaches_release_complete() {
     assert!(impl_ < verify, "verification must follow implementation");
     assert!(verify < receipt, "a receipt must follow verification");
     assert!(receipt < complete, "completion must follow the receipt");
-    assert!(complete < release, "the release must follow phase completion");
+    assert!(
+        complete < release,
+        "the release must follow phase completion"
+    );
 
     // No action may repeat. This is the property the temporal rail violates.
     let mut sorted = r.labels.clone();
@@ -272,10 +277,9 @@ fn dependencies_gate_the_first_action() {
         .labels
         .iter()
         .position(|l| l.starts_with("mark-phase-complete") && l.contains("baseline-repair"));
-    let lang_start = r
-        .labels
-        .iter()
-        .position(|l| l.starts_with("launch-implementation-workflow") && l.contains("language-enumerator"));
+    let lang_start = r.labels.iter().position(|l| {
+        l.starts_with("launch-implementation-workflow") && l.contains("language-enumerator")
+    });
 
     if let (Some(done), Some(start)) = (baseline_done, lang_start) {
         assert!(
@@ -344,7 +348,10 @@ fn measure_full_horizon_scaling() {
 fn full_horizon_does_not_reach_the_whole_release() {
     let outcome = solve(V26_7_28.len(), "(release-complete v26-7-28)", 128, 60_000);
     assert!(
-        matches!(outcome, Err(ExactClassicalError::SearchStateBoundExceeded { .. })),
+        matches!(
+            outcome,
+            Err(ExactClassicalError::SearchStateBoundExceeded { .. })
+        ),
         "full-horizon planning over all {} phases was expected to exhaust the \
          search bound; got {outcome:?} -- if it now plans, the controller can \
          drop the receding horizon",
@@ -492,7 +499,9 @@ fn observed_test_failure_invalidates_the_receipt_and_forces_repair() {
     .expect("baseline phase must complete");
     assert_eq!(ok.labels.len(), 4 + 2 * spec.suites.len());
     assert!(
-        !ok.labels.iter().any(|l| l.starts_with("admit-verification-failure")),
+        !ok.labels
+            .iter()
+            .any(|l| l.starts_with("admit-verification-failure")),
         "the optimistic model must not plan through a failure it did not observe: {:?}",
         ok.labels
     );

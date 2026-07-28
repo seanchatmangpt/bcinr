@@ -35,6 +35,11 @@ pub enum RefusalReason {
     /// "Theorem 1" in Kourani/Park/van der Aalst; the results are Lemmas
     /// 5.1-5.4 and Theorems 5.5/5.6.
     BoundedLanguageAgreementFailed { checked_len: usize },
+    /// `convert_and_verify` was called with a bound that cannot compare
+    /// anything. Both enumerators return the empty set at `max_len == 0`, so
+    /// they agree vacuously and the check would return `Ok` having compared
+    /// zero traces. Agreement on nothing is not evidence.
+    VacuousLanguageBound,
     /// A projection (`project_mg`/`project_sm` via `normalize`) produced a
     /// candidate sub-net that fails `WfNet::new`'s own well-formedness check
     /// (e.g. a dangling arc from `uniq`/`uniq_trans`'s synthetic
@@ -44,6 +49,10 @@ pub enum RefusalReason {
     /// crash a long-lived process (e.g. the `wf_net_to_powl` MCP tool) on
     /// adversarial-but-structurally-valid input.
     InternalNetConstruction(NetError),
+    /// The model could not be recomposed into a language-equivalent WF-net --
+    /// e.g. a bounded `DoRedo`, which a WF-net cycle cannot express without
+    /// widening the language.
+    NotRecomposable(crate::recompose::RecomposeError),
 }
 
 impl std::fmt::Display for RefusalReason {
@@ -55,11 +64,18 @@ impl std::fmt::Display for RefusalReason {
             Self::BudgetExhausted { budget } => {
                 write!(f, "bounded recursion budget {budget} exhausted")
             }
+            Self::VacuousLanguageBound => write!(
+                f,
+                "language bound of 0 compares two empty sets: agreement is vacuous"
+            ),
             Self::BoundedLanguageAgreementFailed { checked_len } => write!(
                 f,
                 "bounded language agreement failed at bound {checked_len}: \
                  powl2_language(convert(N)) != wf_net_language(N)"
             ),
+            Self::NotRecomposable(err) => {
+                write!(f, "model is not language-preservingly recomposable: {err}")
+            }
             Self::InternalNetConstruction(err) => {
                 write!(
                     f,
@@ -128,6 +144,12 @@ pub fn convert_and_verify(
     budget: usize,
     max_len: usize,
 ) -> Result<Powl2Model, Refusal> {
+    if max_len == 0 {
+        return Err(Refusal {
+            reason: RefusalReason::VacuousLanguageBound,
+            net_hash: net.content_hash(),
+        });
+    }
     let model = convert_with_budget(net, budget)?;
     let denotational = powl2_language(&model, max_len);
     let replayed = wf_net_language(net, max_len);

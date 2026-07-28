@@ -303,7 +303,7 @@ pub fn temporal_plan_to_partial_order(
 pub fn temporal_plan_to_wf_net(
     problem: &GroundTemporalProblem,
     plan: &TemporalPlan,
-) -> Result<WfNet, NetError> {
+) -> Result<WfNet, bcinr_powl::recompose::RecomposeError> {
     let model = temporal_plan_to_partial_order(problem, plan);
     bcinr_powl::recompose::recompose(&model)
 }
@@ -320,7 +320,7 @@ pub fn temporal_plan_to_powl2(
     plan: &TemporalPlan,
 ) -> Result<Powl2Model, Refusal> {
     let net = temporal_plan_to_wf_net(problem, plan).map_err(|err| Refusal {
-        reason: RefusalReason::InternalNetConstruction(err),
+        reason: RefusalReason::NotRecomposable(err),
         net_hash: "0".repeat(64),
     })?;
     let max_len = net.transitions().len();

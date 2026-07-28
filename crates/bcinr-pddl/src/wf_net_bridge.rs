@@ -65,7 +65,7 @@ fn causal_plan_to_partial_order(
 pub fn causal_plan_to_wf_net(
     epoch: &GroundedPlanningEpoch,
     causal_plan: &CausalPlan,
-) -> Result<WfNet, bcinr_powl::wf_net::NetError> {
+) -> Result<WfNet, bcinr_powl::recompose::RecomposeError> {
     let model = causal_plan_to_partial_order(epoch, causal_plan);
     bcinr_powl::recompose::recompose(&model)
 }
@@ -101,7 +101,7 @@ pub fn causal_plan_to_powl2(
     causal_plan: &CausalPlan,
 ) -> Result<Powl2Model, Refusal> {
     let net = causal_plan_to_wf_net(epoch, causal_plan).map_err(|err| Refusal {
-        reason: RefusalReason::InternalNetConstruction(err),
+        reason: RefusalReason::NotRecomposable(err),
         // No `WfNet` was ever successfully constructed to hash -- mirrors
         // `capability.rs`'s `Digest::ZERO` convention for a refusal raised
         // before any real content-derived digest can exist.

@@ -56,10 +56,7 @@ pub enum Pddl8Error {
     InvalidCaseId(String),
     /// Numeric effect caused arithmetic error (division by zero, NaN, etc).
     /// Function name and reason for the failure.
-    NumericError {
-        function: String,
-        reason: String,
-    },
+    NumericError { function: String, reason: String },
     /// A bounded search/analysis stage (`PlannerOutcome<T>`) did not produce
     /// `Found` — carries the *full* typed witness
     /// (`bcinr_mfw_ir::PlannerFailure`: `Exhausted`/`Bounded`/`Unsupported`/

@@ -28,13 +28,18 @@ fn derived_simple() {
     )
     .expect("failed to parse");
 
-    let ground = GroundTemporalProblem::build(&domain, &problem)
-        .expect("failed to ground");
+    let ground = GroundTemporalProblem::build(&domain, &problem).expect("failed to ground");
 
-    println!("Ground derived predicates: {}", ground.derived_predicates.len());
+    println!(
+        "Ground derived predicates: {}",
+        ground.derived_predicates.len()
+    );
     for (i, dp) in ground.derived_predicates.iter().enumerate() {
         println!("  [{}] {} => {:?}", i, dp.head.label(), dp.condition);
     }
 
-    assert!(!ground.derived_predicates.is_empty(), "derived predicates should be grounded");
+    assert!(
+        !ground.derived_predicates.is_empty(),
+        "derived predicates should be grounded"
+    );
 }

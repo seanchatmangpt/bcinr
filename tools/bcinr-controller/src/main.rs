@@ -12,14 +12,16 @@ use std::process::exit;
 
 use bcinr_pddl::{
     domain31_from_pddl, problem31_from_pddl, validate_plan, ExactClassicalError,
-    ExactClassicalProblem, EXACT_MAX_GROUND_ACTIONS, EXACT_MAX_PLAN_DEPTH,
-    EXACT_MAX_SEARCH_STATES,
+    ExactClassicalProblem, EXACT_MAX_GROUND_ACTIONS, EXACT_MAX_PLAN_DEPTH, EXACT_MAX_SEARCH_STATES,
 };
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() != 3 {
-        let program = args.first().map(String::as_str).unwrap_or("bcinr-controller");
+        let program = args
+            .first()
+            .map(String::as_str)
+            .unwrap_or("bcinr-controller");
         eprintln!("usage: {program} <domain.pddl> <problem.pddl>");
         exit(2);
     }
@@ -29,14 +31,20 @@ fn main() {
     let domain_text = match std::fs::read_to_string(domain_path) {
         Ok(text) => text,
         Err(err) => {
-            eprintln!("failed to read domain file {}: {err}", domain_path.display());
+            eprintln!(
+                "failed to read domain file {}: {err}",
+                domain_path.display()
+            );
             exit(1);
         }
     };
     let problem_text = match std::fs::read_to_string(problem_path) {
         Ok(text) => text,
         Err(err) => {
-            eprintln!("failed to read problem file {}: {err}", problem_path.display());
+            eprintln!(
+                "failed to read problem file {}: {err}",
+                problem_path.display()
+            );
             exit(1);
         }
     };

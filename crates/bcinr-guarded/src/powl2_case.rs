@@ -96,14 +96,10 @@ impl Powl2Case {
         match self {
             Self::Activity => None,
             Self::Silent => None,
-            Self::Sequence => {
-                Some("Sequence(c_0..c_k) == PartialOrder { children: c_0..c_k, edges: {(i, i+1)} }")
-            }
+            Self::Sequence => Some("Sequence(c_0..c_k) == PartialOrder { children: c_0..c_k, edges: {(i, i+1)} }"),
             Self::PartialOrder => None,
             Self::ChoiceGraph => None,
-            Self::DoRedo => Some(
-                "REFUSES: max_redos has no counterpart in an unbounded paper choice-graph cycle.",
-            ),
+            Self::DoRedo => Some("REFUSES: max_redos has no counterpart in an unbounded paper choice-graph cycle."),
         }
     }
 
@@ -122,23 +118,11 @@ impl Powl2Case {
     /// The numbered result that defines this case.
     pub fn paper_definition(&self) -> Option<PaperResult> {
         match self {
-            Self::Activity => Some(PaperResult {
-                number: "3.7",
-                title: "POWL Model",
-            }),
-            Self::Silent => Some(PaperResult {
-                number: "3.7",
-                title: "POWL Model",
-            }),
+            Self::Activity => Some(PaperResult { number: "3.7", title: "POWL Model" }),
+            Self::Silent => Some(PaperResult { number: "3.7", title: "POWL Model" }),
             Self::Sequence => None,
-            Self::PartialOrder => Some(PaperResult {
-                number: "3.7",
-                title: "POWL Model",
-            }),
-            Self::ChoiceGraph => Some(PaperResult {
-                number: "3.6",
-                title: "Choice Graph",
-            }),
+            Self::PartialOrder => Some(PaperResult { number: "3.7", title: "POWL Model" }),
+            Self::ChoiceGraph => Some(PaperResult { number: "3.6", title: "Choice Graph" }),
             Self::DoRedo => None,
         }
     }

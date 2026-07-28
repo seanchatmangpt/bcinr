@@ -4,7 +4,14 @@ version = "26.7.28"
 description = "bcinr admitted semantic graph -> Rust projections. One admitted fact per semantic object; every structural representation is manufactured."
 
 [ontology]
-source = "ontology/graph.ttl"
+# The admitted graph is a union of committed sources. `imports` is a first-class
+# field of the manifest schema, so there is no derived concatenation to keep in
+# sync -- and nothing here can point at a path that is not in the repository.
+source = "ontology/bcinr.ttl"
+imports = [
+    "ontology/taxonomies.ttl",
+    "ontology/profile.ttl",
+]
 
 [generation]
 output_dir = "."

@@ -7,8 +7,8 @@
 //! - Phase 2: `ResourceLedger::request_lease` on overlapping vs. non-overlapping intervals
 
 use bcinr_pddl::{
-    domain_from_pddl, problem_from_pddl, GroundTemporalProblem, LogicalTime, ResourceLedger,
-    Resource, ResourceMode,
+    domain_from_pddl, problem_from_pddl, GroundTemporalProblem, LogicalTime, Resource,
+    ResourceLedger, ResourceMode,
 };
 
 fn main() {
@@ -52,13 +52,12 @@ mod phase1_temporal_planning {
     /// Tests baseline temporal planning performance.
     #[divan::bench]
     fn find_plan_no_deadline() -> Option<f64> {
-        let domain = domain_from_pddl(divan::black_box(DOMAIN_NO_DEADLINE))
-            .expect("domain must parse");
-        let problem = problem_from_pddl(divan::black_box(PROBLEM_NO_DEADLINE))
-            .expect("problem must parse");
+        let domain =
+            domain_from_pddl(divan::black_box(DOMAIN_NO_DEADLINE)).expect("domain must parse");
+        let problem =
+            problem_from_pddl(divan::black_box(PROBLEM_NO_DEADLINE)).expect("problem must parse");
 
-        let ground = GroundTemporalProblem::build(&domain, &problem)
-            .expect("must ground");
+        let ground = GroundTemporalProblem::build(&domain, &problem).expect("must ground");
         ground
             .find_temporal_plan()
             .into_result()
@@ -70,13 +69,12 @@ mod phase1_temporal_planning {
     /// Deadline is just enough to accommodate the plan (tight constraint).
     #[divan::bench]
     fn find_plan_with_tight_deadline() -> Option<f64> {
-        let domain = domain_from_pddl(divan::black_box(DOMAIN_NO_DEADLINE))
-            .expect("domain must parse");
-        let problem = problem_from_pddl(divan::black_box(PROBLEM_NO_DEADLINE))
-            .expect("problem must parse");
+        let domain =
+            domain_from_pddl(divan::black_box(DOMAIN_NO_DEADLINE)).expect("domain must parse");
+        let problem =
+            problem_from_pddl(divan::black_box(PROBLEM_NO_DEADLINE)).expect("problem must parse");
 
-        let mut ground = GroundTemporalProblem::build(&domain, &problem)
-            .expect("must ground");
+        let mut ground = GroundTemporalProblem::build(&domain, &problem).expect("must ground");
         ground.set_deadline(LogicalTime::from_seconds_f64(12.0)); // Just enough for duration 10
         ground
             .find_temporal_plan()
@@ -89,13 +87,12 @@ mod phase1_temporal_planning {
     /// Deadline is generous, imposing minimal constraint.
     #[divan::bench]
     fn find_plan_with_loose_deadline() -> Option<f64> {
-        let domain = domain_from_pddl(divan::black_box(DOMAIN_NO_DEADLINE))
-            .expect("domain must parse");
-        let problem = problem_from_pddl(divan::black_box(PROBLEM_NO_DEADLINE))
-            .expect("problem must parse");
+        let domain =
+            domain_from_pddl(divan::black_box(DOMAIN_NO_DEADLINE)).expect("domain must parse");
+        let problem =
+            problem_from_pddl(divan::black_box(PROBLEM_NO_DEADLINE)).expect("problem must parse");
 
-        let mut ground = GroundTemporalProblem::build(&domain, &problem)
-            .expect("must ground");
+        let mut ground = GroundTemporalProblem::build(&domain, &problem).expect("must ground");
         ground.set_deadline(LogicalTime::from_seconds_f64(1000.0)); // Very loose
         ground
             .find_temporal_plan()
@@ -113,8 +110,7 @@ mod phase1_temporal_planning {
         let problem = problem_from_pddl(divan::black_box(PROBLEM_MAINTENANCE_WINDOW))
             .expect("problem must parse");
 
-        let ground = GroundTemporalProblem::build(&domain, &problem)
-            .expect("must ground");
+        let ground = GroundTemporalProblem::build(&domain, &problem).expect("must ground");
         ground
             .find_temporal_plan()
             .into_result()
@@ -145,8 +141,12 @@ mod phase2_resource_ledger {
             .expect("first lease must succeed");
 
         // Second lease should conflict
-        let result = ledger.request_lease(divan::black_box(cpu), divan::black_box(5.0), divan::black_box(15.0));
-        result.is_err()  // Returns true if conflict detected (expected)
+        let result = ledger.request_lease(
+            divan::black_box(cpu),
+            divan::black_box(5.0),
+            divan::black_box(15.0),
+        );
+        result.is_err() // Returns true if conflict detected (expected)
     }
 
     /// Benchmark: request lease on non-overlapping interval (no conflict).
@@ -168,8 +168,12 @@ mod phase2_resource_ledger {
             .expect("first lease must succeed");
 
         // Second lease should succeed (non-overlapping)
-        let result = ledger.request_lease(divan::black_box(cpu), divan::black_box(10.0), divan::black_box(20.0));
-        result.is_ok()  // Returns true if no conflict (expected)
+        let result = ledger.request_lease(
+            divan::black_box(cpu),
+            divan::black_box(10.0),
+            divan::black_box(20.0),
+        );
+        result.is_ok() // Returns true if no conflict (expected)
     }
 
     /// Benchmark: request lease on shared resource within capacity.
@@ -190,8 +194,12 @@ mod phase2_resource_ledger {
             .expect("lease 1 must succeed");
 
         // Overlaps with lease1 but within capacity (2)
-        let result = ledger.request_lease(divan::black_box(workers), divan::black_box(5.0), divan::black_box(15.0));
-        result.is_ok()  // Should succeed
+        let result = ledger.request_lease(
+            divan::black_box(workers),
+            divan::black_box(5.0),
+            divan::black_box(15.0),
+        );
+        result.is_ok() // Should succeed
     }
 
     /// Benchmark: request lease exceeding shared resource capacity.
@@ -216,8 +224,12 @@ mod phase2_resource_ledger {
             .expect("lease 2 must succeed");
 
         // Third overlapping lease should fail (exceeds capacity)
-        let result = ledger.request_lease(divan::black_box(workers), divan::black_box(7.0), divan::black_box(12.0));
-        result.is_err()  // Should fail
+        let result = ledger.request_lease(
+            divan::black_box(workers),
+            divan::black_box(7.0),
+            divan::black_box(12.0),
+        );
+        result.is_err() // Should fail
     }
 
     /// Benchmark: sequential non-overlapping leases on exclusive resource.
@@ -236,7 +248,11 @@ mod phase2_resource_ledger {
         for i in 0..16 {
             let start = (i * 10) as f64;
             let end = start + 10.0;
-            if let Ok(_lease) = ledger.request_lease(divan::black_box(cpu.clone()), divan::black_box(start), divan::black_box(end)) {
+            if let Ok(_lease) = ledger.request_lease(
+                divan::black_box(cpu.clone()),
+                divan::black_box(start),
+                divan::black_box(end),
+            ) {
                 count += 1;
             }
         }

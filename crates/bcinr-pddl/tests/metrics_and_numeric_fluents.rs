@@ -3,7 +3,7 @@
 //! 2. Numeric fluents in plain action preconditions
 
 use bcinr_pddl::{
-    domain_from_pddl, domain31_from_pddl, problem_from_pddl, problem31_from_pddl,
+    domain31_from_pddl, domain_from_pddl, problem31_from_pddl, problem_from_pddl,
     GroundTemporalProblem, PlannerOutcome,
 };
 
@@ -81,7 +81,10 @@ fn metric_function_evaluation() {
     let gtp = GroundTemporalProblem::build(&domain, &problem).unwrap();
     let outcome = gtp.find_temporal_plan();
 
-    assert!(matches!(outcome, PlannerOutcome::Found(_)), "Plan should be found");
+    assert!(
+        matches!(outcome, PlannerOutcome::Found(_)),
+        "Plan should be found"
+    );
     if let PlannerOutcome::Found(plan) = outcome {
         // Metric should be computed: initial cost 10 + increase 5 = 15
         assert!(
@@ -130,9 +133,9 @@ fn numeric_precondition_plain_action() {
     let precondition = &domain31.actions[0].precondition;
     match precondition {
         bcinr_pddl::PddlCondition::And(parts) => {
-            let has_compare = parts.iter().any(|c| {
-                matches!(c, bcinr_pddl::PddlCondition::Compare(_, _, _))
-            });
+            let has_compare = parts
+                .iter()
+                .any(|c| matches!(c, bcinr_pddl::PddlCondition::Compare(_, _, _)));
             assert!(
                 has_compare,
                 "Numeric precondition should be preserved in action.precondition"
@@ -244,8 +247,15 @@ fn metric_driven_plan_selection_falsifier() {
     let gp = bcinr_pddl::GroundProblem::build(&domain, &problem, None).unwrap();
 
     // Verify that initial_fn_values was populated
-    assert!(gp.initial_fn_values.contains_key("cost"), "Initial cost should exist");
-    assert_eq!(gp.initial_fn_values.get("cost"), Some(&0.0), "Initial cost should be 0");
+    assert!(
+        gp.initial_fn_values.contains_key("cost"),
+        "Initial cost should exist"
+    );
+    assert_eq!(
+        gp.initial_fn_values.get("cost"),
+        Some(&0.0),
+        "Initial cost should be 0"
+    );
 
     // Verify that metric was populated
     assert!(gp.metric.is_some(), "Metric should be present");
@@ -254,5 +264,8 @@ fn metric_driven_plan_selection_falsifier() {
     let outcome = gp.find_plan();
 
     // Both plans are valid, but the planner should return the cheaper one
-    assert!(matches!(outcome, PlannerOutcome::Found(_)), "At least one plan should be found");
+    assert!(
+        matches!(outcome, PlannerOutcome::Found(_)),
+        "At least one plan should be found"
+    );
 }

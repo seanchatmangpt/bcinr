@@ -9,15 +9,7 @@
 /// The underlying `u64` is bounded by domain/problem grounding, not by the type itself.
 /// Cross-crate usage (PDDL → POWL → workflow runtime) relies on this single definition.
 #[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    serde::Serialize,
-    serde::Deserialize,
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]
 pub struct LogicalTime(pub u64);
 

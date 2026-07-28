@@ -136,7 +136,10 @@ impl ResourceLedger {
                     if intervals_overlap((lease.start, lease.end), (start, end)) {
                         return Err(ResourceRefusal::Conflict {
                             resource_id: resource.name.clone(),
-                            overlap_interval: overlap_region((lease.start, lease.end), (start, end)),
+                            overlap_interval: overlap_region(
+                                (lease.start, lease.end),
+                                (start, end),
+                            ),
                         });
                     }
                 }

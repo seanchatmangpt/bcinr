@@ -5,9 +5,9 @@
 //! - Phase 2: Derived predicates with quantified bodies (forall/exists)
 //! - Phase 3: Conditional effects (when with condition evaluation)
 
+use bcinr_mfw_ir::PlannerOutcome;
 use bcinr_pddl::ground::GroundTemporalProblem;
 use bcinr_pddl::{domain_from_pddl, problem_from_pddl};
-use bcinr_mfw_ir::PlannerOutcome;
 
 /// Phase 1: Equality in preconditions
 /// Uses durative actions so we can test with GroundTemporalProblem
@@ -35,8 +35,7 @@ fn phase1_equality_in_durative_preconditions() {
     )
     .expect("failed to parse problem");
 
-    let ground = GroundTemporalProblem::build(&domain, &problem)
-        .expect("failed to ground problem");
+    let ground = GroundTemporalProblem::build(&domain, &problem).expect("failed to ground problem");
 
     let outcome = ground.find_temporal_plan();
     assert!(
@@ -146,8 +145,7 @@ fn phase3_conditional_effect_when_fires_on_condition() {
     )
     .expect("failed to parse problem");
 
-    let ground = GroundTemporalProblem::build(&domain, &problem)
-        .expect("failed to ground problem");
+    let ground = GroundTemporalProblem::build(&domain, &problem).expect("failed to ground problem");
 
     let outcome = ground.find_temporal_plan();
     assert!(
@@ -179,8 +177,7 @@ fn phase3_conditional_effect_when_does_not_fire_without_condition() {
     )
     .expect("failed to parse problem");
 
-    let ground = GroundTemporalProblem::build(&domain, &problem)
-        .expect("failed to ground problem");
+    let ground = GroundTemporalProblem::build(&domain, &problem).expect("failed to ground problem");
 
     let outcome = ground.find_temporal_plan();
     assert!(
@@ -215,8 +212,7 @@ fn phase3_conditional_effect_with_forall() {
     )
     .expect("failed to parse problem");
 
-    let ground = GroundTemporalProblem::build(&domain, &problem)
-        .expect("failed to ground problem");
+    let ground = GroundTemporalProblem::build(&domain, &problem).expect("failed to ground problem");
 
     let outcome = ground.find_temporal_plan();
     assert!(
