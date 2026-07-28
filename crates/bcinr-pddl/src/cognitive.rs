@@ -31,10 +31,20 @@
 //! unordered", which is why the hierarchical entry point is the one to call
 //! when distribution is the goal.
 //!
-//! On refusal the hierarchical path falls back to the flat `Sequence` (never
-//! fabricate structure the analysis cannot prove) but reports the `Refusal` in
-//! [`ExactCognitiveWorkflow::hierarchical_refusal`], so "no concurrency here"
-//! stays distinguishable from "the bridge refused".
+//! On refusal the hierarchical path falls back to the flat `Sequence` -- never
+//! fabricate structure the analysis cannot prove -- and returns it as
+//! [`HierarchicalProjection::NotDerived`] rather than as an ordinary success.
+//! A flat model and a derived one have the same shape, so a caller that could
+//! reach the tape without naming which it held would be unable to tell "this
+//! plan has no exploitable concurrency" from "the concurrency was never
+//! derived". The standing and any `Refusal` are still carried on the workflow;
+//! the enum is what makes consulting them unavoidable.
+//!
+//! The lossy-effect refusal is decided per *path*, not per domain: an action
+//! whose effects cannot survive STRIPS lowering only withholds concurrency
+//! when it actually appears in the witnessed plan. `ground_v2::legacy_action`
+//! records the lossy kind per action and `path_to_tape` refuses only on the
+//! path, which surfaces here as `plan_is_label_only`.
 
 #![cfg(feature = "mfw-planner")]
 
@@ -58,7 +68,6 @@ use crate::ground_v2::{
 use crate::parse::{domain31_from_pddl, problem31_from_pddl};
 use crate::wf_net_bridge::causal_plan_to_powl2;
 use crate::Pddl8Tape;
-use wasm4pm_compat::pddl::PddlEffect;
 
 /// Standing of the PDDL-to-POWL projection emitted by this rail.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -112,38 +121,6 @@ pub enum CognitiveProjectionStanding {
     RefusedLossyEffectModel,
 }
 
-/// Whether every effect in the domain survives lowering to
-/// `Pddl8GroundAction`'s add/delete atom lists.
-///
-/// `Add`/`Del` are exactly representable. Every other form is dropped by
-/// `ground_v2::legacy_action`, which records the loss in
-/// `ExactGroundAction::lossy` as [`ground_v2::LossyLowering::Effect`]; the
-/// causal analyser consumes the lowered
-/// result, so the independence relation it derives is only as complete as this
-/// predicate is true.
-///
-/// This is the *domain*-level predicate. Its per-plan counterpart is
-/// `ExactClassicalError::EffectNotRepresentable`, which fires only when a
-/// lossy action actually lands on the witnessed path; a domain can fail this
-/// check and still yield an exactly-representable plan.
-fn effects_survive_strips_lowering(domain: &crate::Pddl31Domain) -> bool {
-    fn effect_ok(e: &PddlEffect) -> bool {
-        match e {
-            PddlEffect::Add(_) | PddlEffect::Del(_) => true,
-            PddlEffect::Numeric(_) | PddlEffect::Timed(_, _) => false,
-            PddlEffect::Forall { .. } | PddlEffect::When { .. } => false,
-        }
-    }
-    domain
-        .actions
-        .iter()
-        .all(|a| a.effect.iter().all(effect_ok))
-        && domain
-            .durative_actions
-            .iter()
-            .all(|a| a.effects.iter().all(effect_ok))
-}
-
 /// Complete output of one exact cognitive-composition request.
 #[derive(Debug)]
 pub struct ExactCognitiveWorkflow {
@@ -164,6 +141,16 @@ pub struct ExactCognitiveWorkflow {
     /// below consumes labels alone, so a plan that exists is preferable to a
     /// refusal over fields it never reads.
     pub plan_is_label_only: bool,
+    /// The projected POWL 2.0 model, before compilation to a tape.
+    ///
+    /// `powl` below is this model linearized into an executable tape, and a
+    /// tape answers "what runs next" rather than "what may run together". The
+    /// partial order is the derived answer this rail exists to produce -- it is
+    /// what [`bcinr_powl::process_toolkit::dispatch_waves`] reads to compute
+    /// antichains, and what a consumer needs in order to distribute work
+    /// without being told the concurrency. Compiling it away and keeping only
+    /// the tape discards the deliverable and keeps the byproduct.
+    pub model: Powl2Model,
     pub powl: CompiledPowl2,
     pub execution_receipt: PowlV2ExecutionReceipt,
     pub projection_standing: CognitiveProjectionStanding,
@@ -194,6 +181,69 @@ pub struct ExactCognitiveWorkflow {
     /// sound to run) -- and both leave this field `None`. `EmptyPlan` also
     /// leaves it `None`.
     pub hierarchical_refusal: Option<bcinr_powl::wf_to_powl::Refusal>,
+}
+
+/// The result of a *hierarchical* projection, with "a partial order was
+/// derived" separated from "a flat sequence is all there is" at the type level.
+///
+/// [`ExactCognitiveWorkflow`] already carries both facts, in
+/// `projection_standing` and `hierarchical_refusal`. It carried them well
+/// enough to be correct and badly enough to be useless: the fields are written
+/// on every hierarchical call and read by nothing outside this module's own
+/// tests, because `powl` is reachable without consulting them. A caller that
+/// takes the tape and dispatches it cannot tell a plan with no exploitable
+/// concurrency from one whose concurrency was never derived -- and those two
+/// have the same shape, so the mistake is silent.
+///
+/// PDDL states preconditions and effects and never states what runs in
+/// parallel; the partial order is the derived answer, and this rail exists to
+/// derive it. Handing back a flat sequence is the correct response to a
+/// refusal, but it is the *absence* of that answer, and the absence must be as
+/// visible as the answer. Matching an arm here is the acknowledgement.
+#[derive(Debug)]
+pub enum HierarchicalProjection {
+    /// Independence was derived from the domain's own causal structure and
+    /// survived Algorithm 3, so `powl` may carry genuine `PartialOrder` /
+    /// `ChoiceGraph` structure. Exactly
+    /// [`CognitiveProjectionStanding::CausalHierarchical`].
+    Derived(ExactCognitiveWorkflow),
+    /// No partial order was derived. The workflow is correct and complete --
+    /// no step is ever dropped -- but its order is the single witnessed one,
+    /// and any concurrency the domain implies is *not* represented in it.
+    ///
+    /// Read `projection_standing` for which of the four reasons applies, and
+    /// `hierarchical_refusal` when the standing is `ExactSequential`.
+    NotDerived(ExactCognitiveWorkflow),
+}
+
+impl HierarchicalProjection {
+    fn classify(workflow: ExactCognitiveWorkflow) -> Self {
+        match workflow.projection_standing {
+            CognitiveProjectionStanding::CausalHierarchical => Self::Derived(workflow),
+            CognitiveProjectionStanding::ExactSequential
+            | CognitiveProjectionStanding::EmptyPlan
+            | CognitiveProjectionStanding::CausalAnalysisFailed(_)
+            | CognitiveProjectionStanding::RefusedLossyEffectModel => Self::NotDerived(workflow),
+        }
+    }
+
+    /// The standing, without consuming the projection.
+    pub fn standing(&self) -> &CognitiveProjectionStanding {
+        match self {
+            Self::Derived(w) | Self::NotDerived(w) => &w.projection_standing,
+        }
+    }
+
+    /// Take the workflow whether or not concurrency was derived.
+    ///
+    /// Deliberately verbose: this is the opt-in that reintroduces the old
+    /// behaviour, and it should be visible at the call site that a flat result
+    /// is being accepted without checking why it is flat.
+    pub fn into_workflow_ignoring_standing(self) -> ExactCognitiveWorkflow {
+        match self {
+            Self::Derived(w) | Self::NotDerived(w) => w,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -289,6 +339,7 @@ pub fn plan_exact_cognitive_workflow_bounded(
         admitted,
         plan,
         plan_is_label_only,
+        model,
         powl,
         execution_receipt,
         projection_standing: CognitiveProjectionStanding::ExactSequential,
@@ -308,7 +359,7 @@ pub fn plan_exact_cognitive_workflow_bounded(
 pub fn plan_exact_cognitive_workflow_hierarchical(
     domain_text: &str,
     problem_text: &str,
-) -> Result<ExactCognitiveWorkflow, ExactCognitiveError> {
+) -> Result<HierarchicalProjection, ExactCognitiveError> {
     plan_exact_cognitive_workflow_hierarchical_bounded(
         domain_text,
         problem_text,
@@ -325,7 +376,7 @@ pub fn plan_exact_cognitive_workflow_hierarchical_bounded(
     max_ground_actions: usize,
     max_plan_depth: usize,
     max_search_states: usize,
-) -> Result<ExactCognitiveWorkflow, ExactCognitiveError> {
+) -> Result<HierarchicalProjection, ExactCognitiveError> {
     let domain = domain31_from_pddl(domain_text).map_err(ExactCognitiveError::Parse)?;
     let problem = problem31_from_pddl(problem_text).map_err(ExactCognitiveError::Parse)?;
     let admitted = admit_planning_task(&domain, &problem, &ExactClassicalCapabilityProfile)
@@ -369,15 +420,16 @@ pub fn plan_exact_cognitive_workflow_hierarchical_bounded(
         execute_and_seal_v2(&powl.tape, &ConcurrencyGuardTable::empty(), max_ticks)
             .map_err(ExactCognitiveError::Receipt)?;
 
-    Ok(ExactCognitiveWorkflow {
+    Ok(HierarchicalProjection::classify(ExactCognitiveWorkflow {
         admitted,
         plan,
         plan_is_label_only,
+        model,
         powl,
         execution_receipt,
         projection_standing,
         hierarchical_refusal,
-    })
+    }))
 }
 
 fn build_hierarchical_model(
@@ -402,12 +454,31 @@ fn build_hierarchical_model(
     }
 
     // Refuse to derive concurrency from a shadow. `plan.ops[..].action` is
-    // `ground_v2::legacy_action`'s output -- add/delete atoms only -- so if
-    // the domain carries any other effect form the independence relation
-    // computed below cannot see the conflicts it creates. `plan_is_label_only`
-    // is the stronger, per-plan form of the same fact: those ops carry no
-    // effects at all, so every pair would replay as trivially independent.
-    if plan_is_label_only || !effects_survive_strips_lowering(&admitted.domain) {
+    // `ground_v2::legacy_action`'s output -- add/delete atoms only -- so an
+    // action carrying any other effect form creates conflicts the independence
+    // relation below cannot see.
+    //
+    // `plan_is_label_only` is the whole test, because the lossy signal is
+    // already per-action and already checked per-path:
+    //
+    //   - `legacy_action` marks an action `LossyLowering::Effect` for every
+    //     non-Add/Del form -- `When`, `Forall`, `Numeric`, `Timed` -- and
+    //     `LossyLowering::Precondition` for a dropped condition kind.
+    //   - `path_to_tape` walks the witnessed path and returns
+    //     `EffectNotRepresentable` / `PreconditionNotRepresentable` if any
+    //     action on it is lossy.
+    //   - the hierarchical entry point catches exactly those two errors and
+    //     re-plans with `find_label_plan`, setting `plan_is_label_only`.
+    //
+    // So `!plan_is_label_only` means every action on the witnessed path lowered
+    // exactly -- and the analyser only ever compares occurrences drawn from
+    // that path. A domain-level scan was the coarser form of this fact: it
+    // withheld concurrency from every plan over a domain containing one
+    // conditional effect, including plans in which no lossy action appears at
+    // all. That is not conservatism, it is erasure: a flat result and a
+    // genuinely sequential plan are indistinguishable downstream, so the cost
+    // was invisible.
+    if plan_is_label_only {
         return (
             fallback_sequential(plan),
             CognitiveProjectionStanding::RefusedLossyEffectModel,
