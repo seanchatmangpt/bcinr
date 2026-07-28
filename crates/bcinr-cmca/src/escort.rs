@@ -19,12 +19,17 @@
 //! degradation, a fixed-point (not floating-point) realization, an explicit
 //! declared lens domain (below), integration with [`crate::cascade`]'s
 //! hierarchical allocation, and a still-open, not-yet-resolved semantic
-//! decision between *support coverage* (this module's and
-//! `cascade::escort_weight`'s current `q == 0` convention: uniform over
-//! positive-mass support) and *sibling coverage* (uniform over every
-//! eligible sibling, zero-mass included). This module's current behavior is
-//! not a claim that it already conforms to whatever `~/mfw`'s Lean crown
-//! ultimately settles for `q == 0` -- the citation above documents
+//! decision between *support coverage* (uniform over positive-mass support
+//! only, excluding zero-mass elements) and *sibling coverage* (uniform over
+//! every eligible sibling, zero-mass included). **Current BCINR behavior is
+//! sibling coverage**: [`crate::cascade::escort_weight`]'s `lens == 0`
+//! branch returns `NonNegativeFixed::ONE` unconditionally, regardless of
+//! mass, so a zero-mass sibling gets the same weight as every other one.
+//! This module's current behavior is not a claim that it already conforms
+//! to whatever `~/mfw`'s Lean crown ultimately settles for `q == 0` -- if
+//! that crown settles on support coverage instead, this is the exact
+//! behavior that migrates, not something already aligned with it. The
+//! citation above documents
 //! mathematical ancestry, not completed conformance.
 //!
 //! # Relationship to `cascade::escort_weight` and `allocator::power`

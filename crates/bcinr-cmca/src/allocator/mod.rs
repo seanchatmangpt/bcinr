@@ -1785,8 +1785,14 @@ pub fn allocate_in(
 /// - `proof`: Verification proof authorizing learning updates.
 ///
 /// # Outputs
-/// Returns the resource allocation probability distribution over the $N$ nodes if successful,
-/// or a [`StabilityRefusal`] code otherwise.
+/// Returns a nonnegative resource-allocation vector over the $N$ nodes if
+/// successful, or a [`StabilityRefusal`] code otherwise. In the ordinary
+/// normalized regime the components sum approximately to `ONE` (see
+/// [`FeasibleRegion::contains_allocation`]); a documented fallback regime
+/// (`priced_sum` underflowing to zero) can legitimately return a
+/// subnormalized vector instead -- this is not a probability distribution
+/// by construction, only in the common case. See `contains_allocation`'s
+/// docs for the counterexample that established this.
 ///
 /// # Complexity
 /// - **Time Complexity**: $O(K \cdot Q \cdot N^2)$ operations ($O(1)$ constant time).
