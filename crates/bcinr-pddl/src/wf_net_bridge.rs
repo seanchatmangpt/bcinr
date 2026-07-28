@@ -75,10 +75,12 @@ pub fn causal_plan_to_wf_net(
 /// `PartialOrder`/`ChoiceGraph`) where the causal structure supports it,
 /// rather than the flat sequence `cognitive.rs`'s own projection produces.
 ///
-/// Gated by Theorem 1 via [`convert_and_verify`], not bare `convert`: the
-/// returned model's denotational language must equal the WF-net's own
-/// token-game replay, or the conversion is refused
-/// (`RefusalReason::LanguageMismatch`). A POWL model that is *not*
+/// Gated by *bounded* language agreement via [`convert_and_verify`], not bare
+/// `convert`: the returned model's denotational language must equal the
+/// WF-net's own token-game replay up to the checked bound, or the conversion
+/// is refused (`RefusalReason::BoundedLanguageAgreementFailed`). This is not
+/// the paper's Theorem 5.5 -- see `convert_and_verify`'s own docs for what the
+/// bound does and does not establish. A POWL model that is *not*
 /// language-equivalent to the plan it claims to describe is worse than no
 /// model at all, because it still looks authoritative -- so the check that
 /// makes the claim true runs on the production path, not only in tests.

@@ -1,0 +1,16 @@
+PREFIX bc:  <https://bcinr.dev/ontology#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+# Arity side conditions from Def 3.7 (`n >= 2`), one row per constrained case.
+SELECT ?const_name ?bound ?case_name ?result_number ?result_title
+WHERE {
+    ?case a bc:TaxonCase ;
+          bc:inTaxonomy       bc:Powl2Model ;
+          bc:caseName         ?case_name ;
+          bc:arityLowerBound  ?bound ;
+          bc:arityConstName   ?const_name ;
+          bc:arityConditionSource ?src .
+    ?src bc:resultNumber ?result_number ;
+         bc:resultTitle  ?result_title .
+}
+ORDER BY ?const_name

@@ -17,9 +17,11 @@
 //! which independent actions are genuinely unordered. Two actions end up
 //! concurrent because neither's effects touch the other's preconditions --
 //! derived from the domain's own causal structure, never declared by an
-//! author. The result is gated by Theorem 1 (`convert_and_verify`): its
-//! language must equal the WF-net's own replay, or it refuses rather than
-//! returning a model that merely looks authoritative.
+//! author. The result is gated by bounded language agreement
+//! (`convert_and_verify`): its language must equal the WF-net's own replay up
+//! to the checked bound, or it refuses rather than returning a model that
+//! merely looks authoritative. That bound is not the paper's Theorem 5.5 --
+//! see `convert_and_verify` for what it does and does not establish.
 //!
 //! Downstream, `bcinr_powl::process_toolkit::{dispatch_waves, ready_set}`
 //! turn that partial order into dispatchable antichains -- sets of actions
@@ -89,8 +91,9 @@ pub struct ExactCognitiveWorkflow {
     /// must not look identical from outside, or a broken bridge is
     /// indistinguishable from a legitimately flat plan. This field is what
     /// distinguishes them: `Some(refusal)` means real structure was
-    /// attempted and declined (e.g. `LanguageMismatch` -- Theorem 1 did not
-    /// hold -- or `IrreducibleFragment`), `None` with `ExactSequential`
+    /// attempted and declined (e.g. `BoundedLanguageAgreementFailed` -- the
+    /// two enumerations disagreed at the checked bound -- or
+    /// `IrreducibleFragment`), `None` with `ExactSequential`
     /// means the causal analysis itself found nothing to exploit.
     pub hierarchical_refusal: Option<bcinr_powl::wf_to_powl::Refusal>,
 }

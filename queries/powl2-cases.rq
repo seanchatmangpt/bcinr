@@ -1,0 +1,53 @@
+PREFIX bc:   <https://bcinr.dev/ontology#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#>
+
+# Rust projection of the Powl2Model taxonomy.
+#
+# LAYERING: the ontology holds language-neutral facts (`bc:caseShape "tuple"`,
+# `bc:constructorTier bc:PaperCore`). This query is the Rust-specific layer --
+# it BINDs those facts to Rust tokens. The template is then pure substitution
+# with no conditionals, because a template that branches on data is making a
+# decision, and decisions belong here.
+SELECT ?case_name ?case_order ?case_doc
+       ?pattern_suffix ?tier_variant ?derived_expr ?arity_expr
+       ?normalization_expr ?paper_expr
+WHERE {
+    ?case a bc:TaxonCase ;
+          bc:inTaxonomy bc:Powl2Model ;
+          bc:caseName   ?case_name ;
+          bc:caseOrder  ?case_order ;
+          bc:caseDoc    ?case_doc ;
+          bc:caseShape  ?case_shape ;
+          bc:constructorTier ?tier .
+
+    ?tier bc:rustVariant ?tier_variant .
+
+    OPTIONAL { ?case bc:derivedFrom       ?d . ?d bc:caseName ?derived_name . }
+    OPTIONAL { ?case bc:arityLowerBound   ?bound . }
+    OPTIONAL { ?case bc:normalizationNote ?note . }
+    OPTIONAL {
+        ?case bc:definedBy ?def .
+        ?def bc:resultNumber ?rnum ; bc:resultTitle ?rtitle .
+    }
+
+    # Neutral shape -> Rust match-pattern syntax.
+    BIND(IF(?case_shape = "unit",  "",
+        IF(?case_shape = "tuple", "(..)", " { .. }")) AS ?pattern_suffix)
+
+    # Optional facts -> complete Rust expressions, so the template never
+    # decides between Some and None.
+    BIND(IF(BOUND(?derived_name),
+            CONCAT("Some(Self::", ?derived_name, ")"), "None") AS ?derived_expr)
+
+    BIND(IF(BOUND(?bound),
+            CONCAT("Some(", STR(?bound), ")"), "None") AS ?arity_expr)
+
+    BIND(IF(BOUND(?note),
+            CONCAT("Some(\"", ?note, "\")"), "None") AS ?normalization_expr)
+
+    BIND(IF(BOUND(?rnum),
+            CONCAT("Some(PaperResult { number: \"", ?rnum,
+                   "\", title: \"", ?rtitle, "\" })"), "None") AS ?paper_expr)
+}
+ORDER BY xsd:integer(?case_order)

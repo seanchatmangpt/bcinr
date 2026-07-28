@@ -1,0 +1,31 @@
+PREFIX bc:   <https://bcinr.dev/ontology#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#>
+
+# Every case of every closed taxonomy, denormalised with its taxonomy so a
+# single flat result set can drive one generic template.
+#
+# `is_first` / `is_last` let the template open and close each enum without
+# needing scope escape (Tera has no mutable accumulators). They are computed
+# here, not in the template, because they are decisions.
+SELECT ?taxonomy ?taxonomy_doc ?case_name ?case_order ?case_doc ?is_first ?is_last
+WHERE {
+    ?tax a bc:ClosedTaxonomy ;
+         rdfs:label     ?taxonomy ;
+         bc:taxonomyDoc ?taxonomy_doc .
+
+    ?case a bc:TaxonCase ;
+          bc:inTaxonomy ?tax ;
+          bc:caseName   ?case_name ;
+          bc:caseOrder  ?case_order ;
+          bc:caseDoc    ?case_doc .
+
+    BIND(NOT EXISTS {
+        ?e bc:inTaxonomy ?tax ; bc:caseOrder ?eo . FILTER(?eo < ?case_order)
+    } AS ?is_first)
+
+    BIND(NOT EXISTS {
+        ?l bc:inTaxonomy ?tax ; bc:caseOrder ?lo . FILTER(?lo > ?case_order)
+    } AS ?is_last)
+}
+ORDER BY ?taxonomy xsd:integer(?case_order)

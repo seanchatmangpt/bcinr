@@ -25,10 +25,16 @@ pub enum RefusalReason {
     BudgetExhausted { budget: usize },
     /// Algorithm 3 produced a structurally-valid decomposition, but its
     /// denotational language (`powl2_language`) disagrees with the WF-net's
-    /// own token-game replay (`wf_net_language`) at the checked bound --
-    /// Theorem 1 (language preservation) does not hold for this candidate,
-    /// so it is refused rather than returned as if it were correct.
-    LanguageMismatch { checked_len: usize },
+    /// own token-game replay (`wf_net_language`) at the checked bound, so it
+    /// is refused rather than returned as if it were correct.
+    ///
+    /// This names exactly the obligation discharged: agreement of two bounded
+    /// enumerations. It is *not* the paper's Theorem 5.5 (Correctness), whose
+    /// language-preservation content is carried by Lemmas 5.3 and 5.4 and
+    /// quantifies over the whole language, not a prefix of it. There is no
+    /// "Theorem 1" in Kourani/Park/van der Aalst; the results are Lemmas
+    /// 5.1-5.4 and Theorems 5.5/5.6.
+    BoundedLanguageAgreementFailed { checked_len: usize },
     /// A projection (`project_mg`/`project_sm` via `normalize`) produced a
     /// candidate sub-net that fails `WfNet::new`'s own well-formedness check
     /// (e.g. a dangling arc from `uniq`/`uniq_trans`'s synthetic
@@ -49,9 +55,9 @@ impl std::fmt::Display for RefusalReason {
             Self::BudgetExhausted { budget } => {
                 write!(f, "bounded recursion budget {budget} exhausted")
             }
-            Self::LanguageMismatch { checked_len } => write!(
+            Self::BoundedLanguageAgreementFailed { checked_len } => write!(
                 f,
-                "language preservation (Theorem 1) failed at bound {checked_len}: \
+                "bounded language agreement failed at bound {checked_len}: \
                  powl2_language(convert(N)) != wf_net_language(N)"
             ),
             Self::InternalNetConstruction(err) => {
@@ -93,12 +99,30 @@ pub fn convert(net: &WfNet) -> Result<Powl2Model, Refusal> {
     convert_with_budget(net, DEFAULT_DEPTH_BUDGET)
 }
 
-/// [`convert`], additionally gated by Theorem 1: the resulting model's
-/// denotational language must agree with the WF-net's own token-game
-/// replay, checked up to `max_len` -- two independently-computed languages
-/// (no shared code between [`powl2_language`] and [`wf_net_language`])
-/// agreeing is the genuine correctness evidence; `convert` alone only
-/// checks the structural partition conditions.
+/// [`convert`], additionally gated by *bounded* language agreement: the
+/// resulting model's denotational language must agree with the WF-net's own
+/// token-game replay, checked up to `max_len`. [`powl2_language`] and
+/// [`wf_net_language`] share no code -- the former recurses only on
+/// [`Powl2Model`], the latter touches only the [`WfNet`] API -- so their
+/// agreement is real evidence.
+///
+/// # What this does NOT establish
+///
+/// This is not the paper's Theorem 5.5 (Correctness). That theorem quantifies
+/// over the entire language; this compares two enumerations truncated at
+/// `max_len`.
+///
+/// The two enumerators are independent in *code* but share a *failure mode*:
+/// both return the empty set at `max_len == 0`, so they agree vacuously and
+/// this function returns `Ok` having compared nothing. Independence of
+/// implementation does not imply independence of failure direction. Callers
+/// must choose `max_len` large enough that the comparison is non-empty --
+/// see `wf_net_bridge.rs`, which derives it from the recomposed net's
+/// transition count and argues the bound is exact for that construction.
+///
+/// An unbounded check exists: `mfw/pc-powl2/differential-rust` explores
+/// `WfNet` against `recompose(convert(N))` as epsilon-NFAs over the complete
+/// product automaton with no trace-length bound.
 pub fn convert_and_verify(
     net: &WfNet,
     budget: usize,
@@ -109,7 +133,7 @@ pub fn convert_and_verify(
     let replayed = wf_net_language(net, max_len);
     if denotational != replayed {
         return Err(Refusal {
-            reason: RefusalReason::LanguageMismatch {
+            reason: RefusalReason::BoundedLanguageAgreementFailed {
                 checked_len: max_len,
             },
             net_hash: net.content_hash(),
@@ -124,8 +148,12 @@ pub fn convert_and_verify(
 /// is deliberately no free-choice pre-check here. The paper does not gate on
 /// free-choiceness (its own Figure 7a non-free-choice example is simply run
 /// and left to the ordinary fall-through), and its correctness proofs
-/// (Lemmas 5.1-5.3) require only safeness, soundness, and a conflict- or
-/// concurrency-hiding partition -- never Def 3.4. Refusing up front would
+/// (Lemmas 5.1-5.4) require only safeness, soundness, and a conflict- or
+/// concurrency-hiding partition -- never Def 3.4. The range is 5.1-5.4, not
+/// 5.1-5.3: 5.1/5.2 are the structural guarantees for the marked-graph and
+/// state-machine projections, 5.3/5.4 the matching language-preservation
+/// results. Citing only through 5.3 covers the partial-order half of the
+/// recursion and silently omits the choice-graph half. Refusing up front would
 /// reject nets Algorithm 3 might legitimately decompose. Non-separable input
 /// still refuses, just via `IrreducibleFragment` rather than a special case.
 /// [`WfNet::is_free_choice`] remains available as the Def 3.4 predicate for

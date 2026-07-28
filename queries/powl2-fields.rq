@@ -1,0 +1,23 @@
+PREFIX bc:   <https://bcinr.dev/ontology#>
+PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#>
+
+# One row per field of each Powl2Model variant, keyed by the owning case name
+# so the template can nest with `{% if field.case_name == case.case_name %}`.
+#
+# `positional` distinguishes tuple variants (Activity(String)) from struct
+# variants (PartialOrder { children, edges }).
+SELECT ?case_name ?field_name ?field_type ?field_order ?positional ?field_doc
+WHERE {
+    ?case a bc:TaxonCase ;
+          bc:inTaxonomy bc:Powl2Model ;
+          bc:caseName   ?case_name ;
+          bc:caseField  ?field .
+
+    ?field bc:fieldName  ?field_name ;
+           bc:fieldType  ?field_type ;
+           bc:fieldOrder ?field_order .
+
+    OPTIONAL { ?field bc:fieldPositional ?positional . }
+    OPTIONAL { ?field bc:fieldDoc        ?field_doc . }
+}
+ORDER BY ?case_name xsd:integer(?field_order)

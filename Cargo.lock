@@ -266,6 +266,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "bcinr-guarded"
+version = "26.7.25"
+dependencies = [
+ "bcinr-powl",
+]
+
+[[package]]
 name = "bcinr-logic"
 version = "26.7.25"
 dependencies = [
@@ -325,6 +332,7 @@ dependencies = [
 name = "bcinr-powl"
 version = "26.7.25"
 dependencies = [
+ "bcinr-cmca",
  "bcinr-logic",
  "bcinr-mfw-ir",
  "blake3",

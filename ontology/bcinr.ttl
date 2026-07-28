@@ -1,0 +1,167 @@
+@prefix bc:   <https://bcinr.dev/ontology#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+################################################################################
+# bcinr admitted semantic graph
+#
+# One admitted fact per semantic object. Every structural representation of that
+# fact -- Rust enum variants, exhaustive match arms, arity checks, refusal
+# variants, paper citations -- is manufactured from here by ggen.
+#
+# Rendered by `ggen sync` via ggen.toml. Do not hand-edit generated output.
+################################################################################
+
+################################################################################
+# Meta-vocabulary
+################################################################################
+
+bc:Source           a rdfs:Class .   # a research artifact of record
+bc:NumberedResult   a rdfs:Class .   # a numbered definition/lemma/theorem in a Source
+bc:ClosedTaxonomy   a rdfs:Class .   # a closed variant set; elimination must be exhaustive
+bc:TaxonCase        a rdfs:Class .   # one variant of a ClosedTaxonomy
+bc:CaseField        a rdfs:Class .   # one field carried by a TaxonCase
+bc:ConstructorTier  a rdfs:Class .   # PaperCore vs ExecutionOnly
+
+bc:PaperCore     a bc:ConstructorTier ;
+    rdfs:label "paper core" ;
+    bc:rustVariant "PaperCore" ;
+    bc:tierDoc "A primitive constructor of the research object itself." .
+
+bc:ExecutionOnly a bc:ConstructorTier ;
+    rdfs:label "execution superset" ;
+    bc:rustVariant "ExecutionSuperset" ;
+    bc:tierDoc "Not primitive in the paper. Must declare bc:derivedFrom." .
+
+################################################################################
+# Source of record
+#
+# Fixes the numbering so a citation that does not resolve is a build failure.
+# bcinr previously shipped "language preservation (Theorem 1) failed" in a
+# user-facing refusal; the paper has no Theorem 1.
+################################################################################
+
+bc:PaperSeparableWFNets a bc:Source ;
+    bc:sourceTitle "Hierarchical Decomposition of Separable Workflow-Nets" ;
+    bc:arxivId     "2602.15739" ;
+    bc:localPath   "/Users/sac/Documents/Papers/workflow/Hierarchical Decomposition of Separable Workflow-Nets .pdf" .
+
+bc:Def_3_6 a bc:NumberedResult ;
+    bc:fromSource bc:PaperSeparableWFNets ;
+    bc:resultNumber "3.6" ; bc:resultTitle "Choice Graph" ;
+    bc:pdfLineAnchor 307 .
+
+bc:Def_3_7 a bc:NumberedResult ;
+    bc:fromSource bc:PaperSeparableWFNets ;
+    bc:resultNumber "3.7" ; bc:resultTitle "POWL Model" ;
+    bc:pdfLineAnchor 345 .
+
+bc:Def_3_8 a bc:NumberedResult ;
+    bc:fromSource bc:PaperSeparableWFNets ;
+    bc:resultNumber "3.8" ; bc:resultTitle "Order-Preserving Shuffle Operator" .
+
+bc:Def_3_9 a bc:NumberedResult ;
+    bc:fromSource bc:PaperSeparableWFNets ;
+    bc:resultNumber "3.9" ; bc:resultTitle "POWL 2.0 Semantics" .
+
+bc:Def_4_8 a bc:NumberedResult ;
+    bc:fromSource bc:PaperSeparableWFNets ;
+    bc:resultNumber "4.8" ; bc:resultTitle "Execution Flow" ;
+    bc:pdfLineAnchor 946 .
+
+bc:Thm_5_5 a bc:NumberedResult ;
+    bc:fromSource bc:PaperSeparableWFNets ;
+    bc:resultNumber "5.5" ; bc:resultTitle "Correctness" ;
+    bc:pdfLineAnchor 1379 .
+
+bc:Thm_5_6 a bc:NumberedResult ;
+    bc:fromSource bc:PaperSeparableWFNets ;
+    bc:resultNumber "5.6" ; bc:resultTitle "Completeness" ;
+    bc:pdfLineAnchor 1410 .
+
+################################################################################
+# Powl2Model -- the highest-value duplication in the repo.
+#
+# These 6 variants are matched exhaustively in 13 files across 3 crates. One
+# admitted fact; every elimination site is manufactured from it.
+################################################################################
+
+bc:Powl2Model a bc:ClosedTaxonomy ;
+    rdfs:label "Powl2Model" ;
+    bc:taxonomyDoc "One recursive POWL 2.0 model. Paper-core constructors are Def 3.7's transition / partial order / choice graph; Sequence, XOR and Do/Redo are derived encodings, not primitives." ;
+    bc:definedBy bc:Def_3_7 .
+
+# --- paper core -------------------------------------------------------------
+
+bc:Powl2_Activity a bc:TaxonCase ;
+    bc:caseShape "tuple" ;
+    bc:inTaxonomy bc:Powl2Model ; bc:caseOrder 0 ;
+    bc:caseName "Activity" ;
+    bc:caseDoc "A labelled transition. Def 3.7's base constructor." ;
+    bc:constructorTier bc:PaperCore ;
+    bc:definedBy bc:Def_3_7 ;
+    bc:caseField [ bc:fieldOrder 0 ; bc:fieldName "label" ; bc:fieldType "String" ; bc:fieldPositional true ] .
+
+bc:Powl2_Silent a bc:TaxonCase ;
+    bc:caseShape "unit" ;
+    bc:inTaxonomy bc:Powl2Model ; bc:caseOrder 1 ;
+    bc:caseName "Silent" ;
+    bc:caseDoc "A tau transition: structurally present, contributing no label to the language." ;
+    bc:constructorTier bc:PaperCore ;
+    bc:definedBy bc:Def_3_7 .
+
+bc:Powl2_PartialOrder a bc:TaxonCase ;
+    bc:caseShape "struct" ;
+    bc:inTaxonomy bc:Powl2Model ; bc:caseOrder 3 ;
+    bc:caseName "PartialOrder" ;
+    bc:caseDoc "Submodels under a strict partial order over child indices (Def 3.7), interleaved by the order-preserving shuffle of Def 3.8." ;
+    bc:constructorTier bc:PaperCore ;
+    bc:definedBy bc:Def_3_7 ;
+    bc:arityLowerBound 2 ;
+    bc:arityConstName "PARTIAL_ORDER_MIN_CHILDREN" ;
+    bc:arityConditionSource bc:Def_3_7 ;
+    bc:caseField [ bc:fieldOrder 0 ; bc:fieldName "children" ; bc:fieldType "Vec<Powl2Model>" ] ;
+    bc:caseField [ bc:fieldOrder 1 ; bc:fieldName "edges" ; bc:fieldType "Vec<(usize, usize)>" ;
+                   bc:fieldDoc "Strict precedence edges over child indices." ] .
+
+bc:Powl2_ChoiceGraph a bc:TaxonCase ;
+    bc:caseShape "struct" ;
+    bc:inTaxonomy bc:Powl2Model ; bc:caseOrder 4 ;
+    bc:caseName "ChoiceGraph" ;
+    bc:caseDoc "A choice graph over submodels (Def 3.6). Its start and finish nodes are ARTIFICIAL: Def 3.6 fixes N = X union {start, finish} with start, finish NOT IN X, and excludes them from the execution sequence." ;
+    bc:constructorTier bc:PaperCore ;
+    bc:definedBy bc:Def_3_6 ;
+    bc:arityLowerBound 2 ;
+    bc:arityConstName "CHOICE_GRAPH_MIN_CHILDREN" ;
+    bc:arityConditionSource bc:Def_3_7 ;
+    bc:caseField [ bc:fieldOrder 0 ; bc:fieldName "children" ; bc:fieldType "Vec<Powl2Model>" ] ;
+    bc:caseField [ bc:fieldOrder 1 ; bc:fieldName "edges" ; bc:fieldType "Vec<(usize, usize)>" ] ;
+    bc:caseField [ bc:fieldOrder 2 ; bc:fieldName "start" ; bc:fieldType "usize" ;
+                   bc:fieldDoc "Artificial start sentinel; not a member of the child set." ] ;
+    bc:caseField [ bc:fieldOrder 3 ; bc:fieldName "end" ; bc:fieldType "usize" ;
+                   bc:fieldDoc "Artificial finish sentinel; not a member of the child set." ] .
+
+# --- execution superset (each MUST carry bc:derivedFrom) --------------------
+
+bc:Powl2_Sequence a bc:TaxonCase ;
+    bc:caseShape "tuple" ;
+    bc:inTaxonomy bc:Powl2Model ; bc:caseOrder 2 ;
+    bc:caseName "Sequence" ;
+    bc:caseDoc "Total order over submodels. Derived: equivalent to a PartialOrder whose edge set is {(i, i+1)}." ;
+    bc:constructorTier bc:ExecutionOnly ;
+    bc:derivedFrom bc:Powl2_PartialOrder ;
+    bc:normalizationNote "Sequence(c_0..c_k) == PartialOrder { children: c_0..c_k, edges: {(i, i+1)} }" ;
+    bc:caseField [ bc:fieldOrder 0 ; bc:fieldName "children" ; bc:fieldType "Vec<Powl2Model>" ; bc:fieldPositional true ] .
+
+bc:Powl2_DoRedo a bc:TaxonCase ;
+    bc:caseShape "struct" ;
+    bc:inTaxonomy bc:Powl2Model ; bc:caseOrder 5 ;
+    bc:caseName "DoRedo" ;
+    bc:caseDoc "Bounded loop. Derived: a choice-graph cycle, but bounded. An unbounded paper cycle would enlarge the language, so normalization to paper core REFUSES rather than widening it." ;
+    bc:constructorTier bc:ExecutionOnly ;
+    bc:derivedFrom bc:Powl2_ChoiceGraph ;
+    bc:normalizationNote "REFUSES: max_redos has no counterpart in an unbounded paper choice-graph cycle." ;
+    bc:caseField [ bc:fieldOrder 0 ; bc:fieldName "body" ; bc:fieldType "Box<Powl2Model>" ] ;
+    bc:caseField [ bc:fieldOrder 1 ; bc:fieldName "redo" ; bc:fieldType "Box<Powl2Model>" ] ;
+    bc:caseField [ bc:fieldOrder 2 ; bc:fieldName "max_redos" ; bc:fieldType "u8" ;
+                   bc:fieldDoc "Maximum admitted redo count. Zero means no redo, not unbounded." ] .

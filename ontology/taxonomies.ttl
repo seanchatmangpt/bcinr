@@ -1,0 +1,259 @@
+@prefix bc:   <https://bcinr.dev/ontology#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+################################################################################
+# Closed taxonomies of the bcinr system.
+#
+# Every variant set that must be eliminated exhaustively lives here. One
+# admitted fact per variant; the Rust enum, its ALL table, its name/doc/
+# citation accessors and its exhaustive match arms are all manufactured.
+#
+# A taxonomy declared here but absent from the executable type -- or present in
+# the type and absent here -- is a compile error at the classify tripwire, not
+# a review item.
+################################################################################
+
+################################################################################
+# PDDL 3.1 -- effect taxonomy
+#
+# `ground_v2.rs:767` drops Numeric/Timed/Forall/When through `_ => {}`, and
+# `cognitive.rs:271` then derives causal independence over that shadow. Six
+# admitted forms; nothing may silently handle five.
+################################################################################
+
+bc:PddlEffect a bc:ClosedTaxonomy ;
+    rdfs:label "PddlEffect" ;
+    bc:taxonomyDoc "The six effect forms PDDL 3.1 admits. An effect kind that cannot be represented downstream must refuse, never be dropped." ;
+    bc:rustPath "wasm4pm_compat::pddl::PddlEffect" .
+
+bc:Eff_Add a bc:TaxonCase ; bc:inTaxonomy bc:PddlEffect ; bc:caseOrder 0 ;
+    bc:caseName "Add" ; bc:caseShape "tuple" ;
+    bc:caseDoc "Add a ground atom to the state." ;
+    bc:representableInStrips true .
+
+bc:Eff_Del a bc:TaxonCase ; bc:inTaxonomy bc:PddlEffect ; bc:caseOrder 1 ;
+    bc:caseName "Del" ; bc:caseShape "tuple" ;
+    bc:caseDoc "Delete a ground atom from the state." ;
+    bc:representableInStrips true .
+
+bc:Eff_Numeric a bc:TaxonCase ; bc:inTaxonomy bc:PddlEffect ; bc:caseOrder 2 ;
+    bc:caseName "Numeric" ; bc:caseShape "tuple" ;
+    bc:caseDoc "Assign/increase/decrease/scale a numeric fluent." ;
+    bc:representableInStrips false ;
+    bc:lossRefusal "UnsupportedEffect" .
+
+bc:Eff_Timed a bc:TaxonCase ; bc:inTaxonomy bc:PddlEffect ; bc:caseOrder 3 ;
+    bc:caseName "Timed" ; bc:caseShape "tuple" ;
+    bc:caseDoc "An effect scoped to at-start / at-end / over-all." ;
+    bc:representableInStrips false ;
+    bc:lossRefusal "TimedEffectUnsupported" .
+
+bc:Eff_Forall a bc:TaxonCase ; bc:inTaxonomy bc:PddlEffect ; bc:caseOrder 4 ;
+    bc:caseName "Forall" ; bc:caseShape "struct" ;
+    bc:caseDoc "A quantified effect over a typed domain." ;
+    bc:representableInStrips false ;
+    bc:lossRefusal "UnsupportedEffect" .
+
+bc:Eff_When a bc:TaxonCase ; bc:inTaxonomy bc:PddlEffect ; bc:caseOrder 5 ;
+    bc:caseName "When" ; bc:caseShape "struct" ;
+    bc:caseDoc "A conditional effect. Two actions conflicting only through a `when` are classified independent if this form is dropped." ;
+    bc:representableInStrips false ;
+    bc:lossRefusal "UnsupportedEffect" .
+
+################################################################################
+# PDDL 3.0 -- trajectory constraints
+#
+# `monitors.rs` implements five and silently no-ops the rest via
+# `_ => monitor_state`. AtMostOnce's violation arm is unreachable and
+# SometimeBefore's argument order is inverted.
+################################################################################
+
+bc:TrajectoryConstraint a bc:ClosedTaxonomy ;
+    rdfs:label "TrajectoryConstraint" ;
+    bc:taxonomyDoc "PDDL 3.0 trajectory constraint forms. A monitor that cannot decide a form must refuse at admission, never no-op." ;
+    bc:rustPath "wasm4pm_compat::pddl::TrajectoryConstraint" .
+
+bc:Traj_Always a bc:TaxonCase ; bc:inTaxonomy bc:TrajectoryConstraint ; bc:caseOrder 0 ;
+    bc:caseName "Always" ; bc:caseShape "tuple" ;
+    bc:caseDoc "Holds in every state." ;
+    bc:monitorSupported true ;
+    bc:pendingAtFinalizeMeans "satisfied" ;
+    bc:pendingRationale "Never reaches a terminal Satisfied; ending Pending means never falsified." .
+
+bc:Traj_Sometime a bc:TaxonCase ; bc:inTaxonomy bc:TrajectoryConstraint ; bc:caseOrder 1 ;
+    bc:caseName "Sometime" ; bc:caseShape "tuple" ;
+    bc:caseDoc "Holds in at least one state." ;
+    bc:monitorSupported true ;
+    bc:pendingAtFinalizeMeans "violated" ;
+    bc:pendingRationale "Ending Pending means never witnessed." .
+
+bc:Traj_AtMostOnce a bc:TaxonCase ; bc:inTaxonomy bc:TrajectoryConstraint ; bc:caseOrder 2 ;
+    bc:caseName "AtMostOnce" ; bc:caseShape "tuple" ;
+    bc:caseDoc "Holds in at most one contiguous interval." ;
+    bc:monitorSupported true ;
+    bc:pendingAtFinalizeMeans "satisfied" ;
+    bc:pendingRationale "Zero occurrences satisfies at-most-one. Current default of `violated` refuses valid plans." ;
+    bc:absorbingOnSatisfied false ;
+    bc:absorbingRationale "Satisfied is NOT terminal here: a second occurrence must still violate. The shared is_terminal() guard makes that arm unreachable." .
+
+bc:Traj_SometimeBefore a bc:TaxonCase ; bc:inTaxonomy bc:TrajectoryConstraint ; bc:caseOrder 3 ;
+    bc:caseName "SometimeBefore" ; bc:caseShape "tuple" ;
+    bc:caseDoc "(sometime-before phi psi): psi must hold strictly before any occurrence of phi. The FIRST argument is the triggered/later condition." ;
+    bc:monitorSupported true ;
+    bc:pendingAtFinalizeMeans "satisfied" ;
+    bc:pendingRationale "If neither condition ever holds, the constraint is vacuously satisfied." ;
+    bc:argumentOrderNote "create_monitor maps arg0 to condition_before, inverting the PDDL 3.0 reading." .
+
+bc:Traj_SometimeAfter a bc:TaxonCase ; bc:inTaxonomy bc:TrajectoryConstraint ; bc:caseOrder 4 ;
+    bc:caseName "SometimeAfter" ; bc:caseShape "tuple" ;
+    bc:caseDoc "(sometime-after phi psi): for all i, phi@i implies exists j>=i with psi@j." ;
+    bc:monitorSupported true ;
+    bc:pendingAtFinalizeMeans "satisfied" ;
+    bc:pendingRationale "Vacuous universal: if phi never holds, satisfied." ;
+    bc:absorbingOnSatisfied false ;
+    bc:absorbingRationale "A later phi with no following psi must still violate." .
+
+bc:Traj_Within a bc:TaxonCase ; bc:inTaxonomy bc:TrajectoryConstraint ; bc:caseOrder 5 ;
+    bc:caseName "Within" ; bc:caseShape "tuple" ;
+    bc:caseDoc "Deadline over a timed trajectory." ;
+    bc:monitorSupported false ;
+    bc:unsupportedRefusal "UnsupportedTrajectoryConstraint" .
+
+bc:Traj_AlwaysWithin a bc:TaxonCase ; bc:inTaxonomy bc:TrajectoryConstraint ; bc:caseOrder 6 ;
+    bc:caseName "AlwaysWithin" ; bc:caseShape "tuple" ;
+    bc:caseDoc "Deadline following every trigger." ;
+    bc:monitorSupported false ;
+    bc:unsupportedRefusal "UnsupportedTrajectoryConstraint" .
+
+bc:Traj_HoldDuring a bc:TaxonCase ; bc:inTaxonomy bc:TrajectoryConstraint ; bc:caseOrder 7 ;
+    bc:caseName "HoldDuring" ; bc:caseShape "tuple" ;
+    bc:caseDoc "Holds across a bounded time window." ;
+    bc:monitorSupported false ;
+    bc:unsupportedRefusal "UnsupportedTrajectoryConstraint" .
+
+bc:Traj_HoldAfter a bc:TaxonCase ; bc:inTaxonomy bc:TrajectoryConstraint ; bc:caseOrder 8 ;
+    bc:caseName "HoldAfter" ; bc:caseShape "tuple" ;
+    bc:caseDoc "Holds from a time point onward." ;
+    bc:monitorSupported false ;
+    bc:unsupportedRefusal "UnsupportedTrajectoryConstraint" .
+
+bc:Traj_And a bc:TaxonCase ; bc:inTaxonomy bc:TrajectoryConstraint ; bc:caseOrder 9 ;
+    bc:caseName "And" ; bc:caseShape "tuple" ;
+    bc:caseDoc "Conjunction; must be flattened before monitor construction." ;
+    bc:monitorSupported false ;
+    bc:unsupportedRefusal "flattened by flatten_trajectory_constraint" .
+
+################################################################################
+# Claim standing -- three hand-written 4-way classifications collapsed to one
+#
+# FormalStanding (contracts.rs), SemanticSupport (capability.rs) and
+# procint:status all encode "never round up silently" separately.
+################################################################################
+
+bc:FormalStanding a bc:ClosedTaxonomy ;
+    rdfs:label "FormalStanding" ;
+    bc:taxonomyDoc "How much standing a claim has. Axiom-cleanliness is necessary, not sufficient: it cannot distinguish a proved theorem from a vacuous one." .
+
+bc:Standing_Proven a bc:TaxonCase ; bc:inTaxonomy bc:FormalStanding ; bc:caseOrder 0 ;
+    bc:caseName "Proven" ; bc:caseShape "unit" ;
+    bc:caseDoc "Kernel-checked, sorry-free, axioms within the trusted set, and non-vacuity witnessed." ;
+    bc:permitsOptimization true .
+
+bc:Standing_Stated a bc:TaxonCase ; bc:inTaxonomy bc:FormalStanding ; bc:caseOrder 1 ;
+    bc:caseName "Stated" ; bc:caseShape "unit" ;
+    bc:caseDoc "Defined in Lean but not proven to have the properties a caller might assume." ;
+    bc:permitsOptimization false .
+
+bc:Standing_Vacuous a bc:TaxonCase ; bc:inTaxonomy bc:FormalStanding ; bc:caseOrder 2 ;
+    bc:caseName "Vacuous" ; bc:caseShape "unit" ;
+    bc:caseDoc "Typechecks and constrains nothing. `exists d, f 0 = d` holds of every f. Audits identically to a real theorem." ;
+    bc:permitsOptimization false .
+
+bc:Standing_Conjectural a bc:TaxonCase ; bc:inTaxonomy bc:FormalStanding ; bc:caseOrder 3 ;
+    bc:caseName "Conjectural" ; bc:caseShape "unit" ;
+    bc:caseDoc "A bare `def : Prop` with no proof attempted; the open goal its own authors name as such." ;
+    bc:permitsOptimization false .
+
+bc:Standing_Refuted a bc:TaxonCase ; bc:inTaxonomy bc:FormalStanding ; bc:caseOrder 4 ;
+    bc:caseName "Refuted" ; bc:caseShape "unit" ;
+    bc:caseDoc "A countermodel exists." ;
+    bc:permitsOptimization false .
+
+bc:Standing_Blocked a bc:TaxonCase ; bc:inTaxonomy bc:FormalStanding ; bc:caseOrder 5 ;
+    bc:caseName "Blocked" ; bc:caseShape "unit" ;
+    bc:caseDoc "No proof and no formalized representation exists at all." ;
+    bc:permitsOptimization false .
+
+################################################################################
+# Cascade refusals -- CMCA
+################################################################################
+
+bc:CascadeRefusal a bc:ClosedTaxonomy ;
+    rdfs:label "CascadeRefusal" ;
+    bc:taxonomyDoc "Conditions under which the multifractal cascade has no correct answer. Each is a real condition, not a degradation." ;
+    bc:rustPath "bcinr_cmca::cascade::CascadeRefusal" .
+
+bc:Casc_LengthMismatch a bc:TaxonCase ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 0 ;
+    bc:caseName "LengthMismatch" ; bc:caseShape "struct" ;
+    bc:caseDoc "parent and mass vectors disagree in length." ;
+    bc:falsifier "new(vec![None; 3], vec![ONE; 2])" .
+
+bc:Casc_ParentOutOfRange a bc:TaxonCase ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 1 ;
+    bc:caseName "ParentOutOfRange" ; bc:caseShape "struct" ;
+    bc:caseDoc "A parent index addresses a node that does not exist." ;
+    bc:falsifier "new(vec![Some(9)], vec![ONE])" .
+
+bc:Casc_Cyclic a bc:TaxonCase ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 2 ;
+    bc:caseName "Cyclic" ; bc:caseShape "struct" ;
+    bc:caseDoc "The parent relation contains a cycle, so no hierarchy exists." ;
+    bc:falsifier "consequence_mass(tree(parent=[Some(1),Some(0)]), &[1])" .
+
+bc:Casc_NoRoot a bc:TaxonCase ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 3 ;
+    bc:caseName "NoRoot" ; bc:caseShape "unit" ;
+    bc:caseDoc "Every node has a parent, so there is nowhere for flow to enter." .
+
+bc:Casc_ExponentOutOfRange a bc:TaxonCase ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 4 ;
+    bc:caseName "ExponentOutOfRange" ; bc:caseShape "struct" ;
+    bc:caseDoc "A lens exponent exceeds the admitted magnitude." .
+
+bc:Casc_DegenerateSiblingSet a bc:TaxonCase ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 5 ;
+    bc:caseName "DegenerateSiblingSet" ; bc:caseShape "struct" ;
+    bc:caseDoc "All sibling escort weights are zero, so the normalizing sum vanishes. Fires only when ALL underflow; the mixed case is the dangerous one and does not refuse." .
+
+bc:Casc_DegenerateSubtreeLeaves a bc:TaxonCase ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 6 ;
+    bc:caseName "DegenerateSubtreeLeaves" ; bc:caseShape "struct" ;
+    bc:caseDoc "The flat path has no representable subtree-leaf weights." .
+
+bc:Casc_ZeroMassUnderNegativeLens a bc:TaxonCase ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 7 ;
+    bc:caseName "ZeroMassUnderNegativeLens" ; bc:caseShape "struct" ;
+    bc:caseDoc "m^q for m = 0 and q < 0 is undefined, not large." ;
+    bc:falsifier "consequence_mass(tree with a ZERO mass, &[1, -1])" .
+
+################################################################################
+# WF-net -> POWL conversion refusals
+################################################################################
+
+bc:RefusalReason a bc:ClosedTaxonomy ;
+    rdfs:label "RefusalReason" ;
+    bc:taxonomyDoc "Why Algorithm 3 declined a net. Each names the obligation actually checked -- not a paper result it does not discharge." ;
+    bc:rustPath "bcinr_powl::wf_to_powl::RefusalReason" .
+
+bc:Ref_IrreducibleFragment a bc:TaxonCase ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 0 ;
+    bc:caseName "IrreducibleFragment" ; bc:caseShape "struct" ;
+    bc:caseDoc "No base case and no valid partition -- Algorithm 3 line 25's FallThrough." ;
+    bc:falsifier "a single transition with a self-loop place (|P| = 3)" .
+
+bc:Ref_BudgetExhausted a bc:TaxonCase ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 1 ;
+    bc:caseName "BudgetExhausted" ; bc:caseShape "struct" ;
+    bc:caseDoc "The bounded recursion budget ran out before termination." ;
+    bc:falsifier "convert_with_budget(net_needing_one_level, 0)" .
+
+bc:Ref_BoundedLanguageAgreementFailed a bc:TaxonCase ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 2 ;
+    bc:caseName "BoundedLanguageAgreementFailed" ; bc:caseShape "struct" ;
+    bc:caseDoc "The two independently-computed languages disagreed at the checked bound. NOT Theorem 5.5, which quantifies over the whole language." ;
+    bc:falsifier "a converted model whose denotational language differs from the token-game replay" .
+
+bc:Ref_InternalNetConstruction a bc:TaxonCase ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 3 ;
+    bc:caseName "InternalNetConstruction" ; bc:caseShape "tuple" ;
+    bc:caseDoc "A projection produced a sub-net failing WfNet::new -- algorithm-internal, surfaced as a refusal rather than a panic." ;
+    bc:falsifier "recompose output that fails WfNet::new (wf_net_bridge.rs:102)" .

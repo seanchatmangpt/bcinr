@@ -1,0 +1,42 @@
+[project]
+name = "bcinr"
+version = "26.7.28"
+description = "bcinr admitted semantic graph -> Rust projections. One admitted fact per semantic object; every structural representation is manufactured."
+
+[ontology]
+source = "ontology/graph.ttl"
+
+[generation]
+output_dir = "."
+
+# --- POWL 2.0 model taxonomy -------------------------------------------------
+#
+# The 6 Powl2Model variants are matched exhaustively in 13 files across 3
+# crates. This is the first projection: the variant set, its paper-core /
+# execution-superset tier, arity bounds, normalization targets and paper
+# citations, plus a `classify` tripwire whose match has no `_` arm.
+
+[[generation.rules]]
+name = "powl2_case"
+query = { file = "queries/powl2-cases.rq" }
+template = { file = "templates/powl2_case.rs.tera" }
+output_file = "crates/bcinr-guarded/src/powl2_case.rs"
+mode = "Overwrite"
+
+# --- Def 3.7 arity side conditions -------------------------------------------
+
+[[generation.rules]]
+name = "powl2_arity"
+query = { file = "queries/powl2-arity.rq" }
+template = { file = "templates/powl2_arity.rs.tera" }
+output_file = "crates/bcinr-powl/src/generated_arity.rs"
+mode = "Overwrite"
+
+# --- Every closed taxonomy in the system, from one generic template ---------
+
+[[generation.rules]]
+name = "taxonomies"
+query = { file = "queries/taxonomy-cases.rq" }
+template = { file = "templates/taxonomy.rs.tera" }
+output_file = "crates/bcinr-guarded/src/taxonomy.rs"
+mode = "Overwrite"
