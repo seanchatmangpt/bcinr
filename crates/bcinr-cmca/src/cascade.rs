@@ -381,11 +381,36 @@ fn depths(tree: &CascadeTree) -> Result<Vec<usize>, CascadeRefusal> {
 /// alloc_flow[x]`). For an internal node it is the flow that *passed through*
 /// it before splitting -- which is what makes "how much does this subtree
 /// matter" answerable at every depth, where `allocator`'s leaf-only output
-/// cannot answer it. Leaves sum to `ONE` (up to Q16.16 flooring) in the
-/// typical case; [`consequence_mass_traced`] exists to measure this claim
-/// per node rather than assume it (see [`AllocationTrace`]'s docs -- the
-/// analogous claim on `allocator::allocate`'s output was checked this way
-/// and found to have a real, legitimate exception).
+/// cannot answer it.
+///
+/// # Descendant-flow conservation (BCINR-CMCA-B2)
+///
+/// At each internal node, the flow into its children never exceeds the flow
+/// that arrived at the node -- `child_sum(v) <= input_share(v)`, always, no
+/// exceptions. This is provable, not merely observed: both fixed-point
+/// operations in the split (`saturating_div` for each child's share,
+/// `saturating_mul` for that share's contribution) truncate toward zero and
+/// never round up, and the shares are an exact partition of `1` in real-number
+/// terms -- so floor-then-floor of an exact partition can only lose value,
+/// never manufacture it. The residual (`input_share - child_sum`) can be
+/// nonzero (Q16.16 flooring means an *exact* `ONE`-sum is not guaranteed),
+/// but it is one-sided: [`consequence_mass_traced`]'s
+/// `AllocationStep::residual_bits` is never negative, verified across 18
+/// named fixtures plus a synthetic stress corpus at arities 2..=20 with
+/// adversarial (pairwise-coprime) mass ratios -- see
+/// `tests/cascade_residual_classification.rs`. A conservative, operation-count-
+/// derived envelope also holds throughout that corpus: `residual_bits(v) <=
+/// 2 * children(v).len()`, i.e. at most one Q16.16 ULP of loss per child per
+/// truncating operation, though this is an empirically-robust ceiling rather
+/// than a tight closed-form bound.
+///
+/// This claim is deliberately narrower than "leaves sum to `ONE`" (an
+/// earlier version of this doc comment made that claim before
+/// [`consequence_mass_traced`] existed to check it) -- the analogous claim on
+/// `allocator::allocate`'s output was checked the same way and found to have
+/// a real, legitimate exception (a documented fallback branch), so this
+/// crate does not assume a mathematically plausible conservation law without
+/// measuring it against the actual arithmetic first.
 pub fn consequence_mass(
     tree: &CascadeTree,
     lenses: &[i32],
