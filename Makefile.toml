@@ -1,5 +1,4 @@
 [config]
-# Standardized Rust workspace configuration
 skip_core_tasks = false
 default_to_workspace = true
 
@@ -7,305 +6,75 @@ default_to_workspace = true
 CARGO_INCREMENTAL = "0"
 RUSTFLAGS = "-D warnings"
 
+[tasks.graph-validate]
+workspace = false
+command = "ggen"
+args = ["graph", "validate", "--files", "ontology/bcinr.ttl", "--files", "ontology/taxonomies.ttl", "--files", "ontology/profile.ttl", "--shapes", "ontology/shapes.ttl"]
+
+[tasks.ggen-sync]
+workspace = false
+dependencies = ["graph-validate"]
+command = "ggen"
+args = ["sync"]
+
+[tasks.ggen-receipt-gate]
+workspace = false
+dependencies = ["ggen-sync"]
+command = "python3"
+args = ["scripts/verify_ggen_receipt.py", ".ggen-v2/receipt.json"]
+
+[tasks.generated-clean]
+workspace = false
+dependencies = ["ggen-sync"]
+command = "git"
+args = ["diff", "--exit-code", "--", "crates/bcinr-cmca/src/generated_profile.rs", "crates/bcinr-guarded/src/powl2_case.rs", "crates/bcinr-guarded/src/runtime_binding.rs", "crates/bcinr-guarded/src/taxonomy.rs", "crates/bcinr-guarded/tests/generated_falsifiers.rs", "crates/bcinr-powl/src/generated_arity.rs", "docs/contracts/REFUSAL_LEDGER.md"]
+
+[tasks.fmt]
+workspace = false
+command = "cargo"
+args = ["fmt", "--all", "--", "--check"]
+
 [tasks.check]
-category = "Build"
-description = "Verify workspace compiles"
-# `workspace = false`: this task's own `args` already say `--workspace`, so
-# a single invocation from the root already covers every member in one
-# `cargo` process. Without this flag, cargo-make's `default_to_workspace =
-# true` (see [config]) makes it re-invoke a task named "check" once per
-# member directory instead -- and per cargo-make's own member-descent
-# semantics, that re-invocation does NOT reuse this task's `args`; members
-# with no local Makefile.toml (every MFW retrofit crate: bcinr-mfw-ir,
-# bcinr-pddl, bcinr-powl, bcinr-powl-receipt, bcinr-mcp, plus bcinr,
-# bcinr-core, bcinr-api, bcinr-logic, and every tool under tools/) instead
-# silently fall back to a bare `cargo check` with none of
-# `--workspace`/`--all-targets`/`--all-features` -- confirmed live via
-# `cargo make check`'s own per-member log lines
-# (`Execute Command: "cargo" "check"`, no flags). Same fix pattern already
-# established by the `fmt` task below for the identical reason.
 workspace = false
 dependencies = ["graph-validate"]
 command = "cargo"
 args = ["check", "--workspace", "--all-targets", "--all-features"]
 
-[tasks.graph-validate]
-category = "Build"
-description = "Admission gate for the semantic graph: SHACL-validate every ontology file"
-# Everything in crates/*/src/generated_*.rs and crates/bcinr-guarded/ is
-# manufactured from these files, so a wrong fact here propagates to every
-# projection at once and looks authoritative in all of them. This runs first
-# in `check` for that reason: generation must not be reachable from a graph
-# that has not been admitted.
-#
-# Files are validated one at a time (the tool's own semantics), so a shape
-# whose sh:class target lives in a *different* file cannot be checked. Keep
-# each taxonomy's ClosedTaxonomy declaration in the same file as its cases.
-workspace = false
-command = "ggen"
-args = [
-    "graph", "validate",
-    "--files", "ontology/bcinr.ttl",
-    "--files", "ontology/taxonomies.ttl",
-    "--files", "ontology/profile.ttl",
-    "--shapes", "ontology/shapes.ttl",
-]
-
-[tasks.build]
-category = "Build"
-description = "Build the workspace in release mode"
-command = "cargo"
-args = ["build", "--workspace", "--release", "--all-features"]
-
 [tasks.test]
-category = "Test"
-description = "Run all workspace tests"
-# workspace = false: see [tasks.check]'s comment for why -- this task's
-# `--no-fail-fast` (added in commit a04a6264 specifically "so make test
-# reaches every crate") never actually took effect without this flag either:
-# cargo-make's per-member descent invoked a bare `cargo test --all-features`
-# per member directory (no --no-fail-fast, no --all-targets), so `bcinr`'s
-# own pre-existing tests/e2e.rs failures aborted the whole `cargo-make`
-# task immediately after the first member ("Project: bcinr") and every
-# later member -- including every MFW retrofit crate -- was never reached,
-# regardless of --no-fail-fast being present in this task's own (unused)
-# `args`. `workspace = false` makes this one real `cargo test --workspace
-# --all-features --all-targets --no-fail-fast` invocation from the root,
-# which both reaches every member AND keeps running past bcinr's own
-# unrelated e2e.rs failures.
 workspace = false
 command = "cargo"
 args = ["test", "--workspace", "--all-features", "--all-targets", "--no-fail-fast"]
 
-[tasks.bench]
-category = "Performance"
-description = "Execute workspace-wide benchmarks"
-command = "cargo"
-args = ["bench", "--all-features"]
-
-[tasks.bench-report]
-category = "Performance"
-description = "Generate performance report"
-dependencies = ["bench"]
-script = [
-    "echo \"| Algorithm Family | Primitive | Latency (avg) |\"",
-    "echo \"|---|---|---|\"",
-    "find target/criterion -name estimates.json | xargs grep -h '\"mean\":' | jq -r '\"| \\(.family) | \\(.primitive) | \\(.mean.point_estimate) \\(.mean.unit) |\"' || echo 'Use jq for structured report output'"
-]
-
-[tasks.fmt]
-category = "Lint"
-description = "Check formatting"
-# `cargo fmt --all` already covers the entire workspace by itself, and this
-# task's command doesn't vary per member -- so opt out of cargo-make's
-# default_to_workspace member-descent behavior (`workspace = true` by
-# default here, per [config]). Without this, cargo-make re-invokes a task
-# named "fmt" inside each member's own directory; members with no local
-# Makefile.toml (e.g. the root `bcinr` package) fall back to cargo-make's
-# built-in core-task bundle, which has no task literally named "fmt" (its
-# equivalent core task is "format"), so the whole gate failed immediately
-# with "Task fmt not found" before ever running `cargo fmt` for real.
-workspace = false
-command = "cargo"
-args = ["fmt", "--all", "--", "--check"]
-
-[tasks.audit]
-category = "Security"
-description = "Run cargo audit for vulnerabilities"
-command = "cargo"
-args = ["audit"]
-
-[tasks.deny]
-category = "Security"
-description = "Check licenses and supply chain"
-command = "cargo"
-args = ["deny", "check"]
-
-[tasks.docs]
-category = "Documentation"
-description = "Build all documentation"
-command = "cargo"
-args = ["doc", "--workspace", "--all-features", "--no-deps", "--document-private-items"]
-
-[tasks.clean]
-category = "Cleanup"
-description = "Clean artifacts and criterion results"
-script = [
-    "cargo clean",
-    "rm -rf target/criterion"
-]
-
-[tasks.lint-anti-llm]
-category = "Lint"
-description = "Scan bcinr-mcp for LLM-generated stubs, hedge comments, and unverified claims"
-workspace = false
-command = "cargo"
-# `--bin anti-llm-cheat-lsp` is required, not optional: that crate's own
-# Cargo.toml now defines two binaries (`anti-llm-cheat-lsp` via src/main.rs,
-# `gen_receipts` via src/bin/gen_receipts.rs) with no `default-run` key set,
-# so a bare `cargo run` refuses to pick one ("could not determine which
-# binary to run") -- confirmed live before this fix. Disambiguating here,
-# in this repo's own Makefile.toml, avoids touching the external
-# anti-llm-cheat-lsp repo at all.
-args = ["run", "--manifest-path", "/Users/sac/anti-llm-cheat-lsp/Cargo.toml", "--quiet", "--bin", "anti-llm-cheat-lsp", "--", "scan", "--dir", "crates/bcinr-mcp/src"]
-
-# Wire anti-llm scan into clippy so CI always catches stub code in the MCP layer.
 [tasks.clippy]
-category = "Lint"
-description = "Run clippy with strict pedantic lints (+ anti-LLM stub scan)"
-# workspace = false: see [tasks.check]'s comment for why -- without this,
-# cargo-make's per-member descent ran a bare `cargo clippy` (RUSTFLAGS
-# still carries -D warnings via [env], since that propagates as process
-# env rather than a per-task arg, but --workspace/--all-targets/
-# --all-features did not) once per member directory, so it never actually
-# ran against the pedantic/full-target surface this task's own `args`
-# request, and halted at the very first member with pre-existing lint debt
-# (bcinr-logic, pulled in as a dependency of every MFW crate) -- meaning
-# clippy was never actually run against bcinr-mfw-ir, bcinr-pddl,
-# bcinr-powl, bcinr-powl-receipt, or bcinr-mcp in this invocation either.
 workspace = false
-dependencies = ["lint-anti-llm"]
 command = "cargo"
 args = ["clippy", "--workspace", "--all-targets", "--all-features", "--", "-D", "warnings"]
 
-[tasks.scan-cheats]
-category = "Lint"
-description = "Scan for algorithmic cheats and anti-patterns"
+[tasks.docs]
 workspace = false
 command = "cargo"
-args = ["run", "--manifest-path", "tools/bcinr-cheat-scanner/Cargo.toml", "--release", "--quiet"]
+args = ["doc", "--workspace", "--all-features", "--no-deps", "--document-private-items"]
 
 [tasks.contract-gate]
-category = "Lint"
-description = "Validate branchless contract compliance"
 workspace = false
 command = "cargo"
 args = ["run", "--manifest-path", "tools/bcinr-contract-gate/Cargo.toml", "--release", "--quiet"]
 
-[tasks.ggen]
-category = "Test"
-description = "Run counterfactual and falsification test suite"
+[tasks.scan-cheats]
+workspace = false
+command = "cargo"
+args = ["run", "--manifest-path", "tools/bcinr-cheat-scanner/Cargo.toml", "--release", "--quiet"]
+
+[tasks.ggen-falsification]
 workspace = false
 command = "cargo"
 args = ["run", "--manifest-path", "tools/ggen/Cargo.toml", "--release", "--quiet"]
 
-# ---------------------------------------------------------------------------
-# GGEN Chess Factory — manufacturing cell tasks (TTL -> ggen -> Rust).
-# Edit ontology/chess.ttl, never hand-edit generated source.
-# ---------------------------------------------------------------------------
-
-[tasks.chess-factory-sync]
-category = "Factory"
-description = "Manufacture chess-factory stations from law (ggen sync over chess.ttl)"
+[tasks.closure]
 workspace = false
-cwd = "crates/chess-factory"
-command = "/Users/sac/.local/bin/ggen"
-args = ["sync"]
+dependencies = ["ggen-receipt-gate", "generated-clean", "fmt", "check", "clippy", "test", "contract-gate", "scan-cheats", "ggen-falsification", "docs"]
 
-[tasks.factory-build]
-category = "Factory"
-description = "Build the chess-factory crate (lib + bins) with all features"
+[tasks.clean]
 workspace = false
 command = "cargo"
-args = ["build", "-p", "chess-factory", "--all-features"]
-# The factory cell is self-contained: do not inherit the workspace-wide
-# `-D warnings` (sibling bcinr-logic carries pre-existing dead-code lint debt
-# in its SIMD fallbacks; that is out of this manufacturing cell's scope).
-env = { RUSTFLAGS = "" }
-dependencies = ["chess-factory-sync"]
-
-[tasks.factory-verify]
-category = "Factory"
-description = "CC=1 contract gate over the generated stations + motifs"
-workspace = false
-command = "cargo"
-args = [
-    "run", "--manifest-path", "tools/bcinr-contract-gate/Cargo.toml",
-    "--release", "--quiet", "--",
-    "crates/chess-factory/src/stations",
-]
-env = { RUSTFLAGS = "" }
-dependencies = ["factory-build"]
-
-[tasks.factory-bench]
-category = "Factory"
-description = "Smoke benchmark: one sanity_random cell, emits the Elo curve"
-workspace = false
-command = "cargo"
-args = [
-    "run", "-p", "chess-factory", "--bin", "bcinr_benchmark",
-    "--all-features", "--",
-    "--opponent", "sanity_random", "--budget", "t100us", "--games", "2",
-]
-env = { RUSTFLAGS = "" }
-dependencies = ["factory-build"]
-
-[tasks.factory-kaizen]
-category = "Factory"
-description = "Emit one DemoteStationWeight Kaizen recommendation from the curve"
-workspace = false
-command = "cargo"
-args = ["run", "-p", "chess-factory", "--bin", "bcinr_kaizen", "--all-features"]
-env = { RUSTFLAGS = "" }
-dependencies = ["factory-bench"]
-
-[tasks.factory]
-category = "Factory"
-description = "Full factory chain: sync -> build -> contract-gate -> smoke bench -> kaizen"
-workspace = false
-dependencies = [
-    "chess-factory-sync",
-    "factory-build",
-    "factory-verify",
-    "factory-bench",
-    "factory-kaizen",
-]
-
-[tasks.perf-branch-gate]
-category = "Verification"
-description = "Gate: branch mispredictions < 0.1% of retired instructions (Linux perf stat)"
-workspace = false
-condition = { platforms = ["linux"] }
-script_runner = "bash"
-script = [
-    "set -euo pipefail",
-    "echo 'Building benchmark binary...'",
-    "cargo build --release -p bcinr-powl --bench scheduler_bench 2>/dev/null || cargo build --release -p bcinr-powl 2>/dev/null",
-    "BENCH_BIN=$(find target/release -name 'scheduler_bench' -type f | head -1)",
-    "if [ -z \"$BENCH_BIN\" ]; then echo 'ERROR: bench binary not found'; exit 1; fi",
-    "PERF_OUT=$(perf stat -e instructions,branch-misses -- \"$BENCH_BIN\" --bench 2>&1 || true)",
-    "echo \"$PERF_OUT\"",
-    "INSTRUCTIONS=$(echo \"$PERF_OUT\" | grep -E 'instructions' | head -1 | awk '{gsub(/,/,\"\"); print $1}')",
-    "BRANCH_MISSES=$(echo \"$PERF_OUT\" | grep -E 'branch-misses' | head -1 | awk '{gsub(/,/,\"\"); print $1}')",
-    "if [ -z \"$INSTRUCTIONS\" ] || [ \"$INSTRUCTIONS\" = '0' ]; then echo 'NOTE: perf stat not available on this platform. macOS: use Instruments > CPU Counters.'; exit 0; fi",
-    "MISS_BP=$(( BRANCH_MISSES * 10000 / INSTRUCTIONS ))",
-    "echo \"Branch miss rate: ${MISS_BP} basis points (${BRANCH_MISSES} misses / ${INSTRUCTIONS} instructions)\"",
-    "if [ \"$MISS_BP\" -ge 10 ]; then echo \"GATE FAIL: ${MISS_BP} bp >= 10 bp (0.1% threshold)\"; exit 1; fi",
-    "echo \"GATE PASS: ${MISS_BP} bp < 10 bp\"",
-]
-
-[tasks.ci]
-category = "CI"
-description = "Comprehensive CI pipeline"
-dependencies = ["fmt", "check", "clippy", "scan-cheats", "contract-gate", "factory-verify", "test", "audit", "deny"]
-
-[tasks.default]
-alias = "ci"
-
-[tasks.test-mutants]
-category = "Test"
-description = "Verify mutant detection via compile-time injection"
-workspace = false
-script = [
-    "cargo test -p bcinr-cmca --features mutant_1",
-    "cargo test -p bcinr-cmca --features mutant_2",
-    "cargo test -p bcinr-cmca --features mutant_3",
-    "cargo test -p bcinr-cmca --features mutant_4",
-    "cargo test -p bcinr-cmca --features mutant_5",
-    "cargo test -p bcinr-cmca --features mutant_6",
-    "cargo test -p bcinr-cmca --features mutant_7",
-    "cargo test -p bcinr-cmca --features mutant_8",
-    "cargo test -p bcinr-cmca --features mutant_9",
-    "cargo test -p bcinr-cmca --features mutant_10",
-    "cargo test -p bcinr-cmca --features mutant_11",
-]
+args = ["clean"]

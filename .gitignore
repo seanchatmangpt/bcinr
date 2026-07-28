@@ -12,3 +12,9 @@ thesis.toc
 
 # Oracle sources: fetched on demand, licence-incompatible with this tree.
 oracles/vendor/
+
+# Exact-run evidence is uploaded by CI, never committed as source.
+/.ggen-v2/receipt.json
+/.ggen-v2/receipt-log.jsonl
+/crown_verification_report.json
+/verification-artifacts/

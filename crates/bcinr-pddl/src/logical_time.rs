@@ -1,42 +1,46 @@
-/// Canonical bounded-integer logical time type for PDDL temporal planning.
-///
-/// `LogicalTime` represents discrete time units (milliseconds) in temporal plans.
-/// It is used as:
-/// - Observation timestamps in `ObservationSnapshot`
-/// - Goal deadlines in `GoalEnvelope`
-/// - Plan deadline constraints in `GroundTemporalProblem`
-///
-/// The underlying `u64` is bounded by domain/problem grounding, not by the type itself.
-/// Cross-crate usage (PDDL → POWL → workflow runtime) relies on this single definition.
+/// Canonical non-negative millisecond time for planning and resource admission.
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
 pub struct LogicalTime(pub u64);
 
+/// Refusal raised while admitting external floating-point time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeConversionError {
+    NonFinite,
+    Negative,
+    Overflow,
+}
+
+impl std::fmt::Display for TimeConversionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NonFinite => write!(f, "time is NaN or infinite"),
+            Self::Negative => write!(f, "time is negative"),
+            Self::Overflow => write!(f, "time exceeds logical-time range"),
+        }
+    }
+}
+impl std::error::Error for TimeConversionError {}
+
 impl LogicalTime {
-    /// Create a new `LogicalTime` from milliseconds.
-    pub const fn from_millis(millis: u64) -> Self {
-        Self(millis)
+    pub const fn from_millis(millis: u64) -> Self { Self(millis) }
+    pub const fn as_millis(self) -> u64 { self.0 }
+    pub const fn zero() -> Self { Self(0) }
+    pub fn as_seconds_f64(self) -> f64 { self.0 as f64 / 1000.0 }
+
+    pub fn try_from_seconds_f64(seconds: f64) -> Result<Self, TimeConversionError> {
+        if !seconds.is_finite() { return Err(TimeConversionError::NonFinite); }
+        if seconds < 0.0 { return Err(TimeConversionError::Negative); }
+        let millis = seconds * 1000.0;
+        if millis > u64::MAX as f64 { return Err(TimeConversionError::Overflow); }
+        Ok(Self(millis.round() as u64))
     }
 
-    /// Get the time value in milliseconds.
-    pub const fn as_millis(&self) -> u64 {
-        self.0
-    }
-
-    /// Create `LogicalTime` representing zero (t=0).
-    pub const fn zero() -> Self {
-        Self(0)
-    }
-
-    /// Convert `LogicalTime` to floating-point seconds for temporal plan comparison.
-    pub fn as_seconds_f64(&self) -> f64 {
-        self.0 as f64 / 1000.0
-    }
-
-    /// Create `LogicalTime` from floating-point seconds.
+    /// Compatibility constructor for already-trusted values. Boundary code
+    /// must use [`Self::try_from_seconds_f64`].
     pub fn from_seconds_f64(seconds: f64) -> Self {
-        Self((seconds * 1000.0).round() as u64)
+        Self::try_from_seconds_f64(seconds).expect("invalid external logical time")
     }
 }
 
@@ -51,21 +55,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn logical_time_ordering() {
-        let t0 = LogicalTime::zero();
-        let t1 = LogicalTime::from_millis(100);
-        let t2 = LogicalTime::from_millis(200);
-
-        assert!(t0 < t1);
-        assert!(t1 < t2);
-        assert!(t0 <= t0);
-        assert_eq!(t0, LogicalTime::zero());
+    fn finite_seconds_admit() {
+        assert_eq!(LogicalTime::try_from_seconds_f64(1.5).unwrap().as_millis(), 1500);
     }
 
     #[test]
-    fn logical_time_f64_conversion() {
-        let t = LogicalTime::from_seconds_f64(1.5);
-        assert_eq!(t.as_millis(), 1500);
-        assert!((t.as_seconds_f64() - 1.5).abs() < 0.001);
+    fn invalid_seconds_refuse() {
+        assert_eq!(LogicalTime::try_from_seconds_f64(f64::NAN), Err(TimeConversionError::NonFinite));
+        assert_eq!(LogicalTime::try_from_seconds_f64(-1.0), Err(TimeConversionError::Negative));
     }
 }

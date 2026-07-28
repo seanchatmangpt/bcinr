@@ -1,108 +1,33 @@
-//! # CMCA: Chatman Multifractal Consequence Allocation
+//! Chatman Multifractal Consequence Allocation.
 //!
-//! `bcinr-cmca` is an authoritative systems library implementing deterministic,
-//! branchless, and allocation-free algorithms for runtime telemetry, calibration,
-//! monitoring, and cascade allocation (see [`allocator`]) of bounded computational
-//! systems. "Covariance Monitoring and Calibration Assessment" was this crate's
-//! earlier, calibration-only framing; see `docs/CMCA_EXPLANATION.md` for the
-//! canonical-name reconciliation across this crate's calibration (`observatory`)
-//! and cascade-allocation (`allocator`) responsibilities.
-//!
-//! Under the strict constraints of the **Radon Law** (Cyclomatic Complexity $CC=1$),
-//! this module provides tools to audit the health and stability of mathematical
-//! substrates without introducing timing side-channels, dynamic heap allocations,
-//! or panic-prone execution paths.
-//!
-//! ## Architectural Foundations
-//!
-//! The crate enforces an autonomic feedback loop structured around the standard **MAPE-K**
-//! (Monitor, Analyze, Plan, Execute, Shared Knowledge) control loop:
-//! 1. **Observe**: Collect telemetry metrics (such as scaling factors, condition bounds, and drift metrics).
-//! 2. **Infer**: Compute safety flags branchlessly using fixed-point arithmetic invariants.
-//! 3. **Propose**: Report validation states indicating whether to proceed or trigger recertification.
-//!
-//! ## Key Modules
-//!
-//! * [`fixed`]: Q16.16 fixed-point arithmetic implementation designed for $CC=1$ operations.
-//! * [`allocator`]: Linear bounds-checked and panic-free bump allocators.
-//! * [`observatory`]: The evaluation engine that computes calibration safety flags based on mathematical thresholds.
-//!
-//! ## Example Usage
-//!
-//! ```rust
-//! use bcinr_cmca::fixed::NonNegativeFixed;
-//! use bcinr_cmca::observatory::{evaluate_calibration, ObservatoryFlag};
-//!
-//! // Define typical parameters for telemetry monitoring
-//! let kappa_hat = NonNegativeFixed::from_bits(131072);       // Estimated condition number (2.0)
-//! let kappa_under = NonNegativeFixed::from_bits(131072);     // Lower bound condition number (2.0)
-//! let epsilon_on = NonNegativeFixed::from_bits(65536);       // Upper limit threshold (1.0)
-//! let gamma_min_plus_hat = NonNegativeFixed::from_bits(131072); // Estimated positive eigenvalue (2.0)
-//! let gamma_min_plus_under = NonNegativeFixed::from_bits(131072); // Lower bound positive eigenvalue (2.0)
-//! let epsilon_gram = NonNegativeFixed::from_bits(65536);     // Gram matrix threshold (1.0)
-//! let d_js = NonNegativeFixed::ZERO;                         // Divergence/Drift measurement (0.0)
-//! let epsilon_drift = NonNegativeFixed::from_bits(65536);    // Maximum allowed drift threshold (1.0)
-//! let s_meas = NonNegativeFixed::ONE;                        // Measured scale (1.0)
-//! let s_leaf = NonNegativeFixed::from_bits(32768);           // Leaf scale target (0.5)
-//!
-//! // Provide the artifact
-//! use bcinr_cmca::observatory::{MeasurementArtifact, SupportStanding, ModeDelta};
-//! use bcinr_cmca::allocator::CertificateReceipt;
-//!
-//! let artifact = MeasurementArtifact {
-//!     point_estimate: kappa_hat,
-//!     lower_bound: kappa_under,
-//!     upper_bound: kappa_hat,
-//!     support_standing: SupportStanding { is_supported: true, smoothing_applied: false },
-//!     effective_sample_size: NonNegativeFixed::ONE,
-//!     dependence_standing: 0,
-//!     numeric_error: NonNegativeFixed::ZERO,
-//!     drift: d_js,
-//!     gram_lower_bound: gamma_min_plus_under,
-//!     graph_digest: 0,
-//!     control_mode_digest: 42,
-//!     proposal: ModeDelta::ProposeDelta,
-//! };
-//!
-//! // Evaluate the calibration state branchlessly
-//! let status = evaluate_calibration(
-//!     &artifact,
-//!     epsilon_on,
-//!     epsilon_gram,
-//!     epsilon_drift,
-//!     s_meas,
-//!     s_leaf,
-//! );
-//!
-//! // The production calibration succeeds, proposing recertification. Hostile
-//! // mutation features intentionally alter this semantic surface and are verified
-//! // by the dedicated isolated-mutant rails instead of this production example.
-//! # if cfg!(any(
-//! #     feature = "mutant_1", feature = "mutant_2", feature = "mutant_3",
-//! #     feature = "mutant_4", feature = "mutant_5", feature = "mutant_6",
-//! #     feature = "mutant_7", feature = "mutant_8", feature = "mutant_9",
-//! #     feature = "mutant_10", feature = "mutant_11"
-//! # )) { return; }
-//! assert!(status.is_ok());
-//! ```
+//! The crate exposes two admitted boundaries over private implementation
+//! kernels:
+//! - [`allocator`]: transactional fixed-size certified control rail;
+//! - [`cascade`]: arbitrary-shape analysis rail aligned to the same lens domain.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(unsafe_code)]
 
+#[cfg(any(feature = "alloc", feature = "std"))]
+extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+#[path = "allocator.rs"]
+mod allocator_legacy;
+#[path = "allocator_checked.rs"]
 pub mod allocator;
-/// Arbitrary-shape multifractal cascade with a lens per level. Requires
-/// `alloc`: unlike [`allocator`], it sizes to the tree rather than to a fixed
-/// `N = 8`, so it cannot be allocation-free. See the module docs for why both
-/// exist.
+
 #[cfg(feature = "alloc")]
+#[path = "cascade.rs"]
+mod cascade_legacy;
+#[cfg(feature = "alloc")]
+#[path = "cascade_checked.rs"]
 pub mod cascade;
+
 pub mod fixed;
 pub mod generated;
-/// Numeric-profile and policy constants generated by `ggen sync` from
-/// `ontology/graph.ttl`. Do not hand-edit; edit the graph and regenerate.
+/// Numeric policy manufactured from the admitted ontology profile.
 pub mod generated_profile;
 pub mod lrc;
 pub mod observatory;
@@ -110,38 +35,10 @@ pub mod stability_theorem;
 
 pub use allocator::{check_hierarchy_acyclic, HierarchyRefusal, StabilityRefusal};
 
-// INTEGRATION NOTE (v26.7.24): Recovery-only authority modules (CertifiedLearning,
-// CertifiedSelectionOnly, AdmittedControlState, CertificateReceipt, EnvelopeReceipt,
-// OutcomeReceipt, AdaptiveUpdate) are defined in allocator.rs but intentionally NOT
-// exported publicly. This fence preserves production behavior while recovery's authority
-// chain is validated. Exports will be added in a future PR after formal Hoare-logic
-// verification. Recovery's new typed refusals (CMCA_LEARNING_FROZEN, etc.) will be
-// added to StabilityRefusal as new enum variants once dependency closure is proven.
-
-/// A branchless mock/dummy function utilized in tests and contract validation.
-///
-/// Under release profiles, this function compiles to a single wrapping addition
-/// instruction without any conditional branches or memory accesses, conforming to $CC=1$.
-///
-/// # Examples
-///
-/// ```rust
-/// use bcinr_cmca::dummy_branchless;
-///
-/// assert_eq!(dummy_branchless(42), 43);
-/// assert_eq!(dummy_branchless(u64::MAX), 0);
-/// ```
-///
-/// # Branchless Contract
-///
-/// ```text
-/// u64_contract!(
-///     requires: true,
-///     ensures: true
-/// )
-/// ```
-pub fn dummy_branchless(val: u64) -> u64 {
-    val.wrapping_add(1)
+/// Minimal branchless primitive retained for contract-gate fixtures.
+#[must_use]
+pub fn dummy_branchless(value: u64) -> u64 {
+    value.wrapping_add(1)
 }
 
 #[cfg(test)]
@@ -149,8 +46,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_dummy_branchless() {
-        assert_eq!(dummy_branchless(0), 1);
+    fn dummy_wraps() {
         assert_eq!(dummy_branchless(42), 43);
         assert_eq!(dummy_branchless(u64::MAX), 0);
     }

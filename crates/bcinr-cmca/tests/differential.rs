@@ -11,18 +11,34 @@ mod reference;
 
 use bcinr_cmca::allocator::{
     allocate, AdaptiveUpdate, AdmittedControlState, CertificateReceipt, CertifiedLearning,
-    EnvelopeReceipt, OutcomeReceipt,
+    EnvelopeReceipt, OutcomeReceipt, StabilityRefusal,
 };
 use bcinr_cmca::fixed::{NonNegativeFixed, SignedFixed};
 use bcinr_cmca::generated::consequence_mass::case_studies::{
-    LensSpec, PackedSemanticState, K, N, Q,
+    LensSpec, PackedSemanticState, FACTOR_ACCESS_FREQUENCY, FACTOR_BUSINESS_VALUE,
+    FACTOR_DOWNSTREAM_CONSEQUENCE, FACTOR_RECOMPUTATION_COST, FACTOR_RETRIEVAL_DEMAND,
+    FACTOR_SCHEDULING_DEMAND, FACTOR_SEARCH_DEMAND, FACTOR_STANDING, FACTOR_VERIFICATION_COST,
+    K, MEASURE_CACHE, MEASURE_RETRIEVAL, MEASURE_SCHEDULING, MEASURE_SEARCH, N, Q,
 };
 use bcinr_cmca::generated::stability_profile::CERTIFICATE_DIGEST;
+use bcinr_cmca::generated_profile::{
+    ALLOCATION_ERROR_OPERATION_BUDGET, ESCORT_DYNAMIC_RANGE_LIMIT,
+    TRANSCENDENTAL_MAX_ERROR_ULPS,
+};
+use proptest::prelude::*;
 use reference::allocate_f64;
 
-use proptest::prelude::*;
+const SCALE: f64 = 65_536.0;
+const Q16_MAX: f64 = u32::MAX as f64 / SCALE;
 
-fn get_proof() -> Option<AdaptiveUpdate<CertifiedLearning>> {
+#[derive(Debug)]
+enum OracleOutcome {
+    Representable([f64; N]),
+    OutOfNumericEnvelope,
+    UnsupportedDomain,
+}
+
+fn proof() -> Option<AdaptiveUpdate<CertifiedLearning>> {
     AdaptiveUpdate::admit_adaptive_update(
         AdmittedControlState::admit_control_state(0),
         CertificateReceipt::admit_certificate(0),
@@ -34,23 +50,16 @@ fn get_proof() -> Option<AdaptiveUpdate<CertifiedLearning>> {
     )
 }
 
-// Helper to convert NonNegativeFixed to f64
-fn to_f64(f: NonNegativeFixed) -> f64 {
-    (f.val as f64) / 65536.0
+fn to_f64(value: NonNegativeFixed) -> f64 {
+    value.val as f64 / SCALE
 }
 
-fn to_f64_signed(f: SignedFixed) -> f64 {
-    (f.val as f64) / 65536.0
+fn signed_to_f64(value: SignedFixed) -> f64 {
+    value.val as f64 / SCALE
 }
 
-// Helper to convert f64 to NonNegativeFixed
-fn to_signed_fixed(v: f64) -> SignedFixed {
-    let scaled = (v * 65536.0).round();
-    SignedFixed::from_bits(scaled as i32)
-}
-
-fn to_fixed(v: f64) -> NonNegativeFixed {
-    let scaled = (v * 65536.0).round();
+fn to_fixed(value: f64) -> NonNegativeFixed {
+    let scaled = (value * SCALE).round();
     if scaled >= u32::MAX as f64 {
         NonNegativeFixed::MAX
     } else if scaled <= 0.0 {
@@ -60,235 +69,319 @@ fn to_fixed(v: f64) -> NonNegativeFixed {
     }
 }
 
-// Generate valid parent array representing a forest
-fn parent_strategy() -> impl Strategy<Value = [i32; N]> {
-    let s0 = Just(-1i32);
-    let s1 = any::<bool>().prop_map(|b| if b { 0 } else { -1 });
-    let s2 = (0..3).prop_map(|v| if v == 2 { -1 } else { v });
-    let s3 = (0..4).prop_map(|v| if v == 3 { -1 } else { v });
-    let s4 = (0..5).prop_map(|v| if v == 4 { -1 } else { v });
-    let s5 = (0..6).prop_map(|v| if v == 5 { -1 } else { v });
-    let s6 = (0..7).prop_map(|v| if v == 6 { -1 } else { v });
-    let s7 = (0..8).prop_map(|v| if v == 7 { -1 } else { v });
+fn to_signed_fixed(value: f64) -> SignedFixed {
+    SignedFixed::from_bits((value * SCALE).round() as i32)
+}
 
-    (s0, s1, s2, s3, s4, s5, s6, s7)
-        .prop_map(|(p0, p1, p2, p3, p4, p5, p6, p7)| [p0, p1, p2, p3, p4, p5, p6, p7])
+fn parent_strategy() -> impl Strategy<Value = [i32; N]> {
+    (
+        Just(-1i32),
+        any::<bool>().prop_map(|root| if root { -1 } else { 0 }),
+        (0..3).prop_map(|value| if value == 2 { -1 } else { value }),
+        (0..4).prop_map(|value| if value == 3 { -1 } else { value }),
+        (0..5).prop_map(|value| if value == 4 { -1 } else { value }),
+        (0..6).prop_map(|value| if value == 5 { -1 } else { value }),
+        (0..7).prop_map(|value| if value == 6 { -1 } else { value }),
+        (0..8).prop_map(|value| if value == 7 { -1 } else { value }),
+    )
+        .prop_map(|values| {
+            let (p0, p1, p2, p3, p4, p5, p6, p7) = values;
+            [p0, p1, p2, p3, p4, p5, p6, p7]
+        })
+}
+
+fn oracle_masses(states: &[PackedSemanticState; N]) -> Option<[[f64; N]; K]> {
+    let mut masses = [[0.0; N]; K];
+    let minimum = 6.0 / SCALE;
+    let maximum = 1_000.0;
+    for (index, state) in states.iter().enumerate() {
+        let f = |slot| to_f64(state.factors[slot]);
+        let candidates = [
+            ((f(FACTOR_RECOMPUTATION_COST) * 5.0 + f(FACTOR_VERIFICATION_COST))
+                * f(FACTOR_ACCESS_FREQUENCY))
+                * f(FACTOR_STANDING),
+            f(FACTOR_BUSINESS_VALUE) * f(FACTOR_RETRIEVAL_DEMAND),
+            f(FACTOR_BUSINESS_VALUE) * f(FACTOR_SCHEDULING_DEMAND),
+            ((f(FACTOR_BUSINESS_VALUE) + f(FACTOR_DOWNSTREAM_CONSEQUENCE))
+                * f(FACTOR_SEARCH_DEMAND))
+                * f(FACTOR_STANDING),
+        ];
+        if candidates
+            .iter()
+            .any(|value| !value.is_finite() || *value > Q16_MAX)
+        {
+            return None;
+        }
+        masses[MEASURE_CACHE][index] = candidates[0].clamp(minimum, maximum);
+        masses[MEASURE_RETRIEVAL][index] = candidates[1].clamp(minimum, maximum);
+        masses[MEASURE_SCHEDULING][index] = candidates[2].clamp(minimum, maximum);
+        masses[MEASURE_SEARCH][index] = candidates[3].clamp(minimum, maximum);
+    }
+    Some(masses)
+}
+
+fn group_representable(indices: impl Iterator<Item = usize>, masses: &[f64; N], q: f64) -> bool {
+    let scores: Vec<f64> = indices.map(|index| q * masses[index].log2()).collect();
+    if scores.is_empty() {
+        return true;
+    }
+    let minimum = scores.iter().copied().fold(f64::INFINITY, f64::min);
+    let maximum = scores.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    maximum - minimum <= ESCORT_DYNAMIC_RANGE_LIMIT as f64
+}
+
+fn classify_envelope(
+    states: &[PackedSemanticState; N],
+    lenses: &[LensSpec; Q],
+    parent: &[i32; N],
+    mu: &[f64; N],
+    costs: &[f64; N],
+) -> Result<(), OracleOutcome> {
+    if parent.iter().any(|p| *p < -1 || *p >= N as i32)
+        || !parent.iter().any(|p| *p == -1)
+        || lenses
+            .iter()
+            .any(|lens| !(-2.0..=2.0).contains(&signed_to_f64(lens.q)))
+    {
+        return Err(OracleOutcome::UnsupportedDomain);
+    }
+    let Some(masses) = oracle_masses(states) else {
+        return Err(OracleOutcome::OutOfNumericEnvelope);
+    };
+
+    let is_leaf = core::array::from_fn::<_, N, _>(|node| {
+        !parent.iter().any(|candidate| *candidate == node as i32)
+    });
+    let mut descendant = [[false; N]; N];
+    for ancestor in 0..N {
+        descendant[ancestor][ancestor] = true;
+        for node in 0..N {
+            let mut cursor = node;
+            for _ in 0..N {
+                match parent[cursor] {
+                    -1 => break,
+                    p if p as usize == ancestor => {
+                        descendant[ancestor][node] = true;
+                        break;
+                    }
+                    p => cursor = p as usize,
+                }
+            }
+        }
+    }
+
+    for mass_set in &masses {
+        for lens in lenses {
+            let q = signed_to_f64(lens.q);
+            if !group_representable(
+                (0..N).filter(|index| parent[*index] == -1),
+                mass_set,
+                q,
+            ) {
+                return Err(OracleOutcome::OutOfNumericEnvelope);
+            }
+            for node in 0..N {
+                if !group_representable(
+                    (0..N).filter(|index| parent[*index] == node as i32),
+                    mass_set,
+                    q,
+                ) || !group_representable(
+                    (0..N).filter(|index| is_leaf[*index] && descendant[node][*index]),
+                    mass_set,
+                    q,
+                ) {
+                    return Err(OracleOutcome::OutOfNumericEnvelope);
+                }
+            }
+        }
+    }
+
+    if mu
+        .iter()
+        .zip(costs)
+        .any(|(price, cost)| price * cost * core::f64::consts::LOG2_E > 16.0)
+    {
+        return Err(OracleOutcome::OutOfNumericEnvelope);
+    }
+    Ok(())
+}
+
+fn comparison_bound() -> f64 {
+    (TRANSCENDENTAL_MAX_ERROR_ULPS * ALLOCATION_ERROR_OPERATION_BUDGET) as f64 / SCALE
 }
 
 proptest! {
-    #![proptest_config(proptest::prelude::ProptestConfig::with_cases(std::env::var("PROPTEST_CASES").unwrap_or("1".into()).parse().unwrap()))]
+    #![proptest_config(ProptestConfig::with_cases(
+        std::env::var("PROPTEST_CASES").unwrap_or_else(|_| "32".into()).parse().unwrap()
+    ))]
+
     #[test]
-    fn test_differential_allocator(
-        // Factors: recomp, verify, standing, validity, access, search, retrieval, sched in [0.0, 1.0]
-        // bval, conseq in [0.0, 1000.0]
+    fn differential_oracle_compares_outcome_pairs(
         factors in prop::collection::vec(prop::collection::vec(0.0..1.0, 8), N),
         bvals in prop::collection::vec(0.0..1000.0, N),
-        conseqs in prop::collection::vec(0.0..1000.0, N),
-
-        // Lens exponents in [-1.99, 1.99] to avoid boundary rounding issues
-        lens_exps in prop::collection::vec(-1.99..1.99, Q),
-
-        // Lambda matrix
+        consequences in prop::collection::vec(0.0..1000.0, N),
+        lens_exponents in prop::collection::vec(-1.99..1.99, Q),
         lambda_rows in prop::collection::vec(prop::collection::vec(0.0..1.0, Q), K),
-
-        // Eta floor weight (ETA_G_MIN is 0.0010)
-        eta_val in 0.1..0.9,
-
-        // Parent structure
+        eta in 0.1..0.9,
         parent in parent_strategy(),
-
-        // Weights in [0.1, 1.0]
-        weights_flat in prop::collection::vec(0.1..1.0, N * 2 * Q),
-
-        // Payoffs in [0.0, 1.0]
-        payoffs_flat in prop::collection::vec(0.0..1.0, N * 2 * Q),
-
-        // Zeta learning rate: must be <= ZETA_W_MAX (0.0125)
-        zeta_val in 0.001..0.0125,
-
-        // Epsilon kappa
-        epsilon_kappa_val in 0.001..0.05,
-
-        // Mu Lagrange multipliers
-        mu_vals in prop::collection::vec(0.0..10.0, N),
-
-        // Costs
-        cost_vals in prop::collection::vec(0.0..1.0, N),
-
-        // Time
+        raw_weights in prop::collection::vec(0.1..1.0, N * 2 * Q),
+        raw_payoffs in prop::collection::vec(0.0..1.0, N * 2 * Q),
+        zeta in 0.001..0.0125,
+        epsilon_kappa in 0.001..0.05,
+        mu in prop::collection::vec(0.0..10.0, N),
+        costs in prop::collection::vec(0.0..1.0, N),
         t in 0..100u32,
-        // tau_d must be >= MODE_DWELL_ROUNDS_MIN (461)
         tau_d in 461..1000u32,
     ) {
-        // Construct Q16.16 PackedSemanticStates
         let mut states = [PackedSemanticState { id: 0, factors: [NonNegativeFixed::ZERO; 10] }; N];
-        for i in 0..N {
-            states[i].id = i as u32;
-            for (f, factor) in factors[i].iter().enumerate().take(8) {
-                states[i].factors[f] = to_fixed(*factor);
+        for index in 0..N {
+            states[index].id = index as u32;
+            for slot in 0..8 {
+                states[index].factors[slot] = to_fixed(factors[index][slot]);
             }
-            states[i].factors[8] = to_fixed(bvals[i]);
-            states[i].factors[9] = to_fixed(conseqs[i]);
+            states[index].factors[8] = to_fixed(bvals[index]);
+            states[index].factors[9] = to_fixed(consequences[index]);
         }
 
-        // Construct Q16.16 Lenses
         let mut lenses = [LensSpec { id: 0, q: SignedFixed::ZERO }; Q];
-        for q_idx in 0..Q {
-            lenses[q_idx].id = q_idx as u32;
-            lenses[q_idx].q = to_signed_fixed(lens_exps[q_idx]);
+        for index in 0..Q {
+            lenses[index] = LensSpec { id: index as u32, q: to_signed_fixed(lens_exponents[index]) };
         }
 
-        // Construct normalized lambda
         let mut lambda_fixed = [[NonNegativeFixed::ZERO; Q]; K];
         let mut lambda_f64 = [[0.0; Q]; K];
-        for k in 0..K {
-            let row_sum: f64 = lambda_rows[k].iter().sum();
-            for q_idx in 0..Q {
-                let val = if row_sum > 0.0 { lambda_rows[k][q_idx] / row_sum } else { 1.0 / Q as f64 };
-                lambda_fixed[k][q_idx] = to_fixed(val);
-                lambda_f64[k][q_idx] = val;
+        for model in 0..K {
+            let sum: f64 = lambda_rows[model].iter().sum();
+            for lens in 0..Q {
+                let value = if sum > 0.0 { lambda_rows[model][lens] / sum } else { 1.0 / Q as f64 };
+                lambda_fixed[model][lens] = to_fixed(value);
+                lambda_f64[model][lens] = value;
             }
         }
 
-        let eta_fixed = to_fixed(eta_val);
-        let zeta_fixed = to_fixed(zeta_val);
-        let epsilon_kappa_fixed = to_fixed(epsilon_kappa_val);
-
-        // Weights
         let mut weights_fixed = [[NonNegativeFixed::ZERO; 2 * Q]; N];
         let mut weights_f64 = [[0.0; 2 * Q]; N];
-        for i in 0..N {
-            for e in 0..(2 * Q) {
-                let w = weights_flat[i * 2 * Q + e];
-                weights_fixed[i][e] = to_fixed(w);
-                weights_f64[i][e] = w;
-            }
-        }
-
-        // Normalize weights initially
-        for i in 0..N {
-            for q_idx in 0..Q {
-                let sum = weights_f64[i][2 * q_idx] + weights_f64[i][2 * q_idx + 1];
-                if sum > 0.0 {
-                    weights_f64[i][2 * q_idx] /= sum;
-                    weights_f64[i][2 * q_idx + 1] /= sum;
-                }
-                let sum_fixed = weights_fixed[i][2 * q_idx] + weights_fixed[i][2 * q_idx + 1];
-                weights_fixed[i][2 * q_idx] = weights_fixed[i][2 * q_idx].saturating_div(sum_fixed);
-                weights_fixed[i][2 * q_idx + 1] = weights_fixed[i][2 * q_idx + 1].saturating_div(sum_fixed);
-            }
-        }
-
-        // Payoffs
         let mut payoffs_fixed = [[NonNegativeFixed::ZERO; 2 * Q]; N];
         let mut payoffs_f64 = [[0.0; 2 * Q]; N];
-        for i in 0..N {
-            for e in 0..(2 * Q) {
-                let p = payoffs_flat[i * 2 * Q + e];
-                payoffs_fixed[i][e] = to_fixed(p);
-                payoffs_f64[i][e] = p;
+        for node in 0..N {
+            for edge in 0..2 * Q {
+                let offset = node * 2 * Q + edge;
+                weights_fixed[node][edge] = to_fixed(raw_weights[offset]);
+                weights_f64[node][edge] = raw_weights[offset];
+                payoffs_fixed[node][edge] = to_fixed(raw_payoffs[offset]);
+                payoffs_f64[node][edge] = raw_payoffs[offset];
+            }
+            for lens in 0..Q {
+                let sum_f64 = weights_f64[node][2 * lens] + weights_f64[node][2 * lens + 1];
+                weights_f64[node][2 * lens] /= sum_f64;
+                weights_f64[node][2 * lens + 1] /= sum_f64;
+                let sum_fixed = weights_fixed[node][2 * lens] + weights_fixed[node][2 * lens + 1];
+                weights_fixed[node][2 * lens] = weights_fixed[node][2 * lens].saturating_div(sum_fixed);
+                weights_fixed[node][2 * lens + 1] = weights_fixed[node][2 * lens + 1].saturating_div(sum_fixed);
             }
         }
 
-        // Mu and costs
-        let mut mu_fixed = [NonNegativeFixed::ZERO; N];
-        let mut mu_f64 = [0.0; N];
-        let mut costs_fixed = [NonNegativeFixed::ZERO; N];
-        let mut costs_f64 = [0.0; N];
-        for i in 0..N {
-            mu_fixed[i] = to_fixed(mu_vals[i]);
-            mu_f64[i] = mu_vals[i];
-            costs_fixed[i] = to_fixed(cost_vals[i]);
-            costs_f64[i] = cost_vals[i];
-        }
-
-        // Dwell Time Lock states
-        let mut last_switch_t_fixed = 0u32;
-        let mut prev_mode_fixed = 0u32;
-        let mut last_switch_t_f64 = 0u32;
-        let mut prev_mode_f64 = 0u32;
-
-        // Call NonNegativeFixed-Point Allocator
-        let result_fixed = allocate(
-            &states,
-            &lenses,
-            &lambda_fixed,
-            eta_fixed,
-            &parent,
-            &mut weights_fixed,
-            &payoffs_fixed,
-            zeta_fixed,
-            epsilon_kappa_fixed,
-            &mu_fixed,
-            &costs_fixed,
-            t,
-            &mut last_switch_t_fixed,
-            &mut prev_mode_fixed,
-            tau_d,
-            CERTIFICATE_DIGEST,
-            get_proof().as_ref(),
-        ).unwrap();
-
-        // Call f64 Allocator
-        let result_f64 = allocate_f64(
-            &states,
-            &lenses,
-            &lambda_f64,
-            eta_val,
-            &parent,
-            &mut weights_f64,
-            &payoffs_f64,
-            zeta_val,
-            epsilon_kappa_val,
-            &mu_f64,
-            &costs_f64,
-            t,
-            &mut last_switch_t_f64,
-            &mut prev_mode_f64,
-            tau_d,
+        let mu_fixed = core::array::from_fn(|index| to_fixed(mu[index]));
+        let costs_fixed = core::array::from_fn(|index| to_fixed(costs[index]));
+        let mut fixed_last = 0;
+        let mut fixed_mode = 0;
+        let before_weights = weights_fixed;
+        let fixed = allocate(
+            &states, &lenses, &lambda_fixed, to_fixed(eta), &parent, &mut weights_fixed,
+            &payoffs_fixed, to_fixed(zeta), to_fixed(epsilon_kappa), &mu_fixed, &costs_fixed,
+            t, &mut fixed_last, &mut fixed_mode, tau_d, CERTIFICATE_DIGEST, proof().as_ref(),
         );
 
-        // Compare allocations for leaf nodes
-        let mut is_leaf = [true; N];
-        for (i, leaf) in is_leaf.iter_mut().enumerate() {
-            for &p in parent.iter() {
-                if p == i as i32 {
-                    *leaf = false;
-                }
+        let oracle = match classify_envelope(&states, &lenses, &parent, &mu.clone().try_into().unwrap(), &costs.clone().try_into().unwrap()) {
+            Ok(()) => {
+                let mut reference_weights = weights_f64;
+                let mut reference_last = 0;
+                let mut reference_mode = 0;
+                OracleOutcome::Representable(allocate_f64(
+                    &states, &lenses, &lambda_f64, eta, &parent, &mut reference_weights,
+                    &payoffs_f64, zeta, epsilon_kappa, &mu.clone().try_into().unwrap(),
+                    &costs.clone().try_into().unwrap(), t, &mut reference_last, &mut reference_mode,
+                    tau_d,
+                ))
             }
-        }
+            Err(outcome) => outcome,
+        };
 
-        for i in 0..N {
-            if is_leaf[i] {
-                let val_fixed = to_f64(result_fixed[i]);
-                let val_f64 = result_f64[i];
-                let diff = (val_fixed - val_f64).abs();
-
-                if diff >= bcinr_cmca::generated_profile::DIFFERENTIAL_TOLERANCE {
-                    println!("DIFFERENTIAL FAILURE AT NODE {}", i);
-                    println!("parent: {:?}", parent);
-                    println!("lambda_fixed: {:?}", lambda_fixed);
-                    println!("lambda_f64:   {:?}", lambda_f64);
-                    println!("result_fixed (f64): {:?}", result_fixed.map(to_f64));
-                    println!("result_f64:   {:?}", result_f64);
-
-                    // Let's print out the raw factors for all nodes
-                    for (idx, state) in states.iter().enumerate() {
-                        println!("node {}: factors={:?}", idx, state.factors.map(to_f64));
+        match (fixed, oracle) {
+            (Ok(actual), OracleOutcome::Representable(expected)) => {
+                let is_leaf = core::array::from_fn::<_, N, _>(|node| !parent.iter().any(|p| *p == node as i32));
+                for node in 0..N {
+                    if is_leaf[node] {
+                        let difference = (to_f64(actual[node]) - expected[node]).abs();
+                        prop_assert!(difference <= comparison_bound(), "node={node}, fixed={}, reference={}, difference={}, bound={}", to_f64(actual[node]), expected[node], difference, comparison_bound());
                     }
-
-                    // Let's print the lenses
-                    println!("lenses: {:?}", lenses.map(|l| to_f64_signed(l.q)));
                 }
-
-                // Allow a small numerical tolerance due to fixed point approximations
-                assert!(
-                    diff < bcinr_cmca::generated_profile::DIFFERENTIAL_TOLERANCE,
-                    "Differential mismatch at node {}: fixed={}, f64={}, diff={} (tolerance {} is POLICY, not derived -- see ontology/profile.ttl)",
-                    i, val_fixed, val_f64, diff,
-                    bcinr_cmca::generated_profile::DIFFERENTIAL_TOLERANCE
-                );
             }
+            (Err(StabilityRefusal::NumericRangeExceeded), OracleOutcome::OutOfNumericEnvelope) => {
+                prop_assert_eq!(weights_fixed, before_weights, "refusal mutated persistent weights");
+                prop_assert_eq!(fixed_last, 0);
+                prop_assert_eq!(fixed_mode, 0);
+            }
+            (Err(StabilityRefusal::UnsupportedDomain), OracleOutcome::UnsupportedDomain) => {}
+            (actual, expected) => prop_assert!(false, "outcome mismatch: fixed={actual:?}, oracle={expected:?}"),
         }
+    }
+}
+
+fn boundary_fixture(high_business_value: f64, lens: f64) -> (
+    [PackedSemanticState; N],
+    [LensSpec; Q],
+    [[NonNegativeFixed; Q]; K],
+    [i32; N],
+    [[NonNegativeFixed; 2 * Q]; N],
+    [[NonNegativeFixed; 2 * Q]; N],
+) {
+    let mut states = [PackedSemanticState { id: 0, factors: [NonNegativeFixed::ONE; 10] }; N];
+    for (index, state) in states.iter_mut().enumerate() {
+        state.id = index as u32;
+        state.factors[FACTOR_BUSINESS_VALUE] = if index == 0 { to_fixed(high_business_value) } else { NonNegativeFixed::ZERO };
+        state.factors[FACTOR_DOWNSTREAM_CONSEQUENCE] = NonNegativeFixed::ZERO;
+    }
+    let lenses = core::array::from_fn(|index| LensSpec { id: index as u32, q: to_signed_fixed(lens) });
+    let lambda = [[NonNegativeFixed::from_bits(16_384); Q]; K];
+    let parent = [-1; N];
+    let weights = [[NonNegativeFixed::from_bits(32_768); 2 * Q]; N];
+    let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
+    (states, lenses, lambda, parent, weights, payoffs)
+}
+
+#[test]
+fn five_permanent_numeric_boundary_witnesses_refuse_deterministically() {
+    let seeds = [
+        (1_000.0, 2.0),
+        (100.0, 2.0),
+        (10.0, 2.0),
+        (1.0, 2.0),
+        (1_000.0, -2.0),
+    ];
+    for (seed, (high, lens)) in seeds.into_iter().enumerate() {
+        let (states, lenses, lambda, parent, initial_weights, payoffs) = boundary_fixture(high, lens);
+        let mut first_weights = initial_weights;
+        let mut first_last = 0;
+        let mut first_mode = 0;
+        let first = allocate(
+            &states, &lenses, &lambda, to_fixed(0.1), &parent, &mut first_weights,
+            &payoffs, NonNegativeFixed::ZERO, NonNegativeFixed::ZERO,
+            &[NonNegativeFixed::ZERO; N], &[NonNegativeFixed::ZERO; N], 0,
+            &mut first_last, &mut first_mode, 500, CERTIFICATE_DIGEST, proof().as_ref(),
+        );
+        let mut second_weights = initial_weights;
+        let mut second_last = 0;
+        let mut second_mode = 0;
+        let second = allocate(
+            &states, &lenses, &lambda, to_fixed(0.1), &parent, &mut second_weights,
+            &payoffs, NonNegativeFixed::ZERO, NonNegativeFixed::ZERO,
+            &[NonNegativeFixed::ZERO; N], &[NonNegativeFixed::ZERO; N], 0,
+            &mut second_last, &mut second_mode, 500, CERTIFICATE_DIGEST, proof().as_ref(),
+        );
+        assert_eq!(first, Err(StabilityRefusal::NumericRangeExceeded), "seed {seed}");
+        assert_eq!(second, first, "seed {seed} is nondeterministic");
+        assert_eq!(first_weights, initial_weights, "seed {seed} mutated state");
+        assert_eq!(second_weights, initial_weights, "seed {seed} mutated state");
     }
 }

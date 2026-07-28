@@ -1,0 +1,51 @@
+name: v26.7.28 closure
+on:
+  pull_request:
+    branches: [feat/v26.7.28-powl2-multifractal]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: v26-7-28-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  closure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-make
+        run: cargo install cargo-make --locked
+      - name: Build exact ggen CLI source
+        run: |
+          cargo install \
+            --git https://github.com/seanchatmangpt/ggen \
+            --rev ed625aeecce7c412db4a022e67cda5bdc6068083 \
+            --package ggen-cli-lib \
+            --bin ggen \
+            --locked
+      - name: Record exact environment
+        run: |
+          mkdir -p verification-artifacts
+          git rev-parse HEAD | tee verification-artifacts/source-revision.txt
+          rustc -Vv | tee verification-artifacts/rust-toolchain.txt
+          ggen --version | tee verification-artifacts/ggen-version.txt
+      - name: Execute closure ladder
+        run: cargo make closure 2>&1 | tee verification-artifacts/closure.log
+      - name: Upload exact-run evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v26-7-28-closure-${{ github.sha }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            verification-artifacts/
+            .ggen-v2/receipt.json
+            .ggen-v2/receipt-log.jsonl
