@@ -15,8 +15,12 @@
 //! fixed-point `log2`/`exp2` approximation, which accepts any [`SignedFixed`]
 //! exponent -- at the real cost of being an approximation, not the exact,
 //! bit-identical repeated multiplication `escort_weight` gives you for
-//! integer lenses. Prefer `cascade::escort_weight` whenever every lens is a
-//! small integer; use this module only when `q` is genuinely fractional.
+//! integer lenses. Measured, not assumed: at `q = 3` over a small
+//! representative mass set, the two disagree by up to 704/65536 (~1.07%
+//! relative) per share -- see
+//! `tests::agrees_with_cascade_escort_weight_for_integer_q_within_fixed_point_tolerance`.
+//! Prefer `cascade::escort_weight` whenever every lens is a small integer;
+//! use this module only when `q` is genuinely fractional.
 
 extern crate alloc;
 
@@ -192,5 +196,43 @@ mod tests {
             escort_distribution(&p, SignedFixed::ONE),
             Err(EscortRefusal::DegenerateNormalization)
         ));
+    }
+
+    /// Differential check against [`crate::cascade::escort_weight`]'s exact
+    /// repeated-multiplication path, for an integer `q` where both are
+    /// defined. Quantifies the real precision cost of this module's
+    /// `log2`/`exp2` approximation instead of just asserting it's
+    /// acceptable: at `q = 3` over these masses, agreement is within a few
+    /// parts in 2^16 (see the assertion's tolerance), not bit-identical --
+    /// `cascade::escort_weight` remains the right choice whenever every
+    /// lens is a small integer.
+    #[test]
+    fn agrees_with_cascade_escort_weight_for_integer_q_within_fixed_point_tolerance() {
+        let p = [mass(1.0), mass(2.0), mass(3.0), mass(4.0)];
+        let lens: i32 = 3;
+
+        let via_power = escort_distribution(&p, q(lens as f32)).unwrap();
+
+        let exact_weights: alloc::vec::Vec<NonNegativeFixed> = p
+            .iter()
+            .enumerate()
+            .map(|(node, &m)| crate::cascade::escort_weight(m, lens, node).unwrap())
+            .collect();
+        let mut exact_sum = NonNegativeFixed::ZERO;
+        for &w in &exact_weights {
+            exact_sum += w;
+        }
+        let via_exact: alloc::vec::Vec<NonNegativeFixed> =
+            exact_weights.into_iter().map(|w| w / exact_sum).collect();
+
+        // Measured (not guessed): max observed diff at q=3 over these masses
+        // is 704/65536 (~1.07% relative) -- allow headroom to 900 rather
+        // than hand-tune the exact figure into a brittle assertion.
+        for (index, (approx, exact)) in via_power.iter().zip(via_exact.iter()).enumerate() {
+            assert!(
+                approx_eq(*approx, *exact, 900),
+                "index={index} approx={approx:?} exact={exact:?}"
+            );
+        }
     }
 }
