@@ -1,4 +1,4 @@
-//! Safe & sound workflow-net (WF-net) type, ported and adapted from
+//! Workflow-net (WF-net) type with a decidable soundness check, ported and adapted from
 //! `~/ggen/crates/powl2-decompose/src/net.rs` (MIT OR Apache-2.0, © Sean Chatman,
 //! same copyright holder as this crate) per Kourani, Park & van der Aalst,
 //! "Hierarchical Decomposition of Separable Workflow-Nets" (arXiv:2602.15739),
@@ -6,12 +6,19 @@
 //!
 //! Self-contained: string-indexed places/transitions, no external Petri-net type.
 
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
+
+/// Marking cap for the reachability graph. Exceeding it yields a report with
+/// `truncated = true` and every soundness verdict withheld -- an unexplored
+/// state space is not evidence of soundness.
+pub const MAX_REACHABLE_MARKINGS: usize = 200_000;
 
 /// A transition label: `Some(activity)` or the silent activity `tau` (`None`).
 pub type Label = Option<String>;
 
-/// A safe & sound workflow net `N = (P, T, F)` (Def 3.3).
+/// A workflow net `N = (P, T, F)` (Def 3.3). Structural validity is enforced
+/// by [`WfNet::new`]; safeness and soundness are *behavioural* and are decided
+/// separately by [`WfNet::check_soundness`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WfNet {
     places: BTreeSet<String>,
@@ -449,5 +456,216 @@ impl WfNet {
             hasher.update(b"\x00");
         }
         hasher.finalize().to_hex().to_string()
+    }
+}
+
+/// A marking: token count per place, indexed by the place's position in
+/// `WfNet::places()` (a `BTreeSet`, so the order is the deterministic
+/// lexicographic one).
+///
+/// `Vec<u32>` rather than a set of place names: a set cannot represent two
+/// tokens in one place, which is exactly the state an unsafe net reaches. A
+/// set-valued marking silently decrements-to-zero and reports a language the
+/// net does not have -- see the note on `wf_net_language` in `language.rs`.
+pub type Marking = Vec<u32>;
+
+/// The outcome of replaying a WF-net's token game to exhaustion.
+///
+/// Every field is a decided fact about the *explored* state space. When
+/// `truncated` is set the exploration hit [`MAX_REACHABLE_MARKINGS`] and the
+/// three soundness clauses are `None`, because "no counterexample found in the
+/// part we looked at" is not the same claim as "no counterexample exists".
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SoundnessReport {
+    /// Number of distinct markings reached from `[source: 1]`.
+    pub reachable_markings: usize,
+    /// The exploration hit [`MAX_REACHABLE_MARKINGS`] and stopped early.
+    pub truncated: bool,
+    /// No reachable marking puts more than one token in any place (1-safe).
+    pub is_safe: bool,
+    /// The first marking found carrying `> 1` token in some place, if any.
+    /// Kept as evidence so a refusal can name its witness.
+    pub unsafe_witness: Option<Marking>,
+    /// Def 3.4 free-choice, a purely structural property (so never `None`).
+    pub is_free_choice: bool,
+    /// Every transition is enabled in at least one reachable marking.
+    /// `None` when truncated.
+    pub no_dead_transitions: Option<bool>,
+    /// van der Aalst clause 1: from every reachable marking, the final marking
+    /// `[sink: 1]` is reachable. `None` when truncated.
+    pub option_to_complete: Option<bool>,
+    /// van der Aalst clause 2: no reachable marking marks the sink while
+    /// differing from the final marking (no tokens left behind). `None` when
+    /// truncated.
+    pub proper_completion: Option<bool>,
+}
+
+impl SoundnessReport {
+    /// All three van der Aalst clauses decided and holding. A truncated report
+    /// is never sound.
+    #[must_use]
+    pub fn is_sound(&self) -> bool {
+        self.option_to_complete == Some(true)
+            && self.proper_completion == Some(true)
+            && self.no_dead_transitions == Some(true)
+    }
+
+    /// Sound *and* 1-safe: the precondition Algorithm 3 is proved against.
+    #[must_use]
+    pub fn is_safe_and_sound(&self) -> bool {
+        self.is_safe && self.is_sound()
+    }
+}
+
+impl WfNet {
+    /// Decide safeness and the three soundness clauses by exhaustive
+    /// breadth-first replay of the token game from `[source: 1]`.
+    ///
+    /// Complexity is the size of the reachability graph, which is exponential
+    /// in the number of places in general -- hence the
+    /// [`MAX_REACHABLE_MARKINGS`] cap and the `truncated` flag rather than an
+    /// unbounded search.
+    #[must_use]
+    pub fn check_soundness(&self) -> SoundnessReport {
+        let places: Vec<&String> = self.places.iter().collect();
+        let index: HashMap<&str, usize> = places
+            .iter()
+            .enumerate()
+            .map(|(i, p)| (p.as_str(), i))
+            .collect();
+        let n = places.len();
+
+        // Pre-resolve each transition's pre-/post-sets to place indices once,
+        // so the inner replay loop is index arithmetic only.
+        let fired: Vec<(usize, Vec<usize>, Vec<usize>)> = self
+            .transitions
+            .keys()
+            .enumerate()
+            .map(|(ti, t)| {
+                let pre = self
+                    .pre_trans(t)
+                    .iter()
+                    .map(|p| index[p.as_str()])
+                    .collect();
+                let post = self
+                    .post_trans(t)
+                    .iter()
+                    .map(|p| index[p.as_str()])
+                    .collect();
+                (ti, pre, post)
+            })
+            .collect();
+
+        let mut initial = vec![0u32; n];
+        initial[index[self.source.as_str()]] = 1;
+        let mut final_marking = vec![0u32; n];
+        final_marking[index[self.sink.as_str()]] = 1;
+
+        // Reachability graph: markings as nodes, plus the forward edges needed
+        // for the reverse pass that decides option-to-complete.
+        let mut ids: HashMap<Marking, usize> = HashMap::new();
+        let mut markings: Vec<Marking> = Vec::new();
+        let mut succ: Vec<Vec<usize>> = Vec::new();
+        let mut enabled_somewhere: HashSet<usize> = HashSet::new();
+        let mut is_safe = true;
+        let mut unsafe_witness = None;
+        let mut truncated = false;
+
+        ids.insert(initial.clone(), 0);
+        markings.push(initial);
+        succ.push(Vec::new());
+
+        let mut queue = VecDeque::from([0usize]);
+        while let Some(cur) = queue.pop_front() {
+            for (ti, pre, post) in &fired {
+                if !pre.iter().all(|&p| markings[cur][p] >= 1) {
+                    continue;
+                }
+                enabled_somewhere.insert(*ti);
+                let mut next = markings[cur].clone();
+                for &p in pre {
+                    next[p] -= 1;
+                }
+                for &p in post {
+                    next[p] += 1;
+                }
+                if next.iter().any(|&c| c > 1) && unsafe_witness.is_none() {
+                    is_safe = false;
+                    unsafe_witness = Some(next.clone());
+                }
+                let id = match ids.get(&next) {
+                    Some(&id) => id,
+                    None => {
+                        if markings.len() >= MAX_REACHABLE_MARKINGS {
+                            truncated = true;
+                            continue;
+                        }
+                        let id = markings.len();
+                        ids.insert(next.clone(), id);
+                        markings.push(next);
+                        succ.push(Vec::new());
+                        queue.push_back(id);
+                        id
+                    }
+                };
+                succ[cur].push(id);
+            }
+        }
+
+        let mut report = SoundnessReport {
+            reachable_markings: markings.len(),
+            truncated,
+            is_safe,
+            unsafe_witness,
+            is_free_choice: self.is_free_choice(),
+            no_dead_transitions: None,
+            option_to_complete: None,
+            proper_completion: None,
+        };
+        if truncated {
+            return report;
+        }
+
+        report.no_dead_transitions = Some(enabled_somewhere.len() == self.transitions.len());
+
+        // Clause 1 -- option to complete. Reverse BFS from the final marking
+        // over the graph just built: a marking can complete iff it reaches the
+        // final marking, so the set that can is exactly the set the final
+        // marking reaches *backwards*.
+        report.option_to_complete = Some(match ids.get(&final_marking) {
+            None => false,
+            Some(&fin) => {
+                let mut pred: Vec<Vec<usize>> = vec![Vec::new(); markings.len()];
+                for (from, tos) in succ.iter().enumerate() {
+                    for &to in tos {
+                        pred[to].push(from);
+                    }
+                }
+                let mut can_complete = vec![false; markings.len()];
+                can_complete[fin] = true;
+                let mut q = VecDeque::from([fin]);
+                while let Some(m) = q.pop_front() {
+                    for &p in &pred[m] {
+                        if !can_complete[p] {
+                            can_complete[p] = true;
+                            q.push_back(p);
+                        }
+                    }
+                }
+                can_complete.iter().all(|&b| b)
+            }
+        });
+
+        // Clause 2 -- proper completion. The sink being marked at all in a
+        // marking that is not exactly the final one means tokens were left
+        // behind (or the sink was re-marked).
+        let sink_idx = index[self.sink.as_str()];
+        report.proper_completion = Some(
+            markings
+                .iter()
+                .all(|m| m[sink_idx] == 0 || *m == final_marking),
+        );
+
+        report
     }
 }

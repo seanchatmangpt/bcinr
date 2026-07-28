@@ -367,10 +367,26 @@ fn do_redo_language(
     result
 }
 
-/// `L(N)`: the bounded language of `net`, computed by exhaustive safe replay
-/// of firing sequences from `[source]` to `[sink]`. Independent of
-/// [`powl2_language`] by construction (no shared code) -- their agreement on
-/// a converted model is the genuine Theorem-1 differential check.
+/// `L(N)`: the bounded language of `net`, computed by exhaustive replay of
+/// firing sequences from `[source]` to `[sink]`. Independent of
+/// [`powl2_language`] by construction (no shared code), which is what makes
+/// their agreement on a converted model real evidence rather than a tautology.
+/// It is *bounded* agreement, not the paper's Theorem 5.5 -- there is no
+/// "Theorem 1" in Kourani/Park/van der Aalst.
+///
+/// # Only valid on 1-safe nets
+///
+/// Markings here are sets of place names, so a marking cannot hold two tokens
+/// in one place: firing a transition *removes* a place rather than
+/// decrementing its count. On a net that is not 1-safe the enumerated language
+/// is therefore **wrong**, not merely incomplete -- it admits firing sequences
+/// the net cannot perform and misses ones it can.
+///
+/// This is unreachable through the conversion path: `convert_with_budget`
+/// decides [`WfNet::check_soundness`] first and refuses anything that is not
+/// safe (`RefusalReason::NotSafe`), so `convert_and_verify` only ever calls
+/// this on a net whose markings really are sets. Callers invoking it directly
+/// on an arbitrary net must check safeness themselves.
 #[must_use]
 pub fn wf_net_language(net: &WfNet, max_len: usize) -> Language {
     let mut out = Language::new();

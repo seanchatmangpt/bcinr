@@ -35,6 +35,23 @@ pub enum RefusalReason {
     /// "Theorem 1" in Kourani/Park/van der Aalst; the results are Lemmas
     /// 5.1-5.4 and Theorems 5.5/5.6.
     BoundedLanguageAgreementFailed { checked_len: usize },
+    /// The input net is not 1-safe: some reachable marking carries more than
+    /// one token in a place. Algorithm 3's correctness proofs (Lemmas 5.1-5.4)
+    /// assume a *safe* & sound WF-net, so running it here would produce a
+    /// model with no proof attached to it.
+    NotSafe { witness_markings: usize },
+    /// The input net fails at least one of van der Aalst's three soundness
+    /// clauses. Same reason as [`Self::NotSafe`]: outside the hypotheses of
+    /// the results being appealed to.
+    NotSound {
+        option_to_complete: bool,
+        proper_completion: bool,
+        no_dead_transitions: bool,
+    },
+    /// The reachability graph exceeded [`MAX_REACHABLE_MARKINGS`] before the
+    /// token game terminated, so safeness and soundness are *undecided* --
+    /// not decided favourably. Refused rather than assumed.
+    SoundnessUndecided { explored: usize },
     /// `convert_and_verify` was called with a bound that cannot compare
     /// anything. Both enumerators return the empty set at `max_len == 0`, so
     /// they agree vacuously and the check would return `Ok` having compared
@@ -64,6 +81,23 @@ impl std::fmt::Display for RefusalReason {
             Self::BudgetExhausted { budget } => {
                 write!(f, "bounded recursion budget {budget} exhausted")
             }
+            Self::NotSafe { witness_markings } => write!(
+                f,
+                "input net is not 1-safe (reached {witness_markings} markings before the witness)"
+            ),
+            Self::NotSound {
+                option_to_complete,
+                proper_completion,
+                no_dead_transitions,
+            } => write!(
+                f,
+                "input net is not sound (option-to-complete: {option_to_complete}, \
+                 proper-completion: {proper_completion}, no-dead-transitions: {no_dead_transitions})"
+            ),
+            Self::SoundnessUndecided { explored } => write!(
+                f,
+                "soundness undecided: reachability graph exceeded the marking bound at {explored}"
+            ),
             Self::VacuousLanguageBound => write!(
                 f,
                 "language bound of 0 compares two empty sets: agreement is vacuous"
@@ -181,6 +215,33 @@ pub fn convert_and_verify(
 /// [`WfNet::is_free_choice`] remains available as the Def 3.4 predicate for
 /// callers that want it as a diagnostic.
 pub fn convert_with_budget(net: &WfNet, budget: usize) -> Result<Powl2Model, Refusal> {
+    let report = net.check_soundness();
+    if report.truncated {
+        return Err(Refusal {
+            reason: RefusalReason::SoundnessUndecided {
+                explored: report.reachable_markings,
+            },
+            net_hash: net.content_hash(),
+        });
+    }
+    if !report.is_safe {
+        return Err(Refusal {
+            reason: RefusalReason::NotSafe {
+                witness_markings: report.reachable_markings,
+            },
+            net_hash: net.content_hash(),
+        });
+    }
+    if !report.is_sound() {
+        return Err(Refusal {
+            reason: RefusalReason::NotSound {
+                option_to_complete: report.option_to_complete == Some(true),
+                proper_completion: report.proper_completion == Some(true),
+                no_dead_transitions: report.no_dead_transitions == Some(true),
+            },
+            net_hash: net.content_hash(),
+        });
+    }
     convert_rec(net, 0, budget)
 }
 
