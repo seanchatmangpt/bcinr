@@ -15,6 +15,30 @@ imports = [
     "ontology/profile.ttl",
 ]
 
+# --- Fail-closed admission gates ----------------------------------------------
+#
+# Each gate is a SELECT evaluated against the post-materialization graph -- the
+# union of `source` and `imports` above -- in listed order. Any returned row is a
+# violation and refuses the sync before a single file is written.
+#
+# `[validation].gates`, not `[law].gates`: this manifest carries `version`, so it
+# is read by ggen's declarative-rules path, which takes gates from
+# `manifest.validation.gates` (`ggen-engine/src/generation_rules.rs:320`). The
+# frontmatter path's `[law].gates` (`sync.rs:520`) deserializes here without
+# error and never executes -- a gate that silently does nothing is worse than no
+# gate, so the distinction is load-bearing rather than stylistic.
+#
+# Each gate file joins the receipt's input closure, so removing one is recorded
+# rather than silent.
+#
+# These are the checks SHACL structurally cannot make: `ontology/shapes.ttl` is
+# applied per-file, so no shape can reach a referent declared in a sibling file.
+[validation]
+gates = [
+    "queries/gate-referent-exists.rq",
+    "queries/gate-case-uniqueness.rq",
+]
+
 [generation]
 output_dir = "."
 

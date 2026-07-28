@@ -14,14 +14,21 @@
 // `ontology/shapes.ttl` refuses to admit a refusal case that carries neither a
 // witness nor a written argument for why none exists, so absence from this
 // file is always accompanied by a recorded reason rather than by silence.
+//
+// `#[allow(unused_imports)]` below is load-bearing, not sloppiness.
+// `bc:rustFalsifierPrelude` is declared once per *taxonomy* and replayed into
+// every case of it, so a case that needs only part of the shared prelude is the
+// expected shape rather than a defect. Making the prelude per-case instead
+// would trade one honest allow for N near-duplicate graph facts that drift
+// against each other -- the same duplication this whole projection exists to
+// remove. Under `-D warnings` the allow is what keeps that choice compilable.
 
 /// `CascadeRefusal::LengthMismatch` -- parent and mass vectors disagree in length.
 #[test]
+#[allow(unused_imports)]
 fn falsifier_cascaderefusal_lengthmismatch() {
-    use bcinr_cmca::cascade::{consequence_mass, CascadeTree};
-    use bcinr_cmca::fixed::NonNegativeFixed;
-    let m = |v: f64| NonNegativeFixed::from_bits((v * 65536.0) as u32);
-
+    use bcinr_cmca::cascade::{consequence_mass, CascadeTree}; use bcinr_cmca::fixed::NonNegativeFixed; let m = |v: f64| NonNegativeFixed::from_bits((v * 65536.0) as u32);
+    
     let observed = CascadeTree::new(vec![None], vec![m(1.0), m(1.0)]).map(|_| ());
     assert!(
         matches!(observed, Err(bcinr_cmca::cascade::CascadeRefusal::LengthMismatch { .. })),
@@ -32,11 +39,10 @@ fn falsifier_cascaderefusal_lengthmismatch() {
 
 /// `CascadeRefusal::ParentOutOfRange` -- A parent index addresses a node that does not exist.
 #[test]
+#[allow(unused_imports)]
 fn falsifier_cascaderefusal_parentoutofrange() {
-    use bcinr_cmca::cascade::{consequence_mass, CascadeTree};
-    use bcinr_cmca::fixed::NonNegativeFixed;
-    let m = |v: f64| NonNegativeFixed::from_bits((v * 65536.0) as u32);
-
+    use bcinr_cmca::cascade::{consequence_mass, CascadeTree}; use bcinr_cmca::fixed::NonNegativeFixed; let m = |v: f64| NonNegativeFixed::from_bits((v * 65536.0) as u32);
+    
     let observed = CascadeTree::new(vec![None, Some(9)], vec![m(1.0), m(1.0)]).map(|_| ());
     assert!(
         matches!(observed, Err(bcinr_cmca::cascade::CascadeRefusal::ParentOutOfRange { .. })),
@@ -47,17 +53,13 @@ fn falsifier_cascaderefusal_parentoutofrange() {
 
 /// `CascadeRefusal::Cyclic` -- The parent relation contains a cycle, so no hierarchy exists.
 #[test]
+#[allow(unused_imports)]
 fn falsifier_cascaderefusal_cyclic() {
-    use bcinr_cmca::cascade::{consequence_mass, CascadeTree};
-    use bcinr_cmca::fixed::NonNegativeFixed;
-    let m = |v: f64| NonNegativeFixed::from_bits((v * 65536.0) as u32);
+    use bcinr_cmca::cascade::{consequence_mass, CascadeTree}; use bcinr_cmca::fixed::NonNegativeFixed; let m = |v: f64| NonNegativeFixed::from_bits((v * 65536.0) as u32);
     let t = CascadeTree::new(vec![None, Some(2), Some(1)], vec![m(1.0), m(1.0), m(1.0)]).unwrap();
     let observed = consequence_mass(&t, &[2]).map(|_| ());
     assert!(
-        matches!(
-            observed,
-            Err(bcinr_cmca::cascade::CascadeRefusal::Cyclic { .. })
-        ),
+        matches!(observed, Err(bcinr_cmca::cascade::CascadeRefusal::Cyclic { .. })),
         "the graph declares CascadeRefusal::Cyclic reachable by this witness, but it produced {:?}",
         observed
     );
@@ -65,10 +67,9 @@ fn falsifier_cascaderefusal_cyclic() {
 
 /// `CascadeRefusal::NoRoot` -- Every node has a parent, so there is nowhere for flow to enter.
 #[test]
+#[allow(unused_imports)]
 fn falsifier_cascaderefusal_noroot() {
-    use bcinr_cmca::cascade::{consequence_mass, CascadeTree};
-    use bcinr_cmca::fixed::NonNegativeFixed;
-    let m = |v: f64| NonNegativeFixed::from_bits((v * 65536.0) as u32);
+    use bcinr_cmca::cascade::{consequence_mass, CascadeTree}; use bcinr_cmca::fixed::NonNegativeFixed; let m = |v: f64| NonNegativeFixed::from_bits((v * 65536.0) as u32);
     let t = CascadeTree::new(vec![Some(0)], vec![m(1.0)]).unwrap();
     let observed = consequence_mass(&t, &[2]).map(|_| ());
     assert!(
@@ -80,10 +81,9 @@ fn falsifier_cascaderefusal_noroot() {
 
 /// `CascadeRefusal::ExponentOutOfRange` -- A lens exponent exceeds the admitted magnitude.
 #[test]
+#[allow(unused_imports)]
 fn falsifier_cascaderefusal_exponentoutofrange() {
-    use bcinr_cmca::cascade::{consequence_mass, CascadeTree};
-    use bcinr_cmca::fixed::NonNegativeFixed;
-    let m = |v: f64| NonNegativeFixed::from_bits((v * 65536.0) as u32);
+    use bcinr_cmca::cascade::{consequence_mass, CascadeTree}; use bcinr_cmca::fixed::NonNegativeFixed; let m = |v: f64| NonNegativeFixed::from_bits((v * 65536.0) as u32);
     let t = CascadeTree::new(vec![None, Some(0), Some(0)], vec![m(1.0), m(1.0), m(1.0)]).unwrap();
     let observed = consequence_mass(&t, &[999]).map(|_| ());
     assert!(
@@ -95,10 +95,9 @@ fn falsifier_cascaderefusal_exponentoutofrange() {
 
 /// `CascadeRefusal::DegenerateSiblingSet` -- All sibling escort weights are zero, so the normalizing sum vanishes. Fires only when ALL underflow; the mixed case is the dangerous one and does not refuse.
 #[test]
+#[allow(unused_imports)]
 fn falsifier_cascaderefusal_degeneratesiblingset() {
-    use bcinr_cmca::cascade::{consequence_mass, CascadeTree};
-    use bcinr_cmca::fixed::NonNegativeFixed;
-    let m = |v: f64| NonNegativeFixed::from_bits((v * 65536.0) as u32);
+    use bcinr_cmca::cascade::{consequence_mass, CascadeTree}; use bcinr_cmca::fixed::NonNegativeFixed; let m = |v: f64| NonNegativeFixed::from_bits((v * 65536.0) as u32);
     let t = CascadeTree::new(vec![None, Some(0), Some(0)], vec![m(1.0), m(0.0), m(0.0)]).unwrap();
     let observed = consequence_mass(&t, &[2]).map(|_| ());
     assert!(
@@ -110,10 +109,9 @@ fn falsifier_cascaderefusal_degeneratesiblingset() {
 
 /// `CascadeRefusal::ZeroMassUnderNegativeLens` -- m^q for m = 0 and q < 0 is undefined, not large.
 #[test]
+#[allow(unused_imports)]
 fn falsifier_cascaderefusal_zeromassundernegativelens() {
-    use bcinr_cmca::cascade::{consequence_mass, CascadeTree};
-    use bcinr_cmca::fixed::NonNegativeFixed;
-    let m = |v: f64| NonNegativeFixed::from_bits((v * 65536.0) as u32);
+    use bcinr_cmca::cascade::{consequence_mass, CascadeTree}; use bcinr_cmca::fixed::NonNegativeFixed; let m = |v: f64| NonNegativeFixed::from_bits((v * 65536.0) as u32);
     let t = CascadeTree::new(vec![None, Some(0), Some(0)], vec![m(1.0), m(0.0), m(1.0)]).unwrap();
     let observed = consequence_mass(&t, &[-2]).map(|_| ());
     assert!(
@@ -125,15 +123,10 @@ fn falsifier_cascaderefusal_zeromassundernegativelens() {
 
 /// `CascadeRefusal::NumericFault` -- A Q16.16 operation saturated or divided by zero; read off the value's error channel, with the stage named.
 #[test]
+#[allow(unused_imports)]
 fn falsifier_cascaderefusal_numericfault() {
-    use bcinr_cmca::cascade::{consequence_mass, CascadeTree};
-    use bcinr_cmca::fixed::NonNegativeFixed;
-    let m = |v: f64| NonNegativeFixed::from_bits((v * 65536.0) as u32);
-    let t = CascadeTree::new(
-        vec![None, Some(0), Some(0)],
-        vec![m(1.0), m(1000.0), m(1000.0)],
-    )
-    .unwrap();
+    use bcinr_cmca::cascade::{consequence_mass, CascadeTree}; use bcinr_cmca::fixed::NonNegativeFixed; let m = |v: f64| NonNegativeFixed::from_bits((v * 65536.0) as u32);
+    let t = CascadeTree::new(vec![None, Some(0), Some(0)], vec![m(1.0), m(1000.0), m(1000.0)]).unwrap();
     let observed = consequence_mass(&t, &[16]).map(|_| ());
     assert!(
         matches!(observed, Err(bcinr_cmca::cascade::CascadeRefusal::NumericFault { .. })),
@@ -144,15 +137,10 @@ fn falsifier_cascaderefusal_numericfault() {
 
 /// `CascadeRefusal::EscortUnderflow` -- m^q collapsed to zero from a non-zero mass: unrepresentable, not negligible. Detected structurally because saturating_mul flags overflow but not underflow.
 #[test]
+#[allow(unused_imports)]
 fn falsifier_cascaderefusal_escortunderflow() {
-    use bcinr_cmca::cascade::{consequence_mass, CascadeTree};
-    use bcinr_cmca::fixed::NonNegativeFixed;
-    let m = |v: f64| NonNegativeFixed::from_bits((v * 65536.0) as u32);
-    let t = CascadeTree::new(
-        vec![None, Some(0), Some(0)],
-        vec![m(1.0), m(0.001), m(900.0)],
-    )
-    .unwrap();
+    use bcinr_cmca::cascade::{consequence_mass, CascadeTree}; use bcinr_cmca::fixed::NonNegativeFixed; let m = |v: f64| NonNegativeFixed::from_bits((v * 65536.0) as u32);
+    let t = CascadeTree::new(vec![None, Some(0), Some(0)], vec![m(1.0), m(0.001), m(900.0)]).unwrap();
     let observed = consequence_mass(&t, &[16]).map(|_| ());
     assert!(
         matches!(observed, Err(bcinr_cmca::cascade::CascadeRefusal::EscortUnderflow { .. })),
@@ -163,46 +151,10 @@ fn falsifier_cascaderefusal_escortunderflow() {
 
 /// `RefusalReason::IrreducibleFragment` -- Our partitioner found no base case and no valid partition at this level -- Algorithm 3 line 25's FallThrough. It does NOT assert that no POWL structure exists: see bc:referenceDivergence.
 #[test]
+#[allow(unused_imports)]
 fn falsifier_refusalreason_irreduciblefragment() {
-    use bcinr_powl::wf_net::WfNet;
-    use bcinr_powl::wf_to_powl::{convert, convert_and_verify, convert_with_budget};
-    let s = |x: &str| x.to_string();
-    let net = WfNet::new(
-        ["i", "a", "b", "c", "d", "e", "o"].map(s),
-        [
-            ("t0", None),
-            ("t1", Some(s("A"))),
-            ("t2", Some(s("B"))),
-            ("t3", Some(s("C"))),
-            ("t4", None),
-            ("t5", None),
-        ]
-        .map(|(t, l)| (s(t), l)),
-        [
-            ("i", "t0"),
-            ("a", "t1"),
-            ("b", "t2"),
-            ("a", "t3"),
-            ("b", "t3"),
-            ("c", "t4"),
-            ("d", "t4"),
-            ("e", "t5"),
-        ]
-        .map(|(p, t)| (s(p), s(t))),
-        [
-            ("t0", "a"),
-            ("t0", "b"),
-            ("t1", "c"),
-            ("t2", "d"),
-            ("t3", "e"),
-            ("t4", "o"),
-            ("t5", "o"),
-        ]
-        .map(|(t, p)| (s(t), s(p))),
-        "i",
-        "o",
-    )
-    .unwrap();
+    use bcinr_powl::wf_net::WfNet; use bcinr_powl::wf_to_powl::{convert, convert_and_verify, convert_with_budget}; let s = |x: &str| x.to_string();
+    let net = WfNet::new(["i","a","b","c","d","e","o"].map(s), [("t0",None),("t1",Some(s("A"))),("t2",Some(s("B"))),("t3",Some(s("C"))),("t4",None),("t5",None)].map(|(t,l)|(s(t),l)), [("i","t0"),("a","t1"),("b","t2"),("a","t3"),("b","t3"),("c","t4"),("d","t4"),("e","t5")].map(|(p,t)|(s(p),s(t))), [("t0","a"),("t0","b"),("t1","c"),("t2","d"),("t3","e"),("t4","o"),("t5","o")].map(|(t,p)|(s(t),s(p))), "i", "o").unwrap();
     let observed = convert(&net).map(|_| ());
     assert!(
         matches!(observed, Err(bcinr_powl::wf_to_powl::Refusal { reason: bcinr_powl::wf_to_powl::RefusalReason::IrreducibleFragment { .. }, .. })),
@@ -213,19 +165,10 @@ fn falsifier_refusalreason_irreduciblefragment() {
 
 /// `RefusalReason::BudgetExhausted` -- The bounded recursion budget ran out before termination.
 #[test]
+#[allow(unused_imports)]
 fn falsifier_refusalreason_budgetexhausted() {
-    use bcinr_powl::wf_net::WfNet;
-    use bcinr_powl::wf_to_powl::{convert, convert_and_verify, convert_with_budget};
-    let s = |x: &str| x.to_string();
-    let net = WfNet::new(
-        ["i", "m", "o"].map(s),
-        [("t1", Some(s("A"))), ("t2", Some(s("B")))].map(|(t, l)| (s(t), l)),
-        [("i", "t1"), ("m", "t2")].map(|(p, t)| (s(p), s(t))),
-        [("t1", "m"), ("t2", "o")].map(|(t, p)| (s(t), s(p))),
-        "i",
-        "o",
-    )
-    .unwrap();
+    use bcinr_powl::wf_net::WfNet; use bcinr_powl::wf_to_powl::{convert, convert_and_verify, convert_with_budget}; let s = |x: &str| x.to_string();
+    let net = WfNet::new(["i","m","o"].map(s), [("t1",Some(s("A"))),("t2",Some(s("B")))].map(|(t,l)|(s(t),l)), [("i","t1"),("m","t2")].map(|(p,t)|(s(p),s(t))), [("t1","m"),("t2","o")].map(|(t,p)|(s(t),s(p))), "i", "o").unwrap();
     let observed = convert_with_budget(&net, 0).map(|_| ());
     assert!(
         matches!(observed, Err(bcinr_powl::wf_to_powl::Refusal { reason: bcinr_powl::wf_to_powl::RefusalReason::BudgetExhausted { .. }, .. })),
@@ -236,19 +179,10 @@ fn falsifier_refusalreason_budgetexhausted() {
 
 /// `RefusalReason::VacuousLanguageBound` -- A bound of 0 compares two empty sets. Both enumerators return the empty language there, so they agree vacuously -- independence of implementation does not imply independence of failure mode.
 #[test]
+#[allow(unused_imports)]
 fn falsifier_refusalreason_vacuouslanguagebound() {
-    use bcinr_powl::wf_net::WfNet;
-    use bcinr_powl::wf_to_powl::{convert, convert_and_verify, convert_with_budget};
-    let s = |x: &str| x.to_string();
-    let net = WfNet::new(
-        ["i", "m", "o"].map(s),
-        [("t1", Some(s("A"))), ("t2", Some(s("B")))].map(|(t, l)| (s(t), l)),
-        [("i", "t1"), ("m", "t2")].map(|(p, t)| (s(p), s(t))),
-        [("t1", "m"), ("t2", "o")].map(|(t, p)| (s(t), s(p))),
-        "i",
-        "o",
-    )
-    .unwrap();
+    use bcinr_powl::wf_net::WfNet; use bcinr_powl::wf_to_powl::{convert, convert_and_verify, convert_with_budget}; let s = |x: &str| x.to_string();
+    let net = WfNet::new(["i","m","o"].map(s), [("t1",Some(s("A"))),("t2",Some(s("B")))].map(|(t,l)|(s(t),l)), [("i","t1"),("m","t2")].map(|(p,t)|(s(p),s(t))), [("t1","m"),("t2","o")].map(|(t,p)|(s(t),s(p))), "i", "o").unwrap();
     let observed = convert_and_verify(&net, 64, 0).map(|_| ());
     assert!(
         matches!(observed, Err(bcinr_powl::wf_to_powl::Refusal { reason: bcinr_powl::wf_to_powl::RefusalReason::VacuousLanguageBound, .. })),
@@ -259,35 +193,13 @@ fn falsifier_refusalreason_vacuouslanguagebound() {
 
 /// `RefusalReason::NotSafe` -- Some reachable marking carries more than one token in a place. Lemmas 5.1-5.4 assume a safe net, so Algorithm 3 would return a model with no proof attached.
 #[test]
+#[allow(unused_imports)]
 fn falsifier_refusalreason_notsafe() {
-    use bcinr_powl::wf_net::WfNet;
-    use bcinr_powl::wf_to_powl::{convert, convert_and_verify, convert_with_budget};
-    let s = |x: &str| x.to_string();
-    let net = WfNet::new(
-        ["i", "a", "b", "c", "o"].map(s),
-        [("t1", None), ("t2", None), ("t3", None), ("t4", None)].map(|(t, l)| (s(t), l)),
-        [("i", "t1"), ("a", "t2"), ("b", "t3"), ("c", "t4")].map(|(p, t)| (s(p), s(t))),
-        [
-            ("t1", "a"),
-            ("t1", "b"),
-            ("t2", "c"),
-            ("t3", "c"),
-            ("t4", "o"),
-        ]
-        .map(|(t, p)| (s(t), s(p))),
-        "i",
-        "o",
-    )
-    .unwrap();
+    use bcinr_powl::wf_net::WfNet; use bcinr_powl::wf_to_powl::{convert, convert_and_verify, convert_with_budget}; let s = |x: &str| x.to_string();
+    let net = WfNet::new(["i","a","b","c","o"].map(s), [("t1",None),("t2",None),("t3",None),("t4",None)].map(|(t,l)|(s(t),l)), [("i","t1"),("a","t2"),("b","t3"),("c","t4")].map(|(p,t)|(s(p),s(t))), [("t1","a"),("t1","b"),("t2","c"),("t3","c"),("t4","o")].map(|(t,p)|(s(t),s(p))), "i", "o").unwrap();
     let observed = convert(&net).map(|_| ());
     assert!(
-        matches!(
-            observed,
-            Err(bcinr_powl::wf_to_powl::Refusal {
-                reason: bcinr_powl::wf_to_powl::RefusalReason::NotSafe { .. },
-                ..
-            })
-        ),
+        matches!(observed, Err(bcinr_powl::wf_to_powl::Refusal { reason: bcinr_powl::wf_to_powl::RefusalReason::NotSafe { .. }, .. })),
         "the graph declares RefusalReason::NotSafe reachable by this witness, but it produced {:?}",
         observed
     );
@@ -295,19 +207,10 @@ fn falsifier_refusalreason_notsafe() {
 
 /// `RefusalReason::NotSound` -- At least one of van der Aalst's three clauses fails: option-to-complete, proper completion, no dead transitions.
 #[test]
+#[allow(unused_imports)]
 fn falsifier_refusalreason_notsound() {
-    use bcinr_powl::wf_net::WfNet;
-    use bcinr_powl::wf_to_powl::{convert, convert_and_verify, convert_with_budget};
-    let s = |x: &str| x.to_string();
-    let net = WfNet::new(
-        ["i", "a", "b", "o"].map(s),
-        [("t1", None), ("t2", None), ("t3", None)].map(|(t, l)| (s(t), l)),
-        [("i", "t1"), ("a", "t2"), ("a", "t3"), ("b", "t3")].map(|(p, t)| (s(p), s(t))),
-        [("t1", "a"), ("t1", "b"), ("t2", "o"), ("t3", "o")].map(|(t, p)| (s(t), s(p))),
-        "i",
-        "o",
-    )
-    .unwrap();
+    use bcinr_powl::wf_net::WfNet; use bcinr_powl::wf_to_powl::{convert, convert_and_verify, convert_with_budget}; let s = |x: &str| x.to_string();
+    let net = WfNet::new(["i","a","b","o"].map(s), [("t1",None),("t2",None),("t3",None)].map(|(t,l)|(s(t),l)), [("i","t1"),("a","t2"),("a","t3"),("b","t3")].map(|(p,t)|(s(p),s(t))), [("t1","a"),("t1","b"),("t2","o"),("t3","o")].map(|(t,p)|(s(t),s(p))), "i", "o").unwrap();
     let observed = convert(&net).map(|_| ());
     assert!(
         matches!(observed, Err(bcinr_powl::wf_to_powl::Refusal { reason: bcinr_powl::wf_to_powl::RefusalReason::NotSound { .. }, .. })),
@@ -315,3 +218,4 @@ fn falsifier_refusalreason_notsound() {
         observed
     );
 }
+

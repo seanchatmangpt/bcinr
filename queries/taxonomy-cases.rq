@@ -5,10 +5,21 @@ PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#>
 # Every case of every closed taxonomy, denormalised with its taxonomy so a
 # single flat result set can drive one generic template.
 #
-# `is_first` / `is_last` let the template open and close each enum without
-# needing scope escape (Tera has no mutable accumulators). They are computed
-# here, not in the template, because they are decisions.
-SELECT ?taxonomy ?taxonomy_doc ?case_name ?case_order ?case_doc ?coverage_gap ?case_gap ?is_first ?is_last
+# Optional facts are emitted as COMPLETE rendered fragments, empty when absent,
+# never as a bare value the template has to test. A template that asks "is this
+# non-empty?" is deciding, and a decision in a template is unreviewable: it does
+# not appear in the graph, no gate can reach it, and it silently changes what is
+# emitted. Binding the whole block here keeps the template a substitution, which
+# is what makes template correctness reduce to query correctness.
+#
+# `is_first` / `is_last` remain, and they are the one impurity left here: they
+# exist only because a flat result set is being asked to drive a nested
+# structure, so the template must still ask "is this row a boundary?". The fix
+# is to change the SHAPE this query returns, not to dress up the flags -- until
+# then they stay, because removing them without changing the shape emits a file
+# with no enums in it at all.
+SELECT ?taxonomy ?taxonomy_doc ?case_name ?case_order ?case_doc
+       ?coverage_gap_block ?case_gap_block ?is_first ?is_last
 WHERE {
 
     ?tax a bc:ClosedTaxonomy ;
@@ -30,6 +41,16 @@ WHERE {
     OPTIONAL { ?case bc:referenceCoverageGap ?declared_case_gap . }
     BIND(COALESCE(?declared_gap,      "") AS ?coverage_gap)
     BIND(COALESCE(?declared_case_gap, "") AS ?case_gap)
+
+    # The doc block, not the raw text: absent gap yields the empty string, so the
+    # template emits it unconditionally either way.
+    BIND(IF(?coverage_gap = "", "",
+            CONCAT("///\n/// # Known coverage gap\n///\n/// ", ?coverage_gap, "\n"))
+         AS ?coverage_gap_block)
+
+    BIND(IF(?case_gap = "", "",
+            CONCAT("    ///\n    /// Known coverage gap: ", ?case_gap, "\n"))
+         AS ?case_gap_block)
 
     BIND(NOT EXISTS {
         ?e bc:inTaxonomy ?tax ; bc:caseOrder ?eo . FILTER(?eo < ?case_order)

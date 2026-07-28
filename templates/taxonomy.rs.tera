@@ -11,43 +11,37 @@
 {% for c in results %}
 {%- if c.is_first %}
 /// {{ c.taxonomy_doc }}
-{% if c.coverage_gap %}///
-/// # Known coverage gap
-///
-/// {{ c.coverage_gap }}
-{% endif %}#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+{{ c.coverage_gap_block }}#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum {{ c.taxonomy }} {
 {%- endif %}
     /// {{ c.case_doc }}
-{% if c.case_gap %}    ///
-    /// Known coverage gap: {{ c.case_gap }}
-{% endif %}    {{ c.case_name }},
+{{ c.case_gap_block }}    {{ c.case_name }},
 {%- if c.is_last %}
 }
 
 impl {{ c.taxonomy }} {
     /// Every case, in declared order.
     pub const ALL: &'static [Self] = &[
-{%- for m in results %}{% if m.taxonomy == c.taxonomy %}
+{%- for m in results | filter(attribute="taxonomy", value=c.taxonomy) %}
         Self::{{ m.case_name }},
-{%- endif %}{% endfor %}
+{%- endfor %}
     ];
 
     /// The case's name as written in the graph.
     pub fn name(&self) -> &'static str {
         match self {
-{%- for m in results %}{% if m.taxonomy == c.taxonomy %}
+{%- for m in results | filter(attribute="taxonomy", value=c.taxonomy) %}
             Self::{{ m.case_name }} => "{{ m.case_name }}",
-{%- endif %}{% endfor %}
+{%- endfor %}
         }
     }
 
     /// The case's documented meaning, from the graph.
     pub fn doc(&self) -> &'static str {
         match self {
-{%- for m in results %}{% if m.taxonomy == c.taxonomy %}
+{%- for m in results | filter(attribute="taxonomy", value=c.taxonomy) %}
             Self::{{ m.case_name }} => "{{ m.case_doc }}",
-{%- endif %}{% endfor %}
+{%- endfor %}
         }
     }
 }

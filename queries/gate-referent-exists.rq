@@ -1,0 +1,22 @@
+# MESSAGE: [BC-GATE-001] a citation points at a result this graph does not declare.
+#
+# Law is grounded by agreeing with an authority outside itself, never by assertion.
+# `bc:definedBy` is that appeal: it names the numbered result a taxonomy or case is
+# claiming to implement. An appeal to a referent that does not exist is not a weaker
+# claim than a wrong one -- it is unfalsifiable, and it shipped once already, as a
+# refusal citing a "Theorem 1" that no source on disk contains.
+#
+# SHACL cannot close this. `ontology/shapes.ttl` is applied per-file (see
+# `Makefile.toml:40-42`), and a `sh:class` target in a different file is invisible to
+# it -- citations live wherever the citing case lives, while every `bc:NumberedResult`
+# is declared in `ontology/bcinr.ttl`. A gate runs against the post-materialization
+# union that `ggen.toml`'s `source` + `imports` already declare, so the cross-file
+# check is available here and nowhere else.
+#
+# Any returned row is a violation and refuses the sync before a file is written.
+PREFIX bc: <https://bcinr.dev/ontology#>
+
+SELECT ?subject ?missing_referent WHERE {
+    ?subject bc:definedBy ?missing_referent .
+    FILTER NOT EXISTS { ?missing_referent a bc:NumberedResult }
+}

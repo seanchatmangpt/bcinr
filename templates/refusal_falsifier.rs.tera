@@ -14,9 +14,18 @@
 // `ontology/shapes.ttl` refuses to admit a refusal case that carries neither a
 // witness nor a written argument for why none exists, so absence from this
 // file is always accompanied by a recorded reason rather than by silence.
+//
+// `#[allow(unused_imports)]` below is load-bearing, not sloppiness.
+// `bc:rustFalsifierPrelude` is declared once per *taxonomy* and replayed into
+// every case of it, so a case that needs only part of the shared prelude is the
+// expected shape rather than a defect. Making the prelude per-case instead
+// would trade one honest allow for N near-duplicate graph facts that drift
+// against each other -- the same duplication this whole projection exists to
+// remove. Under `-D warnings` the allow is what keeps that choice compilable.
 {% for c in results %}
 /// `{{ c.taxonomy_label }}::{{ c.case_name }}` -- {{ c.case_doc }}
 #[test]
+#[allow(unused_imports)]
 fn {{ c.fn_name }}() {
     {{ c.prelude }}
     {{ c.setup }}

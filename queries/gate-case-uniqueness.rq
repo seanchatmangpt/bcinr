@@ -1,0 +1,29 @@
+# MESSAGE: [BC-GATE-002] two cases in one taxonomy share a caseOrder or a caseName.
+#
+# `bc:caseOrder` fixes emission order and `bc:caseName` becomes the Rust variant
+# identifier, so a collision inside one taxonomy either silently merges two cases or
+# emits a duplicate variant. The second fails at `rustc`, which is late but loud; the
+# first is a silent wrong answer, because the emitted enum is simply shorter than the
+# graph and nothing compares the two.
+#
+# Scoped per taxonomy deliberately. Distinct taxonomies routinely reuse an order and
+# occasionally a name -- `bc:PddlEffect` and `bc:RefusalReason` both have a case at
+# order 1 -- and that is not an error.
+#
+# `STR(?a) < STR(?b)` reports each colliding pair once rather than twice.
+PREFIX bc: <https://bcinr.dev/ontology#>
+
+SELECT ?taxonomy ?a ?b ?collision WHERE {
+    ?a bc:inTaxonomy ?taxonomy .
+    ?b bc:inTaxonomy ?taxonomy .
+    FILTER(STR(?a) < STR(?b))
+    {
+        ?a bc:caseOrder ?collision .
+        ?b bc:caseOrder ?collision .
+    }
+    UNION
+    {
+        ?a bc:caseName ?collision .
+        ?b bc:caseName ?collision .
+    }
+}

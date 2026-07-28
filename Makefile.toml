@@ -41,6 +41,14 @@ description = "Admission gate for the semantic graph: SHACL-validate every ontol
 # Files are validated one at a time (the tool's own semantics), so a shape
 # whose sh:class target lives in a *different* file cannot be checked. Keep
 # each taxonomy's ClosedTaxonomy declaration in the same file as its cases.
+#
+# That limit is SHACL's here, not the graph's. Constraints that must reach
+# across files live in `[validation].gates` (see `ggen.toml`), which ggen
+# evaluates against the post-materialization union of `source` + `imports`
+# before it writes anything -- `queries/gate-referent-exists.rq` checks every
+# `bc:definedBy` against the `bc:NumberedResult` declarations in `bcinr.ttl`,
+# which no per-file shape can see. Two admission layers, different reach:
+# shapes for intra-file structure, gates for anything relational.
 workspace = false
 command = "ggen"
 args = [
