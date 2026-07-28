@@ -32,5 +32,8 @@ pub fn classify_refusalreason(value: &bcinr_powl::wf_to_powl::RefusalReason) -> 
         bcinr_powl::wf_to_powl::RefusalReason::InternalNetConstruction(..) => super::taxonomy::RefusalReason::InternalNetConstruction,
         bcinr_powl::wf_to_powl::RefusalReason::VacuousLanguageBound => super::taxonomy::RefusalReason::VacuousLanguageBound,
         bcinr_powl::wf_to_powl::RefusalReason::NotRecomposable(..) => super::taxonomy::RefusalReason::NotRecomposable,
+        bcinr_powl::wf_to_powl::RefusalReason::NotSafe { .. } => super::taxonomy::RefusalReason::NotSafe,
+        bcinr_powl::wf_to_powl::RefusalReason::NotSound { .. } => super::taxonomy::RefusalReason::NotSound,
+        bcinr_powl::wf_to_powl::RefusalReason::SoundnessUndecided { .. } => super::taxonomy::RefusalReason::SoundnessUndecided,
     }
 }

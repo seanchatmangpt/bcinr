@@ -252,6 +252,12 @@ pub enum RefusalReason {
     VacuousLanguageBound,
     /// The model has no language-preserving WF-net image -- e.g. a bounded DoRedo, which an unbounded net cycle would widen.
     NotRecomposable,
+    /// Some reachable marking carries more than one token in a place. Lemmas 5.1-5.4 assume a safe net, so Algorithm 3 would return a model with no proof attached.
+    NotSafe,
+    /// At least one of van der Aalst's three clauses fails: option-to-complete, proper completion, no dead transitions.
+    NotSound,
+    /// The reachability graph exceeded MAX_REACHABLE_MARKINGS before the token game terminated. Undecided, not decided favourably.
+    SoundnessUndecided,
 }
 
 impl RefusalReason {
@@ -263,6 +269,9 @@ impl RefusalReason {
         Self::InternalNetConstruction,
         Self::VacuousLanguageBound,
         Self::NotRecomposable,
+        Self::NotSafe,
+        Self::NotSound,
+        Self::SoundnessUndecided,
     ];
 
     /// The case's name as written in the graph.
@@ -274,6 +283,9 @@ impl RefusalReason {
             Self::InternalNetConstruction => "InternalNetConstruction",
             Self::VacuousLanguageBound => "VacuousLanguageBound",
             Self::NotRecomposable => "NotRecomposable",
+            Self::NotSafe => "NotSafe",
+            Self::NotSound => "NotSound",
+            Self::SoundnessUndecided => "SoundnessUndecided",
         }
     }
 
@@ -286,6 +298,9 @@ impl RefusalReason {
             Self::InternalNetConstruction => "A projection produced a sub-net failing WfNet::new -- algorithm-internal, surfaced as a refusal rather than a panic.",
             Self::VacuousLanguageBound => "A bound of 0 compares two empty sets. Both enumerators return the empty language there, so they agree vacuously -- independence of implementation does not imply independence of failure mode.",
             Self::NotRecomposable => "The model has no language-preserving WF-net image -- e.g. a bounded DoRedo, which an unbounded net cycle would widen.",
+            Self::NotSafe => "Some reachable marking carries more than one token in a place. Lemmas 5.1-5.4 assume a safe net, so Algorithm 3 would return a model with no proof attached.",
+            Self::NotSound => "At least one of van der Aalst's three clauses fails: option-to-complete, proper completion, no dead transitions.",
+            Self::SoundnessUndecided => "The reachability graph exceeded MAX_REACHABLE_MARKINGS before the token game terminated. Undecided, not decided favourably.",
         }
     }
 }

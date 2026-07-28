@@ -1,7 +1,9 @@
 [project]
+# `name` and `version` are both required: the manifest loader uses the presence
+# of `version` to disambiguate the declarative-rules schema (this one) from the
+# frontmatter schema. `description` is not a field of either.
 name = "bcinr"
 version = "26.7.28"
-description = "bcinr admitted semantic graph -> Rust projections. One admitted fact per semantic object; every structural representation is manufactured."
 
 [ontology]
 # The admitted graph is a union of committed sources. `imports` is a first-class

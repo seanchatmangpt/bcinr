@@ -275,6 +275,21 @@ bc:Ref_VacuousLanguageBound a bc:TaxonCase ; bc:inTaxonomy bc:RefusalReason ; bc
     bc:caseDoc "A bound of 0 compares two empty sets. Both enumerators return the empty language there, so they agree vacuously -- independence of implementation does not imply independence of failure mode." ;
     bc:falsifier "convert_and_verify(net, 64, 0)" .
 
+bc:Ref_NotSafe a bc:TaxonCase ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 6 ;
+    bc:caseName "NotSafe" ; bc:caseShape "struct" ;
+    bc:caseDoc "Some reachable marking carries more than one token in a place. Lemmas 5.1-5.4 assume a safe net, so Algorithm 3 would return a model with no proof attached." ;
+    bc:falsifier "two transitions depositing into one place: check_soundness reports unsafe_witness [0,0,2,0,0]" .
+
+bc:Ref_NotSound a bc:TaxonCase ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 7 ;
+    bc:caseName "NotSound" ; bc:caseShape "struct" ;
+    bc:caseDoc "At least one of van der Aalst's three clauses fails: option-to-complete, proper completion, no dead transitions." ;
+    bc:falsifier "a net with a transition enabled in no reachable marking" .
+
+bc:Ref_SoundnessUndecided a bc:TaxonCase ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 8 ;
+    bc:caseName "SoundnessUndecided" ; bc:caseShape "struct" ;
+    bc:caseDoc "The reachability graph exceeded MAX_REACHABLE_MARKINGS before the token game terminated. Undecided, not decided favourably." ;
+    bc:falsifier "a net whose reachable marking count exceeds MAX_REACHABLE_MARKINGS" .
+
 bc:Ref_NotRecomposable a bc:TaxonCase ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 5 ;
     bc:caseName "NotRecomposable" ; bc:caseShape "tuple" ;
     bc:caseDoc "The model has no language-preserving WF-net image -- e.g. a bounded DoRedo, which an unbounded net cycle would widen." ;
