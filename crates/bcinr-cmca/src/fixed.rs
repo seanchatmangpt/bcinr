@@ -234,6 +234,7 @@ impl NonNegativeFixed {
         bit!(2);
         bit!(1);
         bit!(0);
+        let _ = normalized;
 
         let computed = integer.wrapping_shl(16).wrapping_add(fraction as i32);
         let local = zero.select_u32(StabilityRefusal::UnsupportedDomain as u32, OK);
