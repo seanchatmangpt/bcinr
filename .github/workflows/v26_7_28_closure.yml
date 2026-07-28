@@ -34,9 +34,9 @@ jobs:
           cargo install \
             --git https://github.com/seanchatmangpt/ggen \
             --rev ed625aeecce7c412db4a022e67cda5bdc6068083 \
-            --package ggen-cli-lib \
             --bin ggen \
-            --locked 2>&1 | tee verification-artifacts/ggen-install.log
+            --locked \
+            ggen-cli-lib 2>&1 | tee verification-artifacts/ggen-install.log
       - name: Record exact environment
         run: |
           git rev-parse HEAD | tee verification-artifacts/source-revision.txt
