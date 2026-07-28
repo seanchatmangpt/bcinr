@@ -13,6 +13,37 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 /// state space is not evidence of soundness.
 pub const MAX_REACHABLE_MARKINGS: usize = 200_000;
 
+/// A node of the net's underlying bipartite graph.
+///
+/// Places and transitions live in separate namespaces, so a traversal needs to
+/// carry which one it is holding. This was previously done by prefixing the
+/// name with `"p:"` or `"t:"` and parsing it back with `strip_prefix` -- which
+/// made node kind a property of a string that any caller could get wrong, gave
+/// the parse a third outcome (neither prefix) whose handler silently returned
+/// no successors, and would confuse a place literally named `t:foo` with a
+/// transition. The enum has exactly two cases and no parse.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Node {
+    /// A place of `P`.
+    Place(String),
+    /// A transition of `T`.
+    Transition(String),
+}
+
+/// A borrowed place name.
+///
+/// Places and transitions are both named by `String`, so every signature taking
+/// one of each -- `fwd_restricted(place, stop_transition)` and its backward
+/// twin -- accepted the arguments in either order and returned a wrong answer
+/// silently when they were swapped. These two newtypes cost nothing at runtime
+/// and make that call unrepresentable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PlaceRef<'a>(pub &'a str);
+
+/// A borrowed transition name. See [`PlaceRef`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct TransRef<'a>(pub &'a str);
+
 /// A transition label: `Some(activity)` or the silent activity `tau` (`None`).
 pub type Label = Option<String>;
 
@@ -127,7 +158,7 @@ impl WfNet {
         let fwd = self.nodes_reachable_from_source();
         let bwd = self.nodes_reaching_sink();
         for p in &self.places {
-            let node = format!("p:{p}");
+            let node = Node::Place(p.clone());
             if !fwd.contains(&node) || !bwd.contains(&node) {
                 return Err(NetError::NotWfNet(format!(
                     "place {p} not on a source->sink path"
@@ -135,7 +166,7 @@ impl WfNet {
             }
         }
         for t in self.transitions.keys() {
-            let node = format!("t:{t}");
+            let node = Node::Transition(t.clone());
             if !fwd.contains(&node) || !bwd.contains(&node) {
                 return Err(NetError::NotWfNet(format!(
                     "transition {t} not on a source->sink path"
@@ -252,7 +283,11 @@ impl WfNet {
     /// Forward restricted reachability (Def 4.5): transitions reachable from
     /// place `p` on a path that never fires `tstop`.
     #[must_use]
-    pub fn fwd_restricted(&self, p: &str, tstop: &str) -> BTreeSet<String> {
+    pub fn fwd_restricted(
+        &self,
+        PlaceRef(p): PlaceRef<'_>,
+        TransRef(tstop): TransRef<'_>,
+    ) -> BTreeSet<String> {
         let mut result = BTreeSet::new();
         let mut seen_p = BTreeSet::new();
         let mut stack = vec![p.to_string()];
@@ -278,7 +313,11 @@ impl WfNet {
     /// Backward restricted reachability (Def 4.6): transitions from which `p`
     /// is reachable on a path that never fires `tstop`.
     #[must_use]
-    pub fn bwd_restricted(&self, p: &str, tstop: &str) -> BTreeSet<String> {
+    pub fn bwd_restricted(
+        &self,
+        PlaceRef(p): PlaceRef<'_>,
+        TransRef(tstop): TransRef<'_>,
+    ) -> BTreeSet<String> {
         let mut result = BTreeSet::new();
         let mut seen_p = BTreeSet::new();
         let mut stack = vec![p.to_string()];
@@ -333,7 +372,12 @@ impl WfNet {
 
     /// Place equivalence w.r.t. part `T'`: same pre-/post-transitions inside `T'`.
     #[must_use]
-    pub fn equiv_wrt(&self, p: &str, q: &str, part: &BTreeSet<String>) -> bool {
+    pub fn equiv_wrt(
+        &self,
+        PlaceRef(p): PlaceRef<'_>,
+        PlaceRef(q): PlaceRef<'_>,
+        part: &BTreeSet<String>,
+    ) -> bool {
         let restrict = |s: BTreeSet<String>| -> BTreeSet<String> {
             s.into_iter().filter(|t| part.contains(t)).collect()
         };
@@ -341,14 +385,24 @@ impl WfNet {
             && restrict(self.post_place(p)) == restrict(self.post_place(q))
     }
 
-    fn nodes_reachable_from_source(&self) -> BTreeSet<String> {
+    fn nodes_reachable_from_source(&self) -> BTreeSet<Node> {
+        self.traverse(Node::Place(self.source.clone()), Self::successors)
+    }
+
+    fn nodes_reaching_sink(&self) -> BTreeSet<Node> {
+        self.traverse(Node::Place(self.sink.clone()), Self::predecessors)
+    }
+
+    /// Breadth-first closure of `step` from `start`. Forward and backward
+    /// reachability differ only in which neighbour function is used, so they
+    /// share this.
+    fn traverse(&self, start: Node, step: fn(&Self, &Node) -> Vec<Node>) -> BTreeSet<Node> {
         let mut seen = BTreeSet::new();
         let mut queue = VecDeque::new();
-        let start = format!("p:{}", self.source);
-        queue.push_back(start.clone());
-        seen.insert(start);
+        seen.insert(start.clone());
+        queue.push_back(start);
         while let Some(node) = queue.pop_front() {
-            for n in self.tagged_successors(&node) {
+            for n in step(self, &node) {
                 if seen.insert(n.clone()) {
                     queue.push_back(n);
                 }
@@ -357,51 +411,25 @@ impl WfNet {
         seen
     }
 
-    fn nodes_reaching_sink(&self) -> BTreeSet<String> {
-        let mut seen = BTreeSet::new();
-        let mut queue = VecDeque::new();
-        let start = format!("p:{}", self.sink);
-        queue.push_back(start.clone());
-        seen.insert(start);
-        while let Some(node) = queue.pop_front() {
-            for n in self.tagged_predecessors(&node) {
-                if seen.insert(n.clone()) {
-                    queue.push_back(n);
-                }
-            }
-        }
-        seen
-    }
-
-    fn tagged_successors(&self, node: &str) -> Vec<String> {
-        if let Some(p) = node.strip_prefix("p:") {
-            self.post_place(p)
+    fn successors(&self, node: &Node) -> Vec<Node> {
+        match node {
+            Node::Place(p) => self
+                .post_place(p)
                 .into_iter()
-                .map(|t| format!("t:{t}"))
-                .collect()
-        } else if let Some(t) = node.strip_prefix("t:") {
-            self.post_trans(t)
-                .into_iter()
-                .map(|p| format!("p:{p}"))
-                .collect()
-        } else {
-            Vec::new()
+                .map(Node::Transition)
+                .collect(),
+            Node::Transition(t) => self.post_trans(t).into_iter().map(Node::Place).collect(),
         }
     }
 
-    fn tagged_predecessors(&self, node: &str) -> Vec<String> {
-        if let Some(p) = node.strip_prefix("p:") {
-            self.pre_place(p)
+    fn predecessors(&self, node: &Node) -> Vec<Node> {
+        match node {
+            Node::Place(p) => self
+                .pre_place(p)
                 .into_iter()
-                .map(|t| format!("t:{t}"))
-                .collect()
-        } else if let Some(t) = node.strip_prefix("t:") {
-            self.pre_trans(t)
-                .into_iter()
-                .map(|p| format!("p:{p}"))
-                .collect()
-        } else {
-            Vec::new()
+                .map(Node::Transition)
+                .collect(),
+            Node::Transition(t) => self.pre_trans(t).into_iter().map(Node::Place).collect(),
         }
     }
 

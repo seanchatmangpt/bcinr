@@ -12,7 +12,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::language::{powl2_language, wf_net_language};
 use crate::powl2::Powl2Model;
-use crate::wf_net::{Label, NetError, WfNet};
+use crate::wf_net::{Label, NetError, PlaceRef, TransRef, WfNet};
 
 /// Machine-readable reason a WF-net (or sub-net) was refused as non-separable.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -447,7 +447,7 @@ fn is_conflict_hiding(net: &WfNet, parts: &[BTreeSet<String>]) -> bool {
         let entry: Vec<String> = net.entry_places(part).into_iter().collect();
         for i in 0..entry.len() {
             for j in (i + 1)..entry.len() {
-                if !net.equiv_wrt(&entry[i], &entry[j], part) {
+                if !net.equiv_wrt(PlaceRef(&entry[i]), PlaceRef(&entry[j]), part) {
                     return false;
                 }
             }
@@ -455,7 +455,7 @@ fn is_conflict_hiding(net: &WfNet, parts: &[BTreeSet<String>]) -> bool {
         let exit: Vec<String> = net.exit_places(part).into_iter().collect();
         for i in 0..exit.len() {
             for j in (i + 1)..exit.len() {
-                if !net.equiv_wrt(&exit[i], &exit[j], part) {
+                if !net.equiv_wrt(PlaceRef(&exit[i]), PlaceRef(&exit[j]), part) {
                     return false;
                 }
             }
@@ -522,7 +522,7 @@ fn partition_sm(net: &WfNet) -> Vec<BTreeSet<String>> {
         }
         let reach: BTreeMap<String, BTreeSet<String>> = outs
             .iter()
-            .map(|p| (p.clone(), net.fwd_restricted(p, tsplit)))
+            .map(|p| (p.clone(), net.fwd_restricted(PlaceRef(p), TransRef(tsplit))))
             .collect();
         let mut threads = BTreeSet::new();
         for t in net.transitions().keys() {
@@ -549,7 +549,7 @@ fn partition_sm(net: &WfNet) -> Vec<BTreeSet<String>> {
         }
         let reach: BTreeMap<String, BTreeSet<String>> = ins
             .iter()
-            .map(|p| (p.clone(), net.bwd_restricted(p, tjoin)))
+            .map(|p| (p.clone(), net.bwd_restricted(PlaceRef(p), TransRef(tjoin))))
             .collect();
         let mut threads = BTreeSet::new();
         for t in net.transitions().keys() {

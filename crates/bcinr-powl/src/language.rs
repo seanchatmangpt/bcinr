@@ -8,10 +8,10 @@
 //! exhaustive WF-net token-game replay. Their agreement on a converted model
 //! is the genuine differential check for Algorithm 3's correctness.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::powl2::Powl2Model;
-use crate::wf_net::WfNet;
+use crate::wf_net::{Marking, WfNet};
 
 /// A bounded language: all label sequences of length <= `max_len`.
 pub type Language = BTreeSet<Vec<String>>;
@@ -374,33 +374,50 @@ fn do_redo_language(
 /// It is *bounded* agreement, not the paper's Theorem 5.5 -- there is no
 /// "Theorem 1" in Kourani/Park/van der Aalst.
 ///
-/// # Only valid on 1-safe nets
+/// Markings are [`Marking`] -- a token count per place -- not sets of place
+/// names. A set-valued marking cannot hold two tokens in one place, so firing
+/// a transition *removed* a place rather than decrementing its count, and on a
+/// net that is not 1-safe the enumerated language came out **wrong** rather
+/// than merely incomplete: it admitted firing sequences the net cannot perform
+/// and missed ones it can. Since this enumeration is one half of the
+/// independent-oracle check in `convert_and_verify`, a wrong language there
+/// weakens the very comparison it exists to provide.
 ///
-/// Markings here are sets of place names, so a marking cannot hold two tokens
-/// in one place: firing a transition *removes* a place rather than
-/// decrementing its count. On a net that is not 1-safe the enumerated language
-/// is therefore **wrong**, not merely incomplete -- it admits firing sequences
-/// the net cannot perform and misses ones it can.
-///
-/// This is unreachable through the conversion path: `convert_with_budget`
-/// decides [`WfNet::check_soundness`] first and refuses anything that is not
-/// safe (`RefusalReason::NotSafe`), so `convert_and_verify` only ever calls
-/// this on a net whose markings really are sets. Callers invoking it directly
-/// on an arbitrary net must check safeness themselves.
+/// The conversion path refuses unsafe nets before reaching here, so the defect
+/// was latent rather than live -- but the enumerator is public and correctness
+/// should not depend on the caller having run the gate.
 #[must_use]
 pub fn wf_net_language(net: &WfNet, max_len: usize) -> Language {
     let mut out = Language::new();
-    let start: BTreeSet<String> = [net.source().to_string()].into_iter().collect();
-    let sink_marking: BTreeSet<String> = [net.sink().to_string()].into_iter().collect();
+    let places: Vec<&String> = net.places().iter().collect();
+    let index: BTreeMap<&str, usize> = places
+        .iter()
+        .enumerate()
+        .map(|(i, p)| (p.as_str(), i))
+        .collect();
+    let mut start: Marking = vec![0; places.len()];
+    start[index[net.source()]] = 1;
+    let mut sink_marking: Marking = vec![0; places.len()];
+    sink_marking[index[net.sink()]] = 1;
     let mut trace = Vec::new();
-    explore(net, &start, &sink_marking, &mut trace, 0, max_len, &mut out);
+    explore(
+        net,
+        &index,
+        &start,
+        &sink_marking,
+        &mut trace,
+        0,
+        max_len,
+        &mut out,
+    );
     out
 }
 
 fn explore(
     net: &WfNet,
-    marking: &BTreeSet<String>,
-    sink_marking: &BTreeSet<String>,
+    index: &BTreeMap<&str, usize>,
+    marking: &Marking,
+    sink_marking: &Marking,
     trace: &mut Vec<String>,
     fired: usize,
     max_len: usize,
@@ -415,11 +432,16 @@ fn explore(
     }
     for t in net.transitions().keys() {
         let pre = net.pre_trans(t);
-        if !pre.is_subset(marking) {
+        if !pre.iter().all(|p| marking[index[p.as_str()]] >= 1) {
             continue;
         }
-        let mut next: BTreeSet<String> = marking.difference(&pre).cloned().collect();
-        next.extend(net.post_trans(t));
+        let mut next = marking.clone();
+        for p in &pre {
+            next[index[p.as_str()]] -= 1;
+        }
+        for p in net.post_trans(t) {
+            next[index[p.as_str()]] += 1;
+        }
         let label = net.label(t);
         let pushed = label.is_some();
         if let Some(a) = label {
@@ -428,7 +450,16 @@ fn explore(
             }
             trace.push(a);
         }
-        explore(net, &next, sink_marking, trace, fired + 1, max_len, out);
+        explore(
+            net,
+            index,
+            &next,
+            sink_marking,
+            trace,
+            fired + 1,
+            max_len,
+            out,
+        );
         if pushed {
             trace.pop();
         }
