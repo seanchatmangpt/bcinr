@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
-"""Reject a ggen promotion claim unless every equivalence dimension is observed."""
+"""Classify a fresh ggen manufacturing receipt without granting release standing.
+
+`ggen sync` runs before compilation, tests, and evidence verification. Unknown
+post-manufacture dimensions are therefore expected at this stage. This wrapper
+admits the manufacturing act only when every generated output was observed and
+config standing is equivalent. It explicitly overrides any premature producer
+claim that the artifact is promotion-eligible; the later closure rails alone can
+upgrade the complete repository to release standing.
+"""
+
 import json
 import sys
 from pathlib import Path
-
-GOOD = {"Equivalent", "Verified", "Pass", "Green"}
-REQUIRED = ("source", "compiled_binary", "docs", "tests", "receipts", "evidence", "gates", "config")
 
 
 def state(value):
@@ -19,26 +25,52 @@ def state(value):
 def main() -> int:
     path = Path(sys.argv[1] if len(sys.argv) > 1 else ".ggen-v2/receipt.json")
     try:
-        record = json.loads(path.read_text())["record"]
+        record = json.loads(path.read_text(encoding="utf-8"))["record"]
         v2 = record["v2"]
         equivalence = v2["equivalence"]
+        admissions = v2["admission"]["Recorded"]
     except (OSError, KeyError, TypeError, json.JSONDecodeError) as error:
-        print(f"GGEN_RECEIPT_REFUSED: {error}")
+        print(f"GGEN_MANUFACTURE_REFUSED: {error}")
         return 1
 
-    failures = [f"{key}={state(equivalence.get(key))}" for key in REQUIRED if state(equivalence.get(key)) not in GOOD]
+    failures = []
     if record.get("andon") != "Green":
         failures.append(f"andon={record.get('andon')}")
-    if v2.get("standing_ceiling") != "Green":
-        failures.append(f"standing_ceiling={v2.get('standing_ceiling')}")
-    if not v2.get("promotion_eligible"):
-        failures.append("promotion_eligible=false")
+    if not admissions:
+        failures.append("no generated output admissions")
+    for admission in admissions:
+        if admission.get("decision") != "Admitted" or admission.get("observed_outcome") != "Pass":
+            failures.append(
+                f"{admission.get('evidence_id', '<unknown>')}: "
+                f"decision={admission.get('decision')} "
+                f"outcome={admission.get('observed_outcome')}"
+            )
+
+    config_state = state(equivalence.get("config"))
+    if config_state != "Equivalent":
+        failures.append(f"config={config_state}")
+    source_state = state(equivalence.get("source"))
+    if source_state in {"Unknown", "Malformed"}:
+        failures.append(f"source={source_state}")
+
     if failures:
-        print("GGEN_RECEIPT_REFUSED")
+        print("GGEN_MANUFACTURE_REFUSED")
         for failure in failures:
             print(f"- {failure}")
         return 1
-    print("GGEN_RECEIPT_ADMITTED")
+
+    unresolved = {
+        key: state(equivalence.get(key))
+        for key in ("compiled_binary", "docs", "tests", "receipts", "evidence", "gates")
+        if state(equivalence.get(key)) not in {"Equivalent", "Verified", "Pass", "Green"}
+    }
+    if v2.get("promotion_eligible") and unresolved:
+        print("GGEN_PREMATURE_PROMOTION_OVERRIDDEN")
+        for key, value in unresolved.items():
+            print(f"- {key}={value}")
+
+    print("GGEN_MANUFACTURE_ADMITTED_PARTIAL")
+    print("- release standing remains unavailable until the closure ladder completes")
     return 0
 
 
