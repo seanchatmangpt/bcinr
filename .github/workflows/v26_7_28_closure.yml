@@ -28,6 +28,8 @@ jobs:
         run: mkdir -p verification-artifacts
       - name: Build exact ggen CLI source
         shell: bash
+        env:
+          RUSTFLAGS: ""
         run: |
           set -o pipefail
           cargo install \
