@@ -20,24 +20,33 @@ jobs:
           components: rustfmt, clippy
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
+      - name: Prepare evidence directory
+        run: mkdir -p verification-artifacts
       - name: Install cargo-make
-        run: cargo install cargo-make --locked
-      - name: Build exact ggen CLI source
+        shell: bash
         run: |
+          set -o pipefail
+          cargo install cargo-make --locked 2>&1 | tee verification-artifacts/cargo-make-install.log
+      - name: Build exact ggen CLI source
+        shell: bash
+        run: |
+          set -o pipefail
           cargo install \
             --git https://github.com/seanchatmangpt/ggen \
             --rev ed625aeecce7c412db4a022e67cda5bdc6068083 \
             --package ggen-cli-lib \
             --bin ggen \
-            --locked
+            --locked 2>&1 | tee verification-artifacts/ggen-install.log
       - name: Record exact environment
         run: |
-          mkdir -p verification-artifacts
           git rev-parse HEAD | tee verification-artifacts/source-revision.txt
           rustc -Vv | tee verification-artifacts/rust-toolchain.txt
           ggen --version | tee verification-artifacts/ggen-version.txt
       - name: Execute closure ladder
-        run: cargo make closure 2>&1 | tee verification-artifacts/closure.log
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo make closure 2>&1 | tee verification-artifacts/closure.log
       - name: Upload exact-run evidence
         if: always()
         uses: actions/upload-artifact@v4
