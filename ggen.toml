@@ -84,3 +84,10 @@ query = { file = "queries/refusal-ledger.rq" }
 template = { file = "templates/refusal_ledger.md.tera" }
 output_file = "docs/contracts/REFUSAL_LEDGER.md"
 mode = "Overwrite"
+
+[[generation.rules]]
+name = "fetch_oracles"
+query = { file = "queries/reference-implementations.rq" }
+template = { file = "templates/fetch_oracles.sh.tera" }
+output_file = "oracles/fetch.sh"
+mode = "Overwrite"

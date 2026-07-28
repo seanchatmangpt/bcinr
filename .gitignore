@@ -9,3 +9,6 @@ thesis.toc
 .venv/
 .agents/
 .DS_Store
+
+# Oracle sources: fetched on demand, licence-incompatible with this tree.
+oracles/vendor/

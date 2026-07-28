@@ -14,7 +14,7 @@ PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#>
 # Every column is BOUND here rather than decided in the template: a template
 # that branches on data is making a decision, and decisions belong in the query.
 SELECT ?taxonomy_label ?taxonomy_doc ?rust_path ?case_name ?case_order
-       ?case_doc ?witness_status ?witness_detail ?is_first ?is_last
+       ?case_doc ?witness_status ?witness_detail ?divergence ?is_first ?is_last
 WHERE {
     ?case a bc:TaxonCase ;
           bc:inTaxonomy ?taxonomy ;
@@ -31,6 +31,10 @@ WHERE {
     OPTIONAL { ?case bc:falsifierUnwitnessedReason ?unwitnessed . }
     OPTIONAL { ?case bc:rustFalsifierSetup        ?setup . }
     OPTIONAL { ?case bc:falsifier                  ?prose . }
+    # A refusal an independent implementation does not make is a capability
+    # gap, and must not be presented as a property of the input.
+    OPTIONAL { ?case bc:referenceDivergence       ?declared_divergence . }
+    BIND(COALESCE(?declared_divergence, "") AS ?divergence)
 
     # Exactly two states, and shapes.ttl admits nothing else: a case carries a
     # witness that runs, or a written argument for why none exists.

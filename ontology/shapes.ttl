@@ -255,3 +255,68 @@ bc:ProfileConstantShape a sh:NodeShape ;
         ) ]
     ) ;
     sh:message "a profile constant must carry either bc:derivationOf (how it follows) or bc:policyMarked + bc:policyOwner + bc:policyRationale (that it does not, who chose it, and why) -- a number with neither is presented as though it followed from the mathematics" .
+
+################################################################################
+# ReferenceImplementation -- the oracle admission conditions.
+################################################################################
+
+bc:ReferenceImplementationShape a sh:NodeShape ;
+    sh:targetClass bc:ReferenceImplementation ;
+
+    sh:property [ sh:path rdfs:label ; sh:minCount 1 ; sh:maxCount 1 ;
+        sh:pattern "^[a-z][a-z0-9-]*$" ;
+        sh:message "an oracle's label becomes a directory name under vendor/ and must be one lowercase token" ] ;
+
+    sh:property [ sh:path bc:referenceUrl ; sh:minCount 1 ; sh:maxCount 1 ;
+        sh:pattern "^https://" ;
+        sh:message "oracle sources are fetched over https from a stated URL" ] ;
+
+    # A moving ref makes a differential result irreproducible: the same command
+    # can agree today and diverge tomorrow with nothing in this repository
+    # having changed. Requiring a 40-hex commit rather than merely "some string"
+    # is the difference between stating the principle and enforcing it -- this
+    # shape initially admitted `master` on the grounds that VAL had no harness
+    # yet, which is precisely the exemption that makes a principle decorative.
+    sh:property [ sh:path bc:referenceCommit ; sh:minCount 1 ; sh:maxCount 1 ;
+        sh:pattern "^[0-9a-f]{40}$" ;
+        sh:message "an oracle must be pinned to a full commit hash, not a branch: a moving ref makes a differential result irreproducible" ] ;
+
+    # Licence must be stated explicitly. The whole reason vendor/ is gitignored
+    # is that at least one oracle is copyleft, and that fact cannot be left to be
+    # rediscovered later by whoever next reaches for the source.
+    sh:property [ sh:path bc:referenceLicence ; sh:minCount 1 ; sh:maxCount 1 ;
+        sh:message "an oracle's licence must be stated: it decides whether its source may be copied, and vendor/ is gitignored precisely because one of them is AGPL" ] ;
+
+    sh:property [ sh:path bc:referenceVendorable ; sh:minCount 1 ; sh:maxCount 1 ;
+        sh:datatype xsd:boolean ;
+        sh:message "state explicitly whether the licence permits copying into this tree; do not leave it to be inferred from the licence string" ] ;
+
+    sh:property [ sh:path bc:referenceCovers ; sh:minCount 1 ; sh:minLength 40 ;
+        sh:message "an oracle must say what it checks AND whether it is actually wired: an unwired oracle listed as covering something is worse than no listing" ] .
+
+################################################################################
+# Evidence provenance.
+#
+# The residual this whole stack does not close: a fact nobody checked. It passes
+# the type system, ggen's cross-representation check, the oracle differential and
+# the test suite alike -- because none of them ever looks at it. Provenance
+# cannot make such a fact true; it can stop it from being indistinguishable from
+# one that was executed.
+################################################################################
+
+bc:EvidenceProvenanceShape a sh:NodeShape ;
+    sh:targetClass bc:TaxonCase ;
+
+    sh:not [ sh:and (
+        [ sh:property [ sh:path bc:referenceCoverageGap ; sh:minCount 1 ] ]
+        [ sh:property [ sh:path bc:coverageGapEvidence  ; sh:maxCount 0 ] ]
+    ) ] ;
+    sh:message "a coverage gap must state how it was established (bc:coverageGapEvidence): read, run, or differential. A gap claimed from reading and a gap confirmed by running are different claims and must not render identically." .
+
+bc:TaxonomyEvidenceShape a sh:NodeShape ;
+    sh:targetClass bc:ClosedTaxonomy ;
+    sh:not [ sh:and (
+        [ sh:property [ sh:path bc:referenceCoverageGap ; sh:minCount 1 ] ]
+        [ sh:property [ sh:path bc:coverageGapEvidence  ; sh:maxCount 0 ] ]
+    ) ] ;
+    sh:message "a taxonomy-level coverage gap must state how it was established (bc:coverageGapEvidence)." .

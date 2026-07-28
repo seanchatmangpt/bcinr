@@ -8,8 +8,9 @@ PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#>
 # `is_first` / `is_last` let the template open and close each enum without
 # needing scope escape (Tera has no mutable accumulators). They are computed
 # here, not in the template, because they are decisions.
-SELECT ?taxonomy ?taxonomy_doc ?case_name ?case_order ?case_doc ?is_first ?is_last
+SELECT ?taxonomy ?taxonomy_doc ?case_name ?case_order ?case_doc ?coverage_gap ?case_gap ?is_first ?is_last
 WHERE {
+
     ?tax a bc:ClosedTaxonomy ;
          rdfs:label     ?taxonomy ;
          bc:taxonomyDoc ?taxonomy_doc .
@@ -19,6 +20,16 @@ WHERE {
           bc:caseName   ?case_name ;
           bc:caseOrder  ?case_order ;
           bc:caseDoc    ?case_doc .
+
+    # A closed taxonomy's completeness is not decidable from inside: nothing in
+    # our own code can tell us a variant is missing. A mature reference
+    # implementation's closed enum IS the specification's variant set,
+    # empirically -- so the gap is a set difference against theirs, and it is
+    # recorded here rather than left as an open worry.
+    OPTIONAL { ?tax  bc:referenceCoverageGap ?declared_gap . }
+    OPTIONAL { ?case bc:referenceCoverageGap ?declared_case_gap . }
+    BIND(COALESCE(?declared_gap,      "") AS ?coverage_gap)
+    BIND(COALESCE(?declared_case_gap, "") AS ?case_gap)
 
     BIND(NOT EXISTS {
         ?e bc:inTaxonomy ?tax ; bc:caseOrder ?eo . FILTER(?eo < ?case_order)

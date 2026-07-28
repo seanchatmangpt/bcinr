@@ -42,7 +42,9 @@ bc:Eff_Numeric a bc:TaxonCase ; bc:inTaxonomy bc:PddlEffect ; bc:caseOrder 2 ;
     bc:representableInStrips false ;
     bc:lossRefusal "UnsupportedEffect" .
 
-bc:Eff_Timed a bc:TaxonCase ; bc:inTaxonomy bc:PddlEffect ; bc:caseOrder 3 ;
+bc:Eff_Timed a bc:TaxonCase ;
+    bc:referenceCoverageGap """VAL's time_spec (ptree.h:136) has five values: E_AT_START, E_AT_END, E_OVER_ALL, E_CONTINUOUS, E_AT. We consume three. E_CONTINUOUS (continuous effects) and E_AT (timed initial literals) are absent. Missing variants are a set difference against their enum.""" ;
+    bc:coverageGapEvidence bc:EvidenceRead ; bc:inTaxonomy bc:PddlEffect ; bc:caseOrder 3 ;
     bc:caseName "Timed" ; bc:caseShape "tuple" ;
     bc:caseDoc "An effect scoped to at-start / at-end / over-all." ;
     bc:representableInStrips false ;
@@ -69,6 +71,8 @@ bc:Eff_When a bc:TaxonCase ; bc:inTaxonomy bc:PddlEffect ; bc:caseOrder 5 ;
 ################################################################################
 
 bc:TrajectoryConstraint a bc:ClosedTaxonomy ;
+    bc:referenceCoverageGap """VAL's constraint_sort (ptree.h:139) enumerates eleven sorts; this taxonomy has nine PDDL sorts plus the structural And. Missing: `at end` (E_ATEND, standard PDDL 3.0) and `after` (E_AFTER, a VAL extension). Missing variants are a set difference against their enum.""" ;
+    bc:coverageGapEvidence bc:EvidenceRead ;
     rdfs:label "TrajectoryConstraint" ;
     bc:taxonomyDoc "PDDL 3.0 trajectory constraint forms. A monitor that cannot decide a form must refuse at admission, never no-op." ;
     bc:rustPath "wasm4pm_compat::pddl::TrajectoryConstraint" .
@@ -264,7 +268,9 @@ bc:Ref_IrreducibleFragment a bc:TaxonCase ;
     bc:rustFalsifierSetup """let net = WfNet::new(["i","a","b","c","d","e","o"].map(s), [("t0",None),("t1",Some(s("A"))),("t2",Some(s("B"))),("t3",Some(s("C"))),("t4",None),("t5",None)].map(|(t,l)|(s(t),l)), [("i","t0"),("a","t1"),("b","t2"),("a","t3"),("b","t3"),("c","t4"),("d","t4"),("e","t5")].map(|(p,t)|(s(p),s(t))), [("t0","a"),("t0","b"),("t1","c"),("t2","d"),("t3","e"),("t4","o"),("t5","o")].map(|(t,p)|(s(t),s(p))), "i", "o").unwrap();""" ;
     bc:rustFalsifierExpr """convert(&net).map(|_| ())""" ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 0 ;
     bc:caseName "IrreducibleFragment" ; bc:caseShape "struct" ;
-    bc:caseDoc "No base case and no valid partition -- Algorithm 3 line 25's FallThrough." ; .
+    bc:caseDoc "Our partitioner found no base case and no valid partition at this level -- Algorithm 3 line 25's FallThrough. It does NOT assert that no POWL structure exists: see bc:referenceDivergence." ;
+    bc:referenceDivergence """The recorded witness is decomposed by the authors' reference implementation (seanchatmangpt/POWL, conversion/to_powl/from_pn), which returns a 2-node ChoiceGraph for it. So this refusal is a capability gap in our partition detection, not a property of the input. Reference `mine_partial_order` starts from the singleton partition and MERGES parts that conflict-hide, and `mine_choice_graph` is a separate detector; our sm/mg partition + progress guards reject cases both of theirs accept.""" ;
+    bc:divergenceEvidence bc:EvidenceDifferential ; .
 
 bc:Ref_BudgetExhausted a bc:TaxonCase ;
     bc:rustFalsifierSetup """let net = WfNet::new(["i","m","o"].map(s), [("t1",Some(s("A"))),("t2",Some(s("B")))].map(|(t,l)|(s(t),l)), [("i","t1"),("m","t2")].map(|(p,t)|(s(p),s(t))), [("t1","m"),("t2","o")].map(|(t,p)|(s(t),s(p))), "i", "o").unwrap();""" ;
@@ -331,3 +337,59 @@ bc:Ref_NotRecomposable a bc:TaxonCase ;
     bc:caseName "NotRecomposable" ; bc:caseShape "tuple" ;
     bc:caseDoc "The model has no language-preserving WF-net image -- e.g. a bounded DoRedo, which an unbounded net cycle would widen." ;
     bc:falsifier "recompose(DoRedo { max_redos: 2, .. })" .
+
+################################################################################
+# Reference implementations used as differential oracles.
+#
+# An oracle is not a dependency. It is a second implementation of the same
+# specification, written by someone else, whose agreement is evidence and whose
+# disagreement is a finding. The value is entirely in the independence -- which
+# is why none of these may be vendored into the tree even when the licence would
+# allow it: an oracle maintained here stops being independent.
+#
+# Admitted here so the pinned commit is ONE fact. It was briefly duplicated
+# between oracles/fetch.sh and oracles/README.md, which is the same drift this
+# graph exists to prevent, reintroduced by the harness built to detect it.
+################################################################################
+
+bc:ReferenceImplementation a rdfs:Class .
+
+# How a claim in this graph was established. Every layer of checking has a
+# blind spot that another layer targets, so a claim's provenance decides which
+# blind spot it might still be sitting in -- and a claim established by READING
+# is exactly the residual class the stack does not close: it passes the type
+# system, ggen, the oracle differential and the test suite alike, because none
+# of them ever looks at it.
+bc:EvidenceKind a rdfs:Class .
+
+bc:EvidenceRead a bc:EvidenceKind ;
+    rdfs:label "read" ;
+    bc:evidenceDoc "Established by reading a specification or a reference implementation's source. Nothing executes it. A misreading survives every automated layer here." .
+
+bc:EvidenceRun a bc:EvidenceKind ;
+    rdfs:label "run" ;
+    bc:evidenceDoc "Established by executing an input and recording what actually happened. Decides the case that was run and no other." .
+
+bc:EvidenceDifferential a bc:EvidenceKind ;
+    rdfs:label "differential" ;
+    bc:evidenceDoc "Established by two independent implementations disagreeing on the same input. Stronger than a run: it shows one of the two misunderstands the specification, which internal consistency cannot reveal." .
+
+bc:Ref_POWL a bc:ReferenceImplementation ;
+    rdfs:label "powl" ;
+    bc:referenceTitle    "POWL 2.0 reference implementation" ;
+    bc:referenceUrl      "https://github.com/seanchatmangpt/POWL.git" ;
+    bc:referenceCommit   "d2bae89b4f3a6375b56225ecfaf5eac3797900dc" ;
+    bc:referenceLanguage "Python" ;
+    bc:referenceLicence  "AGPL-3.0" ;
+    bc:referenceVendorable false ;
+    bc:referenceCovers   "Algorithm 3: WF-net to POWL 2.0. Runnable today; oracles/differential.py compares conversion verdicts over the shared corpus." .
+
+bc:Ref_VAL a bc:ReferenceImplementation ;
+    rdfs:label "val" ;
+    bc:referenceTitle    "VAL, the PDDL plan validator" ;
+    bc:referenceUrl      "https://github.com/KCL-Planning/VAL.git" ;
+    bc:referenceCommit   "3c7a1f330bdab0ba28a4762bb45c3f06c27fb6d4" ;
+    bc:referenceLanguage "C++" ;
+    bc:referenceLicence  "BSD-3-Clause" ;
+    bc:referenceVendorable false ;
+    bc:referenceCovers   "PDDL plan validity: durative-action semantics, at-end condition timing, and all eleven trajectory-constraint sorts. Source fetched and read; no harness wired yet, so every Found this repository produces is still checked only by the code that produced it." .

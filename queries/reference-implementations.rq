@@ -1,0 +1,30 @@
+PREFIX bc:   <https://bcinr.dev/ontology#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+# Differential oracles, projected into the fetch script.
+#
+# The pinned commit was briefly written in two places -- the script and the
+# README -- which is exactly the drift the graph exists to prevent, reintroduced
+# by the harness built to detect it. One admitted fact; the script is
+# manufactured.
+SELECT ?name ?title ?url ?commit ?language ?licence ?covers ?vendor_note
+WHERE {
+    ?ref a bc:ReferenceImplementation ;
+         rdfs:label           ?name ;
+         bc:referenceTitle    ?title ;
+         bc:referenceUrl      ?url ;
+         bc:referenceCommit   ?commit ;
+         bc:referenceLanguage ?language ;
+         bc:referenceLicence  ?licence ;
+         bc:referenceVendorable ?vendorable ;
+         bc:referenceCovers   ?covers .
+
+    # Whether a licence permits copying into an MIT/Apache tree is a legal
+    # judgement, so it is stated in the graph rather than inferred from the
+    # licence string here.
+    BIND(IF(?vendorable,
+            "vendorable, but kept under vendor/ anyway: an oracle maintained here stops being independent",
+            CONCAT(?licence, ": must not be copied into this MIT OR Apache-2.0 tree"))
+         AS ?vendor_note)
+}
+ORDER BY ?name

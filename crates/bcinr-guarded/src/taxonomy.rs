@@ -8,7 +8,6 @@
 // the graph changes this file; every exhaustive elimination built on it then
 // fails to compile until the new case is handled.
 
-
 /// Conditions under which the multifractal cascade has no correct answer. Each is a real condition, not a degradation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum CascadeRefusal {
@@ -143,6 +142,8 @@ pub enum PddlEffect {
     /// Assign/increase/decrease/scale a numeric fluent.
     Numeric,
     /// An effect scoped to at-start / at-end / over-all.
+    ///
+    /// Known coverage gap: VAL's time_spec (ptree.h:136) has five values: E_AT_START, E_AT_END, E_OVER_ALL, E_CONTINUOUS, E_AT. We consume three. E_CONTINUOUS (continuous effects) and E_AT (timed initial literals) are absent. Missing variants are a set difference against their enum.
     Timed,
     /// A quantified effect over a typed domain.
     Forall,
@@ -240,7 +241,7 @@ impl Powl2Model {
 /// Why Algorithm 3 declined a net. Each names the obligation actually checked -- not a paper result it does not discharge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum RefusalReason {
-    /// No base case and no valid partition -- Algorithm 3 line 25's FallThrough.
+    /// Our partitioner found no base case and no valid partition at this level -- Algorithm 3 line 25's FallThrough. It does NOT assert that no POWL structure exists: see bc:referenceDivergence.
     IrreducibleFragment,
     /// The bounded recursion budget ran out before termination.
     BudgetExhausted,
@@ -292,7 +293,7 @@ impl RefusalReason {
     /// The case's documented meaning, from the graph.
     pub fn doc(&self) -> &'static str {
         match self {
-            Self::IrreducibleFragment => "No base case and no valid partition -- Algorithm 3 line 25's FallThrough.",
+            Self::IrreducibleFragment => "Our partitioner found no base case and no valid partition at this level -- Algorithm 3 line 25's FallThrough. It does NOT assert that no POWL structure exists: see bc:referenceDivergence.",
             Self::BudgetExhausted => "The bounded recursion budget ran out before termination.",
             Self::BoundedLanguageAgreementFailed => "The two independently-computed languages disagreed at the checked bound. NOT Theorem 5.5, which quantifies over the whole language.",
             Self::InternalNetConstruction => "A projection produced a sub-net failing WfNet::new -- algorithm-internal, surfaced as a refusal rather than a panic.",
@@ -305,6 +306,10 @@ impl RefusalReason {
     }
 }
 /// PDDL 3.0 trajectory constraint forms. A monitor that cannot decide a form must refuse at admission, never no-op.
+///
+/// # Known coverage gap
+///
+/// VAL's constraint_sort (ptree.h:139) enumerates eleven sorts; this taxonomy has nine PDDL sorts plus the structural And. Missing: `at end` (E_ATEND, standard PDDL 3.0) and `after` (E_AFTER, a VAL extension). Missing variants are a set difference against their enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum TrajectoryConstraint {
     /// Holds in every state of the trajectory, including the initial and final ones.

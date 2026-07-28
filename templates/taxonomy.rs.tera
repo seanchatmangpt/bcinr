@@ -11,11 +11,17 @@
 {% for c in results %}
 {%- if c.is_first %}
 /// {{ c.taxonomy_doc }}
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+{% if c.coverage_gap %}///
+/// # Known coverage gap
+///
+/// {{ c.coverage_gap }}
+{% endif %}#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum {{ c.taxonomy }} {
 {%- endif %}
     /// {{ c.case_doc }}
-    {{ c.case_name }},
+{% if c.case_gap %}    ///
+    /// Known coverage gap: {{ c.case_gap }}
+{% endif %}    {{ c.case_name }},
 {%- if c.is_last %}
 }
 

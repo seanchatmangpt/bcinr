@@ -1,0 +1,46 @@
+{
+  "_comment": "Shared WF-net corpus. Both the Rust runner and the Python oracle read THIS file; two hand-maintained input lists drift, and a differential over drifted inputs stops comparing anything. source/sink are always i/o. A transition label of null is the silent activity tau.",
+  "cases": [
+    { "name": "sequence",
+      "places": ["i","m","o"],
+      "transitions": [["t1","A"],["t2","B"]],
+      "pt": [["i","t1"],["m","t2"]],
+      "tp": [["t1","m"],["t2","o"]] },
+
+    { "name": "xor_choice",
+      "places": ["i","o"],
+      "transitions": [["t1","A"],["t2","B"]],
+      "pt": [["i","t1"],["i","t2"]],
+      "tp": [["t1","o"],["t2","o"]] },
+
+    { "name": "concurrent_and",
+      "places": ["i","a","b","c","d","o"],
+      "transitions": [["t0",null],["t1","A"],["t2","B"],["t3",null]],
+      "pt": [["i","t0"],["a","t1"],["b","t2"],["c","t3"],["d","t3"]],
+      "tp": [["t0","a"],["t0","b"],["t1","c"],["t2","d"],["t3","o"]] },
+
+    { "name": "unsafe_two_into_one",
+      "places": ["i","a","b","c","o"],
+      "transitions": [["t1",null],["t2",null],["t3",null],["t4",null]],
+      "pt": [["i","t1"],["a","t2"],["b","t3"],["c","t4"]],
+      "tp": [["t1","a"],["t1","b"],["t2","c"],["t3","c"],["t4","o"]] },
+
+    { "name": "unsound_conflict",
+      "places": ["i","a","b","o"],
+      "transitions": [["t1",null],["t2",null],["t3",null]],
+      "pt": [["i","t1"],["a","t2"],["a","t3"],["b","t3"]],
+      "tp": [["t1","a"],["t1","b"],["t2","o"],["t3","o"]] },
+
+    { "name": "self_loop",
+      "places": ["i","p","o"],
+      "transitions": [["t1","A"],["t2","B"]],
+      "pt": [["i","t1"],["p","t2"],["p","t1"]],
+      "tp": [["t1","p"],["t2","o"]] },
+
+    { "name": "non_free_choice_sound",
+      "places": ["i","a","b","c","d","e","o"],
+      "transitions": [["t0",null],["t1","A"],["t2","B"],["t3","C"],["t4",null],["t5",null]],
+      "pt": [["i","t0"],["a","t1"],["b","t2"],["a","t3"],["b","t3"],["c","t4"],["d","t4"],["e","t5"]],
+      "tp": [["t0","a"],["t0","b"],["t1","c"],["t2","d"],["t3","e"],["t4","o"],["t5","o"]] }
+  ]
+}

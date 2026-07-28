@@ -30,7 +30,7 @@ available, and it decayed into part of the document.
 | Variant | Witness | Condition |
 |---------|---------|-----------|
 {%- endif %}
-| `{{ c.case_name }}` | {{ c.witness_status }} | {{ c.case_doc }} {% if c.witness_detail %}<br/>*Witness:* {{ c.witness_detail }}{% endif %} |
+| `{{ c.case_name }}` | {{ c.witness_status }} | {{ c.case_doc }} {% if c.witness_detail %}<br/>*Witness:* {{ c.witness_detail }}{% endif %}{% if c.divergence %}<br/>**Reference divergence:** {{ c.divergence }}{% endif %} |
 {%- if c.is_last %}
 {% endif %}
 {%- endfor %}
