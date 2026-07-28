@@ -216,7 +216,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-cmca"
-version = "26.7.25"
+version = "26.7.28"
 dependencies = [
  "bcinr-logic",
  "chicago-tdd-tools",
@@ -275,7 +275,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-logic"
-version = "26.7.25"
+version = "26.7.28"
 dependencies = [
  "criterion",
  "proptest",
@@ -306,14 +306,14 @@ dependencies = [
 
 [[package]]
 name = "bcinr-mfw-ir"
-version = "26.7.25"
+version = "26.7.28"
 dependencies = [
  "blake3",
 ]
 
 [[package]]
 name = "bcinr-pddl"
-version = "26.7.25"
+version = "26.7.28"
 dependencies = [
  "bcinr-mfw-ir",
  "bcinr-powl",
@@ -331,7 +331,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-powl"
-version = "26.7.25"
+version = "26.7.28"
 dependencies = [
  "bcinr-cmca",
  "bcinr-logic",
@@ -349,7 +349,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-powl-receipt"
-version = "26.7.25"
+version = "26.7.28"
 dependencies = [
  "bcinr-logic",
  "bcinr-mfw-ir",

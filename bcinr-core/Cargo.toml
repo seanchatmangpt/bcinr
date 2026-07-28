@@ -13,7 +13,7 @@ readme = "../README.md"
 
 [dependencies]
 bcinr-api = { path = "../crates/bcinr-api", version = "26.7.25" }
-bcinr-logic = { path = "../crates/bcinr-logic", version = "26.7.25" }
+bcinr-logic = { path = "../crates/bcinr-logic", version = "26.7.28" }
 
 [features]
 default = []

@@ -13,10 +13,10 @@ readme = "../../README.md"
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
-bcinr-pddl = { path = "../bcinr-pddl", version = "26.7.25" }
-bcinr-powl = { path = "../bcinr-powl", version = "26.7.25" }
-bcinr-powl-receipt = { path = "../bcinr-powl-receipt", version = "26.7.25" }
-bcinr-logic = { path = "../bcinr-logic", version = "26.7.25" }
+bcinr-pddl = { path = "../bcinr-pddl", version = "26.7.28" }
+bcinr-powl = { path = "../bcinr-powl", version = "26.7.28" }
+bcinr-powl-receipt = { path = "../bcinr-powl-receipt", version = "26.7.28" }
+bcinr-logic = { path = "../bcinr-logic", version = "26.7.28" }
 bcinr-api = { path = "../bcinr-api", version = "26.7.25" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

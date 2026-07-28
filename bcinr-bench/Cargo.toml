@@ -15,7 +15,7 @@ readme = "../README.md"
 criterion = "0.5"
 divan = "0.1"
 bcinr-core = { path = "../bcinr-core", version = "26.7.25" }
-bcinr-logic = { path = "../crates/bcinr-logic", version = "26.7.25", features = ["bench", "alloc"] }
+bcinr-logic = { path = "../crates/bcinr-logic", version = "26.7.28", features = ["bench", "alloc"] }
 bcinr-pddl = { path = "../crates/bcinr-pddl" }
 bcinr-mcp = { path = "../crates/bcinr-mcp" }
 bcinr-mfw-ir = { path = "../crates/bcinr-mfw-ir" }
