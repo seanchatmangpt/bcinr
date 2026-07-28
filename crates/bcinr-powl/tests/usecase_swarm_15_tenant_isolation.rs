@@ -33,7 +33,6 @@
 use bcinr_powl::compiler::{compile_powl, PowlAstNode};
 use bcinr_powl::ocel::OcelLog;
 use bcinr_powl::scheduler::{scheduler_tick, PowlRunState};
-use std::collections::HashMap;
 
 fn execute(ast: &PowlAstNode<'_>, run_id: u64) -> (PowlRunState, OcelLog, u32) {
     let tape = compile_powl(ast).expect("POWL model must compile");
@@ -194,8 +193,19 @@ fn test_object_references_tenant_scoped() {
     // Tenant B ops involve indices 0-1 (object_2 operations, but different compiled tape)
     // No cross-tenant event appears in either log
 
-    // Count tenant B ops: each 2-op workflow produces 2 ops + 1 run_sealed = 3 events
+    // Each 2-op workflow produces 2 ops + 1 run_sealed = 3 events
+    let a_event_count = events_a.len();
     let b_event_count = events_b.len();
+    assert_eq!(a_event_count, 3, "tenant A log has 2 workflow ops + 1 run_sealed event");
+    assert_eq!(b_event_count, 3, "tenant B log has 2 workflow ops + 1 run_sealed event");
+
+    // Verify: tenant A log has only tenant A's ops (0, 1) plus run_sealed
+    let a_ops: Vec<u32> = events_a
+        .iter()
+        .filter(|e| e.op_idx < 2) // Only count actual workflow ops, not run_sealed
+        .map(|e| e.op_idx)
+        .collect();
+    assert_eq!(a_ops, vec![0, 1], "tenant A ops are 0, 1");
 
     // Verify: tenant B log has only tenant B's ops (0, 1) plus run_sealed
     // All ops should have indices <= 1 (the two workflow ops)

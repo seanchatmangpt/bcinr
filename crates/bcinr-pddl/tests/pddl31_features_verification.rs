@@ -40,7 +40,7 @@ fn feature_derived_with_forall_body_works() {
     assert_eq!(domain.derived.len(), 1);
     // Verify the body contains a forall
     match &domain.derived[0].body {
-        bcinr_pddl::PddlCondition::Forall { vars, body } => {
+        bcinr_pddl::PddlCondition::Forall { vars, body: _ } => {
             assert_eq!(vars.len(), 1);
         }
         _ => panic!("Expected forall in derived predicate body"),
@@ -62,7 +62,7 @@ fn feature_derived_with_exists_body_works() {
     assert_eq!(domain.derived.len(), 1);
     // Verify the body contains an exists
     match &domain.derived[0].body {
-        bcinr_pddl::PddlCondition::Exists { vars, body } => {
+        bcinr_pddl::PddlCondition::Exists { vars, body: _ } => {
             assert_eq!(vars.len(), 1);
         }
         _ => panic!("Expected exists in derived predicate body"),

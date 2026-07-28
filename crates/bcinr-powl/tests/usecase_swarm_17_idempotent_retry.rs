@@ -26,7 +26,6 @@
 use bcinr_powl::compiler::{compile_powl, PowlAstNode};
 use bcinr_powl::ocel::OcelLog;
 use bcinr_powl::scheduler::{scheduler_tick, PowlRunState};
-use std::collections::HashMap;
 
 fn execute(ast: &PowlAstNode<'_>, run_id: u64) -> (PowlRunState, OcelLog, u32) {
     let tape = compile_powl(ast).expect("POWL model must compile");
@@ -177,9 +176,24 @@ fn test_receipt_shows_single_execution_across_retries() {
 
     let digest_combined = combined_log.seal_receipt().digest();
 
-    // Both logs prove: execute_action happened exactly once
-    let execute_ops_first = log_first.events().iter().filter(|e| e.op_idx == 0).count();
-    assert_eq!(execute_ops_first, 1, "first execution recorded once");
+    // The combined log (first execution + retry) proves: execute_action fired
+    // exactly once across both attempts, even though the retry re-ran the
+    // request handling logic.
+    let execute_ops_combined = combined_log
+        .events()
+        .iter()
+        .filter(|e| e.op_idx == 0)
+        .count();
+    assert_eq!(
+        execute_ops_combined, 1,
+        "execute_action fired exactly once across first execution + retry"
+    );
+
+    // The two receipts must differ: they record different numbers/kinds of ops.
+    assert_ne!(
+        digest_first, digest_combined,
+        "receipts differ between first-only and first+retry logs"
+    );
 }
 
 /// Test 4: Different idempotency keys allow independent executions

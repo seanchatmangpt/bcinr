@@ -48,7 +48,11 @@ pub struct GroundProblem {
     pub goal: Vec<Pddl8GroundAtom>,
     pub actions: Vec<Pddl8GroundAction>,
     /// Parallel structure to `actions`: full PddlEffect list for each action
-    /// (Pddl8GroundAction only stores atoms, not numeric effects).
+    /// (Pddl8GroundAction only stores atoms, not numeric effects). Unread
+    /// until the widened effect model (independence test extension, plan
+    /// task S3) reads conditional/numeric effects off it; scheduled to be
+    /// removed with the rest of the temporal rail otherwise.
+    #[allow(dead_code)]
     action_effects: Vec<Vec<PddlEffect>>,
     /// precondition atom -> indices of actions that require it. Lets
     /// `find_plan`'s BFS only consider actions that could possibly apply at

@@ -127,7 +127,7 @@ fn numeric_precondition_plain_action() {
     "#;
 
     let domain31 = domain31_from_pddl(domain_pddl).unwrap();
-    let problem31 = problem31_from_pddl(problem_pddl).unwrap();
+    let _problem31 = problem31_from_pddl(problem_pddl).unwrap();
 
     // Verify that numeric precondition is preserved in action.precondition
     let precondition = &domain31.actions[0].precondition;

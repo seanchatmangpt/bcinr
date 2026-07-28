@@ -111,7 +111,7 @@ fn test_incident_partial_execution_captured_in_receipt() {
     ]);
 
     let run_id = 2002u64;
-    let (state, log, _ticks) = execute(&ast, run_id);
+    let (_state, log, _ticks) = execute(&ast, run_id);
 
     // Workflow completes (for modeling); in a real crash, it would stop at op_3
     // The receipt shows which ops fired
@@ -179,8 +179,27 @@ fn test_distributed_incident_service_a_failure_service_b_recovery() {
     // Digest proves this exact timeline
     let digest = log.seal_receipt().digest();
 
-    // If attacker claims "A never failed", the receipt proof would show op_2
-    // (service_a_failure_event) exists. Tampering with the log would change digest.
+    // If attacker claims "A never failed", they must remove op_2
+    // (service_a_failure_event) from the log. Build that tampered log and
+    // verify its digest differs from the original.
+    let mut tampered_log = OcelLog::new();
+    tampered_log.record_op_fired(run_id, 0, 1, 1).unwrap(); // service_a_initialized
+    tampered_log.record_op_fired(run_id, 1, 2, 1).unwrap(); // service_a_processing_request
+                                                              // op_2 (service_a_failure_event) removed
+    tampered_log.record_op_fired(run_id, 3, 3, 1).unwrap(); // service_b_detects_a_failure
+    tampered_log.record_op_fired(run_id, 4, 4, 1).unwrap(); // service_b_acquires_lease
+    tampered_log.record_op_fired(run_id, 5, 5, 1).unwrap(); // service_b_reprocesses_request
+    tampered_log.record_op_fired(run_id, 6, 6, 1).unwrap(); // service_b_sends_response
+    tampered_log
+        .record_run_sealed(run_id, 0b111_1011, 6)
+        .unwrap();
+
+    let digest_tampered = tampered_log.seal_receipt().digest();
+
+    assert_ne!(
+        digest, digest_tampered,
+        "tampering with the log (removing/altering an event) must change the receipt digest"
+    );
 }
 
 /// Test 4: Root cause isolation via receipt analysis

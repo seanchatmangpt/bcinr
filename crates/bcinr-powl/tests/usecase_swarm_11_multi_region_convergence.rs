@@ -24,7 +24,6 @@
 use bcinr_powl::compiler::{compile_powl, PowlAstNode};
 use bcinr_powl::ocel::OcelLog;
 use bcinr_powl::scheduler::{scheduler_tick, PowlRunState};
-use std::collections::{HashMap, HashSet};
 
 fn execute(ast: &PowlAstNode<'_>, run_id: u64) -> (PowlRunState, OcelLog, u32) {
     let tape = compile_powl(ast).expect("POWL model must compile");
@@ -166,6 +165,10 @@ fn test_convergence_fails_if_region_missing() {
     assert_eq!(
         state.check_mask, 0,
         "partial region set still schedules to completion"
+    );
+    assert_eq!(
+        region_ops, 2,
+        "both available regions (A, B) contributed events despite C's absence"
     );
 }
 

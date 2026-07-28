@@ -197,6 +197,10 @@ fn test_recovery_checks_receipt_before_re_execution() {
     let run_first = 1804u64;
     let (_state_first, log_first, _ticks_first) = execute(&ast_first, run_first);
     let digest_first = log_first.seal_receipt().digest();
+    assert!(
+        !digest_first.is_empty(),
+        "first worker's completion is receipted before worker 2 checks it"
+    );
 
     // Second worker (checks receipt before re-executing)
     let ast_second = PowlAstNode::Sequence(vec![
@@ -210,21 +214,22 @@ fn test_recovery_checks_receipt_before_re_execution() {
     let run_second = 1805u64;
     let (_state_second, log_second, _ticks_second) = execute(&ast_second, run_second);
 
-    // Verify: worker_2 did not execute the task
-    let execute_count = log_second
-        .events()
-        .iter()
-        .filter(|e| e.op_idx == 0 && "worker_2_check_receipt".contains("check"))
-        .count();
-
-    // Log shows: check → find → skip
+    // Verify: worker_2's own AST never contains an execute-task atom (its
+    // sequence is check -> find -> skip -> acknowledge), so no op position in
+    // its log can correspond to task execution. OcelEvent carries op_idx, not
+    // the atom label, so this is checked structurally against the AST rather
+    // than by matching a string against the log.
     let ops_second: Vec<u32> = log_second
         .events()
         .iter()
         .filter(|e| e.op_idx < 4)
         .map(|e| e.op_idx)
         .collect();
-    assert!(ops_second.len() >= 3, "recovery sequence recorded");
+    assert_eq!(
+        ops_second,
+        vec![0, 1, 2, 3],
+        "recovery sequence (check, find, skip, acknowledge) fully recorded, in order"
+    );
 }
 
 /// Test 5: Lease expiration has a timeout; prevents indefinite waiting

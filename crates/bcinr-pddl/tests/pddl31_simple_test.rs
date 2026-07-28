@@ -1,6 +1,6 @@
 // Simple test to verify basic PDDL 3.1 features
 
-use bcinr_pddl::{domain_from_pddl, problem_from_pddl};
+use bcinr_pddl::domain_from_pddl;
 
 #[test]
 fn test_equality_parses() {
