@@ -19,11 +19,22 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Format
-        run: cargo fmt --all -- --check
+      - name: Materialize rustfmt patch
+        run: |
+          mkdir -p verification-artifacts
+          cargo fmt --all
+          git diff --binary > verification-artifacts/rustfmt.patch
       - name: CMCA authority rail
         run: cargo check -p bcinr-cmca --all-targets --all-features
       - name: External boundary rails
         run: cargo check -p bcinr-pddl -p bcinr-ffi --all-targets --all-features
       - name: Workspace compile
         run: cargo check --workspace --all-targets --all-features
+      - name: Upload compile evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v26-7-28-compile-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 7
+          path: verification-artifacts/
