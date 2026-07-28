@@ -757,20 +757,21 @@ mod tests {
 
     #[test]
     fn activity_slice_preserves_choice_vertices_as_explicit_silent_nodes() {
+        // Def 3.6 sentinels are 3/4, outside the 3-element child set.
         let original = Powl2Model::ChoiceGraph {
             children: vec![activity("start"), activity("drop"), activity("end")],
-            edges: vec![(0, 1), (1, 2)],
-            start: 0,
-            end: 2,
+            edges: vec![(3, 0), (0, 1), (1, 2), (2, 4)],
+            start: 3,
+            end: 4,
         };
         let (sliced, _) = slice_process_activities(&original, |label| label != "drop").unwrap();
         assert_eq!(
             sliced,
             Powl2Model::ChoiceGraph {
                 children: vec![activity("start"), silent(), activity("end")],
-                edges: vec![(0, 1), (1, 2)],
-                start: 0,
-                end: 2,
+                edges: vec![(3, 0), (0, 1), (1, 2), (2, 4)],
+                start: 3,
+                end: 4,
             }
         );
         validate_powl2(&sliced).unwrap();

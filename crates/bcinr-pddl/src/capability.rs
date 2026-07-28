@@ -27,12 +27,25 @@
 //!   `UniversalPreconditions`, this is only proven through the one
 //!   parser-reachable path that exists — `:action`/`:goal` preconditions
 //!   still can't carry a `PddlCondition::Or` at all in this crate.
-//! - [`PddlFeature::Equality`] — `Unsupported`. Nothing in this crate
-//!   special-cases the built-in `=` predicate (no equality facts are
-//!   synthesized, no identity check exists anywhere in `ground/mod.rs`) — a
-//!   domain declaring `:equality` gets `=` treated as an arbitrary
-//!   uninterpreted predicate name, which is silently wrong, not merely
-//!   incomplete.
+//! - [`PddlFeature::Equality`] — `Exact`. This entry previously read
+//!   "`Unsupported` ... no identity check exists anywhere in `ground/mod.rs`",
+//!   which was flatly wrong and had a real cost: `admit_planning_task` refused
+//!   every domain declaring `:equality`, so the crate rejected a feature it
+//!   implements. Both evaluators decide `=` by object identity after
+//!   grounding has substituted names -- `ground/mod.rs:1245` and
+//!   `ground_v2.rs:652`, each `a.pred == "=" && a.args.len() == 2 =>
+//!   a.args[0] == a.args[1]` -- and three integration tests exercise it
+//!   (`tests/existential_preconditions.rs::exists_with_equality`,
+//!   `tests/pddl31_equality_derived_conditional.rs`,
+//!   `tests/pddl31_features_verification.rs`).
+//!
+//!   The one real caveat, which is a *rail* limit and not an equality limit:
+//!   `collect_positive_atoms` (`ground_v2.rs:781`) and `legacy_positive_atoms`
+//!   (`parse.rs:1225`) both drop `=` atoms. In `ground_v2` that is harmless --
+//!   the dropped list is a display artifact, not the applicability check. On
+//!   the legacy `GroundProblem` rail the atom list *is* the precondition, so
+//!   `=` is genuinely lost there along with every other non-`And`-of-`Atom`
+//!   form.
 //! - [`PddlFeature::ExistentialPreconditions`] — `Approximate` (Phase 2b complete).
 //!   `ground::eval_quantifier`'s `Exists` arm is real, directly unit-tested
 //!   (`ground::quantifier_tests::exists_*`), and now reachable through derived
@@ -55,14 +68,22 @@
 //!   the adversarial case the pre-fix stub got wrong: one item not ready).
 //!   `Approximate`, not `Exact`, because the same feature in a plain
 //!   `:action` precondition or `:goal` still silently vanishes.
-//! - [`PddlFeature::ConditionalEffects`] — `Unsupported`. A real bug, not a
-//!   gap: `ground::apply_effect_ground`'s `PddlEffect::When { condition,
-//!   effects }` arm destructures `condition` with `..` and **never
-//!   evaluates it** — the effects fire unconditionally. `PddlEffect::Forall`
-//!   effects have the same disease (`vars` is discarded, effects apply once
-//!   without any substitution/enumeration over objects). Neither bug was
-//!   introduced this phase; both are surfaced here rather than silently
-//!   inherited as an `Exact`/`Approximate` rating that would overclaim.
+//! - [`PddlFeature::ConditionalEffects`] — `Approximate`. This entry
+//!   previously read "`Unsupported`. A real bug ... destructures `condition`
+//!   with `..` and never evaluates it". That description is no longer true of
+//!   the code and had the same cost as the `Equality` entry below: the
+//!   content scan refused every domain merely *using* `when`/`forall` in an
+//!   effect, whether or not the requirement was declared, so the crate
+//!   rejected semantics it implements.
+//!
+//!   `ground::apply_effect_ground` evaluates the condition
+//!   (`ground/mod.rs:1495-1502`, `if eval_condition(condition, ..)`) and
+//!   enumerates `Forall` bindings via `subst_effect`
+//!   (`ground/mod.rs:1503-1540`). Rated `Approximate` rather than `Exact`
+//!   because that holds for the *durative/`ground_v2` rails only* — the
+//!   legacy `GroundProblem` rail never applies non-add/del effects at all
+//!   (`ground/mod.rs:243-245` leaves `action_effects` empty and its BFS
+//!   clones `fn_vals` unchanged).
 //!   [`admit_planning_task`] refuses on this feature two ways: the
 //!   declared-requirement loop (any `:requirements` entry that
 //!   `requirement_implies` maps to `ConditionalEffects`), and a separate
@@ -293,12 +314,12 @@ impl CapabilityProfile for DefaultCapabilityProfile {
         match feature {
             PddlFeature::Strips => Exact,
             PddlFeature::Typing => Exact,
-            PddlFeature::NegativePreconditions => Exact,
-            PddlFeature::Disjunction => Exact,
-            PddlFeature::Equality => Unsupported,
+            PddlFeature::NegativePreconditions => Approximate,
+            PddlFeature::Disjunction => Approximate,
+            PddlFeature::Equality => Exact,
             PddlFeature::ExistentialPreconditions => Approximate,
             PddlFeature::UniversalPreconditions => Approximate,
-            PddlFeature::ConditionalEffects => Unsupported,
+            PddlFeature::ConditionalEffects => Approximate,
             PddlFeature::NumericFluents => Approximate,
             PddlFeature::NumericEffects => Exact,
             PddlFeature::DurativeActions => Approximate,
@@ -386,12 +407,16 @@ fn requirement_implies(req: &str, feature: PddlFeature) -> bool {
 /// actually *uses* a conditional or quantified effect construct, independent
 /// of what the domain's `:requirements` declare.
 ///
-/// This exists because `ground::apply_effect_ground` mishandles both
-/// constructs unconditionally (see this module's doc comment on
-/// [`PddlFeature::ConditionalEffects`]): its `When` arm destructures
-/// `condition` with `..` and fires `effects` regardless of whether the
-/// condition holds, and its `Forall` arm discards `vars` and fires `effects`
-/// exactly once instead of enumerating every object binding. Gating
+/// This exists to catch a domain that *uses* `when`/`forall` in an effect
+/// without declaring `:conditional-effects`, on a profile that rates the
+/// feature `Unsupported` — the declared-requirement loop alone would miss it.
+///
+/// It is no longer justified by `apply_effect_ground` mishandling the
+/// constructs: that function evaluates the `When` condition
+/// (`ground/mod.rs:1495-1502`) and enumerates `Forall` bindings
+/// (`:1503-1540`). Under [`DefaultCapabilityProfile`], which now rates the
+/// feature `Approximate`, this scan does not fire at all. It remains for
+/// profiles that genuinely cannot execute the constructs. Gating
 /// admission on the *declared* `:conditional-effects` requirement string
 /// alone (see [`requirement_implies`] and the loop in
 /// [`admit_planning_task`]) misses a domain that uses `when`/`forall` in an
@@ -1065,8 +1090,17 @@ mod tests {
         assert!(outcome.is_found());
     }
 
+    /// `:equality` is admitted, because `=` is implemented.
+    ///
+    /// This test previously asserted the opposite. It was not testing a
+    /// design decision, it was pinning a defect: both evaluators decide `=`
+    /// (`ground/mod.rs:1245`, `ground_v2.rs:652`) and three integration
+    /// tests exercise it, while the profile rated the feature `Unsupported`
+    /// and `admit_planning_task` therefore refused every domain declaring the
+    /// requirement. Inverted rather than deleted, so the corrected behaviour
+    /// stays pinned.
     #[test]
-    fn equality_requirement_is_refused_as_unsupported() {
+    fn equality_requirement_is_admitted_because_it_is_implemented() {
         let domain = domain31_from_pddl(
             "(define (domain d) (:requirements :strips :equality) (:predicates (p)) \
              (:action a :parameters () :precondition (p) :effect (not (p))))",
@@ -1074,10 +1108,11 @@ mod tests {
         .unwrap();
         let problem = problem31_from_pddl(STRIPS_PROBLEM).unwrap();
         let outcome = admit_planning_task(&domain, &problem, &DefaultCapabilityProfile);
-        match outcome {
-            PlannerOutcome::Unsupported(u) => assert_eq!(u.feature_name, "Equality"),
-            other => panic!("expected Unsupported(Equality), got {other:?}"),
-        }
+        assert!(
+            outcome.is_found(),
+            "domain declaring :equality must be admitted -- `=` is decided by \
+             eval_condition on every rail that carries a PddlCondition; got {outcome:?}"
+        );
     }
 
     #[test]
@@ -1223,6 +1258,26 @@ mod tests {
         );
     }
 
+    /// A profile that cannot execute conditional or quantified effects.
+    ///
+    /// The content scan exists for exactly this case: a domain that *uses*
+    /// `when`/`forall` without declaring `:conditional-effects`, on a profile
+    /// that cannot run them. `DefaultCapabilityProfile` no longer qualifies --
+    /// `ground::apply_effect_ground` evaluates the condition and enumerates
+    /// the bindings -- so the two tests below use this instead. Testing the
+    /// scan through a profile that rates the feature supported was testing the
+    /// rating, not the mechanism.
+    struct NoConditionalEffectsProfile;
+
+    impl CapabilityProfile for NoConditionalEffectsProfile {
+        fn support(&self, feature: PddlFeature) -> SemanticSupport {
+            match feature {
+                PddlFeature::ConditionalEffects => SemanticSupport::Unsupported,
+                other => DefaultCapabilityProfile.support(other),
+            }
+        }
+    }
+
     #[test]
     fn undeclared_when_effect_is_refused_as_unsupported_not_silently_admitted() {
         // Adversarial case from the gap report: the domain declares only
@@ -1243,7 +1298,14 @@ mod tests {
         let problem =
             problem31_from_pddl("(define (problem pr) (:domain d) (:init (p)) (:goal (r)))")
                 .unwrap();
-        let outcome = admit_planning_task(&domain, &problem, &DefaultCapabilityProfile);
+        // `DefaultCapabilityProfile` admits this now, because the effect is
+        // executed correctly. The scan must still fire for a profile that
+        // cannot execute it.
+        assert!(
+            admit_planning_task(&domain, &problem, &DefaultCapabilityProfile).is_found(),
+            "Default profile executes `when` effects and must admit them"
+        );
+        let outcome = admit_planning_task(&domain, &problem, &NoConditionalEffectsProfile);
         match outcome {
             PlannerOutcome::Unsupported(u) => assert_eq!(u.feature_name, "ConditionalEffects"),
             other => panic!(
@@ -1266,7 +1328,14 @@ mod tests {
             "(define (problem pr) (:domain d) (:objects o1 - obj) (:init) (:goal (p o1)))",
         )
         .unwrap();
-        let outcome = admit_planning_task(&domain, &problem, &DefaultCapabilityProfile);
+        // `DefaultCapabilityProfile` admits this now, because the effect is
+        // executed correctly. The scan must still fire for a profile that
+        // cannot execute it.
+        assert!(
+            admit_planning_task(&domain, &problem, &DefaultCapabilityProfile).is_found(),
+            "Default profile executes `when` effects and must admit them"
+        );
+        let outcome = admit_planning_task(&domain, &problem, &NoConditionalEffectsProfile);
         match outcome {
             PlannerOutcome::Unsupported(u) => assert_eq!(u.feature_name, "ConditionalEffects"),
             other => panic!(

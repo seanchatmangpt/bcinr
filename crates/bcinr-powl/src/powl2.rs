@@ -64,6 +64,12 @@ pub enum Powl2Error {
         endpoint: usize,
         len: usize,
     },
+    /// Def 3.6 requires exactly one node with no incoming edge (`start`) and
+    /// exactly one with no outgoing edge (`finish`).
+    ChoiceEndpointNotUnique {
+        node: usize,
+        role: &'static str,
+    },
     PartialOrderCycle,
     ChoiceNodeOffStartEndPath {
         node: usize,
@@ -96,9 +102,17 @@ impl std::fmt::Display for Powl2Error {
             Self::InvalidEdge { from, to, len } => {
                 write!(f, "POWL 2.0 edge {from}->{to} is outside 0..{len}")
             }
-            Self::InvalidChoiceEndpoint { endpoint, len } => {
-                write!(f, "POWL 2.0 choice endpoint {endpoint} is outside 0..{len}")
-            }
+            Self::InvalidChoiceEndpoint { endpoint, len } => write!(
+                f,
+                "POWL 2.0 choice endpoint {endpoint} is not the Def 3.6 sentinel \
+                 encoding for {len} children (expected start={len}, finish={})",
+                len + 1
+            ),
+            Self::ChoiceEndpointNotUnique { node, role } => write!(
+                f,
+                "POWL 2.0 choice graph has a second {role} at node {node}; Def 3.6 \
+                 requires exactly one"
+            ),
             Self::PartialOrderCycle => write!(f, "POWL 2.0 partial order contains a cycle"),
             Self::ChoiceNodeOffStartEndPath { node } => write!(
                 f,
@@ -249,20 +263,30 @@ pub fn validate_powl2(model: &Powl2Model) -> Result<(), Powl2Error> {
                     minimum: crate::generated_arity::CHOICE_GRAPH_MIN_CHILDREN,
                 });
             }
-            if *start >= children.len() {
+            // Def 3.6: `N = X union {start, finish}` with `start, finish NOT
+            // IN X`, and the sentinels are "not included in the execution
+            // sequence". They are therefore NOT child indices -- the encoding
+            // is `start = n`, `finish = n + 1` over `n` children, which is
+            // what `wf_to_powl::execution_flow` emits and what
+            // `language.rs`'s `node < n_children` guard implements.
+            //
+            // This previously required `start < children.len()`, i.e. it
+            // rejected the paper-conformant encoding, and so rejected every
+            // choice graph the SM branch of Algorithm 3 can produce. No test
+            // routed converter output through here, which is why it stood.
+            let n = children.len();
+            if *start != n || *end != n + 1 {
                 return Err(Powl2Error::InvalidChoiceEndpoint {
-                    endpoint: *start,
-                    len: children.len(),
+                    endpoint: if *start != n { *start } else { *end },
+                    len: n,
                 });
             }
-            if *end >= children.len() {
-                return Err(Powl2Error::InvalidChoiceEndpoint {
-                    endpoint: *end,
-                    len: children.len(),
-                });
-            }
-            validate_edges(children.len(), edges)?;
-            validate_choice_coverage(children.len(), edges, *start, *end)?;
+            // Edges may name the two sentinels, so the bound is `n + 2` here.
+            // `PartialOrder` keeps the tighter `n` bound -- it has no
+            // sentinels.
+            validate_edges(n + 2, edges)?;
+            validate_choice_unique_endpoints(n, edges, *start, *end)?;
+            validate_choice_coverage(n, edges, *start, *end)?;
             children.iter().try_for_each(validate_powl2)
         }
         Powl2Model::DoRedo { body, redo, .. } => {
@@ -371,7 +395,16 @@ impl<P: Powl2ChoicePolicy> Compiler<'_, P> {
         let mut path = vec![start];
         for _ in 0..POWL2_MAX_CHOICE_STEPS {
             if current == end {
-                return self.compile_sequence_indices(children, &path, depth);
+                // Def 3.6: the sentinels "are not included in the execution
+                // sequence", so drop them before compiling the traversed
+                // path. Same rule `language.rs`'s `node < n_children` guard
+                // applies on the denotational side.
+                let executed: Vec<usize> = path
+                    .iter()
+                    .copied()
+                    .filter(|&n| n < children.len())
+                    .collect();
+                return self.compile_sequence_indices(children, &executed, depth);
             }
             let mut successors = edges
                 .iter()
@@ -405,7 +438,13 @@ impl<P: Powl2ChoicePolicy> Compiler<'_, P> {
         path: &[usize],
         depth: usize,
     ) -> Result<Segment, Powl2Error> {
-        let mut segment = self.compile(&children[path[0]], depth)?;
+        // A start->finish path touching no real child contributes nothing to
+        // the execution sequence; compile it as a silent step rather than
+        // indexing an empty slice.
+        let Some(&first) = path.first() else {
+            return self.compile(&Powl2Model::Silent, depth);
+        };
+        let mut segment = self.compile(&children[first], depth)?;
         for &index in &path[1..] {
             let next = self.compile(&children[index], depth)?;
             wire(&mut self.tape, segment.exits, next.entries);
@@ -497,14 +536,55 @@ fn validate_acyclic(len: usize, edges: &[(usize, usize)]) -> Result<(), Powl2Err
     }
 }
 
+/// Def 3.6 bullets 3 and 4: `start` is the *unique* node with no incoming
+/// edge, `finish` the unique node with no outgoing edge.
+///
+/// Nothing checked these, so a graph with a second source or sink passed
+/// validation and was not a choice graph. `wf_net.rs:100-119` already applies
+/// exactly this test to WF-nets; this is the same shape over `0..n` plus the
+/// two sentinels.
+fn validate_choice_unique_endpoints(
+    n: usize,
+    edges: &[(usize, usize)],
+    start: usize,
+    end: usize,
+) -> Result<(), Powl2Error> {
+    for node in 0..n {
+        if !edges.iter().any(|&(_, to)| to == node) {
+            return Err(Powl2Error::ChoiceEndpointNotUnique {
+                node,
+                role: "source",
+            });
+        }
+        if !edges.iter().any(|&(from, _)| from == node) {
+            return Err(Powl2Error::ChoiceEndpointNotUnique { node, role: "sink" });
+        }
+    }
+    if edges.iter().any(|&(_, to)| to == start) {
+        return Err(Powl2Error::ChoiceEndpointNotUnique {
+            node: start,
+            role: "source",
+        });
+    }
+    if edges.iter().any(|&(from, _)| from == end) {
+        return Err(Powl2Error::ChoiceEndpointNotUnique {
+            node: end,
+            role: "sink",
+        });
+    }
+    Ok(())
+}
+
 fn validate_choice_coverage(
     len: usize,
     edges: &[(usize, usize)],
     start: usize,
     end: usize,
 ) -> Result<(), Powl2Error> {
-    let forward = reachable(len, edges, start, false);
-    let backward = reachable(len, edges, end, true);
+    // Traversal arrays must span the sentinels; the coverage loop below still
+    // only requires the `n` real children to lie on a start->finish path.
+    let forward = reachable(len + 2, edges, start, false);
+    let backward = reachable(len + 2, edges, end, true);
     for node in 0..len {
         if !forward.contains(&node) || !backward.contains(&node) {
             return Err(Powl2Error::ChoiceNodeOffStartEndPath { node });
@@ -585,15 +665,28 @@ mod tests {
                 Powl2Model::Activity("right".into()),
                 Powl2Model::Activity("end".into()),
             ],
-            edges: vec![(0, 1), (0, 2), (1, 3), (2, 3)],
-            start: 0,
-            end: 3,
+            // Def 3.6 encoding: sentinels are node 4 (start) and 5 (finish),
+            // outside the 4-element child set. Previously this used child
+            // indices 0 and 3, which `validate_powl2` accepted and the paper
+            // does not define.
+            edges: vec![(4, 0), (0, 1), (0, 2), (1, 3), (2, 3), (3, 5)],
+            start: 4,
+            end: 5,
         };
         let compiled = compile_powl2(&model, &mut LowestIndexPolicy).unwrap();
         assert_eq!(labels(&compiled), vec!["start", "left", "end"]);
+        // The traversal now enters from and exits to the sentinels, so those
+        // hops appear in the record. They are part of the path even though
+        // Def 3.6 excludes the sentinels from the execution *sequence* --
+        // which is why `labels` above is unchanged.
         assert_eq!(
             compiled.selected_choices,
             vec![
+                ChoiceSelection {
+                    graph_depth: 1,
+                    from: 4,
+                    to: 0,
+                },
                 ChoiceSelection {
                     graph_depth: 1,
                     from: 0,
@@ -603,6 +696,11 @@ mod tests {
                     graph_depth: 1,
                     from: 1,
                     to: 3,
+                },
+                ChoiceSelection {
+                    graph_depth: 1,
+                    from: 3,
+                    to: 5,
                 },
             ]
         );
@@ -616,9 +714,12 @@ mod tests {
                 Powl2Model::Activity("end".into()),
                 Powl2Model::Activity("orphan".into()),
             ],
-            edges: vec![(0, 1), (2, 2)],
-            start: 0,
-            end: 1,
+            // Sentinels 3/4 over 3 real children. Child 2 is reachable from
+            // nothing and reaches nothing, so it lies off every
+            // start->finish path.
+            edges: vec![(3, 0), (0, 1), (1, 4), (2, 2)],
+            start: 3,
+            end: 4,
         };
         assert_eq!(
             validate_powl2(&model),

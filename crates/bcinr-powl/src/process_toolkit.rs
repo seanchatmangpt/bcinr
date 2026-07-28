@@ -438,6 +438,17 @@ pub fn dispatch_waves(model: &Powl2Model) -> Result<Vec<Vec<usize>>, ProcessTool
             .map(|(index, _)| vec![index])
             .collect()),
         Powl2Model::PartialOrder { children, edges } => {
+            // Refuse a dynamic submodel wherever it sits, not only at the
+            // root. The match arm below catches a root-level ChoiceGraph or
+            // DoRedo, but a nested one was previously scheduled as an opaque
+            // static unit *without error* -- so one level of nesting bypassed
+            // the refusal entirely and runtime-decided control flow entered a
+            // wave with no analysis behind it.
+            for child in children {
+                if !is_statically_schedulable(child) {
+                    return Err(ProcessToolkitError::NotStaticallySchedulable);
+                }
+            }
             let node_count = children.len();
             let edges = canonical_edges(node_count, edges)?;
             topological_layers(node_count, &edges)?;
@@ -472,6 +483,19 @@ pub fn dispatch_waves(model: &Powl2Model) -> Result<Vec<Vec<usize>>, ProcessTool
         Powl2Model::ChoiceGraph { .. } | Powl2Model::DoRedo { .. } => {
             Err(ProcessToolkitError::NotStaticallySchedulable)
         }
+    }
+}
+
+/// Whether a submodel's control flow is decided statically.
+///
+/// `ChoiceGraph` and `DoRedo` are decided at runtime, so a wave schedule
+/// cannot describe them; every other constructor is structural and recurses.
+fn is_statically_schedulable(model: &Powl2Model) -> bool {
+    match model {
+        Powl2Model::Activity(_) | Powl2Model::Silent => true,
+        Powl2Model::Sequence(children) => children.iter().all(is_statically_schedulable),
+        Powl2Model::PartialOrder { children, .. } => children.iter().all(is_statically_schedulable),
+        Powl2Model::ChoiceGraph { .. } | Powl2Model::DoRedo { .. } => false,
     }
 }
 

@@ -58,6 +58,7 @@ use crate::ground_v2::{
 use crate::parse::{domain31_from_pddl, problem31_from_pddl};
 use crate::wf_net_bridge::causal_plan_to_powl2;
 use crate::Pddl8Tape;
+use wasm4pm_compat::pddl::PddlEffect;
 
 /// Standing of the PDDL-to-POWL projection emitted by this rail.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,6 +71,45 @@ pub enum CognitiveProjectionStanding {
     /// `PartialOrder`/`ChoiceGraph` structure discovered from the causal
     /// analysis's independence witnesses, not just the witnessed order.
     CausalHierarchical,
+    /// The domain uses effect forms that `Pddl8GroundAction` cannot carry, so
+    /// the causal analysis was not attempted at all and the projection is the
+    /// witnessed linear order.
+    ///
+    /// Distinct from [`Self::ExactSequential`], which means the analysis ran
+    /// and found nothing to exploit. Here it was never sound to run: the
+    /// analyser replays over `preconditions`/`add_effects`/`del_effects` only
+    /// (`causal::simulate_two`), so two actions conflicting solely through a
+    /// `when`, `forall` or numeric effect have *identical* shadow effects,
+    /// commute in the replay, and are reported independent. The conservative
+    /// fallback in `analyze_pair` is guarded on `!commute` and therefore never
+    /// fires for exactly this class. Independence claimed on that basis would
+    /// reach `dispatch_waves` and co-schedule genuinely conflicting actions.
+    RefusedLossyEffectModel,
+}
+
+/// Whether every effect in the domain survives lowering to
+/// `Pddl8GroundAction`'s add/delete atom lists.
+///
+/// `Add`/`Del` are exactly representable. Every other form is dropped by
+/// `ground_v2::legacy_action`'s catch-all, and the causal analyser consumes
+/// the result, so the independence relation it derives is only as complete as
+/// this predicate is true.
+fn effects_survive_strips_lowering(domain: &crate::Pddl31Domain) -> bool {
+    fn effect_ok(e: &PddlEffect) -> bool {
+        match e {
+            PddlEffect::Add(_) | PddlEffect::Del(_) => true,
+            PddlEffect::Numeric(_) | PddlEffect::Timed(_, _) => false,
+            PddlEffect::Forall { .. } | PddlEffect::When { .. } => false,
+        }
+    }
+    domain
+        .actions
+        .iter()
+        .all(|a| a.effect.iter().all(effect_ok))
+        && domain
+            .durative_actions
+            .iter()
+            .all(|a| a.effects.iter().all(effect_ok))
 }
 
 /// Complete output of one exact cognitive-composition request.
@@ -262,6 +302,18 @@ fn build_hierarchical_model(
         return (
             Powl2Model::Silent,
             CognitiveProjectionStanding::ExactSequential,
+            None,
+        );
+    }
+
+    // Refuse to derive concurrency from a shadow. `plan.ops[..].action` is
+    // `ground_v2::legacy_action`'s output -- add/delete atoms only -- so if
+    // the domain carries any other effect form the independence relation
+    // computed below cannot see the conflicts it creates.
+    if !effects_survive_strips_lowering(&admitted.domain) {
+        return (
+            fallback_sequential(plan),
+            CognitiveProjectionStanding::RefusedLossyEffectModel,
             None,
         );
     }

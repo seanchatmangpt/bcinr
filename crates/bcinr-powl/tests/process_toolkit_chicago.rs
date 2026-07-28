@@ -46,9 +46,10 @@ chicago_tdd_tools::test!(stable_node_paths_support_inspection_and_visualization,
             activity("automatic"),
             activity("end"),
         ],
-        vec![(0, 1), (0, 2), (1, 3), (2, 3)],
-        0,
-        3,
+        // Def 3.6: sentinels are 4/5, outside the 4-element child set.
+        vec![(4, 0), (0, 1), (0, 2), (1, 3), (2, 3), (3, 5)],
+        4,
+        5,
     )
     .expect("choice graph should validate");
 
@@ -61,7 +62,8 @@ chicago_tdd_tools::test!(stable_node_paths_support_inspection_and_visualization,
 
     assert_eq!(nodes.len(), 5);
     assert_eq!(selected, &activity("manual"));
-    assert!(mermaid.contains("choice 0->3"));
+    // Sentinel-to-sentinel span under the Def 3.6 encoding.
+    assert!(mermaid.contains("choice 4->5"));
     assert!(mermaid.contains("activity: manual"));
     assert!(mermaid.contains("choice"));
 });
