@@ -75,7 +75,7 @@ bc:TrajectoryConstraint a bc:ClosedTaxonomy ;
 
 bc:Traj_Always a bc:TaxonCase ; bc:inTaxonomy bc:TrajectoryConstraint ; bc:caseOrder 0 ;
     bc:caseName "Always" ; bc:caseShape "tuple" ;
-    bc:caseDoc "Holds in every state." ;
+    bc:caseDoc "Holds in every state of the trajectory, including the initial and final ones." ;
     bc:monitorSupported true ;
     bc:pendingAtFinalizeMeans "satisfied" ;
     bc:pendingRationale "Never reaches a terminal Satisfied; ending Pending means never falsified." .
@@ -176,7 +176,7 @@ bc:Standing_Conjectural a bc:TaxonCase ; bc:inTaxonomy bc:FormalStanding ; bc:ca
 
 bc:Standing_Refuted a bc:TaxonCase ; bc:inTaxonomy bc:FormalStanding ; bc:caseOrder 4 ;
     bc:caseName "Refuted" ; bc:caseShape "unit" ;
-    bc:caseDoc "A countermodel exists." ;
+    bc:caseDoc "A countermodel exists and is recorded: the claim is known false, not merely unproven." ;
     bc:permitsOptimization false .
 
 bc:Standing_Blocked a bc:TaxonCase ; bc:inTaxonomy bc:FormalStanding ; bc:caseOrder 5 ;

@@ -1,0 +1,237 @@
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix bc:   <https://bcinr.dev/ontology#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+################################################################################
+# Admission gate for the bcinr semantic graph.
+#
+# Everything downstream -- Rust enums, exhaustive matches, arity constants,
+# refusal taxonomies -- is manufactured from this graph, so the graph propagates
+# a wrong fact exactly as efficiently as a right one. Generation without an
+# admission gate is a mechanism for making one unchecked assertion look like
+# consensus in every projection at once.
+#
+# These shapes are that gate. They constrain the META-VOCABULARY (what a
+# well-formed TaxonCase, ClosedTaxonomy, NumberedResult, ProfileConstant is),
+# not the domain claims -- a shape cannot decide whether Def 3.7 really requires
+# n >= 2. What it can decide is that a citation resolves, a variant carries a
+# doc, a policy constant admits it is policy, and a derived constructor names
+# what it is derived from.
+#
+# Run: `ggen graph validate --files ontology/*.ttl --shapes ontology/shapes.ttl`
+################################################################################
+
+################################################################################
+# TaxonCase -- one variant of a closed variant set.
+################################################################################
+
+bc:TaxonCaseShape a sh:NodeShape ;
+    sh:targetClass bc:TaxonCase ;
+
+    # Identity. The name is projected directly into Rust as an enum variant, so
+    # it must be exactly one PascalCase token -- a lowercase or spaced value
+    # would render code that does not compile, discovered at build time rather
+    # than at admission time.
+    sh:property [
+        sh:path bc:caseName ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:pattern "^[A-Z][A-Za-z0-9]*$" ;
+        sh:message "caseName must be exactly one PascalCase identifier: it is projected verbatim as a Rust enum variant" ;
+    ] ;
+
+    # Order fixes the declaration sequence in every projection. Two cases with
+    # the same order render in an implementation-defined sequence, which makes
+    # generated output non-deterministic across runs.
+    sh:property [
+        sh:path bc:caseOrder ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:minInclusive 0 ;
+        sh:message "caseOrder must be exactly one non-negative integer: it is the ORDER BY key that makes generation deterministic" ;
+    ] ;
+
+    # A doc string is the only part of the variant a reader sees. An empty or
+    # near-empty one restates the name and carries no information, so the floor
+    # is a real sentence rather than mere presence.
+    sh:property [
+        sh:path bc:caseDoc ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:minLength 24 ;
+        sh:message "caseDoc must be exactly one string of at least 24 characters: a doc that restates the variant name carries no information" ;
+    ] ;
+
+    # Shape decides the Rust match pattern (``, `(..)`, ` { .. }`). An
+    # unrecognised value renders a pattern that does not parse.
+    sh:property [
+        sh:path bc:caseShape ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:in ( "unit" "tuple" "struct" ) ;
+        sh:message "caseShape must be exactly one of unit / tuple / struct: it selects the Rust match-pattern suffix" ;
+    ] ;
+
+    # Membership must resolve to a declared taxonomy, or the case is generated
+    # into no enum at all and silently disappears from every projection.
+    sh:property [
+        sh:path bc:inTaxonomy ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:class bc:ClosedTaxonomy ;
+        sh:message "inTaxonomy must name exactly one declared bc:ClosedTaxonomy" ;
+    ] ;
+
+    # An execution-superset constructor is by definition not primitive, so it
+    # must say what it is derived from. Without this the tier label is an
+    # assertion nothing can check, and `normalize` has no target to normalise
+    # towards.
+    sh:not [
+        sh:and (
+            [ sh:property [ sh:path bc:constructorTier ; sh:hasValue bc:ExecutionOnly ; sh:minCount 1 ] ]
+            [ sh:property [ sh:path bc:derivedFrom ; sh:maxCount 0 ] ]
+        )
+    ] ;
+    sh:message "a bc:ExecutionOnly constructor must declare bc:derivedFrom: 'not primitive' is only meaningful relative to what it reduces to" .
+
+################################################################################
+# ClosedTaxonomy -- the variant set itself.
+################################################################################
+
+bc:ClosedTaxonomyShape a sh:NodeShape ;
+    sh:targetClass bc:ClosedTaxonomy ;
+
+    sh:property [
+        sh:path rdfs:label ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:pattern "^[A-Z][A-Za-z0-9]*$" ;
+        sh:message "a taxonomy's label is projected as a Rust type name and must be exactly one PascalCase identifier" ;
+    ] ;
+
+    sh:property [
+        sh:path bc:taxonomyDoc ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:minLength 24 ;
+        sh:message "taxonomyDoc must be exactly one substantive string" ;
+    ] ;
+
+    # `rustPath` is what the runtime-binding projection matches against. It is
+    # optional -- a taxonomy may exist only as an admitted fact -- but when
+    # present it must be a single path, since the generated `classify` function
+    # names exactly one live type.
+    sh:property [
+        sh:path bc:rustPath ;
+        sh:maxCount 1 ;
+        sh:pattern "^[a-z][a-z0-9_]*(::[A-Za-z][A-Za-z0-9_]*)+$" ;
+        sh:message "rustPath must be a single crate::module::Type path" ;
+    ] .
+
+################################################################################
+# NumberedResult -- citations into the source of record.
+#
+# This is the shape that would have caught the shipped "language preservation
+# (Theorem 1) failed" refusal: the paper has no Theorem 1, and nothing checked
+# that a cited result existed before it reached a user-facing string.
+################################################################################
+
+bc:NumberedResultShape a sh:NodeShape ;
+    sh:targetClass bc:NumberedResult ;
+
+    sh:property [
+        sh:path bc:fromSource ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:class bc:Source ;
+        sh:message "a numbered result must resolve to exactly one declared bc:Source" ;
+    ] ;
+
+    sh:property [
+        sh:path bc:resultNumber ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:pattern "^[0-9][0-9.]*[0-9]$" ;
+        sh:message "resultNumber must be a dotted numeral as printed in the source (e.g. 3.7, 5.5)" ;
+    ] ;
+
+    sh:property [
+        sh:path bc:resultTitle ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "a cited result must carry its title, so a citation can be checked against the source by a reader" ;
+    ] .
+
+bc:SourceShape a sh:NodeShape ;
+    sh:targetClass bc:Source ;
+    sh:property [
+        sh:path bc:sourceTitle ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:message "a source of record must carry its title" ;
+    ] .
+
+################################################################################
+# CaseField -- one field of a TaxonCase.
+################################################################################
+
+bc:CaseFieldShape a sh:NodeShape ;
+    sh:targetObjectsOf bc:caseField ;
+
+    sh:property [
+        sh:path bc:fieldOrder ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:minInclusive 0 ;
+        sh:message "fieldOrder must be exactly one non-negative integer: it fixes positional field order" ;
+    ] ;
+
+    sh:property [
+        sh:path bc:fieldName ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:pattern "^[a-z][a-z0-9_]*$" ;
+        sh:message "fieldName is projected as a Rust field and must be exactly one snake_case identifier" ;
+    ] ;
+
+    sh:property [
+        sh:path bc:fieldType ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "fieldType must be exactly one Rust type expression" ;
+    ] .
+
+################################################################################
+# ProfileConstant -- the derivation discipline, made checkable.
+#
+# The governing rule is stated in profile.ttl: every constant is EITHER derived
+# from a stated rule OR explicitly marked policy with an owner and a rationale.
+# Stated in prose it is a convention; stated here it is an admission condition,
+# and a magic number with neither cannot enter the graph.
+################################################################################
+
+bc:ProfileConstantShape a sh:NodeShape ;
+    sh:targetClass bc:ProfileConstant ;
+
+    sh:property [
+        sh:path bc:constName ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:pattern "^[A-Z][A-Z0-9_]*$" ;
+        sh:message "constName is projected as a Rust constant and must be exactly one UPPER_SNAKE_CASE identifier" ;
+    ] ;
+
+    sh:property [
+        sh:path bc:constType ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:message "constType must be exactly one Rust type" ;
+    ] ;
+
+    sh:property [
+        sh:path bc:constValue ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:message "constValue must be exactly one literal" ;
+    ] ;
+
+    sh:or (
+        [ sh:property [ sh:path bc:derivationOf ; sh:minCount 1 ; sh:minLength 24 ] ]
+        [ sh:and (
+            [ sh:property [ sh:path bc:policyMarked    ; sh:hasValue true ; sh:minCount 1 ] ]
+            [ sh:property [ sh:path bc:policyOwner     ; sh:minCount 1 ] ]
+            [ sh:property [ sh:path bc:policyRationale ; sh:minCount 1 ; sh:minLength 24 ] ]
+        ) ]
+    ) ;
+    sh:message "a profile constant must carry either bc:derivationOf (how it follows) or bc:policyMarked + bc:policyOwner + bc:policyRationale (that it does not, who chose it, and why) -- a number with neither is presented as though it followed from the mathematics" .

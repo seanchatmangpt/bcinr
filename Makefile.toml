@@ -25,8 +25,31 @@ description = "Verify workspace compiles"
 # (`Execute Command: "cargo" "check"`, no flags). Same fix pattern already
 # established by the `fmt` task below for the identical reason.
 workspace = false
+dependencies = ["graph-validate"]
 command = "cargo"
 args = ["check", "--workspace", "--all-targets", "--all-features"]
+
+[tasks.graph-validate]
+category = "Build"
+description = "Admission gate for the semantic graph: SHACL-validate every ontology file"
+# Everything in crates/*/src/generated_*.rs and crates/bcinr-guarded/ is
+# manufactured from these files, so a wrong fact here propagates to every
+# projection at once and looks authoritative in all of them. This runs first
+# in `check` for that reason: generation must not be reachable from a graph
+# that has not been admitted.
+#
+# Files are validated one at a time (the tool's own semantics), so a shape
+# whose sh:class target lives in a *different* file cannot be checked. Keep
+# each taxonomy's ClosedTaxonomy declaration in the same file as its cases.
+workspace = false
+command = "ggen"
+args = [
+    "graph", "validate",
+    "--files", "ontology/bcinr.ttl",
+    "--files", "ontology/taxonomies.ttl",
+    "--files", "ontology/profile.ttl",
+    "--shapes", "ontology/shapes.ttl",
+]
 
 [tasks.build]
 category = "Build"
