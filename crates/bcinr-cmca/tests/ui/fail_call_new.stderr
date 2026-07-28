@@ -4,7 +4,7 @@ error[E0624]: associated function `new` is private
 3 |     let _ = CertifiedLearning::new();
   |                                ^^^ private associated function
   |
- ::: src/allocator.rs
+ ::: src/allocator/mod.rs
   |
   |     pub(crate) const fn new() -> Self {
   |     --------------------------------- private associated function defined here

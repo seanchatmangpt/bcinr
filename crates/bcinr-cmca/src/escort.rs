@@ -1,6 +1,32 @@
 //! Fractional-exponent escort distribution: `L_q(i) = p_i^q / SUM_j p_j^q`,
 //! for real-valued `q`.
 //!
+//! # Ancestry
+//!
+//! This normalized-power construction is not novel to this crate. It is an
+//! *escort mapping* -- see Harper, "Escort Evolutionary Game Theory"
+//! (Physica D, 2009), which develops escort maps `phi(x) = x^q` over the
+//! simplex, escort replicator dynamics, and the `q == 0` orthogonal-projection
+//! special case -- and the exponent `q` plays the role of a multifractal
+//! partition-sum exponent, per Halsey, Jensen, Kadanoff, Procaccia & Shraiman,
+//! "Fractal measures and their singularities" (Phys. Rev. A, 1986), where
+//! varying `q` shifts which subset of a measure dominates a partition sum
+//! `chi(q) = sum_i p_i^q`.
+//!
+//! What this crate adds on top of that ancestry: a fixed five-lens reference
+//! profile (not yet formalized -- see `~/mfw`'s planned
+//! `MFW/CMCA/ReferenceEscort.lean`), typed refusals instead of silent
+//! degradation, a fixed-point (not floating-point) realization, an explicit
+//! declared lens domain (below), integration with [`crate::cascade`]'s
+//! hierarchical allocation, and a still-open, not-yet-resolved semantic
+//! decision between *support coverage* (this module's and
+//! `cascade::escort_weight`'s current `q == 0` convention: uniform over
+//! positive-mass support) and *sibling coverage* (uniform over every
+//! eligible sibling, zero-mass included). This module's current behavior is
+//! not a claim that it already conforms to whatever `~/mfw`'s Lean crown
+//! ultimately settles for `q == 0` -- the citation above documents
+//! mathematical ancestry, not completed conformance.
+//!
 //! # Relationship to `cascade::escort_weight` and `allocator::power`
 //!
 //! [`crate::cascade::escort_weight`] computes `m^q` exactly, by repeated

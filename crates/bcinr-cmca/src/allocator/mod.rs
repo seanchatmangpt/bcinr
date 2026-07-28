@@ -1303,100 +1303,17 @@ fn compute_pi_kq_for_kq(
     res
 }
 
-/// Allocates resources down the node forest branchlessly, performing MWU step updates,
-/// stable projections, and explore floors.
-///
-/// This is the entry point for the Cascade Allocation engine.
-///
-/// # Mathematical Behavior
-///
-/// 1. **Divergence Guard & MWU**: For each internal node, computes the divergence $\kappa_v$ between child
-///    allocations and subtree leaf distributions. If $\kappa_v > \epsilon_{\kappa}$ and learning is authorized
-///    by `proof`, updates routing weights multiplicatively using payoffs scaled by learning rate $\beta$.
-/// 2. **Cascade flow propagation**: Distributes flow from roots to leaves over the hierarchy of $N$ nodes.
-/// 3. **Stable projection**: Scales leaf allocations by $\exp(-\mu_x \cdot c_x)$ and normalizes.
-/// 4. **Explore floor mixture**: Restricts allocations from dropping below $\frac{\eta}{n_L}$ by mixing the
-///    projection with a uniform distribution.
-///
-/// # Inputs
-/// - `states`: Packed semantic states for the $N$ nodes.
-/// - `lenses`: Lenses defining policy priorities.
-/// - `lambda`: Weighting matrix mapping models and lenses to overall priority.
-/// - `eta`: Explore floor parameter $\eta \in [0, 1]$.
-/// - `parent`: Forest structure represented by parent indices (where `-1` indicates root).
-/// - `weights`: Multiplicative routing weights (updated in place).
-/// - `payoffs`: Environment payoff feedback for each decision slot.
-/// - `zeta`: Learning rate parameter.
-/// - `epsilon_kappa`: Divergence update threshold.
-/// - `mu`: Resource prices vector.
-/// - `costs`: Operational costs vector.
-/// - `t`: Current epoch index.
-/// - `last_switch_t`: Epoch of the last policy switch (updated in place).
-/// - `prev_mode`: Currently active policy mode index (updated in place).
-/// - `tau_d`: Minimum dwell rounds constraint.
-/// - `digest`: Security certificate digest.
-/// - `proof`: Verification proof authorizing learning updates.
-///
-/// # Outputs
-/// Returns the resource allocation probability distribution over the $N$ nodes if successful,
-/// or a [`StabilityRefusal`] code otherwise.
-///
-/// # Complexity
-/// - **Time Complexity**: $O(K \cdot Q \cdot N^2)$ operations ($O(1)$ constant time).
-/// - **Space Complexity**: $O(1)$ auxiliary stack space.
-/// - **Cyclomatic Complexity**: $CC = 1$.
-///
-/// # Examples
-///
-/// ```rust
-/// use bcinr_cmca::fixed::NonNegativeFixed;
-/// use bcinr_cmca::allocator::{allocate, AdaptiveUpdate, AdmittedControlState, CertificateReceipt, EnvelopeReceipt, OutcomeReceipt, CertifiedLearning};
-/// use bcinr_cmca::generated::consequence_mass::case_studies::{OBJECT_REGISTRY, LENS_REGISTRY, LAMBDA, ETA, N, Q};
-/// use bcinr_cmca::generated::stability_profile::CERTIFICATE_DIGEST;
-///
-/// let mut weights = [[NonNegativeFixed::ONE; 2 * Q]; N];
-/// let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
-/// let mut last_switch_t = 0;
-/// let mut prev_mode = 0;
-/// let parent = [-1; N];
-/// let mu = [NonNegativeFixed::ZERO; N];
-/// let costs = [NonNegativeFixed::ZERO; N];
-///
-/// let proof = AdaptiveUpdate::admit_adaptive_update(
-///     AdmittedControlState::admit_control_state(0),
-///     CertificateReceipt::admit_certificate(0),
-///     EnvelopeReceipt::admit_envelope(0),
-///     OutcomeReceipt::admit_outcome(0),
-///     NonNegativeFixed::ZERO,
-///     NonNegativeFixed::ONE,
-///     CertifiedLearning::admit_learning(),
-/// );
-///
-/// let result = allocate(
-///     &OBJECT_REGISTRY,
-///     &LENS_REGISTRY,
-///     &LAMBDA,
-///     ETA,
-///     &parent,
-///     &mut weights,
-///     &payoffs,
-///     NonNegativeFixed::ZERO,
-///     NonNegativeFixed::ZERO,
-///     &mu,
-///     &costs,
-///     0,
-///     &mut last_switch_t,
-///     &mut prev_mode,
-///     500,
-///     CERTIFICATE_DIGEST,
-///     proof.as_ref(),
-/// );
-/// assert!(result.is_ok());
-/// ```
+mod feasible_region;
+pub use feasible_region::FeasibleRegion;
+
+/// [`allocate`] parameterized by an explicit [`FeasibleRegion`] instead of
+/// [`FeasibleRegion::CURRENT`]. See `allocate`'s docs for the mechanism,
+/// inputs, and complexity -- identical here except for `region`.
 ///
 /// # Branchless Contract
 #[allow(clippy::too_many_arguments)] // deliberate wide parameter list preserving the public allocation API
-pub fn allocate(
+pub fn allocate_in(
+    region: &FeasibleRegion,
     states: &[PackedSemanticState; N],
     lenses: &[LensSpec; Q],
     lambda: &[[NonNegativeFixed; Q]; K],
@@ -1419,10 +1336,10 @@ pub fn allocate(
     let mut local_last_switch_t = *last_switch_t;
     let mut local_prev_mode = *prev_mode;
 
-    let beta_max = NonNegativeFixed::from_bits(6553);
-    let m_min = NonNegativeFixed::from_bits(6);
-    let m_max = NonNegativeFixed::from_bits(65536000);
-    let mu_max = NonNegativeFixed::from_bits(6553600);
+    let beta_max = region.beta_max;
+    let m_min = region.m_min;
+    let m_max = region.m_max;
+    let mu_max = region.mu_max;
 
     let proof_some = proof.is_some();
     let degrade_to_certified_selection = proof.is_none();
@@ -1824,6 +1741,144 @@ pub fn allocate(
     wrap_result(
         pi_res,
         const_select_u32(has_refusal as u32, err_val, u32::MAX),
+    )
+}
+
+/// Allocates resources down the node forest branchlessly, performing MWU step updates,
+/// stable projections, and explore floors.
+///
+/// This is the entry point for the Cascade Allocation engine. It is
+/// [`allocate_in`] with the bounds this crate has always used
+/// ([`FeasibleRegion::CURRENT`]) -- preserved as a thin wrapper so no
+/// existing caller needs to change:
+/// `allocate(x) == allocate_in(&FeasibleRegion::CURRENT, x)` for every
+/// input, by construction. Call `allocate_in` directly to use a different
+/// [`FeasibleRegion`].
+///
+/// # Mathematical Behavior
+///
+/// 1. **Divergence Guard & MWU**: For each internal node, computes the divergence $\kappa_v$ between child
+///    allocations and subtree leaf distributions. If $\kappa_v > \epsilon_{\kappa}$ and learning is authorized
+///    by `proof`, updates routing weights multiplicatively using payoffs scaled by learning rate $\beta$.
+/// 2. **Cascade flow propagation**: Distributes flow from roots to leaves over the hierarchy of $N$ nodes.
+/// 3. **Stable projection**: Scales leaf allocations by $\exp(-\mu_x \cdot c_x)$ and normalizes.
+/// 4. **Explore floor mixture**: Restricts allocations from dropping below $\frac{\eta}{n_L}$ by mixing the
+///    projection with a uniform distribution.
+///
+/// # Inputs
+/// - `states`: Packed semantic states for the $N$ nodes.
+/// - `lenses`: Lenses defining policy priorities.
+/// - `lambda`: Weighting matrix mapping models and lenses to overall priority.
+/// - `eta`: Explore floor parameter $\eta \in [0, 1]$.
+/// - `parent`: Forest structure represented by parent indices (where `-1` indicates root).
+/// - `weights`: Multiplicative routing weights (updated in place).
+/// - `payoffs`: Environment payoff feedback for each decision slot.
+/// - `zeta`: Learning rate parameter.
+/// - `epsilon_kappa`: Divergence update threshold.
+/// - `mu`: Resource prices vector.
+/// - `costs`: Operational costs vector.
+/// - `t`: Current epoch index.
+/// - `last_switch_t`: Epoch of the last policy switch (updated in place).
+/// - `prev_mode`: Currently active policy mode index (updated in place).
+/// - `tau_d`: Minimum dwell rounds constraint.
+/// - `digest`: Security certificate digest.
+/// - `proof`: Verification proof authorizing learning updates.
+///
+/// # Outputs
+/// Returns the resource allocation probability distribution over the $N$ nodes if successful,
+/// or a [`StabilityRefusal`] code otherwise.
+///
+/// # Complexity
+/// - **Time Complexity**: $O(K \cdot Q \cdot N^2)$ operations ($O(1)$ constant time).
+/// - **Space Complexity**: $O(1)$ auxiliary stack space.
+/// - **Cyclomatic Complexity**: $CC = 1$.
+///
+/// # Examples
+///
+/// ```rust
+/// use bcinr_cmca::fixed::NonNegativeFixed;
+/// use bcinr_cmca::allocator::{allocate, AdaptiveUpdate, AdmittedControlState, CertificateReceipt, EnvelopeReceipt, OutcomeReceipt, CertifiedLearning};
+/// use bcinr_cmca::generated::consequence_mass::case_studies::{OBJECT_REGISTRY, LENS_REGISTRY, LAMBDA, ETA, N, Q};
+/// use bcinr_cmca::generated::stability_profile::CERTIFICATE_DIGEST;
+///
+/// let mut weights = [[NonNegativeFixed::ONE; 2 * Q]; N];
+/// let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
+/// let mut last_switch_t = 0;
+/// let mut prev_mode = 0;
+/// let parent = [-1; N];
+/// let mu = [NonNegativeFixed::ZERO; N];
+/// let costs = [NonNegativeFixed::ZERO; N];
+///
+/// let proof = AdaptiveUpdate::admit_adaptive_update(
+///     AdmittedControlState::admit_control_state(0),
+///     CertificateReceipt::admit_certificate(0),
+///     EnvelopeReceipt::admit_envelope(0),
+///     OutcomeReceipt::admit_outcome(0),
+///     NonNegativeFixed::ZERO,
+///     NonNegativeFixed::ONE,
+///     CertifiedLearning::admit_learning(),
+/// );
+///
+/// let result = allocate(
+///     &OBJECT_REGISTRY,
+///     &LENS_REGISTRY,
+///     &LAMBDA,
+///     ETA,
+///     &parent,
+///     &mut weights,
+///     &payoffs,
+///     NonNegativeFixed::ZERO,
+///     NonNegativeFixed::ZERO,
+///     &mu,
+///     &costs,
+///     0,
+///     &mut last_switch_t,
+///     &mut prev_mode,
+///     500,
+///     CERTIFICATE_DIGEST,
+///     proof.as_ref(),
+/// );
+/// assert!(result.is_ok());
+/// ```
+#[allow(clippy::too_many_arguments)] // deliberate wide parameter list preserving the public allocation API
+pub fn allocate(
+    states: &[PackedSemanticState; N],
+    lenses: &[LensSpec; Q],
+    lambda: &[[NonNegativeFixed; Q]; K],
+    eta: NonNegativeFixed,
+    parent: &[i32; N],
+    weights: &mut [[NonNegativeFixed; 2 * Q]; N],
+    payoffs: &[[NonNegativeFixed; 2 * Q]; N],
+    zeta: NonNegativeFixed,
+    epsilon_kappa: NonNegativeFixed,
+    mu: &[NonNegativeFixed; N],
+    costs: &[NonNegativeFixed; N],
+    t: u32,
+    last_switch_t: &mut u32,
+    prev_mode: &mut u32,
+    tau_d: u32,
+    digest: [u8; 32],
+    proof: Option<&AdaptiveUpdate<CertifiedLearning>>,
+) -> Result<[NonNegativeFixed; N], StabilityRefusal> {
+    allocate_in(
+        &FeasibleRegion::CURRENT,
+        states,
+        lenses,
+        lambda,
+        eta,
+        parent,
+        weights,
+        payoffs,
+        zeta,
+        epsilon_kappa,
+        mu,
+        costs,
+        t,
+        last_switch_t,
+        prev_mode,
+        tau_d,
+        digest,
+        proof,
     )
 }
 
