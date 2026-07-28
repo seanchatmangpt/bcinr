@@ -183,7 +183,24 @@ fn solve_from(
 
     let ground = ExactClassicalProblem::build(&domain, &problem, 200_000)?;
     let ground_actions = ground.actions.len();
-    let tape = ground.find_plan(max_depth, max_states)?;
+    // `SolveResult` carries labels and nothing else, so this takes the
+    // label-only lowering. `find_plan` would refuse this domain outright. The
+    // refusal actually reported is on the PRECONDITION axis, measured by
+    // running `tools/bcinr-controller` (which calls `find_plan`) against this
+    // fixture:
+    //
+    //   planning failed: action launch-implementation-workflow(claude-code,
+    //   baseline-repair) carries a universally quantified precondition that
+    //   the flat STRIPS tape cannot represent
+    //
+    // i.e. `launch-implementation-workflow`'s `forall`-over-dependencies
+    // precondition, which the flat `Pddl8GroundAction` cannot represent.
+    // `admit-implementation-success` independently carries a `forall`/`when`
+    // conditional effect (invalidating prior test results on
+    // re-implementation), refused on the effect axis; the precondition
+    // refusal above is simply the one that surfaces. Either way it is a
+    // refusal these assertions would be earning over a field they never read.
+    let tape = ground.find_label_plan(max_depth, max_states)?;
     Ok(SolveResult {
         labels: tape.ops.iter().map(|o| o.label.clone()).collect(),
         ground_actions,

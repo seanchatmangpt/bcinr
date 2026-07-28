@@ -1147,37 +1147,76 @@ impl GroundTemporalProblem {
                     }
                 }
 
-                // If the next event is a completion at `current_time`, process ONE completion.
-                // Note: there could be multiple completions at `current_time`.
-                // We pick the first one and remove it.
-                if let Some(min_pos) = pending
+                // Every completion due at `current_time` is processed as one
+                // batch, in the act-type order VAL's Def 3.3 fixes for
+                // simultaneous happenings: invariant checks, then effects.
+                //
+                // Processing one completion at a time made the verdict depend
+                // on the order actions happen to be declared in, because a
+                // completion's at-end effects mutated the state that a
+                // co-timed completion's at-end conditions were then judged
+                // against. Falsified before this change: two actions ending at
+                // t=2, one deleting `p` at end and the other requiring `p` at
+                // end, gave `not found` declared a-then-b and `Found` declared
+                // b-then-a, for the same domain and problem.
+                let due: Vec<usize> = pending
                     .iter()
                     .enumerate()
                     .filter(|(_, (t, _, _, _))| *t == current_time)
                     .map(|(p, _)| p)
-                    .next()
-                {
-                    let (_, idx, _, at_end_conds) = pending.remove(min_pos);
-                    let da = &self.durative_actions[idx];
-                    // `at end` conditions are judged at completion, against the
-                    // state that actually obtains there.
-                    if !at_end_conds
+                    .collect();
+                if !due.is_empty() {
+                    let batch: Vec<(usize, Vec<PddlCondition>)> = due
                         .iter()
-                        .all(|c| eval_condition(c, &state, &fn_vals, &self.quant_domain))
+                        .rev() // remove back-to-front so earlier indices stay valid
+                        .map(|&pos| {
+                            let (_, idx, _, at_end_conds) = pending.remove(pos);
+                            (idx, at_end_conds)
+                        })
+                        .collect();
+
+                    // Phase 1 -- conditions, all judged against the state as it
+                    // stands before any effect at this instant is applied.
+                    let holds = |conds: &[PddlCondition], st: &_, fv: &_| {
+                        conds
+                            .iter()
+                            .all(|c| eval_condition(c, st, fv, &self.quant_domain))
+                    };
+                    if !batch
+                        .iter()
+                        .all(|(_, conds)| holds(conds, &state, &fn_vals))
                     {
                         trajectory_dead = true;
                         break;
                     }
-                    for eff in &da.effects {
-                        apply_effect_at_end(
-                            eff,
-                            &mut state,
-                            &mut fn_vals,
-                            &self.quant_domain,
-                            &self.derived_predicates,
-                        );
+
+                    // Phase 2 -- effects.
+                    for (idx, _) in &batch {
+                        for eff in &self.durative_actions[*idx].effects {
+                            apply_effect_at_end(
+                                eff,
+                                &mut state,
+                                &mut fn_vals,
+                                &self.quant_domain,
+                                &self.derived_predicates,
+                            );
+                        }
+                        completed.insert(*idx);
                     }
-                    completed.insert(idx);
+
+                    // Non-interference of coinciding endpoints (PDDL 2.1's
+                    // no-moving-targets rule; VAL resolves simultaneity by
+                    // requiring that the preconditions and effects of coinciding
+                    // actions do not interfere). A condition that held before the
+                    // batch and fails after it was satisfied only by winning a
+                    // race, so the plan is not valid whichever order was taken.
+                    if !batch
+                        .iter()
+                        .all(|(_, conds)| holds(conds, &state, &fn_vals))
+                    {
+                        trajectory_dead = true;
+                        break;
+                    }
                 }
             } else if !scheduled {
                 trajectory_dead = true;
@@ -1211,7 +1250,9 @@ impl GroundTemporalProblem {
         } else {
             true
         };
-        if eval_condition(&self.goal, &state, &fn_vals, &self.quant_domain) {
+        // A trajectory that died (broken `over all` invariant, policy violation,
+        // failed precondition, ...) is not a plan, however the final state reads.
+        if !trajectory_dead && eval_condition(&self.goal, &state, &fn_vals, &self.quant_domain) {
             let makespan = steps
                 .iter()
                 .map(|s| s.start_time + s.duration)

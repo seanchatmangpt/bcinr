@@ -77,8 +77,9 @@ pub mod wf_net_bridge_temporal;
 #[cfg(feature = "mfw-planner")]
 pub mod workflow_cmd;
 pub use capability::{
-    admit_planning_task, AdmittedPlanningTask, CapabilityProfile, DefaultCapabilityProfile,
-    GroundedPlanningEpoch, PddlFeature, SemanticSupport, ALL_PDDL_FEATURES,
+    admit_planning_task, feature_bit, unsupported_mask, AdmittedPlanningTask, CapabilityProfile,
+    DefaultCapabilityProfile, GroundedPlanningEpoch, PddlFeature, SemanticSupport,
+    ALL_PDDL_FEATURES,
 };
 pub use capability_router::{
     route_capability_plan, CapabilityRouteReceipt, CapabilityTask, CostVector, DesiredEffect,
@@ -111,7 +112,7 @@ pub use embedded::{
 };
 pub use ground_v2::{
     ExactClassicalCapabilityProfile, ExactClassicalError, ExactClassicalProblem, ExactGroundAction,
-    EXACT_MAX_GROUND_ACTIONS, EXACT_MAX_PLAN_DEPTH, EXACT_MAX_SEARCH_STATES,
+    LossyLowering, EXACT_MAX_GROUND_ACTIONS, EXACT_MAX_PLAN_DEPTH, EXACT_MAX_SEARCH_STATES,
 };
 pub use llm_bridge::{
     admit_candidate_domain, admit_candidate_problem, manufacture_world, AdmittedDomain,

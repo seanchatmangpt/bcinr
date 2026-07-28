@@ -57,6 +57,36 @@ pub enum ExactClassicalError {
         function: String,
     },
     TapeFull,
+    /// A ground action on the found plan carries an effect that the flat
+    /// STRIPS `Pddl8GroundAction` shipped on the emitted tape cannot
+    /// represent (conditional, quantified, numeric, or timed). The *search*
+    /// handles these exactly (see `collect_effect`); only the lowering to the
+    /// legacy tape is lossy, so the refusal fires when the lossy artifact
+    /// would escape -- never during grounding or search.
+    EffectNotRepresentable {
+        action: String,
+        effect_kind: &'static str,
+    },
+    /// A ground action on the found plan carries a *precondition* that the
+    /// flat STRIPS `Pddl8GroundAction` shipped on the emitted tape cannot
+    /// represent (negated, disjunctive, implicative, quantified, numeric, or
+    /// timed). `Pddl8GroundAction::preconditions` is a conjunction of positive
+    /// ground atoms and nothing else, so every other form is dropped by
+    /// `collect_positive_atoms`.
+    ///
+    /// This is the precondition twin of [`Self::EffectNotRepresentable`] and
+    /// fires at the same boundary, for the same reason: the *search* evaluates
+    /// these forms exactly (see `eval_condition`), and refusing during
+    /// grounding would reject domains that plan correctly. What must not
+    /// escape is the lowered artifact. A tape whose `preconditions` silently
+    /// omit a load-bearing condition validates **vacuously** --
+    /// `validate::validate_plan` iterates exactly that list, so it reports a
+    /// plan as valid precisely because the conditions that would have
+    /// falsified it were dropped on the way in.
+    PreconditionNotRepresentable {
+        action: String,
+        condition_kind: &'static str,
+    },
     /// `capability::admit_planning_task` refused the domain/problem pair --
     /// e.g. `problem.domain != domain.name` (a check `validate_scope` never
     /// performs), an empty/malformed domain, or a requirement the domain's
@@ -114,6 +144,20 @@ impl std::fmt::Display for ExactClassicalError {
                 write!(f, "numeric scale-down by zero for {function}")
             }
             Self::TapeFull => write!(f, "plan exceeds the 64-slot PDDL tape bound"),
+            Self::EffectNotRepresentable {
+                action,
+                effect_kind,
+            } => write!(
+                f,
+                "action {action} carries a {effect_kind} effect that the flat STRIPS tape cannot represent"
+            ),
+            Self::PreconditionNotRepresentable {
+                action,
+                condition_kind,
+            } => write!(
+                f,
+                "action {action} carries a {condition_kind} precondition that the flat STRIPS tape cannot represent"
+            ),
             Self::Admission(failure) => write!(f, "admission refused: {failure}"),
         }
     }
@@ -148,6 +192,25 @@ impl CapabilityProfile for ExactClassicalCapabilityProfile {
     }
 }
 
+/// Which half of a `Pddl8GroundAction` lost information during the flat STRIPS
+/// lowering, and to what form.
+///
+/// One marker covers both axes rather than two parallel `Option` fields: the
+/// two losses are the same defect (`Pddl8GroundAction` carries conjunctions of
+/// positive ground atoms and nothing else) seen from either side, and a single
+/// field makes it impossible to check one and forget the other -- which is
+/// exactly how the precondition axis stayed silent after the effect axis was
+/// closed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LossyLowering {
+    /// A precondition form dropped by `collect_positive_atoms`: negated,
+    /// disjunctive, implicative, quantified, numeric, or timed.
+    Precondition(&'static str),
+    /// An effect form dropped by `legacy_action`: conditional, quantified,
+    /// numeric, or timed.
+    Effect(&'static str),
+}
+
 #[derive(Debug, Clone)]
 pub struct ExactGroundAction {
     pub schema_name: String,
@@ -156,6 +219,15 @@ pub struct ExactGroundAction {
     pub condition: PddlCondition,
     pub effects: Vec<PddlEffect>,
     pub legacy_action: Pddl8GroundAction,
+    /// `Some(..)` when `legacy_action` dropped a precondition or an effect
+    /// during the flat STRIPS lowering. Recorded at grounding time so
+    /// `path_to_tape` can refuse by a field read instead of re-walking the
+    /// condition and effect trees.
+    ///
+    /// When both axes are lossy this names the effect, so that the refusal an
+    /// action raises does not change as the precondition check is added; the
+    /// tie-break is cosmetic, since either value refuses the same tape.
+    pub lossy: Option<LossyLowering>,
 }
 
 #[derive(Debug, Clone)]
@@ -265,18 +337,66 @@ impl ExactClassicalProblem {
         })
     }
 
-    /// Exact breadth-first search over the admitted classical semantics.
+    /// Exact breadth-first search over the admitted classical semantics,
+    /// lowered to a tape whose per-op `action` carries the plan's **exact**
+    /// preconditions and effects.
+    ///
+    /// That contract is why this refuses on either axis whenever an action on
+    /// the found path cannot ride the flat `Pddl8GroundAction`:
+    ///
+    /// - [`ExactClassicalError::EffectNotRepresentable`] for a conditional,
+    ///   quantified, numeric, or timed effect;
+    /// - [`ExactClassicalError::PreconditionNotRepresentable`] for a negated,
+    ///   disjunctive, implicative, quantified, numeric, or timed precondition.
+    ///
+    /// A tape whose fields silently omit a load-bearing effect *or* condition
+    /// is a wrong answer, not a partial one — and the precondition half is the
+    /// worse of the two, since `validate::validate_plan` iterates
+    /// `preconditions` to decide validity and therefore reports a dropped
+    /// condition as a satisfied one. Callers that read nothing but
+    /// `ops[..].label` should call [`Self::find_label_plan`] instead — being
+    /// refused over fields they never touch is the wrong trade.
     pub fn find_plan(
         &self,
         max_depth: usize,
         max_states: usize,
     ) -> Result<Pddl8Tape, ExactClassicalError> {
+        let path = self.search_path(max_depth, max_states)?;
+        self.path_to_tape(&path)
+    }
+
+    /// The same bounded search as [`Self::find_plan`], lowered to a tape that
+    /// carries **labels and order only** — every op's preconditions and
+    /// effects are empty, never fabricated from a lossy flattening.
+    ///
+    /// Call this only from consumers that provably read nothing but
+    /// `ops[..].label` (and the sequential `pred_mask` order). An empty
+    /// effect list here means "not carried", not "this action has no
+    /// effects"; anything that replays, validates, or derives independence
+    /// from the tape must use [`Self::find_plan`] and take the refusal.
+    pub fn find_label_plan(
+        &self,
+        max_depth: usize,
+        max_states: usize,
+    ) -> Result<Pddl8Tape, ExactClassicalError> {
+        let path = self.search_path(max_depth, max_states)?;
+        self.path_to_label_tape(&path)
+    }
+
+    /// Bounded BFS returning the witnessed plan as action indices. Shared by
+    /// both lowerings so they can never disagree about *which* plan was found
+    /// — they differ only in what each op is allowed to claim about itself.
+    fn search_path(
+        &self,
+        max_depth: usize,
+        max_states: usize,
+    ) -> Result<Vec<usize>, ExactClassicalError> {
         let initial = ExactState {
             facts: self.initial_facts.clone(),
             functions: self.initial_functions.clone(),
         };
         if eval_condition(&self.goal, &initial, &self.objects, &self.type_index) {
-            return Ok(Pddl8Tape { ops: Vec::new() });
+            return Ok(Vec::new());
         }
 
         let mut queue = VecDeque::from([(initial.clone(), Vec::<usize>::new())]);
@@ -303,7 +423,7 @@ impl ExactClassicalProblem {
                 let mut next_path = path.clone();
                 next_path.push(action_index);
                 if eval_condition(&self.goal, &next, &self.objects, &self.type_index) {
-                    return self.path_to_tape(&next_path);
+                    return Ok(next_path);
                 }
                 queue.push_back((next, next_path));
             }
@@ -316,9 +436,55 @@ impl ExactClassicalProblem {
         }
     }
 
+    /// Lower a witnessed path to a label-and-order-only tape: `preconditions`,
+    /// `add_effects`, and `del_effects` are empty on every op by construction.
+    fn path_to_label_tape(&self, path: &[usize]) -> Result<Pddl8Tape, ExactClassicalError> {
+        if path.len() > 64 {
+            return Err(ExactClassicalError::TapeFull);
+        }
+        let ops = path
+            .iter()
+            .enumerate()
+            .map(|(index, action_index)| {
+                let action = &self.actions[*action_index];
+                Pddl8TapeOp {
+                    index: index as u8,
+                    label: action.label.clone(),
+                    pred_mask: if index == 0 { 0 } else { 1u64 << (index - 1) },
+                    action: Pddl8GroundAction {
+                        schema_name: action.schema_name.clone(),
+                        label: action.label.clone(),
+                        preconditions: Vec::new(),
+                        add_effects: Vec::new(),
+                        del_effects: Vec::new(),
+                    },
+                }
+            })
+            .collect();
+        Ok(Pddl8Tape { ops })
+    }
+
     fn path_to_tape(&self, path: &[usize]) -> Result<Pddl8Tape, ExactClassicalError> {
         if path.len() > 64 {
             return Err(ExactClassicalError::TapeFull);
+        }
+        for action_index in path {
+            let action = &self.actions[*action_index];
+            match action.lossy {
+                Some(LossyLowering::Effect(effect_kind)) => {
+                    return Err(ExactClassicalError::EffectNotRepresentable {
+                        action: action.label.clone(),
+                        effect_kind,
+                    })
+                }
+                Some(LossyLowering::Precondition(condition_kind)) => {
+                    return Err(ExactClassicalError::PreconditionNotRepresentable {
+                        action: action.label.clone(),
+                        condition_kind,
+                    })
+                }
+                None => {}
+            }
         }
         let ops = path
             .iter()
@@ -449,11 +615,13 @@ fn ground_action_schema(
                 .iter()
                 .map(|effect| subst_effect(effect, binding))
                 .collect::<Vec<_>>();
+            let (legacy, lossy) = legacy_action(&schema.name, &label, &condition, &effects);
             out.push(ExactGroundAction {
                 schema_name: schema.name.clone(),
                 label: label.clone(),
                 args,
-                legacy_action: legacy_action(&schema.name, &label, &condition, &effects),
+                legacy_action: legacy,
+                lossy,
                 condition,
                 effects,
             });
@@ -755,36 +923,89 @@ fn legacy_action(
     label: &str,
     condition: &PddlCondition,
     effects: &[PddlEffect],
-) -> Pddl8GroundAction {
+) -> (Pddl8GroundAction, Option<LossyLowering>) {
     let mut preconditions = Vec::new();
-    collect_positive_atoms(condition, &mut preconditions);
+    let dropped_condition = collect_positive_atoms(condition, &mut preconditions);
     let mut add_effects = Vec::new();
     let mut del_effects = Vec::new();
+    let mut dropped_effect: Option<&'static str> = None;
     for effect in effects {
         match effect {
             PddlEffect::Add(atom) => add_effects.push(atom_to_ground(atom)),
             PddlEffect::Del(atom) => del_effects.push(atom_to_ground(atom)),
-            _ => {}
+            // The search lowers these exactly; the flat tape cannot carry
+            // them. Record the loss rather than refuse here -- refusing at
+            // grounding time would reject domains that plan correctly.
+            PddlEffect::When { .. } => dropped_effect = dropped_effect.or(Some("conditional")),
+            PddlEffect::Forall { .. } => dropped_effect = dropped_effect.or(Some("quantified")),
+            PddlEffect::Numeric(_) => dropped_effect = dropped_effect.or(Some("numeric")),
+            PddlEffect::Timed(_, _) => dropped_effect = dropped_effect.or(Some("timed")),
         }
     }
-    Pddl8GroundAction {
-        schema_name: schema_name.to_string(),
-        label: label.to_string(),
-        preconditions,
-        add_effects,
-        del_effects,
-    }
+    // Effect wins the tie so that an action lossy on both axes keeps raising
+    // the refusal it already raised before the precondition axis was checked.
+    let lossy = dropped_effect
+        .map(LossyLowering::Effect)
+        .or(dropped_condition.map(LossyLowering::Precondition));
+    (
+        Pddl8GroundAction {
+            schema_name: schema_name.to_string(),
+            label: label.to_string(),
+            preconditions,
+            add_effects,
+            del_effects,
+        },
+        lossy,
+    )
 }
 
-fn collect_positive_atoms(condition: &PddlCondition, out: &mut Vec<Pddl8GroundAtom>) {
+/// Flatten `condition` into the conjunction of positive ground atoms that
+/// `Pddl8GroundAction::preconditions` can hold, returning `Some(kind)` for the
+/// first form that had to be dropped.
+///
+/// The caller records that kind rather than refusing here: the search
+/// (`eval_condition`) handles every one of these forms exactly, so a domain
+/// using them can still plan correctly. Only the lowered tape is lossy, and
+/// only when such an action lands on the witnessed path -- which is where
+/// `path_to_tape` refuses.
+///
+/// A dropped precondition is not a smaller answer, it is a wrong one:
+/// `validate::validate_plan` checks a plan by iterating exactly this list, so
+/// a tape missing a condition validates vacuously.
+fn collect_positive_atoms(
+    condition: &PddlCondition,
+    out: &mut Vec<Pddl8GroundAtom>,
+) -> Option<&'static str> {
     match condition {
-        PddlCondition::Atom(atom) if atom.pred != "=" => out.push(atom_to_ground(atom)),
-        PddlCondition::And(parts) => {
-            for part in parts {
-                collect_positive_atoms(part, out);
-            }
+        // A two-argument `=` is decided by `eval_condition` from the ground
+        // arguments alone, with no reference to state. Every action reaching
+        // `path_to_tape` is on a witnessed path, so its top-level conjuncts
+        // all evaluated true -- a satisfied constant carries no information
+        // the replay needs, so omitting it is exact, not lossy. Any other
+        // arity is not that constant: `eval_condition` falls through to the
+        // state lookup, so it is a real fact and must ride the tape.
+        PddlCondition::Atom(atom) if atom.pred == "=" && atom.args.len() == 2 => None,
+        PddlCondition::Atom(atom) => {
+            out.push(atom_to_ground(atom));
+            None
         }
-        _ => {}
+        PddlCondition::And(parts) => parts.iter().fold(None, |dropped, part| {
+            dropped.or(collect_positive_atoms(part, out))
+        }),
+        // `(not (= ?x ?y))` -- the ADL "two distinct objects" idiom -- is the
+        // same state-independent constant as the positive case above once the
+        // binding is ground, so omitting a satisfied one is exact. Every other
+        // negation reads state and is a real drop.
+        PddlCondition::Not(inner) => match inner.as_ref() {
+            PddlCondition::Atom(atom) if atom.pred == "=" && atom.args.len() == 2 => None,
+            _ => Some("negated"),
+        },
+        PddlCondition::Or(_) => Some("disjunctive"),
+        PddlCondition::Imply(_, _) => Some("implicative"),
+        PddlCondition::Forall { .. } => Some("universally quantified"),
+        PddlCondition::Exists { .. } => Some("existentially quantified"),
+        PddlCondition::Compare(_, _, _) => Some("numeric"),
+        PddlCondition::Timed(_, _) => Some("timed"),
     }
 }
 
@@ -960,6 +1181,15 @@ mod tests {
         ExactClassicalProblem::build(&domain, &problem, 1_000)?.find_plan(16, 10_000)
     }
 
+    /// Same search as [`solve`], but lowered to the label-and-order-only tape.
+    /// Used where the search handles a condition exactly and the *flat tape*
+    /// is what cannot carry it: this witnesses that a plan was in fact found.
+    fn solve_labels(domain: &str, problem: &str) -> Result<Pddl8Tape, ExactClassicalError> {
+        let domain = domain31_from_pddl(domain).unwrap();
+        let problem = problem31_from_pddl(problem).unwrap();
+        ExactClassicalProblem::build(&domain, &problem, 1_000)?.find_label_plan(16, 10_000)
+    }
+
     #[test]
     fn negative_preconditions_are_load_bearing() {
         let domain = "(define (domain d) (:requirements :strips :negative-preconditions) \
@@ -967,10 +1197,24 @@ mod tests {
             (:action finish :parameters () :precondition (not (locked)) :effect (done)))";
         let open = "(define (problem p) (:domain d) (:init) (:goal (done)))";
         let locked = "(define (problem p) (:domain d) (:init (locked)) (:goal (done)))";
-        assert_eq!(solve(domain, open).unwrap().ops.len(), 1);
+        // Load-bearing in the search: satisfied -> a plan exists; violated ->
+        // no plan. That is the semantics under test, and it is unchanged.
+        assert_eq!(solve_labels(domain, open).unwrap().ops.len(), 1);
         assert!(matches!(
             solve(domain, locked),
             Err(ExactClassicalError::NoPlan)
+        ));
+        // Load-bearing on the tape too: `Pddl8GroundAction::preconditions` is
+        // a positive conjunction, so `(not (locked))` cannot ride it. Emitting
+        // the tape anyway is what made `validate::validate_plan` -- which
+        // decides validity by iterating exactly that list -- report the plan
+        // valid in the `locked` state as well. Emission refuses instead.
+        assert!(matches!(
+            solve(domain, open),
+            Err(ExactClassicalError::PreconditionNotRepresentable {
+                condition_kind: "negated",
+                ..
+            })
         ));
     }
 
@@ -983,9 +1227,24 @@ mod tests {
               :effect (done ?x)))";
         let problem = "(define (problem p) (:domain d) (:objects a b - item) \
             (:init (backup a)) (:goal (done a)))";
-        let tape = solve(domain, problem).unwrap();
+        // Exact in the search: `(not (= a b))` binds x and y apart and the
+        // disjunction is satisfied by its `backup` branch, so `finish(a,b)`
+        // is the witnessed step.
+        let tape = solve_labels(domain, problem).unwrap();
         assert_eq!(tape.ops.len(), 1);
         assert_eq!(tape.ops[0].label, "finish(a,b)");
+        // Not representable on the flat tape: the `(not (= ?x ?y))` conjunct
+        // is a satisfied state-independent constant once ground and so is
+        // omitted exactly, but the disjunction is genuinely dropped, and a
+        // tape asserting `finish(a,b)` has no precondition at all would
+        // validate against an init where neither `ready` nor `backup` holds.
+        assert!(matches!(
+            solve(domain, problem),
+            Err(ExactClassicalError::PreconditionNotRepresentable {
+                condition_kind: "disjunctive",
+                ..
+            })
+        ));
     }
 
     #[test]
@@ -998,7 +1257,17 @@ mod tests {
         let problem = "(define (problem p) (:domain d) (:objects a b - item) \
             (:init (ready a) (ready b)) \
             (:goal (and (done a) (done b))))";
-        assert_eq!(solve(domain, problem).unwrap().ops.len(), 1);
+        // The search solves this exactly (a path is found -- the refusal is
+        // not `NoPlan`), but the flat STRIPS tape cannot carry the quantified
+        // conditional effect, so emission refuses instead of shipping a tape
+        // whose op has empty add/del sets.
+        assert!(matches!(
+            solve(domain, problem),
+            Err(ExactClassicalError::EffectNotRepresentable {
+                effect_kind: "quantified",
+                ..
+            })
+        ));
     }
 
     #[test]
@@ -1022,7 +1291,15 @@ mod tests {
               :effect (and (decrease (fuel) 2) (done))))";
         let enough = "(define (problem p) (:domain d) (:init (= (fuel) 2)) (:goal (done)))";
         let insufficient = "(define (problem p) (:domain d) (:init (= (fuel) 1)) (:goal (done)))";
-        assert_eq!(solve(domain, enough).unwrap().ops.len(), 1);
+        // Search succeeds on `enough` (refusal is not `NoPlan`), but the
+        // numeric effect cannot be lowered onto the flat tape.
+        assert!(matches!(
+            solve(domain, enough),
+            Err(ExactClassicalError::EffectNotRepresentable {
+                effect_kind: "numeric",
+                ..
+            })
+        ));
         assert!(matches!(
             solve(domain, insufficient),
             Err(ExactClassicalError::NoPlan)

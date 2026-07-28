@@ -58,7 +58,7 @@ use crate::capability::GroundedPlanningEpoch;
 pub struct PddlCausalAnalyzer;
 
 /// Errors [`PddlCausalAnalyzer::analyze`] can produce.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CausalAnalysisError {
     /// An `ActionOccurrence.action` index was out of range for
     /// `epoch.actions`.

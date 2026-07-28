@@ -49,7 +49,7 @@ use bcinr_powl_receipt::execution_v2::{
 };
 
 use crate::capability::{admit_planning_task, AdmittedPlanningTask, GroundedPlanningEpoch};
-use crate::causal::PddlCausalAnalyzer;
+use crate::causal::{CausalAnalysisError, PddlCausalAnalyzer};
 use crate::error::Pddl8Error;
 use crate::ground_v2::{
     ExactClassicalCapabilityProfile, ExactClassicalError, ExactClassicalProblem,
@@ -65,7 +65,29 @@ use wasm4pm_compat::pddl::PddlEffect;
 pub enum CognitiveProjectionStanding {
     /// Every plan action is preserved in its witnessed linear order. No
     /// concurrency claim is made without an independence witness.
+    ///
+    /// On the hierarchical entry points this means the causal analysis ran
+    /// and `causal_plan_to_powl2` declined to build structure from it; the
+    /// accompanying `hierarchical_refusal` is `Some(_)` and says why. The
+    /// sequential entry points emit this without ever attempting the
+    /// analysis.
     ExactSequential,
+    /// The plan was empty, so there was nothing to project. The model is
+    /// `Silent`, not a flat `Sequence`.
+    ///
+    /// Distinct from every other variant: no analysis was needed, none was
+    /// attempted, and no claim about concurrency is being made or withheld.
+    EmptyPlan,
+    /// `PddlCausalAnalyzer::analyze` returned an error, so no causal plan
+    /// exists to decompose and the projection is the witnessed linear order.
+    ///
+    /// This is the analysis *failing*, not the analysis finding nothing to
+    /// exploit — the plan replay was rejected as not a valid linear plan over
+    /// the epoch, or an occurrence referenced an out-of-range action. The
+    /// carried [`CausalAnalysisError`] is the reason, kept rather than
+    /// discarded so a broken grounding is not indistinguishable from a
+    /// legitimately flat plan.
+    CausalAnalysisFailed(CausalAnalysisError),
     /// The plan was routed through `PddlCausalAnalyzer` -> `WfNet` ->
     /// Algorithm 3, and the projection may contain genuine
     /// `PartialOrder`/`ChoiceGraph` structure discovered from the causal
@@ -75,8 +97,11 @@ pub enum CognitiveProjectionStanding {
     /// the causal analysis was not attempted at all and the projection is the
     /// witnessed linear order.
     ///
-    /// Distinct from [`Self::ExactSequential`], which means the analysis ran
-    /// and found nothing to exploit. Here it was never sound to run: the
+    /// Distinct from [`Self::ExactSequential`] on both of that variant's
+    /// paths: hierarchically it means the analysis ran and found nothing to
+    /// exploit, and on the sequential entry points it means the analysis was
+    /// never part of the rail to begin with. Neither is an objection to
+    /// running the analysis. Here running it was never *sound*: the
     /// analyser replays over `preconditions`/`add_effects`/`del_effects` only
     /// (`causal::simulate_two`), so two actions conflicting solely through a
     /// `when`, `forall` or numeric effect have *identical* shadow effects,
@@ -91,9 +116,16 @@ pub enum CognitiveProjectionStanding {
 /// `Pddl8GroundAction`'s add/delete atom lists.
 ///
 /// `Add`/`Del` are exactly representable. Every other form is dropped by
-/// `ground_v2::legacy_action`'s catch-all, and the causal analyser consumes
-/// the result, so the independence relation it derives is only as complete as
-/// this predicate is true.
+/// `ground_v2::legacy_action`, which records the loss in
+/// `ExactGroundAction::lossy` as [`ground_v2::LossyLowering::Effect`]; the
+/// causal analyser consumes the lowered
+/// result, so the independence relation it derives is only as complete as this
+/// predicate is true.
+///
+/// This is the *domain*-level predicate. Its per-plan counterpart is
+/// `ExactClassicalError::EffectNotRepresentable`, which fires only when a
+/// lossy action actually lands on the witnessed path; a domain can fail this
+/// check and still yield an exactly-representable plan.
 fn effects_survive_strips_lowering(domain: &crate::Pddl31Domain) -> bool {
     fn effect_ok(e: &PddlEffect) -> bool {
         match e {
@@ -117,6 +149,21 @@ fn effects_survive_strips_lowering(domain: &crate::Pddl31Domain) -> bool {
 pub struct ExactCognitiveWorkflow {
     pub admitted: AdmittedPlanningTask,
     pub plan: Pddl8Tape,
+    /// `true` when `plan` came from `ExactClassicalProblem::find_label_plan`
+    /// rather than `find_plan`, i.e. its ops carry labels and order only and
+    /// every `ops[..].action` has empty `preconditions`/`add_effects`/
+    /// `del_effects`.
+    ///
+    /// `Pddl8Tape` lives in `wasm4pm-compat` and has no slot to record this,
+    /// so the distinction lives here instead of on the tape. Read it before
+    /// touching `ops[..].action`: an empty effect list under `true` means
+    /// "not carried", not "this action has no effects". This rail sets it
+    /// only when the exact lowering refused with
+    /// [`ExactClassicalError::EffectNotRepresentable`] or
+    /// [`ExactClassicalError::PreconditionNotRepresentable`] -- the projection
+    /// below consumes labels alone, so a plan that exists is preferable to a
+    /// refusal over fields it never reads.
+    pub plan_is_label_only: bool,
     pub powl: CompiledPowl2,
     pub execution_receipt: PowlV2ExecutionReceipt,
     pub projection_standing: CognitiveProjectionStanding,
@@ -133,8 +180,19 @@ pub struct ExactCognitiveWorkflow {
     /// distinguishes them: `Some(refusal)` means real structure was
     /// attempted and declined (e.g. `BoundedLanguageAgreementFailed` -- the
     /// two enumerations disagreed at the checked bound -- or
-    /// `IrreducibleFragment`), `None` with `ExactSequential`
-    /// means the causal analysis itself found nothing to exploit.
+    /// `IrreducibleFragment`).
+    ///
+    /// On the hierarchical entry points `ExactSequential` is emitted *only*
+    /// alongside `Some(refusal)`: a successful causal analysis that
+    /// Algorithm 3 accepts always yields `CausalHierarchical`, so there is no
+    /// "analysis ran, found nothing" outcome to report. The two ways the
+    /// hierarchical path can fall back without an Algorithm 3 refusal each
+    /// have their own standing --
+    /// [`CognitiveProjectionStanding::CausalAnalysisFailed`] (the analysis
+    /// errored, reason carried) and
+    /// [`CognitiveProjectionStanding::RefusedLossyEffectModel`] (it was never
+    /// sound to run) -- and both leave this field `None`. `EmptyPlan` also
+    /// leaves it `None`.
     pub hierarchical_refusal: Option<bcinr_powl::wf_to_powl::Refusal>,
 }
 
@@ -190,9 +248,26 @@ pub fn plan_exact_cognitive_workflow_bounded(
         .map_err(ExactCognitiveError::Admission)?;
     let grounded = ExactClassicalProblem::build(&domain, &problem, max_ground_actions)
         .map_err(ExactCognitiveError::Planning)?;
-    let plan = grounded
-        .find_plan(max_plan_depth, max_search_states)
-        .map_err(ExactCognitiveError::Planning)?;
+    // This entry point projects `plan.ops[..].label` and nothing else (see
+    // `model` below, and `downstream`'s `batches`/`verify`/`exact_semantic_root`
+    // which are its only in-tree consumers). So when the exact lowering refuses
+    // because an effect *or a precondition* cannot ride the flat tape, drop to
+    // the label-only tape rather than fail the request -- and record which one
+    // was used, because `plan` is public and an empty effect list must not
+    // read as "no effects".
+    let (plan, plan_is_label_only) = match grounded.find_plan(max_plan_depth, max_search_states) {
+        Ok(plan) => (plan, false),
+        Err(
+            ExactClassicalError::EffectNotRepresentable { .. }
+            | ExactClassicalError::PreconditionNotRepresentable { .. },
+        ) => (
+            grounded
+                .find_label_plan(max_plan_depth, max_search_states)
+                .map_err(ExactCognitiveError::Planning)?,
+            true,
+        ),
+        Err(error) => return Err(ExactCognitiveError::Planning(error)),
+    };
 
     let model = if plan.ops.is_empty() {
         Powl2Model::Silent
@@ -213,6 +288,7 @@ pub fn plan_exact_cognitive_workflow_bounded(
     Ok(ExactCognitiveWorkflow {
         admitted,
         plan,
+        plan_is_label_only,
         powl,
         execution_receipt,
         projection_standing: CognitiveProjectionStanding::ExactSequential,
@@ -257,14 +333,31 @@ pub fn plan_exact_cognitive_workflow_hierarchical_bounded(
         .map_err(ExactCognitiveError::Admission)?;
     let grounded = ExactClassicalProblem::build(&domain, &problem, max_ground_actions)
         .map_err(ExactCognitiveError::Planning)?;
-    let plan = grounded
-        .find_plan(max_plan_depth, max_search_states)
-        .map_err(ExactCognitiveError::Planning)?;
+    // Unlike the sequential entry point, this one *does* read
+    // `plan.ops[..].action` -- `build_hierarchical_model` feeds it to
+    // `PddlCausalAnalyzer` to derive independence. So it takes the exact tape
+    // whenever one exists, and only drops to the label-only tape when the
+    // exact lowering refuses -- at which point `build_hierarchical_model` is
+    // told so explicitly and declines to run the analysis at all.
+    let (plan, plan_is_label_only) = match grounded.find_plan(max_plan_depth, max_search_states) {
+        Ok(plan) => (plan, false),
+        Err(
+            ExactClassicalError::EffectNotRepresentable { .. }
+            | ExactClassicalError::PreconditionNotRepresentable { .. },
+        ) => (
+            grounded
+                .find_label_plan(max_plan_depth, max_search_states)
+                .map_err(ExactCognitiveError::Planning)?,
+            true,
+        ),
+        Err(error) => return Err(ExactCognitiveError::Planning(error)),
+    };
 
     let (model, projection_standing, hierarchical_refusal) = build_hierarchical_model(
         &admitted,
         &grounded,
         &plan,
+        plan_is_label_only,
         max_ground_actions,
         max_plan_depth,
         max_search_states,
@@ -279,6 +372,7 @@ pub fn plan_exact_cognitive_workflow_hierarchical_bounded(
     Ok(ExactCognitiveWorkflow {
         admitted,
         plan,
+        plan_is_label_only,
         powl,
         execution_receipt,
         projection_standing,
@@ -290,6 +384,7 @@ fn build_hierarchical_model(
     admitted: &AdmittedPlanningTask,
     grounded: &ExactClassicalProblem,
     plan: &Pddl8Tape,
+    plan_is_label_only: bool,
     max_ground_actions: usize,
     max_plan_depth: usize,
     max_search_states: usize,
@@ -301,7 +396,7 @@ fn build_hierarchical_model(
     if plan.ops.is_empty() {
         return (
             Powl2Model::Silent,
-            CognitiveProjectionStanding::ExactSequential,
+            CognitiveProjectionStanding::EmptyPlan,
             None,
         );
     }
@@ -309,8 +404,10 @@ fn build_hierarchical_model(
     // Refuse to derive concurrency from a shadow. `plan.ops[..].action` is
     // `ground_v2::legacy_action`'s output -- add/delete atoms only -- so if
     // the domain carries any other effect form the independence relation
-    // computed below cannot see the conflicts it creates.
-    if !effects_survive_strips_lowering(&admitted.domain) {
+    // computed below cannot see the conflicts it creates. `plan_is_label_only`
+    // is the stronger, per-plan form of the same fact: those ops carry no
+    // effects at all, so every pair would replay as trivially independent.
+    if plan_is_label_only || !effects_survive_strips_lowering(&admitted.domain) {
         return (
             fallback_sequential(plan),
             CognitiveProjectionStanding::RefusedLossyEffectModel,
@@ -339,15 +436,19 @@ fn build_hierarchical_model(
         .collect();
 
     // The causal analysis failing is not a bridge refusal -- there is no
-    // `Refusal` to report, the analysis simply produced no partial order to
-    // decompose -- so it falls back with `None`, distinct from a real
-    // Algorithm 3 refusal below.
-    let Ok(causal_plan) = PddlCausalAnalyzer.analyze(&epoch, &occurrences) else {
-        return (
-            fallback_sequential(plan),
-            CognitiveProjectionStanding::ExactSequential,
-            None,
-        );
+    // Algorithm 3 `Refusal` to report, because Algorithm 3 was never reached
+    // -- so `hierarchical_refusal` stays `None`. The reason is carried in the
+    // standing instead, so this stays distinguishable from both a successful
+    // analysis and a real Algorithm 3 refusal below.
+    let causal_plan = match PddlCausalAnalyzer.analyze(&epoch, &occurrences) {
+        Ok(p) => p,
+        Err(e) => {
+            return (
+                fallback_sequential(plan),
+                CognitiveProjectionStanding::CausalAnalysisFailed(e),
+                None,
+            );
+        }
     };
 
     match causal_plan_to_powl2(&epoch, &causal_plan) {

@@ -299,8 +299,74 @@ pub enum SemanticSupport {
 /// let a caller be *more* conservative (e.g. downgrade `Approximate` to
 /// `Unsupported` for a safety-critical deployment) — [`admit_planning_task`]
 /// never grants more trust than the profile it is given.
+///
+/// [`Self::support`] is the trait's *only* method, and deliberately so: every
+/// derived view of a profile ([`unsupported_mask`], [`feature_bit`]) is a free
+/// function over it rather than a defaulted trait method, so an impl has
+/// nothing it could override into disagreeing with its own `support`.
+/// [`admit_planning_task`] reads a profile two ways — the declared-requirement
+/// gate folds the whole mask, the effect-body scan tests a single bit — and
+/// both bottom out in the same sixteen `support` calls by construction, not by
+/// an override contract an impl is trusted to honour.
 pub trait CapabilityProfile {
     fn support(&self, feature: PddlFeature) -> SemanticSupport;
+}
+
+/// Bit `i` (for `ALL_PDDL_FEATURES[i]`) is set iff `profile` marks that
+/// feature [`SemanticSupport::Unsupported`].
+///
+/// Derived from [`CapabilityProfile::support`] over [`ALL_PDDL_FEATURES`], so
+/// it is pointwise-consistent with the profile by construction; it exists only
+/// so admission can fold the sixteen `support` lookups once instead of once
+/// per declared requirement. It is deliberately *not* the profile's
+/// representation: [`SemanticSupport`] is four-way, and one bit per feature
+/// would erase the `Approximate`/`Exact` distinction that callers (and
+/// `capability_digest`) depend on.
+///
+/// A free function, not a defaulted trait method, for the reason given on
+/// [`CapabilityProfile`]: as a default method a downstream impl could override
+/// it to under-report, and [`admit_planning_task`]'s requirement gate would
+/// then admit a domain that the same function's effect-body scan — reading the
+/// same profile the other way — refuses.
+pub fn unsupported_mask<P: CapabilityProfile + ?Sized>(profile: &P) -> u32 {
+    let mut mask = 0u32;
+    let mut i = 0;
+    while i < ALL_PDDL_FEATURES.len() {
+        let unsupported = profile.support(ALL_PDDL_FEATURES[i]) == SemanticSupport::Unsupported;
+        mask |= (unsupported as u32) << i;
+        i += 1;
+    }
+    mask
+}
+
+/// The single bit `feature` occupies in [`unsupported_mask`] (and in
+/// `requirement_mask`): `1 << i` for the `i` with
+/// `ALL_PDDL_FEATURES[i] == feature`.
+///
+/// Total by construction — [`ALL_PDDL_FEATURES`] lists all sixteen variants,
+/// so the scan always matches and the trailing `0` is unreachable rather than
+/// a silent "no such feature".
+pub fn feature_bit(feature: PddlFeature) -> u32 {
+    let mut i = 0;
+    while i < ALL_PDDL_FEATURES.len() {
+        if ALL_PDDL_FEATURES[i] == feature {
+            return 1u32 << i;
+        }
+        i += 1;
+    }
+    0
+}
+
+/// Bit `i` (for `ALL_PDDL_FEATURES[i]`) is set iff requirement string `req`
+/// implies that feature, per [`requirement_implies`].
+fn requirement_mask(req: &str) -> u32 {
+    let mut mask = 0u32;
+    let mut i = 0;
+    while i < ALL_PDDL_FEATURES.len() {
+        mask |= (requirement_implies(req, ALL_PDDL_FEATURES[i]) as u32) << i;
+        i += 1;
+    }
+    mask
 }
 
 /// The profile reflecting what this crate's planners *actually* implement
@@ -645,19 +711,23 @@ pub fn admit_planning_task(
         }
     }
 
+    // Bit-mask form of the old O(requirements x 16) nested scan: the
+    // profile's sixteen `support` lookups are folded once, and each declared
+    // requirement is then a single AND. The lowest set bit of the overlap is
+    // the same (requirement, feature) pair the nested loop would have hit
+    // first, since ALL_PDDL_FEATURES order *is* bit order.
+    let unsupported = unsupported_mask(profile);
     for req in &domain.requirements {
-        for &feature in &ALL_PDDL_FEATURES {
-            if requirement_implies(req, feature)
-                && profile.support(feature) == SemanticSupport::Unsupported
-            {
-                return PlannerOutcome::Unsupported(UnsupportedFeature {
-                    feature_name: format!("{feature:?}"),
-                    context: format!(
-                        "domain requirement {req:?} implies PddlFeature::{feature:?}, which the \
-                         given CapabilityProfile marks Unsupported"
-                    ),
-                });
-            }
+        let offending = requirement_mask(req) & unsupported;
+        if offending != 0 {
+            let feature = ALL_PDDL_FEATURES[offending.trailing_zeros() as usize];
+            return PlannerOutcome::Unsupported(UnsupportedFeature {
+                feature_name: format!("{feature:?}"),
+                context: format!(
+                    "domain requirement {req:?} implies PddlFeature::{feature:?}, which the \
+                     given CapabilityProfile marks Unsupported"
+                ),
+            });
         }
     }
 
@@ -676,7 +746,13 @@ pub fn admit_planning_task(
     // `domain.durative_actions`, both preserved faithfully by
     // `lower_action31`/`lower_durative_action`) instead of trusting the
     // declared requirements list.
-    if profile.support(PddlFeature::ConditionalEffects) == SemanticSupport::Unsupported {
+    // Reads the same `unsupported` mask the requirement gate above folded,
+    // rather than calling `profile.support` a second time: one source of truth
+    // per admission, so the two paths through this function cannot disagree
+    // about the same profile even if `support` were not a pure function of the
+    // feature (a stateful or interior-mutable impl is not forbidden by the
+    // trait).
+    if unsupported & feature_bit(PddlFeature::ConditionalEffects) != 0 {
         for action in &domain.actions {
             if effect_list_uses_conditional_or_quantified(&action.effect) {
                 return PlannerOutcome::Unsupported(UnsupportedFeature {
