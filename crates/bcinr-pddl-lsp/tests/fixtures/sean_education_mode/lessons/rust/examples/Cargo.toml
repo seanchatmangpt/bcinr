@@ -1,8 +1,0 @@
-[package]
-name = "bcinr-pddl-education-example"
-version = "0.1.0"
-edition = "2021"
-
-[lib]
-name = "bcinr_pddl_education_example"
-path = "src/lib.rs"

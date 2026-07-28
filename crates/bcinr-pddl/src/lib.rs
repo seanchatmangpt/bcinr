@@ -73,8 +73,6 @@ pub mod validate;
 #[cfg(feature = "mfw-planner")]
 pub mod wf_net_bridge;
 #[cfg(feature = "mfw-planner")]
-pub mod wf_net_bridge_temporal;
-#[cfg(feature = "mfw-planner")]
 pub mod workflow_cmd;
 pub use capability::{
     admit_planning_task, feature_bit, unsupported_mask, AdmittedPlanningTask, CapabilityProfile,

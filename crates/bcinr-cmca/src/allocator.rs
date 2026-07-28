@@ -953,8 +953,13 @@ impl AdaptiveUpdate<CertifiedLearning> {
 ///
 /// # Complexity
 /// $O(1)$ constant time, branchless.
+///
+/// Made `pub` (was `pub(crate)`) so [`crate::escort`] can build a
+/// fractional-exponent escort distribution on top of it -- see that
+/// module's docs for why `cascade::escort_weight`'s exact, integer-only
+/// repeated multiplication isn't sufficient for every caller.
 #[inline(always)]
-pub(crate) fn power(base: NonNegativeFixed, exponent: SignedFixed) -> NonNegativeFixed {
+pub fn power(base: NonNegativeFixed, exponent: SignedFixed) -> NonNegativeFixed {
     let base_is_zero = const_eq_u32(base.val, 0);
     let log_val = base.log2();
     let exp_signed = exponent.val;

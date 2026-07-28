@@ -1,8 +1,0 @@
-# Seeds for failure cases proptest has generated in the past. It is
-# automatically read and these particular cases re-run before any
-# novel cases are generated.
-#
-# It is recommended to check this file in to source control so that
-# everyone who runs the test benefits from these saved cases.
-cc edb3d6ddef039c36e7335fcb7dfd9fccdc94607d28eb138c76277a8addc3dcc2 # shrinks to state_mask = 1, active_triggers = 0, fired_joins_mask = 0, active_locks = 19, active_instances_vec = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], task_id = 0, join_type_idx = 0, split_type_idx = 0, min_instances = 0, max_instances = 0, threshold_instances = 0, join_state_bit = 0, flags = 0, consume_mask = 0, produce_mask = 0, cancellation_mask = 0, condition_mask = 0, reset_mask = 1476757944086918619, reachability_mask = 4932767036801571040, interleaved_lock_mask = 18264288186439186061
-cc a7c8d45405fe9f6668774e86442c376e5acc69a9b66b761176117f92ee6ecac0 # shrinks to state_mask = 315, active_triggers = 0, fired_joins_mask = 15405514131336331264, active_locks = 163, active_instances_vec = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], task_id = 0, join_type_idx = 3, split_type_idx = 0, min_instances = 0, max_instances = 0, threshold_instances = 0, join_state_bit = 20, flags = 96, consume_mask = 137658476216005, produce_mask = 0, cancellation_mask = 0, condition_mask = 0, reset_mask = 21106682356034, reachability_mask = 3153593237541433401, interleaved_lock_mask = 9612406090046728785

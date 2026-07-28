@@ -1,11 +1,23 @@
 [workspace]
-members = ["bcinr", "bcinr-core", "bcinr-bench", "crates/bcinr-api", "crates/bcinr-logic",
-    "crates/bcinr-cmca", "tools/bcinr-reporter", "tools/bcinr-contract-gate", "tools/bcinr-bench-auditor", "tools/bcinr-cheat-scanner", "tools/rust_audit", "crates/encode_unicode_patch", "tools/ggen", "playground", "crates/bcinr-powl",
-    "crates/bcinr-guarded", "crates/bcinr-powl-receipt", "crates/bcinr-pddl", "crates/bcinr-mcp", "crates/bcinr-mfw-ir", "crates/bcinr-ffi", "tools/bcinr-controller"]
-default-members = ["bcinr-core"]
-# crates/bcinr-pddl-lsp is disabled: it depends on lsp-max-andon, which is
-# `publish = false` (no crates.io release exists) and is only reachable via
-# an external filesystem path dep into the 54G ../../../lsp-max sibling repo.
+members = ["crates/bcinr-logic",
+    "crates/bcinr-cmca", "tools/bcinr-reporter", "tools/bcinr-contract-gate", "tools/bcinr-bench-auditor", "tools/bcinr-cheat-scanner", "tools/rust_audit", "crates/encode_unicode_patch", "tools/ggen", "crates/bcinr-powl",
+    "crates/bcinr-guarded", "crates/bcinr-powl-receipt", "crates/bcinr-pddl", "crates/bcinr-mfw-ir"]
+default-members = ["crates/bcinr-logic"]
+# Scope: this repository is the PDDL 3.1 -> POWL 2.0 derivation and the numeric
+# substrate under it. Concurrency is *derived* from a domain's causal structure
+# -- `bcinr-pddl::causal` proves pairwise independence, `bcinr-powl` decomposes
+# and checks the result against the source net's language -- and nothing else
+# in the ecosystem does that: ferroplan retired its interference test, and
+# aries answers the question inside its own solver where a consumer cannot
+# check it.
+#
+# Removed as out of scope, not as failures: `crates/bcinr-mcp` and
+# `tools/bcinr-controller` (harness -- `~/mfw/mfw-planner` does this better,
+# with engine admission receipts and an independently-vendored VAL),
+# `crates/bcinr-ffi` and `crates/bcinr-api` and `playground` (not on the
+# derivation path; bcinr-ffi additionally claimed 26.7.25 while shipping
+# 26.7.28 semantics), and `crates/bcinr-pddl-lsp` (already not a member -- it
+# needed a path dep into a 54G sibling repo).
 resolver = "2"
 
 [profile.release]
