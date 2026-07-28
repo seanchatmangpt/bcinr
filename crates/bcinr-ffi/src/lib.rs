@@ -47,7 +47,9 @@ fn require_version(version: u32) -> Result<(), String> {
     if version == VERSION {
         Ok(())
     } else {
-        Err(format!("unsupported version: {version} (expected {VERSION})"))
+        Err(format!(
+            "unsupported version: {version} (expected {VERSION})"
+        ))
     }
 }
 
@@ -103,8 +105,8 @@ pub fn pddl_execute_rust(req: &PddlExecutionRequest) -> Result<PddlExecutionResp
 /// POWL tape, scheduler, OCEL trace, and replay receipt.
 pub fn powl_execute_rust(req: &PowlExecutionRequest) -> Result<PowlExecutionResponse, String> {
     require_version(req.version)?;
-    let _: serde_json::Value = serde_json::from_str(&req.tape_json)
-        .map_err(|e| format!("tape JSON parse error: {e}"))?;
+    let _: serde_json::Value =
+        serde_json::from_str(&req.tape_json).map_err(|e| format!("tape JSON parse error: {e}"))?;
     let _: serde_json::Value = serde_json::from_str(&req.context_json)
         .map_err(|e| format!("context JSON parse error: {e}"))?;
     Err("unsupported_execution_rail: protocol v1 has no canonical POWL tape decoder; no workflow was executed and no receipt may be issued".into())

@@ -2,8 +2,8 @@
 
 pub use crate::cascade_legacy::{admit_fixed, CascadeRefusal, CascadeTree, NumericContext};
 
-use alloc::vec::Vec;
 use crate::fixed::NonNegativeFixed;
+use alloc::vec::Vec;
 
 /// Largest admitted integer lens magnitude. The analysis and certified rails
 /// share the mathematical domain `q ∈ [-2, 2]`; a larger repeated-loop bound is

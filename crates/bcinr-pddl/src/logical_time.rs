@@ -24,16 +24,30 @@ impl std::fmt::Display for TimeConversionError {
 impl std::error::Error for TimeConversionError {}
 
 impl LogicalTime {
-    pub const fn from_millis(millis: u64) -> Self { Self(millis) }
-    pub const fn as_millis(self) -> u64 { self.0 }
-    pub const fn zero() -> Self { Self(0) }
-    pub fn as_seconds_f64(self) -> f64 { self.0 as f64 / 1000.0 }
+    pub const fn from_millis(millis: u64) -> Self {
+        Self(millis)
+    }
+    pub const fn as_millis(self) -> u64 {
+        self.0
+    }
+    pub const fn zero() -> Self {
+        Self(0)
+    }
+    pub fn as_seconds_f64(self) -> f64 {
+        self.0 as f64 / 1000.0
+    }
 
     pub fn try_from_seconds_f64(seconds: f64) -> Result<Self, TimeConversionError> {
-        if !seconds.is_finite() { return Err(TimeConversionError::NonFinite); }
-        if seconds < 0.0 { return Err(TimeConversionError::Negative); }
+        if !seconds.is_finite() {
+            return Err(TimeConversionError::NonFinite);
+        }
+        if seconds < 0.0 {
+            return Err(TimeConversionError::Negative);
+        }
         let millis = seconds * 1000.0;
-        if millis > u64::MAX as f64 { return Err(TimeConversionError::Overflow); }
+        if millis > u64::MAX as f64 {
+            return Err(TimeConversionError::Overflow);
+        }
         Ok(Self(millis.round() as u64))
     }
 
@@ -56,12 +70,21 @@ mod tests {
 
     #[test]
     fn finite_seconds_admit() {
-        assert_eq!(LogicalTime::try_from_seconds_f64(1.5).unwrap().as_millis(), 1500);
+        assert_eq!(
+            LogicalTime::try_from_seconds_f64(1.5).unwrap().as_millis(),
+            1500
+        );
     }
 
     #[test]
     fn invalid_seconds_refuse() {
-        assert_eq!(LogicalTime::try_from_seconds_f64(f64::NAN), Err(TimeConversionError::NonFinite));
-        assert_eq!(LogicalTime::try_from_seconds_f64(-1.0), Err(TimeConversionError::Negative));
+        assert_eq!(
+            LogicalTime::try_from_seconds_f64(f64::NAN),
+            Err(TimeConversionError::NonFinite)
+        );
+        assert_eq!(
+            LogicalTime::try_from_seconds_f64(-1.0),
+            Err(TimeConversionError::Negative)
+        );
     }
 }

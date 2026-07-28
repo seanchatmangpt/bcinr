@@ -17,13 +17,12 @@ use bcinr_cmca::fixed::{NonNegativeFixed, SignedFixed};
 use bcinr_cmca::generated::consequence_mass::case_studies::{
     LensSpec, PackedSemanticState, FACTOR_ACCESS_FREQUENCY, FACTOR_BUSINESS_VALUE,
     FACTOR_DOWNSTREAM_CONSEQUENCE, FACTOR_RECOMPUTATION_COST, FACTOR_RETRIEVAL_DEMAND,
-    FACTOR_SCHEDULING_DEMAND, FACTOR_SEARCH_DEMAND, FACTOR_STANDING, FACTOR_VERIFICATION_COST,
-    K, MEASURE_CACHE, MEASURE_RETRIEVAL, MEASURE_SCHEDULING, MEASURE_SEARCH, N, Q,
+    FACTOR_SCHEDULING_DEMAND, FACTOR_SEARCH_DEMAND, FACTOR_STANDING, FACTOR_VERIFICATION_COST, K,
+    MEASURE_CACHE, MEASURE_RETRIEVAL, MEASURE_SCHEDULING, MEASURE_SEARCH, N, Q,
 };
 use bcinr_cmca::generated::stability_profile::CERTIFICATE_DIGEST;
 use bcinr_cmca::generated_profile::{
-    ALLOCATION_ERROR_OPERATION_BUDGET, ESCORT_DYNAMIC_RANGE_LIMIT,
-    TRANSCENDENTAL_MAX_ERROR_ULPS,
+    ALLOCATION_ERROR_OPERATION_BUDGET, ESCORT_DYNAMIC_RANGE_LIMIT, TRANSCENDENTAL_MAX_ERROR_ULPS,
 };
 use proptest::prelude::*;
 use reference::allocate_f64;
@@ -173,11 +172,7 @@ fn classify_envelope(
     for mass_set in &masses {
         for lens in lenses {
             let q = signed_to_f64(lens.q);
-            if !group_representable(
-                (0..N).filter(|index| parent[*index] == -1),
-                mass_set,
-                q,
-            ) {
+            if !group_representable((0..N).filter(|index| parent[*index] == -1), mass_set, q) {
                 return Err(OracleOutcome::OutOfNumericEnvelope);
             }
             for node in 0..N {
@@ -328,7 +323,10 @@ proptest! {
     }
 }
 
-fn boundary_fixture(high_business_value: f64, lens: f64) -> (
+fn boundary_fixture(
+    high_business_value: f64,
+    lens: f64,
+) -> (
     [PackedSemanticState; N],
     [LensSpec; Q],
     [[NonNegativeFixed; Q]; K],
@@ -336,13 +334,23 @@ fn boundary_fixture(high_business_value: f64, lens: f64) -> (
     [[NonNegativeFixed; 2 * Q]; N],
     [[NonNegativeFixed; 2 * Q]; N],
 ) {
-    let mut states = [PackedSemanticState { id: 0, factors: [NonNegativeFixed::ONE; 10] }; N];
+    let mut states = [PackedSemanticState {
+        id: 0,
+        factors: [NonNegativeFixed::ONE; 10],
+    }; N];
     for (index, state) in states.iter_mut().enumerate() {
         state.id = index as u32;
-        state.factors[FACTOR_BUSINESS_VALUE] = if index == 0 { to_fixed(high_business_value) } else { NonNegativeFixed::ZERO };
+        state.factors[FACTOR_BUSINESS_VALUE] = if index == 0 {
+            to_fixed(high_business_value)
+        } else {
+            NonNegativeFixed::ZERO
+        };
         state.factors[FACTOR_DOWNSTREAM_CONSEQUENCE] = NonNegativeFixed::ZERO;
     }
-    let lenses = core::array::from_fn(|index| LensSpec { id: index as u32, q: to_signed_fixed(lens) });
+    let lenses = core::array::from_fn(|index| LensSpec {
+        id: index as u32,
+        q: to_signed_fixed(lens),
+    });
     let lambda = [[NonNegativeFixed::from_bits(16_384); Q]; K];
     let parent = [-1; N];
     let weights = [[NonNegativeFixed::from_bits(32_768); 2 * Q]; N];
@@ -360,26 +368,57 @@ fn five_permanent_numeric_boundary_witnesses_refuse_deterministically() {
         (1_000.0, -2.0),
     ];
     for (seed, (high, lens)) in seeds.into_iter().enumerate() {
-        let (states, lenses, lambda, parent, initial_weights, payoffs) = boundary_fixture(high, lens);
+        let (states, lenses, lambda, parent, initial_weights, payoffs) =
+            boundary_fixture(high, lens);
         let mut first_weights = initial_weights;
         let mut first_last = 0;
         let mut first_mode = 0;
         let first = allocate(
-            &states, &lenses, &lambda, to_fixed(0.1), &parent, &mut first_weights,
-            &payoffs, NonNegativeFixed::ZERO, NonNegativeFixed::ZERO,
-            &[NonNegativeFixed::ZERO; N], &[NonNegativeFixed::ZERO; N], 0,
-            &mut first_last, &mut first_mode, 500, CERTIFICATE_DIGEST, proof().as_ref(),
+            &states,
+            &lenses,
+            &lambda,
+            to_fixed(0.1),
+            &parent,
+            &mut first_weights,
+            &payoffs,
+            NonNegativeFixed::ZERO,
+            NonNegativeFixed::ZERO,
+            &[NonNegativeFixed::ZERO; N],
+            &[NonNegativeFixed::ZERO; N],
+            0,
+            &mut first_last,
+            &mut first_mode,
+            500,
+            CERTIFICATE_DIGEST,
+            proof().as_ref(),
         );
         let mut second_weights = initial_weights;
         let mut second_last = 0;
         let mut second_mode = 0;
         let second = allocate(
-            &states, &lenses, &lambda, to_fixed(0.1), &parent, &mut second_weights,
-            &payoffs, NonNegativeFixed::ZERO, NonNegativeFixed::ZERO,
-            &[NonNegativeFixed::ZERO; N], &[NonNegativeFixed::ZERO; N], 0,
-            &mut second_last, &mut second_mode, 500, CERTIFICATE_DIGEST, proof().as_ref(),
+            &states,
+            &lenses,
+            &lambda,
+            to_fixed(0.1),
+            &parent,
+            &mut second_weights,
+            &payoffs,
+            NonNegativeFixed::ZERO,
+            NonNegativeFixed::ZERO,
+            &[NonNegativeFixed::ZERO; N],
+            &[NonNegativeFixed::ZERO; N],
+            0,
+            &mut second_last,
+            &mut second_mode,
+            500,
+            CERTIFICATE_DIGEST,
+            proof().as_ref(),
         );
-        assert_eq!(first, Err(StabilityRefusal::NumericRangeExceeded), "seed {seed}");
+        assert_eq!(
+            first,
+            Err(StabilityRefusal::NumericRangeExceeded),
+            "seed {seed}"
+        );
         assert_eq!(second, first, "seed {seed} is nondeterministic");
         assert_eq!(first_weights, initial_weights, "seed {seed} mutated state");
         assert_eq!(second_weights, initial_weights, "seed {seed} mutated state");

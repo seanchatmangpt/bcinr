@@ -284,9 +284,7 @@ impl SignedFixed {
     pub const fn from_num(number: i32) -> Self {
         let shifted = (number as i64) << 16;
         let overflow = CanonicalMask {
-            val: 0u32.wrapping_sub(
-                (shifted > i32::MAX as i64 || shifted < i32::MIN as i64) as u32,
-            ),
+            val: 0u32.wrapping_sub((shifted > i32::MAX as i64 || shifted < i32::MIN as i64) as u32),
         };
         let saturation = const_lt_i32(number, 0).select_i32(i32::MIN, i32::MAX);
         Self {
@@ -563,7 +561,11 @@ mod tests {
             let value = NonNegativeFixed::from_bits(raw);
             let round_trip = value.log2().exp2();
             assert_eq!(round_trip.err, OK);
-            assert!(round_trip.val.abs_diff(raw) <= 4, "raw={raw}, got={}", round_trip.val);
+            assert!(
+                round_trip.val.abs_diff(raw) <= 4,
+                "raw={raw}, got={}",
+                round_trip.val
+            );
         }
     }
 }

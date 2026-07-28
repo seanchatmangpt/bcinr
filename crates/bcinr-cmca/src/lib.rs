@@ -13,17 +13,17 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
-#[path = "allocator.rs"]
-mod allocator_legacy;
 #[path = "allocator_checked.rs"]
 pub mod allocator;
+#[path = "allocator.rs"]
+mod allocator_legacy;
 
-#[cfg(feature = "alloc")]
-#[path = "cascade.rs"]
-mod cascade_legacy;
 #[cfg(feature = "alloc")]
 #[path = "cascade_checked.rs"]
 pub mod cascade;
+#[cfg(feature = "alloc")]
+#[path = "cascade.rs"]
+mod cascade_legacy;
 
 pub mod fixed;
 pub mod generated;
