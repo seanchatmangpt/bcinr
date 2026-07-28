@@ -12,6 +12,7 @@ pub use crate::allocator_legacy::{
     wrap_result, AdaptiveUpdate, AdmittedControlState, CertificateReceipt, CertifiedLearning,
     CertifiedSelectionOnly, EnvelopeReceipt, HierarchyRefusal, OutcomeReceipt, StabilityRefusal,
 };
+pub(crate) use crate::allocator_legacy::{clip, const_max_i32};
 
 use crate::fixed::{NonNegativeFixed, SignedFixed};
 use crate::generated::consequence_mass::case_studies::{
@@ -55,10 +56,19 @@ pub fn allocate(
     proof: Option<&AdaptiveUpdate<CertifiedLearning>>,
 ) -> Result<[NonNegativeFixed; N], StabilityRefusal> {
     admit_request(
-        states, lenses, lambda, eta, parent, weights, payoffs, zeta, epsilon_kappa, mu, costs,
+        states,
+        lenses,
+        lambda,
+        eta,
+        parent,
+        weights,
+        payoffs,
+        zeta,
+        epsilon_kappa,
+        mu,
+        costs,
     )?;
 
-    // Zero unreceipted mutation: the straight-line kernel receives local state.
     let mut candidate_weights = *weights;
     let mut candidate_last_switch = *last_switch_t;
     let mut candidate_mode = *prev_mode;
@@ -142,7 +152,10 @@ fn admit_request(
     if eta.val > NonNegativeFixed::ONE.val {
         return Err(StabilityRefusal::UnsupportedDomain);
     }
-    if lambda.iter().flatten().any(|value| value.val > NonNegativeFixed::ONE.val)
+    if lambda
+        .iter()
+        .flatten()
+        .any(|value| value.val > NonNegativeFixed::ONE.val)
         || weights
             .iter()
             .flatten()
@@ -179,7 +192,10 @@ fn checked_node_masses(
         masses[MEASURE_CACHE][index] = checked_clip(
             checked_mul(
                 checked_mul(
-                    checked_add(checked_mul(f_recomp, NonNegativeFixed::from_num(5))?, f_verify)?,
+                    checked_add(
+                        checked_mul(f_recomp, NonNegativeFixed::from_num(5))?,
+                        f_verify,
+                    )?,
                     f_access,
                 )?,
                 f_stand,
@@ -188,7 +204,10 @@ fn checked_node_masses(
             maximum,
         )?;
         masses[MEASURE_SEARCH][index] = checked_clip(
-            checked_mul(checked_mul(checked_add(f_bval, f_conseq)?, f_search)?, f_stand)?,
+            checked_mul(
+                checked_mul(checked_add(f_bval, f_conseq)?, f_search)?,
+                f_stand,
+            )?,
             minimum,
             maximum,
         )?;
@@ -388,7 +407,10 @@ mod tests {
             val: 1,
             err: StabilityRefusal::NumericRangeExceeded as u32,
         };
-        assert_eq!(admit_fixed(value), Err(StabilityRefusal::NumericRangeExceeded));
+        assert_eq!(
+            admit_fixed(value),
+            Err(StabilityRefusal::NumericRangeExceeded)
+        );
     }
 
     #[test]
