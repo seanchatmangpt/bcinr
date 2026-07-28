@@ -206,16 +206,35 @@ impl GroundProblem {
             }
         }
 
+        // This rail enforces `always` only: its BFS carries `(state, fn_vals,
+        // path)` with no per-constraint monitor state, and every other form is
+        // path-dependent. The nine other forms were previously matched away
+        // and dropped in silence, so a plan violating a `sometime-before` came
+        // back `Found`.
+        //
+        // Refuse them instead. The temporal rail already does exactly this
+        // (see `GroundTemporalProblem::build`, which reuses
+        // `flatten_trajectory_constraint` + `MonitorFactory`); this is the
+        // same shape narrowed to what a monitor-less BFS can honour.
         let mut constraints = Vec::new();
+        let mut flattened = Vec::new();
         for pref in &problem.preferences {
-            if let wasm4pm_compat::pddl::TrajectoryConstraint::Always(c) = &pref.constraint {
-                constraints.push(*c.clone());
-            } else if let wasm4pm_compat::pddl::TrajectoryConstraint::And(parts) = &pref.constraint
-            {
-                for p in parts {
-                    if let wasm4pm_compat::pddl::TrajectoryConstraint::Always(c) = p {
-                        constraints.push(*c.clone());
-                    }
+            flatten_trajectory_constraint(&pref.constraint, &mut flattened);
+        }
+        for tc in &flattened {
+            match tc {
+                wasm4pm_compat::pddl::TrajectoryConstraint::Always(c) => {
+                    constraints.push(*c.clone());
+                }
+                other => {
+                    return Err(Pddl8Error::UnsupportedTrajectoryConstraint(format!(
+                        "problem :constraints uses {other:?}; the classical GroundProblem rail \
+                         evaluates `always` only, because its search carries no per-constraint \
+                         monitor state and every other form is path-dependent. Use \
+                         GroundTemporalProblem, which threads a TrajectoryPolicy, or drop the \
+                         constraint -- silently ignoring it would report plans that violate it \
+                         as Found"
+                    )));
                 }
             }
         }
@@ -877,7 +896,7 @@ impl GroundTemporalProblem {
 
         // Pending completions: (end_time, action_idx, over_all_conditions)
         // OverAll conditions are checked continuously during [start_time, end_time)
-        let mut pending: Vec<(f64, usize, Vec<PddlCondition>)> = Vec::new();
+        let mut pending: Vec<(f64, usize, Vec<PddlCondition>, Vec<PddlCondition>)> = Vec::new();
 
         // Grounded durative-action indices that have already run to completion
         // once in this trajectory. `pending`'s in-flight check alone only
@@ -1007,7 +1026,7 @@ impl GroundTemporalProblem {
                     // numeric fluent): only its *finished* effect blocks a
                     // restart, so without this guard the same grounded
                     // instance can be scheduled concurrently with itself.
-                    if pending.iter().any(|(_, idx, _)| *idx == i) {
+                    if pending.iter().any(|(_, idx, _, _)| *idx == i) {
                         continue;
                     }
                     // Already ran to completion once in this trajectory --
@@ -1050,7 +1069,11 @@ impl GroundTemporalProblem {
                         collect_over_all_conditions(cond, &mut over_all_conditions);
                     }
 
-                    pending.push((end, i, over_all_conditions));
+                    let mut at_end_conditions = Vec::new();
+                    for c in &da.conditions {
+                        collect_at_end_conditions(c, &mut at_end_conditions);
+                    }
+                    pending.push((end, i, over_all_conditions, at_end_conditions));
                     scheduled = true;
                     started_this_pass = true;
                     started_this_tick.insert(i);
@@ -1065,7 +1088,7 @@ impl GroundTemporalProblem {
                 .iter()
                 .enumerate()
                 .min_by(|(_, a), (_, b)| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
-                .map(|(p, (t, _, _))| (p, *t));
+                .map(|(p, (t, _, _, _))| (p, *t));
 
             let next_til_time = self
                 .timed_inits
@@ -1104,7 +1127,7 @@ impl GroundTemporalProblem {
                     // After TILs are applied, check OverAll conditions for all in-flight actions.
                     // OverAll conditions must be satisfied throughout the action's interval [start, end).
                     // If any action's OverAll condition is violated at current_time, the trajectory is dead.
-                    for (end_time, _idx, over_all_conds) in &pending {
+                    for (end_time, _idx, over_all_conds, _at_end) in &pending {
                         if current_time < *end_time {
                             // Action is still in flight at current_time
                             for cond in over_all_conds {
@@ -1130,12 +1153,21 @@ impl GroundTemporalProblem {
                 if let Some(min_pos) = pending
                     .iter()
                     .enumerate()
-                    .filter(|(_, (t, _, _))| *t == current_time)
+                    .filter(|(_, (t, _, _, _))| *t == current_time)
                     .map(|(p, _)| p)
                     .next()
                 {
-                    let (_, idx, _) = pending.remove(min_pos);
+                    let (_, idx, _, at_end_conds) = pending.remove(min_pos);
                     let da = &self.durative_actions[idx];
+                    // `at end` conditions are judged at completion, against the
+                    // state that actually obtains there.
+                    if !at_end_conds
+                        .iter()
+                        .all(|c| eval_condition(c, &state, &fn_vals, &self.quant_domain))
+                    {
+                        trajectory_dead = true;
+                        break;
+                    }
                     for eff in &da.effects {
                         apply_effect_at_end(
                             eff,
@@ -1401,6 +1433,28 @@ fn eval_quantifier(
 /// Collect all OverAll conditions from a (possibly timed) condition.
 /// Recursively unwraps nested And/Or/Imply/Not/Forall/Exists and TimeSpec(OverAll, ...)
 /// Each collected condition is the inner content of an OverAll wrapper.
+/// Collect the `at end` conditions of a durative action.
+///
+/// These must hold when the action *completes*, not when it is scheduled.
+/// Every condition was previously evaluated once at scheduling time
+/// (`eval_condition`'s `Timed` arm discards the specifier), and
+/// `collect_over_all_conditions` skips `AtEnd` as "not continuous" -- so an
+/// `at end` condition true at start and false at completion produced a
+/// `Found` plan.
+fn collect_at_end_conditions(cond: &PddlCondition, out: &mut Vec<PddlCondition>) {
+    use wasm4pm_compat::pddl::TimeSpecifier;
+    match cond {
+        PddlCondition::Timed(TimeSpecifier::AtEnd, inner) => out.push(*inner.clone()),
+        PddlCondition::Timed(_, _) => {}
+        PddlCondition::And(subs) | PddlCondition::Or(subs) => {
+            for sub in subs {
+                collect_at_end_conditions(sub, out);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn collect_over_all_conditions(cond: &PddlCondition, out: &mut Vec<PddlCondition>) {
     use wasm4pm_compat::pddl::TimeSpecifier;
     match cond {
@@ -1660,6 +1714,36 @@ fn eval_numeric(expr: &NumericExpr, fn_vals: &HashMap<String, f64>) -> f64 {
 }
 
 /// Resolve a `DurationConstraint` to (min, max) f64 bounds.
+/// Whether a duration expression refers to a numeric fluent.
+///
+/// `resolve_duration` evaluates against an empty map, so any `FunctionTerm`
+/// resolves to `0.0` via `eval_numeric`'s `unwrap_or(&0.0)`. Detecting it
+/// lets the caller refuse instead of shipping that zero.
+fn duration_expr_fluent(expr: &NumericExpr) -> Option<String> {
+    match expr {
+        NumericExpr::Number(_) => None,
+        NumericExpr::FunctionTerm(name, args) => Some(if args.is_empty() {
+            name.clone()
+        } else {
+            format!("{name}({})", args.join(" "))
+        }),
+        NumericExpr::Neg(inner) => duration_expr_fluent(inner),
+        NumericExpr::BinOp { lhs, rhs, .. } => {
+            duration_expr_fluent(lhs).or_else(|| duration_expr_fluent(rhs))
+        }
+    }
+}
+
+/// The first fluent any arm of a duration constraint refers to, if any.
+fn duration_constraint_fluent(dc: &DurationConstraint) -> Option<String> {
+    match dc {
+        DurationConstraint::Eq(e) | DurationConstraint::Gte(e) | DurationConstraint::Lte(e) => {
+            duration_expr_fluent(e)
+        }
+        DurationConstraint::And(parts) => parts.iter().find_map(duration_constraint_fluent),
+    }
+}
+
 fn resolve_duration(dc: &DurationConstraint) -> (f64, f64) {
     match dc {
         DurationConstraint::Eq(expr) => {
@@ -1773,6 +1857,12 @@ fn ground_durative_schema(
     out: &mut Vec<GroundDurativeAction>,
 ) -> Result<(), Pddl8Error> {
     let n = da.params.len();
+    if let Some(function) = duration_constraint_fluent(&da.duration) {
+        return Err(Pddl8Error::FluentValuedDurationUnsupported {
+            action: da.name.clone(),
+            function,
+        });
+    }
     let (dur_min, dur_max) = resolve_duration(&da.duration);
 
     if n == 0 {

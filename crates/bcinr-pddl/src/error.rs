@@ -75,6 +75,16 @@ pub enum Pddl8Error {
     /// `ground::trajectory_policy::TrajectoryPolicy::new`, which only skips
     /// whatever `create_monitor` returns `None` for instead of refusing.
     UnsupportedTrajectoryConstraint(String),
+    /// A durative action's `:duration` refers to a numeric fluent.
+    ///
+    /// `resolve_duration` runs at grounding time, before any initial fluent
+    /// values are in scope, and evaluated against an empty map -- so
+    /// `(= ?duration (speed))` silently resolved to `0.0` regardless of
+    /// `(speed)`'s real value. Refused rather than resolved: threading the
+    /// fluent store into grounding reorders `GroundTemporalProblem::build`,
+    /// because durations then become problem-dependent rather than a property
+    /// of the schema.
+    FluentValuedDurationUnsupported { action: String, function: String },
 }
 
 impl std::fmt::Display for Pddl8Error {
@@ -99,6 +109,12 @@ impl std::fmt::Display for Pddl8Error {
             Self::UnsupportedTrajectoryConstraint(s) => {
                 write!(f, "unsupported trajectory constraint: {s}")
             }
+            Self::FluentValuedDurationUnsupported { action, function } => write!(
+                f,
+                "durative action {action:?} has a fluent-valued duration referring to \
+                 {function:?}; durations are resolved at grounding time, before fluent \
+                 values exist, so this cannot be evaluated rather than silently taken as 0"
+            ),
         }
     }
 }
