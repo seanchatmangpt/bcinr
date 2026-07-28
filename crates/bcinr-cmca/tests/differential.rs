@@ -264,7 +264,7 @@ proptest! {
                 let val_f64 = result_f64[i];
                 let diff = (val_fixed - val_f64).abs();
 
-                if diff >= 0.22 {
+                if diff >= bcinr_cmca::generated_profile::DIFFERENTIAL_TOLERANCE {
                     println!("DIFFERENTIAL FAILURE AT NODE {}", i);
                     println!("parent: {:?}", parent);
                     println!("lambda_fixed: {:?}", lambda_fixed);
@@ -282,7 +282,12 @@ proptest! {
                 }
 
                 // Allow a small numerical tolerance due to fixed point approximations
-                assert!(diff < 0.22, "Differential mismatch at node {}: fixed={}, f64={}, diff={}", i, val_fixed, val_f64, diff);
+                assert!(
+                    diff < bcinr_cmca::generated_profile::DIFFERENTIAL_TOLERANCE,
+                    "Differential mismatch at node {}: fixed={}, f64={}, diff={} (tolerance {} is POLICY, not derived -- see ontology/profile.ttl)",
+                    i, val_fixed, val_f64, diff,
+                    bcinr_cmca::generated_profile::DIFFERENTIAL_TOLERANCE
+                );
             }
         }
     }

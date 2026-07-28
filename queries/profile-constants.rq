@@ -1,0 +1,21 @@
+PREFIX bc:   <https://bcinr.dev/ontology#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+# Profile and policy constants, with their provenance rendered as a Rust doc
+# comment. The IF lives here, not in the template: choosing between a
+# derivation and a policy marker is a decision.
+SELECT ?const_name ?const_type ?const_value ?provenance
+WHERE {
+    ?c a bc:ProfileConstant ;
+       bc:constName  ?const_name ;
+       bc:constType  ?const_type ;
+       bc:constValue ?const_value .
+    OPTIONAL { ?c bc:derivationOf    ?derivation . }
+    OPTIONAL { ?c bc:policyOwner     ?owner . }
+    OPTIONAL { ?c bc:policyRationale ?rationale . }
+
+    BIND(IF(BOUND(?derivation),
+            CONCAT("DERIVED. ", ?derivation),
+            CONCAT("POLICY (owner: ", ?owner, "). ", ?rationale)) AS ?provenance)
+}
+ORDER BY ?const_name

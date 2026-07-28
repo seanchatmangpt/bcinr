@@ -145,7 +145,11 @@ impl TrajectoryPolicy {
                         return Err(ConstraintViolation::HardConstraint);
                     }
                 }
-                MonitorState::Violated | MonitorState::IrrecoverablyViolated => {
+                MonitorState::Violated
+                | MonitorState::IrrecoverablyViolated
+                | MonitorState::Outstanding => {
+                    // `Outstanding` = a trigger fired and its response never
+                    // arrived. Recoverable during search, a violation here.
                     return Err(ConstraintViolation::HardConstraint);
                 }
                 MonitorState::Satisfied => {} // OK

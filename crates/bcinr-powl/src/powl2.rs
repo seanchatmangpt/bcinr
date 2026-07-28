@@ -47,12 +47,34 @@ pub enum Powl2Error {
     EmptySequence,
     EmptyPartialOrder,
     EmptyChoiceGraph,
-    InvalidEdge { from: usize, to: usize, len: usize },
-    InvalidChoiceEndpoint { endpoint: usize, len: usize },
+    /// Fewer children than the definition admits. Def 3.7 states `n >= 2` for
+    /// both the partial order and the choice graph; a one-child model is not
+    /// something the paper defines.
+    ArityBelowMinimum {
+        constructor: &'static str,
+        found: usize,
+        minimum: usize,
+    },
+    InvalidEdge {
+        from: usize,
+        to: usize,
+        len: usize,
+    },
+    InvalidChoiceEndpoint {
+        endpoint: usize,
+        len: usize,
+    },
     PartialOrderCycle,
-    ChoiceNodeOffStartEndPath { node: usize },
-    ChoicePathBoundExceeded { limit: usize },
-    ChoicePolicyReturnedInvalidSuccessor { from: usize, selected: usize },
+    ChoiceNodeOffStartEndPath {
+        node: usize,
+    },
+    ChoicePathBoundExceeded {
+        limit: usize,
+    },
+    ChoicePolicyReturnedInvalidSuccessor {
+        from: usize,
+        selected: usize,
+    },
     TapeFull,
     LabelSlabFull,
 }
@@ -63,6 +85,14 @@ impl std::fmt::Display for Powl2Error {
             Self::EmptySequence => write!(f, "POWL 2.0 sequence has no children"),
             Self::EmptyPartialOrder => write!(f, "POWL 2.0 partial order has no children"),
             Self::EmptyChoiceGraph => write!(f, "POWL 2.0 choice graph has no vertices"),
+            Self::ArityBelowMinimum {
+                constructor,
+                found,
+                minimum,
+            } => write!(
+                f,
+                "POWL 2.0 {constructor} has {found} children; Def 3.7 requires at least {minimum}"
+            ),
             Self::InvalidEdge { from, to, len } => {
                 write!(f, "POWL 2.0 edge {from}->{to} is outside 0..{len}")
             }
@@ -192,6 +222,13 @@ pub fn validate_powl2(model: &Powl2Model) -> Result<(), Powl2Error> {
             if children.is_empty() {
                 return Err(Powl2Error::EmptyPartialOrder);
             }
+            if children.len() < crate::generated_arity::PARTIAL_ORDER_MIN_CHILDREN {
+                return Err(Powl2Error::ArityBelowMinimum {
+                    constructor: "partial order",
+                    found: children.len(),
+                    minimum: crate::generated_arity::PARTIAL_ORDER_MIN_CHILDREN,
+                });
+            }
             validate_edges(children.len(), edges)?;
             validate_acyclic(children.len(), edges)?;
             children.iter().try_for_each(validate_powl2)
@@ -204,6 +241,13 @@ pub fn validate_powl2(model: &Powl2Model) -> Result<(), Powl2Error> {
         } => {
             if children.is_empty() {
                 return Err(Powl2Error::EmptyChoiceGraph);
+            }
+            if children.len() < crate::generated_arity::CHOICE_GRAPH_MIN_CHILDREN {
+                return Err(Powl2Error::ArityBelowMinimum {
+                    constructor: "choice graph",
+                    found: children.len(),
+                    minimum: crate::generated_arity::CHOICE_GRAPH_MIN_CHILDREN,
+                });
             }
             if *start >= children.len() {
                 return Err(Powl2Error::InvalidChoiceEndpoint {

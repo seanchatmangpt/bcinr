@@ -1,0 +1,53 @@
+@prefix bc:   <https://bcinr.dev/ontology#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+################################################################################
+# Numeric profile and policy constants.
+#
+# Every constant is EITHER derived from a stated rule OR explicitly marked
+# policy with an owner and a rationale. A value with neither must not appear in
+# generated or hand-written code as though it followed from the mathematics.
+#
+# The distinction the system needs:
+#
+#   CMCA mathematical domain   q in [-2, 2], m in the declared mass domain
+#   Q16.16 numeric profile     16 fractional bits, finite maximum
+#   executable envelope        the intersection -- what this backend can run
+#
+# An input may be mathematically meaningful and still outside the envelope.
+# That is a typed execution refusal, not invalid mathematics.
+################################################################################
+
+bc:Q16_16 a bc:NumericProfile ;
+    rdfs:label "Q16.16" ;
+    bc:profileDoc "Unsigned 32-bit fixed point, 16 fractional bits." .
+
+bc:FractionalBits a bc:ProfileConstant ;
+    bc:constName "Q16_16_FRACTIONAL_BITS" ; bc:constType "u32" ; bc:constValue "16" ;
+    bc:inProfile bc:Q16_16 ;
+    bc:derivationOf "Definitional: the representation is Q16.16." .
+
+bc:EscortDynamicRange a bc:ProfileConstant ;
+    bc:constName "ESCORT_DYNAMIC_RANGE_LIMIT" ; bc:constType "i32" ; bc:constValue "16" ;
+    bc:inProfile bc:Q16_16 ;
+    bc:derivationOf "Derived from the fractional width. The escort kernel is max-shift stabilised -- exp2(q*log2(m_i) - max_j(q*log2(m_j))) -- so the largest weight is exactly 1.0 and overflow is structurally impossible. The binding constraint is the SPREAD: a sibling more than 2^-16 below the maximum underflows to zero. So the representable region is defined by max_j(q*log2(m_j)) - min_j(q*log2(m_j)) < 16, a property of the sibling SET, not of an individual (q, m) pair." .
+
+bc:DifferentialTolerance a bc:ProfileConstant ;
+    bc:constName "DIFFERENTIAL_TOLERANCE" ; bc:constType "f64" ; bc:constValue "0.22" ;
+    bc:inProfile bc:Q16_16 ;
+    bc:policyMarked true ;
+    bc:policyOwner "bcinr-cmca" ;
+    bc:policyRationale "UNDERIVED. 0.22 permits a 22 percentage-point disagreement on a normalized allocation share, which is not a tolerance so much as an absence of one. It was chosen to make the fixed-vs-f64 comparison pass, not derived from the numeric profile. The principled replacement is to classify each generated case as inside or outside the executable envelope and compare outcomes rather than values: inside, assert agreement to an error bound derived from ESCORT_DYNAMIC_RANGE_LIMIT; outside, assert NumericRangeExceeded. Until that lands this number is a placeholder and must be labelled as one." .
+
+bc:MaxLensMagnitude a bc:ProfileConstant ;
+    bc:constName "MAX_LENS_MAGNITUDE" ; bc:constType "u32" ; bc:constValue "16" ;
+    bc:inProfile bc:Q16_16 ;
+    bc:policyMarked true ;
+    bc:policyOwner "bcinr-cmca::cascade" ;
+    bc:policyRationale "UNDERIVED, and inconsistent with the allocator. Any value >= 2 satisfies the stated rationale of bounding the repeated-multiplication loop. allocator.rs:1452 independently admits q in [-2, 2]; cascade.rs admits |q| <= 16. Two implementations claiming the same measure accept domains differing by a factor of 8." .
+
+bc:MaxCycleUnroll a bc:ProfileConstant ;
+    bc:constName "MAX_CYCLE_UNROLL" ; bc:constType "usize" ; bc:constValue "2" ;
+    bc:policyMarked true ;
+    bc:policyOwner "bcinr-powl::language" ;
+    bc:policyRationale "UNDERIVED, and load-bearing. The termination argument holds for any finite value, so 2 is a free choice -- but powl2_language IS the bounded-agreement oracle, so this constant silently sets how strong that check is. A larger value enumerates strictly more traces and therefore checks strictly more." .

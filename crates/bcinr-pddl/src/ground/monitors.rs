@@ -36,6 +36,18 @@ pub enum MonitorState {
     Violated,
     /// Constraint can never be satisfied from this point forward.
     IrrecoverablyViolated,
+    /// A trigger has fired and its required response has not yet been
+    /// observed.
+    ///
+    /// Distinct from both `Pending` and `Violated`, and neither is a
+    /// substitute. `Pending` cannot express it, because `finalize` reads
+    /// `Pending` as "never triggered", which for a universal like
+    /// `(sometime-after phi psi)` is vacuously true -- collapsing the two
+    /// makes an unanswered trigger look satisfied. `Violated` cannot express
+    /// it either, because the search prunes on `Violated`, and an outstanding
+    /// response is recoverable: a later `psi` discharges it. So this state is
+    /// non-pruning during search and a violation at finalize.
+    Outstanding,
 }
 
 impl MonitorState {
@@ -45,6 +57,12 @@ impl MonitorState {
             self,
             MonitorState::Violated | MonitorState::IrrecoverablyViolated
         )
+    }
+
+    /// A trigger is awaiting its response: recoverable now, a violation if the
+    /// plan ends here. See [`MonitorState::Outstanding`].
+    pub fn is_outstanding(&self) -> bool {
+        matches!(self, MonitorState::Outstanding)
     }
 
     /// Check if the constraint is in a terminal state.
@@ -193,6 +211,11 @@ impl AtMostOnceMonitor {
 }
 
 impl ConstraintMonitor for AtMostOnceMonitor {
+    /// Zero occurrences satisfies `at-most-once`.
+    fn pending_is_satisfied_at_finalize(&self) -> bool {
+        true
+    }
+
     fn step(
         &self,
         monitor_state: MonitorState,
@@ -203,7 +226,15 @@ impl ConstraintMonitor for AtMostOnceMonitor {
         quant_domain: &QuantifierDomain,
         _derived_predicates: &[GroundDerivedPredicate],
     ) -> MonitorState {
-        if monitor_state.is_terminal() {
+        // NOT `is_terminal()`: `Satisfied` is not absorbing for this monitor.
+        // One occurrence satisfies `at-most-once`; a *second* must violate it,
+        // so the `Satisfied` arm below has to stay reachable. Guarding on
+        // `is_terminal()` made it dead code and this monitor accepted any
+        // number of occurrences.
+        if matches!(
+            monitor_state,
+            MonitorState::IrrecoverablyViolated | MonitorState::Violated
+        ) {
             return monitor_state;
         }
 
@@ -255,6 +286,12 @@ impl SometimeBeforeMonitor {
 }
 
 impl ConstraintMonitor for SometimeBeforeMonitor {
+    /// If neither condition ever holds the constraint is vacuously satisfied:
+    /// there is no occurrence of the trigger for anything to precede.
+    fn pending_is_satisfied_at_finalize(&self) -> bool {
+        true
+    }
+
     fn step(
         &self,
         monitor_state: MonitorState,
@@ -307,6 +344,13 @@ impl SometimeAfterMonitor {
 }
 
 impl ConstraintMonitor for SometimeAfterMonitor {
+    /// `Pending` here means the trigger was never observed, so the universal
+    /// is vacuously true. The "trigger seen, response outstanding" case is
+    /// carried by `Violated`, which `finalize` already treats as a violation.
+    fn pending_is_satisfied_at_finalize(&self) -> bool {
+        true
+    }
+
     fn step(
         &self,
         monitor_state: MonitorState,
@@ -317,7 +361,11 @@ impl ConstraintMonitor for SometimeAfterMonitor {
         quant_domain: &QuantifierDomain,
         _derived_predicates: &[GroundDerivedPredicate],
     ) -> MonitorState {
-        if monitor_state.is_terminal() {
+        // NOT `is_terminal()`: `Satisfied` is not absorbing. `(sometime-after
+        // phi psi)` is a universal over every occurrence of `phi`, so a later
+        // `phi` with no following `psi` must violate even after an earlier
+        // pair discharged. Absorbing on `Satisfied` accepted invalid plans.
+        if monitor_state == MonitorState::IrrecoverablyViolated {
             return monitor_state;
         }
 
@@ -326,24 +374,27 @@ impl ConstraintMonitor for SometimeAfterMonitor {
         let after_holds =
             eval_condition(&self.condition_after, next_state, fn_values, quant_domain);
 
-        match monitor_state {
-            MonitorState::Pending => {
-                if before_holds {
-                    // We've seen c1, now waiting for c2
-                    // Return Pending to indicate we're tracking
-                    if after_holds {
-                        // Immediately saw c2 after c1 -> satisfied
-                        MonitorState::Satisfied
-                    } else {
-                        // c1 holds but c2 doesn't yet
-                        MonitorState::Pending
-                    }
+        // `Violated` is the "trigger seen, response outstanding" marker. It is
+        // non-terminal and recoverable: a later `psi` discharges it. Keeping it
+        // distinct from `Pending` is what lets `finalize` tell "never triggered"
+        // (vacuously true) from "triggered and never answered" (a violation) --
+        // the previous encoding conflated both in `Pending`.
+        let outstanding = monitor_state == MonitorState::Outstanding;
+
+        match (before_holds, after_holds) {
+            // `psi` holds: discharges any outstanding trigger, and also the one
+            // arriving now, since `j >= i` admits `j == i`.
+            (_, true) => MonitorState::Satisfied,
+            // A trigger with no response yet -- re-arms even from `Satisfied`.
+            (true, false) => MonitorState::Outstanding,
+            // Nothing happened: keep waiting if outstanding, else hold state.
+            (false, false) => {
+                if outstanding {
+                    MonitorState::Outstanding
                 } else {
-                    // Haven't seen c1 yet
-                    MonitorState::Pending
+                    monitor_state
                 }
             }
-            _ => monitor_state,
         }
     }
 }
@@ -366,8 +417,13 @@ impl MonitorFactory {
             TrajectoryConstraint::AtMostOnce(cond) => {
                 Some(Box::new(AtMostOnceMonitor::new((**cond).clone())))
             }
+            // PDDL 3.0 `(sometime-before phi psi)`: `psi` must hold strictly
+            // before any occurrence of `phi`. The FIRST argument is the
+            // triggered/later condition, so `c2` is what must come first and
+            // `c1` is the trigger. The previous mapping passed them in
+            // declaration order, inverting the constraint.
             TrajectoryConstraint::SometimeBefore(c1, c2) => Some(Box::new(
-                SometimeBeforeMonitor::new((**c1).clone(), (**c2).clone()),
+                SometimeBeforeMonitor::new((**c2).clone(), (**c1).clone()),
             )),
             TrajectoryConstraint::SometimeAfter(c1, c2) => Some(Box::new(
                 SometimeAfterMonitor::new((**c1).clone(), (**c2).clone()),

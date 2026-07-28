@@ -134,7 +134,10 @@ fn test_sometime_before_constraint() {
   (:domain sometime-before-test)
   (:init (can-start))
   (:goal (and (start-signal) (end-signal)))
-  (:constraints (sometime-before (start-signal) (end-signal))))
+  ;; `(sometime-before phi psi)` requires psi strictly before any phi, so the
+  ;; FIRST argument is the later one. The domain achieves start-signal then
+  ;; end-signal, so end-signal is the trigger and start-signal must precede it.
+  (:constraints (sometime-before (end-signal) (start-signal))))
 "#;
 
     let domain = domain_from_pddl(DOMAIN).expect("domain must parse");
@@ -211,7 +214,8 @@ fn test_multiple_constraints() {
   (:constraints (and
     (always (safe))
     (sometime (active))
-    (sometime-before (active) (success)))))
+    ;; success is the trigger; active must hold strictly before it.
+    (sometime-before (success) (active)))))
 "#;
 
     let domain = domain_from_pddl(DOMAIN).expect("domain must parse");
@@ -223,7 +227,7 @@ fn test_multiple_constraints() {
     // All constraints should be satisfied:
     // - always(safe): safe is initially true and never changed
     // - sometime(active): active becomes true via activate action
-    // - sometime-before(active, success): active happens before success
+    // - sometime-before(success, active): active must hold strictly before success
     assert!(matches!(outcome, PlannerOutcome::Found(_)));
 }
 
