@@ -117,6 +117,89 @@ pub enum CascadeRefusal {
     /// finite answer, and saturating to `MAX` would silently make a
     /// zero-mass node dominate every sibling.
     ZeroMassUnderNegativeLens { node: usize, lens: i32 },
+    /// A Q16.16 operation saturated or divided by zero, so the value carried
+    /// forward is not the value the mathematics calls for.
+    ///
+    /// `NonNegativeFixed` computes this: `saturating_mul` and friends set
+    /// `err` to a `StabilityRefusal` discriminant and leave it `u32::MAX` when
+    /// clean. Every arithmetic stage in this module now consumes that channel
+    /// through [`admit_fixed`] rather than taking `.to_bits()` and dropping it,
+    /// because an error that exists inside a value but never reaches the
+    /// `Result` is indistinguishable from a correct answer.
+    ///
+    /// Note this module has no max-shift stabilisation: `m^q` is materialised
+    /// by repeated multiplication, so overflow is genuinely reachable here.
+    /// (The certified allocator *does* max-shift, which makes overflow
+    /// structurally impossible and routine underflow benign -- the two modules
+    /// need different treatment for that reason.)
+    NumericFault {
+        operation: NumericContext,
+        node: usize,
+        error_code: u32,
+    },
+    /// `m^q` collapsed to zero from a non-zero mass: the value is not
+    /// negligible, it is unrepresentable at this precision.
+    ///
+    /// `saturating_mul` flags overflow but NOT underflow, so this cannot be
+    /// read off the error channel and is detected structurally. Distinguishing
+    /// it matters: a true zero mass is a fact about the input, whereas a mass
+    /// that *became* zero is a fact about Q16.16, and only the second is a
+    /// representability failure.
+    EscortUnderflow {
+        node: usize,
+        lens: i32,
+        mass_bits: u32,
+    },
+}
+
+/// Where in the cascade an arithmetic fault arose.
+///
+/// Carried on [`CascadeRefusal::NumericFault`] so a refusal names the stage
+/// that could not be represented, not merely that something overflowed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NumericContext {
+    /// `m^q` by repeated multiplication.
+    EscortWeight { lens: i32 },
+    /// `1 / m^|q|` for a negative lens.
+    EscortReciprocal { lens: i32 },
+    /// Summing a sibling group's escort weights.
+    SiblingSum,
+    /// Summing a subtree's leaf escort weights.
+    SubtreeLeafSum,
+    /// `w_i / SUM w_j`.
+    ShareDivision,
+    /// `rho * flow`.
+    DescendantSplit,
+    /// `(1 - rho) * flow`.
+    FlatSplit,
+    /// Accumulating flow into a child.
+    FlowAccumulation,
+    /// Accumulating the flat path into a subtree leaf.
+    FlatAccumulation,
+    /// `flow + flat` at a node.
+    FinalAccumulation,
+}
+
+/// Admit a fixed-point value only if the operation that produced it was
+/// exact, converting the value-internal error channel into a typed refusal.
+///
+/// This is the single choke point the module routes every arithmetic result
+/// through. `NonNegativeFixed::err` is `u32::MAX` when clean and a
+/// `StabilityRefusal` discriminant otherwise.
+#[inline]
+pub fn admit_fixed(
+    value: NonNegativeFixed,
+    operation: NumericContext,
+    node: usize,
+) -> Result<NonNegativeFixed, CascadeRefusal> {
+    if value.err == u32::MAX {
+        return Ok(value);
+    }
+    Err(CascadeRefusal::NumericFault {
+        operation,
+        node,
+        error_code: value.err,
+    })
 }
 
 impl CascadeTree {
@@ -216,13 +299,25 @@ pub fn escort_weight(
     for _ in 0..magnitude {
         accumulated = accumulated.saturating_mul(mass);
     }
+    let accumulated = admit_fixed(accumulated, NumericContext::EscortWeight { lens }, node)?;
+    if accumulated.to_bits() == 0 && mass.to_bits() != 0 {
+        return Err(CascadeRefusal::EscortUnderflow {
+            node,
+            lens,
+            mass_bits: mass.to_bits(),
+        });
+    }
     if lens > 0 {
         return Ok(accumulated);
     }
     if accumulated.to_bits() == 0 {
         return Err(CascadeRefusal::ZeroMassUnderNegativeLens { node, lens });
     }
-    Ok(NonNegativeFixed::ONE.saturating_div(accumulated))
+    admit_fixed(
+        NonNegativeFixed::ONE.saturating_div(accumulated),
+        NumericContext::EscortReciprocal { lens },
+        node,
+    )
 }
 
 /// Depth of every node (roots at depth 0), refusing on a cyclic `parent`.
@@ -344,13 +439,21 @@ pub fn consequence_mass(
         .collect();
     let mut root_total = NonNegativeFixed::ZERO;
     for &root in &roots {
-        root_total = root_total.saturating_add(weight[root]);
+        root_total = admit_fixed(
+            root_total.saturating_add(weight[root]),
+            NumericContext::SiblingSum,
+            root,
+        )?;
     }
     if root_total.to_bits() == 0 {
         return Err(CascadeRefusal::DegenerateSiblingSet { parent: None });
     }
     for &root in &roots {
-        flow[root] = weight[root].saturating_div(root_total);
+        flow[root] = admit_fixed(
+            weight[root].saturating_div(root_total),
+            NumericContext::ShareDivision,
+            root,
+        )?;
     }
 
     // Depth order guarantees a node's inbound flow is final before it splits.
@@ -361,21 +464,38 @@ pub fn consequence_mass(
         if is_leaf[v] {
             continue;
         }
-        let descendant_part = tree.rho[v].saturating_mul(flow[v]);
+        let descendant_part = admit_fixed(
+            tree.rho[v].saturating_mul(flow[v]),
+            NumericContext::DescendantSplit,
+            v,
+        )?;
         let flat_part = NonNegativeFixed::ONE
             .saturating_sub(tree.rho[v])
             .saturating_mul(flow[v]);
+        let flat_part = admit_fixed(flat_part, NumericContext::FlatSplit, v)?;
 
         let mut child_total = NonNegativeFixed::ZERO;
         for &c in &children[v] {
-            child_total = child_total.saturating_add(weight[c]);
+            child_total = admit_fixed(
+                child_total.saturating_add(weight[c]),
+                NumericContext::SiblingSum,
+                c,
+            )?;
         }
         if child_total.to_bits() == 0 {
             return Err(CascadeRefusal::DegenerateSiblingSet { parent: Some(v) });
         }
         for &c in &children[v] {
-            let share = weight[c].saturating_div(child_total);
-            flow[c] = flow[c].saturating_add(descendant_part.saturating_mul(share));
+            let share = admit_fixed(
+                weight[c].saturating_div(child_total),
+                NumericContext::ShareDivision,
+                c,
+            )?;
+            flow[c] = admit_fixed(
+                flow[c].saturating_add(descendant_part.saturating_mul(share)),
+                NumericContext::FlowAccumulation,
+                c,
+            )?;
         }
 
         // Only walk the flat path when it actually carries mass: under
@@ -386,18 +506,36 @@ pub fn consequence_mass(
         }
         let mut leaf_total = NonNegativeFixed::ZERO;
         for &x in &subtree_leaves[v] {
-            leaf_total = leaf_total.saturating_add(weight[x]);
+            leaf_total = admit_fixed(
+                leaf_total.saturating_add(weight[x]),
+                NumericContext::SubtreeLeafSum,
+                x,
+            )?;
         }
         if leaf_total.to_bits() == 0 {
             return Err(CascadeRefusal::DegenerateSubtreeLeaves { node: v });
         }
         for &x in &subtree_leaves[v] {
-            let share = weight[x].saturating_div(leaf_total);
-            flat[x] = flat[x].saturating_add(flat_part.saturating_mul(share));
+            let share = admit_fixed(
+                weight[x].saturating_div(leaf_total),
+                NumericContext::ShareDivision,
+                x,
+            )?;
+            flat[x] = admit_fixed(
+                flat[x].saturating_add(flat_part.saturating_mul(share)),
+                NumericContext::FlatAccumulation,
+                x,
+            )?;
         }
     }
 
-    Ok((0..len)
-        .map(|node| flow[node].saturating_add(flat[node]))
-        .collect())
+    (0..len)
+        .map(|node| {
+            admit_fixed(
+                flow[node].saturating_add(flat[node]),
+                NumericContext::FinalAccumulation,
+                node,
+            )
+        })
+        .collect()
 }
