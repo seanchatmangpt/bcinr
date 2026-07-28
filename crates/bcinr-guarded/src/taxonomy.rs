@@ -8,7 +8,6 @@
 // the graph changes this file; every exhaustive elimination built on it then
 // fails to compile until the new case is handled.
 
-
 /// Conditions under which the multifractal cascade has no correct answer. Each is a real condition, not a degradation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum CascadeRefusal {
@@ -92,7 +91,7 @@ pub enum FormalStanding {
     Vacuous,
     /// A bare `def : Prop` with no proof attempted; the open goal its own authors name as such.
     Conjectural,
-    /// A countermodel exists.
+    /// A countermodel exists and is recorded: the claim is known false, not merely unproven.
     Refuted,
     /// No proof and no formalized representation exists at all.
     Blocked,
@@ -128,7 +127,7 @@ impl FormalStanding {
             Self::Stated => "Defined in Lean but not proven to have the properties a caller might assume.",
             Self::Vacuous => "Typechecks and constrains nothing. `exists d, f 0 = d` holds of every f. Audits identically to a real theorem.",
             Self::Conjectural => "A bare `def : Prop` with no proof attempted; the open goal its own authors name as such.",
-            Self::Refuted => "A countermodel exists.",
+            Self::Refuted => "A countermodel exists and is recorded: the claim is known false, not merely unproven.",
             Self::Blocked => "No proof and no formalized representation exists at all.",
         }
     }
@@ -307,7 +306,7 @@ impl RefusalReason {
 /// PDDL 3.0 trajectory constraint forms. A monitor that cannot decide a form must refuse at admission, never no-op.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum TrajectoryConstraint {
-    /// Holds in every state.
+    /// Holds in every state of the trajectory, including the initial and final ones.
     Always,
     /// Holds in at least one state.
     Sometime,
@@ -363,7 +362,7 @@ impl TrajectoryConstraint {
     /// The case's documented meaning, from the graph.
     pub fn doc(&self) -> &'static str {
         match self {
-            Self::Always => "Holds in every state.",
+            Self::Always => "Holds in every state of the trajectory, including the initial and final ones.",
             Self::Sometime => "Holds in at least one state.",
             Self::AtMostOnce => "Holds in at most one contiguous interval.",
             Self::SometimeBefore => "(sometime-before phi psi): psi must hold strictly before any occurrence of phi. The FIRST argument is the triggered/later condition.",

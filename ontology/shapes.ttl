@@ -93,6 +93,26 @@ bc:TaxonCaseShape a sh:NodeShape ;
     ] ;
     sh:message "a bc:ExecutionOnly constructor must declare bc:derivedFrom: 'not primitive' is only meaningful relative to what it reduces to" .
 
+bc:FalsifiableCaseShape a sh:NodeShape ;
+    sh:targetClass bc:TaxonCase ;
+
+    # Every case must be EITHER mechanically falsifiable -- carrying an
+    # expression that runs and is asserted to produce it -- OR explicitly
+    # recorded as unwitnessed with the argument for why. A variant with
+    # neither is a claim that a condition is reachable, made in a medium where
+    # nothing decides it; the eleven dead StabilityRefusal variants were
+    # exactly that, and were found by audit rather than by build.
+    #
+    # This is the one constraint here that moves an obligation across the
+    # decidability gap rather than merely enforcing consistency: the generated
+    # test either runs and passes, or does not exist and says why.
+    sh:or (
+        [ sh:property [ sh:path bc:rustFalsifierExpr ; sh:minCount 1 ; sh:maxCount 1 ] ]
+        [ sh:property [ sh:path bc:falsifierUnwitnessedReason ; sh:minCount 1 ; sh:minLength 60 ] ]
+        [ sh:property [ sh:path ( bc:inTaxonomy bc:isRefusalTaxonomy ) ; sh:maxCount 0 ] ]
+    ) ;
+    sh:message "a refusal case must carry either bc:rustFalsifierExpr (a witness that runs) or bc:falsifierUnwitnessedReason (why none exists); cases in taxonomies not marked bc:isRefusalTaxonomy are exempt -- a constructor is not a condition that can fire" .
+
 ################################################################################
 # ClosedTaxonomy -- the variant set itself.
 ################################################################################

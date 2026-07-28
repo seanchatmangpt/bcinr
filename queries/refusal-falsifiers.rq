@@ -1,0 +1,55 @@
+PREFIX bc:   <https://bcinr.dev/ontology#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#>
+
+# Executable falsifiers for refusal taxonomies.
+#
+# This is the one projection that carries a claim across the decidability gap
+# rather than only enforcing agreement between representations. The rest of the
+# generated output guarantees that the graph and the code say the same thing --
+# a syntactic property. `bc:falsifier` was prose: a semantic claim ("this input
+# produces this refusal") sitting in a medium where nothing could decide it, and
+# one of them had silently stopped being true.
+#
+# Here each witness becomes a test that runs. The claim is still not proved in
+# general -- one input is not a theorem -- but "this refusal is reachable" is
+# now decided by execution rather than asserted in a comment.
+#
+# LAYERING: neutral facts live in the graph (`bc:caseShape "struct"`,
+# `bc:isRefusalTaxonomy`). This query is the Rust layer and BINDs them into Rust
+# tokens, so the template substitutes and never decides.
+SELECT ?fn_name ?case_name ?taxonomy_label ?case_doc
+       ?prelude ?setup ?expr ?pattern
+WHERE {
+    ?case a bc:TaxonCase ;
+          bc:inTaxonomy ?taxonomy ;
+          bc:caseName   ?case_name ;
+          bc:caseOrder  ?case_order ;
+          bc:caseDoc    ?case_doc ;
+          bc:caseShape  ?case_shape ;
+          bc:rustFalsifierExpr ?expr .
+
+    ?taxonomy bc:isRefusalTaxonomy true ;
+              rdfs:label ?taxonomy_label ;
+              bc:rustPath ?rust_path ;
+              bc:rustFalsifierPrelude    ?prelude ;
+              bc:rustErrorPatternPrefix  ?prefix ;
+              bc:rustErrorPatternSuffix  ?suffix .
+
+    # Setup is optional; a case whose witness is a single expression has none.
+    # Bound to the empty string so the template never branches on presence.
+    OPTIONAL { ?case bc:rustFalsifierSetup ?declared_setup . }
+    BIND(COALESCE(?declared_setup, "") AS ?setup)
+
+    # Neutral shape -> Rust match-pattern syntax, then the full pattern the
+    # observed value must match. The taxonomy supplies the wrapper because
+    # nesting is a property of the error type, not of the case.
+    BIND(IF(?case_shape = "unit", "",
+        IF(?case_shape = "tuple", "(..)", " { .. }")) AS ?pattern_suffix)
+    BIND(CONCAT(?prefix, ?rust_path, "::", ?case_name, ?pattern_suffix, ?suffix) AS ?pattern)
+
+    # A test function name that is unique across taxonomies and stable under
+    # reordering: lowercase the taxonomy label, keep the case name verbatim.
+    BIND(CONCAT("falsifier_", LCASE(?taxonomy_label), "_", LCASE(?case_name)) AS ?fn_name)
+}
+ORDER BY ?taxonomy_label xsd:integer(?case_order)

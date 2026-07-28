@@ -390,10 +390,16 @@ pub fn consequence_mass(
     if len == 0 {
         return Ok(Vec::new());
     }
-    let depth = depths(tree)?;
+    // Order matters: a parent vector with no `None` entry always contains a
+    // cycle on a finite node set, so running `depths` first made `NoRoot`
+    // unreachable -- every root-free tree was reported as `Cyclic` instead of
+    // the more specific diagnosis. Checking rootedness first leaves both
+    // variants live: `Cyclic` now witnesses a cycle among nodes that coexists
+    // with a root elsewhere in the forest (e.g. parent = [None, Some(2), Some(1)]).
     if !tree.parent.iter().any(Option::is_none) {
         return Err(CascadeRefusal::NoRoot);
     }
+    let depth = depths(tree)?;
 
     let lens_at = |d: usize| -> i32 {
         if lenses.is_empty() {

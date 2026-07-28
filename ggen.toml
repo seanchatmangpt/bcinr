@@ -63,3 +63,17 @@ query = { file = "queries/runtime-bindings.rq" }
 template = { file = "templates/runtime_binding.rs.tera" }
 output_file = "crates/bcinr-guarded/src/runtime_binding.rs"
 mode = "Overwrite"
+
+# --- Executable falsifiers ---------------------------------------------------
+#
+# The only rule here whose output moves a claim across the decidability gap:
+# every other projection guarantees the graph and the code agree, which is
+# syntactic. This one turns "this refusal is reachable" from a comment into a
+# computation that runs.
+
+[[generation.rules]]
+name = "refusal_falsifiers"
+query = { file = "queries/refusal-falsifiers.rq" }
+template = { file = "templates/refusal_falsifier.rs.tera" }
+output_file = "crates/bcinr-guarded/tests/generated_falsifiers.rs"
+mode = "Overwrite"

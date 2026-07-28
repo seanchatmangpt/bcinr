@@ -19,4 +19,3 @@ pub const MAX_LENS_MAGNITUDE: u32 = 16;
 
 /// DERIVED. Definitional: the representation is Q16.16.
 pub const Q16_16_FRACTIONAL_BITS: u32 = 16;
-

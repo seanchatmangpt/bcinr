@@ -189,43 +189,60 @@ bc:Standing_Blocked a bc:TaxonCase ; bc:inTaxonomy bc:FormalStanding ; bc:caseOr
 ################################################################################
 
 bc:CascadeRefusal a bc:ClosedTaxonomy ;
+    bc:isRefusalTaxonomy true ;
     rdfs:label "CascadeRefusal" ;
     bc:taxonomyDoc "Conditions under which the multifractal cascade has no correct answer. Each is a real condition, not a degradation." ;
     bc:rustPath "bcinr_cmca::cascade::CascadeRefusal" ;
-    bc:runtimeCrate "bcinr_cmca" .
+    bc:runtimeCrate "bcinr_cmca" ;
+    bc:rustFalsifierPrelude """use bcinr_cmca::cascade::{consequence_mass, CascadeTree}; use bcinr_cmca::fixed::NonNegativeFixed; let m = |v: f64| NonNegativeFixed::from_bits((v * 65536.0) as u32);""" ;
+    bc:rustErrorPatternPrefix "Err(" ;
+    bc:rustErrorPatternSuffix ")" .
 
-bc:Casc_LengthMismatch a bc:TaxonCase ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 0 ;
+bc:Casc_LengthMismatch a bc:TaxonCase ;
+    bc:rustFalsifierExpr """CascadeTree::new(vec![None], vec![m(1.0), m(1.0)]).map(|_| ())""" ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 0 ;
     bc:caseName "LengthMismatch" ; bc:caseShape "struct" ;
     bc:caseDoc "parent and mass vectors disagree in length." ;
     bc:falsifier "new(vec![None; 3], vec![ONE; 2])" .
 
-bc:Casc_ParentOutOfRange a bc:TaxonCase ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 1 ;
+bc:Casc_ParentOutOfRange a bc:TaxonCase ;
+    bc:rustFalsifierExpr """CascadeTree::new(vec![None, Some(9)], vec![m(1.0), m(1.0)]).map(|_| ())""" ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 1 ;
     bc:caseName "ParentOutOfRange" ; bc:caseShape "struct" ;
     bc:caseDoc "A parent index addresses a node that does not exist." ;
     bc:falsifier "new(vec![Some(9)], vec![ONE])" .
 
-bc:Casc_Cyclic a bc:TaxonCase ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 2 ;
+bc:Casc_Cyclic a bc:TaxonCase ;
+    bc:rustFalsifierSetup """let t = CascadeTree::new(vec![None, Some(2), Some(1)], vec![m(1.0), m(1.0), m(1.0)]).unwrap();""" ;
+    bc:rustFalsifierExpr """consequence_mass(&t, &[2]).map(|_| ())""" ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 2 ;
     bc:caseName "Cyclic" ; bc:caseShape "struct" ;
     bc:caseDoc "The parent relation contains a cycle, so no hierarchy exists." ;
     bc:falsifier "consequence_mass(tree(parent=[Some(1),Some(0)]), &[1])" .
 
-bc:Casc_NoRoot a bc:TaxonCase ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 3 ;
+bc:Casc_NoRoot a bc:TaxonCase ;
+    bc:rustFalsifierSetup """let t = CascadeTree::new(vec![Some(0)], vec![m(1.0)]).unwrap();""" ;
+    bc:rustFalsifierExpr """consequence_mass(&t, &[2]).map(|_| ())""" ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 3 ;
     bc:caseName "NoRoot" ; bc:caseShape "unit" ;
     bc:caseDoc "Every node has a parent, so there is nowhere for flow to enter." .
 
-bc:Casc_ExponentOutOfRange a bc:TaxonCase ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 4 ;
+bc:Casc_ExponentOutOfRange a bc:TaxonCase ;
+    bc:rustFalsifierSetup """let t = CascadeTree::new(vec![None, Some(0), Some(0)], vec![m(1.0), m(1.0), m(1.0)]).unwrap();""" ;
+    bc:rustFalsifierExpr """consequence_mass(&t, &[999]).map(|_| ())""" ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 4 ;
     bc:caseName "ExponentOutOfRange" ; bc:caseShape "struct" ;
     bc:caseDoc "A lens exponent exceeds the admitted magnitude." .
 
-bc:Casc_DegenerateSiblingSet a bc:TaxonCase ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 5 ;
+bc:Casc_DegenerateSiblingSet a bc:TaxonCase ;
+    bc:rustFalsifierSetup """let t = CascadeTree::new(vec![None, Some(0), Some(0)], vec![m(1.0), m(0.0), m(0.0)]).unwrap();""" ;
+    bc:rustFalsifierExpr """consequence_mass(&t, &[2]).map(|_| ())""" ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 5 ;
     bc:caseName "DegenerateSiblingSet" ; bc:caseShape "struct" ;
     bc:caseDoc "All sibling escort weights are zero, so the normalizing sum vanishes. Fires only when ALL underflow; the mixed case is the dangerous one and does not refuse." .
 
-bc:Casc_DegenerateSubtreeLeaves a bc:TaxonCase ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 6 ;
+bc:Casc_DegenerateSubtreeLeaves a bc:TaxonCase ;
+    bc:falsifierUnwitnessedReason """Shadowed by DegenerateSiblingSet. Reaching it needs a node whose subtree-leaf weights all vanish while its own child weights do not, which forces an inner node whose children all vanish -- and the sibling check fires on that inner node first. May be unreachable; not asserted either way.""" ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 6 ;
     bc:caseName "DegenerateSubtreeLeaves" ; bc:caseShape "struct" ;
     bc:caseDoc "The flat path has no representable subtree-leaf weights." .
 
-bc:Casc_ZeroMassUnderNegativeLens a bc:TaxonCase ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 7 ;
+bc:Casc_ZeroMassUnderNegativeLens a bc:TaxonCase ;
+    bc:rustFalsifierSetup """let t = CascadeTree::new(vec![None, Some(0), Some(0)], vec![m(1.0), m(0.0), m(1.0)]).unwrap();""" ;
+    bc:rustFalsifierExpr """consequence_mass(&t, &[-2]).map(|_| ())""" ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 7 ;
     bc:caseName "ZeroMassUnderNegativeLens" ; bc:caseShape "struct" ;
     bc:caseDoc "m^q for m = 0 and q < 0 is undefined, not large." ;
     bc:falsifier "consequence_mass(tree with a ZERO mass, &[1, -1])" .
@@ -235,62 +252,86 @@ bc:Casc_ZeroMassUnderNegativeLens a bc:TaxonCase ; bc:inTaxonomy bc:CascadeRefus
 ################################################################################
 
 bc:RefusalReason a bc:ClosedTaxonomy ;
+    bc:isRefusalTaxonomy true ;
     rdfs:label "RefusalReason" ;
     bc:taxonomyDoc "Why Algorithm 3 declined a net. Each names the obligation actually checked -- not a paper result it does not discharge." ;
     bc:rustPath "bcinr_powl::wf_to_powl::RefusalReason" ;
-    bc:runtimeCrate "bcinr_powl" .
+    bc:runtimeCrate "bcinr_powl" ;
+    bc:rustFalsifierPrelude """use bcinr_powl::wf_net::WfNet; use bcinr_powl::wf_to_powl::{convert, convert_and_verify, convert_with_budget}; let s = |x: &str| x.to_string();""" ;
+    # RefusalReason is carried inside a `Refusal`, so the pattern that decides
+    # "this input produced THIS refusal" has to reach through the wrapper.
+    bc:rustErrorPatternPrefix "Err(bcinr_powl::wf_to_powl::Refusal { reason: " ;
+    bc:rustErrorPatternSuffix ", .. })" .
 
-bc:Ref_IrreducibleFragment a bc:TaxonCase ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 0 ;
+bc:Ref_IrreducibleFragment a bc:TaxonCase ;
+    bc:rustFalsifierSetup """let net = WfNet::new(["i","a","b","c","d","e","o"].map(s), [("t0",None),("t1",Some(s("A"))),("t2",Some(s("B"))),("t3",Some(s("C"))),("t4",None),("t5",None)].map(|(t,l)|(s(t),l)), [("i","t0"),("a","t1"),("b","t2"),("a","t3"),("b","t3"),("c","t4"),("d","t4"),("e","t5")].map(|(p,t)|(s(p),s(t))), [("t0","a"),("t0","b"),("t1","c"),("t2","d"),("t3","e"),("t4","o"),("t5","o")].map(|(t,p)|(s(t),s(p))), "i", "o").unwrap();""" ;
+    bc:rustFalsifierExpr """convert(&net).map(|_| ())""" ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 0 ;
     bc:caseName "IrreducibleFragment" ; bc:caseShape "struct" ;
     bc:caseDoc "No base case and no valid partition -- Algorithm 3 line 25's FallThrough." ;
-    bc:falsifier "a single transition with a self-loop place (|P| = 3)" .
+    bc:falsifier "a safe, sound, NON-free-choice net: pre(t1) = {a} overlaps pre(t3) = {a,b} without equalling it, so no partition applies. The previously recorded witness -- a single transition with a self-loop place -- is no longer one: the soundness gate refuses that net first." .
 
-bc:Ref_BudgetExhausted a bc:TaxonCase ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 1 ;
+bc:Ref_BudgetExhausted a bc:TaxonCase ;
+    bc:rustFalsifierSetup """let net = WfNet::new(["i","m","o"].map(s), [("t1",Some(s("A"))),("t2",Some(s("B")))].map(|(t,l)|(s(t),l)), [("i","t1"),("m","t2")].map(|(p,t)|(s(p),s(t))), [("t1","m"),("t2","o")].map(|(t,p)|(s(t),s(p))), "i", "o").unwrap();""" ;
+    bc:rustFalsifierExpr """convert_with_budget(&net, 0).map(|_| ())""" ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 1 ;
     bc:caseName "BudgetExhausted" ; bc:caseShape "struct" ;
     bc:caseDoc "The bounded recursion budget ran out before termination." ;
     bc:falsifier "convert_with_budget(net_needing_one_level, 0)" .
 
-bc:Ref_BoundedLanguageAgreementFailed a bc:TaxonCase ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 2 ;
+bc:Ref_BoundedLanguageAgreementFailed a bc:TaxonCase ;
+    bc:falsifierUnwitnessedReason """Reaching it requires Algorithm 3 to produce a structurally valid decomposition whose language differs from the net replay. Constructing one on demand means finding a bug in Algorithm 3, so the absence of a witness is the desired state, not a coverage gap.""" ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 2 ;
     bc:caseName "BoundedLanguageAgreementFailed" ; bc:caseShape "struct" ;
     bc:caseDoc "The two independently-computed languages disagreed at the checked bound. NOT Theorem 5.5, which quantifies over the whole language." ;
     bc:falsifier "a converted model whose denotational language differs from the token-game replay" .
 
-bc:Ref_InternalNetConstruction a bc:TaxonCase ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 3 ;
+bc:Ref_InternalNetConstruction a bc:TaxonCase ;
+    bc:falsifierUnwitnessedReason """Algorithm-internal: a projection producing a sub-net that fails WfNet::new. Same shape as BoundedLanguageAgreementFailed -- a witness would be an internal inconsistency, not an input.""" ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 3 ;
     bc:caseName "InternalNetConstruction" ; bc:caseShape "tuple" ;
     bc:caseDoc "A projection produced a sub-net failing WfNet::new -- algorithm-internal, surfaced as a refusal rather than a panic." ;
     bc:falsifier "recompose output that fails WfNet::new (wf_net_bridge.rs:102)" .
 
-bc:Casc_NumericFault a bc:TaxonCase ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 8 ;
+bc:Casc_NumericFault a bc:TaxonCase ;
+    bc:rustFalsifierSetup """let t = CascadeTree::new(vec![None, Some(0), Some(0)], vec![m(1.0), m(1000.0), m(1000.0)]).unwrap();""" ;
+    bc:rustFalsifierExpr """consequence_mass(&t, &[16]).map(|_| ())""" ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 8 ;
     bc:caseName "NumericFault" ; bc:caseShape "struct" ;
     bc:caseDoc "A Q16.16 operation saturated or divided by zero; read off the value's error channel, with the stage named." ;
     bc:falsifier "consequence_mass(tree with mass 1000, &[16])" .
 
-bc:Casc_EscortUnderflow a bc:TaxonCase ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 9 ;
+bc:Casc_EscortUnderflow a bc:TaxonCase ;
+    bc:rustFalsifierSetup """let t = CascadeTree::new(vec![None, Some(0), Some(0)], vec![m(1.0), m(0.001), m(900.0)]).unwrap();""" ;
+    bc:rustFalsifierExpr """consequence_mass(&t, &[16]).map(|_| ())""" ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 9 ;
     bc:caseName "EscortUnderflow" ; bc:caseShape "struct" ;
     bc:caseDoc "m^q collapsed to zero from a non-zero mass: unrepresentable, not negligible. Detected structurally because saturating_mul flags overflow but not underflow." ;
     bc:falsifier "consequence_mass(tree with mass 0.01, &[16])" .
 
-bc:Ref_VacuousLanguageBound a bc:TaxonCase ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 4 ;
+bc:Ref_VacuousLanguageBound a bc:TaxonCase ;
+    bc:rustFalsifierSetup """let net = WfNet::new(["i","m","o"].map(s), [("t1",Some(s("A"))),("t2",Some(s("B")))].map(|(t,l)|(s(t),l)), [("i","t1"),("m","t2")].map(|(p,t)|(s(p),s(t))), [("t1","m"),("t2","o")].map(|(t,p)|(s(t),s(p))), "i", "o").unwrap();""" ;
+    bc:rustFalsifierExpr """convert_and_verify(&net, 64, 0).map(|_| ())""" ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 4 ;
     bc:caseName "VacuousLanguageBound" ; bc:caseShape "unit" ;
     bc:caseDoc "A bound of 0 compares two empty sets. Both enumerators return the empty language there, so they agree vacuously -- independence of implementation does not imply independence of failure mode." ;
     bc:falsifier "convert_and_verify(net, 64, 0)" .
 
-bc:Ref_NotSafe a bc:TaxonCase ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 6 ;
+bc:Ref_NotSafe a bc:TaxonCase ;
+    bc:rustFalsifierSetup """let net = WfNet::new(["i","a","b","c","o"].map(s), [("t1",None),("t2",None),("t3",None),("t4",None)].map(|(t,l)|(s(t),l)), [("i","t1"),("a","t2"),("b","t3"),("c","t4")].map(|(p,t)|(s(p),s(t))), [("t1","a"),("t1","b"),("t2","c"),("t3","c"),("t4","o")].map(|(t,p)|(s(t),s(p))), "i", "o").unwrap();""" ;
+    bc:rustFalsifierExpr """convert(&net).map(|_| ())""" ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 6 ;
     bc:caseName "NotSafe" ; bc:caseShape "struct" ;
     bc:caseDoc "Some reachable marking carries more than one token in a place. Lemmas 5.1-5.4 assume a safe net, so Algorithm 3 would return a model with no proof attached." ;
     bc:falsifier "two transitions depositing into one place: check_soundness reports unsafe_witness [0,0,2,0,0]" .
 
-bc:Ref_NotSound a bc:TaxonCase ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 7 ;
+bc:Ref_NotSound a bc:TaxonCase ;
+    bc:rustFalsifierSetup """let net = WfNet::new(["i","a","b","o"].map(s), [("t1",None),("t2",None),("t3",None)].map(|(t,l)|(s(t),l)), [("i","t1"),("a","t2"),("a","t3"),("b","t3")].map(|(p,t)|(s(p),s(t))), [("t1","a"),("t1","b"),("t2","o"),("t3","o")].map(|(t,p)|(s(t),s(p))), "i", "o").unwrap();""" ;
+    bc:rustFalsifierExpr """convert(&net).map(|_| ())""" ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 7 ;
     bc:caseName "NotSound" ; bc:caseShape "struct" ;
     bc:caseDoc "At least one of van der Aalst's three clauses fails: option-to-complete, proper completion, no dead transitions." ;
     bc:falsifier "a net with a transition enabled in no reachable marking" .
 
-bc:Ref_SoundnessUndecided a bc:TaxonCase ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 8 ;
+bc:Ref_SoundnessUndecided a bc:TaxonCase ;
+    bc:falsifierUnwitnessedReason """Requires a net whose reachable marking count exceeds MAX_REACHABLE_MARKINGS (200000). Such a net exists and is easy to describe, but replaying it costs seconds and the assertion adds nothing the bound itself does not already state.""" ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 8 ;
     bc:caseName "SoundnessUndecided" ; bc:caseShape "struct" ;
     bc:caseDoc "The reachability graph exceeded MAX_REACHABLE_MARKINGS before the token game terminated. Undecided, not decided favourably." ;
     bc:falsifier "a net whose reachable marking count exceeds MAX_REACHABLE_MARKINGS" .
 
-bc:Ref_NotRecomposable a bc:TaxonCase ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 5 ;
+bc:Ref_NotRecomposable a bc:TaxonCase ;
+    bc:falsifierUnwitnessedReason """Raised by recompose, not by convert: no WfNet input reaches it, because convert never emits a bounded DoRedo. Witnessing it means starting from a Powl2Model, which is a different entry point than the one this projection covers.""" ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 5 ;
     bc:caseName "NotRecomposable" ; bc:caseShape "tuple" ;
     bc:caseDoc "The model has no language-preserving WF-net image -- e.g. a bounded DoRedo, which an unbounded net cycle would widen." ;
     bc:falsifier "recompose(DoRedo { max_redos: 2, .. })" .
