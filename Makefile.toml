@@ -72,19 +72,32 @@ description = "BCINR-CMCA-C: refuse if generated_profile.rs disagrees with ontol
 # content differs, and `check` should not mutate the working tree as a side
 # effect of a read-only verification task. Run this standalone (locally or
 # as its own CI step) instead.
+# IMPORTANT: `ggen sync` overwrites generated_profile.rs in place, which
+# means comparing the file to HEAD *after* running sync is meaningless --
+# sync silently repairs any hand-edit before the comparison ever runs
+# (confirmed live: this exact bug was in the task's first version, and
+# passed silently over a deliberately hand-edited file). The file must be
+# snapshotted BEFORE regeneration and compared to what regeneration
+# actually produces, not to git history.
 workspace = false
 script = '''
 #!/usr/bin/env bash
 set -euo pipefail
+TARGET="crates/bcinr-cmca/src/generated_profile.rs"
+SNAPSHOT=$(mktemp)
+cp "$TARGET" "$SNAPSHOT"
 ggen sync > /dev/null
-if ! git diff --exit-code HEAD -- crates/bcinr-cmca/src/generated_profile.rs > /dev/null; then
-    echo "DRIFT: crates/bcinr-cmca/src/generated_profile.rs disagrees with a fresh"
-    echo "'ggen sync' from ontology/profile.ttl. Either the file was hand-edited, or"
-    echo "the ontology changed and the file was not regenerated. Run 'ggen sync' and"
-    echo "commit the result -- never hand-edit generated_profile.rs directly."
-    git diff -- crates/bcinr-cmca/src/generated_profile.rs
+if ! diff -q "$SNAPSHOT" "$TARGET" > /dev/null; then
+    echo "DRIFT: $TARGET did not match what 'ggen sync' from ontology/profile.ttl"
+    echo "actually produces. Either the file was hand-edited, or the ontology"
+    echo "changed and the file was not regenerated before being committed. The"
+    echo "working tree now holds the freshly regenerated (correct) version --"
+    echo "review and commit it. Never hand-edit generated_profile.rs directly."
+    diff -u "$SNAPSHOT" "$TARGET" || true
+    rm -f "$SNAPSHOT"
     exit 1
 fi
+rm -f "$SNAPSHOT"
 echo "generated_profile.rs matches ontology/profile.ttl -- no drift."
 '''
 
