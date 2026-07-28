@@ -66,6 +66,19 @@ pub enum RefusalReason {
     /// crash a long-lived process (e.g. the `wf_net_to_powl` MCP tool) on
     /// adversarial-but-structurally-valid input.
     InternalNetConstruction(NetError),
+    /// Algorithm 3 emitted a `Powl2Model` that is not well-formed (e.g. a
+    /// `PartialOrder` edge naming a non-existent child), so its denotational
+    /// language cannot be enumerated. Like
+    /// [`Self::InternalNetConstruction`] this is an algorithm-internal
+    /// inconsistency rather than a property of the caller's input -- but that
+    /// variant carries a [`NetError`] from `WfNet::new`, which cannot express
+    /// a model-side defect, so this is its `Powl2Model` counterpart.
+    ///
+    /// Refusing here is the point: `powl2_language` used to *drop* such an
+    /// edge, which made the left-hand side of the
+    /// [`Self::BoundedLanguageAgreementFailed`] comparison too permissive, so
+    /// the gate could pass because it had been weakened.
+    InternalModelInvalid(crate::powl2::Powl2Error),
     /// The model could not be recomposed into a language-equivalent WF-net --
     /// e.g. a bounded `DoRedo`, which a WF-net cycle cannot express without
     /// widening the language.
@@ -109,6 +122,12 @@ impl std::fmt::Display for RefusalReason {
             ),
             Self::NotRecomposable(err) => {
                 write!(f, "model is not language-preservingly recomposable: {err}")
+            }
+            Self::InternalModelInvalid(err) => {
+                write!(
+                    f,
+                    "internal model invalid: language enumeration refused it: {err}"
+                )
             }
             Self::InternalNetConstruction(err) => {
                 write!(
@@ -185,7 +204,10 @@ pub fn convert_and_verify(
         });
     }
     let model = convert_with_budget(net, budget)?;
-    let denotational = powl2_language(&model, max_len);
+    let denotational = powl2_language(&model, max_len).map_err(|err| Refusal {
+        reason: RefusalReason::InternalModelInvalid(err),
+        net_hash: net.content_hash(),
+    })?;
     let replayed = wf_net_language(net, max_len);
     if denotational != replayed {
         return Err(Refusal {

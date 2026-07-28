@@ -30,7 +30,6 @@
 use bcinr_powl::compiler::{compile_powl, PowlAstNode};
 use bcinr_powl::ocel::OcelLog;
 use bcinr_powl::scheduler::{scheduler_tick, PowlRunState};
-use std::collections::HashSet;
 
 fn execute(ast: &PowlAstNode<'_>, run_id: u64) -> (PowlRunState, OcelLog, u32) {
     let tape = compile_powl(ast).expect("POWL model must compile");
@@ -184,6 +183,13 @@ fn test_failed_proof_prevents_publication() {
 
     let (state, log, _ticks) = execute(&ast, 1604);
 
+    // The comment below claims "the workflow runs to completion (POWL allows it)";
+    // that claim was previously unchecked. Assert it.
+    assert_eq!(
+        state.check_mask, 0,
+        "workflow must run to completion at the POWL level"
+    );
+
     let events = log.events();
     let ops: Vec<u32> = events
         .iter()
@@ -325,6 +331,13 @@ fn test_proof_revocation_blocks_publication() {
     ]);
 
     let (state, log, _ticks) = execute(&ast, 1609);
+
+    // Revocation/blocking must still be a completed run, not a stalled one:
+    // otherwise the ops-length assertion below could pass on a partial replay.
+    assert_eq!(
+        state.check_mask, 0,
+        "revocation workflow must run to completion"
+    );
 
     let events = log.events();
     let ops: Vec<u32> = events

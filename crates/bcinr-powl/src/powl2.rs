@@ -497,7 +497,10 @@ fn recompute_fan_out(tape: &mut PowlTape) {
     }
 }
 
-fn validate_edges(len: usize, edges: &[(usize, usize)]) -> Result<(), Powl2Error> {
+/// Every edge endpoint must name an existing node (`0..len`). Shared with
+/// `language::powl2_language` so the enumerator and the validator agree on
+/// what a well-formed edge is.
+pub(crate) fn validate_edges(len: usize, edges: &[(usize, usize)]) -> Result<(), Powl2Error> {
     for &(from, to) in edges {
         if from >= len || to >= len {
             return Err(Powl2Error::InvalidEdge { from, to, len });

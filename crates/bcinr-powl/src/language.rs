@@ -10,7 +10,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::powl2::Powl2Model;
+use crate::powl2::{validate_edges, Powl2Error, Powl2Model};
 use crate::wf_net::{Marking, WfNet};
 
 /// A bounded language: all label sequences of length <= `max_len`.
@@ -19,9 +19,20 @@ pub type Language = BTreeSet<Vec<String>>;
 /// `L(psi)` (Def 3.9), truncated to traces of length <= `max_len`. For
 /// acyclic models with `max_len` at least the longest trace this is the exact
 /// language.
-#[must_use]
-pub fn powl2_language(model: &Powl2Model, max_len: usize) -> Language {
-    match model {
+///
+/// # Errors
+///
+/// Returns [`Powl2Error::InvalidEdge`] if a `PartialOrder` edge names a child
+/// index outside `0..children.len()`. Such an edge used to be *dropped*, which
+/// made the enumerated language a strict superset of the model's: the missing
+/// precedence constraint admitted interleavings the model forbids. That
+/// matters because this function is one half of the differential check in
+/// `wf_to_powl::convert_and_verify` -- a too-permissive left-hand side can
+/// make a divergent conversion compare equal, i.e. the verifier passes
+/// *because* it was weakened. A malformed edge is now refused, not silently
+/// reinterpreted.
+pub fn powl2_language(model: &Powl2Model, max_len: usize) -> Result<Language, Powl2Error> {
+    Ok(match model {
         Powl2Model::Activity(label) => {
             let mut l = Language::new();
             if max_len >= 1 {
@@ -34,18 +45,20 @@ pub fn powl2_language(model: &Powl2Model, max_len: usize) -> Language {
             l.insert(Vec::new());
             l
         }
-        Powl2Model::Sequence(children) => sequence_language(children, max_len),
+        Powl2Model::Sequence(children) => sequence_language(children, max_len)?,
         Powl2Model::PartialOrder { children, edges } => {
             let child_langs: Vec<Language> = children
                 .iter()
                 .map(|c| powl2_language(c, max_len))
-                .collect();
+                .collect::<Result<_, _>>()?;
             let n = children.len();
+            // Reuses `powl2::validate_edges` -- the same bound check
+            // `validate_powl2` applies to a `PartialOrder` -- rather than
+            // inventing a second notion of a well-formed edge.
+            validate_edges(n, edges)?;
             let mut prec = vec![vec![false; n]; n];
             for &(i, j) in edges {
-                if i < n && j < n {
-                    prec[i][j] = true;
-                }
+                prec[i][j] = true;
             }
             order_preserving_shuffle(&child_langs, &prec, max_len)
         }
@@ -58,22 +71,22 @@ pub fn powl2_language(model: &Powl2Model, max_len: usize) -> Language {
             let child_langs: Vec<Language> = children
                 .iter()
                 .map(|c| powl2_language(c, max_len))
-                .collect();
+                .collect::<Result<_, _>>()?;
             choice_graph_language(&child_langs, edges, *start, *end, children.len(), max_len)
         }
         Powl2Model::DoRedo {
             body,
             redo,
             max_redos,
-        } => do_redo_language(body, redo, *max_redos, max_len),
-    }
+        } => do_redo_language(body, redo, *max_redos, max_len)?,
+    })
 }
 
-fn sequence_language(children: &[Powl2Model], max_len: usize) -> Language {
+fn sequence_language(children: &[Powl2Model], max_len: usize) -> Result<Language, Powl2Error> {
     let mut current: Language = Language::new();
     current.insert(Vec::new());
     for child in children {
-        let child_lang = powl2_language(child, max_len);
+        let child_lang = powl2_language(child, max_len)?;
         let mut next = Language::new();
         for prefix in &current {
             for suffix in &child_lang {
@@ -87,7 +100,7 @@ fn sequence_language(children: &[Powl2Model], max_len: usize) -> Language {
         }
         current = next;
     }
-    current
+    Ok(current)
 }
 
 /// Order-preserving shuffle (Def 3.8): for every choice of one sequence per
@@ -335,9 +348,9 @@ fn do_redo_language(
     redo: &Powl2Model,
     max_redos: u8,
     max_len: usize,
-) -> Language {
-    let body_lang = powl2_language(body, max_len);
-    let redo_lang = powl2_language(redo, max_len);
+) -> Result<Language, Powl2Error> {
+    let body_lang = powl2_language(body, max_len)?;
+    let redo_lang = powl2_language(redo, max_len)?;
 
     let mut result: Language = Language::new();
     result.extend(body_lang.iter().cloned());
@@ -364,7 +377,7 @@ fn do_redo_language(
         result.extend(next.iter().cloned());
         current = next;
     }
-    result
+    Ok(result)
 }
 
 /// `L(N)`: the bounded language of `net`, computed by exhaustive replay of
@@ -463,5 +476,58 @@ fn explore(
         if pushed {
             trace.pop();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn po_with_dangling_edge() -> Powl2Model {
+        Powl2Model::PartialOrder {
+            children: vec![
+                Powl2Model::Activity("a".to_string()),
+                Powl2Model::Activity("b".to_string()),
+            ],
+            // Child index 5 does not exist: only 0 and 1 are children.
+            edges: vec![(0, 5)],
+        }
+    }
+
+    /// Falsifier for the dropped-edge soundness gap. Pre-fix this returned
+    /// `{[a,b], [b,a]}` -- the dangling edge silently deleted, so the
+    /// enumerated language was a strict superset of the model's and could
+    /// make `convert_and_verify`'s differential check pass by being weaker.
+    #[test]
+    fn falsifier_out_of_range_partial_order_edge_is_refused() {
+        let model = po_with_dangling_edge();
+        assert_eq!(
+            powl2_language(&model, 4),
+            Err(Powl2Error::InvalidEdge {
+                from: 0,
+                to: 5,
+                len: 2
+            })
+        );
+    }
+
+    /// The in-range case still enumerates: the refusal is not a blanket
+    /// rejection of partial orders.
+    #[test]
+    fn in_range_partial_order_edge_still_enumerates() {
+        let model = Powl2Model::PartialOrder {
+            children: vec![
+                Powl2Model::Activity("a".to_string()),
+                Powl2Model::Activity("b".to_string()),
+            ],
+            edges: vec![(0, 1)],
+        };
+        let lang = powl2_language(&model, 4).expect("in-range edges enumerate");
+        assert_eq!(
+            lang,
+            [vec!["a".to_string(), "b".to_string()]]
+                .into_iter()
+                .collect::<Language>()
+        );
     }
 }
