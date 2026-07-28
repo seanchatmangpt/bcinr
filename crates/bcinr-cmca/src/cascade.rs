@@ -381,10 +381,117 @@ fn depths(tree: &CascadeTree) -> Result<Vec<usize>, CascadeRefusal> {
 /// alloc_flow[x]`). For an internal node it is the flow that *passed through*
 /// it before splitting -- which is what makes "how much does this subtree
 /// matter" answerable at every depth, where `allocator`'s leaf-only output
-/// cannot answer it. Leaves sum to `ONE` (up to Q16.16 flooring).
+/// cannot answer it. Leaves sum to `ONE` (up to Q16.16 flooring) in the
+/// typical case; [`consequence_mass_traced`] exists to measure this claim
+/// per node rather than assume it (see [`AllocationTrace`]'s docs -- the
+/// analogous claim on `allocator::allocate`'s output was checked this way
+/// and found to have a real, legitimate exception).
 pub fn consequence_mass(
     tree: &CascadeTree,
     lenses: &[i32],
+) -> Result<Vec<NonNegativeFixed>, CascadeRefusal> {
+    consequence_mass_with_sink(tree, lenses, &mut NoTrace)
+}
+
+/// Records provenance from one [`consequence_mass_with_sink`] walk. Two
+/// implementations: [`NoTrace`] (zero bookkeeping, what [`consequence_mass`]
+/// uses) and `VecTrace` (collects [`AllocationStep`]s, what
+/// [`consequence_mass_traced`] uses) -- both run the identical walk with the
+/// identical arithmetic; the only difference is whether anything is
+/// listening.
+trait AllocationTraceSink {
+    fn record(&mut self, step: AllocationStep);
+}
+
+/// The [`AllocationTraceSink`] [`consequence_mass`] uses: discards every
+/// step immediately, no allocation beyond what the walk already does for
+/// its own internal `Vec`s (see `cascade.rs`'s module docs -- this crate
+/// already requires `alloc` unconditionally here, so this sink saves the
+/// *extra* per-step bookkeeping work, not all allocation).
+struct NoTrace;
+impl AllocationTraceSink for NoTrace {
+    #[inline(always)]
+    fn record(&mut self, _step: AllocationStep) {}
+}
+
+#[derive(Default)]
+struct VecTrace {
+    steps: Vec<AllocationStep>,
+}
+impl AllocationTraceSink for VecTrace {
+    fn record(&mut self, step: AllocationStep) {
+        self.steps.push(step);
+    }
+}
+
+/// One internal node's descendant-flow split: how much flow arrived at
+/// `node` before splitting into its children (`input_share` --
+/// `tree.rho[node] * flow[node]`, i.e. the descendant part, not the flat
+/// part), and how each child's share of it was computed.
+///
+/// Does **not** record the separate flat-path (subtree-leaf) distribution --
+/// that is a second, independent split `consequence_mass`'s walk performs
+/// for the same node when its flat part is nonzero, landing mass directly on
+/// descendant leaves rather than on immediate children. Recording it is
+/// out of scope for this checkpoint; see [`AllocationTrace`]'s docs.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AllocationStep {
+    pub node: usize,
+    pub parent: Option<usize>,
+    /// Depth of `node` from its root (0 = root). Named `wave` to match the
+    /// vocabulary `process_to_mermaid_annotated`'s `wave_of_child` already
+    /// uses for the same concept.
+    pub wave: usize,
+    pub input_share: NonNegativeFixed,
+    /// `(child, this node's contribution to that child's flow)` -- the
+    /// increment this split added, not the child's cumulative flow (which
+    /// may also receive contributions from other ancestors' flat splits).
+    pub child_shares: Vec<(usize, NonNegativeFixed)>,
+    pub child_sum: NonNegativeFixed,
+    /// `input_share.to_bits() as i64 - child_sum.to_bits() as i64`, signed
+    /// so a caller can tell whether the split under- or over-spent, not
+    /// just by how much. Recorded, not asserted: this field is what this
+    /// checkpoint exists to measure. Do not assume it is always zero --
+    /// `allocator::allocate`'s analogous "output sums to ONE" claim was
+    /// checked this way and found to have a real, legitimate exception.
+    pub residual_bits: i64,
+}
+
+/// Full provenance from one [`consequence_mass_traced`] call.
+#[derive(Clone, Debug, PartialEq)]
+pub struct AllocationTrace {
+    /// One entry per internal node that performed a descendant-flow split,
+    /// in the order `consequence_mass`'s own depth-sorted walk visits them
+    /// (ascending depth; see `order.sort_by_key(|node| depth[*node])`
+    /// below) -- deterministic for identical `(tree, lenses)`.
+    pub steps: Vec<AllocationStep>,
+    /// Identical, in the identical order, to [`consequence_mass`]'s return
+    /// value for the same `(tree, lenses)` -- bit-for-bit, not just
+    /// approximately (see `tests::traced_leaves_match_untraced_bit_for_bit`).
+    pub leaves: Vec<NonNegativeFixed>,
+}
+
+/// [`consequence_mass`] with its per-node descendant-flow splits recorded
+/// instead of discarded. Same walk, same arithmetic --
+/// `consequence_mass_traced(tree, lenses)?.leaves ==
+/// consequence_mass(tree, lenses)?` bit-for-bit, always (see
+/// `tests::traced_leaves_match_untraced_bit_for_bit`).
+pub fn consequence_mass_traced(
+    tree: &CascadeTree,
+    lenses: &[i32],
+) -> Result<AllocationTrace, CascadeRefusal> {
+    let mut sink = VecTrace::default();
+    let leaves = consequence_mass_with_sink(tree, lenses, &mut sink)?;
+    Ok(AllocationTrace {
+        steps: sink.steps,
+        leaves,
+    })
+}
+
+fn consequence_mass_with_sink(
+    tree: &CascadeTree,
+    lenses: &[i32],
+    sink: &mut impl AllocationTraceSink,
 ) -> Result<Vec<NonNegativeFixed>, CascadeRefusal> {
     let len = tree.len();
     if len == 0 {
@@ -491,18 +598,36 @@ pub fn consequence_mass(
         if child_total.to_bits() == 0 {
             return Err(CascadeRefusal::DegenerateSiblingSet { parent: Some(v) });
         }
+        let mut child_shares: Vec<(usize, NonNegativeFixed)> = Vec::with_capacity(children[v].len());
+        let mut child_sum = NonNegativeFixed::ZERO;
         for &c in &children[v] {
             let share = admit_fixed(
                 weight[c].saturating_div(child_total),
                 NumericContext::ShareDivision,
                 c,
             )?;
-            flow[c] = admit_fixed(
-                flow[c].saturating_add(descendant_part.saturating_mul(share)),
+            let contribution = admit_fixed(
+                descendant_part.saturating_mul(share),
                 NumericContext::FlowAccumulation,
                 c,
             )?;
+            flow[c] = admit_fixed(
+                flow[c].saturating_add(contribution),
+                NumericContext::FlowAccumulation,
+                c,
+            )?;
+            child_sum = child_sum.saturating_add(contribution);
+            child_shares.push((c, contribution));
         }
+        sink.record(AllocationStep {
+            node: v,
+            parent: tree.parent[v],
+            wave: depth[v],
+            input_share: descendant_part,
+            residual_bits: descendant_part.to_bits() as i64 - child_sum.to_bits() as i64,
+            child_shares,
+            child_sum,
+        });
 
         // Only walk the flat path when it actually carries mass: under
         // `rho == ONE` a degenerate subtree-leaf set is harmless, and
@@ -544,4 +669,87 @@ pub fn consequence_mass(
             )
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn mass(x: f32) -> NonNegativeFixed {
+        NonNegativeFixed::from_bits((x * 65536.0).round() as u32)
+    }
+
+    /// A 3-level tree: root -> {a, b} -> {a1, a2} (only `a` has children).
+    /// Small enough to reason about by hand, deep enough to exercise more
+    /// than one descendant-flow split.
+    fn small_tree() -> CascadeTree {
+        CascadeTree::new(
+            vec![None, Some(0), Some(0), Some(1), Some(1)],
+            vec![
+                mass(1.0), // root -- must be nonzero: with one root, root_total
+                           // is exactly this weight, and zero would refuse as
+                           // DegenerateSiblingSet rather than build the tree.
+                mass(3.0), // a
+                mass(1.0), // b
+                mass(2.0), // a1
+                mass(1.0), // a2
+            ],
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn traced_leaves_match_untraced_bit_for_bit() {
+        let tree = small_tree();
+        let lenses = [1i32];
+        let untraced = consequence_mass(&tree, &lenses).unwrap();
+        let traced = consequence_mass_traced(&tree, &lenses).unwrap();
+        assert_eq!(traced.leaves, untraced, "projection equivalence");
+    }
+
+    #[test]
+    fn trace_is_deterministic_across_identical_calls() {
+        let tree = small_tree();
+        let lenses = [1i32];
+        let first = consequence_mass_traced(&tree, &lenses).unwrap();
+        let second = consequence_mass_traced(&tree, &lenses).unwrap();
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn trace_steps_only_cover_internal_nodes_and_reference_real_children() {
+        let tree = small_tree();
+        let lenses = [1i32];
+        let trace = consequence_mass_traced(&tree, &lenses).unwrap();
+
+        // Internal nodes are root (0) and a (1); b, a1, a2 are leaves and
+        // must not appear as a step's `node`.
+        let stepped_nodes: alloc::vec::Vec<usize> = trace.steps.iter().map(|s| s.node).collect();
+        assert_eq!(stepped_nodes, alloc::vec![0, 1], "depth-ascending order, internal nodes only");
+
+        for step in &trace.steps {
+            for &(child, _) in &step.child_shares {
+                assert_eq!(
+                    tree.parent[child],
+                    Some(step.node),
+                    "every recorded child must actually be a child of the stepped node"
+                );
+            }
+        }
+    }
+
+    /// Not a conservation law -- a measurement. Confirms `residual_bits` is
+    /// computed the way its docs say (`input_share - child_sum`), on this
+    /// tree's actual numbers, rather than asserting it must be zero.
+    #[test]
+    fn residual_bits_matches_its_own_definition() {
+        let tree = small_tree();
+        let lenses = [1i32];
+        let trace = consequence_mass_traced(&tree, &lenses).unwrap();
+        for step in &trace.steps {
+            let expected =
+                step.input_share.to_bits() as i64 - step.child_sum.to_bits() as i64;
+            assert_eq!(step.residual_bits, expected);
+        }
+    }
 }
