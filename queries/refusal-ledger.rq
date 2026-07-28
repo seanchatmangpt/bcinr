@@ -1,0 +1,55 @@
+PREFIX bc:   <https://bcinr.dev/ontology#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#>
+
+# The refusal ledger: every declared refusal, its live Rust path, and whether a
+# witness for it runs.
+#
+# The archetypal drift this closes: CMCA_CONTRACT.md documented a refusal the
+# code did not return, and carried a hand-written warning saying so. Prose
+# cannot fail, so the warning was the only available mechanism and it decayed
+# into part of the document. Generated from the same facts as the enum and the
+# falsifier tests, that disagreement is not representable.
+#
+# Every column is BOUND here rather than decided in the template: a template
+# that branches on data is making a decision, and decisions belong in the query.
+SELECT ?taxonomy_label ?taxonomy_doc ?rust_path ?case_name ?case_order
+       ?case_doc ?witness_status ?witness_detail ?is_first ?is_last
+WHERE {
+    ?case a bc:TaxonCase ;
+          bc:inTaxonomy ?taxonomy ;
+          bc:caseName   ?case_name ;
+          bc:caseOrder  ?case_order ;
+          bc:caseDoc    ?case_doc .
+
+    ?taxonomy bc:isRefusalTaxonomy true ;
+              rdfs:label     ?taxonomy_label ;
+              bc:taxonomyDoc ?taxonomy_doc ;
+              bc:rustPath    ?rust_path .
+
+    OPTIONAL { ?case bc:rustFalsifierExpr         ?expr . }
+    OPTIONAL { ?case bc:falsifierUnwitnessedReason ?unwitnessed . }
+    OPTIONAL { ?case bc:rustFalsifierSetup        ?setup . }
+    OPTIONAL { ?case bc:falsifier                  ?prose . }
+
+    # Exactly two states, and shapes.ttl admits nothing else: a case carries a
+    # witness that runs, or a written argument for why none exists.
+    BIND(IF(BOUND(?expr), "runs", "no witness") AS ?witness_status)
+    # The expression that RUNS takes priority over any prose description of it.
+    # Prose describing a witness is a second fact about the same object, and the
+    # two drift: three recorded descriptions no longer matched the inputs that
+    # actually produced their refusal.
+    BIND(CONCAT(COALESCE(?setup, ""), " ", ?expr) AS ?witness_code)
+    BIND(COALESCE(?witness_code, ?unwitnessed, ?prose, "") AS ?witness_detail)
+
+    # Section boundaries: which row opens and closes each taxonomy's table.
+    # Presentation, but computed here so the template stays substitution-only.
+    {
+        SELECT ?taxonomy (MIN(?o) AS ?first_order) (MAX(?o) AS ?last_order)
+        WHERE { ?c bc:inTaxonomy ?taxonomy ; bc:caseOrder ?o . }
+        GROUP BY ?taxonomy
+    }
+    BIND(?case_order = ?first_order AS ?is_first)
+    BIND(?case_order = ?last_order  AS ?is_last)
+}
+ORDER BY ?taxonomy_label xsd:integer(?case_order)

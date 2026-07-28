@@ -9,71 +9,31 @@
 // generated taxonomy is metadata that happens to agree.
 
 /// Classify a live `bcinr_cmca::cascade::CascadeRefusal` into its admitted case.
-pub fn classify_cascaderefusal(
-    value: &bcinr_cmca::cascade::CascadeRefusal,
-) -> super::taxonomy::CascadeRefusal {
+pub fn classify_cascaderefusal(value: &bcinr_cmca::cascade::CascadeRefusal) -> super::taxonomy::CascadeRefusal {
     match value {
-        bcinr_cmca::cascade::CascadeRefusal::LengthMismatch { .. } => {
-            super::taxonomy::CascadeRefusal::LengthMismatch
-        }
-        bcinr_cmca::cascade::CascadeRefusal::ParentOutOfRange { .. } => {
-            super::taxonomy::CascadeRefusal::ParentOutOfRange
-        }
-        bcinr_cmca::cascade::CascadeRefusal::Cyclic { .. } => {
-            super::taxonomy::CascadeRefusal::Cyclic
-        }
+        bcinr_cmca::cascade::CascadeRefusal::LengthMismatch { .. } => super::taxonomy::CascadeRefusal::LengthMismatch,
+        bcinr_cmca::cascade::CascadeRefusal::ParentOutOfRange { .. } => super::taxonomy::CascadeRefusal::ParentOutOfRange,
+        bcinr_cmca::cascade::CascadeRefusal::Cyclic { .. } => super::taxonomy::CascadeRefusal::Cyclic,
         bcinr_cmca::cascade::CascadeRefusal::NoRoot => super::taxonomy::CascadeRefusal::NoRoot,
-        bcinr_cmca::cascade::CascadeRefusal::ExponentOutOfRange { .. } => {
-            super::taxonomy::CascadeRefusal::ExponentOutOfRange
-        }
-        bcinr_cmca::cascade::CascadeRefusal::DegenerateSiblingSet { .. } => {
-            super::taxonomy::CascadeRefusal::DegenerateSiblingSet
-        }
-        bcinr_cmca::cascade::CascadeRefusal::DegenerateSubtreeLeaves { .. } => {
-            super::taxonomy::CascadeRefusal::DegenerateSubtreeLeaves
-        }
-        bcinr_cmca::cascade::CascadeRefusal::ZeroMassUnderNegativeLens { .. } => {
-            super::taxonomy::CascadeRefusal::ZeroMassUnderNegativeLens
-        }
-        bcinr_cmca::cascade::CascadeRefusal::NumericFault { .. } => {
-            super::taxonomy::CascadeRefusal::NumericFault
-        }
-        bcinr_cmca::cascade::CascadeRefusal::EscortUnderflow { .. } => {
-            super::taxonomy::CascadeRefusal::EscortUnderflow
-        }
+        bcinr_cmca::cascade::CascadeRefusal::ExponentOutOfRange { .. } => super::taxonomy::CascadeRefusal::ExponentOutOfRange,
+        bcinr_cmca::cascade::CascadeRefusal::DegenerateSiblingSet { .. } => super::taxonomy::CascadeRefusal::DegenerateSiblingSet,
+        bcinr_cmca::cascade::CascadeRefusal::DegenerateSubtreeLeaves { .. } => super::taxonomy::CascadeRefusal::DegenerateSubtreeLeaves,
+        bcinr_cmca::cascade::CascadeRefusal::ZeroMassUnderNegativeLens { .. } => super::taxonomy::CascadeRefusal::ZeroMassUnderNegativeLens,
+        bcinr_cmca::cascade::CascadeRefusal::NumericFault { .. } => super::taxonomy::CascadeRefusal::NumericFault,
+        bcinr_cmca::cascade::CascadeRefusal::EscortUnderflow { .. } => super::taxonomy::CascadeRefusal::EscortUnderflow,
     }
 }
 /// Classify a live `bcinr_powl::wf_to_powl::RefusalReason` into its admitted case.
-pub fn classify_refusalreason(
-    value: &bcinr_powl::wf_to_powl::RefusalReason,
-) -> super::taxonomy::RefusalReason {
+pub fn classify_refusalreason(value: &bcinr_powl::wf_to_powl::RefusalReason) -> super::taxonomy::RefusalReason {
     match value {
-        bcinr_powl::wf_to_powl::RefusalReason::IrreducibleFragment { .. } => {
-            super::taxonomy::RefusalReason::IrreducibleFragment
-        }
-        bcinr_powl::wf_to_powl::RefusalReason::BudgetExhausted { .. } => {
-            super::taxonomy::RefusalReason::BudgetExhausted
-        }
-        bcinr_powl::wf_to_powl::RefusalReason::BoundedLanguageAgreementFailed { .. } => {
-            super::taxonomy::RefusalReason::BoundedLanguageAgreementFailed
-        }
-        bcinr_powl::wf_to_powl::RefusalReason::InternalNetConstruction(..) => {
-            super::taxonomy::RefusalReason::InternalNetConstruction
-        }
-        bcinr_powl::wf_to_powl::RefusalReason::VacuousLanguageBound => {
-            super::taxonomy::RefusalReason::VacuousLanguageBound
-        }
-        bcinr_powl::wf_to_powl::RefusalReason::NotRecomposable(..) => {
-            super::taxonomy::RefusalReason::NotRecomposable
-        }
-        bcinr_powl::wf_to_powl::RefusalReason::NotSafe { .. } => {
-            super::taxonomy::RefusalReason::NotSafe
-        }
-        bcinr_powl::wf_to_powl::RefusalReason::NotSound { .. } => {
-            super::taxonomy::RefusalReason::NotSound
-        }
-        bcinr_powl::wf_to_powl::RefusalReason::SoundnessUndecided { .. } => {
-            super::taxonomy::RefusalReason::SoundnessUndecided
-        }
+        bcinr_powl::wf_to_powl::RefusalReason::IrreducibleFragment { .. } => super::taxonomy::RefusalReason::IrreducibleFragment,
+        bcinr_powl::wf_to_powl::RefusalReason::BudgetExhausted { .. } => super::taxonomy::RefusalReason::BudgetExhausted,
+        bcinr_powl::wf_to_powl::RefusalReason::BoundedLanguageAgreementFailed { .. } => super::taxonomy::RefusalReason::BoundedLanguageAgreementFailed,
+        bcinr_powl::wf_to_powl::RefusalReason::InternalNetConstruction(..) => super::taxonomy::RefusalReason::InternalNetConstruction,
+        bcinr_powl::wf_to_powl::RefusalReason::VacuousLanguageBound => super::taxonomy::RefusalReason::VacuousLanguageBound,
+        bcinr_powl::wf_to_powl::RefusalReason::NotRecomposable(..) => super::taxonomy::RefusalReason::NotRecomposable,
+        bcinr_powl::wf_to_powl::RefusalReason::NotSafe { .. } => super::taxonomy::RefusalReason::NotSafe,
+        bcinr_powl::wf_to_powl::RefusalReason::NotSound { .. } => super::taxonomy::RefusalReason::NotSound,
+        bcinr_powl::wf_to_powl::RefusalReason::SoundnessUndecided { .. } => super::taxonomy::RefusalReason::SoundnessUndecided,
     }
 }

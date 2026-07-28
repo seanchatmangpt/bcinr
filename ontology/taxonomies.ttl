@@ -201,8 +201,7 @@ bc:CascadeRefusal a bc:ClosedTaxonomy ;
 bc:Casc_LengthMismatch a bc:TaxonCase ;
     bc:rustFalsifierExpr """CascadeTree::new(vec![None], vec![m(1.0), m(1.0)]).map(|_| ())""" ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 0 ;
     bc:caseName "LengthMismatch" ; bc:caseShape "struct" ;
-    bc:caseDoc "parent and mass vectors disagree in length." ;
-    bc:falsifier "new(vec![None; 3], vec![ONE; 2])" .
+    bc:caseDoc "parent and mass vectors disagree in length." ; .
 
 bc:Casc_ParentOutOfRange a bc:TaxonCase ;
     bc:rustFalsifierExpr """CascadeTree::new(vec![None, Some(9)], vec![m(1.0), m(1.0)]).map(|_| ())""" ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 1 ;
@@ -214,8 +213,7 @@ bc:Casc_Cyclic a bc:TaxonCase ;
     bc:rustFalsifierSetup """let t = CascadeTree::new(vec![None, Some(2), Some(1)], vec![m(1.0), m(1.0), m(1.0)]).unwrap();""" ;
     bc:rustFalsifierExpr """consequence_mass(&t, &[2]).map(|_| ())""" ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 2 ;
     bc:caseName "Cyclic" ; bc:caseShape "struct" ;
-    bc:caseDoc "The parent relation contains a cycle, so no hierarchy exists." ;
-    bc:falsifier "consequence_mass(tree(parent=[Some(1),Some(0)]), &[1])" .
+    bc:caseDoc "The parent relation contains a cycle, so no hierarchy exists." ; .
 
 bc:Casc_NoRoot a bc:TaxonCase ;
     bc:rustFalsifierSetup """let t = CascadeTree::new(vec![Some(0)], vec![m(1.0)]).unwrap();""" ;
@@ -244,8 +242,7 @@ bc:Casc_ZeroMassUnderNegativeLens a bc:TaxonCase ;
     bc:rustFalsifierSetup """let t = CascadeTree::new(vec![None, Some(0), Some(0)], vec![m(1.0), m(0.0), m(1.0)]).unwrap();""" ;
     bc:rustFalsifierExpr """consequence_mass(&t, &[-2]).map(|_| ())""" ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 7 ;
     bc:caseName "ZeroMassUnderNegativeLens" ; bc:caseShape "struct" ;
-    bc:caseDoc "m^q for m = 0 and q < 0 is undefined, not large." ;
-    bc:falsifier "consequence_mass(tree with a ZERO mass, &[1, -1])" .
+    bc:caseDoc "m^q for m = 0 and q < 0 is undefined, not large." ; .
 
 ################################################################################
 # WF-net -> POWL conversion refusals
@@ -267,8 +264,7 @@ bc:Ref_IrreducibleFragment a bc:TaxonCase ;
     bc:rustFalsifierSetup """let net = WfNet::new(["i","a","b","c","d","e","o"].map(s), [("t0",None),("t1",Some(s("A"))),("t2",Some(s("B"))),("t3",Some(s("C"))),("t4",None),("t5",None)].map(|(t,l)|(s(t),l)), [("i","t0"),("a","t1"),("b","t2"),("a","t3"),("b","t3"),("c","t4"),("d","t4"),("e","t5")].map(|(p,t)|(s(p),s(t))), [("t0","a"),("t0","b"),("t1","c"),("t2","d"),("t3","e"),("t4","o"),("t5","o")].map(|(t,p)|(s(t),s(p))), "i", "o").unwrap();""" ;
     bc:rustFalsifierExpr """convert(&net).map(|_| ())""" ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 0 ;
     bc:caseName "IrreducibleFragment" ; bc:caseShape "struct" ;
-    bc:caseDoc "No base case and no valid partition -- Algorithm 3 line 25's FallThrough." ;
-    bc:falsifier "a safe, sound, NON-free-choice net: pre(t1) = {a} overlaps pre(t3) = {a,b} without equalling it, so no partition applies. The previously recorded witness -- a single transition with a self-loop place -- is no longer one: the soundness gate refuses that net first." .
+    bc:caseDoc "No base case and no valid partition -- Algorithm 3 line 25's FallThrough." ; .
 
 bc:Ref_BudgetExhausted a bc:TaxonCase ;
     bc:rustFalsifierSetup """let net = WfNet::new(["i","m","o"].map(s), [("t1",Some(s("A"))),("t2",Some(s("B")))].map(|(t,l)|(s(t),l)), [("i","t1"),("m","t2")].map(|(p,t)|(s(p),s(t))), [("t1","m"),("t2","o")].map(|(t,p)|(s(t),s(p))), "i", "o").unwrap();""" ;

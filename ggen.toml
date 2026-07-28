@@ -77,3 +77,10 @@ query = { file = "queries/refusal-falsifiers.rq" }
 template = { file = "templates/refusal_falsifier.rs.tera" }
 output_file = "crates/bcinr-guarded/tests/generated_falsifiers.rs"
 mode = "Overwrite"
+
+[[generation.rules]]
+name = "refusal_ledger"
+query = { file = "queries/refusal-ledger.rq" }
+template = { file = "templates/refusal_ledger.md.tera" }
+output_file = "docs/contracts/REFUSAL_LEDGER.md"
+mode = "Overwrite"

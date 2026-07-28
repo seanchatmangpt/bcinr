@@ -250,16 +250,22 @@ decision ∈ RoutingDecision ⟹
 
 ## Refusal Conditions
 
-> **Naming note (2026-07-27):** the `SpecError`/`AllocationError` variant names below, and the
-> specific `StabilityRefusal` variant names below, do not match current source. The real
-> `StabilityRefusal` enum (`allocator.rs:362`) uses a different, non-overlapping variant set
-> (`CertificateMissing`, `BlockGainBoundExceeded`, `ContractionMarginInsufficient`,
-> `ModeDwellTimeViolated`, `RuntimeEnvelopeViolated`, `LearningFrozen`, `ContractViolation`, etc.),
-> and no `AllocationError` or `SpecError` type exists anywhere in the crate (only
-> `StabilityRefusal`, `HierarchyRefusal` in `allocator.rs`, and `CertificationRefusal` in
-> `certification.rs`). Treat this section as the original design target/intent, not an
-> as-built API reference — check `allocator.rs`/`certification.rs` directly for the real refusal
-> taxonomy.
+> **This section is a design target, not an as-built reference.** The
+> `SpecError` / `AllocationError` names below do not exist in the crate, and the
+> `StabilityRefusal` variants named here do not match the real enum
+> (`allocator.rs:362`: `CertificateMissing`, `BlockGainBoundExceeded`,
+> `ContractionMarginInsufficient`, `ModeDwellTimeViolated`,
+> `RuntimeEnvelopeViolated`, `LearningFrozen`, `ContractViolation`).
+>
+> **For refusals that are admitted in the semantic graph, read
+> [`REFUSAL_LEDGER.md`](REFUSAL_LEDGER.md) instead.** That file is generated
+> from the same facts as the enums and the executable falsifiers, so it cannot
+> disagree with them -- which is the failure this notice is a symptom of. A
+> hand-maintained warning that a document is wrong is the only mechanism prose
+> offers, and it decays into part of the document. The remaining taxonomies here
+> (`StabilityRefusal`, `HierarchyRefusal`, `CertificationRefusal`) are not yet
+> admitted to the graph, so this section is still the only description of them
+> and is still hand-maintained.
 
 Typed refusal enumeration (design target, see note above): `enum StabilityRefusal { ... }`, `enum AllocationError { ... }`
 

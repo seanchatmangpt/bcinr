@@ -8,6 +8,7 @@
 // the graph changes this file; every exhaustive elimination built on it then
 // fails to compile until the new case is handled.
 
+
 /// Conditions under which the multifractal cascade has no correct answer. Each is a real condition, not a degradation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum CascadeRefusal {
