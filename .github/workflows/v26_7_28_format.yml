@@ -1,0 +1,34 @@
+name: v26.7.28 format
+on:
+  push:
+    branches: [agent/finish-v26-7-28-powl2-multifractal]
+permissions:
+  contents: write
+concurrency:
+  group: v26-7-28-format
+  cancel-in-progress: true
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/finish-v26-7-28-powl2-multifractal
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - name: Apply rustfmt
+        run: cargo fmt --all
+      - name: Commit exact formatter output
+        run: |
+          if git diff --quiet; then
+            echo "already formatted"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- '*.rs'
+          git commit -m "style: apply rustfmt to v26.7.28 closure"
+          git push origin HEAD:agent/finish-v26-7-28-powl2-multifractal
