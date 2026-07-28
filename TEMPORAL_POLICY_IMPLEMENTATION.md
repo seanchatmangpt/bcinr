@@ -163,7 +163,24 @@ cargo check -p bcinr-pddl                # No errors ✓
 
 ---
 
-**Status:** COMPLETE  
+**Status:** PARTIAL_ALIVE — monitor layer complete; parser/planner closure pending
+
+Classified by context cell rather than as one global label, because the layers
+have genuinely different standing:
+
+| Layer | Standing |
+|---|---|
+| Monitor primitives (`monitors.rs`) | ALIVE |
+| `TrajectoryPolicy` unit composition | ALIVE |
+| Parser reachability | UNSUPPORTED — the parser still drops `:constraints`, so no monitor is reachable from PDDL text |
+| Planner integration | PARTIAL_ALIVE |
+| End-to-end PDDL trajectory semantics | UNSUPPORTED |
+
+The "next steps" below are not polish; they are what the UNSUPPORTED rows
+require. `capability.rs` remains the more honest source: it rates trajectory
+constraints and preferences unsupported precisely because parsing drops them.
+A document cannot be COMPLETE while its own next-steps list contains the
+integration that makes the feature reachable.  
 **Last Updated:** 2026-07-26  
 **Constraints Monitored:** 7/7  
 **Tests Passing:** 131/131 (122 lib + 9 integration)

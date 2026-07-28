@@ -115,15 +115,26 @@
 //!     duration therefore always resolves to `0.0` (via `eval_numeric`'s
 //!     `FunctionTerm` arm's `unwrap_or(&0.0)`) regardless of `(speed)`'s
 //!     real value, instead of being rejected or evaluated correctly.
-//!   - **`duration_max` is computed but never enforced.** `ground_durative_schema`
-//!     stores both `duration_min`/`duration_max` on every `GroundDurativeAction`,
-//!     but `find_temporal_plan_with_fn_overrides` only ever reads
-//!     `da.duration_min` when scheduling (`let dur = da.duration_min;`) —
-//!     `duration_max` has no reader anywhere in this crate. A `(<= ?duration
-//!     n)`-shaped upper-bound-only constraint (`DurationConstraint::Lte`,
-//!     which `resolve_duration` resolves to `(0.0, n)`) silently executes
-//!     with duration `0.0` rather than any duration a caller might expect to
-//!     be chosen from the valid range.
+//!   - **`duration_max` is never explored by the planner.**
+//!     `ground_durative_schema` stores both `duration_min`/`duration_max` on
+//!     every `GroundDurativeAction`, but `find_temporal_plan_with_fn_overrides`
+//!     only ever reads `da.duration_min` when scheduling
+//!     (`ground/mod.rs:1026`, `let dur = da.duration_min;`).
+//!
+//!     Stated precisely, because the earlier phrasing here ("`duration_max`
+//!     has no reader anywhere in this crate") is no longer true and the
+//!     correct claim is narrower: `validate.rs:949` *does* read it and will
+//!     reject a step exceeding it. But `validate_temporal_plan_shape` has no
+//!     production caller — it is only re-exported from `lib.rs:174` — so
+//!     nothing enforces the bound on the planning path either.
+//!
+//!     The consequence is not that plans violate the range; picking the
+//!     minimum trivially satisfies an upper bound. It is that the range is
+//!     never *searched*: `(and (>= ?duration 2) (<= ?duration 5))` collapses
+//!     to exactly `2`, and a `(<= ?duration n)`-only constraint
+//!     (`DurationConstraint::Lte`, which `resolve_duration` maps to
+//!     `(0.0, n)`) executes at duration `0.0`. Duration is a fixed point, not
+//!     a decision variable.
 //! - [`PddlFeature::TimedInitialLiterals`] — `Exact`.
 //!   `tests/semantic_falsifier.rs`'s `test_til_schedule` passes and directly
 //!   checks TIL-driven makespan values.
