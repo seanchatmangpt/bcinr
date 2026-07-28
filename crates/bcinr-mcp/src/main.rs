@@ -707,8 +707,13 @@ impl BcinrServer {
 
     /// Independently replay a candidate plan (ordered ground-action labels) against a
     /// PDDL 3.1 domain+problem and report the first violation, if any.
+    ///
+    /// Refuses (`ok: false`, with `refusal_kind`) rather than replaying whenever a step's
+    /// exact grounded action has a precondition or effect the flat STRIPS tape cannot
+    /// carry — replaying a lossy flattening yields a `valid` verdict about a weaker
+    /// problem than the one asked about.
     #[tool(
-        description = "Validate a candidate plan (ordered ground-action labels) against a PDDL 3.1 domain+problem using a from-scratch, solver-independent replay. Returns JSON with ok, valid, step_count, violation (text or null), violation_kind."
+        description = "Validate a candidate plan (ordered ground-action labels) against a PDDL 3.1 domain+problem using a from-scratch, solver-independent replay. Returns JSON with ok, valid, step_count, violation (text or null), violation_kind. Refuses with ok=false and refusal_kind=EffectNotRepresentable|PreconditionNotRepresentable when a plan step's grounded action carries a conditional/quantified/numeric/timed effect, or a negative/disjunctive/implicative/quantified/timed/numeric/equality precondition, that the flat STRIPS tape cannot represent."
     )]
     async fn pddl_validate_plan(&self, Parameters(input): Parameters<ValidatePlanInput>) -> String {
         use std::collections::HashMap;
@@ -739,18 +744,41 @@ impl BcinrServer {
             }
         };
 
-        // Look up each requested plan step among the actually-grounded actions so the
-        // tape carries real preconditions/effects (not fabricated empty ones).
-        let by_label: HashMap<&str, &bcinr_pddl::Pddl8GroundAction> = grounded
+        // Look up each requested plan step among the actually-grounded actions.
+        //
+        // `ExactGroundAction::legacy_action` is a LOSSY flattening of the exact
+        // grounded action on both axes -- `collect_positive_atoms` keeps only a
+        // conjunction of positive, non-equality atoms, and `legacy_action` drops
+        // conditional, quantified, numeric, and timed effects -- so resolving a
+        // label is not enough. Each resolved action must clear the same gate
+        // `ground_v2::path_to_tape` applies before its tape escapes, which is
+        // why this reads the very marker that gate reads,
+        // `ExactGroundAction::lossy`, and raises the same two error variants.
+        // (The gate is duplicated rather than called because `path_to_tape` is
+        // private and keyed by action index, whereas this tool resolves a
+        // caller-supplied label list; the shared `lossy` field is what keeps the
+        // two from drifting.)
+        //
+        // The loss is unsound for THIS consumer specifically, because
+        // `validate_plan` replays `op.action`'s precondition/add/del sets: a
+        // dropped precondition makes the replay check a strictly weaker guard
+        // than the domain states, and a dropped effect makes it reach a state
+        // the domain never produces. Ungated, this tool answered `valid: true`
+        // for plans the exact rail refuses outright with `NoPlan` -- see the
+        // `negative_preconditions_are_load_bearing` and
+        // `numeric_precondition_and_effect_are_exact` fixtures in
+        // `bcinr-pddl/src/ground_v2.rs`. A wrong `valid` verdict is a wrong
+        // answer, not a partial one, so a lossy step is refused by name.
+        let by_label: HashMap<&str, &bcinr_pddl::ExactGroundAction> = grounded
             .actions
             .iter()
-            .map(|a| (a.label.as_str(), &a.legacy_action))
+            .map(|a| (a.label.as_str(), a))
             .collect();
 
         let mut ground_actions = Vec::with_capacity(input.plan.len());
         for label in &input.plan {
-            match by_label.get(label.as_str()) {
-                Some(ga) => ground_actions.push((*ga).clone()),
+            let action = match by_label.get(label.as_str()) {
+                Some(a) => *a,
                 None => {
                     return serde_json::json!({
                         "ok": false,
@@ -760,7 +788,36 @@ impl BcinrServer {
                     })
                     .to_string()
                 }
+            };
+            if let Some(lossy) = action.lossy {
+                let (refusal_kind, lossy_kind, refusal) = match lossy {
+                    bcinr_pddl::LossyLowering::Effect(effect_kind) => (
+                        "EffectNotRepresentable",
+                        effect_kind,
+                        bcinr_pddl::ExactClassicalError::EffectNotRepresentable {
+                            action: action.label.clone(),
+                            effect_kind,
+                        },
+                    ),
+                    bcinr_pddl::LossyLowering::Precondition(condition_kind) => (
+                        "PreconditionNotRepresentable",
+                        condition_kind,
+                        bcinr_pddl::ExactClassicalError::PreconditionNotRepresentable {
+                            action: action.label.clone(),
+                            condition_kind,
+                        },
+                    ),
+                };
+                return serde_json::json!({
+                    "ok": false,
+                    "refusal_kind": refusal_kind,
+                    "action": action.label,
+                    "lossy_kind": lossy_kind,
+                    "error": refusal.to_string(),
+                })
+                .to_string();
             }
+            ground_actions.push(action.legacy_action.clone());
         }
 
         let tape = bcinr_pddl::Pddl8Tape::from_plan(ground_actions);
