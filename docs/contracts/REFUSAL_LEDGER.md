@@ -54,4 +54,9 @@ Why Algorithm 3 declined a net. Each names the obligation actually checked -- no
 | `NotSafe` | runs | Some reachable marking carries more than one token in a place. Lemmas 5.1-5.4 assume a safe net, so Algorithm 3 would return a model with no proof attached. <br/>*Witness:* let net = WfNet::new(["i","a","b","c","o"].map(s), [("t1",None),("t2",None),("t3",None),("t4",None)].map(|(t,l)|(s(t),l)), [("i","t1"),("a","t2"),("b","t3"),("c","t4")].map(|(p,t)|(s(p),s(t))), [("t1","a"),("t1","b"),("t2","c"),("t3","c"),("t4","o")].map(|(t,p)|(s(t),s(p))), "i", "o").unwrap(); convert(&net).map(|_| ()) |
 | `NotSound` | runs | At least one of van der Aalst's three clauses fails: option-to-complete, proper completion, no dead transitions. <br/>*Witness:* let net = WfNet::new(["i","a","b","o"].map(s), [("t1",None),("t2",None),("t3",None)].map(|(t,l)|(s(t),l)), [("i","t1"),("a","t2"),("a","t3"),("b","t3")].map(|(p,t)|(s(p),s(t))), [("t1","a"),("t1","b"),("t2","o"),("t3","o")].map(|(t,p)|(s(t),s(p))), "i", "o").unwrap(); convert(&net).map(|_| ()) |
 | `SoundnessUndecided` | no witness | The reachability graph exceeded MAX_REACHABLE_MARKINGS before the token game terminated. Undecided, not decided favourably. <br/>*Witness:* Requires a net whose reachable marking count exceeds MAX_REACHABLE_MARKINGS (200000). Such a net exists and is easy to describe, but replaying it costs seconds and the assertion adds nothing the bound itself does not already state. |
+| `InternalModelInvalid` | no witness | A decomposition produced a partial order with out-of-range edges -- algorithm-internal, surfaced as a refusal rather than a silent drop. <br/>*Witness:* Algorithm-internal: a decomposition emitting a
+    partial order whose edges fall outside its own node set. Same shape as
+    InternalNetConstruction -- a witness would be an internal inconsistency, not an
+    input; `powl2::validate_edges` is `pub(crate)` and unreachable from the public
+    API. |
 

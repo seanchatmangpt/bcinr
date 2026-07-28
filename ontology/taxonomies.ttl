@@ -291,6 +291,17 @@ bc:Ref_InternalNetConstruction a bc:TaxonCase ;
     bc:caseDoc "A projection produced a sub-net failing WfNet::new -- algorithm-internal, surfaced as a refusal rather than a panic." ;
     bc:falsifier "recompose output that fails WfNet::new (wf_net_bridge.rs:102)" .
 
+bc:Ref_InternalModelInvalid a bc:TaxonCase ;
+    bc:falsifierUnwitnessedReason """Algorithm-internal: a decomposition emitting a
+    partial order whose edges fall outside its own node set. Same shape as
+    InternalNetConstruction -- a witness would be an internal inconsistency, not an
+    input; `powl2::validate_edges` is `pub(crate)` and unreachable from the public
+    API.""" ;
+    bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 9 ;
+    bc:caseName "InternalModelInvalid" ; bc:caseShape "tuple" ;
+    bc:caseDoc "A decomposition produced a partial order with out-of-range edges -- algorithm-internal, surfaced as a refusal rather than a silent drop." ;
+    bc:falsifier "powl2_language on a model whose edges exceed its node count (language.rs)" .
+
 bc:Casc_NumericFault a bc:TaxonCase ;
     bc:rustFalsifierSetup """let t = CascadeTree::new(vec![None, Some(0), Some(0)], vec![m(1.0), m(1000.0), m(1000.0)]).unwrap();""" ;
     bc:rustFalsifierExpr """consequence_mass(&t, &[16]).map(|_| ())""" ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 8 ;

@@ -35,5 +35,6 @@ pub fn classify_refusalreason(value: &bcinr_powl::wf_to_powl::RefusalReason) -> 
         bcinr_powl::wf_to_powl::RefusalReason::NotSafe { .. } => super::taxonomy::RefusalReason::NotSafe,
         bcinr_powl::wf_to_powl::RefusalReason::NotSound { .. } => super::taxonomy::RefusalReason::NotSound,
         bcinr_powl::wf_to_powl::RefusalReason::SoundnessUndecided { .. } => super::taxonomy::RefusalReason::SoundnessUndecided,
+        bcinr_powl::wf_to_powl::RefusalReason::InternalModelInvalid(..) => super::taxonomy::RefusalReason::InternalModelInvalid,
     }
 }

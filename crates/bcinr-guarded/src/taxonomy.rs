@@ -260,6 +260,8 @@ pub enum RefusalReason {
     NotSound,
     /// The reachability graph exceeded MAX_REACHABLE_MARKINGS before the token game terminated. Undecided, not decided favourably.
     SoundnessUndecided,
+    /// A decomposition produced a partial order with out-of-range edges -- algorithm-internal, surfaced as a refusal rather than a silent drop.
+    InternalModelInvalid,
 }
 
 impl RefusalReason {
@@ -274,6 +276,7 @@ impl RefusalReason {
         Self::NotSafe,
         Self::NotSound,
         Self::SoundnessUndecided,
+        Self::InternalModelInvalid,
     ];
 
     /// The case's name as written in the graph.
@@ -288,6 +291,7 @@ impl RefusalReason {
             Self::NotSafe => "NotSafe",
             Self::NotSound => "NotSound",
             Self::SoundnessUndecided => "SoundnessUndecided",
+            Self::InternalModelInvalid => "InternalModelInvalid",
         }
     }
 
@@ -303,6 +307,7 @@ impl RefusalReason {
             Self::NotSafe => "Some reachable marking carries more than one token in a place. Lemmas 5.1-5.4 assume a safe net, so Algorithm 3 would return a model with no proof attached.",
             Self::NotSound => "At least one of van der Aalst's three clauses fails: option-to-complete, proper completion, no dead transitions.",
             Self::SoundnessUndecided => "The reachability graph exceeded MAX_REACHABLE_MARKINGS before the token game terminated. Undecided, not decided favourably.",
+            Self::InternalModelInvalid => "A decomposition produced a partial order with out-of-range edges -- algorithm-internal, surfaced as a refusal rather than a silent drop.",
         }
     }
 }
