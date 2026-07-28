@@ -1,0 +1,27 @@
+PREFIX bc:   <https://bcinr.dev/ontology#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#>
+
+# Taxonomies that have a live runtime counterpart, one row per case.
+#
+# `pattern_suffix` maps the neutral shape to Rust match syntax here, not in the
+# template. `is_first` / `is_last` bracket each generated fn.
+SELECT ?taxonomy ?rust_path ?case_name ?case_order ?pattern_suffix ?is_first ?is_last
+WHERE {
+    ?tax a bc:ClosedTaxonomy ;
+         rdfs:label   ?taxonomy ;
+         bc:rustPath  ?rust_path ;
+         bc:runtimeCrate ?crate .
+
+    ?case a bc:TaxonCase ;
+          bc:inTaxonomy ?tax ;
+          bc:caseName   ?case_name ;
+          bc:caseOrder  ?case_order ;
+          bc:caseShape  ?case_shape .
+
+    BIND(IF(?case_shape = "unit", "",
+        IF(?case_shape = "tuple", "(..)", " { .. }")) AS ?pattern_suffix)
+    BIND(NOT EXISTS { ?e bc:inTaxonomy ?tax ; bc:caseOrder ?eo . FILTER(?eo < ?case_order) } AS ?is_first)
+    BIND(NOT EXISTS { ?l bc:inTaxonomy ?tax ; bc:caseOrder ?lo . FILTER(?lo > ?case_order) } AS ?is_last)
+}
+ORDER BY ?taxonomy xsd:integer(?case_order)

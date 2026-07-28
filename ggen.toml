@@ -54,3 +54,10 @@ query = { file = "queries/profile-constants.rq" }
 template = { file = "templates/profile.rs.tera" }
 output_file = "crates/bcinr-cmca/src/generated_profile.rs"
 mode = "Overwrite"
+
+[[generation.rules]]
+name = "runtime_bindings"
+query = { file = "queries/runtime-bindings.rq" }
+template = { file = "templates/runtime_binding.rs.tera" }
+output_file = "crates/bcinr-guarded/src/runtime_binding.rs"
+mode = "Overwrite"

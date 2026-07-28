@@ -191,7 +191,8 @@ bc:Standing_Blocked a bc:TaxonCase ; bc:inTaxonomy bc:FormalStanding ; bc:caseOr
 bc:CascadeRefusal a bc:ClosedTaxonomy ;
     rdfs:label "CascadeRefusal" ;
     bc:taxonomyDoc "Conditions under which the multifractal cascade has no correct answer. Each is a real condition, not a degradation." ;
-    bc:rustPath "bcinr_cmca::cascade::CascadeRefusal" .
+    bc:rustPath "bcinr_cmca::cascade::CascadeRefusal" ;
+    bc:runtimeCrate "bcinr_cmca" .
 
 bc:Casc_LengthMismatch a bc:TaxonCase ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 0 ;
     bc:caseName "LengthMismatch" ; bc:caseShape "struct" ;
@@ -236,7 +237,8 @@ bc:Casc_ZeroMassUnderNegativeLens a bc:TaxonCase ; bc:inTaxonomy bc:CascadeRefus
 bc:RefusalReason a bc:ClosedTaxonomy ;
     rdfs:label "RefusalReason" ;
     bc:taxonomyDoc "Why Algorithm 3 declined a net. Each names the obligation actually checked -- not a paper result it does not discharge." ;
-    bc:rustPath "bcinr_powl::wf_to_powl::RefusalReason" .
+    bc:rustPath "bcinr_powl::wf_to_powl::RefusalReason" ;
+    bc:runtimeCrate "bcinr_powl" .
 
 bc:Ref_IrreducibleFragment a bc:TaxonCase ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 0 ;
     bc:caseName "IrreducibleFragment" ; bc:caseShape "struct" ;
@@ -257,3 +259,23 @@ bc:Ref_InternalNetConstruction a bc:TaxonCase ; bc:inTaxonomy bc:RefusalReason ;
     bc:caseName "InternalNetConstruction" ; bc:caseShape "tuple" ;
     bc:caseDoc "A projection produced a sub-net failing WfNet::new -- algorithm-internal, surfaced as a refusal rather than a panic." ;
     bc:falsifier "recompose output that fails WfNet::new (wf_net_bridge.rs:102)" .
+
+bc:Casc_NumericFault a bc:TaxonCase ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 8 ;
+    bc:caseName "NumericFault" ; bc:caseShape "struct" ;
+    bc:caseDoc "A Q16.16 operation saturated or divided by zero; read off the value's error channel, with the stage named." ;
+    bc:falsifier "consequence_mass(tree with mass 1000, &[16])" .
+
+bc:Casc_EscortUnderflow a bc:TaxonCase ; bc:inTaxonomy bc:CascadeRefusal ; bc:caseOrder 9 ;
+    bc:caseName "EscortUnderflow" ; bc:caseShape "struct" ;
+    bc:caseDoc "m^q collapsed to zero from a non-zero mass: unrepresentable, not negligible. Detected structurally because saturating_mul flags overflow but not underflow." ;
+    bc:falsifier "consequence_mass(tree with mass 0.01, &[16])" .
+
+bc:Ref_VacuousLanguageBound a bc:TaxonCase ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 4 ;
+    bc:caseName "VacuousLanguageBound" ; bc:caseShape "unit" ;
+    bc:caseDoc "A bound of 0 compares two empty sets. Both enumerators return the empty language there, so they agree vacuously -- independence of implementation does not imply independence of failure mode." ;
+    bc:falsifier "convert_and_verify(net, 64, 0)" .
+
+bc:Ref_NotRecomposable a bc:TaxonCase ; bc:inTaxonomy bc:RefusalReason ; bc:caseOrder 5 ;
+    bc:caseName "NotRecomposable" ; bc:caseShape "tuple" ;
+    bc:caseDoc "The model has no language-preserving WF-net image -- e.g. a bounded DoRedo, which an unbounded net cycle would widen." ;
+    bc:falsifier "recompose(DoRedo { max_redos: 2, .. })" .

@@ -9,3 +9,4 @@ publish = false
 
 [dependencies]
 bcinr-powl = { path = "../bcinr-powl" }
+bcinr-cmca = { path = "../bcinr-cmca", features = ["alloc"] }

@@ -14,3 +14,7 @@ pub mod taxonomy;
 /// The POWL 2.0 model taxonomy with its paper citations, tier and arity
 /// bounds, plus the `classify` tripwire against the live `Powl2Model`.
 pub mod powl2_case;
+
+/// Compile-time bindings from the generated taxonomies to their live runtime
+/// types. Each match has no `_` arm, so drift is a build error.
+pub mod runtime_binding;

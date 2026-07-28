@@ -8,7 +8,6 @@
 // the graph changes this file; every exhaustive elimination built on it then
 // fails to compile until the new case is handled.
 
-
 /// Conditions under which the multifractal cascade has no correct answer. Each is a real condition, not a degradation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum CascadeRefusal {
@@ -28,6 +27,10 @@ pub enum CascadeRefusal {
     DegenerateSubtreeLeaves,
     /// m^q for m = 0 and q < 0 is undefined, not large.
     ZeroMassUnderNegativeLens,
+    /// A Q16.16 operation saturated or divided by zero; read off the value's error channel, with the stage named.
+    NumericFault,
+    /// m^q collapsed to zero from a non-zero mass: unrepresentable, not negligible. Detected structurally because saturating_mul flags overflow but not underflow.
+    EscortUnderflow,
 }
 
 impl CascadeRefusal {
@@ -41,6 +44,8 @@ impl CascadeRefusal {
         Self::DegenerateSiblingSet,
         Self::DegenerateSubtreeLeaves,
         Self::ZeroMassUnderNegativeLens,
+        Self::NumericFault,
+        Self::EscortUnderflow,
     ];
 
     /// The case's name as written in the graph.
@@ -54,6 +59,8 @@ impl CascadeRefusal {
             Self::DegenerateSiblingSet => "DegenerateSiblingSet",
             Self::DegenerateSubtreeLeaves => "DegenerateSubtreeLeaves",
             Self::ZeroMassUnderNegativeLens => "ZeroMassUnderNegativeLens",
+            Self::NumericFault => "NumericFault",
+            Self::EscortUnderflow => "EscortUnderflow",
         }
     }
 
@@ -68,6 +75,8 @@ impl CascadeRefusal {
             Self::DegenerateSiblingSet => "All sibling escort weights are zero, so the normalizing sum vanishes. Fires only when ALL underflow; the mixed case is the dangerous one and does not refuse.",
             Self::DegenerateSubtreeLeaves => "The flat path has no representable subtree-leaf weights.",
             Self::ZeroMassUnderNegativeLens => "m^q for m = 0 and q < 0 is undefined, not large.",
+            Self::NumericFault => "A Q16.16 operation saturated or divided by zero; read off the value's error channel, with the stage named.",
+            Self::EscortUnderflow => "m^q collapsed to zero from a non-zero mass: unrepresentable, not negligible. Detected structurally because saturating_mul flags overflow but not underflow.",
         }
     }
 }
@@ -238,6 +247,10 @@ pub enum RefusalReason {
     BoundedLanguageAgreementFailed,
     /// A projection produced a sub-net failing WfNet::new -- algorithm-internal, surfaced as a refusal rather than a panic.
     InternalNetConstruction,
+    /// A bound of 0 compares two empty sets. Both enumerators return the empty language there, so they agree vacuously -- independence of implementation does not imply independence of failure mode.
+    VacuousLanguageBound,
+    /// The model has no language-preserving WF-net image -- e.g. a bounded DoRedo, which an unbounded net cycle would widen.
+    NotRecomposable,
 }
 
 impl RefusalReason {
@@ -247,6 +260,8 @@ impl RefusalReason {
         Self::BudgetExhausted,
         Self::BoundedLanguageAgreementFailed,
         Self::InternalNetConstruction,
+        Self::VacuousLanguageBound,
+        Self::NotRecomposable,
     ];
 
     /// The case's name as written in the graph.
@@ -256,6 +271,8 @@ impl RefusalReason {
             Self::BudgetExhausted => "BudgetExhausted",
             Self::BoundedLanguageAgreementFailed => "BoundedLanguageAgreementFailed",
             Self::InternalNetConstruction => "InternalNetConstruction",
+            Self::VacuousLanguageBound => "VacuousLanguageBound",
+            Self::NotRecomposable => "NotRecomposable",
         }
     }
 
@@ -266,6 +283,8 @@ impl RefusalReason {
             Self::BudgetExhausted => "The bounded recursion budget ran out before termination.",
             Self::BoundedLanguageAgreementFailed => "The two independently-computed languages disagreed at the checked bound. NOT Theorem 5.5, which quantifies over the whole language.",
             Self::InternalNetConstruction => "A projection produced a sub-net failing WfNet::new -- algorithm-internal, surfaced as a refusal rather than a panic.",
+            Self::VacuousLanguageBound => "A bound of 0 compares two empty sets. Both enumerators return the empty language there, so they agree vacuously -- independence of implementation does not imply independence of failure mode.",
+            Self::NotRecomposable => "The model has no language-preserving WF-net image -- e.g. a bounded DoRedo, which an unbounded net cycle would widen.",
         }
     }
 }
