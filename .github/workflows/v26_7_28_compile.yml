@@ -25,11 +25,20 @@ jobs:
           cargo fmt --all
           git diff --binary > verification-artifacts/rustfmt.patch
       - name: CMCA authority rail
-        run: cargo check -p bcinr-cmca --all-targets --all-features
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo check -p bcinr-cmca --all-targets --all-features 2>&1 | tee verification-artifacts/cmca-check.log
       - name: External boundary rails
-        run: cargo check -p bcinr-pddl -p bcinr-ffi --all-targets --all-features
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo check -p bcinr-pddl -p bcinr-ffi --all-targets --all-features 2>&1 | tee verification-artifacts/external-check.log
       - name: Workspace compile
-        run: cargo check --workspace --all-targets --all-features
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo check --workspace --all-targets --all-features 2>&1 | tee verification-artifacts/workspace-check.log
       - name: Upload compile evidence
         if: always()
         uses: actions/upload-artifact@v4
