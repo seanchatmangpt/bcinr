@@ -328,7 +328,7 @@ pub fn escort_weight(
 fn depths(tree: &CascadeTree) -> Result<Vec<usize>, CascadeRefusal> {
     let len = tree.len();
     let mut depth = vec![0usize; len];
-    for node in 0..len {
+    for (node, slot) in depth.iter_mut().enumerate() {
         let mut steps = 0usize;
         let mut cursor = node;
         while let Some(p) = tree.parent[cursor] {
@@ -338,7 +338,7 @@ fn depths(tree: &CascadeTree) -> Result<Vec<usize>, CascadeRefusal> {
             }
             cursor = p;
         }
-        depth[node] = steps;
+        *slot = steps;
     }
     Ok(depth)
 }
@@ -413,12 +413,12 @@ pub fn consequence_mass(
     // subtree-leaf escort -- `allocator` likewise derives `child_w` and
     // `leaf_w` from the same per-node masses.
     let mut weight = Vec::with_capacity(len);
-    for node in 0..len {
-        weight.push(escort_weight(tree.mass[node], lens_at(depth[node]), node)?);
+    for (node, (&mass, &node_depth)) in tree.mass.iter().zip(depth.iter()).enumerate() {
+        weight.push(escort_weight(mass, lens_at(node_depth), node)?);
     }
 
     let is_leaf: Vec<bool> = (0..len)
-        .map(|node| !tree.parent.iter().any(|p| *p == Some(node)))
+        .map(|node| !tree.parent.contains(&Some(node)))
         .collect();
     let children: Vec<Vec<usize>> = (0..len)
         .map(|v| (0..len).filter(|c| tree.parent[*c] == Some(v)).collect())
