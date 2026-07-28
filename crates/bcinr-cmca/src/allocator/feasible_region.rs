@@ -6,8 +6,44 @@
 
 use crate::fixed::NonNegativeFixed;
 use crate::generated::consequence_mass::case_studies::N;
+use crate::generated_profile::{
+    ALLOCATOR_BETA_MAX_BITS, ALLOCATOR_MASS_MAX_BITS, ALLOCATOR_MASS_MIN_BITS,
+    ALLOCATOR_PRICE_GAIN_MAX_BITS,
+};
 
 use super::StabilityRefusal;
+
+/// The current allocator's four bounds, named and versioned. Field names
+/// carry the operational-role distinction [`FeasibleRegion`]'s docs
+/// establish: `beta_max`/`mass_min`/`mass_max` are clamp targets;
+/// `price_gain_max` is the one bound that gates.
+///
+/// The four values are sourced from [`crate::generated_profile`] --
+/// manufactured by `ggen sync` from `ontology/profile.ttl`'s
+/// `bc:ProfileConstant` entries (`ALLOCATOR_BETA_MAX_BITS` and siblings).
+/// Do not hand-edit those constants; edit the graph and regenerate. This
+/// checkpoint (BCINR-CMCA-C) is preservation only: the four bit values are
+/// unchanged from what `FeasibleRegion::CURRENT` hard-coded before this
+/// type existed -- only where they come from changed.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct AllocatorRuntimeProfile {
+    pub identity: &'static str,
+    pub version: &'static str,
+    pub beta_max: NonNegativeFixed,
+    pub mass_min: NonNegativeFixed,
+    pub mass_max: NonNegativeFixed,
+    pub price_gain_max: NonNegativeFixed,
+}
+
+/// The allocator's admitted current profile.
+pub const BCINR_CMCA_ALLOCATOR_V0_1: AllocatorRuntimeProfile = AllocatorRuntimeProfile {
+    identity: "BCINR-CMCA-Allocator",
+    version: "v0.1",
+    beta_max: NonNegativeFixed::from_bits(ALLOCATOR_BETA_MAX_BITS),
+    mass_min: NonNegativeFixed::from_bits(ALLOCATOR_MASS_MIN_BITS),
+    mass_max: NonNegativeFixed::from_bits(ALLOCATOR_MASS_MAX_BITS),
+    price_gain_max: NonNegativeFixed::from_bits(ALLOCATOR_PRICE_GAIN_MAX_BITS),
+};
 
 /// The numeric bounds `allocate_in` clamps or gates against, named rather
 /// than inline. Two different kinds of bound, not one region:
@@ -42,12 +78,25 @@ impl FeasibleRegion {
     /// The bounds `allocate()` has always used, extracted rather than
     /// changed. `allocate(x) == allocate_in(&FeasibleRegion::CURRENT, x)`
     /// for every input, by construction: `allocate` is defined as that call.
+    /// Sourced from [`BCINR_CMCA_ALLOCATOR_V0_1`] (BCINR-CMCA-C) -- the bit
+    /// values are unchanged, only their origin.
     pub const CURRENT: Self = Self {
-        beta_max: NonNegativeFixed::from_bits(6553),
-        m_min: NonNegativeFixed::from_bits(6),
-        m_max: NonNegativeFixed::from_bits(65536000),
-        mu_max: NonNegativeFixed::from_bits(6553600),
+        beta_max: BCINR_CMCA_ALLOCATOR_V0_1.beta_max,
+        m_min: BCINR_CMCA_ALLOCATOR_V0_1.mass_min,
+        m_max: BCINR_CMCA_ALLOCATOR_V0_1.mass_max,
+        mu_max: BCINR_CMCA_ALLOCATOR_V0_1.price_gain_max,
     };
+
+    /// The profile's identity string -- the minimal additive surface a
+    /// future allocator-side trace or receipt could bind to. Deliberately
+    /// not a cryptographic digest (no const-time BLAKE3 is available in
+    /// this crate) and deliberately not wired into any trace type here:
+    /// `consequence_mass_traced` (the cascade's trace) does not consume
+    /// this profile at all, and `allocate_in` has no trace type of its own
+    /// to bind -- building one is a separate, checkpoint-sized decision.
+    pub const fn profile_identity(&self) -> &'static str {
+        BCINR_CMCA_ALLOCATOR_V0_1.identity
+    }
 
     /// Absolute tolerance `contains_allocation` allows on the sum, matching
     /// the 1% figure `usecase_trading_determinism.rs`'s ad hoc test used
@@ -145,5 +194,54 @@ mod tests {
         let mut mu = [NonNegativeFixed::ZERO; N];
         mu[3] = FeasibleRegion::CURRENT.mu_max;
         assert!(FeasibleRegion::CURRENT.admit_inputs(&mu).is_ok());
+    }
+
+    /// BCINR-CMCA-C law 2 (profile fidelity): the exact literal bit values
+    /// this type held before the ggen-manufactured profile existed. A
+    /// change to `ontology/profile.ttl` that alters one of these values
+    /// must fail this test, not just the drift check -- a Rust-level
+    /// tripwire independent of remembering to run `ggen sync`/diff.
+    #[test]
+    fn current_profile_preserves_exact_q16_bits() {
+        assert_eq!(BCINR_CMCA_ALLOCATOR_V0_1.beta_max.to_bits(), 6553);
+        assert_eq!(BCINR_CMCA_ALLOCATOR_V0_1.mass_min.to_bits(), 6);
+        assert_eq!(BCINR_CMCA_ALLOCATOR_V0_1.mass_max.to_bits(), 65536000);
+        assert_eq!(BCINR_CMCA_ALLOCATOR_V0_1.price_gain_max.to_bits(), 6553600);
+    }
+
+    /// Wiring check, not a value check: `FeasibleRegion::CURRENT` and
+    /// `BCINR_CMCA_ALLOCATOR_V0_1` are both `const`-derived from the same
+    /// generated constants, so this cannot catch a wrong *value* (a bit
+    /// mutation moves both sides together -- confirmed by running this
+    /// exact mutation during BCINR-CMCA-C's falsifier pass; only
+    /// `current_profile_preserves_exact_q16_bits` catches that). What this
+    /// catches is `CURRENT` being wired to some other literal or a
+    /// different field entirely.
+    #[test]
+    fn feasible_region_current_matches_allocator_profile() {
+        assert_eq!(
+            FeasibleRegion::CURRENT.beta_max,
+            BCINR_CMCA_ALLOCATOR_V0_1.beta_max
+        );
+        assert_eq!(
+            FeasibleRegion::CURRENT.m_min,
+            BCINR_CMCA_ALLOCATOR_V0_1.mass_min
+        );
+        assert_eq!(
+            FeasibleRegion::CURRENT.m_max,
+            BCINR_CMCA_ALLOCATOR_V0_1.mass_max
+        );
+        assert_eq!(
+            FeasibleRegion::CURRENT.mu_max,
+            BCINR_CMCA_ALLOCATOR_V0_1.price_gain_max
+        );
+    }
+
+    #[test]
+    fn profile_identity_is_queryable() {
+        assert_eq!(
+            FeasibleRegion::CURRENT.profile_identity(),
+            "BCINR-CMCA-Allocator"
+        );
     }
 }

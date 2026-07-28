@@ -51,3 +51,31 @@ bc:MaxCycleUnroll a bc:ProfileConstant ;
     bc:policyMarked true ;
     bc:policyOwner "bcinr-powl::language" ;
     bc:policyRationale "UNDERIVED, and load-bearing. The termination argument holds for any finite value, so 2 is a free choice -- but powl2_language IS the bounded-agreement oracle, so this constant silently sets how strong that check is. A larger value enumerates strictly more traces and therefore checks strictly more." .
+
+bc:AllocatorBetaMax a bc:ProfileConstant ;
+    bc:constName "ALLOCATOR_BETA_MAX_BITS" ; bc:constType "u32" ; bc:constValue "6553" ;
+    bc:inProfile bc:Q16_16 ;
+    bc:policyMarked true ;
+    bc:policyOwner "bcinr-cmca::allocator" ;
+    bc:policyRationale "UNDERIVED. Ceiling allocate_in clamps the learning-rate zeta into (beta = min(zeta, beta_max)) before the MWU weight update. A clamp target, not a refusal gate -- no input value for this bound produces an error, only a reshaped beta." .
+
+bc:AllocatorMassMin a bc:ProfileConstant ;
+    bc:constName "ALLOCATOR_MASS_MIN_BITS" ; bc:constType "u32" ; bc:constValue "6" ;
+    bc:inProfile bc:Q16_16 ;
+    bc:policyMarked true ;
+    bc:policyOwner "bcinr-cmca::allocator" ;
+    bc:policyRationale "UNDERIVED. Floor allocate_in clips every per-measure node mass into before the cascade weight computation -- a clamp target, not a refusal gate." .
+
+bc:AllocatorMassMax a bc:ProfileConstant ;
+    bc:constName "ALLOCATOR_MASS_MAX_BITS" ; bc:constType "u32" ; bc:constValue "65536000" ;
+    bc:inProfile bc:Q16_16 ;
+    bc:policyMarked true ;
+    bc:policyOwner "bcinr-cmca::allocator" ;
+    bc:policyRationale "UNDERIVED. Ceiling paired with ALLOCATOR_MASS_MIN_BITS for the same per-measure node-mass clamp -- a clamp target, not a refusal gate." .
+
+bc:AllocatorPriceGainMax a bc:ProfileConstant ;
+    bc:constName "ALLOCATOR_PRICE_GAIN_MAX_BITS" ; bc:constType "u32" ; bc:constValue "6553600" ;
+    bc:inProfile bc:Q16_16 ;
+    bc:policyMarked true ;
+    bc:policyOwner "bcinr-cmca::allocator" ;
+    bc:policyRationale "UNDERIVED. Unlike the three bounds above, this one gates rather than clamps: any mu[i] exceeding it sets price_err, which (Checkpoint A traced this precisely through allocate_in's err_val selection chain) produces StabilityRefusal::PriceGainUnsafe. The one bound among the allocator's four whose violation refuses instead of silently reshaping." .

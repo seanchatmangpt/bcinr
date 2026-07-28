@@ -5,6 +5,18 @@
 // No constant here is presented as following from the mathematics unless it
 // does.
 
+/// POLICY (owner: bcinr-cmca::allocator). UNDERIVED. Ceiling allocate_in clamps the learning-rate zeta into (beta = min(zeta, beta_max)) before the MWU weight update. A clamp target, not a refusal gate -- no input value for this bound produces an error, only a reshaped beta.
+pub const ALLOCATOR_BETA_MAX_BITS: u32 = 6553;
+
+/// POLICY (owner: bcinr-cmca::allocator). UNDERIVED. Ceiling paired with ALLOCATOR_MASS_MIN_BITS for the same per-measure node-mass clamp -- a clamp target, not a refusal gate.
+pub const ALLOCATOR_MASS_MAX_BITS: u32 = 65536000;
+
+/// POLICY (owner: bcinr-cmca::allocator). UNDERIVED. Floor allocate_in clips every per-measure node mass into before the cascade weight computation -- a clamp target, not a refusal gate.
+pub const ALLOCATOR_MASS_MIN_BITS: u32 = 6;
+
+/// POLICY (owner: bcinr-cmca::allocator). UNDERIVED. Unlike the three bounds above, this one gates rather than clamps: any mu[i] exceeding it sets price_err, which (Checkpoint A traced this precisely through allocate_in's err_val selection chain) produces StabilityRefusal::PriceGainUnsafe. The one bound among the allocator's four whose violation refuses instead of silently reshaping.
+pub const ALLOCATOR_PRICE_GAIN_MAX_BITS: u32 = 6553600;
+
 /// POLICY (owner: bcinr-cmca). UNDERIVED. 0.22 permits a 22 percentage-point disagreement on a normalized allocation share, which is not a tolerance so much as an absence of one. It was chosen to make the fixed-vs-f64 comparison pass, not derived from the numeric profile. The principled replacement is to classify each generated case as inside or outside the executable envelope and compare outcomes rather than values: inside, assert agreement to an error bound derived from ESCORT_DYNAMIC_RANGE_LIMIT; outside, assert NumericRangeExceeded. Until that lands this number is a placeholder and must be labelled as one.
 pub const DIFFERENTIAL_TOLERANCE: f64 = 0.22;
 

@@ -59,6 +59,35 @@ args = [
     "--shapes", "ontology/shapes.ttl",
 ]
 
+[tasks.profile-drift-check]
+category = "Build"
+description = "BCINR-CMCA-C: refuse if generated_profile.rs disagrees with ontology/profile.ttl"
+# No existing mechanism in this repo detects hand-edit drift on any
+# ggen-produced file (confirmed: `taxonomy.rs`, `runtime_binding.rs`,
+# `generated_profile.rs`, etc. all currently lack one). This is the first.
+# Scoped to generated_profile.rs only for now -- widening to the other four
+# ggen outputs is real, separate future work, not silently folded in here.
+#
+# Deliberately NOT a dependency of `check`: `ggen sync` writes files when
+# content differs, and `check` should not mutate the working tree as a side
+# effect of a read-only verification task. Run this standalone (locally or
+# as its own CI step) instead.
+workspace = false
+script = '''
+#!/usr/bin/env bash
+set -euo pipefail
+ggen sync > /dev/null
+if ! git diff --exit-code HEAD -- crates/bcinr-cmca/src/generated_profile.rs > /dev/null; then
+    echo "DRIFT: crates/bcinr-cmca/src/generated_profile.rs disagrees with a fresh"
+    echo "'ggen sync' from ontology/profile.ttl. Either the file was hand-edited, or"
+    echo "the ontology changed and the file was not regenerated. Run 'ggen sync' and"
+    echo "commit the result -- never hand-edit generated_profile.rs directly."
+    git diff -- crates/bcinr-cmca/src/generated_profile.rs
+    exit 1
+fi
+echo "generated_profile.rs matches ontology/profile.ttl -- no drift."
+'''
+
 [tasks.build]
 category = "Build"
 description = "Build the workspace in release mode"
