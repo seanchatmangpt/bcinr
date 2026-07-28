@@ -36,6 +36,14 @@ std = ["serde", "dep:serde_json"]
 nightly = []
 testing = []
 
+# Declared with `required-features` rather than an inner `#![cfg(feature =
+# "std")]`: with the attribute, a default `cargo test` compiles the file to an
+# empty binary and reports "ok. 0 passed", which is indistinguishable from the
+# suite passing. With `required-features`, cargo skips the target and says so.
+[[test]]
+name = "chicago_tdd_integration"
+required-features = ["std"]
+
 [[bench]]
 name = "powl_quick_bench"
 harness = false

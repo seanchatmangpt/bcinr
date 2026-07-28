@@ -4,10 +4,12 @@
 //! deterministic trace receipt, Chicago diagnostic collector, and an independent OCEL 2.0
 //! importer/semantic validator.
 //!
+//! Declared `required-features = ["std"]` in Cargo.toml, so a default
+//! `cargo test` skips this target visibly instead of compiling it to an empty
+//! binary that reports success.
+//!
 //! Run with:
 //!   cargo test -p bcinr-powl --test chicago_tdd_integration --features std
-
-#![cfg(feature = "std")]
 
 use bcinr_powl::compiler::{compile_powl, PowlAstNode};
 use bcinr_powl::ocel::{ConformanceResult, OcelEvent, OcelLog};
@@ -31,14 +33,17 @@ fn emit_event(
     let mut context = HashMap::new();
     context.insert("event_id", serde_json::json!(event.event_id));
     context.insert("activity", serde_json::json!(event.activity));
-    context.insert("timestamp", serde_json::json!(event.timestamp));
+    context.insert("timestamp", serde_json::json!(event.start_time));
     context.insert("powl_run_id", serde_json::json!(event.run_id));
     context.insert("op_idx", serde_json::json!(event.op_idx));
     context.insert(
         "op_trace",
         serde_json::json!(format!("{:#018x}", event.op_trace)),
     );
-    context.insert("kind_tag", serde_json::json!(event.kind_tag));
+    context.insert(
+        "event_kind",
+        serde_json::json!(format!("{:?}", event.event_kind)),
+    );
 
     sink.emit(Diagnostic {
         code: DiagnosticCode::new("POWL", DiagnosticCategory::Conformance, 1),
@@ -121,6 +126,10 @@ fn execute(
     let mut state = PowlRunState::new(&tape);
     let mut log = OcelLog::new();
     let mut op_trace = 0u64;
+    // One logical time unit per scheduler wave: every op fired in a wave shares
+    // its start time, which is what makes the wave observable as concurrency in
+    // the exported OCEL log.
+    let mut now: bcinr_powl::scheduler::LogicalTime = 0;
 
     for _ in 0..128 {
         if state.check_mask == 0 {
@@ -130,12 +139,13 @@ fn execute(
         while bits != 0 {
             let op_idx = bits.trailing_zeros();
             bits &= bits - 1;
-            log.record_op_fired(run_id, op_idx, 0).unwrap();
+            log.record_op_fired(run_id, op_idx, now, 1).unwrap();
             op_trace |= 1u64 << op_idx;
         }
+        now += 1;
     }
     assert_eq!(state.check_mask, 0, "bounded scheduler must complete");
-    log.record_run_sealed(run_id, op_trace).unwrap();
+    log.record_run_sealed(run_id, op_trace, now).unwrap();
     (tape, state, log, op_trace)
 }
 
@@ -194,9 +204,9 @@ fn powl_temporal_predecessor_inversion_is_refused_and_receipted() {
     ]))
     .unwrap();
     let mut log = OcelLog::new();
-    log.record_op_fired(99, 1, 0).unwrap();
-    log.record_op_fired(99, 0, 0).unwrap();
-    log.record_run_sealed(99, 0b11).unwrap();
+    log.record_op_fired(99, 1, 1, 1).unwrap();
+    log.record_op_fired(99, 0, 0, 1).unwrap();
+    log.record_run_sealed(99, 0b11, 1).unwrap();
 
     assert_eq!(
         log.validate_against_tape(&tape),
@@ -314,9 +324,9 @@ fn powl_xor_executes_exactly_one_branch_and_exports_independently_valid_ocel() {
 fn deterministic_trace_receipts_replay_identically() {
     let build = || {
         let mut log = OcelLog::new();
-        log.record_op_fired(123, 0, 7).unwrap();
-        log.record_op_fired(123, 1, 8).unwrap();
-        log.record_run_sealed(123, 0b11).unwrap();
+        log.record_op_fired(123, 0, 7, 1).unwrap();
+        log.record_op_fired(123, 1, 8, 1).unwrap();
+        log.record_run_sealed(123, 0b11, 1).unwrap();
         log
     };
     let first = build().seal_receipt();
@@ -330,16 +340,17 @@ fn deterministic_trace_receipt_binds_each_mutation_dimension() {
     fn digest(
         run_id: u64,
         first_op: u32,
-        first_kind: u8,
+        first_start: u32,
         second_op: Option<u32>,
         seal: u64,
     ) -> [u8; 32] {
         let mut log = OcelLog::new();
-        log.record_op_fired(run_id, first_op, first_kind).unwrap();
+        log.record_op_fired(run_id, first_op, first_start, 1)
+            .unwrap();
         if let Some(op_idx) = second_op {
-            log.record_op_fired(run_id, op_idx, 9).unwrap();
+            log.record_op_fired(run_id, op_idx, 9, 1).unwrap();
         }
-        log.record_run_sealed(run_id, seal).unwrap();
+        log.record_run_sealed(run_id, seal, 10).unwrap();
         log.seal_receipt().digest()
     }
 
@@ -347,7 +358,7 @@ fn deterministic_trace_receipt_binds_each_mutation_dimension() {
     let mutations = [
         digest(56, 0, 7, None, 0b1),     // run identity
         digest(55, 1, 7, None, 0b1),     // operation identity
-        digest(55, 0, 8, None, 0b1),     // operation kind
+        digest(55, 0, 8, None, 0b1),     // operation start time
         digest(55, 0, 7, Some(1), 0b11), // event count and ordered content
         digest(55, 0, 7, None, 0b11),    // declared seal trace only
     ];
@@ -408,7 +419,7 @@ fn jtbd_04_refuse_hostile_candidate_array_index_react_key() {
 
     // Route conformance check through chicago-tdd-tools
     let collector = OcelCollector::new(None);
-    emit_conformance(
+    emit_summary(
         &collector,
         "jtbd-04-refusal",
         Severity::Info,
@@ -495,7 +506,7 @@ fn jtbd_05_selection_stability_with_dwell() {
 
     // Route through chicago-tdd-tools
     let collector = OcelCollector::new(None);
-    emit_conformance(
+    emit_summary(
         &collector,
         "jtbd-05-stability",
         Severity::Info,
@@ -577,13 +588,13 @@ fn jtbd_06_end_to_end_complete_transcript_with_selections() {
     for (i, &candidate_idx) in expected_selections.iter().enumerate() {
         // Record each selection as an operation firing
         ocel_log
-            .record_op_fired(run_id, candidate_idx as u32, i as u8)
+            .record_op_fired(run_id, candidate_idx as u32, i as u32, 1)
             .expect("record_op_fired must succeed");
     }
 
     // Seal the run with the full op_trace
     ocel_log
-        .record_run_sealed(run_id, op_trace)
+        .record_run_sealed(run_id, op_trace, 1)
         .expect("record_run_sealed must succeed");
 
     // Verify conformance (requires a tape; use a simple linear tape for this test)
@@ -605,7 +616,7 @@ fn jtbd_06_end_to_end_complete_transcript_with_selections() {
 
     // Route complete transcript through chicago-tdd-tools
     let collector = OcelCollector::new(None);
-    emit_conformance(
+    emit_summary(
         &collector,
         "jtbd-06-complete",
         Severity::Info,
@@ -628,7 +639,7 @@ fn jtbd_06_end_to_end_complete_transcript_with_selections() {
 
     // Verify determinism: same transcript → same receipt
     let collector2 = OcelCollector::new(None);
-    emit_conformance(
+    emit_summary(
         &collector2,
         "jtbd-06-complete",
         Severity::Info,

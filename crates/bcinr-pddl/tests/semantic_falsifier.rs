@@ -1,35 +1,17 @@
 use bcinr_pddl::{domain_from_pddl, problem_from_pddl, GroundProblem};
 
-// BLOCKED, pre-existing, unrelated to the Phase 2 PlannerOutcome/capability
-// refactor: `crate::parse::problem_from_pddl` (STRIPS-level `Pddl8Problem`
-// parser, src/parse.rs:141) hardcodes `preferences: vec![]` — it never
-// parses `(:constraints ...)` blocks at all, for either the STRIPS
-// (`problem_from_pddl`) or full PDDL 3.1 (`problem31_from_pddl`,
-// src/parse.rs:294 — same hardcoded empty vec) pipeline. Since
-// `GroundProblem::build` derives `self.constraints` exclusively from
-// `problem.preferences`, trajectory constraints declared via `:constraints`
-// are silently never checked by either grounder today, regardless of this
-// phase's changes. Separately, `test_numeric_cost` (below) hits a second,
-// independent gap: `Pddl8ActionSchema.preconditions: Vec<Pddl8Atom>`
-// (wasm4pm-compat) cannot represent a numeric comparison at all, so
-// `lower_precond_defs`/`collect_gd` (src/parse.rs) silently drops a
-// non-durative `:action`'s numeric precondition rather than rejecting it —
-// action `a`'s `(>= (cost) 10)` precondition never reaches
-// `Pddl8ActionSchema`, so it is always considered satisfied by the classical
-// BFS grounder. Both are real, silently-wrong parser gaps, not
-// PlannerOutcome/quantifier issues — fixing either means writing new
-// `:constraints`-block lowering / rejecting unrepresentable numeric
-// preconditions in `parse.rs`, which is out of this phase's scope (capability
-// admission, semantic cache, q-lens portfolio, causal/concurrency analyzers)
-// and risks large out-of-scope parser changes under this phase's time box.
-// Left `#[ignore]`d rather than silently deleted or left failing
-// uninvestigated, so `cargo test -p bcinr-pddl` is green while this gap stays
-// visible (`cargo test -- --ignored` still runs it and still fails).
-#[ignore = "BLOCKED: problem_from_pddl/problem31_from_pddl hardcode preferences: vec![] \
-             (parse.rs:141,294) — :constraints is never parsed, and \
-             Pddl8ActionSchema.preconditions can't represent numeric comparisons at all, \
-             so this domain's numeric precondition is silently dropped, not enforced. \
-             Pre-existing gap in parse.rs, unrelated to Phase 2's PlannerOutcome/capability work."]
+// BLOCKED: `Pddl8ActionSchema.preconditions: Vec<Pddl8Atom>` (wasm4pm-compat)
+// cannot represent a numeric comparison at all, so `lower_precond_defs` /
+// `collect_gd` silently drop action `a`'s `(>= (cost) 10)` rather than
+// rejecting it -- the legacy classical grounder therefore treats it as always
+// satisfied. This is the legacy rail only: `ground_v2` carries the full
+// `PddlCondition` and evaluates numeric comparisons.
+//
+// Left ignored rather than deleted so the gap stays visible; `cargo test --
+// --ignored` runs it and it still fails.
+#[ignore = "BLOCKED (legacy rail only): Pddl8ActionSchema.preconditions is Vec<Pddl8Atom> and \
+             cannot represent a numeric comparison, so GroundProblem silently drops \
+             (>= (cost) 10) instead of enforcing it. ground_v2 evaluates it correctly."]
 #[test]
 fn test_numeric_cost() {
     let domain = domain_from_pddl("(define (domain d) (:requirements :numeric-fluents) (:predicates (p)) (:functions (cost)) (:action a :parameters () :precondition (>= (cost) 10) :effect (p)))").unwrap();
@@ -73,15 +55,6 @@ fn test_derived_predicates() {
     );
 }
 
-// BLOCKED, pre-existing, unrelated to the Phase 2 refactor — see the doc
-// comment on `test_numeric_cost` above: `problem_from_pddl` never parses
-// `(:constraints ...)` into `problem.preferences` (parse.rs:141), so
-// `GroundProblem::build`'s `self.constraints` is always empty and this
-// domain's `(always (not (p)))` constraint is never checked.
-#[ignore = "BLOCKED: problem_from_pddl hardcodes preferences: vec![] (parse.rs:141) — \
-             :constraints is never parsed, so GroundProblem::build's self.constraints is \
-             always empty and this test's 'always not p' constraint is never enforced. \
-             Pre-existing gap in parse.rs, unrelated to Phase 2's PlannerOutcome/capability work."]
 #[test]
 fn test_trajectory_constraints() {
     let domain = domain_from_pddl("(define (domain d) (:requirements :constraints) (:predicates (p) (q)) (:action do-p :parameters () :precondition () :effect (p)) (:action do-q :parameters () :precondition (p) :effect (q)))").unwrap();

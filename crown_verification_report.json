@@ -1,10 +1,10 @@
 {
   "phase": 7,
   "name": "Crown Verification Report",
-  "generated": "2026-07-27T21:28:57.790800-07:00",
+  "generated": "2026-07-27T22:01:04.268120-07:00",
   "version": "26.7.26",
   "repository": "bcinr",
-  "source_revision": "cf65dcd59d1b6549ddcef6b3adbe69e125d3aa34",
+  "source_revision": "f8c7744058dbb6d822a0bab85d4454f1c35d0701",
   "capability_matrix": {
     "phase_1_unit": "ALIVE",
     "phase_2_integration": "ALIVE",
