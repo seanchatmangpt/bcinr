@@ -32,8 +32,14 @@ jobs:
         run: cargo check --workspace --all-features
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-      - name: CMCA all-features baseline
-        run: cargo test -p bcinr-cmca --all-features
+      # `--features std`, NOT `--all-features`: bcinr-cmca's feature list is
+      # alloc, std, and mutant_1..mutant_11 -- the latter are deliberate
+      # compile-time sabotage switches meant to be enabled ONE AT A TIME (see
+      # the hostile-mutant step below). `--all-features` arms all eleven at once
+      # and fails 4 lib tests by design. `std` implies `alloc`, so this is full
+      # non-mutant coverage, which is what "baseline" meant.
+      - name: CMCA non-mutant baseline
+        run: cargo test -p bcinr-cmca --features std
       - name: CMCA calibration
         run: cargo test -p bcinr-cmca --test calibration
       - name: CMCA differential

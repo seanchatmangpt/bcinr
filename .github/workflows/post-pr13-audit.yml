@@ -91,7 +91,7 @@ jobs:
                   run: cargo clippy --workspace --all-targets --all-features -- -D warnings
                 - name: CMCA focused tests
                   run: |
-                    cargo test -p bcinr-cmca --all-features
+                    cargo test -p bcinr-cmca --features std
                     cargo test -p bcinr-cmca --test calibration
                     cargo test -p bcinr-cmca --test differential
                     cargo test -p bcinr-cmca --test hostile_mutants
@@ -301,7 +301,7 @@ jobs:
           run_required 'cargo fmt --all -- --check' cargo fmt --all -- --check
           run_required 'cargo check --workspace --all-features' cargo check --workspace --all-features
           run_required 'cargo clippy --workspace --all-targets --all-features -- -D warnings' cargo clippy --workspace --all-targets --all-features -- -D warnings
-          run_required 'cargo test -p bcinr-cmca --all-features' cargo test -p bcinr-cmca --all-features
+          run_required 'cargo test -p bcinr-cmca --features std' cargo test -p bcinr-cmca --features std
           run_required 'cargo test -p bcinr-cmca --test calibration' cargo test -p bcinr-cmca --test calibration
           run_required 'cargo test -p bcinr-cmca --test differential' cargo test -p bcinr-cmca --test differential
           run_required 'cargo test -p bcinr-cmca --test hostile_mutants' cargo test -p bcinr-cmca --test hostile_mutants

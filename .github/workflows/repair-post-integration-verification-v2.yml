@@ -62,7 +62,7 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - name: CMCA all-features baseline
-        run: cargo test -p bcinr-cmca --all-features
+        run: cargo test -p bcinr-cmca --features std
       - name: CMCA calibration
         run: cargo test -p bcinr-cmca --test calibration
       - name: CMCA differential
