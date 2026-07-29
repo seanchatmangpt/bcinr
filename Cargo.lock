@@ -138,6 +138,7 @@ dependencies = [
 name = "bcinr-pddl"
 version = "26.7.28"
 dependencies = [
+ "bcinr-cmca",
  "bcinr-mfw-ir",
  "bcinr-powl",
  "bcinr-powl-receipt",

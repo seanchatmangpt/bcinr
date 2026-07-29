@@ -5,7 +5,7 @@
 //! replays the same deterministic stable-maximal scheduler against the same
 //! concurrency guards and compares every committed field.
 
-use bcinr_powl::scheduler::StableMaximalSelector;
+use bcinr_powl::scheduler::{ConcurrencySelector, StableMaximalSelector};
 use bcinr_powl::scheduler_v2::{scheduler_tick_v2, PowlV2RunState, PowlV2TickOutcome};
 use bcinr_powl::tape::v2::{ConcurrencyGuardTable, PowlTape};
 use serde::{Deserialize, Serialize};
@@ -97,20 +97,48 @@ impl std::fmt::Display for PowlV2ReceiptError {
 
 impl std::error::Error for PowlV2ReceiptError {}
 
-/// Execute a compiled POWL v2 tape and seal a whole-run receipt.
+/// Execute a compiled POWL v2 tape and seal a whole-run receipt, using the
+/// default deterministic [`StableMaximalSelector`].
+///
+/// Delegates to [`execute_and_seal_v2_with_selector`] -- see that function
+/// for a version parameterized over [`ConcurrencySelector`] (e.g.
+/// `PriorityCapacitySelector` from BCINR-CMCA-E, or `CapacityBoundedSelector`
+/// from BCINR-SCHED-002). This wrapper exists so every pre-existing call
+/// site keeps its exact prior behavior unchanged.
 pub fn execute_and_seal_v2(
     tape: &PowlTape,
+    guards: &ConcurrencyGuardTable,
+    max_ticks: u32,
+) -> Result<PowlV2ExecutionReceipt, PowlV2ReceiptError> {
+    let mut selector = StableMaximalSelector;
+    execute_and_seal_v2_with_selector(tape, &mut selector, guards, max_ticks)
+}
+
+/// Execute a compiled POWL v2 tape and seal a whole-run receipt, using a
+/// caller-supplied [`ConcurrencySelector`].
+///
+/// # BCINR-CMCA-F: production-reachability boundary
+///
+/// This is the entry point that lets a non-default selector (e.g. a real
+/// CMCA-priority-ordered `PriorityCapacitySelector`) actually seal a receipt
+/// -- `execute_and_seal_v2` alone hard-codes `StableMaximalSelector` and
+/// cannot be handed a different one. `verify_execution_v2_with_selector`
+/// must be given the *same* selector type/state to replay correctly; mixing
+/// selectors between seal and verify will produce a genuine
+/// `FiredTraceMismatch`, since fired-mask order is selector-dependent.
+pub fn execute_and_seal_v2_with_selector<S: ConcurrencySelector>(
+    tape: &PowlTape,
+    selector: &mut S,
     guards: &ConcurrencyGuardTable,
     max_ticks: u32,
 ) -> Result<PowlV2ExecutionReceipt, PowlV2ReceiptError> {
     let tape_root = digest_tape(tape);
     let guard_root = digest_guards(guards);
     let mut state = PowlV2RunState::new();
-    let mut selector = StableMaximalSelector;
     let mut fired_masks = Vec::new();
 
     for _ in 0..max_ticks {
-        match scheduler_tick_v2(tape, &mut state, &mut selector, guards) {
+        match scheduler_tick_v2(tape, &mut state, selector, guards) {
             PowlV2TickOutcome::Fired(mask) => fired_masks.push(mask),
             PowlV2TickOutcome::Complete => break,
             PowlV2TickOutcome::Deadlock { remaining_mask } => {
@@ -150,10 +178,30 @@ pub fn execute_and_seal_v2(
     })
 }
 
-/// Replay and verify every field of a POWL v2 execution receipt.
+/// Replay and verify every field of a POWL v2 execution receipt, using the
+/// default deterministic [`StableMaximalSelector`].
+///
+/// Delegates to [`verify_execution_v2_with_selector`] -- see that function,
+/// and [`execute_and_seal_v2_with_selector`]'s doc comment, for verifying a
+/// receipt sealed with a non-default selector.
 pub fn verify_execution_v2(
     receipt: &PowlV2ExecutionReceipt,
     tape: &PowlTape,
+    guards: &ConcurrencyGuardTable,
+    max_ticks: u32,
+) -> Result<(), PowlV2ReceiptError> {
+    let mut selector = StableMaximalSelector;
+    verify_execution_v2_with_selector(receipt, tape, &mut selector, guards, max_ticks)
+}
+
+/// Replay and verify every field of a POWL v2 execution receipt, using a
+/// caller-supplied [`ConcurrencySelector`]. Must be the same selector
+/// type/construction used to seal `receipt`, or replay will produce a
+/// genuine `FiredTraceMismatch` (fired-mask order is selector-dependent).
+pub fn verify_execution_v2_with_selector<S: ConcurrencySelector>(
+    receipt: &PowlV2ExecutionReceipt,
+    tape: &PowlTape,
+    selector: &mut S,
     guards: &ConcurrencyGuardTable,
     max_ticks: u32,
 ) -> Result<(), PowlV2ReceiptError> {
@@ -162,7 +210,7 @@ pub fn verify_execution_v2(
             found: receipt.version,
         });
     }
-    let replay = execute_and_seal_v2(tape, guards, max_ticks)?;
+    let replay = execute_and_seal_v2_with_selector(tape, selector, guards, max_ticks)?;
     if replay.tape_root != receipt.tape_root {
         return Err(PowlV2ReceiptError::TapeRootMismatch);
     }

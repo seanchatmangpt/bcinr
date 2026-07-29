@@ -16,8 +16,10 @@ use std::collections::BTreeSet;
 
 use bcinr_mfw_ir::{EpochBounds, PlannerFailure, PowlNodeId, UnsupportedFeature};
 use bcinr_powl::compiler::v2::{compile_powl_v2, CompileErrorV2, CompiledPowlV2};
+use bcinr_powl::scheduler::ConcurrencySelector;
 use bcinr_powl_receipt::execution_v2::{
-    execute_and_seal_v2, verify_execution_v2, PowlV2ExecutionReceipt, PowlV2ReceiptError,
+    execute_and_seal_v2, execute_and_seal_v2_with_selector, verify_execution_v2,
+    verify_execution_v2_with_selector, PowlV2ExecutionReceipt, PowlV2ReceiptError,
 };
 use wasm4pm_compat::pddl::{Pddl8GroundAction, Pddl8GroundAtom};
 
@@ -204,6 +206,48 @@ impl PddlPowlPlan {
         verify_execution_v2(
             &powl_receipt,
             &self.compiled.tape,
+            &self.compiled.guards,
+            self.max_execution_ticks,
+        )?;
+
+        let (final_state, state_receipt) = replay_pddl_trace(&self.workflow, &powl_receipt)?;
+
+        Ok(PddlPowlExecution {
+            workflow: self.workflow,
+            compiled: self.compiled,
+            powl_receipt,
+            state_receipt,
+            final_state,
+            max_execution_ticks: self.max_execution_ticks,
+        })
+    }
+
+    /// Execute using a caller-supplied [`ConcurrencySelector`] instead of
+    /// the default [`bcinr_powl::scheduler::StableMaximalSelector`] --
+    /// BCINR-CMCA-F's production-reachability boundary. `seal_selector` and
+    /// `verify_selector` must be equivalent constructions of the same
+    /// selector type (e.g. two `PriorityCapacitySelector`s built from the
+    /// same `capacity`/`priority`) -- sealing and verifying with genuinely
+    /// different selectors produces a real `FiredTraceMismatch`, since
+    /// fired-mask order is selector-dependent.
+    ///
+    /// This does not change [`Self::execute`]'s behavior or any existing
+    /// caller of it; it is a new, opt-in method.
+    pub fn execute_with_selector<S: ConcurrencySelector>(
+        self,
+        seal_selector: &mut S,
+        verify_selector: &mut S,
+    ) -> Result<PddlPowlExecution, PddlPowlError> {
+        let powl_receipt = execute_and_seal_v2_with_selector(
+            &self.compiled.tape,
+            seal_selector,
+            &self.compiled.guards,
+            self.max_execution_ticks,
+        )?;
+        verify_execution_v2_with_selector(
+            &powl_receipt,
+            &self.compiled.tape,
+            verify_selector,
             &self.compiled.guards,
             self.max_execution_ticks,
         )?;

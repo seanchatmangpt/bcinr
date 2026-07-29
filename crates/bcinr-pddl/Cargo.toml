@@ -34,6 +34,7 @@ dhat-heap = []
 mfw-planner = ["dep:bcinr-powl", "dep:bcinr-powl-receipt"]
 
 [dev-dependencies]
+bcinr-cmca = { version = "26.7.28", path = "../bcinr-cmca", features = ["alloc"] }
 chicago-tdd-tools = { version = "26.7.1", features = ["ocel-generation"] }
 divan = "0.1.21"
 proptest = "1"
