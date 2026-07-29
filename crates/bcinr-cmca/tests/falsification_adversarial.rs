@@ -334,7 +334,7 @@ fn falsify_stability_envelope_eigenvalue_bound() {
 // (Renamed from the original "certificate/BLAKE3 chain" framing: this
 // crate does not claim BLAKE3 or cryptographic collision resistance for
 // its own gates — see `src/proposal.rs`'s doc comment on `mix64`. Real
-// BLAKE3 receipts belong to `bcinr-powl-receipt`/OCEL, covered separately
+// BLAKE3 receipts belong to `bcinr-powl (receipt module)`/OCEL, covered separately
 // in `bcinr-powl/tests/usecase_compliance_audit.rs`. What this gate
 // genuinely offers is a documented failure-priority order and refusal of
 // no-op proposals — both tested here against the actual returned flag.)

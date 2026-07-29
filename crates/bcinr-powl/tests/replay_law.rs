@@ -4,14 +4,14 @@
 //! If the code says it worked but the event log cannot prove a lawful process
 //! happened, then it did not work.
 
-use bcinr_powl_receipt::causal_receipt::OcelCausalReceipt;
-use bcinr_powl_receipt::conformance::{
+use bcinr_powl::receipt::causal_receipt::OcelCausalReceipt;
+use bcinr_powl::receipt::conformance::{
     ConformanceDimension, ConformanceMetrics, ConformancePredicate,
 };
-use bcinr_powl_receipt::denial::DenialPolarity;
-use bcinr_powl_receipt::ocel_emit::OcelEmitArena;
-use bcinr_powl_receipt::pm_bridge::frames_to_ocel2_json;
-use bcinr_powl_receipt::replay::{PowlReplayFrame, PowlReplayVerifier, ReplayViolation};
+use bcinr_powl::receipt::denial::DenialPolarity;
+use bcinr_powl::receipt::ocel_emit::OcelEmitArena;
+use bcinr_powl::receipt::pm_bridge::frames_to_ocel2_json;
+use bcinr_powl::receipt::replay::{PowlReplayFrame, PowlReplayVerifier, ReplayViolation};
 
 // ── Helper ─────────────────────────────────────────────────────────────────────
 

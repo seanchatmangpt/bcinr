@@ -16,7 +16,7 @@
 //! implementation site, while this crate only ever talks about the witness
 //! types that attest the projection was semantics-preserving. As the
 //! ground truth notes, this witness — "a PDDL-to-POWL projection preserved
-//! source semantics" — is genuinely new territory: `bcinr-powl-receipt`'s
+//! source semantics" — is genuinely new territory: `bcinr-powl (receipt module)`'s
 //! existing `OcelCausalReceipt`/`PowlReplayFrame` attest to
 //! execution/replay conformance of an *already-compiled* tape, not to the
 //! compilation step itself.

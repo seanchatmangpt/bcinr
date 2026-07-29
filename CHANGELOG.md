@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed — BREAKING
+
+- **`bcinr-powl-receipt` has been folded into `bcinr-powl` and no longer exists
+  as a crate.** Its twelve modules are now `bcinr_powl::receipt::*`.
+
+  Migration is a path rewrite — no API changed:
+
+  ```diff
+  - use bcinr_powl_receipt::execution_v2::{execute_and_seal_v2, verify_execution_v2};
+  + use bcinr_powl::receipt::execution_v2::{execute_and_seal_v2, verify_execution_v2};
+  ```
+
+  ```diff
+  # Cargo.toml
+  - bcinr-powl-receipt = "26.7.28"
+  - bcinr-powl = "26.7.28"
+  + bcinr-powl = "26.7.29"
+  ```
+
+  `bcinr-powl-receipt` `26.7.28` remains on crates.io and is not yanked, but it
+  is the final release; it will not be updated.
+
+  Rationale: the crate only ever depended on `bcinr-powl` (never the reverse), so
+  it was a subsystem rather than an independent surface — `bcinr_powl::receipt_worker`
+  already implemented the same admissibility-before-sealing rule on the hot path.
+  It was also the workspace's last Criterion benchmark; its bench is now Divan,
+  matching every other crate.
+
+### Changed
+
+- `bcinr-powl` now depends on `serde` and `serde_json` unconditionally. They were
+  optional behind its `std` feature, which the folded-in `receipt` module needs
+  unconditionally; `bcinr-powl` links `std` regardless, so the gate bought nothing.
+  `std` still gates the wasm4pm-compat OCEL conversion, JSON output, and
+  `typestate` time/entropy seeding.
+
+Note: `release/v26.7.24.toml` and `scripts/verify-pddl-powl-v26.7.24.sh` still
+reference `bcinr-powl-receipt`. They are version-pinned records of a shipped
+release and are deliberately left as-is rather than rewritten.
+
 ## [26.7.28] - 2026-07-28
 
 ### Published

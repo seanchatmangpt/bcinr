@@ -141,7 +141,6 @@ dependencies = [
  "bcinr-cmca",
  "bcinr-mfw-ir",
  "bcinr-powl",
- "bcinr-powl-receipt",
  "blake3",
  "chicago-tdd-tools",
  "chrono",
@@ -169,19 +168,6 @@ dependencies = [
  "serde_json",
  "trybuild",
  "wasm4pm-compat",
-]
-
-[[package]]
-name = "bcinr-powl-receipt"
-version = "26.7.28"
-dependencies = [
- "bcinr-logic",
- "bcinr-mfw-ir",
- "bcinr-powl",
- "blake3",
- "criterion",
- "serde",
- "serde_json",
 ]
 
 [[package]]

@@ -43,7 +43,7 @@
 //! # Examples
 //!
 //! ```
-//! use bcinr_powl_receipt::replay::{PowlReplayVerifier, PowlReplayFrame};
+//! use bcinr_powl::receipt::replay::{PowlReplayVerifier, PowlReplayFrame};
 //!
 //! // Define a simple replay frame representing the first event
 //! let frame = PowlReplayFrame {
@@ -67,13 +67,13 @@
 //! assert_eq!(metrics.fitness, 0x0001_0000); // 1.0
 //! ```
 
-use crate::conformance::ConformanceMetrics;
+use crate::receipt::conformance::ConformanceMetrics;
 
 /// High-level replay descriptor for one POWL node firing.
 ///
 /// This struct holds the token-flow semantics of a single event in the process log
 /// and is used by [`PowlReplayVerifier`] to progress the replay. It is distinct from
-/// [`crate::causal_receipt::OcelCausalFrame`], which is the binary-packed structure
+/// [`crate::receipt::causal_receipt::OcelCausalFrame`], which is the binary-packed structure
 /// used for cryptographic chaining.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PowlReplayFrame {
@@ -137,7 +137,7 @@ impl PowlReplayVerifier {
     /// # Examples
     ///
     /// ```
-    /// use bcinr_powl_receipt::replay::PowlReplayVerifier;
+    /// use bcinr_powl::receipt::replay::PowlReplayVerifier;
     ///
     /// let verifier = PowlReplayVerifier::new(0x1);
     /// ```
@@ -165,7 +165,7 @@ impl PowlReplayVerifier {
     /// # Examples
     ///
     /// ```
-    /// use bcinr_powl_receipt::replay::{PowlReplayVerifier, PowlReplayFrame};
+    /// use bcinr_powl::receipt::replay::{PowlReplayVerifier, PowlReplayFrame};
     ///
     /// let mut verifier = PowlReplayVerifier::new(0x1);
     /// let frame = PowlReplayFrame {
@@ -217,7 +217,7 @@ impl PowlReplayVerifier {
     /// # Examples
     ///
     /// ```
-    /// use bcinr_powl_receipt::replay::PowlReplayVerifier;
+    /// use bcinr_powl::receipt::replay::PowlReplayVerifier;
     ///
     /// let verifier = PowlReplayVerifier::new(0x1);
     /// let metrics = verifier.finalize();
@@ -242,7 +242,7 @@ impl PowlReplayVerifier {
         let gen_frac = fixed_div(gen_num, gen_den);
 
         // Branchless clamp to [0, 1.0] using mask_ge
-        let is_valid_frac = crate::conformance::mask_ge(0x0001_0000, gen_frac);
+        let is_valid_frac = crate::receipt::conformance::mask_ge(0x0001_0000, gen_frac);
         let gen_frac_clamped = (is_valid_frac & gen_frac) | (!is_valid_frac & 0x0001_0000);
         let generalization = 0x0001_0000 - gen_frac_clamped;
 
@@ -309,7 +309,7 @@ mod tests {
 
     #[test]
     fn strict_predicate_passes_on_a_perfect_trace_due_to_real_dimensions() {
-        use crate::conformance::ConformancePredicate;
+        use crate::receipt::conformance::ConformancePredicate;
 
         let mut v = PowlReplayVerifier::new(0x1);
         assert!(v.replay_frame(&f(0, 0x1, 0x1, 0x0)).is_ok());

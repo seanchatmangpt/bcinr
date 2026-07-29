@@ -2,9 +2,9 @@
 
 ## 1. Executive Summary
 
-This proposal introduces the **Zero-Allocation Branchless Process Replay Validator (ZA-BPRV)**, a constant-time, branch-free, and allocation-free trace replay engine designed for Partially Ordered Workflow Language (POWL) process conformance validation in `crates/bcinr-powl-receipt`.
+This proposal introduces the **Zero-Allocation Branchless Process Replay Validator (ZA-BPRV)**, a constant-time, branch-free, and allocation-free trace replay engine designed for Partially Ordered Workflow Language (POWL) process conformance validation in `crates/bcinr-powl` (`receipt` module).
 
-Currently, the process trace replay verifier (`crates/bcinr-powl-receipt/src/replay.rs`) violates the strict **BCINR Radon Law** ($CC=1$, zero alloc, no branching) on multiple fronts:
+Currently, the process trace replay verifier (`crates/bcinr-powl/src/receipt/replay.rs`) violates the strict **BCINR Radon Law** ($CC=1$, zero alloc, no branching) on multiple fronts:
 1. **Heap-Allocated Inputs**: The `PowlReplayFrame` structure carries heap-allocated `String` and `Vec<String>` fields for event activity labels and object links, which violates the `#![no_std]` zero-heap-allocation mandate on the hot-path execution.
 2. **Data-Dependent Branching on Errors**: Verification gates inside `replay_frame` exit early upon encountering invalid transitions or unknown nodes. These conditional early returns introduce data-dependent execution latency, exposing the engine to timing side-channel exploits.
 3. **Speculative Mutations**: Standard early-return patterns mutate or abort execution flow mid-step, violating the transaction law (Section 10 of `AGENTS.md`) which dictates that states must only advance via clean, masked commits.
@@ -19,7 +19,7 @@ ZA-BPRV solves these violations by:
 ## 2. Problem Statement & Current Limitations
 
 ### 2.1 Heap Allocations in the Replay Hot Path
-The current implementation of `PowlReplayFrame` in `crates/bcinr-powl-receipt/src/replay.rs` is defined as:
+The current implementation of `PowlReplayFrame` in `crates/bcinr-powl/src/receipt/replay.rs` is defined as:
 ```rust
 pub struct PowlReplayFrame {
     pub node_id: u32,

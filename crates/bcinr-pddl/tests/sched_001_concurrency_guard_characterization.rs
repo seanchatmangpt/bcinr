@@ -44,8 +44,8 @@
 #![cfg(feature = "mfw-planner")]
 
 use bcinr_pddl::production::execute_pddl_to_powl;
+use bcinr_powl::receipt::execution_v2::execute_and_seal_v2;
 use bcinr_powl::tape::v2::ConcurrencyGuardTable;
-use bcinr_powl_receipt::execution_v2::execute_and_seal_v2;
 
 /// Two actions, both applicable from the empty initial state (so both
 /// become scheduler-ready in the same tick), forced into the same minimal

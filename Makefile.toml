@@ -17,7 +17,7 @@ description = "Verify workspace compiles"
 # member directory instead -- and per cargo-make's own member-descent
 # semantics, that re-invocation does NOT reuse this task's `args`; members
 # with no local Makefile.toml (every MFW retrofit crate: bcinr-mfw-ir,
-# bcinr-pddl, bcinr-powl, bcinr-powl-receipt, bcinr-mcp, plus bcinr,
+# bcinr-pddl, bcinr-powl, bcinr-mcp, plus bcinr,
 # bcinr-core, bcinr-api, bcinr-logic, and every tool under tools/) instead
 # silently fall back to a bare `cargo check` with none of
 # `--workspace`/`--all-targets`/`--all-features` -- confirmed live via
@@ -212,7 +212,7 @@ description = "Run clippy with strict pedantic lints (+ anti-LLM stub scan)"
 # request, and halted at the very first member with pre-existing lint debt
 # (bcinr-logic, pulled in as a dependency of every MFW crate) -- meaning
 # clippy was never actually run against bcinr-mfw-ir, bcinr-pddl,
-# bcinr-powl, bcinr-powl-receipt, or bcinr-mcp in this invocation either.
+# bcinr-powl or bcinr-mcp in this invocation either.
 workspace = false
 dependencies = ["lint-anti-llm"]
 command = "cargo"

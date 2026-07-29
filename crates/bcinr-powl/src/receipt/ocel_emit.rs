@@ -1,12 +1,12 @@
-//! ocel_emit — bump-allocation arena for [`crate::causal_receipt::OcelCausalFrame`]s.
+//! ocel_emit — bump-allocation arena for [`crate::receipt::causal_receipt::OcelCausalFrame`]s.
 //!
 //! `OcelEmitArena` owns a heap-allocated array of 4096 frames and fills them
 //! sequentially.  Each `emit` call writes one frame and returns a reference to
 //! it so the caller can immediately hand it to
-//! [`crate::causal_receipt::OcelCausalReceipt::chain`].
+//! [`crate::receipt::causal_receipt::OcelCausalReceipt::chain`].
 
-use crate::causal_receipt::{OcelCausalFrame, PackedObjRef};
-use crate::denial::DenialPolarity;
+use crate::receipt::causal_receipt::{OcelCausalFrame, PackedObjRef};
+use crate::receipt::denial::DenialPolarity;
 
 /// Fixed capacity of the arena in frames.
 const ARENA_CAPACITY: usize = 4096;
@@ -40,7 +40,7 @@ impl OcelEmitArena {
     /// # Parameters
     ///
     /// - `instruction_id` — monotonic step identity
-    /// - `activity_idx`   — index into an [`crate::intern::ActivityTable`]
+    /// - `activity_idx`   — index into an [`crate::receipt::intern::ActivityTable`]
     /// - `obj_refs`       — up to 8 `(type_idx, object_id)` pairs; excess
     ///   entries are silently truncated to 8
     /// - `denial`         — denial polarity for this step
@@ -126,7 +126,7 @@ impl Default for OcelEmitArena {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::causal_receipt::OcelCausalReceipt;
+    use crate::receipt::causal_receipt::OcelCausalReceipt;
 
     #[test]
     fn emit_basic() {

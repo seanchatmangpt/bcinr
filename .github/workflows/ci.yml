@@ -51,7 +51,7 @@ jobs:
       - name: POWL scheduler v2
         run: cargo test -p bcinr-powl --all-features scheduler_v2
       - name: POWL receipt execution v2
-        run: cargo test -p bcinr-powl-receipt --all-features execution_v2
+        run: cargo test -p bcinr-powl --all-features receipt::execution_v2
       - name: Locked dependency graph
         run: cargo metadata --locked --format-version 1 --no-deps > /dev/null
 

@@ -90,11 +90,11 @@ Gate G4 implements the Mutant Kill Protocol: inject controlled mutations into PD
 | Aspect | Details |
 |--------|---------|
 | **Description** | Scheduler fires wrong action (XOR bit flip in firing mask) |
-| **Injection Point** | `crates/bcinr-powl-receipt/src/execution_v2.rs::execute_and_seal_v2()` |
+| **Injection Point** | `crates/bcinr-powl/src/receipt/execution_v2.rs::execute_and_seal_v2()` |
 | **Mutation** | `fired_masks[0] ^= 1` (flip first bit of first tick's mask) |
 | **Oracle** | `verify_execution_v2()` + receipt validation |
 | **Expected Failure** | `FiredTraceMismatch` — re-execution produces different mask |
-| **Test File** | `crates/bcinr-powl-receipt/tests/mutant_kill_g4_powl.rs::mutant_1_wrong_firing_mask_is_killed` |
+| **Test File** | `crates/bcinr-powl/tests/mutant_kill_g4_powl.rs::mutant_1_wrong_firing_mask_is_killed` |
 | **Result** | ✓ KILLED — Oracle detects firing trace deviation |
 | **Verdict** | ALIVE |
 
@@ -103,11 +103,11 @@ Gate G4 implements the Mutant Kill Protocol: inject controlled mutations into PD
 | Aspect | Details |
 |--------|---------|
 | **Description** | Actions execute in wrong order; preconditions broken |
-| **Injection Point** | `crates/bcinr-powl-receipt/src/execution_v2.rs` |
+| **Injection Point** | `crates/bcinr-powl/src/receipt/execution_v2.rs` |
 | **Mutation** | `fired_masks.swap(0, 1)` (swap execution order of first two ticks) |
 | **Oracle** | Receipt replay detects mask sequence mismatch |
 | **Expected Failure** | `FiredTraceMismatch` — scheduler produces different tick sequence |
-| **Test File** | `crates/bcinr-powl-receipt/tests/mutant_kill_g4_powl.rs::mutant_2_action_order_wrong_is_killed` |
+| **Test File** | `crates/bcinr-powl/tests/mutant_kill_g4_powl.rs::mutant_2_action_order_wrong_is_killed` |
 | **Result** | ✓ KILLED — Deterministic replay catches reordering |
 | **Verdict** | ALIVE |
 
@@ -116,11 +116,11 @@ Gate G4 implements the Mutant Kill Protocol: inject controlled mutations into PD
 | Aspect | Details |
 |--------|---------|
 | **Description** | BLAKE3 chain root corrupted during receipt generation |
-| **Injection Point** | `crates/bcinr-powl-receipt/src/execution_v2.rs::execute_and_seal_v2()` |
+| **Injection Point** | `crates/bcinr-powl/src/receipt/execution_v2.rs::execute_and_seal_v2()` |
 | **Mutation** | `receipt.chain_root.push('X')` (corrupt BLAKE3 digest) |
 | **Oracle** | `verify_execution_v2()` checks chain root against recomputed hash |
 | **Expected Failure** | `ChainRootMismatch` — receipt signature invalid |
-| **Test File** | `crates/bcinr-powl-receipt/tests/mutant_kill_g4_powl.rs::mutant_3_chain_root_corruption_is_killed` |
+| **Test File** | `crates/bcinr-powl/tests/mutant_kill_g4_powl.rs::mutant_3_chain_root_corruption_is_killed` |
 | **Result** | ✓ KILLED — Cryptographic verification catches tampering |
 | **Verdict** | ALIVE |
 
@@ -129,11 +129,11 @@ Gate G4 implements the Mutant Kill Protocol: inject controlled mutations into PD
 | Aspect | Details |
 |--------|---------|
 | **Description** | POWL tape root (structural hash) corrupted |
-| **Injection Point** | `crates/bcinr-powl-receipt/src/execution_v2.rs::verify_execution_v2()` |
+| **Injection Point** | `crates/bcinr-powl/src/receipt/execution_v2.rs::verify_execution_v2()` |
 | **Mutation** | `receipt.tape_root.push('!')` (corrupt tape digest) |
 | **Oracle** | Receipt verification recomputes tape hash |
 | **Expected Failure** | `TapeRootMismatch` — structure identity broken |
-| **Test File** | `crates/bcinr-powl-receipt/tests/mutant_kill_g4_powl.rs::mutant_1b_tape_root_mutation_is_killed` |
+| **Test File** | `crates/bcinr-powl/tests/mutant_kill_g4_powl.rs::mutant_1b_tape_root_mutation_is_killed` |
 | **Result** | ✓ KILLED — Structural hash verification catches mutation |
 | **Verdict** | ALIVE |
 
@@ -142,11 +142,11 @@ Gate G4 implements the Mutant Kill Protocol: inject controlled mutations into PD
 | Aspect | Details |
 |--------|---------|
 | **Description** | Final done mask (completion state) corrupted |
-| **Injection Point** | `crates/bcinr-powl-receipt/src/execution_v2.rs` |
+| **Injection Point** | `crates/bcinr-powl/src/receipt/execution_v2.rs` |
 | **Mutation** | `receipt.final_done_mask ^= 1` (flip one action's completion bit) |
 | **Oracle** | Receipt replay compares final done mask with recomputed |
 | **Expected Failure** | `FinalStateMismatch` — workflow termination diverges |
-| **Test File** | `crates/bcinr-powl-receipt/tests/mutant_kill_g4_powl.rs::mutant_2b_final_state_mutation_is_killed` |
+| **Test File** | `crates/bcinr-powl/tests/mutant_kill_g4_powl.rs::mutant_2b_final_state_mutation_is_killed` |
 | **Result** | ✓ KILLED — Deterministic execution detects state divergence |
 | **Verdict** | ALIVE |
 
@@ -255,7 +255,7 @@ test result: ok. 5 passed
 
 ### POWL Tests
 ```bash
-$ cargo test -p bcinr-powl-receipt --test mutant_kill_g4_powl
+$ cargo test -p bcinr-powl --test mutant_kill_g4_powl
 running 7 tests
 test oracle_powl_baseline_passes ... ok
 test mutant_1_wrong_firing_mask_is_killed ... ok

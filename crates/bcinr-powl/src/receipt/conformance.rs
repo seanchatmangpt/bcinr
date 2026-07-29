@@ -44,7 +44,7 @@
 //! # Examples
 //!
 //! ```
-//! use bcinr_powl_receipt::conformance::{ConformanceMetrics, ConformancePredicate};
+//! use bcinr_powl::receipt::conformance::{ConformanceMetrics, ConformancePredicate};
 //!
 //! // Create a metrics report
 //! let metrics = ConformanceMetrics {
@@ -157,7 +157,7 @@ impl ConformancePredicate {
     /// # Examples
     ///
     /// ```
-    /// use bcinr_powl_receipt::conformance::{ConformanceMetrics, ConformancePredicate, ConformanceDimension};
+    /// use bcinr_powl::receipt::conformance::{ConformanceMetrics, ConformancePredicate, ConformanceDimension};
     ///
     /// let metrics = ConformanceMetrics {
     ///     fitness: 0x0001_0000,        // 1.0 (meets STRICT threshold 1.0)
@@ -210,7 +210,7 @@ impl ConformancePredicate {
 /// # Examples
 ///
 /// ```
-/// use bcinr_powl_receipt::conformance::mask_ge;
+/// use bcinr_powl::receipt::conformance::mask_ge;
 ///
 /// assert_eq!(mask_ge(10, 5), 0xFFFF_FFFF); // true (greater)
 /// assert_eq!(mask_ge(5, 5), 0xFFFF_FFFF);  // true (equal)

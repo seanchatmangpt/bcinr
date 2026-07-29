@@ -2,9 +2,9 @@
 
 ## 1. Executive Summary
 
-This proposal introduces **Direct Bitmask Receipt Hashing (DBRH)**, a constant-time, zero-allocation, and loop-free hashing protocol designed to replace membership-based serialization of event sets within the execution receipt verification pipeline of `crates/bcinr-powl-receipt`.
+This proposal introduces **Direct Bitmask Receipt Hashing (DBRH)**, a constant-time, zero-allocation, and loop-free hashing protocol designed to replace membership-based serialization of event sets within the execution receipt verification pipeline of `crates/bcinr-powl` (`receipt` module).
 
-Currently, `EventSet` serialization and receipt hashing (`crates/bcinr-powl-receipt/src/execution.rs`) violate the strict **BCINR Radon Law** ($CC=1$, zero allocation, zero data-dependent branching) in a fundamental way:
+Currently, `EventSet` serialization and receipt hashing (`crates/bcinr-powl/src/receipt/execution.rs`) violate the strict **BCINR Radon Law** ($CC=1$, zero allocation, zero data-dependent branching) in a fundamental way:
 1. **Data-Dependent Loops**: Serializing an `EventSet` requires traversing its active member indices. The traversal loop relies on a variable popcount iteration path (using `trailing_zeros` and `w & (w - 1)` bit-clearing loops). The execution time and instruction count are directly proportional to the number and position of the active bits in the set.
 2. **Timing Side-Channels**: Because the duration of the hashing loop depends on the input event density, it introduces non-deterministic latency and potential timing side-channels, which are unacceptable for a deterministic computational substrate.
 3. **Heap Allocations (Slow Rail Transition)**: The original implementation constructs intermediate vectors (`Vec<usize>`) to collect active event indices during serialization, preventing bare-metal `#![no_std]` execution.
@@ -16,7 +16,7 @@ By treating the backing bitmask array `words: [u64; 8]` as a raw 64-byte chunk a
 ## 2. Vulnerability & Limitation Analysis
 
 ### 2.1 Data-Dependent Hashing Control Flow
-In `crates/bcinr-powl-receipt/src/execution.rs`, the serialization of an `EventSet` is performed by collecting and appending its set members:
+In `crates/bcinr-powl/src/receipt/execution.rs`, the serialization of an `EventSet` is performed by collecting and appending its set members:
 
 ```rust
 fn push_event_set(buf: &mut Vec<u8>, es: &EventSet) {
@@ -211,7 +211,7 @@ Under the `@armstrong_fault` Master of Failure Law, we inject three independent 
 The `@turing_machine` role will perform a disassembly audit of the release build containing the audited `update_hasher_dbrh` symbol:
 
 ```bash
-cargo objdump --bin bcinr-powl-receipt --release -- --disassemble
+cargo objdump -p bcinr-powl --lib --release -- --disassemble
 ```
 
 The audit verifies:
@@ -226,4 +226,4 @@ The audit verifies:
 - **Constant-Time Security**: Guarantees timing-invariant execution for receipt hashing, completely mitigating timing side-channel attacks on execution verification.
 - **Micro-Optimization**: Eliminates the overhead of trailing-zero scanning and bitmask shifts. Hashing a raw 64-byte block runs in a fraction of the time needed to traverse and push individual elements.
 - **Zero Allocations**: The hot path runs strictly in `#![no_std]`, making it suitable for AGI core substrate deployment.
-- **Substrate Integrity Standing**: DBRH secures a Substrate Integrity Score (SIS) of 100/100, removing the final remaining data-dependent loop from `crates/bcinr-powl-receipt` verification.
+- **Substrate Integrity Standing**: DBRH secures a Substrate Integrity Score (SIS) of 100/100, removing the final remaining data-dependent loop from `crates/bcinr-powl` (`receipt` module) verification.

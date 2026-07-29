@@ -22,7 +22,7 @@ use crate::observatory::ObservatoryFlagSet;
 /// This is not a cryptographic hash. It is a fixed, branchless, allocation-free avalanche
 /// mix (SplitMix64-style) adequate for binding identity fields together for equality
 /// checking inside the authoritative hot path. Slow-rail code that needs cryptographic
-/// binding (BLAKE3 receipts) lives elsewhere (`bcinr-powl-receipt`); nothing here claims
+/// binding (BLAKE3 receipts) lives elsewhere (`bcinr-powl (receipt module)`); nothing here claims
 /// cryptographic collision resistance.
 #[inline(always)]
 pub(crate) fn mix64(a: u64, b: u64) -> u64 {

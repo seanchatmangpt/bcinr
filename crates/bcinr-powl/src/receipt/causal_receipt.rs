@@ -4,7 +4,7 @@
 //! each frame's BLAKE3 digest is computed over `prior_hash || frame_bytes`
 //! (all fields serialised little-endian), advancing the chain by one step.
 
-use crate::denial::DenialPolarity;
+use crate::receipt::denial::DenialPolarity;
 
 // ── PackedObjRef ─────────────────────────────────────────────────────────────
 
@@ -57,7 +57,7 @@ pub struct OcelCausalFrame {
     pub obj_refs: [PackedObjRef; 8],
     /// Wall-clock timestamp in nanoseconds.
     pub ts_ns: u64,
-    /// Index into the [`crate::intern::ActivityTable`] for this step's activity.
+    /// Index into the [`crate::receipt::intern::ActivityTable`] for this step's activity.
     pub activity_idx: u16,
     /// Classifier byte for the POWL node kind (XOR, SEQ, LOOP, etc.).
     pub node_kind: u8,

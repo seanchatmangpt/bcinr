@@ -430,8 +430,9 @@ pub fn allocate_pddl_powl_plan(
         (priority_map, trace)
     };
 
-    let tape_root =
-        Digest::hash(bcinr_powl_receipt::execution_v2::digest_tape(&plan.compiled.tape).as_bytes());
+    let tape_root = Digest::hash(
+        bcinr_powl::receipt::execution_v2::digest_tape(&plan.compiled.tape).as_bytes(),
+    );
     let process_digest = digest_process(plan);
     let profile_digest = request.profile.digest();
     let mass_field_digest = request.masses.digest();
@@ -493,7 +494,7 @@ impl From<&CmcaAllocatedExecution> for CmcaAllocationReceipt {
 #[derive(Debug, Clone)]
 pub struct CmcaPddlPowlExecutionReceipt {
     pub allocation: CmcaAllocationReceipt,
-    pub execution: bcinr_powl_receipt::execution_v2::PowlV2ExecutionReceipt,
+    pub execution: bcinr_powl::receipt::execution_v2::PowlV2ExecutionReceipt,
     pub state: crate::production::PddlPowlStateReceipt,
     pub root: Digest,
 }
@@ -528,7 +529,7 @@ fn root_digest(
 }
 
 fn digest_powl_execution_receipt(
-    receipt: &bcinr_powl_receipt::execution_v2::PowlV2ExecutionReceipt,
+    receipt: &bcinr_powl::receipt::execution_v2::PowlV2ExecutionReceipt,
 ) -> Digest {
     let mut buf = Vec::new();
     buf.extend_from_slice(b"bcinr:cmca-g:powl-execution:v1");
@@ -631,7 +632,7 @@ pub fn verify_cmca_execution(
         capacity: recomputed.capacity,
         priority: recomputed.priority_map.clone(),
     };
-    let replay = bcinr_powl_receipt::execution_v2::execute_and_seal_v2_with_selector(
+    let replay = bcinr_powl::receipt::execution_v2::execute_and_seal_v2_with_selector(
         &plan.compiled.tape,
         &mut seal_selector,
         &plan.compiled.guards,

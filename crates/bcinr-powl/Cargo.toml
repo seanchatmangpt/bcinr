@@ -22,8 +22,13 @@ bcinr-mfw-ir = { version = "26.7.28", path = "../bcinr-mfw-ir" }
 bcinr-cmca = { version = "26.7.28", path = "../bcinr-cmca", features = ["alloc"] }
 blake3 = "1"
 wasm4pm-compat = "26.6.29"
-serde = { version = "1", features = ["derive"], optional = true }
-serde_json = { version = "1", optional = true }
+# Unconditional since 26.7.29: the folded-in `receipt` module (formerly the
+# `bcinr-powl-receipt` crate) derives Serialize/Deserialize on
+# `receipt::execution_v2::PowlV2ExecutionReceipt` and returns
+# `serde_json::Value` from `receipt::pm_bridge`. This crate links `std`
+# unconditionally anyway, so gating these behind `std` bought nothing.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 [dev-dependencies]
 divan = "0.1"
@@ -35,7 +40,11 @@ serde_json = "1"
 
 [features]
 default = []
-std = ["serde", "dep:serde_json"]
+# No longer pulls serde/serde_json — those are unconditional deps as of the
+# `bcinr-powl-receipt` fold-in. `std` still gates the wasm4pm-compat OCEL
+# conversion and JSON output in `ocel.rs`, and the time/entropy seeding in
+# `typestate.rs`.
+std = []
 nightly = []
 testing = []
 
@@ -57,4 +66,8 @@ harness = false
 
 [[bench]]
 name = "phase3_scheduler"
+harness = false
+
+[[bench]]
+name = "receipt_bench"
 harness = false

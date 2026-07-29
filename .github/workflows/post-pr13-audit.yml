@@ -102,7 +102,7 @@ jobs:
                     cargo test -p bcinr-pddl --all-features ground_v2
                     cargo test -p bcinr-powl --all-features powl2
                     cargo test -p bcinr-powl --all-features scheduler_v2
-                    cargo test -p bcinr-powl-receipt --all-features execution_v2
+                    cargo test -p bcinr-powl --all-features receipt::execution_v2
                 - name: Locked dependency graph
                   run: cargo metadata --locked --format-version 1 --no-deps > /dev/null
 
@@ -127,7 +127,7 @@ jobs:
                   run: |
                     cargo test -p bcinr-pddl --all-features
                     cargo test -p bcinr-powl --all-features
-                    cargo test -p bcinr-powl-receipt --all-features
+                    cargo test -p bcinr-powl --all-features receipt::
                 - name: Documentation
                   env:
                     RUSTDOCFLAGS: -D warnings
@@ -311,8 +311,8 @@ jobs:
           run_required 'cargo test -p bcinr-powl --all-features' cargo test -p bcinr-powl --all-features
           run_required 'cargo test -p bcinr-powl --all-features powl2' cargo test -p bcinr-powl --all-features powl2
           run_required 'cargo test -p bcinr-powl --all-features scheduler_v2' cargo test -p bcinr-powl --all-features scheduler_v2
-          run_required 'cargo test -p bcinr-powl-receipt --all-features' cargo test -p bcinr-powl-receipt --all-features
-          run_required 'cargo test -p bcinr-powl-receipt --all-features execution_v2' cargo test -p bcinr-powl-receipt --all-features execution_v2
+          run_required 'cargo test -p bcinr-powl --all-features receipt::' cargo test -p bcinr-powl --all-features receipt::
+          run_required 'cargo test -p bcinr-powl --all-features receipt::execution_v2' cargo test -p bcinr-powl --all-features receipt::execution_v2
           run_required 'cargo metadata --locked --format-version 1 --no-deps' cargo metadata --locked --format-version 1 --no-deps
 
           for mutant in $(seq 1 11); do

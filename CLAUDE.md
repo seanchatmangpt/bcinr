@@ -11,8 +11,8 @@ bcinr/
 ├── bcinr-mcp/           # MCP server: 23 tools (PDDL, POWL, algorithms, receipts)
 ├── bcinr-pddl/          # PDDL 3.1 planner
 ├── bcinr-pddl-lsp/      # PDDL language server
-├── bcinr-powl/          # POWL runtime (workflow compilation)
-├── bcinr-powl-receipt/  # Receipt verification (BLAKE3)
+├── bcinr-powl/          # POWL runtime + receipt verification (BLAKE3)
+│                       #   `receipt::` — folded in from bcinr-powl-receipt
 ├── tools/               # Utility tools
 ├── bcinr-bench/         # Benchmarks (Criterion)
 └── docs/                # Diátaxis documentation

@@ -1,9 +1,9 @@
 //! Shared BLAKE3 hash-chain fold, used by every receipt kind in this crate
 //! that needs the "prior_hash folded with canonical frame bytes" discipline:
-//! [`crate::causal_receipt::OcelCausalReceipt::chain`] (the original, for
-//! `OcelCausalFrame`), [`crate::projection::seal_projection_receipt`],
-//! [`crate::execution::seal_execution_receipt`], and
-//! [`crate::planning::seal_planning_receipt`].
+//! [`crate::receipt::causal_receipt::OcelCausalReceipt::chain`] (the original, for
+//! `OcelCausalFrame`), [`crate::receipt::projection::seal_projection_receipt`],
+//! [`crate::receipt::execution::seal_execution_receipt`], and
+//! [`crate::receipt::planning::seal_planning_receipt`].
 //!
 //! `causal_receipt.rs`'s chain predates this module and is left untouched
 //! (its own streaming-`Hasher` implementation is not routed through here) —

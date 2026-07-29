@@ -13,7 +13,7 @@
 //! The PDDL reader is implemented in this crate as a bounded S-expression
 //! parser. No third-party PDDL parser or parser license crosses the boundary.
 //!
-//! `bcinr-powl` and `bcinr-powl-receipt` are optional path dependencies,
+//! `bcinr-powl` is an optional path dependency,
 //! enabled only by the `mfw-planner` feature. Default consumers do not pull
 //! either crate into their dependency graph.
 //!

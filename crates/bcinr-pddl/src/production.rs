@@ -16,11 +16,11 @@ use std::collections::BTreeSet;
 
 use bcinr_mfw_ir::{EpochBounds, PlannerFailure, PowlNodeId, UnsupportedFeature};
 use bcinr_powl::compiler::v2::{compile_powl_v2, CompileErrorV2, CompiledPowlV2};
-use bcinr_powl::scheduler::ConcurrencySelector;
-use bcinr_powl_receipt::execution_v2::{
+use bcinr_powl::receipt::execution_v2::{
     execute_and_seal_v2, execute_and_seal_v2_with_selector, verify_execution_v2,
     verify_execution_v2_with_selector, PowlV2ExecutionReceipt, PowlV2ReceiptError,
 };
+use bcinr_powl::scheduler::ConcurrencySelector;
 use wasm4pm_compat::pddl::{Pddl8GroundAction, Pddl8GroundAtom};
 
 use crate::capability::{CapabilityProfile, SemanticSupport};

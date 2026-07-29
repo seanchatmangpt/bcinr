@@ -21,12 +21,9 @@
 //! Each `EventWorkItem`'s `tick_fired_mask` is the *complete* set of ops that
 //! fired together in one tick (see that field's own doc comment) — the same
 //! shape of information [`crate::scheduler::scheduler_tick_guarded`] and
-//! `bcinr_powl_receipt::execution::seal_execution_receipt` (a plain code
-//! span, not a doc-link: this crate does not depend on `bcinr-powl-receipt`
-//! -- correctly, since that crate depends on this one, not the reverse -- so
-//! an intra-doc link here could never resolve regardless of how it were
-//! spelled) check against a [`ConcurrencyGuardTable`] before trusting a
-//! `FireSet`. [`ReceiptWorker::drain`]
+//! [`crate::receipt::execution::seal_execution_receipt`] check against a
+//! [`ConcurrencyGuardTable`] before trusting a `FireSet`.
+//! [`ReceiptWorker::drain`]
 //! does the same check here: before a tick's fired ops are folded into a
 //! run's accumulated trace, `guards.admits(&tick's EventSet)` must hold. A
 //! run that ever saw an inadmissible tick is never sealed into
@@ -272,7 +269,7 @@ impl ReceiptWorker {
             // it below, so completion detection still works) — it instead
             // permanently marks the run so it is refused, not sealed, once
             // it would otherwise complete. See `InadmissibleFiredSet` in
-            // `bcinr_powl_receipt::execution` for the sibling pipeline this
+            // `crate::receipt::execution` for the sibling pipeline this
             // mirrors.
             if !guards.admits(&mask_to_event_set(item.tick_fired_mask)) {
                 self.pending[slot].had_inadmissible_tick = true;

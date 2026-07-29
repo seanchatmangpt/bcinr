@@ -8,7 +8,7 @@
 //! the planning-side evidence, `bcinr-powl`'s `PowlProjector` for the
 //! projection digest) and passed in as already-computed `Digest`s, exactly
 //! the same "a receipt records a check that already happened" discipline
-//! [`crate::projection::seal_projection_receipt`] uses. This crate does not
+//! [`crate::receipt::projection::seal_projection_receipt`] uses. This crate does not
 //! depend on `bcinr-pddl` (see this crate's `Cargo.toml` — only
 //! `bcinr-mfw-ir` and `bcinr-powl` were added this phase), so
 //! `cache_evidence`/`residual_evidence`/`frontier_evidence`/
@@ -21,7 +21,7 @@
 
 use bcinr_mfw_ir::{ConsequenceHorizonId, Digest, PlannerOutcome, PlanningEpochId};
 
-use crate::chain::fold;
+use crate::receipt::chain::fold;
 
 // ---------------------------------------------------------------------------
 // PlannerOutcomeTag
@@ -134,8 +134,8 @@ pub struct PlanningReceipt {
 }
 
 /// Seal a [`PlanningReceipt`] from already-computed evidence. Pure
-/// function, same discipline as [`crate::projection::seal_projection_receipt`]
-/// and [`crate::execution::seal_execution_receipt`]: folds
+/// function, same discipline as [`crate::receipt::projection::seal_projection_receipt`]
+/// and [`crate::receipt::execution::seal_execution_receipt`]: folds
 /// `prior_hash` with a canonical, fixed-field-order byte serialization of
 /// every field below (never a `HashMap`-iteration order).
 #[allow(clippy::too_many_arguments)]
