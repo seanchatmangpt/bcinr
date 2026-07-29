@@ -610,6 +610,61 @@ impl ConcurrencySelector for StableMaximalSelector {
     }
 }
 
+/// A finite, explicitly decrementable per-tick concurrency budget.
+///
+/// This is a genuinely different kind of constraint from
+/// [`ConcurrencyGuardTable`]'s pairwise conflict exclusion (BCINR-SCHED-001
+/// found that mechanism `NOT_A_DECISION_BOUNDARY` against real production
+/// input, because precedence edges already exclude every pair it would
+/// ever screen) and from a scheduler's `max_ticks` (a total-tick completion
+/// bound, not a concurrent-slot budget). `capacity` counts down as ops are
+/// admitted into the same tick's candidate set: once `selected.len()`
+/// reaches `capacity`, no further ready op is added this tick, regardless
+/// of whether the guard table would have admitted it. This is BCINR-SCHED-002's
+/// answer to "First establish whether scarcity already has a real semantic
+/// home" — it gives scarcity one, as an explicit, first-class concept,
+/// instead of overloading `ConcurrencyGuardTable`.
+///
+/// # Examples
+///
+/// ```rust
+/// use bcinr_powl::scheduler::{CapacityBoundedSelector, ConcurrencySelector};
+/// use bcinr_powl::tape::v2::ConcurrencyGuardTable;
+/// use bcinr_mfw_ir::EventSet;
+///
+/// let mut selector = CapacityBoundedSelector { capacity: 2 };
+/// let ready = EventSet::empty().with(0).with(1).with(2);
+/// let guards = ConcurrencyGuardTable::empty();
+///
+/// let selected = selector.select_checked(&ready, &guards);
+/// assert_eq!(selected.len(), 2);
+/// ```
+pub struct CapacityBoundedSelector {
+    /// Maximum number of ops this selector will admit into one tick's
+    /// candidate set, independent of guard-table admission.
+    pub capacity: u32,
+}
+
+impl ConcurrencySelector for CapacityBoundedSelector {
+    /// # Complexity
+    ///
+    /// O(`ready.len()` * `guards.nonfaces.len()`) worst case, same shape as
+    /// [`StableMaximalSelector::select`] -- the capacity check itself is
+    /// O(1) per candidate, so it does not change the asymptotic cost.
+    fn select(&mut self, ready: &EventSet, guards: &ConcurrencyGuardTable) -> EventSet {
+        let mut selected = EventSet::empty();
+        for id in ready.iter_stable() {
+            if selected.len() >= self.capacity {
+                break;
+            }
+            let candidate = selected.with(id);
+            if guards.admits(&candidate) {
+                selected = candidate;
+            }
+        }
+        selected
+    }
+}
 /// Convert a `u64` tape-slot bitmask (as used throughout `scheduler_tick`)
 /// into an `EventSet` (as used by `ConcurrencySelector`/`ConcurrencyGuardTable`).
 ///
