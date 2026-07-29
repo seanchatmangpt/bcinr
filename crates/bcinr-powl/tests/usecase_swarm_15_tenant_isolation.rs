@@ -196,8 +196,14 @@ fn test_object_references_tenant_scoped() {
     // Each 2-op workflow produces 2 ops + 1 run_sealed = 3 events
     let a_event_count = events_a.len();
     let b_event_count = events_b.len();
-    assert_eq!(a_event_count, 3, "tenant A log has 2 workflow ops + 1 run_sealed event");
-    assert_eq!(b_event_count, 3, "tenant B log has 2 workflow ops + 1 run_sealed event");
+    assert_eq!(
+        a_event_count, 3,
+        "tenant A log has 2 workflow ops + 1 run_sealed event"
+    );
+    assert_eq!(
+        b_event_count, 3,
+        "tenant B log has 2 workflow ops + 1 run_sealed event"
+    );
 
     // Verify: tenant A log has only tenant A's ops (0, 1) plus run_sealed
     let a_ops: Vec<u32> = events_a

@@ -31,8 +31,8 @@
 //!    today.** None can honestly be classified `PRODUCTION` authority.
 
 use bcinr_cmca::allocator::{
-    allocate_in, power, AdaptiveUpdate, AdmittedControlState, CertifiedLearning, CertificateReceipt,
-    EnvelopeReceipt, FeasibleRegion, OutcomeReceipt, StabilityRefusal,
+    allocate_in, power, AdaptiveUpdate, AdmittedControlState, CertificateReceipt,
+    CertifiedLearning, EnvelopeReceipt, FeasibleRegion, OutcomeReceipt, StabilityRefusal,
 };
 use bcinr_cmca::cascade::{consequence_mass, escort_weight, CascadeRefusal, CascadeTree};
 use bcinr_cmca::escort::{escort_distribution, EscortRefusal};
@@ -97,7 +97,11 @@ fn assert_is_sibling_coverage_not_support_coverage(
     kind: RuntimeSemanticKind,
 ) {
     assert_eq!(kind, RuntimeSemanticKind::UniformSiblingCoverage);
-    assert_eq!(result.len(), 3, "{who}: expected a 3-element [0,1,3] result");
+    assert_eq!(
+        result.len(),
+        3,
+        "{who}: expected a 3-element [0,1,3] result"
+    );
     for (i, (&got, &sibling)) in result.iter().zip(SIBLING_COVERAGE.iter()).enumerate() {
         let expected = mass(sibling);
         assert!(
@@ -154,8 +158,10 @@ fn power_is_uniform_sibling_coverage_at_q_zero() {
     // signature at the primitive level: every base, including zero,
     // contributes equal weight.
     let masses = [NonNegativeFixed::ZERO, mass(1.0), mass(3.0)];
-    let weights: Vec<NonNegativeFixed> =
-        masses.iter().map(|&m| power(m, SignedFixed::ZERO)).collect();
+    let weights: Vec<NonNegativeFixed> = masses
+        .iter()
+        .map(|&m| power(m, SignedFixed::ZERO))
+        .collect();
     for w in &weights {
         assert_eq!(w.to_bits(), NonNegativeFixed::ONE.to_bits());
     }
@@ -288,7 +294,10 @@ fn escort_distribution_integer_path_matches_cascade_escort_weight_is_already_pro
     }
     let via_exact: Vec<NonNegativeFixed> =
         exact_weights.into_iter().map(|w| w / exact_sum).collect();
-    assert_eq!(via_dispatch, via_exact, "bit-for-bit, not just within tolerance");
+    assert_eq!(
+        via_dispatch, via_exact,
+        "bit-for-bit, not just within tolerance"
+    );
 }
 
 /// `DIVERGES`: the same `[0,1,3]`-shaped input at a negative lens takes
@@ -331,7 +340,10 @@ fn escort_distribution_fractional_negative_lens_diverges_from_integer_path() {
     // precision, not a false Ok, is the real divergence here.
     let fractional_result = escort_distribution(&masses, q(-1.5));
     assert!(
-        matches!(fractional_result, Err(EscortRefusal::DegenerateNormalization)),
+        matches!(
+            fractional_result,
+            Err(EscortRefusal::DegenerateNormalization)
+        ),
         "DIVERGES (documented, not a bug to fix here): both paths refuse, but the \
          fractional path collapses to a generic DegenerateNormalization instead of \
          naming the zero-mass node the way the integer path's ExactPathRefused does. \

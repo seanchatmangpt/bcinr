@@ -185,7 +185,7 @@ fn test_distributed_incident_service_a_failure_service_b_recovery() {
     let mut tampered_log = OcelLog::new();
     tampered_log.record_op_fired(run_id, 0, 1, 1).unwrap(); // service_a_initialized
     tampered_log.record_op_fired(run_id, 1, 2, 1).unwrap(); // service_a_processing_request
-                                                              // op_2 (service_a_failure_event) removed
+                                                            // op_2 (service_a_failure_event) removed
     tampered_log.record_op_fired(run_id, 3, 3, 1).unwrap(); // service_b_detects_a_failure
     tampered_log.record_op_fired(run_id, 4, 4, 1).unwrap(); // service_b_acquires_lease
     tampered_log.record_op_fired(run_id, 5, 5, 1).unwrap(); // service_b_reprocesses_request

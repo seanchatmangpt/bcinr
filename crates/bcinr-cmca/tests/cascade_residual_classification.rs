@@ -116,13 +116,13 @@ fn fixture_q_two() -> Fixture {
 fn fixture_deep_tree() -> Fixture {
     let tree = CascadeTree::new(
         vec![
-            None,       // 0 root
-            Some(0),    // 1 a
-            Some(0),    // 2 b
-            Some(1),    // 3 a1
-            Some(1),    // 4 a2
-            Some(3),    // 5 a1x
-            Some(3),    // 6 a1y
+            None,    // 0 root
+            Some(0), // 1 a
+            Some(0), // 2 b
+            Some(1), // 3 a1
+            Some(1), // 4 a2
+            Some(3), // 5 a1x
+            Some(3), // 6 a1y
         ],
         vec![
             mass(1.0),
@@ -360,7 +360,10 @@ fn summarize(observations: &[(ResidualObservation, i32)]) -> ResidualSummary {
             "none"
         };
         by_zero_pattern.entry(pattern).or_default().push(r);
-        by_divisibility.entry(obs.exactly_divisible).or_default().push(r);
+        by_divisibility
+            .entry(obs.exactly_divisible)
+            .or_default()
+            .push(r);
     }
 
     let max_abs = min.unsigned_abs().max(max.unsigned_abs()) as i64;
@@ -395,8 +398,8 @@ fn stress_fixtures() -> Vec<Fixture> {
     // First 20 primes: no ratio between any two divides evenly, maximizing
     // the chance of a "bad" residual at each arity.
     const PRIMES: [f64; 20] = [
-        2.0, 3.0, 5.0, 7.0, 11.0, 13.0, 17.0, 19.0, 23.0, 29.0, 31.0, 37.0, 41.0, 43.0, 47.0,
-        53.0, 59.0, 61.0, 67.0, 71.0,
+        2.0, 3.0, 5.0, 7.0, 11.0, 13.0, 17.0, 19.0, 23.0, 29.0, 31.0, 37.0, 41.0, 43.0, 47.0, 53.0,
+        59.0, 61.0, 67.0, 71.0,
     ];
     (2..=20usize)
         .map(|arity| {
