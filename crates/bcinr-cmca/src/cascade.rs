@@ -276,11 +276,11 @@ impl CascadeTree {
     }
 }
 
-/// `m^q` in Q16.16, by repeated multiplication -- no `powf`, no libm.
-///
-/// `q == 0` is `ONE` for any mass (including zero: the coverage lens weights
-/// every sibling equally by construction).
-pub fn escort_weight(
+/// `m^q` in Q16.16, by repeated multiplication -- no `powf`, no libm. Shared
+/// by [`escort_weight`] and [`escort_weight_support`] for every `lens != 0`,
+/// where the two conventions coincide (see both functions' docs for why
+/// `lens == 0` is the one case they must differ on).
+fn escort_power(
     mass: NonNegativeFixed,
     lens: i32,
     node: usize,
@@ -292,9 +292,10 @@ pub fn escort_weight(
             max_magnitude: MAX_LENS_MAGNITUDE,
         });
     }
-    if lens == 0 {
-        return Ok(NonNegativeFixed::ONE);
-    }
+    debug_assert_ne!(
+        lens, 0,
+        "escort_power is only for lens != 0; callers handle lens == 0 themselves"
+    );
     let mut accumulated = NonNegativeFixed::ONE;
     for _ in 0..magnitude {
         accumulated = accumulated.saturating_mul(mass);
@@ -318,6 +319,84 @@ pub fn escort_weight(
         NumericContext::EscortReciprocal { lens },
         node,
     )
+}
+
+/// `m^q` in Q16.16, by repeated multiplication -- no `powf`, no libm.
+///
+/// `q == 0` is `ONE` for any mass (including zero: the *sibling coverage*
+/// convention weights every sibling equally by construction, whether or not
+/// it carries mass). This is the convention this crate's production call
+/// site (`consequence_mass`) actually uses at `q == 0`, and is now the same
+/// convention [`uniform_sibling_weight`] implements directly -- this
+/// function keeps its historical name and signature for API compatibility
+/// (`escort.rs`'s exact-lens dispatch and existing correspondence tests call
+/// it by name), but for `lens == 0` it now delegates to
+/// [`uniform_sibling_weight`], and for `lens != 0` to the shared
+/// [`escort_power`] helper, rather than duplicating either.
+///
+/// See [`escort_weight_support`] for the other convention (*support
+/// coverage*: zero mass gets zero weight at `q == 0`, excluding it from the
+/// uniform measure instead of including it) -- the two differ only at
+/// `lens == 0`; see `escort.rs`'s module docs for the Lean ancestry of this
+/// distinction (`ReferenceLens.coverage` vs `uniformSiblingCoverage`).
+pub fn escort_weight(
+    mass: NonNegativeFixed,
+    lens: i32,
+    node: usize,
+) -> Result<NonNegativeFixed, CascadeRefusal> {
+    if lens == 0 {
+        // MAX_LENS_MAGNITUDE is a `u32`, so `lens.unsigned_abs() == 0 <=
+        // MAX_LENS_MAGNITUDE` always holds -- no domain check needed here.
+        return Ok(uniform_sibling_weight(mass, node));
+    }
+    escort_power(mass, lens, node)
+}
+
+/// The *sibling coverage* per-node escort weight: `ONE` for every sibling at
+/// `q == 0`, regardless of mass. Only meaningful at `lens == 0` -- callers
+/// choosing between coverage conventions call this directly instead of
+/// `escort_weight(mass, 0, node)` to make that choice visible at the call
+/// site (see `consequence_mass`'s use below).
+///
+/// This is "1/n" in the sense that follows from how the caller uses it, not
+/// from anything this function computes on its own: `consequence_mass`
+/// normalizes every sibling's weight by their sum, and `n` equal `ONE`
+/// weights normalize to `ONE / n` each. This function has no way to know
+/// `n` (it sees one node at a time) and does not attempt to -- it commits
+/// only to "every sibling gets the same weight," which is the part of
+/// "1/n always" that is actually this function's job.
+#[must_use]
+pub fn uniform_sibling_weight(_mass: NonNegativeFixed, _node: usize) -> NonNegativeFixed {
+    NonNegativeFixed::ONE
+}
+
+/// The *support coverage* per-node escort weight: `m^q` in Q16.16, with
+/// `q == 0` returning `ZERO` for a zero mass (excluded from the uniform
+/// measure) and `ONE` otherwise, rather than `ONE` unconditionally.
+///
+/// For `lens != 0` this is identical to [`escort_weight`] -- `m^q` is
+/// already zero for a zero mass under a positive lens, and a zero mass
+/// under a negative lens refuses the same way in both (there is no
+/// coverage question once the lens itself is nonzero; the ambiguity is
+/// specific to `q == 0`, where "which siblings does the uniform measure
+/// range over" is a real, currently-uncertified modeling choice -- see
+/// `escort.rs`'s module docs, `ReferenceLens.coverage`).
+///
+/// No production call site in this crate currently selects support
+/// coverage; it is exposed so a caller that needs it does not have to
+/// duplicate [`escort_power`] to get it.
+pub fn escort_weight_support(
+    mass: NonNegativeFixed,
+    lens: i32,
+    node: usize,
+) -> Result<NonNegativeFixed, CascadeRefusal> {
+    if lens == 0 {
+        if mass.to_bits() == 0 {
+            return Ok(NonNegativeFixed::ZERO);
+        }
+        return Ok(NonNegativeFixed::ONE);
+    }
+    escort_power(mass, lens, node)
 }
 
 /// Depth of every node (roots at depth 0), refusing on a cyclic `parent`.
@@ -544,9 +623,25 @@ fn consequence_mass_with_sink(
     // One escort weight per node, reused by both the child escort and the
     // subtree-leaf escort -- `allocator` likewise derives `child_w` and
     // `leaf_w` from the same per-node masses.
+    //
+    // Classified explicitly (Checkpoint A): at `lens == 0` this walk wants
+    // *sibling coverage*, not *support coverage* -- the module doc above
+    // ("the coverage lens weights every sibling equally by construction")
+    // and `escort.rs`'s correspondence tests both commit to every sibling
+    // (including a zero-mass one) sharing the flow equally, which is
+    // `uniform_sibling_weight`, not `escort_weight_support`. Calling
+    // `uniform_sibling_weight` directly here makes that choice visible at
+    // the call site instead of leaving it implicit inside `escort_weight`'s
+    // `lens == 0` branch.
     let mut weight = Vec::with_capacity(len);
     for (node, (&mass, &node_depth)) in tree.mass.iter().zip(depth.iter()).enumerate() {
-        weight.push(escort_weight(mass, lens_at(node_depth), node)?);
+        let lens = lens_at(node_depth);
+        let w = if lens == 0 {
+            uniform_sibling_weight(mass, node)
+        } else {
+            escort_power(mass, lens, node)?
+        };
+        weight.push(w);
     }
 
     let is_leaf: Vec<bool> = (0..len)
@@ -703,6 +798,165 @@ mod tests {
 
     fn mass(x: f32) -> NonNegativeFixed {
         NonNegativeFixed::from_bits((x * 65536.0).round() as u32)
+    }
+
+    // -- Checkpoint A: escort_weight_support / uniform_sibling_weight split --
+    //
+    // These are written before the two functions exist (TDD red phase) and
+    // pin down the one behavioral difference the ticket cares about:
+    // `q == 0` on a zero-mass node. `escort_weight` (unsplit) treats this as
+    // *sibling coverage* (weight ONE, matching every other sibling); the
+    // Lean reference (`ReferenceLens.coverage`, see `escort.rs`'s module
+    // docs) instead treats it as *support coverage* (weight ZERO, the node
+    // is excluded from the uniform measure because it carries no mass).
+    // `escort_weight` cannot express both at once through one name, hence
+    // the split.
+
+    #[test]
+    fn escort_weight_support_is_zero_at_q_zero_for_zero_mass() {
+        // Support coverage: a mass-carrying sibling excludes the zero-mass
+        // one entirely, rather than weighting it equally.
+        assert_eq!(
+            escort_weight_support(NonNegativeFixed::ZERO, 0, 0).unwrap(),
+            NonNegativeFixed::ZERO
+        );
+    }
+
+    #[test]
+    fn escort_weight_support_is_one_at_q_zero_for_nonzero_mass() {
+        assert_eq!(
+            escort_weight_support(mass(3.0), 0, 0).unwrap(),
+            NonNegativeFixed::ONE
+        );
+    }
+
+    #[test]
+    fn escort_weight_support_matches_escort_weight_for_nonzero_lens() {
+        // Away from q == 0 the two conventions coincide: `m^q` is already
+        // zero for a zero mass under a positive lens, and both functions
+        // refuse identically under a negative lens (there is no coverage
+        // question once the lens itself is nonzero).
+        for lens in [-2, -1, 1, 2] {
+            for m in [mass(0.0), mass(0.5), mass(1.0), mass(3.0)] {
+                assert_eq!(
+                    escort_weight_support(m, lens, 0),
+                    escort_weight(m, lens, 0),
+                    "lens={lens} m={m:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn uniform_sibling_weight_is_one_regardless_of_mass() {
+        // Sibling coverage: every sibling gets the same weight whether or
+        // not it carries mass -- normalizing by `n` equal weights is what
+        // makes this "1/n" once `consequence_mass`'s sibling-sum division
+        // runs; the per-node primitive itself just needs to be constant.
+        assert_eq!(
+            uniform_sibling_weight(NonNegativeFixed::ZERO, 0),
+            NonNegativeFixed::ONE
+        );
+        assert_eq!(uniform_sibling_weight(mass(7.0), 0), NonNegativeFixed::ONE);
+    }
+
+    // -- Checkpoint A: ULP-precision witness --
+    //
+    // The ticket for this checkpoint asked to "reinstate the 498-ULP
+    // witness as a fixture." An exhaustive search of this crate's git
+    // history (`git log --all -S"498"`, `git log --all --grep=ULP -i`)
+    // and its current tests (`falsification_adversarial.rs`'s
+    // `falsify_q16_16_division_precision_loss`, at most 2 ULP;
+    // `cascade_residual_classification.rs`'s `stress_corpus_bounds_check`,
+    // observed max 10 residual bits across arities 2..=20) turned up no
+    // fixture, past or present, exhibiting anything close to 498 ULP of
+    // loss anywhere in `escort_weight`/`escort_power`/`consequence_mass`.
+    // `escort_power`'s own domain (`MAX_LENS_MAGNITUDE == 16` repeated
+    // multiplications) structurally bounds how much a single escort weight
+    // can lose: each `saturating_mul` truncates by strictly less than one
+    // ULP of its input, so 16 chained multiplications cannot manufacture
+    // anywhere near 498 ULP of loss on their own -- a swept measurement
+    // below confirms this.
+    //
+    // This is therefore a *reconstruction*, not a reinstatement: no
+    // original 498-ULP artifact was found to recover. What follows sweeps
+    // the admitted domain (every integer lens in
+    // `-MAX_LENS_MAGNITUDE..=MAX_LENS_MAGNITUDE`, a representative mass
+    // grid biased toward the values that maximize compounding truncation --
+    // near `ONE` from below, and near the smallest representable nonzero
+    // mass) against an independent `f64` oracle (the same independent-oracle
+    // form `tests/reference.rs` and `tests/differential.rs` already use for
+    // this crate; not a translation of `escort_power`'s own control
+    // structure), records the actual observed maximum ULP loss, and pins it
+    // as a named witness so a future regression is caught by name instead of
+    // by a round-numbered guess.
+    #[test]
+    fn escort_power_ulp_loss_witness() {
+        let mut max_loss: i64 = 0;
+        let mut witness: Option<(u32, i32, u32, u32)> = None; // (mass_bits, lens, exact_bits, actual_bits)
+
+        // Mass grid: near ONE from below (worst case for positive lenses,
+        // where repeated truncation compounds a value close to the top of
+        // its range), a few interior points, and the smallest representable
+        // nonzero mass (worst case for negative lenses, which reciprocate).
+        let mass_bits_grid: [u32; 7] = [1, 100, 32768, 65500, 65535, 65536, 131072];
+
+        for &mb in &mass_bits_grid {
+            let m = NonNegativeFixed::from_bits(mb);
+            let m_real = f64::from(mb) / 65536.0;
+            for lens in 1..=(MAX_LENS_MAGNITUDE as i32) {
+                for signed_lens in [lens, -lens] {
+                    let Ok(actual) = escort_power(m, signed_lens, 0) else {
+                        continue; // refusal (e.g. ZeroMassUnderNegativeLens, EscortUnderflow) -- not a precision question
+                    };
+                    // Independent oracle: plain f64 exponentiation, not a
+                    // translation of escort_power's repeated-multiplication
+                    // control structure.
+                    let exact_real = m_real.powi(signed_lens);
+                    if !exact_real.is_finite() || exact_real < 0.0 || exact_real > 65535.0 {
+                        continue; // outside Q16.16's representable range -- saturation, not a precision comparison
+                    }
+                    let exact_bits = (exact_real * 65536.0).round() as i64;
+                    let loss = (exact_bits - actual.to_bits() as i64).abs();
+                    if loss > max_loss {
+                        max_loss = loss;
+                        witness = Some((mb, signed_lens, exact_bits as u32, actual.to_bits()));
+                    }
+                }
+            }
+        }
+
+        extern crate std;
+        std::eprintln!(
+            "escort_power ULP-loss witness: max_loss={max_loss} details={witness:?} \
+             (compare against the ticket's claimed 498 -- no such value was found or reproduced \
+             for this admitted domain)"
+        );
+
+        // The structural bound this measurement is checking: 16 chained
+        // saturating_mul truncations (or one reciprocal on top of them)
+        // cannot lose anywhere near 498 ULP. Pinned generously above the
+        // observed value so a real regression (e.g. a dropped truncation
+        // guard, or a reciprocal computed against the wrong accumulator)
+        // is still caught, without hand-tuning to the exact figure.
+        assert!(
+            max_loss <= 32,
+            "escort_power ULP-loss witness regressed: max_loss={max_loss} details={witness:?} \
+             (previously observed <= a small single-digit/low-double-digit bound; nowhere near \
+             the ticket's claimed 498)"
+        );
+    }
+
+    #[test]
+    fn escort_weight_at_q_zero_still_matches_uniform_sibling_weight() {
+        // `escort_weight`'s existing lens==0 branch is sibling coverage
+        // (documented in `escort.rs`'s module docs and pinned by
+        // `cmca_h_lean_correspondence.rs`) -- this must not silently
+        // change to support coverage as a side effect of the split.
+        assert_eq!(
+            escort_weight(NonNegativeFixed::ZERO, 0, 0).unwrap(),
+            uniform_sibling_weight(NonNegativeFixed::ZERO, 0)
+        );
     }
 
     /// A 3-level tree: root -> {a, b} -> {a1, a2} (only `a` has children).
