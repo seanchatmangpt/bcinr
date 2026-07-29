@@ -334,12 +334,12 @@ impl GroundProblem {
         let goal_set: BTreeSet<Pddl8GroundAtom> = self.goal.iter().cloned().collect();
 
         // State = (atoms, numeric_values, path)
-        let mut queue: VecDeque<(BTreeSet<Pddl8GroundAtom>, HashMap<String, f64>, Vec<usize>)> =
-            VecDeque::new();
+        type SearchState = (BTreeSet<Pddl8GroundAtom>, HashMap<String, f64>, Vec<usize>);
+        let mut queue: VecDeque<SearchState> = VecDeque::new();
 
         // Visited set uses (sorted_atoms, numeric_state) as key
-        let mut visited: std::collections::HashSet<(Vec<Pddl8GroundAtom>, Vec<(String, u64)>)> =
-            Default::default();
+        type VisitedKey = (Vec<Pddl8GroundAtom>, Vec<(String, u64)>);
+        let mut visited: std::collections::HashSet<VisitedKey> = Default::default();
 
         let init_sorted: Vec<Pddl8GroundAtom> = self.initial_state.iter().cloned().collect();
         let mut fn_key_vec: Vec<(String, u64)> = self
@@ -1601,6 +1601,7 @@ fn apply_effect_ground(
         }
         PddlEffect::Forall { vars, effects } => {
             // Iterate over all possible bindings and apply effects for each
+            #[allow(clippy::too_many_arguments)]
             fn apply_forall_effects(
                 idx: usize,
                 vars: &[(String, String)],

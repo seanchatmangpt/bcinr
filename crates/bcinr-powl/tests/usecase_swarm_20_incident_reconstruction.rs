@@ -294,7 +294,7 @@ fn test_receipt_comparison_healthy_vs_incident() {
         .collect();
 
     assert!(
-        ops_incident.iter().any(|&op| op == 2),
+        ops_incident.contains(&2),
         "incident receipt explicitly includes failure op"
     );
 }

@@ -694,7 +694,7 @@ fn compatibility_attack_04_unsupported_capability() {
     // This is a feature/capability negotiation error
 
     let unsupported_cap = "byzantine-fault-tolerance";
-    let available_caps = vec!["basic-execution", "resource-tracking"];
+    let available_caps = ["basic-execution", "resource-tracking"];
     assert!(
         !available_caps.contains(&unsupported_cap),
         "Capability should be unsupported"

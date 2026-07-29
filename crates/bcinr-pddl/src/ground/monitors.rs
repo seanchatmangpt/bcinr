@@ -84,6 +84,7 @@ pub trait ConstraintMonitor: Send + Sync {
     /// Process a single step: M_t + (S_t, a_t, S_{t+1}) -> (M_{t+1}, outcome).
     ///
     /// Returns the new monitor state and the outcome.
+    #[allow(clippy::too_many_arguments)]
     fn step(
         &self,
         monitor_state: MonitorState,

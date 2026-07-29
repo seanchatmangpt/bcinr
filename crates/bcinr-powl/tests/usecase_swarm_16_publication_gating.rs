@@ -156,11 +156,7 @@ fn test_parallel_proofs_then_gated_publication() {
     );
 
     // Verify publish is the last op
-    let last_op = events
-        .iter()
-        .filter(|e| e.op_idx < 5)
-        .last()
-        .map(|e| e.op_idx);
+    let last_op = events.iter().rfind(|e| e.op_idx < 5).map(|e| e.op_idx);
 
     assert_eq!(last_op, Some(4), "publish must be the final op");
 }

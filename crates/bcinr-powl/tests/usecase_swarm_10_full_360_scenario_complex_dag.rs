@@ -135,11 +135,11 @@ fn test_swarm_12_workers_init_then_parallel_deterministic() {
     // Verification 3: Init phase [0,1,2] fires before work phase [3..11]
     let order: Vec<u32> = log.events().iter().map(|e| e.op_idx).collect();
     if let Some(first_worker_idx) = order.iter().position(|&op| (3..12).contains(&op)) {
-        for i in 0..first_worker_idx {
+        for (i, &op) in order.iter().enumerate().take(first_worker_idx) {
             assert!(
-                order[i] < 3 || order[i] >= 12,
+                !(3..12).contains(&op),
                 "init ops must fire before declared workers; found {} at position {}",
-                order[i],
+                op,
                 i
             );
         }
@@ -182,8 +182,8 @@ fn test_swarm_12_workers_init_then_parallel_deterministic() {
 /// - Ops 6-8: group B (parallel, no inter-deps)
 /// - Ops 9-11: group C (parallel, no inter-deps)
 /// - Edges: group A ops depend on init (implicit via sequence)
-///          group B deps on A[0] (ops 6,7,8 → op 3)
-///          group C deps on B[0] (ops 9,10,11 → op 6)
+///   group B deps on A[0] (ops 6,7,8 → op 3)
+///   group C deps on B[0] (ops 9,10,11 → op 6)
 ///
 /// Verifies:
 /// - Partial order compilation handles mixed seq/par correctly
@@ -684,8 +684,8 @@ fn test_swarm_temporal_ordering_preserved_audit_chain() {
 
     // Phase 2 ops (1-3) must fire before phase 3 ops (4-12)
     if let Some(phase2_end) = order.iter().position(|&op| op > 3) {
-        for i in 0..phase2_end {
-            assert!(order[i] <= 3, "phase_2 ops must precede phase_3");
+        for &op in order.iter().take(phase2_end) {
+            assert!(op <= 3, "phase_2 ops must precede phase_3");
         }
     }
 
