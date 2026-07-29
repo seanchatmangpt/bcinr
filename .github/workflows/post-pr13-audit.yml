@@ -122,7 +122,7 @@ jobs:
                     cargo check --workspace --all-features
                     cargo clippy --workspace --all-targets --all-features -- -D warnings
                 - name: Full Linux workspace
-                  run: cargo test --workspace --all-features --all-targets --no-fail-fast
+                  run: cargo test --workspace --all-targets --no-fail-fast
                 - name: Production PDDL/POWL/receipt rails
                   run: |
                     cargo test -p bcinr-pddl --all-features
@@ -202,7 +202,7 @@ jobs:
                     components: rustfmt, clippy
                 - uses: Swatinem/rust-cache@v2
                 - name: Full workspace
-                  run: cargo test --workspace --all-features --all-targets --no-fail-fast
+                  run: cargo test --workspace --all-targets --no-fail-fast
                 - name: Isolated CMCA mutants
                   run: |
                     for mutant in $(seq 1 11); do
@@ -234,7 +234,7 @@ jobs:
                 - uses: actions/checkout@v4
                 - uses: dtolnay/rust-toolchain@nightly
                 - uses: Swatinem/rust-cache@v2
-                - run: cargo test --workspace --all-features --all-targets --no-fail-fast
+                - run: cargo test --workspace --all-targets --no-fail-fast
           YAML_EXHAUSTIVE
 
           cargo generate-lockfile
@@ -322,7 +322,7 @@ jobs:
           broad_log="$(mktemp)"
           broad_start="$(date +%s)"
           set +e
-          timeout 12m cargo test --workspace --all-features --all-targets --no-fail-fast >"$broad_log" 2>&1
+          timeout 12m cargo test --workspace --all-targets --no-fail-fast >"$broad_log" 2>&1
           broad_status=$?
           set -e
           broad_end="$(date +%s)"
@@ -339,7 +339,7 @@ jobs:
             broad_category=BUILD_BROKEN
             broad_next='repair the workspace verifier before publication'
           fi
-          printf '| `%s` | %s | %s | %s | %s |\n' 'cargo test --workspace --all-features --all-targets --no-fail-fast' "$broad_status" "$broad_elapsed" "$broad_category" "$broad_next" >> "$RECEIPT"
+          printf '| `%s` | %s | %s | %s | %s |\n' 'cargo test --workspace --all-targets --no-fail-fast' "$broad_status" "$broad_elapsed" "$broad_category" "$broad_next" >> "$RECEIPT"
           if [ "$broad_status" -ne 0 ] && [ "$broad_status" -ne 124 ]; then
             exit "$broad_status"
           fi

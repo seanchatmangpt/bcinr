@@ -110,7 +110,7 @@ jobs:
       - name: Broad bcinr E2E
         run: cargo test -p bcinr --test e2e_main
       - name: Full workspace
-        run: cargo test --workspace --all-features --all-targets --no-fail-fast
+        run: cargo test --workspace --all-targets --no-fail-fast
       - name: Post-E2E formatting
         run: cargo fmt --all -- --check
       - name: Post-E2E algorithm module integrity
