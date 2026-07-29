@@ -121,10 +121,34 @@ fn request(
     }
 }
 
-/// A real, deterministic (non-`Digest::ZERO`) stand-in manifest digest --
-/// this session's own falsifier target, not a claim about Rail A content.
+/// Rail A's real, committed handoff: `~/mfw/docs/proof-status.md`'s
+/// `JOIN-MATH (ECOSYSTEM-JOIN-001, Rail A)` row records this exact BLAKE3
+/// digest, computed over `CorrespondenceManifest.lean` at commit
+/// `b6a24bf45192b4a49a3cfa0b0536a0e2448a22ce` (cross-checked against
+/// `sha256:2ac0c4117e760b4431ce7148204c45859ae751a99a56bdd015d49790a95d0fbd`
+/// there). The hex string below is parsed at runtime rather than
+/// hand-split into a byte literal array (fewer places a transcription
+/// error can hide), and is not trusted blindly: the
+/// `rail_a_manifest_digest_matches_the_live_proof_status_md` test below
+/// reads `~/mfw/docs/proof-status.md` directly and fails loudly if this
+/// constant has drifted from the real, current file, rather than letting
+/// a stale copy sit unnoticed. Rail A is `ALIVE` as of that commit:
+/// `CorrespondenceManifest.lean` names profile identity
+/// `CMCA-Reference-v0.1`, and `Escort.lean` gained the standalone
+/// `escort_exploit2_1_2_10`/`escort_exploit2_1_2_10_strict_order`
+/// theorems this fixture's masses/lens/expected order correspond to.
+const RAIL_A_MANIFEST_DIGEST_HEX: &str =
+    "f068090c8df550a43b979ba93af07b18938d3e04ee604cdda8086b297a268d20";
+
 fn rail_a_handoff_digest() -> Digest {
-    Digest::hash(b"ECOSYSTEM-JOIN-001:rail-a-handoff-placeholder:not-a-real-lean-manifest")
+    let mut bytes = [0u8; 32];
+    for (i, byte) in bytes.iter_mut().enumerate() {
+        let pair = &RAIL_A_MANIFEST_DIGEST_HEX[i * 2..i * 2 + 2];
+        *byte = u8::from_str_radix(pair, 16).expect(
+            "RAIL_A_MANIFEST_DIGEST_HEX must be valid hex, transcribed from proof-status.md",
+        );
+    }
+    Digest(bytes)
 }
 
 #[test]
@@ -352,4 +376,67 @@ fn exact_rational_oracle_and_fixed_point_runtime_agree_on_priority_order() {
          prepare-high, matching the exact-rational oracle's order -- got \
          low={low:?}, medium={medium:?}, high={high:?}"
     );
+}
+
+// ---------------------------------------------------------------------
+// Drift check: `RAIL_A_MANIFEST_DIGEST_HEX` above is a value copied from
+// `~/mfw/docs/proof-status.md` at the time this fixture was written --
+// exactly the kind of un-receipted handoff this whole checkpoint exists
+// to eliminate. This test closes that gap by reading the real file
+// directly and refusing to pass silently if it has drifted, instead of
+// leaving the copy to go stale unnoticed. This is an environment
+// precondition specific to this cross-repo integration checkpoint
+// (`~/mfw` must be checked out as a sibling directory) -- it fails
+// loudly, by design, rather than skipping quietly, if that's not true;
+// this repository's own convention throughout this session has been
+// "no silent skip," and a cross-repo correspondence check that quietly
+// no-ops when the other repo is absent would defeat its own purpose.
+// ---------------------------------------------------------------------
+
+#[test]
+fn rail_a_manifest_digest_matches_the_live_proof_status_md() {
+    let home = std::env::var("HOME")
+        .expect("HOME must be set to locate the sibling ~/mfw checkout this checkpoint depends on");
+    let path = format!("{home}/mfw/docs/proof-status.md");
+    let content = std::fs::read_to_string(&path).unwrap_or_else(|error| {
+        panic!(
+            "could not read Rail A's handoff file at {path}: {error} -- \
+             this checkpoint requires ~/mfw checked out as a sibling of ~/bcinr; \
+             if that assumption is wrong for this environment, the fix is to \
+             change how this test locates the file, not to skip the check"
+        )
+    });
+
+    let join_math_row = content
+        .lines()
+        .find(|line| line.contains("JOIN-MATH") && line.contains("Rail A"))
+        .unwrap_or_else(|| {
+            panic!(
+                "no JOIN-MATH (ECOSYSTEM-JOIN-001, Rail A) row found in {path} -- \
+                 Rail A's own handoff format may have changed"
+            )
+        });
+
+    let marker = "blake3:";
+    let start = join_math_row
+        .find(marker)
+        .unwrap_or_else(|| panic!("JOIN-MATH row in {path} has no 'blake3:' digest"))
+        + marker.len();
+    let live_hex = &join_math_row[start..start + 64];
+
+    assert_eq!(
+        live_hex, RAIL_A_MANIFEST_DIGEST_HEX,
+        "RAIL_A_MANIFEST_DIGEST_HEX has drifted from the live value in {path} -- \
+         update the constant to match Rail A's current committed handoff"
+    );
+
+    // The digest this test just validated against the live file must be
+    // the exact same value `rail_a_handoff_digest()` uses everywhere else
+    // in this fixture -- not merely a string that happens to look right.
+    let mut bytes = [0u8; 32];
+    for (i, byte) in bytes.iter_mut().enumerate() {
+        let pair = &live_hex[i * 2..i * 2 + 2];
+        *byte = u8::from_str_radix(pair, 16).expect("live digest hex must be valid");
+    }
+    assert_eq!(Digest(bytes), rail_a_handoff_digest());
 }
