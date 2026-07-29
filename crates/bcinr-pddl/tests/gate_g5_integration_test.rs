@@ -123,7 +123,7 @@ fn g5_02_fulfillment_workflow_generates_plan() {
     let verified = workflow.plan(&order).expect("workflow should be admitted");
 
     assert!(
-        verified.batches().len() > 0,
+        !verified.batches().is_empty(),
         "plan must have at least one batch"
     );
     println!(

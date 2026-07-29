@@ -664,6 +664,7 @@ fn action_10_prepare_release() {
 ///   6. release-ready-check
 ///   7. receipt-present
 ///   8. ocel-present
+///
 /// Postcondition: published
 #[test]
 fn action_11_publish_release() {

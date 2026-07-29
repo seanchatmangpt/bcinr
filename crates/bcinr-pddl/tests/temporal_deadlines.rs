@@ -151,7 +151,7 @@ mod deadline_tests {
         let outcome = gtp.find_temporal_plan();
         match outcome {
             PlannerOutcome::Found(plan) => {
-                assert!(plan.steps.len() > 0, "expected at least 1 action in plan");
+                assert!(!plan.steps.is_empty(), "expected at least 1 action in plan");
                 assert!(plan.makespan > 0.0, "makespan should be positive");
             }
             other => panic!("expected Found, got {:?}", other),
@@ -184,7 +184,7 @@ mod deadline_tests {
         let outcome = gtp.find_temporal_plan();
         match outcome {
             PlannerOutcome::Found(plan) => {
-                assert!(plan.steps.len() > 0, "expected at least 1 action in plan");
+                assert!(!plan.steps.is_empty(), "expected at least 1 action in plan");
             }
             other => panic!("expected Found after clearing deadline, got {:?}", other),
         }
