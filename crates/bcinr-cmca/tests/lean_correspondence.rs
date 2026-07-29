@@ -24,7 +24,13 @@
 //! is out of scope here -- D already classified it as a bounded
 //! approximation, not an exact-equality candidate (measured ~1.07% drift
 //! at `q=3` against the exact path in `escort.rs`'s own test suite); an
-//! error-bound theorem for it is future work, not this checkpoint's.
+//! error-bound theorem for it is future work, not this checkpoint's --
+//! see `tests/power_error_bound.rs` for that follow-up checkpoint: an
+//! EMPIRICAL (swept, not analytically derived) relative-error bound of
+//! ~7.6%, measured over `|q| <= 4` (narrower than this crate's full
+//! declared lens domain -- error was measured to scale with `|q|`, up to
+//! ~36% at `|q|` near `MAX_LENS_MAGNITUDE`, so no single bound over the
+//! whole domain would be a useful characterization).
 //!
 //! # Non-interference
 //!

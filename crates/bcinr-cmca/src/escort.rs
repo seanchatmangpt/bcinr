@@ -61,7 +61,13 @@
 //! multiplication `escort_weight` gives you for integer lenses. Measured,
 //! not assumed: at `q = 3` over a small representative mass set, the two
 //! disagree by up to 704/65536 (~1.07% relative) per share -- see
-//! `tests::power_disagrees_with_the_exact_path_at_a_measured_bound`.
+//! `tests::power_disagrees_with_the_exact_path_at_a_measured_bound`. A
+//! domain-wide characterization of `power`'s own relative error (not
+//! mixed with normalization cancellation, as this single-share figure
+//! is) now exists in `tests/power_error_bound.rs`: an empirical, swept
+//! bound of ~7.6% relative error for `|q| <= 4`, with error measured to
+//! grow with `|q|` (up to ~36% near `|q| = 16`) -- so no bound is
+//! claimed, here or there, for `power`'s behavior at larger `|q|`.
 //!
 //! # Declared lens domain
 //!
