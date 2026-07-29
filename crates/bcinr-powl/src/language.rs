@@ -426,6 +426,7 @@ pub fn wf_net_language(net: &WfNet, max_len: usize) -> Language {
     out
 }
 
+#[allow(clippy::too_many_arguments)]
 fn explore(
     net: &WfNet,
     index: &BTreeMap<&str, usize>,
