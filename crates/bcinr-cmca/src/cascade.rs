@@ -623,7 +623,8 @@ fn consequence_mass_with_sink(
         if child_total.to_bits() == 0 {
             return Err(CascadeRefusal::DegenerateSiblingSet { parent: Some(v) });
         }
-        let mut child_shares: Vec<(usize, NonNegativeFixed)> = Vec::with_capacity(children[v].len());
+        let mut child_shares: Vec<(usize, NonNegativeFixed)> =
+            Vec::with_capacity(children[v].len());
         let mut child_sum = NonNegativeFixed::ZERO;
         for &c in &children[v] {
             let share = admit_fixed(
@@ -712,8 +713,8 @@ mod tests {
             vec![None, Some(0), Some(0), Some(1), Some(1)],
             vec![
                 mass(1.0), // root -- must be nonzero: with one root, root_total
-                           // is exactly this weight, and zero would refuse as
-                           // DegenerateSiblingSet rather than build the tree.
+                // is exactly this weight, and zero would refuse as
+                // DegenerateSiblingSet rather than build the tree.
                 mass(3.0), // a
                 mass(1.0), // b
                 mass(2.0), // a1
@@ -750,7 +751,11 @@ mod tests {
         // Internal nodes are root (0) and a (1); b, a1, a2 are leaves and
         // must not appear as a step's `node`.
         let stepped_nodes: alloc::vec::Vec<usize> = trace.steps.iter().map(|s| s.node).collect();
-        assert_eq!(stepped_nodes, alloc::vec![0, 1], "depth-ascending order, internal nodes only");
+        assert_eq!(
+            stepped_nodes,
+            alloc::vec![0, 1],
+            "depth-ascending order, internal nodes only"
+        );
 
         for step in &trace.steps {
             for &(child, _) in &step.child_shares {
@@ -772,8 +777,7 @@ mod tests {
         let lenses = [1i32];
         let trace = consequence_mass_traced(&tree, &lenses).unwrap();
         for step in &trace.steps {
-            let expected =
-                step.input_share.to_bits() as i64 - step.child_sum.to_bits() as i64;
+            let expected = step.input_share.to_bits() as i64 - step.child_sum.to_bits() as i64;
             assert_eq!(step.residual_bits, expected);
         }
     }
