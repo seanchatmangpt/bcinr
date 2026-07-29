@@ -302,3 +302,54 @@ fn falsifier_wrong_lean_manifest_digest_refuses_before_replay() {
 fn plan_for_verification() -> PddlPowlPlan {
     plan()
 }
+
+// ---------------------------------------------------------------------
+// Runtime correspondence: the exact-rational oracle (`reference_escort`,
+// BCINR-CMCA-H) and the fixed-point runtime (`allocate_pddl_powl_plan`,
+// BCINR-CMCA-G) must agree on PRIORITY ORDER for this exact fixture's
+// field -- "no float tolerance may define semantic identity." This does
+// not re-derive H's bit-for-bit correspondence claims; it establishes
+// the one relation ticket-15 actually depends on (high > medium > low)
+// against the real oracle, for the real masses [1, 2, 10] this fixture
+// uses, not [1,2,3,4] or [1,2,10] in the abstract.
+// ---------------------------------------------------------------------
+
+#[test]
+fn exact_rational_oracle_and_fixed_point_runtime_agree_on_priority_order() {
+    use bcinr_cmca::reference_escort::{escort, ReferenceLens};
+
+    // The real exact-rational oracle, BCINR-CMCA-H's own type, on the
+    // exact masses this fixture uses (in prepare-low/medium/high
+    // declaration order).
+    let oracle = escort(ReferenceLens::ExploitTwo, &[1, 2, 10])
+        .expect("exploit2 on strictly positive masses must succeed");
+    assert_eq!(oracle.len(), 3);
+    assert!(
+        oracle[0] < oracle[1] && oracle[1] < oracle[2],
+        "oracle must order low < medium < high -- got {oracle:?}"
+    );
+
+    // The real fixed-point runtime, via the same allocate_pddl_powl_plan
+    // this fixture's main test uses -- not re-derived, reused.
+    let plan = plan();
+    let request = request(2, masses(1, 2, 10), rail_a_handoff_digest());
+    let allocation = allocate_pddl_powl_plan(&plan, &request)
+        .expect("complete mass field over the 4 real production actions must allocate");
+
+    let mut priority_by_label: BTreeMap<String, NonNegativeFixed> = BTreeMap::new();
+    for (&slot, &priority) in &allocation.priority_map {
+        let action = bcinr_pddl::production::action_for_slot(&plan.workflow, slot)
+            .expect("every allocated slot must resolve to a real production action");
+        priority_by_label.insert(action.label.clone(), priority);
+    }
+
+    let low = priority_by_label["prepare-low"];
+    let medium = priority_by_label["prepare-medium"];
+    let high = priority_by_label["prepare-high"];
+    assert!(
+        low < medium && medium < high,
+        "fixed-point runtime must order prepare-low < prepare-medium < \
+         prepare-high, matching the exact-rational oracle's order -- got \
+         low={low:?}, medium={medium:?}, high={high:?}"
+    );
+}

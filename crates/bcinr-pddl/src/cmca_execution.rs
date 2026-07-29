@@ -195,6 +195,11 @@ pub struct CmcaAllocatedExecution {
     pub tape_root: Digest,
     pub profile_identity: ProfileIdentity,
     pub profile_digest: Digest,
+    /// The exact lens schedule this allocation used, exposed directly
+    /// rather than left implicit inside `profile_digest` -- `ECOSYSTEM-JOIN-001`
+    /// Rail B names "lens identity" as its own bound field, not merely
+    /// something a digest happens to cover.
+    pub lens_schedule: LensSchedule,
     pub mass_field_digest: Digest,
     pub capacity: u32,
     /// Tape-slot-id -> admitted CMCA priority. Canonical, not caller-built.
@@ -202,6 +207,44 @@ pub struct CmcaAllocatedExecution {
     pub priority_digest: Digest,
     pub allocation_trace: AllocationTrace,
     pub allocation_trace_digest: Digest,
+    /// Aggregate residual across every internal split this allocation's
+    /// cascade performed -- `ECOSYSTEM-JOIN-001` Rail B names "residual
+    /// summary" as its own bound field, distinct from the full per-step
+    /// `allocation_trace`.
+    pub residual_summary: ResidualSummary,
+}
+
+/// Aggregate view over an [`AllocationTrace`]'s per-step
+/// `residual_bits` -- how much a cascade's descendant-flow splits
+/// under- or over-spent in total, and the single largest such
+/// discrepancy, without requiring a reader to walk every step.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ResidualSummary {
+    pub step_count: usize,
+    /// Sum of every step's signed `residual_bits`.
+    pub total_residual_bits: i64,
+    /// The largest `|residual_bits|` observed across all steps, and the
+    /// node index that produced it (`None` when there are no steps).
+    pub max_abs_residual: Option<(usize, i64)>,
+}
+
+impl ResidualSummary {
+    fn from_trace(trace: &AllocationTrace) -> Self {
+        let mut total = 0i64;
+        let mut max_abs: Option<(usize, i64)> = None;
+        for step in &trace.steps {
+            total += step.residual_bits;
+            let abs = step.residual_bits.abs();
+            if max_abs.map(|(_, current)| abs > current).unwrap_or(true) {
+                max_abs = Some((step.node, abs));
+            }
+        }
+        Self {
+            step_count: trace.steps.len(),
+            total_residual_bits: total,
+            max_abs_residual: max_abs,
+        }
+    }
 }
 
 fn digest_process(plan: &PddlPowlPlan) -> Digest {
@@ -394,18 +437,21 @@ pub fn allocate_pddl_powl_plan(
     let mass_field_digest = request.masses.digest();
     let priority_digest = digest_priority_map(&priority_map);
     let allocation_trace_digest = digest_trace(&allocation_trace);
+    let residual_summary = ResidualSummary::from_trace(&allocation_trace);
 
     Ok(CmcaAllocatedExecution {
         process_digest,
         tape_root,
         profile_identity: request.profile.identity.clone(),
         profile_digest,
+        lens_schedule: request.profile.lens_schedule.clone(),
         mass_field_digest,
         capacity: request.capacity,
         priority_map,
         priority_digest,
         allocation_trace,
         allocation_trace_digest,
+        residual_summary,
     })
 }
 
@@ -416,10 +462,12 @@ pub struct CmcaAllocationReceipt {
     pub tape_root: Digest,
     pub profile_identity: ProfileIdentity,
     pub profile_digest: Digest,
+    pub lens_schedule: LensSchedule,
     pub mass_field_digest: Digest,
     pub capacity: u32,
     pub priority_digest: Digest,
     pub allocation_trace_digest: Digest,
+    pub residual_summary: ResidualSummary,
 }
 
 impl From<&CmcaAllocatedExecution> for CmcaAllocationReceipt {
@@ -429,10 +477,12 @@ impl From<&CmcaAllocatedExecution> for CmcaAllocationReceipt {
             tape_root: allocation.tape_root,
             profile_identity: allocation.profile_identity.clone(),
             profile_digest: allocation.profile_digest,
+            lens_schedule: allocation.lens_schedule.clone(),
             mass_field_digest: allocation.mass_field_digest,
             capacity: allocation.capacity,
             priority_digest: allocation.priority_digest,
             allocation_trace_digest: allocation.allocation_trace_digest,
+            residual_summary: allocation.residual_summary,
         }
     }
 }
