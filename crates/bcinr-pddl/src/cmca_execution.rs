@@ -77,13 +77,27 @@ pub struct CmcaExecutionProfile {
     pub identity: ProfileIdentity,
     pub lens_schedule: LensSchedule,
     pub allocation_semantics: AllocationSemantics,
+    /// Digest of the Lean reference manifest this profile claims
+    /// correspondence with (`ECOSYSTEM-JOIN-001`, Rail B) -- an opaque,
+    /// caller-supplied binding. This module does not author, fetch, or
+    /// verify Lean manifest *content*; that is Rail A's (`~/mfw` math
+    /// session) job, in a separate repository this crate never reads at
+    /// runtime. What this field lets `verify_cmca_execution` prove is
+    /// narrower and real: that the *same* manifest digest governed both
+    /// sealing and verification -- a mismatch refuses via the existing
+    /// `ProfileDigestMismatch` path, exactly like any other profile-field
+    /// mismatch. Checkpoints predating this field (`BCINR-CMCA-F`/`G`)
+    /// pass [`Digest::ZERO`] here, documented at each call site as "no
+    /// Lean manifest binding required for that checkpoint's scope" -- not
+    /// a silent default with hidden meaning.
+    pub lean_manifest_digest: Digest,
 }
 
 impl CmcaExecutionProfile {
     /// Deterministic commitment to every field -- two profiles with the
-    /// same numeric lens schedule but different identity or semantics
-    /// digest differently, on purpose (semantic identity must not collapse
-    /// into coincidentally equal output).
+    /// same numeric lens schedule but different identity, semantics, or
+    /// Lean manifest digest digest differently, on purpose (semantic
+    /// identity must not collapse into coincidentally equal output).
     pub fn digest(&self) -> Digest {
         let mut buf = Vec::new();
         buf.extend_from_slice(b"bcinr:cmca-g:profile:v1");
@@ -96,6 +110,7 @@ impl CmcaExecutionProfile {
         buf.push(match self.allocation_semantics {
             AllocationSemantics::UniformSiblingCoverageQ0 => 0u8,
         });
+        buf.extend_from_slice(self.lean_manifest_digest.as_bytes());
         Digest::hash(&buf)
     }
 }

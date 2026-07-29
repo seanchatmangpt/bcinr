@@ -57,6 +57,9 @@ fn request(capacity: u32) -> CmcaExecutionRequest {
             identity: ProfileIdentity("BCINR_CMCA_PROFILE_V0_1".to_string()),
             lens_schedule: LensSchedule(vec![1]),
             allocation_semantics: AllocationSemantics::UniformSiblingCoverageQ0,
+            // No Lean manifest binding required for BCINR-CMCA-F's scope --
+            // this field was introduced later, by ECOSYSTEM-JOIN-001 Rail B.
+            lean_manifest_digest: bcinr_mfw_ir::Digest::ZERO,
         },
         capacity,
         masses: ProcessMassField(masses),
@@ -142,6 +145,9 @@ fn inverting_real_priority_changes_which_action_the_production_path_defers() {
             identity: ProfileIdentity("BCINR_CMCA_PROFILE_V0_1".to_string()),
             lens_schedule: LensSchedule(vec![1]),
             allocation_semantics: AllocationSemantics::UniformSiblingCoverageQ0,
+            // No Lean manifest binding required for BCINR-CMCA-F's scope --
+            // this field was introduced later, by ECOSYSTEM-JOIN-001 Rail B.
+            lean_manifest_digest: bcinr_mfw_ir::Digest::ZERO,
         },
         capacity: 2,
         masses: ProcessMassField(masses),

@@ -61,6 +61,9 @@ fn profile(identity: &str, lenses: Vec<i32>) -> CmcaExecutionProfile {
         identity: ProfileIdentity(identity.to_string()),
         lens_schedule: LensSchedule(lenses),
         allocation_semantics: AllocationSemantics::UniformSiblingCoverageQ0,
+        // No Lean manifest binding required for BCINR-CMCA-G's scope --
+        // this field was introduced later, by ECOSYSTEM-JOIN-001 Rail B.
+        lean_manifest_digest: bcinr_mfw_ir::Digest::ZERO,
     }
 }
 
