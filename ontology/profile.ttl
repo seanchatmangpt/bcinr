@@ -78,4 +78,4 @@ bc:AllocatorPriceGainMax a bc:ProfileConstant ;
     bc:inProfile bc:Q16_16 ;
     bc:policyMarked true ;
     bc:policyOwner "bcinr-cmca::allocator" ;
-    bc:policyRationale "UNDERIVED. Unlike the three bounds above, this one gates rather than clamps: any mu[i] exceeding it sets price_err, which (Checkpoint A traced this precisely through allocate_in's err_val selection chain) produces StabilityRefusal::PriceGainUnsafe. The one bound among the allocator's four whose violation refuses instead of silently reshaping." .
+    bc:policyRationale "UNDERIVED. Unlike the three bounds above, this one gates rather than clamps: any `mu[i]` exceeding it sets price_err, which (Checkpoint A traced this precisely through allocate_in's err_val selection chain) produces StabilityRefusal::PriceGainUnsafe. The one bound among the allocator's four whose violation refuses instead of silently reshaping." .

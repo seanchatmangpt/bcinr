@@ -50,7 +50,7 @@
 //! `saturating_mul` -- but only for integer `q` (`lens: i32`), and that
 //! module's own docs are explicit that this is deliberate: "no `powf`, no
 //! libm, no floating point anywhere... bit-identical on every platform."
-//! [`escort_distribution`] now dispatches to it automatically whenever `q`
+//! `escort_distribution` now dispatches to it automatically whenever `q`
 //! has no fractional part: an integer lens never reaches the approximate
 //! path, regardless of which entry point a caller uses.
 //!
@@ -71,7 +71,7 @@
 //!
 //! # Declared lens domain
 //!
-//! [`escort_distribution`] refuses any `q` whose magnitude exceeds
+//! `escort_distribution` refuses any `q` whose magnitude exceeds
 //! [`crate::cascade::MAX_LENS_MAGNITUDE`] -- the same bound
 //! `cascade::escort_weight` enforces for integer lenses, now applied to
 //! fractional `q` too. This is a provisional domain, not one derived from a

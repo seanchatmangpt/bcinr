@@ -583,7 +583,7 @@ fn ancestor_doubling_table(parent: &[i32; N]) -> [[i32; N]; 8] {
 /// Validate that `parent` describes an acyclic forest on `N` nodes, per
 /// `CMCA_CONTRACT.md` §9 ("Hierarchy Acyclicity (DAG Property)"): a
 /// well-formed forest always reaches a root (`-1`) within `N` hops from any
-/// node, so `P[7][j] != -1` for any `j` (`P` from [`ancestor_doubling_table`])
+/// node, so `P[7][j] != -1` for any `j` (`P` from `ancestor_doubling_table`)
 /// is exactly the branchless witness of a cycle -- the same check
 /// [`allocate`] already performs internally before it would otherwise
 /// silently degrade to `root_w_sum == 0` and an all-`eta` output. Callers

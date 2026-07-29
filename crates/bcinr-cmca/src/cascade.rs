@@ -42,7 +42,7 @@
 //!
 //! Lenses are integers, and `m^q` is computed by repeated `saturating_mul`
 //! (and one `saturating_div` for negative `q`) over Q16.16
-//! [`NonNegativeFixed`] -- no `powf`, no libm, no floating point anywhere. The
+//! `NonNegativeFixed` -- no `powf`, no libm, no floating point anywhere. The
 //! result is bit-identical on every platform, exactly as the certified path
 //! is. Integer lenses are not a restriction in practice: the lens vocabulary
 //! this crate is built around (exploitation `2`, proportional `1`, coverage
@@ -332,7 +332,7 @@ fn escort_power(
 /// (`escort.rs`'s exact-lens dispatch and existing correspondence tests call
 /// it by name), but for `lens == 0` it now delegates to
 /// [`uniform_sibling_weight`], and for `lens != 0` to the shared
-/// [`escort_power`] helper, rather than duplicating either.
+/// `escort_power` helper, rather than duplicating either.
 ///
 /// See [`escort_weight_support`] for the other convention (*support
 /// coverage*: zero mass gets zero weight at `q == 0`, excluding it from the
@@ -384,7 +384,7 @@ pub fn uniform_sibling_weight(_mass: NonNegativeFixed, _node: usize) -> NonNegat
 ///
 /// No production call site in this crate currently selects support
 /// coverage; it is exposed so a caller that needs it does not have to
-/// duplicate [`escort_power`] to get it.
+/// duplicate `escort_power` to get it.
 pub fn escort_weight_support(
     mass: NonNegativeFixed,
     lens: i32,

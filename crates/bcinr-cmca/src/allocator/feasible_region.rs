@@ -78,7 +78,7 @@ impl FeasibleRegion {
     /// The bounds `allocate()` has always used, extracted rather than
     /// changed. `allocate(x) == allocate_in(&FeasibleRegion::CURRENT, x)`
     /// for every input, by construction: `allocate` is defined as that call.
-    /// Sourced from [`BCINR_CMCA_ALLOCATOR_V0_1`] (BCINR-CMCA-C) -- the bit
+    /// Sourced from `BCINR_CMCA_ALLOCATOR_V0_1` (BCINR-CMCA-C) -- the bit
     /// values are unchanged, only their origin.
     pub const CURRENT: Self = Self {
         beta_max: BCINR_CMCA_ALLOCATOR_V0_1.beta_max,
@@ -120,7 +120,7 @@ impl FeasibleRegion {
 
     /// Checks: every component nonnegative (guaranteed by
     /// `NonNegativeFixed`'s type, not checked here), none exceeds `ONE`, and
-    /// the sum equals `ONE` within [`Self::SUM_TOLERANCE_BITS`].
+    /// the sum equals `ONE` within `Self::SUM_TOLERANCE_BITS`.
     ///
     /// **Not a universal postcondition of `allocate_in`.** It was written as
     /// one, wired into `allocate_in` as an automatic refusal gate, and that

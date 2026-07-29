@@ -19,7 +19,7 @@
 //! which compile to native FP instructions). Adding an external `libm` dependency is out of
 //! scope here, so this module carries its own small `ln` (bit-decomposition + atanh series)
 //! and avoids `sqrt` entirely by normalizing the power-iteration vector with the infinity
-//! norm instead of the Euclidean norm -- valid because [`GAIN_MATRIX`] is entrywise
+//! norm instead of the Euclidean norm -- valid because `GAIN_MATRIX` is entrywise
 //! non-negative, so Perron-Frobenius power iteration converges under any vector norm.
 
 use crate::generated::stability_profile::NonNegativeFixed;
