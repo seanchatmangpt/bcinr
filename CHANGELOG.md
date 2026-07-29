@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [26.7.28] - 2026-07-28
+
+### Published
+
+- Published `bcinr-logic`, `bcinr-powl`, `bcinr-powl-receipt`, `bcinr-pddl` to
+  crates.io at `26.7.28` (bumped from their prior published versions).
+- First-time crates.io publish of `bcinr-mfw-ir` and `bcinr-cmca` at `26.7.28`.
+- `bcinr` (facade) and `bcinr-api`/`bcinr-core`/`bcinr-bench`/`bcinr-ffi` were
+  removed from the workspace in the prior repository-narrowing refactor and are
+  not republished. `bcinr-guarded` carries `publish = false` and stays local-only
+  at `26.7.25`.
+
+### Added
+
+- **`BCINR-CMCA-H`/`H1`**: Rust/Lean correspondence tests against
+  `~/mfw`'s `Escort.lean` — scale invariance, permutation equivariance,
+  golden vectors, pairwise concentration, and exact refusal-constructor
+  identity for `escort_weight`/`escort_distribution`.
+- **`ECOSYSTEM-JOIN-001` Rail B**: `ticket-15` fork/join fixture
+  (`crates/bcinr-pddl/tests/ticket_15_ecosystem_join.rs`), `lean_manifest_digest`
+  binding threaded through `CmcaExecutionProfile`/`CmcaAllocatedExecution`, and
+  `ResidualSummary` on allocation receipts.
+
 ## [26.6.24] - 2026-06-24
 
 ### Added
