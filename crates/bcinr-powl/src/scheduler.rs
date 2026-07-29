@@ -665,6 +665,70 @@ impl ConcurrencySelector for CapacityBoundedSelector {
         selected
     }
 }
+
+/// A finite per-tick concurrency budget ([`CapacityBoundedSelector`]) whose
+/// admission order is driven by a caller-supplied priority per op, instead
+/// of ascending index order.
+///
+/// BCINR-SCHED-002 established that scarcity has a real semantic home
+/// (`CapacityBoundedSelector`) separate from `ConcurrencyGuardTable`'s
+/// conflict exclusion. BCINR-CMCA-E answers the next question: does a real
+/// CMCA-derived priority ever change *which* ready ops are admitted under
+/// that scarcity? This selector makes that question decidable -- the
+/// priority values are the caller's to supply (see
+/// `crate::multifractal::consequence_mass` for a real source over a
+/// [`crate::powl2::Powl2Model`]), this type only defines how they are used:
+/// when `ready.len()` exceeds `capacity`, the ops with the highest
+/// `priority` entries are admitted first; ops with no entry default to
+/// [`bcinr_cmca::fixed::NonNegativeFixed::ZERO`] (least preferred). Ties
+/// break by ascending id, matching [`StableMaximalSelector`]'s determinism.
+///
+/// Guard-table admission is still checked -- this narrows *order*, not the
+/// [`ConcurrencyGuardTable::admits`] postcondition [`ConcurrencySelector::select_checked`]
+/// enforces.
+pub struct PriorityCapacitySelector {
+    /// Maximum number of ops admitted into one tick's candidate set.
+    pub capacity: u32,
+    /// Priority per op id. Higher sorts first. Missing ids default to zero.
+    pub priority: BTreeMap<usize, bcinr_cmca::fixed::NonNegativeFixed>,
+}
+
+impl ConcurrencySelector for PriorityCapacitySelector {
+    /// # Complexity
+    ///
+    /// O(`ready.len()` log `ready.len()`) for the priority sort, plus
+    /// O(`ready.len()` * `guards.nonfaces.len()`) for admission, same shape
+    /// as [`CapacityBoundedSelector::select`].
+    fn select(&mut self, ready: &EventSet, guards: &ConcurrencyGuardTable) -> EventSet {
+        let mut candidates: Vec<usize> = ready.iter_stable().collect();
+        candidates.sort_by(|a, b| {
+            let pa = self
+                .priority
+                .get(a)
+                .copied()
+                .unwrap_or(bcinr_cmca::fixed::NonNegativeFixed::ZERO);
+            let pb = self
+                .priority
+                .get(b)
+                .copied()
+                .unwrap_or(bcinr_cmca::fixed::NonNegativeFixed::ZERO);
+            pb.cmp(&pa).then(a.cmp(b))
+        });
+
+        let mut selected = EventSet::empty();
+        for id in candidates {
+            if selected.len() >= self.capacity {
+                break;
+            }
+            let candidate = selected.with(id);
+            if guards.admits(&candidate) {
+                selected = candidate;
+            }
+        }
+        selected
+    }
+}
+
 /// Convert a `u64` tape-slot bitmask (as used throughout `scheduler_tick`)
 /// into an `EventSet` (as used by `ConcurrencySelector`/`ConcurrencyGuardTable`).
 ///
