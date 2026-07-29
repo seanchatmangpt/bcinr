@@ -14,23 +14,35 @@
 //! `chi(q) = sum_i p_i^q`.
 //!
 //! What this crate adds on top of that ancestry: a fixed five-lens reference
-//! profile (not yet formalized -- see `~/mfw`'s planned
-//! `MFW/CMCA/ReferenceEscort.lean`), typed refusals instead of silent
-//! degradation, a fixed-point (not floating-point) realization, an explicit
-//! declared lens domain (below), integration with [`crate::cascade`]'s
-//! hierarchical allocation, and a still-open, not-yet-resolved semantic
-//! decision between *support coverage* (uniform over positive-mass support
-//! only, excluding zero-mass elements) and *sibling coverage* (uniform over
-//! every eligible sibling, zero-mass included). **Current BCINR behavior is
+//! profile -- now hand-transcribed (not machine-checked; see
+//! [`crate::reference_escort`]) from `~/mfw`'s
+//! `MFW/CMCA/Semantics/Escort.lean` (`CMCA-Escort-v0.1`) -- typed refusals
+//! instead of silent degradation, a fixed-point (not floating-point)
+//! realization, an explicit declared lens domain (below), integration with
+//! [`crate::cascade`]'s hierarchical allocation, and a semantic decision
+//! between *support coverage* (uniform over positive-mass support only,
+//! excluding zero-mass elements -- Lean's `ReferenceLens.coverage`) and
+//! *sibling coverage* (uniform over every eligible sibling, zero-mass
+//! included -- Lean's `uniformSiblingCoverage`). **Current BCINR behavior is
 //! sibling coverage**: [`crate::cascade::escort_weight`]'s `lens == 0`
 //! branch returns `NonNegativeFixed::ONE` unconditionally, regardless of
 //! mass, so a zero-mass sibling gets the same weight as every other one.
-//! This module's current behavior is not a claim that it already conforms
-//! to whatever `~/mfw`'s Lean crown ultimately settles for `q == 0` -- if
-//! that crown settles on support coverage instead, this is the exact
-//! behavior that migrates, not something already aligned with it. The
-//! citation above documents
-//! mathematical ancestry, not completed conformance.
+//! This is now checked, not merely asserted: on zero-containing mass
+//! fields, `escort_distribution(masses, q=0)` matches
+//! `reference_escort::uniform_sibling_coverage(masses)` within a measured
+//! Q16.16 tolerance, and does NOT match
+//! `reference_escort::escort(Coverage, masses)` on the same inputs -- see
+//! `crates/bcinr-cmca/tests/cmca_h_lean_correspondence.rs`,
+//! `q_zero_on_zero_containing_masses_matches_sibling_coverage_not_support_coverage`.
+//! That test held on every case exercised: BCINR's `q = 0` behavior is
+//! sibling coverage, not support coverage, exactly as this paragraph
+//! claims. This is a differential-test correspondence result, not a formal
+//! or machine-checked proof -- there is no FFI or export bridge between
+//! `~/mfw`'s Lean repository and this Rust crate, and `reference_escort`
+//! is itself a hand-transcription of the Lean definitions, not a generated
+//! or verified artifact. The citation above documents mathematical
+//! ancestry; the correspondence tests document checked (not proven)
+//! agreement with the Lean reference oracle.
 //!
 //! # Relationship to `cascade::escort_weight` and `allocator::power`
 //!
@@ -90,7 +102,10 @@ pub enum EscortRefusal {
     /// `NumericFault`, since `CascadeRefusal` already distinguishes several
     /// refusal shapes (underflow, zero mass under a negative lens, ...)
     /// worth keeping intact.
-    ExactPathRefused { index: usize, reason: CascadeRefusal },
+    ExactPathRefused {
+        index: usize,
+        reason: CascadeRefusal,
+    },
     /// Every element's `p_i^q` came out zero (typically: all masses zero
     /// under `q > 0`, or a very negative `q` driving every weight to zero),
     /// so the normalization `w_i / SUM w_j` has no denominator. Refused

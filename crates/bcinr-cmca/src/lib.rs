@@ -111,6 +111,11 @@ pub mod generated;
 pub mod generated_profile;
 pub mod lrc;
 pub mod observatory;
+/// Hand-transcribed exact-rational reference oracle for the CMCA escort
+/// distribution, mirroring `~/mfw`'s `MFW/CMCA/Semantics/Escort.lean`. Not a
+/// machine-checked bridge -- see the module docs for exact scope.
+#[cfg(feature = "alloc")]
+pub mod reference_escort;
 pub mod stability_theorem;
 
 pub use allocator::{check_hierarchy_acyclic, HierarchyRefusal, StabilityRefusal};
