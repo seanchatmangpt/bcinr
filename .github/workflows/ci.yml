@@ -26,10 +26,12 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Formatting
-        run: cargo fmt --all -- --check
-      - name: Workspace compile
-        run: cargo check --workspace --all-features
+      # No `cargo fmt --check` gate: formatting is run by hand. Gating on it
+      # also collides with `ggen sync`, which emits compact output that rustfmt
+      # then reformats -- the two can never both be satisfied.
+      #
+      # No separate `cargo check`: Clippy runs the same type-check front-end
+      # over a superset of targets (--all-targets), so it is strictly subsumed.
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       # `--features std`, NOT `--all-features`: bcinr-cmca's feature list is
@@ -71,10 +73,12 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Formatting
-        run: cargo fmt --all -- --check
-      - name: Workspace compile
-        run: cargo check --workspace --all-features
+      # No `cargo fmt --check` gate: formatting is run by hand. Gating on it
+      # also collides with `ggen sync`, which emits compact output that rustfmt
+      # then reformats -- the two can never both be satisfied.
+      #
+      # No separate `cargo check`: Clippy runs the same type-check front-end
+      # over a superset of targets (--all-targets), so it is strictly subsumed.
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       # Deliberately NOT --all-features: bcinr-cmca declares mutant_1..mutant_11,
@@ -82,7 +86,7 @@ jobs:
       # crates/bcinr-cmca/Cargo.toml). --all-features arms all eleven at once and
       # fails 15 targets by design -- e.g. mutant_7 inverts const_eq_u32, so every
       # saturating_div takes the saturate path and escort_power returns u32::MAX.
-      # Mutants are meant to be enabled one at a time. check/clippy above keep
+      # Mutants are meant to be enabled one at a time. Clippy above keeps
       # --all-features: the mutants change behaviour, not compilation.
       - name: Full Linux workspace
         run: cargo test --workspace --all-targets --no-fail-fast
