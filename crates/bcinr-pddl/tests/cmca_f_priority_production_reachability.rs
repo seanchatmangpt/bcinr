@@ -11,36 +11,27 @@
 //! disclaiming any claim about `bcinr_pddl::production`. BCINR-CMCA-F closes
 //! that gap.
 //!
-//! # Bridging note (same honest pattern as BCINR-CMCA-E)
+//! # BCINR-CMCA-G note
 //!
-//! `bcinr_pddl::production::PddlPowlRuntime::plan` compiles through
-//! `compile_powl_v2` over a flat `bcinr_mfw_ir::PowlModel` -- a different
-//! type from `Powl2Model`/`compile_powl2` (the recursive model
-//! `multifractal::consequence_mass` consumes). No bridge type exists
-//! between them. This fixture establishes the correspondence itself: it
-//! builds a `Powl2Model` with the *same* activity labels as the real
-//! production plan's ground actions, runs the real CMCA cascade over it,
-//! and maps each resulting mass back onto its production tape slot by
-//! label round-trip through `CompiledPowlV2::node_labels` +
-//! `PowlTape::label_slab` -- verified, not assumed.
-//!
-//! # Preserve
-//!
-//! `PddlPowlPlan::execute` (the existing, default entrypoint) is completely
-//! unchanged and untouched by this checkpoint. `execute_with_selector` is a
-//! new, additive, opt-in method; `execute_and_seal_v2`/`verify_execution_v2`
-//! still hard-default to `StableMaximalSelector` and every pre-existing
-//! caller of them is unaffected -- confirmed by the full crate test suite
-//! passing unchanged (see verification notes in this checkpoint's report).
+//! This fixture originally hand-rolled the process-to-priority mapping
+//! (build a matching `Powl2Model`, run the cascade, walk
+//! `workflow.powl_model.provenance` -> `causal_plan.occurrences` ->
+//! `epoch.actions[..].label` by hand). BCINR-CMCA-G promoted that exact
+//! chain into the one canonical production function,
+//! `bcinr_pddl::cmca_execution::allocate_pddl_powl_plan`, and this fixture
+//! now calls it instead of duplicating the mapping -- per BCINR-CMCA-G
+//! acceptance criterion #4 ("fixture-local mapping logic is removed or
+//! reduced to calls into that production function"). The verdict and
+//! assertions below are unchanged from the original checkpoint.
 
 #![cfg(feature = "mfw-planner")]
 
-use std::collections::BTreeMap;
-
 use bcinr_cmca::fixed::NonNegativeFixed;
+use bcinr_pddl::cmca_execution::{
+    AllocationSemantics, CmcaExecutionProfile, CmcaExecutionRequest, LensSchedule,
+    ProcessMassField, ProfileIdentity,
+};
 use bcinr_pddl::production::{PddlPowlConfig, PddlPowlRuntime};
-use bcinr_powl::multifractal::consequence_mass;
-use bcinr_powl::process_toolkit::{activity, partial_order};
 use bcinr_powl::scheduler::PriorityCapacitySelector;
 
 /// Three actions, all applicable from the empty initial state, no shared
@@ -56,116 +47,59 @@ const DOMAIN: &str = "(define (domain cmcaf)
 const PROBLEM: &str = "(define (problem cmcafp) (:domain cmcaf) (:init)
     (:goal (and (done-low) (done-mid) (done-high))))";
 
-/// Build the real production plan, then derive a real CMCA-priority map
-/// keyed by production tape slot id, verified by label round-trip.
-fn plan_and_priorities() -> (
-    bcinr_pddl::production::PddlPowlPlan,
-    BTreeMap<usize, NonNegativeFixed>,
-) {
+fn request(capacity: u32) -> CmcaExecutionRequest {
+    let mut masses = std::collections::BTreeMap::new();
+    masses.insert("act-low".to_string(), NonNegativeFixed::from_bits(1));
+    masses.insert("act-mid".to_string(), NonNegativeFixed::from_bits(10));
+    masses.insert("act-high".to_string(), NonNegativeFixed::from_bits(100));
+    CmcaExecutionRequest {
+        profile: CmcaExecutionProfile {
+            identity: ProfileIdentity("BCINR_CMCA_PROFILE_V0_1".to_string()),
+            lens_schedule: LensSchedule(vec![1]),
+            allocation_semantics: AllocationSemantics::UniformSiblingCoverageQ0,
+        },
+        capacity,
+        masses: ProcessMassField(masses),
+    }
+}
+
+fn plan() -> bcinr_pddl::production::PddlPowlPlan {
     let mut runtime = PddlPowlRuntime::new(PddlPowlConfig::default());
     let plan = runtime
         .plan(DOMAIN, PROBLEM)
         .expect("3 independent, immediately-applicable actions must plan");
-
     assert!(
         plan.compiled.guards.nonfaces.is_empty(),
         "genuinely independent actions must produce no guard conflict -- \
          otherwise this fixture accidentally exercises deferral caused by \
          something other than priority/capacity"
     );
-
-    // Real CMCA masses, computed over a Powl2Model built with the SAME
-    // labels as the real production ground actions.
-    let model = partial_order(
-        vec![
-            activity("act-low"),
-            activity("act-mid"),
-            activity("act-high"),
-        ],
-        vec![],
-    )
-    .expect("3-child partial order with no edges is valid");
-    let mass_of = |node: &bcinr_powl::powl2::Powl2Model| -> NonNegativeFixed {
-        match node {
-            bcinr_powl::powl2::Powl2Model::Activity(label) if label == "act-low" => {
-                NonNegativeFixed::from_bits(1)
-            }
-            bcinr_powl::powl2::Powl2Model::Activity(label) if label == "act-mid" => {
-                NonNegativeFixed::from_bits(10)
-            }
-            bcinr_powl::powl2::Powl2Model::Activity(label) if label == "act-high" => {
-                NonNegativeFixed::from_bits(100)
-            }
-            _ => NonNegativeFixed::ONE,
-        }
-    };
-    let allocated =
-        consequence_mass(&model, &[1], mass_of).expect("real cascade over a valid tree");
-    let mass_by_label: BTreeMap<String, NonNegativeFixed> = allocated
-        .into_iter()
-        .filter(|(node_ref, _)| node_ref.path().len() == 1)
-        .map(|(node_ref, mass)| {
-            let label = match node_ref.path()[0] {
-                0 => "act-low",
-                1 => "act-mid",
-                2 => "act-high",
-                other => panic!("unexpected child index {other}"),
-            };
-            (label.to_string(), mass)
-        })
-        .collect();
-    assert_eq!(mass_by_label.len(), 3);
-
-    // Map each production tape slot to its real CMCA mass, resolved through
-    // the real ground-action label -- `CompiledPowlV2::node_labels` turns
-    // out to hold the projector's own synthetic "action-N" placeholders,
-    // NOT the real PDDL action name (confirmed by inspection: this is a
-    // genuinely different label namespace from `execution_batches()`'s
-    // output). The real label lives in `workflow.powl_model.provenance`
-    // (node -> occurrence) -> `workflow.causal_plan.occurrences` (occurrence
-    // -> action index) -> `workflow.epoch.actions[..].label` -- the same
-    // chain `production.rs`'s own private `action_for_slot` walks.
-    let mut priority = BTreeMap::new();
-    for (&node_id, &occurrence_id) in &plan.workflow.powl_model.provenance {
-        let occurrence = plan
-            .workflow
-            .causal_plan
-            .occurrences
-            .iter()
-            .find(|occurrence| occurrence.id == occurrence_id)
-            .expect("provenance must reference a real occurrence");
-        let action = plan
-            .workflow
-            .epoch
-            .actions
-            .get(occurrence.action as usize)
-            .expect("occurrence must reference a real action index");
-        if let Some(mass) = mass_by_label.get(&action.label) {
-            priority.insert(node_id.0 as usize, *mass);
-        }
-    }
-    assert_eq!(
-        priority.len(),
-        3,
-        "expected to resolve a real CMCA mass for all 3 production action labels -- \
-         got {priority:?} from node_labels {:?}",
-        plan.compiled.node_labels
-    );
-
-    (plan, priority)
+    plan
 }
 
 #[test]
 fn real_cmca_priority_determines_deferral_through_the_production_entrypoint() {
-    let (plan, priority) = plan_and_priorities();
+    let plan = plan();
+    let request = request(2);
+
+    let allocation = bcinr_pddl::cmca_execution::allocate_pddl_powl_plan(&plan, &request)
+        .expect("complete mass field over 3 real production actions must allocate");
+    assert_eq!(allocation.priority_map.len(), 3);
+
+    let low_slot = *allocation
+        .priority_map
+        .iter()
+        .min_by_key(|(_, mass)| **mass)
+        .map(|(id, _)| id)
+        .expect("non-empty priority map");
 
     let mut seal_selector = PriorityCapacitySelector {
         capacity: 2,
-        priority: priority.clone(),
+        priority: allocation.priority_map.clone(),
     };
     let mut verify_selector = PriorityCapacitySelector {
         capacity: 2,
-        priority: priority.clone(),
+        priority: allocation.priority_map.clone(),
     };
     let execution = plan
         .execute_with_selector(&mut seal_selector, &mut verify_selector)
@@ -189,6 +123,7 @@ fn real_cmca_priority_determines_deferral_through_the_production_entrypoint() {
         "the lowest-priority action ('act-low') must be the one deferred out \
          of tick one -- got {batches:?}"
     );
+    let _ = low_slot; // documents which slot was lowest, for the assertion above
 }
 
 /// Hostile falsifier: invert the priority so `act-low` has the highest
@@ -197,32 +132,31 @@ fn real_cmca_priority_determines_deferral_through_the_production_entrypoint() {
 /// consequential here and this checkpoint's headline claim is false.
 #[test]
 fn inverting_real_priority_changes_which_action_the_production_path_defers() {
-    let (plan, priority) = plan_and_priorities();
-    let low_slot = *priority
-        .iter()
-        .min_by_key(|(_, mass)| **mass)
-        .map(|(id, _)| id)
-        .expect("non-empty priority map");
+    let plan = plan();
+    let mut masses = std::collections::BTreeMap::new();
+    masses.insert("act-low".to_string(), NonNegativeFixed::from_bits(1000));
+    masses.insert("act-mid".to_string(), NonNegativeFixed::from_bits(1));
+    masses.insert("act-high".to_string(), NonNegativeFixed::from_bits(1));
+    let request = CmcaExecutionRequest {
+        profile: CmcaExecutionProfile {
+            identity: ProfileIdentity("BCINR_CMCA_PROFILE_V0_1".to_string()),
+            lens_schedule: LensSchedule(vec![1]),
+            allocation_semantics: AllocationSemantics::UniformSiblingCoverageQ0,
+        },
+        capacity: 2,
+        masses: ProcessMassField(masses),
+    };
 
-    let mut inverted = BTreeMap::new();
-    for &id in priority.keys() {
-        inverted.insert(
-            id,
-            if id == low_slot {
-                NonNegativeFixed::from_bits(1000)
-            } else {
-                NonNegativeFixed::from_bits(1)
-            },
-        );
-    }
+    let allocation = bcinr_pddl::cmca_execution::allocate_pddl_powl_plan(&plan, &request)
+        .expect("complete mass field over 3 real production actions must allocate");
 
     let mut seal_selector = PriorityCapacitySelector {
         capacity: 2,
-        priority: inverted.clone(),
+        priority: allocation.priority_map.clone(),
     };
     let mut verify_selector = PriorityCapacitySelector {
         capacity: 2,
-        priority: inverted,
+        priority: allocation.priority_map,
     };
     let execution = plan
         .execute_with_selector(&mut seal_selector, &mut verify_selector)

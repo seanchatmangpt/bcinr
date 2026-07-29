@@ -105,6 +105,10 @@ pub enum PddlPowlError {
     GoalNotReached,
     ParallelReplayMismatch,
     StateReceiptMismatch,
+    /// BCINR-CMCA-G: the canonical CMCA allocation mapping refused --
+    /// see [`crate::cmca_execution::CmcaAllocationRefusal`] for the exact
+    /// distinguishable cause.
+    Cmca(crate::cmca_execution::CmcaAllocationRefusal),
 }
 
 impl std::fmt::Display for PddlPowlError {
@@ -150,6 +154,7 @@ impl std::fmt::Display for PddlPowlError {
                 "POWL parallel replay final state differs from the validated PDDL plan"
             ),
             Self::StateReceiptMismatch => write!(f, "PDDL state-execution receipt mismatch"),
+            Self::Cmca(refusal) => write!(f, "CMCA allocation refused: {refusal}"),
         }
     }
 }
@@ -537,7 +542,11 @@ fn action_labels_for_mask(
     })
 }
 
-fn action_for_slot<'a>(
+/// Walk POWL node -> provenance occurrence -> causal-plan occurrence ->
+/// epoch action for one tape slot. Public since BCINR-CMCA-G: this is the
+/// one canonical identity-resolution chain, reused by
+/// `crate::cmca_execution` instead of being hand-rolled a second time.
+pub fn action_for_slot<'a>(
     workflow: &'a PlannedWorkflow,
     slot: usize,
 ) -> Result<&'a Pddl8GroundAction, PddlPowlError> {

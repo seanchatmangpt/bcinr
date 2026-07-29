@@ -48,6 +48,8 @@ pub mod logical_time;
 pub mod mfw;
 // The parser deliberately mirrors the canonical external predicate declaration
 // tuple so admission does not introduce a second shadow AST.
+#[cfg(feature = "mfw-planner")]
+pub mod cmca_execution;
 #[allow(clippy::type_complexity)]
 pub mod parse;
 pub mod powl_bridge;
