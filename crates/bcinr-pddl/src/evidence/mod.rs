@@ -35,7 +35,7 @@
 //!
 //! Deliberately none beyond `blake3` and `serde`, both unconditional
 //! dependencies of this crate. In particular this module does not use
-//! `problem_builder` or `bcinr-powl-receipt::chain`, which are both gated
+//! `problem_builder` or `bcinr-powl`'s `receipt::chain`, which are both gated
 //! behind the optional `mfw-planner` feature and so unavailable by default.
 
 use std::path::{Path, PathBuf};
@@ -48,7 +48,7 @@ mod ledger;
 pub use ledger::{EvidenceLedger, LedgerEntry, LedgerError};
 
 /// Domain-separation prefix, matching the house style used by `digest_tape`
-/// and friends in `bcinr-powl-receipt`.
+/// and friends in `bcinr-powl`'s `receipt` module.
 const EVIDENCE_DOMAIN: &[u8] = b"bcinr:pddl:evidence:v1";
 
 /// Hash arbitrary bytes under this module's domain separator.

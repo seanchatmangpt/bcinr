@@ -1,18 +1,18 @@
 //! `ExecutionReceipt` — a receipt attesting to one real
-//! `bcinr_powl::scheduler::scheduler_tick_guarded` decision: which of a
+//! `crate::scheduler::scheduler_tick_guarded` decision: which of a
 //! tick's ready ops the `ConcurrencySelector` actually admitted, and which
 //! ops were complete afterward.
 //!
 //! # Which tape this attests to (read before wiring a caller)
 //!
 //! `bcinr-powl`'s scheduler (`scheduler_tick`/`scheduler_tick_guarded`/
-//! `PowlRunState`, all in `bcinr_powl::scheduler`) operates exclusively on
-//! the **legacy** `bcinr_powl::tape::{Powl64Op, PowlTape}` pair (the
+//! `PowlRunState`, all in `crate::scheduler`) operates exclusively on
+//! the **legacy** `crate::tape::{Powl64Op, PowlTape}` pair (the
 //! `OpKind::{Atom,Silent,XorDispatch,Join,LoopRedo}` shape, built by
-//! `bcinr_powl::compiler::compile_powl` from a `PowlAstNode`). It does
-//! **not** operate on the newer `bcinr_powl::tape::v2::{Powl64Op, PowlTape}`
-//! pair that `bcinr_powl::compiler::v2::compile_powl_v2` produces from a
-//! `PowlModel` (the type `crate::projection::ProjectionReceipt` is about) —
+//! `crate::compiler::compile_powl` from a `PowlAstNode`). It does
+//! **not** operate on the newer `crate::tape::v2::{Powl64Op, PowlTape}`
+//! pair that `crate::compiler::v2::compile_powl_v2` produces from a
+//! `PowlModel` (the type `crate::receipt::projection::ProjectionReceipt` is about) —
 //! the two `Powl64Op` shapes are structurally different (the legacy op has
 //! `branch_mask`/`kind`/`index`/`branch_count`; the v2 op has
 //! `op_kind`/`choice_group`/`depth`/`fan_out`/`ctrl`), and as of the
@@ -26,15 +26,13 @@
 //! phase that closes this gap can populate it from a real `PowlModel`
 //! without changing this receipt's shape.
 
+use crate::scheduler::{scheduler_tick, scheduler_tick_guarded, ConcurrencySelector, PowlRunState};
+use crate::tape::v2::ConcurrencyGuardTable;
+use crate::tape::Powl64Op as LegacyPowl64Op;
+use crate::tape::PowlTape as LegacyPowlTape;
 use bcinr_mfw_ir::{Digest, EventSet};
-use bcinr_powl::scheduler::{
-    scheduler_tick, scheduler_tick_guarded, ConcurrencySelector, PowlRunState,
-};
-use bcinr_powl::tape::v2::ConcurrencyGuardTable;
-use bcinr_powl::tape::Powl64Op as LegacyPowl64Op;
-use bcinr_powl::tape::PowlTape as LegacyPowlTape;
 
-use crate::chain::fold;
+use crate::receipt::chain::fold;
 
 // ---------------------------------------------------------------------------
 // Canonical digest helpers
@@ -156,7 +154,7 @@ pub struct ExecutionReceipt {
 /// invalid (after the fact, by [`verify_execution_receipt`]).
 ///
 /// This is the "execution integrity" half of the `projection integrity !=
-/// execution integrity` distinction: a [`crate::projection::ProjectionReceipt`]
+/// execution integrity` distinction: a [`crate::receipt::projection::ProjectionReceipt`]
 /// attests that a *compilation* step preserved semantics; this attests that
 /// a *firing decision* was actually admissible under the compiled
 /// [`ConcurrencyGuardTable`] and that the receipt recording it is exactly
@@ -169,7 +167,7 @@ pub enum ExecutionIntegrityError {
     /// `fired` contains one of `guards`'s minimal nonfaces as a subset —
     /// this `EventSet` was never jointly executable, regardless of what the
     /// rest of the receipt claims. See
-    /// [`bcinr_powl::tape::v2::ConcurrencyGuardTable::admits`].
+    /// [`crate::tape::v2::ConcurrencyGuardTable::admits`].
     InadmissibleFiredSet { fired: EventSet },
     /// The receipt's own `hash` does not equal
     /// `fold(receipt.prior_hash, canonical_bytes_of(receipt's other fields))`
@@ -218,7 +216,7 @@ fn canonical_bytes(
 /// Seal an [`ExecutionReceipt`] from already-computed evidence, refusing to
 /// produce one if `fired` is not admissible under `guards` — i.e. `fired`
 /// contains one of `guards`'s minimal nonfaces as a subset (see
-/// [`bcinr_powl::tape::v2::ConcurrencyGuardTable::admits`]). This is the
+/// [`crate::tape::v2::ConcurrencyGuardTable::admits`]). This is the
 /// enforcement point: a caller cannot obtain a well-formed `ExecutionReceipt`
 /// for an inadmissible `fired` set through this function, closing the gap
 /// where `fired` was previously accepted as a trusted argument with nothing
@@ -345,7 +343,7 @@ pub fn verify_execution_receipt(
 /// `scheduler_tick_guarded`'s real output somehow fails `guards.admits` —
 /// this should never happen given `ConcurrencySelector::select`/
 /// `select_checked` already gate every candidate against the same `guards`
-/// before it fires (see `bcinr_powl::scheduler`), but the check is not
+/// before it fires (see `crate::scheduler`), but the check is not
 /// skipped on that assumption: if the selector's own gating ever regressed,
 /// this is the backstop that keeps a bad firing decision from being sealed
 /// into a receipt at all, rather than silently trusting the assumption.
@@ -395,9 +393,9 @@ pub fn tick_and_seal_execution_receipt<S: ConcurrencySelector>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bcinr_powl::compiler::{compile_powl, PowlAstNode};
-    use bcinr_powl::scheduler::StableMaximalSelector;
-    use bcinr_powl::tape::v2::CompiledNonFace;
+    use crate::compiler::{compile_powl, PowlAstNode};
+    use crate::scheduler::StableMaximalSelector;
+    use crate::tape::v2::CompiledNonFace;
 
     #[test]
     fn seal_execution_receipt_is_deterministic_and_chains() {

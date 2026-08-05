@@ -32,6 +32,7 @@ pub mod powl2;
 pub mod process_rewrite;
 pub mod process_toolkit;
 pub mod projection;
+pub mod receipt;
 pub mod receipt_worker;
 pub mod recompose;
 pub mod scheduler;

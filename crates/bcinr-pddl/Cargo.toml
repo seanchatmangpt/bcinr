@@ -27,7 +27,6 @@ chrono = { version = "0.4", features = ["serde"] }
 bcinr-mfw-ir = { path = "../bcinr-mfw-ir", version = "26.7.28" }
 # Optional POWL execution/proof path.
 bcinr-powl = { path = "../bcinr-powl", version = "26.7.28", optional = true }
-bcinr-powl-receipt = { path = "../bcinr-powl-receipt", version = "26.7.28", optional = true }
 # CMCA allocation: BCINR-CMCA-G moves the process-to-priority mapping from
 # fixture code into a canonical production composition surface
 # (cmca_execution.rs), so this is a real (feature-gated) dependency, not a
@@ -36,7 +35,7 @@ bcinr-cmca = { path = "../bcinr-cmca", version = "26.7.28", features = ["alloc"]
 
 [features]
 dhat-heap = []
-mfw-planner = ["dep:bcinr-powl", "dep:bcinr-powl-receipt", "dep:bcinr-cmca"]
+mfw-planner = ["dep:bcinr-powl", "dep:bcinr-cmca"]
 
 [dev-dependencies]
 chicago-tdd-tools = { version = "26.7.1", features = ["ocel-generation"] }

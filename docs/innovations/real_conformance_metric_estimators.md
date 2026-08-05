@@ -2,9 +2,9 @@
 
 ## 1. Executive Summary
 
-This proposal introduces **Real Conformance Metric Estimators (RCME)**, a set of constant-time, zero-allocation, and branchless fixed-point estimators designed to replace the mocked zero placeholders for **generalization** and **simplicity** within the process replay verifier of `crates/bcinr-powl-receipt`.
+This proposal introduces **Real Conformance Metric Estimators (RCME)**, a set of constant-time, zero-allocation, and branchless fixed-point estimators designed to replace the mocked zero placeholders for **generalization** and **simplicity** within the process replay verifier of `crates/bcinr-powl` (`receipt` module).
 
-Currently, `PowlReplayVerifier::finalize` (`crates/bcinr-powl-receipt/src/replay.rs`) computes only `fitness` and `precision` dynamically. To avoid silent predicate-checking bypasses while keeping the codebase compliant with the strict **BCINR Radon Law** ($CC=1$, zero allocation, zero data-dependent branching), the verifier mocks `generalization` and `simplicity` as `0x0000_0000` (Q16.16 zero). While honest, this placeholder prevents the verifier from evaluating any realistic, non-zero thresholds on these two dimensions.
+Currently, `PowlReplayVerifier::finalize` (`crates/bcinr-powl/src/receipt/replay.rs`) computes only `fitness` and `precision` dynamically. To avoid silent predicate-checking bypasses while keeping the codebase compliant with the strict **BCINR Radon Law** ($CC=1$, zero allocation, zero data-dependent branching), the verifier mocks `generalization` and `simplicity` as `0x0000_0000` (Q16.16 zero). While honest, this placeholder prevents the verifier from evaluating any realistic, non-zero thresholds on these two dimensions.
 
 RCME solves this by defining mathematically rigorous, branchless proxy estimators for generalization and simplicity in Q16.16 fixed-point arithmetic. By deriving these estimators from tape length, unique replayed node counts, and token configurations (unused choices and residual tokens), RCME achieves expressive, real-time conformance metrics without violating any of the absolute runtime laws of the deterministic substrate.
 
@@ -13,7 +13,7 @@ RCME solves this by defining mathematically rigorous, branchless proxy estimator
 ## 2. Vulnerability & Limitation Analysis
 
 ### 2.1 The Mocked Placeholder Limitation
-In the existing codebase (`crates/bcinr-powl-receipt/src/replay.rs`), the finalization method is implemented as follows:
+In the existing codebase (`crates/bcinr-powl/src/receipt/replay.rs`), the finalization method is implemented as follows:
 
 ```rust
 pub fn finalize(self) -> ConformanceMetrics {
@@ -274,7 +274,7 @@ Under the `@armstrong_fault` Master of Failure Law, we inject three mutants to e
 The `@turing_machine` role will disassemble the release binary for `PowlReplayVerifier::finalize`:
 
 ```bash
-cargo objdump --bin bcinr-powl-receipt --release -- --disassemble
+cargo objdump -p bcinr-powl --lib --release -- --disassemble
 ```
 
 The disassembly must satisfy:
@@ -289,4 +289,4 @@ The disassembly must satisfy:
 - **Predicate Usability**: Real estimators enable using `ConformancePredicate::STRICT` and `LENIENT` in real pipelines without facing guaranteed failures.
 - **Constant-Time Execution**: All calculations are algebraic and run in $O(1)$ cycle time, preventing timing side-channel exploits.
 - **Autonomic Loop Telemetry**: Provides the MAPE-K autonomic feedback loop with authentic metrics, enabling optimization of model structure (simplicity) and predictive robustness (generalization).
-- **Ph.D.-Verified Compliance**: RCME elevates the `crates/bcinr-powl-receipt` conformance sub-system to a Substrate Integrity Score (SIS) of 100/100.
+- **Ph.D.-Verified Compliance**: RCME elevates the `crates/bcinr-powl` (`receipt` module) conformance sub-system to a Substrate Integrity Score (SIS) of 100/100.

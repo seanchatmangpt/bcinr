@@ -60,7 +60,7 @@
 //!
 //! `~/mfw` uses Lean's arbitrary-precision `ℚ`. This module has no such
 //! type available, so it implements a minimal `i128`-numerator/denominator
-//! [`ExactRational`] with checked (overflow-detecting) arithmetic, sufficient
+//! `ExactRational` with checked (overflow-detecting) arithmetic, sufficient
 //! for the mass magnitudes exercised by this crate's existing tests and by
 //! `tests/cmca_h_lean_correspondence.rs`. `num-rational` is not a workspace
 //! dependency (checked in `Cargo.lock` before writing this module), so no

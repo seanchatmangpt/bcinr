@@ -10,10 +10,10 @@
 #![allow(clippy::len_zero)]
 
 use bcinr_powl::powl2::{compile_powl2, LowestIndexPolicy, Powl2Model};
-use bcinr_powl::tape::v2::ConcurrencyGuardTable;
-use bcinr_powl_receipt::execution_v2::{
+use bcinr_powl::receipt::execution_v2::{
     execute_and_seal_v2, verify_execution_v2, PowlV2ReceiptError,
 };
+use bcinr_powl::tape::v2::ConcurrencyGuardTable;
 
 /// Build a simple sequence: A → B
 fn simple_sequence() -> bcinr_powl::powl2::CompiledPowl2 {

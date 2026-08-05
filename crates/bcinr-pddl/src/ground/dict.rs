@@ -1,7 +1,7 @@
 //! Dictionary encoder — interns predicate / object / type strings to compact
 //! `u32` IDs.
 //!
-//! This is the scalable sibling of `bcinr_powl_receipt::intern::ActivityTable`.
+//! This is the scalable sibling of `bcinr_powl::receipt::intern::ActivityTable`.
 //! That table is a fixed 4 KiB byte arena with a `u16` offset table and a
 //! linear-scan `intern` — perfect for the ≤256 activity labels of a single
 //! receipt, but it panics past 256 entries and its lookup is O(n). A grounder

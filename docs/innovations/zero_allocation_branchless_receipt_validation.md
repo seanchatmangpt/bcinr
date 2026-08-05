@@ -2,9 +2,9 @@
 
 ## 1. Executive Summary
 
-This proposal introduces the **Zero-Allocation Branchless Execution Receipt Validation and Conformance Checking Pipeline (ZA-BRVP)**, a performance optimization and structural safety enhancement for the verification hot path in `crates/bcinr-powl-receipt`.
+This proposal introduces the **Zero-Allocation Branchless Execution Receipt Validation and Conformance Checking Pipeline (ZA-BRVP)**, a performance optimization and structural safety enhancement for the verification hot path in `crates/bcinr-powl` (`receipt` module).
 
-Currently, execution receipt verification (`crates/bcinr-powl-receipt/src/execution.rs`) and conformance checking (`crates/bcinr-powl-receipt/src/conformance.rs`) violate the strict **BCINR Radon Law** ($CC=1$, zero alloc, no branching) in several critical ways:
+Currently, execution receipt verification (`crates/bcinr-powl/src/receipt/execution.rs`) and conformance checking (`crates/bcinr-powl/src/receipt/conformance.rs`) violate the strict **BCINR Radon Law** ($CC=1$, zero alloc, no branching) in several critical ways:
 1. **Heap Allocations**: The receipt validation process triggers heap allocations by constructing intermediate serialization vectors (`Vec<u8>`) and collecting active event sets (`Vec<usize>`), which is incompatible with a `#![no_std]` hot-path runtime.
 2. **Data-Dependent Branches**: Receipt verification and conformance checks rely on multiple conditional branches (`if` checks and short-circuiting logical operations) to validate hashes, guards, and metric thresholds, introducing variable-time execution and potential timing side-channels.
 
@@ -15,7 +15,7 @@ By transitioning to a streaming hashing model (using `blake3::Hasher` incrementa
 ## 2. Vulnerability & Limitation Analysis
 
 ### 2.1 Heap Allocations in the Hot Path
-In `crates/bcinr-powl-receipt/src/execution.rs`, receipt sealing and verification serialise the receipt structure into a byte buffer before hashing:
+In `crates/bcinr-powl/src/receipt/execution.rs`, receipt sealing and verification serialise the receipt structure into a byte buffer before hashing:
 ```rust
 fn canonical_bytes(
     powl_model_digest: Digest,

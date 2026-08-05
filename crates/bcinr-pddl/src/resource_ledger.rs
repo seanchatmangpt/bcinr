@@ -1,8 +1,11 @@
 //! Interval-aware resource ledger for temporal planning.
 //!
 //! Tracks resource ownership across time intervals with exclusive/shared modes,
-//! lease expiration, and renewal admission. Mirrors the [`admit_proposal`](crate::llm_bridge::admit_proposal)
-//! pattern from [`bcinr_cmca::proposal`] for resource conflict detection.
+//! lease expiration, and renewal admission. Mirrors the
+//! `bcinr_cmca::proposal::admit_proposal` pattern for resource conflict
+//! detection. (Plain code span, not an intra-doc link: `bcinr-cmca` is an
+//! optional dependency behind `mfw-planner`, so the path does not resolve in a
+//! default-feature doc build and `-D warnings` would fail.)
 //!
 //! # Invariants
 //!
@@ -101,7 +104,7 @@ impl ResourceLedger {
 
     /// Attempt to admit a lease for the given resource over [start, end).
     ///
-    /// Re-admission follows the [`admit_proposal`](crate::llm_bridge::admit_proposal)
+    /// Re-admission follows the `bcinr_cmca::proposal::admit_proposal`
     /// pattern: every binding is re-verified before granting. If the interval
     /// conflicts with an existing lease:
     ///   - For **Exclusive** mode: any overlap is refused.

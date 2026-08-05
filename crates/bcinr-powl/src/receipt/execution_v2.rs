@@ -5,9 +5,9 @@
 //! replays the same deterministic stable-maximal scheduler against the same
 //! concurrency guards and compares every committed field.
 
-use bcinr_powl::scheduler::{ConcurrencySelector, StableMaximalSelector};
-use bcinr_powl::scheduler_v2::{scheduler_tick_v2, PowlV2RunState, PowlV2TickOutcome};
-use bcinr_powl::tape::v2::{ConcurrencyGuardTable, PowlTape};
+use crate::scheduler::{ConcurrencySelector, StableMaximalSelector};
+use crate::scheduler_v2::{scheduler_tick_v2, PowlV2RunState, PowlV2TickOutcome};
+use crate::tape::v2::{ConcurrencyGuardTable, PowlTape};
 use serde::{Deserialize, Serialize};
 
 /// Receipt format version for the POWL v2 execution rail.
@@ -352,11 +352,11 @@ const fn valid_mask(len: u8) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use bcinr_powl::powl2::{compile_powl2, LowestIndexPolicy, Powl2Model};
+    use crate::powl2::{compile_powl2, LowestIndexPolicy, Powl2Model};
 
     use super::*;
 
-    fn compiled() -> bcinr_powl::powl2::CompiledPowl2 {
+    fn compiled() -> crate::powl2::CompiledPowl2 {
         compile_powl2(
             &Powl2Model::Sequence(vec![
                 Powl2Model::PartialOrder {

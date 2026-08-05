@@ -10,8 +10,8 @@
 #![cfg(feature = "mfw-planner")]
 
 use bcinr_mfw_ir::PlannerFailure;
+use bcinr_powl::receipt::execution_v2::{digest_tape, verify_execution_v2};
 use bcinr_powl::tape::v2::ConcurrencyGuardTable;
-use bcinr_powl_receipt::execution_v2::{digest_tape, verify_execution_v2};
 use serde::{Deserialize, Serialize};
 
 use crate::cognitive::{

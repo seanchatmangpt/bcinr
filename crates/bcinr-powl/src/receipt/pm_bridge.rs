@@ -22,7 +22,7 @@
 //! }
 //! ```
 
-use crate::replay::PowlReplayFrame;
+use crate::receipt::replay::PowlReplayFrame;
 use serde_json::{json, Value};
 
 /// Convert a slice of [`PowlReplayFrame`] into an OCEL 2.0 JSON object.

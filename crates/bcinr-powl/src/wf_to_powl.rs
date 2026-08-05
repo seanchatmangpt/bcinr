@@ -48,7 +48,7 @@ pub enum RefusalReason {
         proper_completion: bool,
         no_dead_transitions: bool,
     },
-    /// The reachability graph exceeded [`MAX_REACHABLE_MARKINGS`] before the
+    /// The reachability graph exceeded [`crate::wf_net::MAX_REACHABLE_MARKINGS`] before the
     /// token game terminated, so safeness and soundness are *undecided* --
     /// not decided favourably. Refused rather than assumed.
     SoundnessUndecided { explored: usize },

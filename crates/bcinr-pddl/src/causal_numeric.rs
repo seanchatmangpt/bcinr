@@ -180,7 +180,7 @@ fn pairwise_numeric_commute(function: &str, a: &NumericEffect, b: &NumericEffect
 /// Do `a` and `b`'s numeric effects genuinely commute?
 ///
 /// Trivially `true` when [`touched_functions`] are disjoint. Otherwise every
-/// shared function must independently pass [`pairwise_numeric_commute`]; a
+/// shared function must independently pass `pairwise_numeric_commute`; a
 /// single non-commuting shared function makes the whole pair non-commuting.
 ///
 /// If either action fires more than one numeric effect on the same shared

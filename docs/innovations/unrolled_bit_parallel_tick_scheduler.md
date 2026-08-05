@@ -370,4 +370,4 @@ The UBPTS structures will be integrated as follows:
 2. **[`crates/bcinr-powl/src/lib.rs`](file:///Users/sac/bcinr/crates/bcinr-powl/src/lib.rs)**:
    - Expose the unrolled tick entry points to the API.
 3. **Receipt Hashing Integration**:
-   - Update `bcinr-powl-receipt` to hash the new `u64` fire masks directly without set conversion, satisfying `direct_bitmask_receipt_hashing`.
+   - Update `bcinr-powl`'s `receipt` module to hash the new `u64` fire masks directly without set conversion, satisfying `direct_bitmask_receipt_hashing`.

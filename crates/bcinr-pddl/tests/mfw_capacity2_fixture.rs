@@ -1,7 +1,7 @@
 //! Independent adversarial verification: the capacity-2 `{A,B,C}` fixture.
 //!
 //! This is the decisive, post-hoc verification pass for the MFW retrofit
-//! (`bcinr-mfw-ir` + the `bcinr-pddl`/`bcinr-powl`/`bcinr-powl-receipt`
+//! (`bcinr-mfw-ir` + the `bcinr-pddl`/`bcinr-powl`
 //! extensions). It does **not** trust any prior agent's self-reported
 //! ALIVE/PARTIAL/BLOCKED status — every assertion below re-derives its
 //! evidence from a real `cargo test` run against the actual code in this
@@ -30,7 +30,7 @@
 //! hand-constructed, exactly mirroring the pattern already established in
 //! `bcinr-mfw-ir::concurrency`'s own tests, `bcinr-powl::projection`'s
 //! tests, `bcinr-powl::compiler`'s tests, and
-//! `bcinr-powl-receipt::projection`'s tests — this is not a new mock
+//! `bcinr-powl`'s `receipt::projection`'s tests — this is not a new mock
 //! introduced by this file, it is the same fixture-construction convention
 //! already used throughout the codebase, reused here to drive the
 //! *downstream* real machinery (projector, guard-table compiler, real
@@ -49,7 +49,7 @@
 //! `scheduler_tick`/`scheduler_tick_guarded` (grep-confirmed: every
 //! `scheduler_tick`/`scheduler_tick_guarded` call site in the workspace
 //! passes a `compile_powl`-produced legacy tape, never a `compile_powl_v2`
-//! one) — `bcinr-powl-receipt/src/execution.rs`'s own module doc comment
+//! one) — `bcinr-powl/src/receipt/execution.rs`'s own module doc comment
 //! (lines 8-24) discloses exactly this gap. `link6`/`link7` below therefore
 //! reuse the *type* `ConcurrencyGuardTable` (shared between v2 compilation
 //! and the scheduler) against a **separately hand-built legacy tape**, with
@@ -72,14 +72,14 @@ use bcinr_pddl::{
 };
 use bcinr_powl::compiler::v2::compile_powl_v2;
 use bcinr_powl::compiler::{compile_powl, PowlAstNode};
+use bcinr_powl::receipt::execution::{
+    digest_legacy_tape, seal_execution_receipt, tick_and_seal_execution_receipt,
+    verify_execution_receipt, ExecutionIntegrityError, ExecutionReceipt,
+};
 use bcinr_powl::scheduler::{
     scheduler_tick, scheduler_tick_guarded, PowlRunState, StableMaximalSelector,
 };
 use bcinr_powl::tape::v2::{CompiledNonFace, ConcurrencyGuardTable};
-use bcinr_powl_receipt::execution::{
-    digest_legacy_tape, seal_execution_receipt, tick_and_seal_execution_receipt,
-    verify_execution_receipt, ExecutionIntegrityError, ExecutionReceipt,
-};
 
 // ---------------------------------------------------------------------------
 // Shared fixture helpers
@@ -136,7 +136,7 @@ fn real_causal_plan_for_abc() -> CausalPlan {
 /// The hand-built capacity-2 `{A,B,C}` nonface, mirroring the exact fixture
 /// convention already established in `bcinr-mfw-ir::concurrency`,
 /// `bcinr-powl::projection`, `bcinr-powl::compiler`, and
-/// `bcinr-powl-receipt::projection`'s own test modules — reused here, not
+/// `bcinr-powl`'s `receipt::projection`'s own test modules — reused here, not
 /// reinvented, and driven through the *real* projector/compiler/scheduler/
 /// receipt code below rather than only asserted in isolation.
 fn hand_built_capacity2_complex(occurrence_ids: [u32; 3]) -> ExecutableConcurrencyComplex {
@@ -597,7 +597,7 @@ fn link7_execution_receipt_fired_pair_differs_from_the_genuinely_ready_triple() 
 // Link 8 — the sharpest test: does anything reject a hand-fabricated
 // receipt claiming the triple fired? ALIVE as of this session:
 // `seal_execution_receipt`/`verify_execution_receipt` in
-// `bcinr-powl-receipt/src/execution.rs` now both check `fired` against a
+// `bcinr-powl/src/receipt/execution.rs` now both check `fired` against a
 // `ConcurrencyGuardTable`; link8b exercises both.
 // ---------------------------------------------------------------------------
 
@@ -630,14 +630,14 @@ fn link8b_seal_and_verify_execution_receipt_reject_a_hand_fabricated_triple_rece
     // this test now checks directly, replacing the prior round's evidence
     // trail:
     //
-    // `bcinr_powl_receipt::execution::seal_execution_receipt` now takes a
+    // `bcinr_powl::receipt::execution::seal_execution_receipt` now takes a
     // `guards: &ConcurrencyGuardTable` parameter and returns
     // `Result<ExecutionReceipt, ExecutionIntegrityError>`, refusing to seal
     // a receipt whose `fired` is inadmissible; a companion
     // `verify_execution_receipt(receipt, guards) -> Result<(), _>` now
     // exists to catch the same problem in an already-sealed (or hand
     // struct-literal-assembled, since the fields are still `pub`) receipt.
-    // `bcinr_powl_receipt::replay::PowlReplayVerifier` remains a separate,
+    // `bcinr_powl::receipt::replay::PowlReplayVerifier` remains a separate,
     // unrelated token-passing model (untouched by this fix, out of this
     // gap's scope) — this fix closes the sealing/verification gap, not
     // that one.

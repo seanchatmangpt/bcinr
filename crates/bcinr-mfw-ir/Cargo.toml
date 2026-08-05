@@ -15,6 +15,6 @@ readme = "../../README.md"
 
 [dependencies]
 # BLAKE3 for the Digest newtype — same major version pinned everywhere else
-# in this workspace (bcinr-pddl, bcinr-powl, bcinr-powl-receipt all use
+# in this workspace (bcinr-pddl, bcinr-powl, bcinr-powl (receipt module) all use
 # `blake3 = "1"`, resolved to 1.8.5 in Cargo.lock).
 blake3 = "1"

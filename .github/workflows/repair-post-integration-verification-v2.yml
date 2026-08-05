@@ -62,7 +62,7 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - name: CMCA all-features baseline
-        run: cargo test -p bcinr-cmca --all-features
+        run: cargo test -p bcinr-cmca --features std
       - name: CMCA calibration
         run: cargo test -p bcinr-cmca --test calibration
       - name: CMCA differential
@@ -102,15 +102,15 @@ jobs:
       - name: POWL scheduler v2
         run: cargo test -p bcinr-powl --all-features scheduler_v2
       - name: POWL receipt all features
-        run: cargo test -p bcinr-powl-receipt --all-features
+        run: cargo test -p bcinr-powl --all-features receipt::
       - name: POWL receipt execution v2
-        run: cargo test -p bcinr-powl-receipt --all-features execution_v2
+        run: cargo test -p bcinr-powl --all-features receipt::execution_v2
       - name: Strict MCP malformed JSON contract
         run: cargo test -p bcinr-mcp --test adversarial malformed_json_rejected -- --nocapture
       - name: Broad bcinr E2E
         run: cargo test -p bcinr --test e2e_main
       - name: Full workspace
-        run: cargo test --workspace --all-features --all-targets --no-fail-fast
+        run: cargo test --workspace --all-targets --no-fail-fast
       - name: Post-E2E formatting
         run: cargo fmt --all -- --check
       - name: Post-E2E algorithm module integrity

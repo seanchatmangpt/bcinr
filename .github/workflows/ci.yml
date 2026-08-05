@@ -26,14 +26,22 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Formatting
-        run: cargo fmt --all -- --check
-      - name: Workspace compile
-        run: cargo check --workspace --all-features
+      # No `cargo fmt --check` gate: formatting is run by hand. Gating on it
+      # also collides with `ggen sync`, which emits compact output that rustfmt
+      # then reformats -- the two can never both be satisfied.
+      #
+      # No separate `cargo check`: Clippy runs the same type-check front-end
+      # over a superset of targets (--all-targets), so it is strictly subsumed.
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-      - name: CMCA all-features baseline
-        run: cargo test -p bcinr-cmca --all-features
+      # `--features std`, NOT `--all-features`: bcinr-cmca's feature list is
+      # alloc, std, and mutant_1..mutant_11 -- the latter are deliberate
+      # compile-time sabotage switches meant to be enabled ONE AT A TIME (see
+      # the hostile-mutant step below). `--all-features` arms all eleven at once
+      # and fails 4 lib tests by design. `std` implies `alloc`, so this is full
+      # non-mutant coverage, which is what "baseline" meant.
+      - name: CMCA non-mutant baseline
+        run: cargo test -p bcinr-cmca --features std
       - name: CMCA calibration
         run: cargo test -p bcinr-cmca --test calibration
       - name: CMCA differential
@@ -51,7 +59,7 @@ jobs:
       - name: POWL scheduler v2
         run: cargo test -p bcinr-powl --all-features scheduler_v2
       - name: POWL receipt execution v2
-        run: cargo test -p bcinr-powl-receipt --all-features execution_v2
+        run: cargo test -p bcinr-powl --all-features receipt::execution_v2
       - name: Locked dependency graph
         run: cargo metadata --locked --format-version 1 --no-deps > /dev/null
 
@@ -65,14 +73,23 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Formatting
-        run: cargo fmt --all -- --check
-      - name: Workspace compile
-        run: cargo check --workspace --all-features
+      # No `cargo fmt --check` gate: formatting is run by hand. Gating on it
+      # also collides with `ggen sync`, which emits compact output that rustfmt
+      # then reformats -- the two can never both be satisfied.
+      #
+      # No separate `cargo check`: Clippy runs the same type-check front-end
+      # over a superset of targets (--all-targets), so it is strictly subsumed.
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      # Deliberately NOT --all-features: bcinr-cmca declares mutant_1..mutant_11,
+      # compile-time sabotage switches whose purpose is to make tests fail (see
+      # crates/bcinr-cmca/Cargo.toml). --all-features arms all eleven at once and
+      # fails 15 targets by design -- e.g. mutant_7 inverts const_eq_u32, so every
+      # saturating_div takes the saturate path and escort_power returns u32::MAX.
+      # Mutants are meant to be enabled one at a time. Clippy above keeps
+      # --all-features: the mutants change behaviour, not compilation.
       - name: Full Linux workspace
-        run: cargo test --workspace --all-features --all-targets --no-fail-fast
+        run: cargo test --workspace --all-targets --no-fail-fast
       - name: Documentation
         env:
           RUSTDOCFLAGS: -D warnings

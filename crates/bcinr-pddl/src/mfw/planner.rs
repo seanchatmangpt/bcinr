@@ -1,6 +1,6 @@
 //! `MfwPlanner` — the top-level orchestrator wiring this crate's admission/
 //! grounding/consequence/search/causal/concurrency machinery together with
-//! `bcinr-powl`'s `PowlProjector` and `bcinr-powl-receipt`'s receipt
+//! `bcinr-powl`'s `PowlProjector` and its `receipt`
 //! sealing into one `plan()` entry point.
 //!
 //! # What this module is, and isn't
@@ -10,8 +10,8 @@
 //! [`GroundProblem::build`], [`StandingConsequenceCache`], [`Residualizer`],
 //! [`MassVector`]/[`q_lens`], [`MfwPortfolio`], [`PddlCausalAnalyzer`],
 //! [`PddlConcurrencyAnalyzer`], `bcinr_powl::projection::PowlProjector`,
-//! `bcinr_powl_receipt::projection::seal_projection_receipt`,
-//! `bcinr_powl_receipt::planning::seal_planning_receipt`. This module is
+//! `bcinr_powl::receipt::projection::seal_projection_receipt`,
+//! `bcinr_powl::receipt::planning::seal_planning_receipt`. This module is
 //! integration glue, not a new subsystem: it does not reimplement any of
 //! those, it calls them in sequence and threads real values between them.
 //!
@@ -81,10 +81,10 @@ use bcinr_mfw_ir::{
 };
 use wasm4pm_compat::pddl::{Pddl8GroundAction, Pddl8Tape};
 
-use bcinr_powl_receipt::planning::{
+use bcinr_powl::receipt::planning::{
     seal_planning_receipt, ComputeEvidence, PlannerOutcomeTag, PlanningReceipt,
 };
-use bcinr_powl_receipt::projection::{
+use bcinr_powl::receipt::projection::{
     digest_powl_model, seal_projection_receipt, ProjectionReceipt,
 };
 

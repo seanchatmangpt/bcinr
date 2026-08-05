@@ -2,13 +2,13 @@
 
 This massive report details the rigorous engineering within the BCINR substrate for managing receipt verification, cryptographic envelopes, and authorization states. In strict adherence to the **Radon Law ($CC=1$)** and **Zero-Allocation Boundary**, the implementations described herein operate exclusively on stack memory, utilize branchless selection for logic flow, and embed security invariants structurally into the type system. 
 
-*(Note: The functionality associated with `bcinr-powl-auth` is realized across `bcinr-cmca` and `bcinr-powl-receipt`, avoiding a separate micro-crate while maintaining strict domain constraints.)*
+*(Note: The functionality associated with `bcinr-powl-auth` is realized across `bcinr-cmca` and `bcinr-powl`'s `receipt` module, avoiding a separate micro-crate while maintaining strict domain constraints.)*
 
 ---
 
-## 1. Receipt Verification (`crates/bcinr-powl-receipt`)
+## 1. Receipt Verification (`crates/bcinr-powl` (`receipt` module))
 
-The `bcinr-powl-receipt` crate is responsible for sealing execution histories and causally tracking manufacturing steps without unbounded memory growth.
+`bcinr-powl`'s `receipt` module is responsible for sealing execution histories and causally tracking manufacturing steps without unbounded memory growth.
 
 ### 1.1 Causal Frame Hashing (`src/causal_receipt.rs`)
 
@@ -17,7 +17,7 @@ To eliminate heap allocation and ensure cache-locality, causal receipts operate 
 The `to_hash_bytes` function achieves deterministic byte-serialization for hashing without any dynamically allocated buffers, copying purely via unrolled stack iterations:
 
 ```rust
-// File: crates/bcinr-powl-receipt/src/causal_receipt.rs
+// File: crates/bcinr-powl/src/receipt/causal_receipt.rs
 
 #[derive(Clone)]
 #[repr(C, align(64))]
@@ -51,7 +51,7 @@ The rolling BLAKE3 receipt chain directly feeds this serialized frame alongside 
 Execution verification asserts that a tick decision made by the scheduler was formally admissible under a defined `ConcurrencyGuardTable`. Verification logic avoids checking dynamically-sized histories, instead validating the digest representation of execution logic and fired masks.
 
 ```rust
-// File: crates/bcinr-powl-receipt/src/execution.rs
+// File: crates/bcinr-powl/src/receipt/execution.rs
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ExecutionReceipt {
@@ -93,7 +93,7 @@ pub fn verify_execution_receipt(
 
 ## 2. Cryptographic Envelopes & Authorization States Without Heap
 
-Authorization tracking, typed refusals, and cryptographic envelope validation logic primarily reside within the allocation boundaries defined in `crates/bcinr-cmca/src/allocator.rs` and the denial metrics in `crates/bcinr-powl-receipt/src/denial.rs`.
+Authorization tracking, typed refusals, and cryptographic envelope validation logic primarily reside within the allocation boundaries defined in `crates/bcinr-cmca/src/allocator.rs` and the denial metrics in `crates/bcinr-powl/src/receipt/denial.rs`.
 
 ### 2.1 Branchless Denial Polarity (`src/denial.rs`)
 
@@ -102,7 +102,7 @@ When execution faces authorization limits (e.g., `AUTHORIZATION_DENIED`, `SLA_BR
 To convert a complex failure struct into a dense mask, branchless bitmath clamps the presence of any bit in a lane into a distinct `0` or `1`:
 
 ```rust
-// File: crates/bcinr-powl-receipt/src/denial.rs
+// File: crates/bcinr-powl/src/receipt/denial.rs
 
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]

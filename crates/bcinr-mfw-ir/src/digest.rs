@@ -15,7 +15,7 @@ impl Digest {
 
     /// Combine (`self`, `other`) into a new digest by hashing their
     /// concatenation — the same "causal_mix" idea used by
-    /// `bcinr-powl-receipt`'s hash-chained frames (prior_hash || frame_bytes),
+    /// `bcinr-powl (receipt module)`'s hash-chained frames (prior_hash || frame_bytes),
     /// generalized to two arbitrary digests.
     pub fn mix(&self, other: &Digest) -> Self {
         let mut buf = [0u8; 64];

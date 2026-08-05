@@ -1,8 +1,8 @@
 //! `ProjectionReceipt` — a receipt attesting that a PDDL-to-POWL projection
 //! preserved source semantics.
 //!
-//! This is genuinely new territory for this crate: [`crate::causal_receipt`]
-//! and [`crate::replay`] both attest to *execution/replay conformance of an
+//! This is genuinely new territory for this crate: [`crate::receipt::causal_receipt`]
+//! and [`crate::receipt::replay`] both attest to *execution/replay conformance of an
 //! already-compiled tape*; nothing before this module records that the
 //! *compilation step itself* (`CausalPlan` + `ExecutableConcurrencyComplex`
 //! -> `PowlModel`) was semantics-preserving.
@@ -12,25 +12,25 @@
 //! [`seal_projection_receipt`] takes a
 //! [`bcinr_mfw_ir::PowlProjectionWitness`] as its proof obligation: that
 //! witness can only exist because `bcinr-powl`'s real
-//! [`bcinr_powl::projection::PowlProjector::project`] already ran
+//! [`crate::projection::PowlProjector::project`] already ran
 //! `verify_order_preservation`/`verify_concurrency_preservation` and
 //! returned `Ok`. `seal_projection_receipt` does **not** re-run either
 //! check — it folds the witness's own digests into a BLAKE3 hash chain, the
 //! same "prior_hash folded with canonical frame bytes" discipline
-//! [`crate::causal_receipt::OcelCausalReceipt::chain`] uses. A
+//! [`crate::receipt::causal_receipt::OcelCausalReceipt::chain`] uses. A
 //! `ProjectionReceipt` is a durable record that the check happened and
 //! produced these exact digests, not a second opinion on whether it should
 //! have passed.
 
 use std::collections::BTreeSet;
 
+use crate::model::{PowlModel, PowlNode};
 use bcinr_mfw_ir::{
     CausalPlan, ConcurrencyPreservationWitness, Digest, ExecutableConcurrencyComplex,
     OrderPreservationWitness, PlanningEpochId, PowlProjectionWitness, PowlProjector as _,
 };
-use bcinr_powl::model::{PowlModel, PowlNode};
 
-use crate::chain::fold;
+use crate::receipt::chain::fold;
 
 // ---------------------------------------------------------------------------
 // Canonical digest helpers
@@ -59,7 +59,7 @@ fn digest_concurrency_witness(w: &ConcurrencyPreservationWitness) -> Digest {
 /// Canonical digest over a [`PowlModel`]: every node (tagged by variant),
 /// every order edge (already `BTreeSet`-ordered, so ascending iteration is
 /// deterministic), and every minimal nonface (canonicalized into a sorted
-/// member-id list first, mirroring `bcinr_powl::projection`'s own
+/// member-id list first, mirroring `crate::projection`'s own
 /// `canonical_nonface_keys` — that helper is private to `bcinr-powl`, so
 /// this is a from-scratch, structurally-equivalent reimplementation over
 /// `PowlModel`'s public fields, not a call into it).
@@ -140,7 +140,7 @@ pub struct ProjectionReceipt {
 /// `source_concurrency_digest` fields (a consistency check that this
 /// receipt is being sealed for the plan it claims to be about, not a
 /// re-verification of preservation itself; costs nothing in release
-/// builds, same discipline as `bcinr_powl::scheduler`'s
+/// builds, same discipline as `crate::scheduler`'s
 /// `ConcurrencySelector::select_checked`).
 pub fn seal_projection_receipt(
     prior_hash: Digest,
@@ -225,14 +225,14 @@ pub trait SourceSemanticVerifier {
     }
 }
 
-/// The real verifier: wraps `bcinr_powl::projection::PowlProjector`
+/// The real verifier: wraps `crate::projection::PowlProjector`
 /// (`bcinr-powl`'s concrete, non-stub implementation from Phase 2b).
 ///
 /// `PowlProjector` is a stateless unit struct that derives neither `Debug`
 /// nor `Default` (see `bcinr-powl`'s `projection.rs`), so both are
 /// implemented by hand here rather than derived.
 pub struct RealSourceSemanticVerifier {
-    projector: bcinr_powl::projection::PowlProjector,
+    projector: crate::projection::PowlProjector,
 }
 
 impl std::fmt::Debug for RealSourceSemanticVerifier {
@@ -244,13 +244,13 @@ impl std::fmt::Debug for RealSourceSemanticVerifier {
 impl Default for RealSourceSemanticVerifier {
     fn default() -> Self {
         RealSourceSemanticVerifier {
-            projector: bcinr_powl::projection::PowlProjector,
+            projector: crate::projection::PowlProjector,
         }
     }
 }
 
 impl SourceSemanticVerifier for RealSourceSemanticVerifier {
-    type Projector = bcinr_powl::projection::PowlProjector;
+    type Projector = crate::projection::PowlProjector;
 
     fn projector(&self) -> &Self::Projector {
         &self.projector
@@ -272,7 +272,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     /// The same "A, B, C can't all fire together" fixture
-    /// `bcinr_powl::projection`'s own test module uses, mirrored here for
+    /// `crate::projection`'s own test module uses, mirrored here for
     /// consistency (see mission ground truth) rather than reused directly —
     /// `bcinr-powl`'s fixture is private to its own `#[cfg(test)]` module.
     fn fixture() -> (CausalPlan, ExecutableConcurrencyComplex) {
@@ -334,7 +334,7 @@ mod tests {
     #[test]
     fn seal_projection_receipt_chains_onto_prior_hash() {
         let (causal, concurrency) = fixture();
-        let projector = bcinr_powl::projection::PowlProjector;
+        let projector = crate::projection::PowlProjector;
         let (model, witness) = projector.project(&causal, &concurrency).unwrap();
         let model_digest = digest_powl_model(&model);
 
@@ -351,7 +351,7 @@ mod tests {
     #[test]
     fn tampering_with_causal_plan_digest_changes_the_hash() {
         let (causal, concurrency) = fixture();
-        let projector = bcinr_powl::projection::PowlProjector;
+        let projector = crate::projection::PowlProjector;
         let (model, witness) = projector.project(&causal, &concurrency).unwrap();
         let model_digest = digest_powl_model(&model);
 
@@ -389,7 +389,7 @@ mod tests {
     #[test]
     fn chaining_two_receipts_advances_the_hash() {
         let (causal, concurrency) = fixture();
-        let projector = bcinr_powl::projection::PowlProjector;
+        let projector = crate::projection::PowlProjector;
         let (model, witness) = projector.project(&causal, &concurrency).unwrap();
         let model_digest = digest_powl_model(&model);
 
@@ -468,8 +468,8 @@ mod tests {
             .unwrap_err();
         assert_eq!(
             err,
-            bcinr_powl::projection::ProjectionError::Preservation(
-                bcinr_powl::projection::PreservationError::UnmappedAction(ActionOccurrenceId(99))
+            crate::projection::ProjectionError::Preservation(
+                crate::projection::PreservationError::UnmappedAction(ActionOccurrenceId(99))
             )
         );
     }

@@ -53,10 +53,10 @@ use bcinr_mfw_ir::{
     PlanningEpochId,
 };
 use bcinr_powl::powl2::{compile_powl2, CompiledPowl2, LowestIndexPolicy, Powl2Error, Powl2Model};
-use bcinr_powl::tape::v2::ConcurrencyGuardTable;
-use bcinr_powl_receipt::execution_v2::{
+use bcinr_powl::receipt::execution_v2::{
     execute_and_seal_v2, PowlV2ExecutionReceipt, PowlV2ReceiptError,
 };
+use bcinr_powl::tape::v2::ConcurrencyGuardTable;
 
 use crate::capability::{admit_planning_task, AdmittedPlanningTask, GroundedPlanningEpoch};
 use crate::causal::{CausalAnalysisError, PddlCausalAnalyzer};
@@ -546,7 +546,7 @@ fn fallback_sequential(plan: &Pddl8Tape) -> Powl2Model {
 
 #[cfg(test)]
 mod tests {
-    use bcinr_powl_receipt::execution_v2::verify_execution_v2;
+    use bcinr_powl::receipt::execution_v2::verify_execution_v2;
 
     use super::*;
 
