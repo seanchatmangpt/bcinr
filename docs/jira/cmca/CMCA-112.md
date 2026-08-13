@@ -57,22 +57,43 @@ specific extreme-mass-distribution input shape.
 
 ## Acceptance Criteria
 
-- [ ] Correct `fixed_pow`'s doc comment (it currently states an incorrect
+- [x] Correct `fixed_pow`'s doc comment (it currently states an incorrect
       mathematical claim) or, better, fix the underlying saturation issue —
       determine whether a max-shift-stabilized variant (matching
       `compute_pi_kq_for_kq`'s own approach, which `fixed_pow`'s comment
       explicitly contrasts itself against) is needed here too.
-- [ ] Decide and implement the correct `0/0` behavior for `s_meas`/`s_leaf` in
+      Resolution: confirmed saturation/underflow is reachable inside
+      `FeasibleRegion::CURRENT` at `q` near the proptest domain's `1.99`
+      bound (see the added regression tests). Corrected the doc comment to
+      retract the false "cancels out algebraically" claim and documented
+      that a genuine precision gap remains when two siblings both saturate
+      to the identical `MAX` (as opposed to the `0/0` case, which is now
+      fixed below) — a max-shift-stabilized `fixed_pow` variant would be
+      required to close that remaining gap and is left as follow-up scope
+      (not required by this ticket's `0/0` divergence fix).
+- [x] Decide and implement the correct `0/0` behavior for `s_meas`/`s_leaf` in
       `compute_kappa` — either fail closed (treat as kappa=0/no-update,
       matching the f64 oracle's NaN-implies-false semantics) rather than
       saturating to a spurious large finite value.
-- [ ] Add regression tests sweeping mass/`q` combinations near the
+      Resolution: `compute_kappa` now detects `sum_meas_den == 0` (the
+      genuine `0/0` case for a child's `s_meas`) and excludes that child's
+      contribution from `kappa` instead of trusting `saturating_div`'s
+      forced `MAX`, matching the f64 oracle's `NaN`-poisons-to-no-update
+      fail-safe (`kappa > epsilon_kappa` is `false` for both `NaN` in f64
+      and the excluded/zero contribution in fixed-point).
+- [x] Add regression tests sweeping mass/`q` combinations near the
       saturation/underflow boundaries identified above (e.g. masses ≥ 263 at
       `q` near 2, masses near `m_min` at `q` near 2) and assert
       `compute_kappa`'s fixed-point result matches the f64 oracle within a
       measured tolerance — this is currently untested by both the CMCA-107
       regression test and default-configuration proptest.
-- [ ] `cargo test -p bcinr-cmca --features std` full suite green.
+      Resolution: added `allocator::kappa_saturation_tests` (in
+      `crates/bcinr-cmca/src/allocator/mod.rs`) covering the saturation
+      boundary (mass=300/1000 at q=1.99), the underflow boundary (mass near
+      `m_min` at q=1.99), the `0/0` fail-safe (direct child underflows while
+      a deeper subtree leaf does not), and a non-degenerate sanity case
+      confirming the fail-safe doesn't zero out real divergence signals.
+- [x] `cargo test -p bcinr-cmca --features std` full suite green.
 
 ## Files likely touched
 

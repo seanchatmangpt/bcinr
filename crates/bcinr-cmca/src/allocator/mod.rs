@@ -1357,10 +1357,31 @@ pub(crate) fn compute_pi_kq_for_kq(
 
 /// `mass^q_val` in Q16.16, via `exp2(q_val * log2(mass))` -- the same
 /// log-domain power construction `compute_pi_kq_for_kq` already uses for its
-/// max-shift-stabilized root/child/leaf weights, but unshifted: kappa only
-/// ever consumes *ratios* of these values (`s_meas`, `s_leaf` below), so a
-/// missing max-shift constant cancels out algebraically and does not need to
-/// be tracked here.
+/// max-shift-stabilized root/child/leaf weights, but *unshifted*.
+///
+/// CMCA-112: the "a missing max-shift constant cancels out algebraically"
+/// claim this comment previously made is **false** in Q16.16. Unlike
+/// `compute_pi_kq_for_kq`'s per-group max-shift (which subtracts the group's
+/// max exponent before `exp2`, so every value in the group stays within
+/// `exp2`'s representable range and only underflows when *genuinely*
+/// negligible relative to the group max), this function computes each
+/// `mass^q_val` independently and saturates in absolute (not relative)
+/// terms: `exp2` saturates to `MAX` once its integer part reaches 16
+/// (`mass >= 2^(16/q_val)`) and underflows to `0` below `-17`
+/// (`mass < 2^(-17/q_val)`) regardless of any sibling's value. Both bounds
+/// are reachable well inside `FeasibleRegion::CURRENT`
+/// (`~[9.2e-5, 1000]`) at `q_val` near the proptest domain's `1.99` bound --
+/// see `kappa_saturation_tests::fixed_pow_saturates_within_feasible_region_at_q_near_2`
+/// and its underflow counterpart. Once two sibling masses both saturate to
+/// the identical `MAX` (or both underflow to `0`), `compute_kappa`'s ratios
+/// stop differentiating between them even though their true `mass^q_val`
+/// ratio is large. `compute_kappa` compensates for the resulting `0/0` case
+/// (all direct children of `v` underflow) by excluding that child's
+/// contribution rather than trusting `saturating_div`'s spurious `MAX`; the
+/// saturated-but-nonzero case (both siblings pinned to `MAX`) is a genuine
+/// precision loss this function does not yet correct -- a max-shift variant
+/// matching `compute_pi_kq_for_kq`'s approach would be required to close
+/// that remaining gap.
 #[inline(always)]
 fn fixed_pow(mass: NonNegativeFixed, q_val: SignedFixed) -> NonNegativeFixed {
     let log_m = mass.log2();
@@ -1422,6 +1443,20 @@ fn compute_kappa(
             ));
         });
 
+        // `sum_meas_den == 0` means every direct child's mass_pow underflowed
+        // to zero: `s_meas` for this child is a genuine `0/0`, not a real
+        // ratio. `saturating_div` forces that to `NonNegativeFixed::MAX`
+        // regardless of numerator (fixed.rs's `den_is_zero` branch), which
+        // would inject a spurious large finite `s_meas` into `log_ratio`
+        // below. The f64 reference oracle's equivalent `0.0/0.0` is `NaN`,
+        // which poisons its whole `kappa` sum to `NaN` -- and
+        // `kappa > epsilon_kappa` is `false` for `NaN` under IEEE-754, so the
+        // oracle fails safe to "no update" for the entire node, not just
+        // this child. Mirror that by excluding this child's contribution
+        // (CMCA-112): a node with no measurable direct children carries no
+        // divergence signal.
+        let meas_den_is_zero = sum_meas_den.val == 0;
+
         let s_meas = mass_pow[c & 7].saturating_div(sum_meas_den);
         let s_leaf = l_q_c.saturating_div(sum_leaf_den);
         let s_leaf_pos = s_leaf.val > 0;
@@ -1429,10 +1464,155 @@ fn compute_kappa(
         let log_ratio = s_leaf.saturating_div(s_meas).log2();
         let term = (((s_leaf.val as i64).wrapping_mul(log_ratio.val as i64)) >> 16) as i32;
 
-        let contribution = const_select_u32((is_child & s_leaf_pos) as u32, term as u32, 0) as i32;
+        let contribution = const_select_u32(
+            (is_child & s_leaf_pos & !meas_den_is_zero) as u32,
+            term as u32,
+            0,
+        ) as i32;
         kappa = SignedFixed::from_bits(kappa.val.wrapping_add(contribution));
     });
     kappa
+}
+
+#[cfg(test)]
+mod kappa_saturation_tests {
+    //! Regression tests for CMCA-112: `fixed_pow` saturation reachability
+    //! within the actually-feasible mass domain, and `compute_kappa`'s
+    //! `0/0` fail-safe behavior versus the f64 reference oracle's `NaN`
+    //! semantics (`tests/reference.rs`).
+    use super::*;
+
+    fn to_fixed(v: f64) -> NonNegativeFixed {
+        NonNegativeFixed::from_bits((v * 65536.0).round() as u32)
+    }
+
+    fn to_signed(v: f64) -> SignedFixed {
+        SignedFixed::from_bits((v * 65536.0).round() as i32)
+    }
+
+    /// CMCA-112 root cause #1: `fixed_pow` saturates to `MAX` for masses
+    /// that are inside `FeasibleRegion::CURRENT` (`~[9.2e-5, 1000]`) and the
+    /// differential proptest's lens-exponent domain (`-1.99..1.99`). This
+    /// confirms the saturation is reachable, not merely a theoretical edge
+    /// -- two masses whose true `mass^q` ratio is ~23:1 collapse to the
+    /// identical saturated `MAX` value, destroying `compute_kappa`'s
+    /// differentiation between them.
+    #[test]
+    fn fixed_pow_saturates_within_feasible_region_at_q_near_2() {
+        let q = to_signed(1.99);
+
+        let low = fixed_pow(to_fixed(300.0), q);
+        let high = fixed_pow(to_fixed(1000.0), q);
+
+        assert_eq!(
+            low.val,
+            NonNegativeFixed::MAX.val,
+            "expected mass=300 at q=1.99 to saturate to MAX (2^(16/1.99) ~= 263 < 300)"
+        );
+        assert_eq!(
+            high.val,
+            NonNegativeFixed::MAX.val,
+            "expected mass=1000 at q=1.99 to saturate to MAX"
+        );
+        // Both saturate to the identical value despite a true mass^q ratio
+        // of ~23:1 -- the differentiation `compute_kappa` depends on is
+        // gone at this boundary.
+        assert_eq!(low.val, high.val);
+    }
+
+    /// CMCA-112 root cause #1, underflow side: masses near the feasible
+    /// region's floor at q near 2 underflow `fixed_pow` to exactly zero.
+    #[test]
+    fn fixed_pow_underflows_within_feasible_region_at_q_near_2() {
+        let q = to_signed(1.99);
+        let near_floor = fixed_pow(to_fixed(0.000_092), q);
+        assert_eq!(
+            near_floor.val, 0,
+            "expected mass near feasible-region floor at q=1.99 to underflow to 0"
+        );
+    }
+
+    /// CMCA-112 root cause #2: when every direct child of `v` underflows to
+    /// `mass_pow == 0` (so `sum_meas_den == 0`) while a deeper subtree leaf
+    /// does not (so `sum_leaf_den > 0`, `s_leaf > 0`), `compute_kappa` must
+    /// exclude that child's `0/0` `s_meas` term rather than let
+    /// `saturating_div` force it to `NonNegativeFixed::MAX`, matching the
+    /// f64 oracle's `NaN`-poisons-to-no-update fail-safe.
+    #[test]
+    fn compute_kappa_fails_safe_on_direct_child_measure_zero_zero() {
+        // Tree: 0 is root; 1 is its only direct child; 2 is a grandchild
+        // under 1 (so 2 is a subtree-leaf of both 1 and 0, but not a direct
+        // child of 0). All other slots are isolated placeholder roots so
+        // they don't participate in node 0's child/leaf sums.
+        let mut parent = [-1i32; N];
+        parent[1] = 0;
+        parent[2] = 1;
+
+        let mut is_subtree_leaf = [[false; N]; N];
+        // Node 1's only subtree leaf is 2.
+        is_subtree_leaf[1][2] = true;
+        // Node 0's subtree leaves are whatever 1's subtree leaves are (2),
+        // since 1 is not itself a leaf.
+        is_subtree_leaf[0][2] = true;
+
+        let q = to_signed(1.99);
+        let mut node_masses = [[NonNegativeFixed::ZERO; N]; K];
+        // Node 1 (v=0's only direct child) has a mass that underflows
+        // fixed_pow to 0 at q=1.99, driving sum_meas_den (over v=0's direct
+        // children) to 0 -- a genuine 0/0 for s_meas.
+        node_masses[MEASURE_CACHE][1] = to_fixed(0.000_092);
+        // Node 2 (a deeper subtree leaf, not a direct child of v=0) has a
+        // mass well inside the feasible region that does NOT underflow, so
+        // sum_leaf_den > 0 and s_leaf > 0 for node 1.
+        node_masses[MEASURE_CACHE][2] = to_fixed(10.0);
+
+        let kappa = compute_kappa(0, q, &parent, &is_subtree_leaf, &node_masses);
+
+        // Fail-safe: no measurable direct children under v=0 means no
+        // divergence signal, matching the f64 oracle's NaN-poisoned kappa
+        // failing every `kappa > epsilon_kappa` comparison.
+        assert_eq!(
+            kappa.val, 0,
+            "0/0 s_meas must not inject a spurious divergence signal"
+        );
+    }
+
+    /// Sanity check: a non-degenerate case (no 0/0 anywhere, and where a
+    /// direct child's own mass diverges from its subtree-leaf mass) still
+    /// produces a real, nonzero divergence signal, so the fail-safe above
+    /// isn't just zeroing everything out.
+    #[test]
+    fn compute_kappa_nonzero_for_non_degenerate_case() {
+        // Tree: 0 is root with direct children 1 and 2; 1's only subtree
+        // leaf is 3, 2's only subtree leaf is 4. Node 1 and node 2 have
+        // equal direct mass (s_meas equal, 0.5/0.5), but their subtree
+        // leaves 3 and 4 have very different mass, so s_leaf diverges from
+        // s_meas and kappa should be nonzero.
+        let mut parent = [-1i32; N];
+        parent[1] = 0;
+        parent[2] = 0;
+        parent[3] = 1;
+        parent[4] = 2;
+
+        let mut is_subtree_leaf = [[false; N]; N];
+        is_subtree_leaf[1][3] = true;
+        is_subtree_leaf[2][4] = true;
+        is_subtree_leaf[0][3] = true;
+        is_subtree_leaf[0][4] = true;
+
+        let q = to_signed(0.5);
+        let mut node_masses = [[NonNegativeFixed::ZERO; N]; K];
+        node_masses[MEASURE_CACHE][1] = to_fixed(5.0);
+        node_masses[MEASURE_CACHE][2] = to_fixed(5.0);
+        node_masses[MEASURE_CACHE][3] = to_fixed(1.0);
+        node_masses[MEASURE_CACHE][4] = to_fixed(100.0);
+
+        let kappa = compute_kappa(0, q, &parent, &is_subtree_leaf, &node_masses);
+        assert!(
+            kappa.val != 0,
+            "diverging subtree-leaf mass should produce a nonzero divergence signal"
+        );
+    }
 }
 
 mod feasible_region;
