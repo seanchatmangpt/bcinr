@@ -27,8 +27,8 @@
 #![allow(clippy::needless_range_loop)]
 
 use bcinr_cmca::allocator::{
-    allocate, AdaptiveUpdate, AdmittedControlState, CertificateReceipt, CertifiedLearning,
-    EnvelopeReceipt, OutcomeReceipt,
+    allocate, allocate_single_lens, AdaptiveUpdate, AdmittedControlState, CertificateReceipt,
+    CertifiedLearning, EnvelopeReceipt, OutcomeReceipt,
 };
 use bcinr_cmca::fixed::NonNegativeFixed;
 use bcinr_cmca::generated::consequence_mass::case_studies::{
@@ -380,13 +380,16 @@ fn falsify_certificate_prevents_replay_attacks() {
 }
 
 // ============================================================================
-// FALSIFICATION SET 6: Aggregate Lens Blending Determinism
+// FALSIFICATION SET 6: Lens Blending Determinism, and Real Per-Lens Isolation
 //
-// (Per-lens isolation is not observable through the public API — see
-// module doc comment. These tests probe the one thing that *is*
-// observable: the blended output is a pure, deterministic function of the
-// registry's declared factor values, not of allocator call history or
-// candidate identity beyond those factors.)
+// Per-lens isolation used NOT to be observable through the public API — that
+// gap is exactly what `allocate_single_lens` (added alongside this comment
+// update) closes: it exposes `allocate_in`'s existing internal per-lens
+// kernel (`compute_pi_kq_for_kq`) directly, rather than reimplementing it, so
+// a single-lens result can never silently drift from what `allocate()`'s
+// LAMBDA blend computes internally. The first two tests below probe the
+// blended output's determinism (unchanged); the third and fourth are new,
+// and genuinely check per-lens isolation instead of routing around it.
 // ============================================================================
 
 #[test]
@@ -413,15 +416,14 @@ fn falsify_qlens_exploitation_always_picks_max() {
 
 #[test]
 fn falsify_qlens_coverage_skips_demonstrated_concepts() {
-    // Coverage-style "don't repeat the same winner" behavior isn't
-    // independently selectable through `allocate()` (see module doc
-    // comment). What we can genuinely check: the same registry, replayed
-    // at a later round still inside the dwell window, does not silently
-    // start favoring a different candidate purely due to round number —
-    // i.e. there's no hidden per-round rotation standing in for real
-    // coverage tracking (which would be a different kind of bug: fake
-    // "coverage" via arbitrary rotation rather than value-driven
-    // selection).
+    // The same registry, replayed at a later round still inside the dwell
+    // window, does not silently start favoring a different candidate
+    // purely due to round number — i.e. there's no hidden per-round
+    // rotation standing in for real coverage tracking (which would be a
+    // different kind of bug: fake "coverage" via arbitrary rotation rather
+    // than value-driven selection). This targets `allocate()`'s blended
+    // output specifically, independent of the per-lens isolation checks
+    // below.
     let parent = [-1; N];
     let round_0 = run_allocate(parent, 0);
     let round_50 = run_allocate(parent, 50);
@@ -432,6 +434,67 @@ fn falsify_qlens_coverage_skips_demonstrated_concepts() {
             "FALSIFIED: candidate {} allocation changed between round 0 and round 50 with no \
              other input change — indicates a hidden rotation rather than value-driven selection",
             i
+        );
+    }
+}
+
+#[test]
+fn falsify_per_lens_isolation_is_now_real() {
+    // The claim this test exists to falsify: `allocate_single_lens` is a
+    // facade that secretly still blends every lens together, rather than
+    // genuinely returning lens `(k, q)`'s isolated computation. If that
+    // were true, every `(measure, lens_idx)` pair would produce the same
+    // vector. It does not: `LensCoverage` (q=0, LENS_REGISTRY index 2)
+    // weights every sibling equally under `MeasureCache` (k=0), so its
+    // result differs from `LensExploitation` (q=2.0, index 0), which
+    // concentrates mass on the highest-cost/highest-access candidates.
+    let parent = [-1; N];
+    let weights = [[NonNegativeFixed::ONE; 2 * Q]; N];
+
+    let exploitation =
+        allocate_single_lens(&OBJECT_REGISTRY, &LENS_REGISTRY, 0, 0, &parent, &weights)
+            .expect("LensExploitation under MeasureCache must be admitted");
+    let coverage = allocate_single_lens(&OBJECT_REGISTRY, &LENS_REGISTRY, 0, 2, &parent, &weights)
+        .expect("LensCoverage under MeasureCache must be admitted");
+
+    let mut any_divergence = false;
+    for i in 0..N {
+        if exploitation[i].val != coverage[i].val {
+            any_divergence = true;
+            break;
+        }
+    }
+    assert!(
+        any_divergence,
+        "FALSIFIED: LensExploitation and LensCoverage produced identical allocations under \
+         MeasureCache — per-lens isolation is not real, allocate_single_lens still blends \
+         internally. exploitation={exploitation:?} coverage={coverage:?}"
+    );
+}
+
+#[test]
+fn falsify_single_lens_result_matches_the_blend_contribution_it_claims_to_isolate() {
+    // The claim this test exists to falsify: `allocate_single_lens(k, q)`
+    // does not actually correspond to the `(k, q)` term `allocate()`'s
+    // LAMBDA blend sums internally — i.e. it's a plausible-looking but
+    // disconnected computation. `tests/single_lens_allocation.rs`'s
+    // `blend_equals_the_lambda_weighted_sum_of_single_lens_results` already
+    // checks this across the full registry with a measured tolerance; this
+    // test is the adversarial-suite-local witness that a single, easy case
+    // (LensCoverage, q=0, under MeasureCache) is at minimum non-degenerate:
+    // every object gets a strictly positive, non-saturated share (coverage
+    // at q=0 is the uniform-sibling-weight case, so every one of the 8
+    // objects should receive a nonzero, non-dominating share).
+    let parent = [-1; N];
+    let weights = [[NonNegativeFixed::ONE; 2 * Q]; N];
+    let coverage = allocate_single_lens(&OBJECT_REGISTRY, &LENS_REGISTRY, 0, 2, &parent, &weights)
+        .expect("LensCoverage under MeasureCache must be admitted");
+
+    for (i, share) in coverage.iter().enumerate() {
+        assert!(
+            share.val > 0 && share.val < NonNegativeFixed::ONE.val,
+            "FALSIFIED: object {i} under LensCoverage got a degenerate share {share:?} \
+             (expected a nonzero, non-dominating share under uniform sibling weighting)"
         );
     }
 }

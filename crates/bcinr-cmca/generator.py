@@ -123,7 +123,7 @@ def main():
         out_path = sys.argv[2]
     else:
         ttl_path = os.path.join(script_dir, 'ontology', 'cmca-rdf.ttl')
-        out_path = os.path.join(script_dir, 'src', 'generated', 'case_studies.rs')
+        out_path = os.path.join(script_dir, 'src', 'generated', 'consequence_mass', 'case_studies.rs')
         
     out_dir = os.path.dirname(out_path)
     if out_dir:
@@ -218,13 +218,13 @@ def main():
         for f_str, f_full, f_val in zip(factor_strs, factor_names_full, factors):
             f_name = f_full.split(':')[-1]
             lines.append(f"            {f_str}, // {f_name}: {f_val:.5f}")
-        lines.append("        ],"),
+        lines.append("        ],")
         lines.append("    },")
         object_registry_lines.append("\n".join(lines))
         
     # 5. Global ETA
     eta_val = 0.5
-    for subj, props in properties.items():
+    for props in properties.values():
         if 'cmca:eta' in props:
             eta_val = props['cmca:eta']
             break
@@ -358,35 +358,6 @@ pub static OBJECT_REGISTRY: [PackedSemanticState; N] = [
 pub static LENS_REGISTRY: [LensSpec; Q] = [
 {chr(10).join(lens_registry_lines)}
 ];
-
-// Macro generation
-macro_rules! unroll_n_static {{
-    ($idx:ident, $body:block) => {{
-"""
-    for i in range(len(semantic_objects)):
-        generated_code += f"        const $idx: usize = {i};\n"
-        generated_code += f"        $body\n"
-    
-    generated_code += """    };
-}
-macro_rules! unroll_q_static {
-    ($idx:ident, $body:block) => {
-"""
-    for i in range(Q):
-        generated_code += f"        const $idx: usize = {i};\n"
-        generated_code += f"        $body\n"
-        
-    generated_code += """    };
-}
-macro_rules! unroll_k_static {
-    ($idx:ident, $body:block) => {
-"""
-    for i in range(K):
-        generated_code += f"        const $idx: usize = {i};\n"
-        generated_code += f"        $body\n"
-        
-    generated_code += """    };
-}
 """
 
     with open(out_path, 'w') as f:

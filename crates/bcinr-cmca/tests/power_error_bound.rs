@@ -61,19 +61,29 @@
 //!
 //! A single bound over the full `[-16, 16]` domain would therefore have
 //! to be as loose as ~40-50% to be honest -- not a useful
-//! characterization. Per this repo's own Gall-checkpoint discipline ("one
+//! characterization for the tight-precision uses this crate's own tests
+//! exercise. Per this repo's own Gall-checkpoint discipline ("one
 //! consequential distinction ... no unrelated architectural expansion"),
-//! this checkpoint bounds a genuinely useful, narrower sub-domain instead
-//! of manufacturing a uniform bound wide enough to cover the whole
-//! declared lens magnitude: **`|q| <= 4`**, which covers every worked
-//! example this crate's own tests already use (`escort.rs`'s
-//! `q=3` diagnostic test, `q(0.5)`/`q(-0.5)`/`q(1.0)`/`q(2.0)`/`q(4.0)`/
-//! `q(5.0)` in `escort.rs`'s `output_sums_to_approximately_one` and
-//! `higher_q_concentrates_mass_on_the_largest_input`). `power` remains
-//! reachable at `|q|` up to `MAX_LENS_MAGNITUDE` through
-//! `escort_distribution` -- this file does NOT claim any bound for
-//! `4 < |q| <= 16`; that sub-domain is left `UNKNOWN` by this checkpoint,
-//! not silently assumed safe.
+//! this checkpoint *primarily* bounds a genuinely useful, tighter
+//! sub-domain: **`|q| <= 4`**, which covers every worked example this
+//! crate's own tests already use (`escort.rs`'s `q=3` diagnostic test,
+//! `q(0.5)`/`q(-0.5)`/`q(1.0)`/`q(2.0)`/`q(4.0)`/`q(5.0)` in `escort.rs`'s
+//! `output_sums_to_approximately_one` and
+//! `higher_q_concentrates_mass_on_the_largest_input`).
+//!
+//! `power` remains reachable at `|q|` up to `MAX_LENS_MAGNITUDE` (16)
+//! through `escort_distribution`, and CMCA-106 closed the gap this
+//! paragraph used to leave open: the full `4 < |q| <= 16` sub-domain is
+//! **no longer `UNKNOWN`**. `power_relative_error_full_domain_bucketed`
+//! below sweeps the entire admitted domain (`|q| <= 16`) with the same
+//! grid construction as the `|q| <= 4` sweep, extended, and asserts a
+//! real, per-bucket measured bound (see that test's own doc comment for
+//! the exact figures: growing from ~0.5% at `|q| <= 0.25` to ~36.2% at
+//! `|q| <= 16`, with the exact boundary `|q| == 16` measured directly at
+//! ~36.9%). The `|q| <= 4` sweep and bound below remain as the tighter,
+//! separately-asserted characterization for the sub-domain this crate's
+//! own worked examples actually use -- both bounds are checked
+//! independently, and neither supersedes the other.
 //!
 //! # Domain swept (the bound this file actually asserts)
 //!
@@ -162,12 +172,29 @@ fn base_grid() -> Vec<f64> {
 }
 
 fn exponent_grid() -> Vec<f64> {
-    let steps = (4.0 * MAX_SWEPT_LENS_MAGNITUDE * 2.0) as i64 + 1; // 0.25 step
+    exponent_grid_to(MAX_SWEPT_LENS_MAGNITUDE)
+}
+
+/// Same construction as [`exponent_grid`], generalized to an arbitrary
+/// magnitude so the full-domain sweep below (`|q| <= 16`, i.e.
+/// `cascade::MAX_LENS_MAGNITUDE`) can reuse it without duplicating the
+/// step/filter logic.
+fn exponent_grid_to(max_magnitude: f64) -> Vec<f64> {
+    let steps = (4.0 * max_magnitude * 2.0) as i64 + 1; // 0.25 step
     (0..steps)
-        .map(|i| -MAX_SWEPT_LENS_MAGNITUDE + (i as f64) * 0.25)
+        .map(|i| -max_magnitude + (i as f64) * 0.25)
         .filter(|q| q.fract().abs() > 1e-9) // exclude exact integers: never reach `power` in production
         .collect()
 }
+
+/// The crate's own declared admitted domain boundary
+/// (`cascade::MAX_LENS_MAGNITUDE`), duplicated here as an `f64` literal so
+/// this file doesn't need a dependency on `bcinr_cmca::cascade` just for
+/// one constant. Kept in sync by
+/// `full_domain_sweep_matches_declared_admitted_boundary` below, which
+/// fails loudly if the crate's constant ever moves without this file being
+/// updated.
+const FULL_DOMAIN_MAX_LENS_MAGNITUDE: f64 = 16.0;
 
 /// Sweeps `base_grid() x exponent_grid()` through a caller-supplied
 /// `power`-shaped function, returning the maximum relative error observed
@@ -212,15 +239,181 @@ fn max_relative_error(
     (max_rel_err, checked, faulted)
 }
 
+/// Sweeps the full admitted lens domain (`|q| <= FULL_DOMAIN_MAX_LENS_MAGNITUDE`,
+/// i.e. `cascade::MAX_LENS_MAGNITUDE`) through `power`, bucketing the
+/// observed relative error by `|q|` range using the same buckets as the
+/// module doc's table. Returns `(bucket_max_by_upper_bound, overall_max,
+/// checked, faulted)`. `bucket_max_by_upper_bound` pairs each bucket's
+/// upper `|q|` edge with the max relative error observed for `|q|` in
+/// that bucket.
+fn max_relative_error_full_domain_bucketed() -> (Vec<(f64, f64)>, f64, usize, usize) {
+    const BUCKET_EDGES: [f64; 6] = [0.25, 1.0, 2.0, 4.0, 8.0, 16.0];
+    let mut bucket_max = vec![0.0f64; BUCKET_EDGES.len()];
+    let mut overall_max = 0.0f64;
+    let mut faulted = 0usize;
+    let mut checked = 0usize;
+
+    for &base in &base_grid() {
+        for &q in &exponent_grid_to(FULL_DOMAIN_MAX_LENS_MAGNITUDE) {
+            let b = fixed_mass(base);
+            let e = fixed_exponent(q);
+            let got = power(b, e);
+            if got.err != u32::MAX {
+                faulted += 1;
+                continue;
+            }
+            let reference = base.powf(q);
+            if !reference.is_finite() || reference.abs() < MIN_REFERENCE_MAGNITUDE {
+                continue;
+            }
+            let observed = to_f64(got);
+            let rel_err = ((observed - reference) / reference).abs();
+            checked += 1;
+            if rel_err > overall_max {
+                overall_max = rel_err;
+            }
+            let abs_q = q.abs();
+            if let Some(bucket) = BUCKET_EDGES.iter().position(|&edge| abs_q <= edge) {
+                if rel_err > bucket_max[bucket] {
+                    bucket_max[bucket] = rel_err;
+                }
+            }
+        }
+    }
+
+    let named: Vec<(f64, f64)> = BUCKET_EDGES.iter().copied().zip(bucket_max).collect();
+    (named, overall_max, checked, faulted)
+}
+
+/// This checkpoint's real, measured worst-case relative error over the
+/// FULL admitted domain (`|q| <= 16`), not just the `|q| <= 4` sub-domain
+/// bounded above. Per-bucket bounds are the module doc table's measured
+/// figures plus headroom, matching the pattern
+/// `EMPIRICAL_RELATIVE_ERROR_BOUND` already uses for the `|q| <= 4`
+/// bound -- a real number derived from a real sweep, not "no bound
+/// claimed."
+///
+/// Measured maxima at the time this test was written (see this test's own
+/// `eprintln!` for the figure on any given run): `(0,0.25]` ~0.54%,
+/// `(0.25,1]` ~1.53%, `(1,2]` ~3.54%, `(2,4]` ~7.64%, `(4,8]` ~16.44%,
+/// `(8,16]` ~36.21%, with the single worst point over the entire swept
+/// domain also ~36.21% and the exact boundary `|q| == 16` measured
+/// directly at ~36.85% (small `base`, both signs of `q`). (An earlier,
+/// coarser manual sweep during this checkpoint's initial exploration
+/// reported ~48.5% for the full domain; the reproducible grid this test
+/// asserts against -- same `base_grid`/`exponent_grid` construction the
+/// `|q| <= 4` bound above uses, extended to `|q| <= 16` -- measures
+/// ~36.2%. The grid and its exact points are what this test actually
+/// checks, not the earlier figure.) Bounds below are each measured
+/// maximum plus headroom.
+const FULL_DOMAIN_BUCKET_BOUNDS: [f64; 6] = [0.015, 0.05, 0.08, 0.12, 0.25, 0.50];
+
+/// Bound on the single worst point anywhere in the full `|q| <= 16`
+/// domain -- looser than any individual bucket bound above since it is
+/// the max over the whole swept grid, not one range of `|q|`.
+const FULL_DOMAIN_OVERALL_BOUND: f64 = 0.55;
+
+#[test]
+fn power_relative_error_full_domain_bucketed() {
+    let (bucket_max, overall_max, checked, faulted) = max_relative_error_full_domain_bucketed();
+
+    eprintln!(
+        "power_relative_error_full_domain_bucketed: overall_max={overall_max:.6} \
+         ({:.3}%), checked={checked}, faulted_excluded={faulted}",
+        overall_max * 100.0
+    );
+    for (edge, max_err) in &bucket_max {
+        eprintln!(
+            "  |q| in (prev, {edge}]: max_rel_err={max_err:.6} ({:.3}%)",
+            max_err * 100.0
+        );
+    }
+
+    // Explicit boundary figure: the crate's own declared admitted edge,
+    // |q| == MAX_LENS_MAGNITUDE == 16, measured directly (not just folded
+    // into the (8,16] bucket).
+    let boundary_q = FULL_DOMAIN_MAX_LENS_MAGNITUDE;
+    let mut boundary_max = 0.0f64;
+    for &base in &base_grid() {
+        for &sign in &[1.0, -1.0] {
+            let q = sign * boundary_q;
+            let b = fixed_mass(base);
+            let e = fixed_exponent(q);
+            let got = power(b, e);
+            if got.err != u32::MAX {
+                continue;
+            }
+            let reference = base.powf(q);
+            if !reference.is_finite() || reference.abs() < MIN_REFERENCE_MAGNITUDE {
+                continue;
+            }
+            let observed = to_f64(got);
+            let rel_err = ((observed - reference) / reference).abs();
+            if rel_err > boundary_max {
+                boundary_max = rel_err;
+            }
+        }
+    }
+    eprintln!(
+        "  boundary |q|=={boundary_q} exactly: max_rel_err={boundary_max:.6} ({:.3}%)",
+        boundary_max * 100.0
+    );
+
+    assert!(
+        checked > 1500,
+        "full-domain sweep grid too small to be a meaningful characterization: only {checked} \
+         points checked"
+    );
+
+    for ((edge, max_err), bound) in bucket_max.iter().zip(FULL_DOMAIN_BUCKET_BOUNDS) {
+        assert!(
+            *max_err < bound,
+            "bucket |q| <= {edge}: measured max relative error {max_err:.6} ({:.3}%) exceeded \
+             its declared bound {bound:.6} ({:.3}%)",
+            max_err * 100.0,
+            bound * 100.0
+        );
+    }
+
+    assert!(
+        overall_max < FULL_DOMAIN_OVERALL_BOUND,
+        "full-domain (|q| <= {FULL_DOMAIN_MAX_LENS_MAGNITUDE}) max relative error {overall_max:.6} \
+         ({:.3}%) exceeded the declared overall bound {FULL_DOMAIN_OVERALL_BOUND:.6} \
+         ({:.3}%)",
+        overall_max * 100.0,
+        FULL_DOMAIN_OVERALL_BOUND * 100.0
+    );
+}
+
+/// Confirms this file's hardcoded `FULL_DOMAIN_MAX_LENS_MAGNITUDE` literal
+/// still matches the crate's real declared boundary
+/// (`cascade::MAX_LENS_MAGNITUDE`), so the full-domain sweep above can
+/// never silently drift out of sync with the boundary it claims to
+/// characterize.
+#[test]
+fn full_domain_sweep_matches_declared_admitted_boundary() {
+    assert_eq!(
+        FULL_DOMAIN_MAX_LENS_MAGNITUDE,
+        f64::from(bcinr_cmca::cascade::MAX_LENS_MAGNITUDE),
+        "this file's FULL_DOMAIN_MAX_LENS_MAGNITUDE literal has drifted from \
+         cascade::MAX_LENS_MAGNITUDE -- update both the literal and the full-domain sweep's \
+         bucket edges"
+    );
+}
+
 /// Empirical bound on `power`'s relative error over the swept `|q| <= 4`
-/// domain (see module doc for the exact grid and the honest exclusion of
-/// `4 < |q| <= 16`). Measured maximum at the time this checkpoint was
-/// written: ~7.64% (0.0764), at the domain's edge (`|q|` near 4, small
-/// `base`). `0.10` (10%) is that measured maximum plus headroom, not the
-/// measured figure itself -- this characterizes a bounded approximation
-/// over a specific, narrower-than-declared sub-domain, not a claim that
-/// `power` is accurate to 10% everywhere in `escort_distribution`'s
-/// admitted lens range.
+/// sub-domain (see module doc for the exact grid). The full `|q| <= 16`
+/// admitted domain is now separately swept and bounded by
+/// `power_relative_error_full_domain_bucketed` below -- this constant and
+/// its test remain as the tighter, independently-asserted bound for the
+/// sub-domain this crate's own worked examples actually use. Measured
+/// maximum at the time this checkpoint was written: ~7.64% (0.0764), at
+/// the sub-domain's edge (`|q|` near 4, small `base`). `0.10` (10%) is
+/// that measured maximum plus headroom, not the measured figure itself --
+/// this characterizes a bounded approximation over a specific, tighter
+/// sub-domain, not a claim that `power` is accurate to 10% everywhere in
+/// `escort_distribution`'s admitted lens range (see the full-domain bound
+/// for that).
 const EMPIRICAL_RELATIVE_ERROR_BOUND: f64 = 0.10;
 
 #[test]

@@ -351,16 +351,18 @@ fn escort_distribution_fractional_negative_lens_diverges_from_integer_path() {
     );
 }
 
-/// `EXPERIMENTAL`, not `CLASSIFIED`: the ontology-declared lens domain
-/// (`q in [-2,2]`, `ontology/profile.ttl`) reads as an admission gate, but
-/// `allocate_in` only actually refuses on it when `proof.is_some()`. With
-/// `proof=None` -- the common path exercised by every existing test in
-/// this crate except the explicit-proof ones -- an out-of-range `q` is
-/// silently accepted and used in the computation; only the learning-rate
-/// update freezes. A future reader must not assume the domain declaration
-/// is load-bearing in the common case without checking this.
+/// `CLASSIFIED` (CMCA-103 regression): the ontology-declared lens domain
+/// (`q in [-2,2]`, `ontology/profile.ttl`) is an admission gate, and
+/// `allocate_in` now refuses on it unconditionally -- regardless of
+/// `proof.is_some()`/`proof.is_none()`. `proof=None` is the common path
+/// exercised by nearly every other test in this crate; an out-of-range `q`
+/// on that path must produce `Err(StabilityRefusal::QRangeDestabilizing)`,
+/// not a silent accept. (Previously this test documented the opposite,
+/// buggy behavior as EXPERIMENTAL/not-enforced; CMCA-103 fixed the
+/// underlying gate at `allocate_in`'s `has_refusal` computation so that only
+/// the learning-rate update -- not domain admission -- is proof-gated.)
 #[test]
-fn allocate_in_lens_domain_is_declared_but_not_enforced_without_proof() {
+fn allocate_in_refuses_out_of_range_q_without_proof() {
     let mut lenses = LENS_REGISTRY;
     lenses[0].q = SignedFixed::from_bits(3 * 65536); // q=3, outside the declared [-2,2]
 
@@ -395,81 +397,21 @@ fn allocate_in_lens_domain_is_declared_but_not_enforced_without_proof() {
     );
 
     assert!(
-        result.is_ok(),
-        "EXPERIMENTAL finding: with proof=None, an out-of-range q is expected to be \
-         silently accepted (not refused) -- got {result:?}. If this now fails, the \
-         domain check became enforced in the common path and this classification \
-         (and ontology/profile.ttl's documentation of it) needs updating."
+        matches!(result, Err(StabilityRefusal::QRangeDestabilizing)),
+        "CMCA-103: with proof=None, an out-of-range q must now be refused as \
+         QRangeDestabilizing regardless of proof.is_some()/is_none() -- got {result:?}"
     );
 }
 
-/// Regime-honesty check (Checkpoint A's finding, reused here as
-/// classification evidence rather than re-derived): a successful
-/// `allocate()` result is not automatically a normalized distribution.
-/// `CORRECT_MU_COST`-shaped inputs (extreme `mu`/`costs` collapsing
-/// `priced_sum` to zero) hit the documented non-renormalized fallback
-/// branch and legitimately return `Ok` with a sum far from `ONE`.
-/// `AllocatorProjection` classifies as the degenerate-fallback variant
-/// here, explicitly not the normalized-projection variant.
+/// CMCA-103 update: this hostile `mu`/`costs` baseline is out of the
+/// declared price domain (`price_err`), and `price_err` is one of the
+/// selection-critical checks CMCA-103 made unconditional (it feeds directly,
+/// unconditionally, into the pricing pass regardless of `proof`). It no
+/// longer reaches Checkpoint A's degenerate-fallback-but-`Ok` regime on the
+/// proof=None path; it is refused outright, exactly as it already was on
+/// the proof=Some path. See `allocate_in`'s CMCA-103 comment.
 #[test]
-fn hostile_mu_cost_baseline_is_degenerate_fallback_not_normalized() {
-    let lambda = bcinr_cmca::generated::consequence_mass::case_studies::LAMBDA;
-    let mut weights = [[NonNegativeFixed::ONE; 2 * Q]; N];
-    let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
-    let mut last_switch_t = 0;
-    let mut prev_mode = 0;
-    let parent = [-1; N];
-    // Same construction as hostile_mutants.rs::run_alloc_mu_cost, including
-    // proof=None: with proof=Some, allocate_in's price_err DOES refuse
-    // (PriceGainUnsafe) instead of degrading -- confirmed by first running
-    // this test with a real proof and getting exactly that refusal. The
-    // fallback-not-refusal regime this test classifies only exists on the
-    // proof=None path (has_refusal = has_error & !degrade_to_certified_selection,
-    // and degrade_to_certified_selection = proof.is_none()).
-    let mu = [NonNegativeFixed::from_bits(0u32.wrapping_sub(327680)); N];
-    let costs = [NonNegativeFixed::ONE; N];
-
-    let result = allocate_in(
-        &FeasibleRegion::CURRENT,
-        &OBJECT_REGISTRY,
-        &LENS_REGISTRY,
-        &lambda,
-        ETA,
-        &parent,
-        &mut weights,
-        &payoffs,
-        NonNegativeFixed::ZERO,
-        NonNegativeFixed::ZERO,
-        &mu,
-        &costs,
-        0,
-        &mut last_switch_t,
-        &mut prev_mode,
-        500,
-        CERTIFICATE_DIGEST,
-        None,
-    )
-    .unwrap();
-
-    assert!(
-        !FeasibleRegion::CURRENT.contains_allocation(&result),
-        "hostile mu/cost baseline must NOT be classified as a normalized allocation -- \
-         a successful Ok result here is the degenerate fallback regime, not the \
-         normalized-projection regime, per Checkpoint A's finding"
-    );
-}
-
-/// `EXPERIMENTAL`: `allocate_in` has no refusal channel analogous to
-/// `cascade::CascadeRefusal::DegenerateSiblingSet` for all-zero masses --
-/// D1 found only a silent branchless divide-by-`ONE` guard. This test
-/// pins that absence: the closest reachable approximation of "all masses
-/// zero" via `OBJECT_REGISTRY`-derived masses (all `mu`/`costs` pushed to
-/// the same degenerate-fallback regime as the hostile baseline above)
-/// must not panic and must not produce `Err` -- confirming there is no
-/// typed refusal path to take, not just that this particular input
-/// happens to succeed.
-#[test]
-fn allocate_in_has_no_typed_refusal_for_degenerate_fallback_regime() {
+fn hostile_mu_cost_baseline_now_refuses_instead_of_degenerate_fallback() {
     let lambda = bcinr_cmca::generated::consequence_mass::case_studies::LAMBDA;
     let mut weights = [[NonNegativeFixed::ONE; 2 * Q]; N];
     let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
@@ -500,14 +442,56 @@ fn allocate_in_has_no_typed_refusal_for_degenerate_fallback_regime() {
         None,
     );
 
-    assert!(
-        !matches!(result, Err(StabilityRefusal::ContractViolation)),
-        "no ContractViolation expected from this degenerate-but-not-cyclic input"
+    assert_eq!(
+        result,
+        Err(StabilityRefusal::PriceGainUnsafe),
+        "CMCA-103: an out-of-domain price/mu must now refuse unconditionally instead of \
+         hitting the degenerate-fallback-but-Ok regime -- got {result:?}"
     );
-    assert!(
-        result.is_ok(),
-        "EXPERIMENTAL finding: allocate_in has no typed refusal for this degenerate \
-         regime -- it always succeeds via the silent fallback, got {result:?}"
+}
+
+/// CMCA-103 update: `allocate_in` DOES now have a typed refusal
+/// (`PriceGainUnsafe`) reachable for this input -- CMCA-103's fix made
+/// `price_err` selection-critical and therefore unconditional. This
+/// replaces the prior `EXPERIMENTAL` finding that no typed refusal existed
+/// for this degenerate regime on the proof=None path.
+#[test]
+fn allocate_in_now_has_a_typed_refusal_for_the_former_degenerate_fallback_regime() {
+    let lambda = bcinr_cmca::generated::consequence_mass::case_studies::LAMBDA;
+    let mut weights = [[NonNegativeFixed::ONE; 2 * Q]; N];
+    let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
+    let mut last_switch_t = 0;
+    let mut prev_mode = 0;
+    let parent = [-1; N];
+    let mu = [NonNegativeFixed::from_bits(0u32.wrapping_sub(327680)); N];
+    let costs = [NonNegativeFixed::ONE; N];
+
+    let result = allocate_in(
+        &FeasibleRegion::CURRENT,
+        &OBJECT_REGISTRY,
+        &LENS_REGISTRY,
+        &lambda,
+        ETA,
+        &parent,
+        &mut weights,
+        &payoffs,
+        NonNegativeFixed::ZERO,
+        NonNegativeFixed::ZERO,
+        &mu,
+        &costs,
+        0,
+        &mut last_switch_t,
+        &mut prev_mode,
+        500,
+        CERTIFICATE_DIGEST,
+        None,
+    );
+
+    assert_eq!(
+        result,
+        Err(StabilityRefusal::PriceGainUnsafe),
+        "CMCA-103: this degenerate-but-not-cyclic input now has a typed refusal \
+         (PriceGainUnsafe), not the prior silent-fallback-to-Ok -- got {result:?}"
     );
 }
 

@@ -1,4 +1,4 @@
-error[E0451]: field `_sealed` of struct `CertifiedLearning` is private
+error[E0451]: field `_sealed` of struct `bcinr_cmca::allocator::CertifiedLearning` is private
  --> tests/ui/fail_construct_certified_learning.rs:3:33
   |
 3 |     let _ = CertifiedLearning { _sealed: () };

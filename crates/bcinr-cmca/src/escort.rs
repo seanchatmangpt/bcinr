@@ -66,8 +66,28 @@
 //! mixed with normalization cancellation, as this single-share figure
 //! is) now exists in `tests/power_error_bound.rs`: an empirical, swept
 //! bound of ~7.6% relative error for `|q| <= 4`, with error measured to
-//! grow with `|q|` (up to ~36% near `|q| = 16`) -- so no bound is
-//! claimed, here or there, for `power`'s behavior at larger `|q|`.
+//! grow with `|q|`. `power` is reachable through the public
+//! `escort_distribution` API across the crate's *entire* declared lens
+//! domain (`|q| <= cascade::MAX_LENS_MAGNITUDE == 16`, checked by
+//! `escort_distribution`'s own bound check just below) -- so that full
+//! domain, not just `|q| <= 4`, is now also swept and bounded, by
+//! `power_relative_error_full_domain_bucketed` in
+//! `tests/power_error_bound.rs`: max relative error grows from ~0.5% for
+//! `|q| <= 0.25` to ~1.5% for `|q| <= 1`, ~3.5% for `|q| <= 2`, ~7.6% for
+//! `|q| <= 4` (matching the sub-domain figure above), ~16.4% for
+//! `|q| <= 8`, and ~36.2% for `|q| <= 16`, with the exact boundary
+//! `|q| == 16` measured directly at ~36.9%. Every figure here is a real,
+//! reproducible measurement against an `f64` reference oracle over a
+//! fixed grid, not an assumption -- see that test's own module doc and
+//! `eprintln!` output for the exact grid and current numbers. No refusal
+//! path was added for the high-`|q|` region as part of this
+//! measurement: ~36-37% relative error at `|q|` near 16 is large enough
+//! that a caller relying on `power`'s output there for anything more
+//! precise than "roughly which sibling dominates" should not trust the
+//! magnitude -- but changing `escort_distribution`'s `Ok`/`Err` behavior
+//! (e.g. refusing fractional `q` above some `|q|` threshold) is a public
+//! API change with its own scope and was deliberately left undone here;
+//! see the ticket/PR discussion for that specific proposal.
 //!
 //! # Declared lens domain
 //!

@@ -231,7 +231,7 @@ fn kill_m07_ignore_gram() {
 
 use bcinr_cmca::allocator::{
     allocate, AdaptiveUpdate, AdmittedControlState, CertifiedLearning, EnvelopeReceipt,
-    OutcomeReceipt,
+    OutcomeReceipt, StabilityRefusal,
 };
 use bcinr_cmca::generated::consequence_mass::case_studies::{
     ETA, LAMBDA, LENS_REGISTRY, N, OBJECT_REGISTRY, Q,
@@ -316,7 +316,7 @@ fn run_alloc_tree() -> [NonNegativeFixed; N] {
     .unwrap()
 }
 
-fn run_alloc_mu_cost() -> [NonNegativeFixed; N] {
+fn run_alloc_mu_cost() -> Result<[NonNegativeFixed; N], StabilityRefusal> {
     let mut weights = [[NonNegativeFixed::ONE; 2 * Q]; N];
     let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
     let mut last_switch_t = 0;
@@ -344,14 +344,17 @@ fn run_alloc_mu_cost() -> [NonNegativeFixed; N] {
         &mut prev_mode,
         500,
         CERTIFICATE_DIGEST,
-        None, // degrade_to_certified_selection = true, freezes learning but succeeds!
+        // CMCA-103: proof=None used to bypass admission entirely
+        // (degrade_to_certified_selection silently accepted out-of-domain
+        // inputs). Since the fix, this out-of-domain `mu` is refused
+        // (PriceGainUnsafe) unconditionally, regardless of proof -- so this
+        // no longer "freezes learning but succeeds."
+        None,
     )
-    .unwrap()
 }
 
 const CORRECT_BASELINE: [u32; N] = [8349, 7741, 6684, 6684, 6684, 6684, 7973, 14733];
 const CORRECT_TREE: [u32; N] = [0, 9391, 6623, 8066, 8066, 8066, 9275, 16043];
-const CORRECT_MU_COST: [u32; N] = [4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096];
 
 const ACTIVE_MUTANT_COUNT: u8 = cfg!(feature = "mutant_1") as u8
     + cfg!(feature = "mutant_2") as u8
@@ -445,10 +448,24 @@ fn kill_mutant_5_consequence_truncation() {
     if !require_isolated_mutant("mutant_5") {
         return;
     }
-    let result_mutant = run_alloc_mu_cost().map(|x| x.val);
-    assert_ne!(
-        result_mutant, CORRECT_MU_COST,
-        "Mutant 5 should deviate from correct mu_cost baseline"
+    // CMCA-103 note: `run_alloc_mu_cost`'s deliberately out-of-domain `mu`
+    // (used to distinguish clipped vs. unclipped `mu_actual`) is now refused
+    // by the *unconditionally*-enforced admission gate (`price_err`) before
+    // mutant_5's clip removal can have any observable effect on the returned
+    // allocation -- both the baseline and the mutant now return the same
+    // `Err(PriceGainUnsafe)` via this public entry point, so this mutant is
+    // no longer killable through `allocate`/`allocate_in`. This is a
+    // consequence of fixing CMCA-103 (out-of-domain admission is no longer
+    // bypassable via proof=None) and is a distinct, follow-up decision for
+    // the mutation-testing harness (e.g. exercising the clip directly via an
+    // internal/unit-level hook) rather than something CMCA-103 itself
+    // resolves. Asserting the (now-shared) refusal here instead of silently
+    // asserting the old, no-longer-true "mutant deviates from baseline"
+    // claim.
+    let result_mutant = run_alloc_mu_cost();
+    assert!(
+        result_mutant.is_err(),
+        "expected the out-of-domain admission refusal to fire regardless of mutant_5"
     );
 }
 
@@ -647,5 +664,9 @@ fn kill_mutant_11_false_gram_degenerate() {
 fn verify_correctness_baselines() {
     assert_eq!(run_alloc_baseline().map(|x| x.val), CORRECT_BASELINE);
     assert_eq!(run_alloc_tree().map(|x| x.val), CORRECT_TREE);
-    assert_eq!(run_alloc_mu_cost().map(|x| x.val), CORRECT_MU_COST);
+    // CMCA-103: this baseline's `mu` is deliberately out of the declared
+    // domain (see `run_alloc_mu_cost`'s comment); admission is now
+    // unconditional, so it is correctly refused rather than silently
+    // accepted with a frozen-learning degrade.
+    assert_eq!(run_alloc_mu_cost(), Err(StabilityRefusal::PriceGainUnsafe));
 }

@@ -298,7 +298,14 @@ fn test_stability_refusals_and_graceful_fallback() {
     );
     assert_eq!(res, Err(StabilityRefusal::CertificateDigestMismatch));
 
-    // 2. Invalid certificate digest with degrade=true -> should succeed but freeze learning (CertifiedSelectionOnly)
+    // 2. Invalid certificate digest with degrade=true -> should succeed but freeze learning
+    // (CertifiedSelectionOnly). CMCA-103 confirmed this specific case is a
+    // legitimate, deliberately documented contract: `digest_err` (unlike
+    // `q_err`/`price_err`/`eta_err`) only gates the weight-update / mode-
+    // switch code, which proof=None already disables independently -- see
+    // `allocate_in`'s CMCA-103 comment and
+    // tests/jtbd_certified_actuation_chicago.rs's
+    // `jtbd_drift_refusal_routes_to_selection_only_without_state_drift`.
     let weights_before = weights;
     let res_degraded = allocate(
         &OBJECT_REGISTRY,
