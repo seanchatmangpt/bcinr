@@ -1504,6 +1504,25 @@ fn fixed_pow(mass: NonNegativeFixed, q_val: SignedFixed) -> NonNegativeFixed {
     exponent.exp2()
 }
 
+/// `mass_pow[i] = fixed_pow(node_masses[MEASURE_CACHE][i], q_val)` for every
+/// node, computed once for a fixed `q_val`. `compute_kappa`'s `mass_pow`
+/// array has no `v`-dependence (CMCA-120), so callers that invoke
+/// `compute_kappa` once per `(v, q_idx)` pair must call this once per
+/// `q_idx` and reuse the result across the `v` loop instead of recomputing
+/// it per `(v, q_idx)` pair -- an 8x reduction in `fixed_pow` calls with no
+/// behavior change.
+#[inline(always)]
+fn fixed_pow_per_node(
+    q_val: SignedFixed,
+    node_masses: &[[NonNegativeFixed; N]; K],
+) -> [NonNegativeFixed; N] {
+    let mut mass_pow = [NonNegativeFixed::ZERO; N];
+    unroll_8_static!(i, {
+        mass_pow[i & 7] = fixed_pow(node_masses[MEASURE_CACHE][i & 7], q_val);
+    });
+    mass_pow
+}
+
 /// Divergence guard $\kappa_v$ for internal node `v` under lens `q_val`,
 /// matching the module doc comment's
 /// $\kappa_v = \sum_{c \in \text{children}(v)} s_{\text{leaf}}(c) \cdot
@@ -1516,19 +1535,19 @@ fn fixed_pow(mass: NonNegativeFixed, q_val: SignedFixed) -> NonNegativeFixed {
 ///
 /// Uses `node_masses[MEASURE_CACHE]`, mirroring the f64 reference's use of
 /// `node_masses[0]` (`MEASURE_CACHE == 0`).
+///
+/// `mass_pow` (`mass^q_val` per node, under `MEASURE_CACHE`) depends only on
+/// `node_masses[MEASURE_CACHE]` and `q_val` -- neither varies with `v` -- so
+/// callers looping over `v` for a fixed `q_idx` must compute it once
+/// (`fixed_pow_per_node(q_val, node_masses)`) and pass the same array in for
+/// every `v`, rather than recomputing it per call (CMCA-120).
 #[inline(never)]
 fn compute_kappa(
     v: usize,
-    q_val: SignedFixed,
+    mass_pow: &[NonNegativeFixed; N],
     parent: &[i32; N],
     is_subtree_leaf: &[[bool; N]; N],
-    node_masses: &[[NonNegativeFixed; N]; K],
 ) -> SignedFixed {
-    let mut mass_pow = [NonNegativeFixed::ZERO; N];
-    unroll_8_static!(i, {
-        mass_pow[i & 7] = fixed_pow(node_masses[MEASURE_CACHE][i & 7], q_val);
-    });
-
     let mut sum_meas_den = NonNegativeFixed::ZERO;
     unroll_8_static!(c, {
         let is_child = parent[c & 7] == v as i32;
@@ -1680,7 +1699,8 @@ mod kappa_saturation_tests {
         // sum_leaf_den > 0 and s_leaf > 0 for node 1.
         node_masses[MEASURE_CACHE][2] = to_fixed(10.0);
 
-        let kappa = compute_kappa(0, q, &parent, &is_subtree_leaf, &node_masses);
+        let mass_pow = fixed_pow_per_node(q, &node_masses);
+        let kappa = compute_kappa(0, &mass_pow, &parent, &is_subtree_leaf);
 
         // Fail-safe: no measurable direct children under v=0 means no
         // divergence signal, matching the f64 oracle's NaN-poisoned kappa
@@ -1721,7 +1741,8 @@ mod kappa_saturation_tests {
         node_masses[MEASURE_CACHE][3] = to_fixed(1.0);
         node_masses[MEASURE_CACHE][4] = to_fixed(100.0);
 
-        let kappa = compute_kappa(0, q, &parent, &is_subtree_leaf, &node_masses);
+        let mass_pow = fixed_pow_per_node(q, &node_masses);
+        let kappa = compute_kappa(0, &mass_pow, &parent, &is_subtree_leaf);
         assert!(
             kappa.val != 0,
             "diverging subtree-leaf mass should produce a nonzero divergence signal"
@@ -1949,6 +1970,22 @@ pub fn allocate_in(
     let can_switch = t.wrapping_sub(local_last_switch_t) >= tau_d;
     let update_allowed = !(switch_wanted & !can_switch) & !freeze_learning & proof_some;
 
+    // CMCA-120: `compute_kappa`'s `mass_pow` array depends only on
+    // `node_masses[MEASURE_CACHE]` and `q_val`, neither of which varies
+    // across the `v` loop below for a fixed `q_idx`. Compute it once per
+    // `q_idx` here (4 arrays) instead of once per `(v, q_idx)` pair (32
+    // times) -- an 8x reduction in `fixed_pow` calls with no behavior
+    // change.
+    let mut mass_pow_by_q = [[NonNegativeFixed::ZERO; N]; Q];
+    unroll_4_static!(q_idx, {
+        let mut q_val_mutated = SignedFixed::from_bits(lenses[q_idx & 3].q.val);
+        #[cfg(feature = "mutant_2")]
+        {
+            q_val_mutated = SignedFixed::from_bits(0i32.wrapping_sub(q_val_mutated.val));
+        }
+        mass_pow_by_q[q_idx & 3] = fixed_pow_per_node(q_val_mutated, &node_masses);
+    });
+
     unroll_8_static!(v, {
         let has_children = !is_leaf[v & 7];
 
@@ -1958,11 +1995,6 @@ pub fn allocate_in(
         });
 
         unroll_4_static!(q_idx, {
-            let mut _q_val_mutated = SignedFixed::from_bits(lenses[q_idx & 3].q.val);
-            #[cfg(feature = "mutant_2")]
-            {
-                _q_val_mutated = SignedFixed::from_bits(0i32.wrapping_sub(_q_val_mutated.val));
-            }
             let w_flat = local_weights[v & 7][(2 * q_idx) & 7];
             let w_desc = local_weights[v & 7][(2 * q_idx + 1) & 7];
 
@@ -1970,7 +2002,7 @@ pub fn allocate_in(
             // weights when the local divergence kappa_v exceeds
             // epsilon_kappa, matching the module doc comment's contract and
             // the f64 reference oracle's `update_active = kappa > epsilon_kappa`.
-            let kappa = compute_kappa(v, _q_val_mutated, parent, &is_subtree_leaf, &node_masses);
+            let kappa = compute_kappa(v, &mass_pow_by_q[q_idx & 3], parent, &is_subtree_leaf);
             let kappa_exceeds = kappa.val > (epsilon_kappa.val as i32);
             let is_updating = has_children & update_allowed & kappa_exceeds;
             local_weights[v & 7][(2 * q_idx) & 7] = NonNegativeFixed::from_bits(const_select_u32(

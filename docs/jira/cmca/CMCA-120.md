@@ -43,20 +43,31 @@ Found by adversarial review of `compute_kappa`/`fixed_pow`
 
 ## Acceptance Criteria
 
-- [ ] Add a regression test asserting the positive path: construct a case
+- [x] Add a regression test asserting the positive path: construct a case
       where a multi-child node's kappa genuinely exceeds `epsilon_kappa`,
       and assert its weights actually update (differ from initial) and
       match the f64 oracle within a measured tolerance.
-- [ ] Hoist `mass_pow` computation out of the `v` loop in `allocate_in` (or
+      (`cmca_120_multi_child_node_kappa_exceeds_epsilon_and_weights_actually_update`
+      in `tests/differential.rs`, node 1 of the same CMCA-107 fixture,
+      which has three direct children.)
+- [x] Hoist `mass_pow` computation out of the `v` loop in `allocate_in` (or
       restructure `compute_kappa`'s call site) so it's computed once per
       `q_idx`, not once per `(v, q_idx)` pair — an 8x reduction in
       `fixed_pow` calls with no behavior change.
+      (New `fixed_pow_per_node` helper computes `mass_pow` once per `q_idx`
+      into `mass_pow_by_q` before the `v` loop in `allocate_in`;
+      `compute_kappa`'s signature now takes the precomputed `mass_pow`
+      array instead of `q_val` + `node_masses`.)
 - [ ] Benchmark before/after if this crate has a benchmarking harness
       (`bcinr-bench`) to confirm the expected improvement, matching this
       repo's own "optimize algorithm: profile -> identify bottleneck ->
       implement -> benchmark -> commit with % improvement" workflow from
       CLAUDE.md.
-- [ ] `cargo test -p bcinr-cmca --features std` full suite green after the
+      Descoped: no benchmark in `crates/bcinr-bench` exercises
+      `compute_kappa`, `allocate_in`, or `allocate` (confirmed by search
+      over that crate's sources), and this ticket's own instructions say
+      to skip rather than invent one.
+- [x] `cargo test -p bcinr-cmca --features std` full suite green after the
       refactor (no behavior change expected, but verify).
 
 ## Files likely touched

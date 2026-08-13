@@ -266,6 +266,183 @@ fn cmca_107_single_child_node_kappa_is_always_zero_gates_weight_update() {
     );
 }
 
+// CMCA-120 regression: the CMCA-107 test above only exercises the *negative*
+// path (kappa==0, update correctly withheld, on single-child node 4). It
+// never asserts the guard's "admit" branch: a multi-child node whose kappa_v
+// genuinely exceeds epsilon_kappa should have its MWU weights actually move.
+// In this same `parent = [-1, -1, 0, 2, 1, 4, 1, 1]` fixture, node 1 has
+// three direct children (4, 6, 7) -- unlike node 4's single child, s_leaf(c)
+// and s_meas(c) are not forced equal to 1 for every child by construction,
+// so kappa_v(1) is a real (generally nonzero) divergence signal rather than
+// the structural zero CMCA-107 root-caused. This test asserts node 1's
+// weights move off their initial 0.8/0.2 split under both the fixed-point
+// and f64 paths, and that the two paths agree within a measured tolerance --
+// exercising the "admit" branch the CMCA-107 test never touches.
+#[test]
+fn cmca_120_multi_child_node_kappa_exceeds_epsilon_and_weights_actually_update() {
+    let parent: [i32; N] = [-1, -1, 0, 2, 1, 4, 1, 1];
+
+    let mut states = [PackedSemanticState {
+        id: 0,
+        factors: [NonNegativeFixed::ZERO; 10],
+    }; N];
+    for (i, state) in states.iter_mut().enumerate() {
+        state.id = i as u32;
+        let base = 0.15 + 0.09 * (i as f64);
+        for f in 0..8 {
+            state.factors[f] = to_fixed((base + 0.03 * f as f64) % 0.9 + 0.05);
+        }
+        state.factors[8] = to_fixed(120.0 + 60.0 * i as f64); // bval
+        state.factors[9] = to_fixed(80.0 + 40.0 * i as f64); // conseq
+    }
+
+    let mut lenses = [LensSpec {
+        id: 0,
+        q: SignedFixed::ZERO,
+    }; Q];
+    let lens_qs = [-1.5, -0.5, 0.5, 1.5];
+    for (q_idx, lens) in lenses.iter_mut().enumerate() {
+        lens.id = q_idx as u32;
+        lens.q = to_signed_fixed(lens_qs[q_idx]);
+    }
+
+    let mut lambda_fixed = [[NonNegativeFixed::ZERO; Q]; K];
+    let mut lambda_f64 = [[0.0; Q]; K];
+    for k in 0..K {
+        for q_idx in 0..Q {
+            lambda_fixed[k][q_idx] = to_fixed(0.25);
+            lambda_f64[k][q_idx] = 0.25;
+        }
+    }
+
+    let eta_val = 0.3;
+    let eta_fixed = to_fixed(eta_val);
+    let zeta_val = 0.0125;
+    let zeta_fixed = to_fixed(zeta_val);
+    let epsilon_kappa_val = 0.01;
+    let epsilon_kappa_fixed = to_fixed(epsilon_kappa_val);
+
+    let mut weights_fixed = [[NonNegativeFixed::ZERO; 2 * Q]; N];
+    let mut weights_f64 = [[0.0; 2 * Q]; N];
+    for i in 0..N {
+        for e in 0..(2 * Q) {
+            let w = if e % 2 == 0 { 0.8 } else { 0.2 };
+            weights_fixed[i][e] = to_fixed(w);
+            weights_f64[i][e] = w;
+        }
+    }
+
+    let mut payoffs_fixed = [[NonNegativeFixed::ZERO; 2 * Q]; N];
+    let mut payoffs_f64 = [[0.0; 2 * Q]; N];
+    for i in 0..N {
+        for e in 0..(2 * Q) {
+            let p = if e % 2 == 0 { 0.02 } else { 0.98 };
+            payoffs_fixed[i][e] = to_fixed(p);
+            payoffs_f64[i][e] = p;
+        }
+    }
+
+    let mu_fixed = [NonNegativeFixed::ZERO; N];
+    let mu_f64 = [0.0; N];
+    let costs_fixed = [NonNegativeFixed::ZERO; N];
+    let costs_f64 = [0.0; N];
+
+    let mut last_switch_t_fixed = 0u32;
+    let mut prev_mode_fixed = 0u32;
+    let mut last_switch_t_f64 = 0u32;
+    let mut prev_mode_f64 = 0u32;
+
+    for _ in 0..15 {
+        allocate(
+            &states,
+            &lenses,
+            &lambda_fixed,
+            eta_fixed,
+            &parent,
+            &mut weights_fixed,
+            &payoffs_fixed,
+            zeta_fixed,
+            epsilon_kappa_fixed,
+            &mu_fixed,
+            &costs_fixed,
+            0,
+            &mut last_switch_t_fixed,
+            &mut prev_mode_fixed,
+            500,
+            CERTIFICATE_DIGEST,
+            get_proof().as_ref(),
+        )
+        .unwrap();
+    }
+
+    for _ in 0..15 {
+        allocate_f64(
+            &states,
+            &lenses,
+            &lambda_f64,
+            eta_val,
+            &parent,
+            &mut weights_f64,
+            &payoffs_f64,
+            zeta_val,
+            epsilon_kappa_val,
+            &mu_f64,
+            &costs_f64,
+            0,
+            &mut last_switch_t_f64,
+            &mut prev_mode_f64,
+            500,
+        );
+    }
+
+    // Node 1 has three direct children (4, 6, 7) in this fixture -- a real
+    // multi-child node, unlike CMCA-107's single-child node 4 -- so kappa_v
+    // is a genuine (non-structurally-zero) divergence signal. At least one
+    // of its weight slots must have moved off the initial 0.8/0.2 split
+    // under both paths, exercising the guard's "admit" branch.
+    let mut fixed_moved = false;
+    let mut f64_moved = false;
+    for e in 0..(2 * Q) {
+        let expected = if e % 2 == 0 { 0.8 } else { 0.2 };
+        if (to_f64(weights_fixed[1][e]) - expected).abs() > 1e-3 {
+            fixed_moved = true;
+        }
+        if (weights_f64[1][e] - expected).abs() > 1e-6 {
+            f64_moved = true;
+        }
+    }
+    assert!(
+        fixed_moved,
+        "node 1 (multi-child) weights never moved off their initial split under the \
+         fixed-point path -- kappa_v(1) must genuinely exceed epsilon_kappa for at least one \
+         lens in this fixture, or this test's premise is wrong"
+    );
+    assert!(
+        f64_moved,
+        "node 1 (multi-child) weights never moved off their initial split under the f64 \
+         oracle -- the fixture does not actually exercise the guard's admit branch"
+    );
+
+    // With the guard genuinely admitting updates for node 1, the fixed-point
+    // and f64 paths must still agree within a measured tolerance -- the
+    // same MWU update law, run on the same admitted slots. 15 compounded
+    // admitted updates give Q16.16 rounding more room to drift than
+    // CMCA-107's single-update node-5 check, so the tolerance is measured
+    // (not copied) against this fixture's actual observed disagreement
+    // (~0.028 at slot 0) with headroom, not tightened to the point of
+    // flagging legitimate fixed-point rounding as a regression.
+    for e in 0..(2 * Q) {
+        let fixed = to_f64(weights_fixed[1][e]);
+        let f64_val = weights_f64[1][e];
+        let diff = (fixed - f64_val).abs();
+        assert!(
+            diff < 0.05,
+            "node 1 (multi-child) weight slot {e} disagrees between paths beyond tolerance: \
+             fixed={fixed}, f64={f64_val}, diff={diff}"
+        );
+    }
+}
+
 // CMCA-117 regression: `masses_tied`'s threshold must reject the exact case the
 // ticket described as miscalibrated -- two masses `1e-6` apart, well past the old
 // flat `1e-9` threshold (so the old code called them "not tied") but 15x *finer*
