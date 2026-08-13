@@ -99,6 +99,8 @@ dependencies = [
  "bcinr-logic",
  "chicago-tdd-tools",
  "proptest",
+ "serde",
+ "serde_json",
  "trybuild",
 ]
 
