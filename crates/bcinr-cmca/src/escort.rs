@@ -79,15 +79,20 @@
 //! `|q| == 16` measured directly at ~36.9%. Every figure here is a real,
 //! reproducible measurement against an `f64` reference oracle over a
 //! fixed grid, not an assumption -- see that test's own module doc and
-//! `eprintln!` output for the exact grid and current numbers. No refusal
-//! path was added for the high-`|q|` region as part of this
-//! measurement: ~36-37% relative error at `|q|` near 16 is large enough
-//! that a caller relying on `power`'s output there for anything more
+//! `eprintln!` output for the exact grid and current numbers.
+//!
+//! **CMCA-116 closure**: ~36-37% relative error at `|q|` near 16 is large
+//! enough that a caller relying on `power`'s output there for anything more
 //! precise than "roughly which sibling dominates" should not trust the
-//! magnitude -- but changing `escort_distribution`'s `Ok`/`Err` behavior
-//! (e.g. refusing fractional `q` above some `|q|` threshold) is a public
-//! API change with its own scope and was deliberately left undone here;
-//! see the ticket/PR discussion for that specific proposal.
+//! magnitude, and `escort_distribution` gave no signal by which to tell a
+//! high-error call from a low-error one. Rather than narrowing the admitted
+//! domain (which would refuse calls that work fine today), this measured
+//! bucketed error data is now exposed as a runtime-checkable
+//! [`PathConfidence`] via the additive
+//! [`escort_distribution_with_confidence`] entry point, so a caller can
+//! decide for itself whether a given call's error bound is acceptable --
+//! without changing `escort_distribution`'s existing `Ok`/`Err` signature
+//! or behavior for any existing caller.
 //!
 //! # Declared lens domain
 //!
@@ -151,6 +156,67 @@ fn exact_integer_lens(q: SignedFixed) -> Option<i32> {
     }
 }
 
+/// How much a caller should trust an [`escort_distribution`] result's
+/// magnitude, per-call.
+///
+/// This is CMCA-116's closure: `escort_distribution`'s only domain gate is
+/// the flat `|q| > MAX_LENS_MAGNITUDE` cutoff, which does not vary with the
+/// error `power` actually carries at a given `|q|` (measured in this
+/// module's own doc comment and in `tests/power_error_bound.rs`). Rather
+/// than narrowing the admitted domain (closure (a) in the ticket, which
+/// would refuse currently-working calls outright), this crate exposes the
+/// already-measured error bound as a runtime-checkable signal (closure
+/// (b)), additively, so `escort_distribution`'s existing
+/// `Result<Vec<NonNegativeFixed>, EscortRefusal>` signature and every
+/// existing caller keep working unchanged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PathConfidence {
+    /// `q` was an exact integer, routed through `cascade::escort_weight`'s
+    /// repeated-multiplication path: bit-identical to the true value, zero
+    /// approximation error.
+    Exact,
+    /// `q` was genuinely fractional, routed through `allocator::power`'s
+    /// `log2`/`exp2` approximation. `max_relative_error_bps` is an upper
+    /// bound on the relative error of `power`'s output at this `|q|`, in
+    /// basis points (1 bps = 0.01%), taken from the empirical sweep
+    /// documented at the top of this module and in
+    /// `tests/power_error_bound.rs` (bucketed by `|q|`, not interpolated --
+    /// the reported bound is the measured bound for the smallest bucket
+    /// `|q|` falls into, so it is conservative, not exact, for `|q|` values
+    /// strictly inside a bucket).
+    Approximate { max_relative_error_bps: u32 },
+}
+
+/// Bucketed upper bound (basis points, 1 bps = 0.01%) on `power`'s relative
+/// error at magnitude `abs_q_bits` (Q16.16 bits of `|q|`), per the swept
+/// figures in this module's doc comment (`power_relative_error_full_domain_bucketed`
+/// in `tests/power_error_bound.rs`): ~0.5% for `|q| <= 0.25`, ~1.5% for
+/// `|q| <= 1`, ~3.5% for `|q| <= 2`, ~7.6% for `|q| <= 4`, ~16.4% for
+/// `|q| <= 8`, ~36.9% for `|q| <= 16` (the declared domain boundary).
+/// `escort_distribution` has already refused any `q` outside `|q| <= 16`
+/// before this is called, so the final bucket is exhaustive here.
+#[inline]
+fn approximate_error_bound_bps(abs_q_bits: u32) -> u32 {
+    const Q_0_25: u32 = 1 << 14; // 0.25 in Q16.16
+    const Q_1: u32 = 1 << 16;
+    const Q_2: u32 = 2 << 16;
+    const Q_4: u32 = 4 << 16;
+    const Q_8: u32 = 8 << 16;
+    if abs_q_bits <= Q_0_25 {
+        50
+    } else if abs_q_bits <= Q_1 {
+        150
+    } else if abs_q_bits <= Q_2 {
+        350
+    } else if abs_q_bits <= Q_4 {
+        760
+    } else if abs_q_bits <= Q_8 {
+        1640
+    } else {
+        3690
+    }
+}
+
 /// Compute the escort distribution `L_q(i) = p_i^q / SUM_j p_j^q` over
 /// `masses` at lens exponent `q`.
 ///
@@ -188,6 +254,20 @@ pub fn escort_distribution(
     masses: &[NonNegativeFixed],
     q: SignedFixed,
 ) -> Result<Vec<NonNegativeFixed>, EscortRefusal> {
+    escort_distribution_with_confidence(masses, q).map(|(values, _confidence)| values)
+}
+
+/// Same computation as [`escort_distribution`], additionally returning a
+/// [`PathConfidence`] so a caller can distinguish a bit-identical exact-path
+/// result from an approximate-path result -- and, for the approximate path,
+/// how large the measured error bound is at this `|q|`. See
+/// [`PathConfidence`]'s doc for why this is additive rather than a change to
+/// `escort_distribution`'s existing signature (CMCA-116).
+#[allow(clippy::missing_errors_doc)]
+pub fn escort_distribution_with_confidence(
+    masses: &[NonNegativeFixed],
+    q: SignedFixed,
+) -> Result<(Vec<NonNegativeFixed>, PathConfidence), EscortRefusal> {
     if masses.is_empty() {
         return Err(EscortRefusal::EmptyInput);
     }
@@ -195,10 +275,17 @@ pub fn escort_distribution(
     // Declared domain check, once per call (a property of `q` alone, not of
     // any one mass). `unsigned_abs` handles `i32::MIN` correctly, unlike a
     // signed `abs()`.
-    if q.to_bits().unsigned_abs() > MAX_LENS_MAGNITUDE << 16 {
+    let abs_q_bits = q.to_bits().unsigned_abs();
+    if abs_q_bits > MAX_LENS_MAGNITUDE << 16 {
         return Err(EscortRefusal::UnsupportedLens { lens: q });
     }
     let exact_lens = exact_integer_lens(q);
+    let confidence = match exact_lens {
+        Some(_) => PathConfidence::Exact,
+        None => PathConfidence::Approximate {
+            max_relative_error_bps: approximate_error_bound_bps(abs_q_bits),
+        },
+    };
 
     let mut weighted: Vec<NonNegativeFixed> = Vec::with_capacity(masses.len());
     for (index, &mass) in masses.iter().enumerate() {
@@ -237,7 +324,7 @@ pub fn escort_distribution(
         }
         result.push(share);
     }
-    Ok(result)
+    Ok((result, confidence))
 }
 
 #[cfg(test)]
@@ -445,5 +532,62 @@ mod tests {
                  negative q, got {other:?}"
             ),
         }
+    }
+
+    /// CMCA-116 regression: before this fix, `escort_distribution` returned
+    /// the identical `Ok(Vec<NonNegativeFixed>)` shape for a low-error
+    /// fractional `q` (e.g. `q=0.1`, ~0.5% measured error) and a high-error
+    /// fractional `q` near the declared domain boundary (e.g. `q=15.9`,
+    /// ~36% measured error), with no signal a caller could inspect to tell
+    /// them apart. `escort_distribution_with_confidence` must let a caller
+    /// distinguish them.
+    #[test]
+    fn caller_can_distinguish_high_error_fractional_q_from_low_error_fractional_q() {
+        // Masses clustered close to 1.0 -- q=15.9 pushes masses far from 1.0
+        // (both larger, e.g. 4.0^15.9, and smaller, e.g. 0.1^15.9) past
+        // fixed-point range, which would produce a numeric fault instead of
+        // exercising the confidence signal this test targets.
+        let p = [mass(0.8), mass(0.9), mass(1.0), mass(1.1)];
+
+        let (_low_values, low_confidence) =
+            escort_distribution_with_confidence(&p, q(0.1)).unwrap();
+        let (_high_values, high_confidence) =
+            escort_distribution_with_confidence(&p, q(15.9)).unwrap();
+
+        let low_bound = match low_confidence {
+            PathConfidence::Approximate {
+                max_relative_error_bps,
+            } => max_relative_error_bps,
+            PathConfidence::Exact => panic!("q=0.1 is genuinely fractional, must not be Exact"),
+        };
+        let high_bound = match high_confidence {
+            PathConfidence::Approximate {
+                max_relative_error_bps,
+            } => max_relative_error_bps,
+            PathConfidence::Exact => panic!("q=15.9 is genuinely fractional, must not be Exact"),
+        };
+
+        assert!(
+            high_bound > low_bound,
+            "high-|q| call must report a larger error bound than low-|q|: \
+             low={low_bound}bps high={high_bound}bps"
+        );
+        // Matches the measured buckets documented in this module: ~0.5%
+        // (50bps) for |q| <= 0.25, ~36.9% (3690bps) for the |q| <= 16
+        // boundary bucket.
+        assert_eq!(low_bound, 50, "q=0.1 falls in the |q| <= 0.25 bucket");
+        assert_eq!(
+            high_bound, 3690,
+            "q=15.9 falls in the final |q| <= 16 bucket"
+        );
+    }
+
+    /// An exact-integer `q` must report [`PathConfidence::Exact`] -- zero
+    /// approximation error, not merely a small error bound.
+    #[test]
+    fn exact_integer_lens_reports_exact_confidence() {
+        let p = [mass(1.0), mass(2.0), mass(3.0)];
+        let (_values, confidence) = escort_distribution_with_confidence(&p, q(3.0)).unwrap();
+        assert_eq!(confidence, PathConfidence::Exact);
     }
 }
