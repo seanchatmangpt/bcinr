@@ -57,14 +57,16 @@ root cause and a regression test or compile-time signal (full detail in
 | [CMCA-116](CMCA-116.md) | 336 | **Done** — `PathConfidence` signal added to `escort_distribution` | `7c849f92` |
 | [CMCA-122](CMCA-122.md) | 210 | **Done** — dedicated refusal reasons for `eta_err`/`price_err` | `26692f1a` |
 | [CMCA-117](CMCA-117.md) | 200 | **Done** — `PROPTEST_CASES: "4096"` in CI, grid-derived `masses_tied` threshold | `ef3896dc` |
-| [CMCA-120](CMCA-120.md) | 192 | **Accepted residual risk** — not fixed this round; see `DFLSS_CONTROL.md` |  |
-| [CMCA-119](CMCA-119.md) | 135 | **Accepted residual risk** — not fixed this round; see `DFLSS_CONTROL.md` |  |
-| [CMCA-121](CMCA-121.md) | 84 | **Accepted residual risk** — not fixed this round; see `DFLSS_CONTROL.md` |  |
-| [CMCA-118](CMCA-118.md) | 32 | **Accepted residual risk** — not fixed this round; see `DFLSS_CONTROL.md` |  |
+| [CMCA-120](CMCA-120.md) | 192 | **Done** — positive-path kappa regression test, `mass_pow` hoisted out of the `v` loop (benchmark AC descoped, no harness exercises this path) | `d141ddce` |
+| [CMCA-119](CMCA-119.md) | 135 | **Done** — runnable example, entry-point nav doc, `Display`/`Error` on 5 named `...Refusal` enums (other enums out of scope) | `d674189b` |
+| [CMCA-121](CMCA-121.md) | 84 | **Done** — second-switch dwell-time phase added, node-1 residual kappa=0 doc-comment corrected (tree-extension alternative descoped) | `d49c3e7f` |
+| [CMCA-118](CMCA-118.md) | 32 | **Done** — literal-aware TTL comment stripping, subprocess regression test (broader generator test-suite AC left as follow-up) | `1344156e` |
 
-See `docs/jira/cmca/DFLSS_CONTROL.md` for the full Control-phase summary: what was
-measured, what was fixed, why the four remaining tickets are accepted residual risk,
-and the specific test/CI gates now guarding each fixed failure mode.
+Round 3's four lowest-RPN tickets (CMCA-118/119/120/121) were accepted as residual
+risk in this round's initial close-out, then closed in a follow-up pass — see
+`docs/jira/cmca/DFLSS_CONTROL.md` for the full Control-phase summary: what was
+measured, what was fixed (all ten tickets now), and the specific test/CI gates now
+guarding each fixed failure mode.
 
 ## The pattern worth naming
 

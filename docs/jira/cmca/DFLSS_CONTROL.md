@@ -84,33 +84,58 @@ or compile-time signal:
   `cmca_117_masses_tied_threshold_is_derived_from_the_q16_16_grid_not_an_arbitrary_epsilon`
   in `crates/bcinr-cmca/tests/differential.rs`.
 
-## What remains as accepted residual risk
+## Round-3 residual-risk close-out
 
-The four lowest-RPN round-2 tickets were reviewed but not fixed this round. Each is
-accepted as residual risk with the rationale below (see each ticket's `.md` for full
-detail):
+The four lowest-RPN round-2 tickets (CMCA-118/119/120/121) were initially accepted
+as residual risk in this round's first pass, then closed in a follow-up pass on the
+`feat/powl-soundness-cli` branch. Each ticket's acceptance criteria are checked off
+in its own `.md` except for one explicitly-descoped item per ticket, allowed by that
+ticket's own AC text (not silently dropped):
 
-- **CMCA-120** (RPN 192) — `compute_kappa`'s positive (admit) branch, where
-  `kappa > epsilon_kappa` and weights actually update, is exercised by the broader
-  `differential.rs` proptest sweep but not asserted against a deterministic f64
-  oracle in a targeted regression test. Accepted because CMCA-117's
-  `PROPTEST_CASES: "4096"` fix (this round) substantially raises the sweep's real
-  per-run coverage of this exact branch, narrowing the gap the ticket originally
-  scored against.
-- **CMCA-119** (RPN 135) — No runnable example touches `allocate`/
-  `allocate_single_lens`/`escort_distribution`, and 9+ `...Refusal` enums have no
-  shared `Error`/`Display` impl. Accepted as onboarding friction, not a correctness
-  or security defect — a careful integrator reading module docs can still get it
-  right; this is real toil, not a live bug.
-- **CMCA-121** (RPN 84) — The dwell-time hysteresis test proves only a single mode
-  switch, not the spec's bound over a sequence of switches; a stale-baseline bug
-  that only manifests on switch #2 would go uncaught. Accepted because the ticket
-  itself states no such bug is confirmed to exist — this is a coverage gap on an
-  otherwise-correct `t=0` baseline, not a known defect.
-- **CMCA-118** (RPN 32) — `generator.py`'s `#`-stripping would silently corrupt a
-  TTL literal containing `#`, but is confirmed not live: no current ontology file
-  (`cmca-rdf.ttl`, `generalization.ttl`) uses `#` inside a literal. Accepted as
-  latent, not live, and lowest-priority in the FMEA ranking.
+- **CMCA-120** (RPN 192, commit `d141ddce`) — Added
+  `cmca_120_multi_child_node_kappa_exceeds_epsilon_and_weights_actually_update` in
+  `crates/bcinr-cmca/tests/differential.rs`, asserting the positive (admit) branch
+  of `compute_kappa` against the f64 oracle on node 1 of the CMCA-107 fixture (three
+  direct children). Also hoisted `mass_pow` out of `allocate_in`'s `v` loop via a
+  new `fixed_pow_per_node` helper, cutting redundant `fixed_pow` calls from 256 to
+  32 per `allocate_in` call with no behavior change. Descoped: the AC's benchmark
+  item — no harness in `crates/bcinr-bench` exercises `compute_kappa`/`allocate_in`/
+  `allocate`, and the ticket's own text permits skipping rather than inventing one.
+- **CMCA-119** (RPN 135, commit `d674189b`) — Added
+  `crates/bcinr-cmca/examples/basic_allocation.rs` (runnable via `cargo run
+  --example basic_allocation -p bcinr-cmca --features std`), a "Which entry point do
+  I want? (CMCA-119)" navigation section in `lib.rs`'s top-level docs, and
+  hand-written `Display` (always available) plus `#[cfg(feature = "std")]`
+  `std::error::Error` impls for the five `...Refusal` enums the ticket's AC and
+  "Files likely touched" section named: `StabilityRefusal`,
+  `LensSelectionRefusal`, `AllocationRefusal`, `CertificationRefusal`,
+  `EscortRefusal`. Descoped: `HierarchyRefusal`/`CascadeRefusal` and the enums in
+  `observatory.rs`/`proposal.rs`/`reference_escort.rs` were not touched — out of
+  scope per the ticket's own named file list.
+- **CMCA-121** (RPN 84, commit `d49c3e7f`) — Extended
+  `dwell_time_lock_holds_switch_until_tau_d_then_switches` in
+  `crates/bcinr-cmca/tests/dwell_time_hysteresis.rs` with a second phase that
+  re-biases payoffs after the first switch lands at `t=tau_d`, drives `t` through
+  `last_switch_t + tau_d`, and asserts the second switch back to mode 0 lands
+  exactly at the new deadline with `last_switch_t` updated — proving the spec's
+  repeated-switching bound, not just a single instance. Also corrected the doc
+  comment to state the kappa=0 fix applies only at the root, naming node 1's
+  residual kappa=0 degeneracy explicitly rather than implying it was resolved.
+  Descoped: the tree-extension alternative (giving node 1 itself genuinely nonzero
+  kappa) was not implemented — the ticket's AC allows the doc-comment fix as
+  satisfying an explicit either/or, and this ticket's own file states that
+  exercising node 1's MWU weight-update path remains open for a future ticket.
+- **CMCA-118** (RPN 32, commit `1344156e`) — Replaced `generator.py`'s
+  `line.split('#')[0]` comment-stripping with a new `strip_ttl_comment` helper that
+  tracks whether the scan position is inside an open `"..."` literal (honoring
+  `\"` escapes) before treating `#` as a comment start. Added
+  `crates/bcinr-cmca/tests/generator_ttl_comment_stripping.rs`, a Rust test
+  shelling out to `generator.py` as a subprocess, covering: a literal containing
+  `#` surviving intact, a genuine trailing comment still stripped, the
+  multiline-literal/language-tag rejections still firing, and both real
+  `ontology/*.ttl` files still generating successfully. Descoped: broader
+  `generator.py` test-suite coverage beyond this bug's regression test — the
+  ticket's AC explicitly leaves this unchecked as out of scope for its minimum bar.
 
 ## Control mechanisms going forward
 
@@ -124,8 +149,13 @@ Regression of the six fixed-this-round failure modes is now caught by:
 | CMCA-116 undifferentiated high/low-error results | `PathConfidence`-asserting `#[test]`s in `src/escort.rs` |
 | CMCA-122 misdirected refusal reason | `eta_err_and_price_err_co_occurring_reports_price_gain_unsafe_not_learning_rate`, `eta_err_alone_reports_its_own_dedicated_reason` (`tests/hostile_mutants.rs`) |
 | CMCA-117 decorative differential safety net | `PROPTEST_CASES: "4096"` in `.github/workflows/ci.yml`; `cmca_117_masses_tied_threshold_is_derived_from_the_q16_16_grid_not_an_arbitrary_epsilon` (`tests/differential.rs`) |
+| CMCA-120 untested `compute_kappa` admit branch | `cmca_120_multi_child_node_kappa_exceeds_epsilon_and_weights_actually_update` (`tests/differential.rs`) |
+| CMCA-119 onboarding gap (no example, no unified error trait) | `examples/basic_allocation.rs` (`cargo run --example basic_allocation`); `Display`/`Error` impls on `StabilityRefusal`, `LensSelectionRefusal`, `AllocationRefusal`, `CertificationRefusal`, `EscortRefusal` |
+| CMCA-121 single-switch-only dwell-time coverage | Second-phase assertions in `dwell_time_lock_holds_switch_until_tau_d_then_switches` (`tests/dwell_time_hysteresis.rs`) |
+| CMCA-118 TTL `#`-in-literal corruption | `generator_ttl_comment_stripping.rs` (subprocess test against `generator.py`'s `strip_ttl_comment`) |
 
 All of the above run under the existing gate: `cargo build -p bcinr-cmca --features
 std`, `cargo test -p bcinr-cmca --features std`, `cargo test -p bcinr-cmca --features
 alloc`, `cargo clippy -p bcinr-cmca --features std -- -D warnings`, `cargo fmt -p
-bcinr-cmca -- --check` — all green as of this round's close-out.
+bcinr-cmca -- --check` — all green as of this close-out (verified on
+`feat/powl-soundness-cli`, commit `1344156e` and its `docs(cmca)` follow-up).
