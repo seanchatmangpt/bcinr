@@ -17,6 +17,8 @@ publish = false
 
 [dependencies]
 bcinr-logic = { path = "../bcinr-logic", version = "26.7.28" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 [dev-dependencies]
 chicago-tdd-tools = { version = "26.7.1", features = ["ocel-generation"] }
