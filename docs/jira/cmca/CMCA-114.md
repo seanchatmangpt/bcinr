@@ -53,24 +53,60 @@ is needed.
 
 ## Acceptance Criteria
 
-- [ ] Add `#[deprecated(note = "CMCA-102/CMCA-114: authority chain pending
+- [x] Add `#[deprecated(note = "CMCA-102/CMCA-114: authority chain pending
       Hoare-logic verification, do not use in production code")]` (or
       equivalent) to all 7 types and their constructors, so any caller —
       including autofde-lab — gets a real, unavoidable compile-time signal,
-      not just an absence from generated docs.
-- [ ] Re-evaluate whether the crate's own `tests/*.rs` suite can be adjusted
+      not just an absence from generated docs. Done: all 7 types
+      (`CertifiedLearning`, `CertifiedSelectionOnly`, `AdmittedControlState`,
+      `CertificateReceipt`, `EnvelopeReceipt`, `OutcomeReceipt`,
+      `AdaptiveUpdate<Mode>`) and their public `admit_*` constructors now
+      carry `#[deprecated]` with that note. The `pub(crate)`-only `new`
+      constructors were left undeprecated (they're never externally
+      reachable, and internal call sites that legitimately construct these
+      after real verification — `certification::seal_certificate`,
+      `observatory::wrap_observatory_result`,
+      `observatory::evaluate_calibration`, `allocate`/`allocate_in`'s proof
+      parameter — carry a scoped `#[allow(deprecated)]` with a comment
+      naming why, rather than a blanket crate-level allow).
+- [x] Re-evaluate whether the crate's own `tests/*.rs` suite can be adjusted
       to use `pub(crate)` instead of the external-crate import path (e.g. by
       moving the relevant tests inside `allocator/mod.rs`'s own
       `#[cfg(test)]` module, or via a `#[cfg(test)] pub use` re-export
       scoped to test builds only) — if feasible, this is strictly stronger
       than `#[doc(hidden)] + #[deprecated]` and should be preferred.
-- [ ] If `pub(crate)` is genuinely infeasible without a larger test-suite
+      Evaluated, not applied this ticket — see next item.
+- [x] If `pub(crate)` is genuinely infeasible without a larger test-suite
       refactor: document that decision explicitly in this ticket's
       resolution (don't silently re-close as "already handled by CMCA-102").
-- [ ] Verify a downstream consumer (write a throwaway external test crate, or
+      **Resolution:** `pub(crate)` was not applied. 19 files under
+      `crates/bcinr-cmca/tests/` (each compiled by cargo as its own separate
+      crate, so `pub(crate)` in `bcinr-cmca`'s `src/` would not reach them)
+      import these types via `bcinr_cmca::allocator::{...}`, including the
+      dedicated `tests/ui/*.rs` trybuild fixtures that specifically assert
+      construction *fails* from outside the crate for the sealed-field
+      types. Moving all of that to `#[cfg(test)]` inline modules or a
+      test-only `pub use` re-export is a real, larger refactor (touching 19
+      files, several of which are named integration suites like
+      `falsification_adversarial.rs`, `hostile_mutants.rs`, and
+      `differential.rs` that are load-bearing for other tickets) and is out
+      of scope for this ticket, whose job is to close the zero-enforcement
+      gap, not restructure the test suite. `#[deprecated]` fully satisfies
+      that job: it is a real compiler diagnostic, not merely absent
+      documentation, and (per the next item) actually fires for an external
+      caller.
+- [x] Verify a downstream consumer (write a throwaway external test crate, or
       at minimum confirm via `cargo doc`/compiler output) that the
       `#[deprecated]` warning actually fires when `bcinr_cmca::allocator::CertifiedLearning`
-      is imported and used from outside the crate.
+      is imported and used from outside the crate. Verified via a new
+      trybuild UI-test fixture,
+      `crates/bcinr-cmca/tests/ui/fail_deprecated_admit_learning.rs`, which
+      imports and calls `CertifiedLearning::admit_learning()` from outside
+      the crate under `#![deny(deprecated)]` and asserts the resulting
+      compiler output names the CMCA-102/CMCA-114 note at both the import
+      and the call site — i.e. any downstream consumer running with
+      warnings-as-errors (this crate's own `clippy -D warnings` policy
+      included) gets a hard compile failure, not a silent pass.
 
 ## Files likely touched
 

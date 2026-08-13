@@ -782,18 +782,27 @@ pub(crate) fn const_max_i32(a: i32, b: i32) -> i32 {
 /// chain's dependency closure. Still `pub` (not `pub(crate)`) because this crate's
 /// own `tests/*.rs` integration suite reaches it via `bcinr_cmca::allocator::*`.
 #[doc(hidden)]
+#[deprecated(
+    note = "CMCA-102/CMCA-114: authority chain pending Hoare-logic verification, do not use in production code"
+)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct CertifiedLearning {
     _sealed: (),
 }
 
+#[allow(deprecated)]
 impl CertifiedLearning {
     #[inline(always)]
+    #[allow(deprecated)]
     pub(crate) const fn new() -> Self {
         Self { _sealed: () }
     }
 
     #[inline(always)]
+    #[deprecated(
+        note = "CMCA-102/CMCA-114: authority chain pending Hoare-logic verification, do not use in production code"
+    )]
+    #[allow(deprecated)]
     pub const fn admit_learning() -> Self {
         Self { _sealed: () }
     }
@@ -806,18 +815,27 @@ impl CertifiedLearning {
 /// chain's dependency closure. Still `pub` (not `pub(crate)`) because this crate's
 /// own `tests/*.rs` integration suite reaches it via `bcinr_cmca::allocator::*`.
 #[doc(hidden)]
+#[deprecated(
+    note = "CMCA-102/CMCA-114: authority chain pending Hoare-logic verification, do not use in production code"
+)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct CertifiedSelectionOnly {
     _sealed: (),
 }
 
+#[allow(deprecated)]
 impl CertifiedSelectionOnly {
     #[inline(always)]
+    #[allow(deprecated)]
     pub(crate) const fn new() -> Self {
         Self { _sealed: () }
     }
 
     #[inline(always)]
+    #[deprecated(
+        note = "CMCA-102/CMCA-114: authority chain pending Hoare-logic verification, do not use in production code"
+    )]
+    #[allow(deprecated)]
     pub const fn admit_selection_only() -> Self {
         Self { _sealed: () }
     }
@@ -830,18 +848,27 @@ impl CertifiedSelectionOnly {
 /// chain's dependency closure. Still `pub` (not `pub(crate)`) because this crate's
 /// own `tests/*.rs` integration suite reaches it via `bcinr_cmca::allocator::*`.
 #[doc(hidden)]
+#[deprecated(
+    note = "CMCA-102/CMCA-114: authority chain pending Hoare-logic verification, do not use in production code"
+)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct AdmittedControlState {
     pub(crate) digest: u64,
 }
 
+#[allow(deprecated)]
 impl AdmittedControlState {
     #[inline(always)]
+    #[allow(deprecated)]
     pub(crate) const fn new(digest: u64) -> Self {
         Self { digest }
     }
 
     #[inline(always)]
+    #[deprecated(
+        note = "CMCA-102/CMCA-114: authority chain pending Hoare-logic verification, do not use in production code"
+    )]
+    #[allow(deprecated)]
     pub const fn admit_control_state(digest: u64) -> Self {
         Self { digest }
     }
@@ -854,18 +881,27 @@ impl AdmittedControlState {
 /// chain's dependency closure. Still `pub` (not `pub(crate)`) because this crate's
 /// own `tests/*.rs` integration suite reaches it via `bcinr_cmca::allocator::*`.
 #[doc(hidden)]
+#[deprecated(
+    note = "CMCA-102/CMCA-114: authority chain pending Hoare-logic verification, do not use in production code"
+)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct CertificateReceipt {
     pub(crate) digest: u64,
 }
 
+#[allow(deprecated)]
 impl CertificateReceipt {
     #[inline(always)]
+    #[allow(deprecated)]
     pub(crate) const fn new(digest: u64) -> Self {
         Self { digest }
     }
 
     #[inline(always)]
+    #[deprecated(
+        note = "CMCA-102/CMCA-114: authority chain pending Hoare-logic verification, do not use in production code"
+    )]
+    #[allow(deprecated)]
     pub const fn admit_certificate(digest: u64) -> Self {
         Self { digest }
     }
@@ -878,18 +914,27 @@ impl CertificateReceipt {
 /// chain's dependency closure. Still `pub` (not `pub(crate)`) because this crate's
 /// own `tests/*.rs` integration suite reaches it via `bcinr_cmca::allocator::*`.
 #[doc(hidden)]
+#[deprecated(
+    note = "CMCA-102/CMCA-114: authority chain pending Hoare-logic verification, do not use in production code"
+)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct EnvelopeReceipt {
     pub(crate) digest: u64,
 }
 
+#[allow(deprecated)]
 impl EnvelopeReceipt {
     #[inline(always)]
+    #[allow(deprecated)]
     pub(crate) const fn new(digest: u64) -> Self {
         Self { digest }
     }
 
     #[inline(always)]
+    #[deprecated(
+        note = "CMCA-102/CMCA-114: authority chain pending Hoare-logic verification, do not use in production code"
+    )]
+    #[allow(deprecated)]
     pub const fn admit_envelope(digest: u64) -> Self {
         Self { digest }
     }
@@ -902,18 +947,27 @@ impl EnvelopeReceipt {
 /// chain's dependency closure. Still `pub` (not `pub(crate)`) because this crate's
 /// own `tests/*.rs` integration suite reaches it via `bcinr_cmca::allocator::*`.
 #[doc(hidden)]
+#[deprecated(
+    note = "CMCA-102/CMCA-114: authority chain pending Hoare-logic verification, do not use in production code"
+)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct OutcomeReceipt {
     pub(crate) digest: u64,
 }
 
+#[allow(deprecated)]
 impl OutcomeReceipt {
     #[inline(always)]
+    #[allow(deprecated)]
     pub(crate) const fn new(digest: u64) -> Self {
         Self { digest }
     }
 
     #[inline(always)]
+    #[deprecated(
+        note = "CMCA-102/CMCA-114: authority chain pending Hoare-logic verification, do not use in production code"
+    )]
+    #[allow(deprecated)]
     pub const fn admit_outcome(digest: u64) -> Self {
         Self { digest }
     }
@@ -929,19 +983,25 @@ impl OutcomeReceipt {
 /// chain's dependency closure. Still `pub` (not `pub(crate)`) because this crate's
 /// own `tests/*.rs` integration suite reaches it via `bcinr_cmca::allocator::*`.
 #[doc(hidden)]
+#[deprecated(
+    note = "CMCA-102/CMCA-114: authority chain pending Hoare-logic verification, do not use in production code"
+)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct AdaptiveUpdate<Mode> {
     _mode: core::marker::PhantomData<Mode>,
 }
 
+#[allow(deprecated)]
 impl<Mode> Clone for AdaptiveUpdate<Mode> {
     #[inline(always)]
     fn clone(&self) -> Self {
         *self
     }
 }
+#[allow(deprecated)]
 impl<Mode> Copy for AdaptiveUpdate<Mode> {}
 
+#[allow(deprecated)]
 impl AdaptiveUpdate<CertifiedLearning> {
     /// Constructs a new `AdaptiveUpdate` receipt under certified learning mode.
     ///
@@ -951,6 +1011,9 @@ impl AdaptiveUpdate<CertifiedLearning> {
     /// # Complexity
     /// $O(1)$ constant time, branchless.
     #[inline(always)]
+    #[deprecated(
+        note = "CMCA-102/CMCA-114: authority chain pending Hoare-logic verification, do not use in production code"
+    )]
     pub fn admit_adaptive_update(
         state: AdmittedControlState,
         cert: CertificateReceipt,
@@ -1624,6 +1687,7 @@ pub use feasible_region::FeasibleRegion;
 ///
 /// # Branchless Contract
 #[allow(clippy::too_many_arguments)] // deliberate wide parameter list preserving the public allocation API
+#[allow(deprecated)] // signature legitimately carries the CMCA-114 authority-chain proof type
 pub fn allocate_in(
     region: &FeasibleRegion,
     states: &[PackedSemanticState; N],
@@ -2247,6 +2311,7 @@ pub fn allocate_in(
 /// assert!(result.is_ok());
 /// ```
 #[allow(clippy::too_many_arguments)] // deliberate wide parameter list preserving the public allocation API
+#[allow(deprecated)] // signature legitimately carries the CMCA-114 authority-chain proof type
 pub fn allocate(
     states: &[PackedSemanticState; N],
     lenses: &[LensSpec; Q],

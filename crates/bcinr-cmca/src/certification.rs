@@ -67,6 +67,7 @@ pub enum CertificationRefusal {
 /// does this function call `CertificateReceipt::admit_certificate`, the crate's existing
 /// sealed constructor (owned by `allocator.rs`; this module does not construct
 /// `CertificateReceipt` any other way).
+#[allow(deprecated)] // sole legitimate internal caller of the CMCA-114 authority-chain constructor, after full verification above
 pub fn seal_certificate(
     candidate: StabilityCandidate,
     actual: CertificateBindings,
