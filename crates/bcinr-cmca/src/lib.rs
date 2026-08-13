@@ -27,6 +27,20 @@
 //! * [`allocator`]: Linear bounds-checked and panic-free bump allocators.
 //! * [`observatory`]: The evaluation engine that computes calibration safety flags based on mathematical thresholds.
 //!
+//! ## `allocator::allocate` is fixed to this crate's own `N=8`/`K=4`/`Q=4` shape (CMCA-108)
+//!
+//! [`allocator::allocate`] and [`allocator::allocate_single_lens`] -- this crate's
+//! certified, branchless, allocation-free allocation path -- are compiled
+//! against this crate's own object/measure/lens counts (`N = 8`, `K = 4`,
+//! `Q = 4`, from `generated::consequence_mass::case_studies`), **not**
+//! generic over caller-chosen sizes. A caller can supply different factor
+//! *values* but not a different *shape* without this crate being
+//! regenerated against a different `ontology/*.ttl`. See
+//! [`allocator::allocate`]'s doc comment for why (the branchless kernel
+//! beneath it unrolls against the literal constants 8/4/4) and for
+//! [`cascade::consequence_mass`], the escape hatch for arbitrary tree
+//! shapes.
+//!
 //! ## Example Usage
 //!
 //! ```rust

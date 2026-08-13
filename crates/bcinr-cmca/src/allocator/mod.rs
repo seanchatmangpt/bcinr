@@ -1917,6 +1917,35 @@ pub fn allocate_in(
 /// input, by construction. Call `allocate_in` directly to use a different
 /// [`FeasibleRegion`].
 ///
+/// # Fixed shape: `N = 8`, `K = 4`, `Q = 4` -- not a generic parameter
+///
+/// This function is compiled against this crate's own `N`, `K`, `Q`
+/// constants ([`crate::generated::consequence_mass::case_studies::N`] `= 8`,
+/// `K = 4`, `Q = 4`), not a caller-chosen size. `N`/`K`/`Q` are plain `const`
+/// items, not `const` generic parameters -- there is no way to call this
+/// function at a different shape without this crate itself being
+/// regenerated against a different `ontology/*.ttl`.
+///
+/// This is deliberate, not an oversight (see CMCA-108): the branchless,
+/// $CC=1$, allocation-free implementation below unrolls its inner loops
+/// (`unroll_8_static!`, `unroll_4_static!`) against the literal constants
+/// `8`/`4`/`4` at dozens of call sites in the private kernel this function
+/// and [`allocate_single_lens`] both call into. Making `N`/`K`/`Q` into
+/// `const` generic parameters on just these two public functions would not,
+/// by itself, generalize the algorithm -- the unrolled kernel beneath them
+/// would still silently assume 8/4/4 (e.g. `is_leaf[i & 7]` indexing with a
+/// literal `& 7` mask), so a naive signature change risks *compiling* at a
+/// different shape while computing the wrong answer. Correctly widening
+/// this kernel is a substantially larger rewrite of the unrolling
+/// infrastructure itself, out of scope for a targeted fix.
+///
+/// If your data does not have exactly 8 objects / 4 measures / 4 lenses,
+/// this function is not callable for your shape. Use
+/// [`crate::cascade::consequence_mass`] instead: it takes a tree of
+/// **any** shape and a lens per level (trading the branchless/$O(1)$
+/// guarantee for that generality -- see the [`crate::cascade`] module docs
+/// for the full tradeoff).
+///
 /// # Mathematical Behavior
 ///
 /// 1. **Divergence Guard & MWU**: For each internal node, computes the divergence $\kappa_v$ between child
@@ -2077,6 +2106,13 @@ pub enum LensSelectionRefusal {
 /// Returns exactly one lens's allocation vector `pi_kq[measure][lens_idx]`,
 /// bypassing the LAMBDA-weighted blend across all `K x Q` measure/lens pairs
 /// that [`allocate`] always performs.
+///
+/// # Fixed shape: `N = 8`, `K = 4`, `Q = 4`
+///
+/// Like [`allocate`], this function is bound to this crate's own compiled-in
+/// `N`/`K`/`Q` (8/4/4) -- see [`allocate`]'s "Fixed shape" section for why,
+/// and for the escape hatch ([`crate::cascade::consequence_mass`]) for
+/// other shapes.
 ///
 /// # Why this exists
 ///

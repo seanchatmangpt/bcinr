@@ -45,23 +45,68 @@ starts, not discovered mid-integration.
 
 ## Acceptance Criteria
 
-- [ ] Determine autofde-lab's actual required object/measure/lens counts —
+- [x] Determine autofde-lab's actual required object/measure/lens counts —
       does it match N=8/K=4/Q=4, or does it need to be genuinely
       parameterized?
-- [ ] If parameterization is needed: design a path to a const-generic (or
+      **Verified:** `~/autofde-lab` has no Cargo.toml of its own and no
+      recorded requirement for a specific object/measure/lens count (see
+      Context above, confirmed prior to this pass). No evidence was found,
+      in this pass, that autofde-lab's shape is pinned to something other
+      than 8/4/4 or that it has started integration against this crate at
+      all. Absent a concrete non-8/4/4 requirement to build against, this
+      pass could not determine a real target shape to parameterize for.
+- [x] If parameterization is needed: design a path to a const-generic (or
       dynamically-sized, alloc-gated) variant of `allocate`/`allocate_single_lens`
       that doesn't require forking the crate per consumer — decide whether
       this lives alongside the certified N=8 path (as `cascade` already does
       relative to `allocator`) or replaces it for non-N=8 consumers.
-- [ ] If autofde-lab's shape does match 8/4/4: document this constraint
+      **Verified NOT done as a const-generic rewrite, and why:** confirmed
+      by reading `allocator/mod.rs` that `N`, `K`, `Q` are plain
+      `pub const` items (`generated/consequence_mass/case_studies.rs:5,7,8`
+      — `N=8`, `K=4`, `Q=4`), not `const` generic parameters — so this
+      ticket's premise (b) applies literally. But the shape assumption goes
+      far deeper than the two public function signatures: `allocate`/
+      `allocate_single_lens` call into a private kernel that unrolls its
+      loops against the literal constants 8 and 4 via
+      `unroll_8_static!`/`unroll_4_static!` at **40+ call sites** (counted
+      directly, e.g. `is_leaf[i & 7]`, `ancestor_doubling_table`,
+      `compute_pi_kq_for_kq`), not just in the two public functions. Adding
+      `const N: usize`/`K`/`Q` generic parameters to only `allocate`/
+      `allocate_single_lens` without rewriting that kernel would either fail
+      to compile for other sizes or — worse — compile and silently compute
+      the wrong answer (the `& 7`/`& 3` masks would keep indexing as if
+      N/K were still 8/4 regardless of the caller's actual N/K). A
+      *correct* const-generic path requires rewriting the unrolling
+      infrastructure itself, which is the "full generalization" this
+      ticket's own preamble already flagged as too large for one pass. The
+      module docs in `cascade.rs` already independently documented this
+      exact tradeoff ("Widening it would destroy the property that
+      justifies it") before this pass touched anything, corroborating the
+      call to route to documentation instead of a risky partial refactor.
+      Deferred as future work; the design path is: rewrite
+      `unroll_8_static!`/`unroll_4_static!` (and callers) into
+      const-generic-driven code generation, or replace the private kernel
+      with a genuinely loop-based (non-unrolled) implementation, before
+      `allocate`'s own signature can safely take `N`/`K`/`Q` as generic
+      parameters.
+- [x] If autofde-lab's shape does match 8/4/4: document this constraint
       explicitly in the crate's top-level docs (not just discoverable by
       reading generated-code internals) so the NEXT consumer doesn't hit the
       same discovery cost.
-- [ ] Either way: the crate's docs should state plainly, near `allocate`'s
+      **Done:** added an `## allocator::allocate is fixed to this crate's
+      own N=8/K=4/Q=4 shape (CMCA-108)` section to `lib.rs`'s crate-level
+      doc comment, naming the constraint and the escape hatch by name.
+- [x] Either way: the crate's docs should state plainly, near `allocate`'s
       entry point, that it is bound to this crate's own compiled-in registry
       shape and that `cascade::consequence_mass` is the escape hatch for
       different shapes — this is currently only inferable by reading module
       docs on two separate files and comparing their signatures by hand.
+      **Done:** added a `# Fixed shape: N = 8, K = 4, Q = 4 -- not a
+      generic parameter` doc section directly on `allocate`'s doc comment
+      (`allocator/mod.rs`, immediately before `# Mathematical Behavior`),
+      and a shorter cross-referencing section on `allocate_single_lens`'s
+      doc comment, both naming `cascade::consequence_mass` as the escape
+      hatch for other shapes.
 
 ## Files likely touched
 
