@@ -1,82 +1,67 @@
 # bcinr-cmca tickets
 
-Tracked gaps found during the `bcinr-cmca` lens-selection fix and production-readiness
-audit (2026-08-13). Each ticket is a standalone file; open each for full context,
-acceptance criteria, and files likely touched.
+Tracked gaps found during the `bcinr-cmca` lens-selection fix, production-readiness
+audit, and a maximum-concurrency adversarial code review (2026-08-13). Each ticket is
+a standalone file; open each for full context, acceptance criteria, and files likely
+touched.
+
+## Round 1 (CMCA-101–107): the original hardening pass
 
 | ID | Title | Type | Priority | Status |
 |----|-------|------|----------|--------|
-| [CMCA-101](CMCA-101.md) | Dwell-time hysteresis (`dom_mode`/`prev_mode`) computed but never wired to output | Tech Debt | Medium | **Done** |
-| [CMCA-102](CMCA-102.md) | Authority chain (`CertifiedLearning` et al.) held unexported pending Hoare-logic verification | Tech Debt / Verification | Low | **Done (Branch B)** |
-| [CMCA-103](CMCA-103.md) | `allocate_in` silently accepts out-of-range `q` when `proof=None` | Bug | High | **Done** |
-| [CMCA-104](CMCA-104.md) | `DIFFERENTIAL_TOLERANCE=0.22` placeholder doesn't gate CI | Test Rigor / Correctness | High | **Done** |
-| [CMCA-105](CMCA-105.md) | No CI check that `generated/` matches ontology source | Infra / CI Hardening | High | **Partially done** — generator fixed, CI step still deferred, see below |
-| [CMCA-106](CMCA-106.md) | `power()`'s error bound unmeasured beyond `\|q\|=16` | Correctness / Numerical Verification | High | **Done** |
-| [CMCA-107](CMCA-107.md) | Fixed-vs-f64 `allocate()` disagreement of ~0.65 | Bug | High | **Done — root-caused and fixed** |
+| [CMCA-101](CMCA-101.md) | Dwell-time hysteresis (`dom_mode`/`prev_mode`) computed but never wired to output | Tech Debt | Medium | **Done** — see CMCA-121 for a residual test gap found on re-review |
+| [CMCA-102](CMCA-102.md) | Authority chain (`CertifiedLearning` et al.) held unexported pending Hoare-logic verification | Tech Debt / Verification | Low | **Done (Branch B)** — see CMCA-114, its enforcement was found to be non-existent |
+| [CMCA-103](CMCA-103.md) | `allocate_in` silently accepts out-of-range `q` when `proof=None` | Bug | High | **Done** — see CMCA-110/122, the same bug class was found still open for `eta`/`numeric_has_err` |
+| [CMCA-104](CMCA-104.md) | `DIFFERENTIAL_TOLERANCE=0.22` placeholder doesn't gate CI | Test Rigor / Correctness | High | **Done** — see CMCA-117 for calibration/coverage gaps found on re-review |
+| [CMCA-105](CMCA-105.md) | No CI check that `generated/` matches ontology source | Infra / CI Hardening | High | **Partially done** — see CMCA-118/113 for concrete bugs found in the generator and its downstream constants |
+| [CMCA-106](CMCA-106.md) | `power()`'s error bound unmeasured beyond `\|q\|=16` | Correctness / Numerical Verification | High | **Done** — see CMCA-109/116, a real bug and a real gap found adjacent to this |
+| [CMCA-107](CMCA-107.md) | Fixed-vs-f64 `allocate()` disagreement of ~0.65 | Bug | High | **Done** — see CMCA-112/120, the fix has its own precision/coverage gaps |
 
-**6 of 7 tickets fully closed, 1 partially closed with an honest remainder.** Verified
-end-to-end this session: `cargo test -p bcinr-cmca --features std` → **192 passed, 0
-failed**; `cargo clippy -p bcinr-cmca --features std --all-targets -- -D warnings` →
-clean; `cargo check --workspace` → clean; `cargo publish -p bcinr-cmca --dry-run` →
-correctly refused.
+## Round 2 (CMCA-108–122): adversarial review of round 1's own output
 
-## What shipped, and how the tickets interacted with each other
+Nine agents reviewed the round-1 work concurrently and adversarially — each
+instructed explicitly to find real defects, not to confirm the work was good.
+30 distinct findings surfaced; the ones below are the real, ticket-worthy ones
+(minor/no-finding items are folded into the ticket bodies above or omitted).
 
-This work was done by parallel agents in isolated git worktrees, each self-verifying
-before returning a diff, then integrated one at a time into the real tree with a full
-test run after each — because several of these fixes touch the same code
-(`allocator/mod.rs`) and genuinely interact:
+| ID | Title | Type | Priority |
+|----|-------|------|----------|
+| [CMCA-108](CMCA-108.md) | `allocate`/`allocate_single_lens` hard-locked to compile-time N=8/K=4/Q=4 | Bug / Design Gap | **Critical — blocking for autofde-lab** |
+| [CMCA-109](CMCA-109.md) | `power(0, negative q)` silently returns saturated-max tagged as "no fault" | Bug | **Critical** |
+| [CMCA-110](CMCA-110.md) | `eta_err` has no upper bound; `numeric_has_err` still proof-gated — CMCA-103's bug class left half-fixed | Bug | **Critical** |
+| [CMCA-111](CMCA-111.md) | `allocate_single_lens`'s "reproduces the blend" claim is false under real (non-zero-payoff) MWU updates | Bug / Doc Overclaim | High |
+| [CMCA-112](CMCA-112.md) | `compute_kappa`'s `fixed_pow` saturates for in-domain masses; `0/0` diverges from f64 fail-safe | Bug | High |
+| [CMCA-113](CMCA-113.md) | `stability_profile.rs`'s production constants are opaque and untraceable | Design Gap | High |
+| [CMCA-114](CMCA-114.md) | `#[doc(hidden)]` gives zero compile-time enforcement; authority chain is a reachable rubber-stamp | Bug / Security Design Gap | High |
+| [CMCA-115](CMCA-115.md) | `allocation_receipt` has no cyclic-parent check; digest oversold as tamper-evident | Bug / Security Design Gap | High |
+| [CMCA-116](CMCA-116.md) | `escort_distribution` gives zero signal for ~36% error results | Bug / Design Gap | High |
+| [CMCA-117](CMCA-117.md) | Differential test's envelope classification miscalibrated; CI never actually fuzzes it | Test Rigor | Medium-High |
+| [CMCA-118](CMCA-118.md) | `generator.py` silently corrupts TTL literals containing `#`; zero test coverage | Bug | Medium |
+| [CMCA-119](CMCA-119.md) | No runnable example; 5 overlapping entry points; no unified error trait | Design Gap / Onboarding | Medium |
+| [CMCA-120](CMCA-120.md) | CMCA-107 regression test only covers the negative path; 8x redundant `fixed_pow` computation | Test Gap / Performance | Medium |
+| [CMCA-121](CMCA-121.md) | Dwell-time test proves single-switch only; residual kappa=0 node in the "fixed" tree | Test Gap / Documentation | Low-Medium |
+| [CMCA-122](CMCA-122.md) | `eta_err` reports the wrong refusal reason when combined with `price_err`; `clip()` now dead code | Bug / Test Gap | Medium |
 
-- **CMCA-107's divergence-guard fix changed real allocator behavior** (which weight
-  updates get admitted), and this **broke CMCA-101's originally-written test** once both
-  were combined: CMCA-101's test tree was a flat star (root + 7 leaf children), and
-  `compute_kappa` (CMCA-107's fix) is identically zero for any node whose direct children
-  are all leaves — a real mathematical property, not a bug in either fix. CMCA-101's test
-  was changed to a genuine two-level tree to make the weight update it's testing actually
-  admissible. **Neither ticket was wrong; they were both right about different things, and
-  combining them surfaced a real edge case in the test setup, not the production code.**
-- **CMCA-103's `q_err`/`price_err`/`eta_err` enforcement fix** was scoped narrower than
-  its own ticket's default framing after investigation found some `has_error` components
-  are legitimately proof-gated (documented by an existing Chicago-TDD test) and some are
-  not — the fix distinguishes them rather than making everything unconditional.
-- **CMCA-104's tolerance fix directly found CMCA-107** — tightening a placeholder
-  assertion surfaced a real, previously-invisible bug. This is the system working as
-  intended: real rigor finds real bugs.
+## The pattern worth naming
 
-## Per-ticket notes
+Every round-1 ticket marked "Done" had at least one real gap found on
+adversarial re-review — not because the round-1 work was sloppy (it was
+independently verified, tested, and green at the time), but because "done"
+for a ticket scoped narrowly to one defect is not the same as "the
+surrounding code is now fully correct." CMCA-103's own fix left the identical
+bug class open one flag away (`eta_err`'s missing upper bound, CMCA-110).
+CMCA-107's own fix has a precision gap in the exact function it added
+(`fixed_pow`, CMCA-112). CMCA-106's own sweep found a real bug adjacent to
+what it was measuring (`power(0, ...)`, CMCA-109) without noticing it, because
+it wasn't in the swept grid. This is the value of adversarial review as a
+distinct pass from implementation-and-verification: the second pass is
+looking for what the first pass's own frame of reference couldn't see.
 
-- **CMCA-101**: `tests/dwell_time_hysteresis.rs`, 2 new tests. Correction to the
-  ticket's own premise: the mechanism isn't fully inert (`switch_wanted`/`can_switch`
-  gate the weight update that feeds subsequent calls) — it's just never exercised by any
-  real caller, exactly as the ticket's title says.
-- **CMCA-102**: Branch B only (explicit `#[doc(hidden)]` + doc comments naming the real
-  blocker). Branch A (an actual Hoare-logic proof) remains open, out of reach here.
-- **CMCA-103**: fixed, with one flagged follow-up — `hostile_mutants.rs`'s mutant_5 kill
-  test can no longer distinguish that mutant through the public API post-fix; left with a
-  comment rather than a unilateral mutation-harness redesign.
-- **CMCA-104**: implemented; directly found CMCA-107 as a side effect of doing its job
-  correctly.
-- **CMCA-105**: `generator.py`'s default output path fixed; the `macro_rules!` drift
-  reconciled with a confident git-history answer (dead code, correctly removed from the
-  committed tree, generator just never caught up — fixed the generator, not the tree).
-  **Still open**: `stability_profile.rs` has no ontology/generator backing at all and
-  never did (present hand-written since the crate's first commit) — bringing it under
-  real generation needs domain knowledge this session doesn't have, so the CI diff-check
-  step itself was correctly not added yet. Also corrected: the ticket's original
-  characterization of this file's header as a false "ggen sync... DO NOT EDIT" claim was
-  itself inaccurate — that exact phrasing belongs to a different file
-  (`generated_profile.rs`), not `stability_profile.rs`.
-- **CMCA-106**: full-domain sweep implemented and verified independently — the numbers
-  in the ticket match a direct re-run exactly.
-- **CMCA-107**: root-caused (missing divergence guard, confirmed via the tell-tale
-  previously-unused `_epsilon_kappa` parameter) and fixed. Original failing seed
-  unrecoverable; the defect class is pinned via a deterministic regression test instead.
-
-## Verification
-
-Every change above was independently re-verified in this session, not taken on an
-agent's word alone: diffs read line-by-line before applying, `cargo build`/`test`/
-`clippy` re-run after each integration step (not just once at the end), and the two
-places integration actually broke something (CMCA-101 × CMCA-107 interaction, and
-lib.rs/allocator.rs clobbering from stale-worktree base commits) were caught by that
-per-step verification and fixed before moving on.
+**Highest priority for the stated goal (autofde-lab production integration):**
+CMCA-108 (compile-time size lock-in) must be resolved or explicitly
+acknowledged before integration work starts — it determines whether the
+certified allocation path is usable at all. CMCA-109/110 are real, silent
+correctness bugs reachable via the common `proof=None` call path autofde-lab
+would use by default. CMCA-113/114 are both about production-readiness gaps
+in exactly the "certified"/"stability" machinery a real production consumer
+would reasonably assume is load-bearing.
