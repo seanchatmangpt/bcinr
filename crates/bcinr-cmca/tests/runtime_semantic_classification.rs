@@ -553,9 +553,10 @@ fn allocate_in_refuses_eta_above_one_without_proof() {
     );
     assert_eq!(
         result,
-        Err(StabilityRefusal::LearningRateOutsideEnvelope),
+        Err(StabilityRefusal::ExploreFloorOutsideEnvelope),
         "CMCA-110: eta_err (now upper-bound-checked) must be the reason this refuses -- got \
-         {result:?}"
+         {result:?}. CMCA-122 gave eta_err its own dedicated reason instead of folding it \
+         into LearningRateOutsideEnvelope."
     );
 }
 

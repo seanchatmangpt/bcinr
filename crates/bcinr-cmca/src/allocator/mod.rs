@@ -381,6 +381,12 @@ pub enum StabilityRefusal {
     NumericRangeExceeded,
     UnsupportedDomain,
     ContractViolation,
+    /// CMCA-122: the explore-floor parameter `eta` is outside its
+    /// envelope. Previously folded into [`Self::LearningRateOutsideEnvelope`]
+    /// alongside `zeta`/`beta` even though `eta` has nothing to do with the
+    /// learning-rate parameters -- a caller debugging off the old, shared
+    /// reason was routed to the wrong subsystem.
+    ExploreFloorOutsideEnvelope,
 }
 
 impl StabilityRefusal {
@@ -420,8 +426,7 @@ impl StabilityRefusal {
             Some(Self::NumericRangeExceeded),
             Some(Self::UnsupportedDomain),
             Some(Self::ContractViolation),
-            None,
-            None,
+            Some(Self::ExploreFloorOutsideEnvelope),
             None,
             None,
             None,
@@ -433,8 +438,8 @@ impl StabilityRefusal {
             None,
         ];
 
-        let in_bounds = const_lt_u32(val, 21);
-        let idx = const_select_u32(in_bounds, val, 21) as usize;
+        let in_bounds = const_lt_u32(val, 22);
+        let idx = const_select_u32(in_bounds, val, 22) as usize;
         lookup[idx & 31]
     }
 }
@@ -461,7 +466,7 @@ const REFUSALS: [StabilityRefusal; 32] = [
     StabilityRefusal::NumericRangeExceeded,
     StabilityRefusal::UnsupportedDomain,
     StabilityRefusal::ContractViolation,
-    StabilityRefusal::CertificateMissing,
+    StabilityRefusal::ExploreFloorOutsideEnvelope,
     StabilityRefusal::CertificateMissing,
     StabilityRefusal::CertificateMissing,
     StabilityRefusal::CertificateMissing,
@@ -1117,6 +1122,52 @@ pub(crate) fn clip(
     let val_or_min = const_select_u32(lt_min, min_val.val, val.val);
     let gt_max = const_lt_u32(max_val.val, val_or_min);
     NonNegativeFixed::from_bits(const_select_u32(gt_max, max_val.val, val_or_min))
+}
+
+#[cfg(test)]
+mod clip_tests {
+    //! CMCA-122: `clip`'s call site inside `allocate_in` (the `mu_actual`
+    //! computation) is now unreachable on any `Ok` path -- `price_err`
+    //! refuses unconditionally before a clamped value can be observed
+    //! through the public API (see the `mu_actual` comment above and
+    //! `hostile_mutants.rs`'s `kill_mutant_5_consequence_truncation`, which
+    //! can no longer distinguish clip-present from clip-removed through
+    //! `allocate`/`allocate_in`). These tests exercise `clip` directly --
+    //! bypassing the admission gate entirely -- so its clamping behavior
+    //! still has real, non-degenerate regression coverage regardless of
+    //! whether any caller-reachable input can currently observe it.
+    use super::*;
+
+    fn fx(v: u32) -> NonNegativeFixed {
+        NonNegativeFixed::from_bits(v)
+    }
+
+    #[test]
+    fn clip_clamps_values_above_max_down_to_max() {
+        let result = clip(fx(1_000_000), fx(0), fx(500_000));
+        assert_eq!(result.val, 500_000, "value above max must clamp to max");
+    }
+
+    #[test]
+    fn clip_clamps_values_below_min_up_to_min() {
+        let result = clip(fx(10), fx(100), fx(500_000));
+        assert_eq!(result.val, 100, "value below min must clamp to min");
+    }
+
+    #[test]
+    fn clip_passes_in_range_values_through_unchanged() {
+        let result = clip(fx(250_000), fx(0), fx(500_000));
+        assert_eq!(
+            result.val, 250_000,
+            "in-range value must pass through as identity"
+        );
+    }
+
+    #[test]
+    fn clip_at_exact_bounds_is_identity() {
+        assert_eq!(clip(fx(0), fx(0), fx(500_000)).val, 0);
+        assert_eq!(clip(fx(500_000), fx(0), fx(500_000)).val, 500_000);
+    }
 }
 
 /// Performs a single straight-line flow propagation step down the node forest.
@@ -2029,6 +2080,15 @@ pub fn allocate_in(
     unroll_8_static!(x, {
         #[cfg(feature = "mutant_5")]
         let mu_actual = mu[x & 7];
+        // CMCA-122: since CMCA-103, `price_err` (mu[x] > mu_max) refuses
+        // *unconditionally* before this computation's result can be
+        // observed on any `Ok` path (see `selection_critical_error` below),
+        // so `clip` can only ever be non-identity here on a path that is
+        // already guaranteed to be refused. It is retained as an explicit
+        // defense-in-depth clamp -- not load-bearing for correctness on the
+        // `Ok` path, but cheap and branchless -- rather than removed
+        // outright. `clip`'s own clamping behavior is unit-tested directly
+        // in `clip_tests` below, independent of this admission gate.
         #[cfg(not(feature = "mutant_5"))]
         let mu_actual = clip(mu[x & 7], NonNegativeFixed::ZERO, mu_max);
 
@@ -2148,6 +2208,16 @@ pub fn allocate_in(
     *last_switch_t = const_select_u32(has_refusal as u32, *last_switch_t, local_last_switch_t);
     *prev_mode = const_select_u32(has_refusal as u32, *prev_mode, local_prev_mode);
 
+    // CMCA-122: `eta_err` and `price_err` each now get a dedicated branch
+    // instead of being folded into `LearningRateOutsideEnvelope` (`eta_err`)
+    // or relying on the innermost fallback (`price_err`) -- see the 5-whys
+    // in CMCA-122.md. `price_err` is checked ahead of `eta_err` so that when
+    // both are true simultaneously, the reported reason is the pricing
+    // fault (`PriceGainUnsafe`) rather than a misleading learning-rate/
+    // explore-floor reason -- either co-occurring condition previously
+    // masked, whichever this chain checks second, so an explicit priority
+    // is required and pricing is chosen as the higher-priority admission
+    // concern.
     let err_val = const_select_u32(
         has_cycle as u32,
         StabilityRefusal::ContractViolation as u32,
@@ -2158,15 +2228,23 @@ pub fn allocate_in(
                 dwell_err as u32,
                 4,
                 const_select_u32(
-                    (lr_err | beta_err | eta_err) as u32,
-                    3,
+                    price_err as u32,
+                    StabilityRefusal::PriceGainUnsafe as u32,
                     const_select_u32(
-                        (!gd_ok) as u32,
-                        1,
+                        eta_err as u32,
+                        StabilityRefusal::ExploreFloorOutsideEnvelope as u32,
                         const_select_u32(
-                            digest_err as u32,
-                            10,
-                            const_select_u32(numeric_has_err as u32, numeric_err, 7),
+                            (lr_err | beta_err) as u32,
+                            3,
+                            const_select_u32(
+                                (!gd_ok) as u32,
+                                1,
+                                const_select_u32(
+                                    digest_err as u32,
+                                    10,
+                                    const_select_u32(numeric_has_err as u32, numeric_err, 7),
+                                ),
+                            ),
                         ),
                     ),
                 ),

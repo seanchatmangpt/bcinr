@@ -353,6 +353,102 @@ fn run_alloc_mu_cost() -> Result<[NonNegativeFixed; N], StabilityRefusal> {
     )
 }
 
+/// CMCA-122 regression test: constructs a call where `eta_err` and
+/// `price_err` are both true simultaneously, and asserts the returned
+/// `StabilityRefusal` correctly identifies the pricing fault rather than
+/// misreporting `LearningRateOutsideEnvelope` (the pre-fix behavior, which
+/// masked `price_err` because `eta_err` was folded into the same
+/// `(lr_err | beta_err | eta_err)` priority-chain bucket).
+fn run_alloc_eta_and_price_err() -> Result<[NonNegativeFixed; N], StabilityRefusal> {
+    let mut weights = [[NonNegativeFixed::ONE; 2 * Q]; N];
+    let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
+    let mut last_switch_t = 0;
+    let mut prev_mode = 0;
+    let parent = [-1; N];
+
+    // Out-of-domain mu (mu > mu_max): triggers `price_err`, same as
+    // `run_alloc_mu_cost` above.
+    let mu = [NonNegativeFixed::from_bits(0u32.wrapping_sub(327680)); N];
+    let costs = [NonNegativeFixed::ONE; N];
+
+    // eta above ETA_G_MAX (1.0 in Q16.16 == 65536): triggers `eta_err`.
+    let eta_out_of_range = NonNegativeFixed::from_bits(NonNegativeFixed::ONE.val + 1);
+
+    allocate(
+        &OBJECT_REGISTRY,
+        &LENS_REGISTRY,
+        &LAMBDA,
+        eta_out_of_range,
+        &parent,
+        &mut weights,
+        &payoffs,
+        NonNegativeFixed::ZERO,
+        NonNegativeFixed::ZERO,
+        &mu,
+        &costs,
+        0,
+        &mut last_switch_t,
+        &mut prev_mode,
+        500,
+        CERTIFICATE_DIGEST,
+        None,
+    )
+}
+
+#[test]
+fn eta_err_and_price_err_co_occurring_reports_price_gain_unsafe_not_learning_rate() {
+    let result = run_alloc_eta_and_price_err();
+    assert_eq!(
+        result,
+        Err(StabilityRefusal::PriceGainUnsafe),
+        "when eta_err and price_err are both true, the reported reason must be \
+         PriceGainUnsafe (the real cause), not LearningRateOutsideEnvelope \
+         (which CMCA-122 fixed away from bundling eta_err into)"
+    );
+}
+
+#[test]
+fn eta_err_alone_reports_its_own_dedicated_reason() {
+    // Same eta out-of-range as above, but mu within domain -- isolates
+    // eta_err from price_err to confirm eta_err now has its own,
+    // non-learning-rate reason.
+    let mut weights = [[NonNegativeFixed::ONE; 2 * Q]; N];
+    let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
+    let mut last_switch_t = 0;
+    let mut prev_mode = 0;
+    let parent = [-1; N];
+    let mu = [NonNegativeFixed::ZERO; N];
+    let costs = [NonNegativeFixed::ZERO; N];
+    let eta_out_of_range = NonNegativeFixed::from_bits(NonNegativeFixed::ONE.val + 1);
+
+    let result = allocate(
+        &OBJECT_REGISTRY,
+        &LENS_REGISTRY,
+        &LAMBDA,
+        eta_out_of_range,
+        &parent,
+        &mut weights,
+        &payoffs,
+        NonNegativeFixed::ZERO,
+        NonNegativeFixed::ZERO,
+        &mu,
+        &costs,
+        0,
+        &mut last_switch_t,
+        &mut prev_mode,
+        500,
+        CERTIFICATE_DIGEST,
+        None,
+    );
+
+    assert_eq!(
+        result,
+        Err(StabilityRefusal::ExploreFloorOutsideEnvelope),
+        "eta_err alone must report its own dedicated reason, not \
+         LearningRateOutsideEnvelope"
+    );
+}
+
 const CORRECT_BASELINE: [u32; N] = [8349, 7741, 6684, 6684, 6684, 6684, 7973, 14733];
 const CORRECT_TREE: [u32; N] = [0, 9391, 6623, 8066, 8066, 8066, 9275, 16043];
 
@@ -456,12 +552,14 @@ fn kill_mutant_5_consequence_truncation() {
     // `Err(PriceGainUnsafe)` via this public entry point, so this mutant is
     // no longer killable through `allocate`/`allocate_in`. This is a
     // consequence of fixing CMCA-103 (out-of-domain admission is no longer
-    // bypassable via proof=None) and is a distinct, follow-up decision for
-    // the mutation-testing harness (e.g. exercising the clip directly via an
-    // internal/unit-level hook) rather than something CMCA-103 itself
-    // resolves. Asserting the (now-shared) refusal here instead of silently
-    // asserting the old, no-longer-true "mutant deviates from baseline"
-    // claim.
+    // bypassable via proof=None). CMCA-122 resolves the follow-up: `clip`'s
+    // clamping behavior now has direct, real unit-level coverage in
+    // `allocator::clip_tests` (src/allocator/mod.rs) that bypasses the
+    // admission gate entirely, so the underlying behavior this mutant would
+    // have broken is still regression-tested -- just not through this
+    // public-API-level test. Asserting the (now-shared) refusal here
+    // instead of silently asserting the old, no-longer-true "mutant
+    // deviates from baseline" claim.
     let result_mutant = run_alloc_mu_cost();
     assert!(
         result_mutant.is_err(),
