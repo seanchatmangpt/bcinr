@@ -58,6 +58,7 @@ not require a newer Rust version than 1.63.
     clippy::impl_hash_borrow_with_str_and_bytes,// intentional Hash impl
     clippy::unnecessary_cast,// casting is intentional for pointer alignment
     renamed_and_removed_lints,// allow handling of renamed lints across versions
+    deprecated,// vendored 1.0.1 keeps legacy numeric module paths for its documented MSRV compatibility
 )]
 #![warn(clippy::doc_markdown, clippy::manual_filter_map)]
 // opt-in lints that might be interesting to recheck once in a while:
