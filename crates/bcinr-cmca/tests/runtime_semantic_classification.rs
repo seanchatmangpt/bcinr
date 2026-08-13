@@ -492,6 +492,104 @@ fn allocate_in_now_has_a_typed_refusal_for_the_former_degenerate_fallback_regime
     );
 }
 
+// ---------------------------------------------------------------------
+// CMCA-110: `eta_err` only checked a lower bound (`ETA_G_MIN`); nothing
+// enforced an upper bound, so `eta > 1.0` reached the explore-floor blend
+// (`(NonNegativeFixed::ONE - eta_actual) * p_mu`) unconditionally, where
+// `saturating_sub` underflows, silently clamps to 0, and discards the
+// priced allocation for pure uniform explore with no refusal. Separately,
+// `numeric_has_err` (the fold of `pi_res[x].err` across all 8 nodes --
+// exactly where that underflow's fault flag lands) was bucketed into the
+// proof-gated `has_error` instead of the unconditional
+// `selection_critical_error`, so even a numeric fault from the
+// unconditionally-executing selection code was swallowed on the common
+// `proof=None` path. Both gaps are closed in `allocate_in`.
+// ---------------------------------------------------------------------
+
+/// CMCA-110 acceptance criterion 1 & 3: `eta > 1.0` with `proof=None` must
+/// now be refused, not silently accepted with a uniform-explore result that
+/// discarded the priced allocation via an unflagged underflow.
+#[test]
+fn allocate_in_refuses_eta_above_one_without_proof() {
+    let lambda = bcinr_cmca::generated::consequence_mass::case_studies::LAMBDA;
+    let mut weights = [[NonNegativeFixed::ONE; 2 * Q]; N];
+    let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
+    let mut last_switch_t = 0;
+    let mut prev_mode = 0;
+    let parent = [-1; N];
+    let mu = [NonNegativeFixed::ZERO; N];
+    let costs = [NonNegativeFixed::ZERO; N];
+
+    // Just over 1.0 in Q16.16 -- the smallest out-of-domain value for a
+    // blend-mixing coefficient, and exactly the value the ticket's
+    // underflow analysis identifies as the first corrupting input.
+    let eta_over_one = NonNegativeFixed::from_bits(NonNegativeFixed::ONE.val + 1);
+
+    let result = allocate_in(
+        &FeasibleRegion::CURRENT,
+        &OBJECT_REGISTRY,
+        &LENS_REGISTRY,
+        &lambda,
+        eta_over_one,
+        &parent,
+        &mut weights,
+        &payoffs,
+        NonNegativeFixed::ZERO,
+        NonNegativeFixed::ZERO,
+        &mu,
+        &costs,
+        0,
+        &mut last_switch_t,
+        &mut prev_mode,
+        500,
+        CERTIFICATE_DIGEST,
+        None, // proof = None: the common path
+    );
+
+    assert!(
+        result.is_err(),
+        "CMCA-110: eta > 1.0 with proof=None must be refused, not silently degraded to an \
+         unflagged uniform-explore result -- got {result:?}"
+    );
+    assert_eq!(
+        result,
+        Err(StabilityRefusal::LearningRateOutsideEnvelope),
+        "CMCA-110: eta_err (now upper-bound-checked) must be the reason this refuses -- got \
+         {result:?}"
+    );
+}
+
+/// CMCA-110 acceptance criterion 4: `numeric_has_err` is now folded into
+/// `selection_critical_error` (unconditional), not `has_error`
+/// (proof-gated). This is verified at the arithmetic layer the ticket's
+/// root-cause analysis names directly: the explore-floor blend's
+/// `NonNegativeFixed::ONE - eta_actual` subtraction, which is exactly what
+/// `pi_res[x].err`/`numeric_err`/`numeric_has_err` fold together in
+/// `allocate_in`. This is an independent check from the `eta_err`
+/// upper-bound gate above -- it confirms the *numeric* fault this
+/// out-of-range `eta` produces is itself real and would be a genuine
+/// second gate even if `eta_err` did not exist, not that the two fixes
+/// coincidentally cover the same case only because they share an input.
+#[test]
+fn eta_above_one_underflows_the_explore_floor_blend_subtraction() {
+    let eta_over_one = NonNegativeFixed::from_bits(NonNegativeFixed::ONE.val + 1);
+    let underflowed = NonNegativeFixed::ONE - eta_over_one;
+
+    assert_eq!(
+        underflowed.err,
+        StabilityRefusal::NumericRangeExceeded as u32,
+        "CMCA-110: `NonNegativeFixed::ONE - eta_actual` must fault as \
+         NumericRangeExceeded (not silently saturate to 0 unflagged) when eta > 1.0 -- this is \
+         the numeric fault `numeric_has_err` folds and must surface as a refusal on the \
+         proof=None path now that it is selection-critical"
+    );
+    assert_eq!(
+        underflowed.val, 0,
+        "CMCA-110: the underlying saturating_sub still clamps to 0 -- the fix is that the \
+         resulting err flag now reaches has_refusal, not that the clamp itself changed"
+    );
+}
+
 /// Documentation-as-test: records the D1 finding that all five surfaces
 /// have zero production callers today. This is the test to update (not
 /// silently delete) if any of them ever gains a real caller -- the point

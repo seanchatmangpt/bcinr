@@ -1504,6 +1504,16 @@ pub fn allocate_in(
         ((crate::generated::stability_profile::ZETA_W_MAX.raw * 65536) / 1_000_000_000) as u32;
     let eta_g_min_q16 =
         ((crate::generated::stability_profile::ETA_G_MIN.raw * 65536) / 1_000_000_000) as u32;
+    // CMCA-110: `eta_actual` feeds the explore-floor blend unconditionally
+    // (`(NonNegativeFixed::ONE - eta_actual) * p_mu` below), and `sub` is
+    // `saturating_sub` -- when `eta_actual.val > NonNegativeFixed::ONE.val`
+    // that subtraction underflows, silently clamps to 0, and discards the
+    // priced allocation in favor of pure uniform explore with no refusal.
+    // `ETA_G_MAX` is exactly `NonNegativeFixed::ONE` (eta is a mixing weight
+    // in [ETA_G_MIN, 1.0]; anything above 1.0 is out of domain for a blend
+    // coefficient), so the ceiling is derived from the blend math itself, not
+    // guessed.
+    let eta_g_max_q16 = NonNegativeFixed::ONE.val;
 
     let lr_err = const_lt_u32(zeta_w_max_q16, zeta.val) != 0;
     let dwell_err = const_lt_u32(
@@ -1522,7 +1532,8 @@ pub fn allocate_in(
         price_err |= const_lt_u32(mu_max.val, mu[i & 7].val) != 0;
     });
 
-    let eta_err = const_lt_u32(eta.val, eta_g_min_q16) != 0;
+    let eta_err =
+        (const_lt_u32(eta.val, eta_g_min_q16) != 0) | (const_lt_u32(eta_g_max_q16, eta.val) != 0);
 
     let is_zeta_less = const_lt_u32(zeta.val, beta_max.val);
     let beta = NonNegativeFixed::from_bits(const_select_u32(is_zeta_less, zeta.val, beta_max.val));
@@ -1838,7 +1849,7 @@ pub fn allocate_in(
     });
     let numeric_has_err = const_eq_u32(numeric_err, u32::MAX) == 0;
 
-    let has_error = has_error | has_cycle | numeric_has_err;
+    let has_error = has_error | has_cycle;
     // CMCA-103: investigation found the proof=None / degrade-to-certified-
     // selection path is NOT uniformly allowed to bypass admission -- but it
     // legitimately bypasses admission for a specific subset of `has_error`'s
@@ -1859,9 +1870,9 @@ pub fn allocate_in(
     //
     // The remaining `has_error` components -- `digest_err`, `gd_ok`
     // (gain-matrix contraction), `lr_err`/`beta_err` (learning rate), and
-    // `dwell_err` (mode-switch timing), plus `has_cycle`/`numeric_has_err` --
-    // are consumed only by the weight-update / mode-switch code, which is
-    // already independently gated by `proof_some`/`update_allowed` (see
+    // `dwell_err` (mode-switch timing), plus `has_cycle` -- are consumed only
+    // by the weight-update / mode-switch code, which is already
+    // independently gated by `proof_some`/`update_allowed` (see
     // `is_updating`, `did_switch` above): with proof=None that code is
     // already a no-op regardless of these flags, so refusing on them too
     // would only ever discard an unmodified, already-certified selection.
@@ -1871,7 +1882,15 @@ pub fn allocate_in(
     // tests/jtbd_certified_actuation_chicago.rs, which Chicago-TDD-asserts
     // that absence of adaptive authority (proof=None) must degrade a
     // digest-mismatched call to certified selection rather than refuse it.
-    let selection_critical_error = q_err | price_err | eta_err;
+    //
+    // CMCA-110: `numeric_has_err` is different from those -- it is folded
+    // from `pi_res[x].err`, i.e. errors from the Q16.16 arithmetic chain in
+    // the `pi_kq`/pricing/explore-floor blend that *does* execute
+    // unconditionally (see the block comment above). A numeric fault
+    // produced there (e.g. the eta-underflow this ticket closes) must
+    // refuse unconditionally too, so it belongs in `selection_critical_error`
+    // rather than the proof-gated `has_error` bucket.
+    let selection_critical_error = q_err | price_err | eta_err | numeric_has_err;
     let has_refusal = selection_critical_error | (has_error & !degrade_to_certified_selection);
     unroll_8_static!(v, {
         unroll_8_static!(e, {
