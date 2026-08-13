@@ -494,7 +494,7 @@ pub enum HierarchyRefusal {
 /// needs the cycle witness `P[7][j] != -1`) so the two never compute this
 /// independently and risk drifting apart.
 #[allow(non_snake_case)]
-fn ancestor_doubling_table(parent: &[i32; N]) -> [[i32; N]; 8] {
+pub(crate) fn ancestor_doubling_table(parent: &[i32; N]) -> [[i32; N]; 8] {
     let mut P = [[-1i32; N]; 8];
     unroll_8_static!(j, {
         P[0][j] = parent[j];
@@ -776,6 +776,12 @@ pub(crate) fn const_max_i32(a: i32, b: i32) -> i32 {
 }
 
 /// Marker struct indicating certified learning mode is active.
+///
+/// Hidden-by-design (CMCA-102, Branch B): part of the recovery authority chain
+/// withheld from the crate's public-facing docs pending a Hoare-logic proof of the
+/// chain's dependency closure. Still `pub` (not `pub(crate)`) because this crate's
+/// own `tests/*.rs` integration suite reaches it via `bcinr_cmca::allocator::*`.
+#[doc(hidden)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct CertifiedLearning {
     _sealed: (),
@@ -794,6 +800,12 @@ impl CertifiedLearning {
 }
 
 /// Marker struct indicating selection-only mode is active.
+///
+/// Hidden-by-design (CMCA-102, Branch B): part of the recovery authority chain
+/// withheld from the crate's public-facing docs pending a Hoare-logic proof of the
+/// chain's dependency closure. Still `pub` (not `pub(crate)`) because this crate's
+/// own `tests/*.rs` integration suite reaches it via `bcinr_cmca::allocator::*`.
+#[doc(hidden)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct CertifiedSelectionOnly {
     _sealed: (),
@@ -812,6 +824,12 @@ impl CertifiedSelectionOnly {
 }
 
 /// Proof token certifying that the control state has been admitted.
+///
+/// Hidden-by-design (CMCA-102, Branch B): part of the recovery authority chain
+/// withheld from the crate's public-facing docs pending a Hoare-logic proof of the
+/// chain's dependency closure. Still `pub` (not `pub(crate)`) because this crate's
+/// own `tests/*.rs` integration suite reaches it via `bcinr_cmca::allocator::*`.
+#[doc(hidden)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct AdmittedControlState {
     pub(crate) digest: u64,
@@ -830,6 +848,12 @@ impl AdmittedControlState {
 }
 
 /// Proof token certifying receipt of a valid security certificate.
+///
+/// Hidden-by-design (CMCA-102, Branch B): part of the recovery authority chain
+/// withheld from the crate's public-facing docs pending a Hoare-logic proof of the
+/// chain's dependency closure. Still `pub` (not `pub(crate)`) because this crate's
+/// own `tests/*.rs` integration suite reaches it via `bcinr_cmca::allocator::*`.
+#[doc(hidden)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct CertificateReceipt {
     pub(crate) digest: u64,
@@ -848,6 +872,12 @@ impl CertificateReceipt {
 }
 
 /// Proof token certifying receipt of a valid envelope.
+///
+/// Hidden-by-design (CMCA-102, Branch B): part of the recovery authority chain
+/// withheld from the crate's public-facing docs pending a Hoare-logic proof of the
+/// chain's dependency closure. Still `pub` (not `pub(crate)`) because this crate's
+/// own `tests/*.rs` integration suite reaches it via `bcinr_cmca::allocator::*`.
+#[doc(hidden)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct EnvelopeReceipt {
     pub(crate) digest: u64,
@@ -866,6 +896,12 @@ impl EnvelopeReceipt {
 }
 
 /// Proof token certifying receipt of a valid outcome.
+///
+/// Hidden-by-design (CMCA-102, Branch B): part of the recovery authority chain
+/// withheld from the crate's public-facing docs pending a Hoare-logic proof of the
+/// chain's dependency closure. Still `pub` (not `pub(crate)`) because this crate's
+/// own `tests/*.rs` integration suite reaches it via `bcinr_cmca::allocator::*`.
+#[doc(hidden)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct OutcomeReceipt {
     pub(crate) digest: u64,
@@ -887,6 +923,12 @@ impl OutcomeReceipt {
 ///
 /// Constructed via `AdaptiveUpdate::new` when the control mode and environmental bounds
 /// are validated.
+///
+/// Hidden-by-design (CMCA-102, Branch B): part of the recovery authority chain
+/// withheld from the crate's public-facing docs pending a Hoare-logic proof of the
+/// chain's dependency closure. Still `pub` (not `pub(crate)`) because this crate's
+/// own `tests/*.rs` integration suite reaches it via `bcinr_cmca::allocator::*`.
+#[doc(hidden)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct AdaptiveUpdate<Mode> {
     _mode: core::marker::PhantomData<Mode>,
@@ -1083,7 +1125,7 @@ fn flow_step(
 /// $O(N^2)$ operations, which is $O(1)$ since $N=8$.
 #[inline(never)]
 #[allow(clippy::too_many_arguments)] // deliberate wide parameter list for a hot, branchless kernel
-fn compute_pi_kq_for_kq(
+pub(crate) fn compute_pi_kq_for_kq(
     k_actual: usize,
     q_idx: usize,
     q_val_mutated: SignedFixed,
@@ -1303,6 +1345,86 @@ fn compute_pi_kq_for_kq(
     res
 }
 
+/// `mass^q_val` in Q16.16, via `exp2(q_val * log2(mass))` -- the same
+/// log-domain power construction `compute_pi_kq_for_kq` already uses for its
+/// max-shift-stabilized root/child/leaf weights, but unshifted: kappa only
+/// ever consumes *ratios* of these values (`s_meas`, `s_leaf` below), so a
+/// missing max-shift constant cancels out algebraically and does not need to
+/// be tracked here.
+#[inline(always)]
+fn fixed_pow(mass: NonNegativeFixed, q_val: SignedFixed) -> NonNegativeFixed {
+    let log_m = mass.log2();
+    let exponent =
+        SignedFixed::from_bits((((q_val.val as i64).wrapping_mul(log_m.val as i64)) >> 16) as i32);
+    exponent.exp2()
+}
+
+/// Divergence guard $\kappa_v$ for internal node `v` under lens `q_val`,
+/// matching the module doc comment's
+/// $\kappa_v = \sum_{c \in \text{children}(v)} s_{\text{leaf}}(c) \cdot
+/// \log_2(s_{\text{leaf}}(c) / s_{\text{meas}}(c))$ and the f64 reference
+/// oracle's `allocate_f64` (`tests/reference.rs`) -- CMCA-107's root cause
+/// was this guard being entirely absent from the Q16.16 path, so
+/// `allocate_in` always updated weights while the f64 oracle only updated
+/// them when `kappa_v > epsilon_kappa`. See CMCA-107 for the full
+/// investigation.
+///
+/// Uses `node_masses[MEASURE_CACHE]`, mirroring the f64 reference's use of
+/// `node_masses[0]` (`MEASURE_CACHE == 0`).
+#[inline(never)]
+fn compute_kappa(
+    v: usize,
+    q_val: SignedFixed,
+    parent: &[i32; N],
+    is_subtree_leaf: &[[bool; N]; N],
+    node_masses: &[[NonNegativeFixed; N]; K],
+) -> SignedFixed {
+    let mut mass_pow = [NonNegativeFixed::ZERO; N];
+    unroll_8_static!(i, {
+        mass_pow[i & 7] = fixed_pow(node_masses[MEASURE_CACHE][i & 7], q_val);
+    });
+
+    let mut sum_meas_den = NonNegativeFixed::ZERO;
+    unroll_8_static!(c, {
+        let is_child = parent[c & 7] == v as i32;
+        sum_meas_den +=
+            NonNegativeFixed::from_bits(const_select_u32(is_child as u32, mass_pow[c & 7].val, 0));
+    });
+
+    let mut sum_leaf_den = NonNegativeFixed::ZERO;
+    unroll_8_static!(x, {
+        let is_sub = is_subtree_leaf[v & 7][x & 7];
+        sum_leaf_den +=
+            NonNegativeFixed::from_bits(const_select_u32(is_sub as u32, mass_pow[x & 7].val, 0));
+    });
+
+    let mut kappa = SignedFixed::ZERO;
+    unroll_8_static!(c, {
+        let is_child = parent[c & 7] == v as i32;
+
+        let mut l_q_c = NonNegativeFixed::ZERO;
+        unroll_8_static!(x, {
+            let is_sub_c = is_subtree_leaf[c & 7][x & 7];
+            l_q_c += NonNegativeFixed::from_bits(const_select_u32(
+                is_sub_c as u32,
+                mass_pow[x & 7].val,
+                0,
+            ));
+        });
+
+        let s_meas = mass_pow[c & 7].saturating_div(sum_meas_den);
+        let s_leaf = l_q_c.saturating_div(sum_leaf_den);
+        let s_leaf_pos = s_leaf.val > 0;
+
+        let log_ratio = s_leaf.saturating_div(s_meas).log2();
+        let term = (((s_leaf.val as i64).wrapping_mul(log_ratio.val as i64)) >> 16) as i32;
+
+        let contribution = const_select_u32((is_child & s_leaf_pos) as u32, term as u32, 0) as i32;
+        kappa = SignedFixed::from_bits(kappa.val.wrapping_add(contribution));
+    });
+    kappa
+}
+
 mod feasible_region;
 pub use feasible_region::FeasibleRegion;
 
@@ -1322,7 +1444,7 @@ pub fn allocate_in(
     weights: &mut [[NonNegativeFixed; 2 * Q]; N],
     payoffs: &[[NonNegativeFixed; 2 * Q]; N],
     zeta: NonNegativeFixed,
-    _epsilon_kappa: NonNegativeFixed,
+    epsilon_kappa: NonNegativeFixed,
     mu: &[NonNegativeFixed; N],
     costs: &[NonNegativeFixed; N],
     t: u32,
@@ -1527,7 +1649,14 @@ pub fn allocate_in(
             }
             let w_flat = local_weights[v & 7][(2 * q_idx) & 7];
             let w_desc = local_weights[v & 7][(2 * q_idx + 1) & 7];
-            let is_updating = has_children & update_allowed;
+
+            // Divergence guard (CMCA-107): only update this (v, q_idx) slot's
+            // weights when the local divergence kappa_v exceeds
+            // epsilon_kappa, matching the module doc comment's contract and
+            // the f64 reference oracle's `update_active = kappa > epsilon_kappa`.
+            let kappa = compute_kappa(v, _q_val_mutated, parent, &is_subtree_leaf, &node_masses);
+            let kappa_exceeds = kappa.val > (epsilon_kappa.val as i32);
+            let is_updating = has_children & update_allowed & kappa_exceeds;
             local_weights[v & 7][(2 * q_idx) & 7] = NonNegativeFixed::from_bits(const_select_u32(
                 is_updating as u32,
                 (w_flat
@@ -1700,7 +1829,40 @@ pub fn allocate_in(
     let numeric_has_err = const_eq_u32(numeric_err, u32::MAX) == 0;
 
     let has_error = has_error | has_cycle | numeric_has_err;
-    let has_refusal = has_error & !degrade_to_certified_selection;
+    // CMCA-103: investigation found the proof=None / degrade-to-certified-
+    // selection path is NOT uniformly allowed to bypass admission -- but it
+    // legitimately bypasses admission for a specific subset of `has_error`'s
+    // components, and that subset does not include `q_err`.
+    //
+    // `q_err`, `price_err`, and `eta_err` all feed *unconditionally* into
+    // the selection computation below (`lenses[..].q` in the `pi_kq`
+    // pass, `mu`/`mu_actual` in the pricing pass, and `eta_actual` in the
+    // explore-floor blend all execute regardless of `proof`/`update_allowed`
+    // -- see the `pi_kq`, `pi_res`/`priced_sum`, and explore-floor blocks
+    // above). An out-of-range value there silently corrupts the *returned*
+    // allocation even when only "certified selection" (no learning update)
+    // is being performed, so these must refuse unconditionally -- this is
+    // the CMCA-103 defect (confirmed via
+    // crates/bcinr-cmca/tests/runtime_semantic_classification.rs and, prior
+    // to this fix, silently accepted on the proof=None path exercised by
+    // nearly every caller in this crate).
+    //
+    // The remaining `has_error` components -- `digest_err`, `gd_ok`
+    // (gain-matrix contraction), `lr_err`/`beta_err` (learning rate), and
+    // `dwell_err` (mode-switch timing), plus `has_cycle`/`numeric_has_err` --
+    // are consumed only by the weight-update / mode-switch code, which is
+    // already independently gated by `proof_some`/`update_allowed` (see
+    // `is_updating`, `did_switch` above): with proof=None that code is
+    // already a no-op regardless of these flags, so refusing on them too
+    // would only ever discard an unmodified, already-certified selection.
+    // Continuing to gate refusal on those by `!degrade_to_certified_selection`
+    // is a legitimate, deliberately documented contract -- see
+    // `jtbd_drift_refusal_routes_to_selection_only_without_state_drift` in
+    // tests/jtbd_certified_actuation_chicago.rs, which Chicago-TDD-asserts
+    // that absence of adaptive authority (proof=None) must degrade a
+    // digest-mismatched call to certified selection rather than refuse it.
+    let selection_critical_error = q_err | price_err | eta_err;
+    let has_refusal = selection_critical_error | (has_error & !degrade_to_certified_selection);
     unroll_8_static!(v, {
         unroll_8_static!(e, {
             weights[v & 7][e & 7] = NonNegativeFixed::from_bits(const_select_u32(
@@ -1886,6 +2048,181 @@ pub fn allocate(
         digest,
         proof,
     )
+}
+
+/// Why [`allocate_single_lens`] refused to produce a single-lens allocation.
+///
+/// A typed, non-panicking refusal, matching the crate's established
+/// one-variant-per-check convention (mirrors [`crate::certification::CertificationRefusal`]'s
+/// shape).
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum LensSelectionRefusal {
+    /// `measure` was not a valid index into the `K` measures (`0..K`).
+    MeasureIndexOutOfRange { measure: usize },
+    /// `lens_idx` was not a valid index into the `Q` lenses (`0..Q`).
+    LensIndexOutOfRange { lens_idx: usize },
+    /// `lenses[lens_idx].q`'s magnitude exceeded
+    /// [`crate::cascade::MAX_LENS_MAGNITUDE`] -- the same, unconditionally
+    /// enforced bound [`crate::escort::escort_distribution`] checks. Not to
+    /// be confused with `allocate_in`'s separate, `proof`-conditional
+    /// `q in [-2, 2]` admission policy (see
+    /// `crate::generated_profile::MAX_LENS_MAGNITUDE`'s doc comment for why
+    /// the two are different, independently-sourced domains).
+    QMagnitudeExceeded { q: SignedFixed },
+    /// `parent` contains a cycle (or a chain deeper than `N - 1` hops
+    /// permits) -- the same witness [`check_hierarchy_acyclic`] checks.
+    Cyclic,
+}
+
+/// Returns exactly one lens's allocation vector `pi_kq[measure][lens_idx]`,
+/// bypassing the LAMBDA-weighted blend across all `K x Q` measure/lens pairs
+/// that [`allocate`] always performs.
+///
+/// # Why this exists
+///
+/// [`allocate`] computes `pi_kq[k][q]` for every one of the `K * Q`
+/// (measure, lens) pairs on every call (from real
+/// [`PackedSemanticState::factors`] data, via the same per-measure mass
+/// formulas this function reuses below), then unconditionally sums all of
+/// them into one LAMBDA-weighted `pi_combined` -- there was no way, before
+/// this function, for a caller to ask "what would lens `q` alone say."
+/// `bcinr-cmca`'s own adversarial test suite documented this gap directly
+/// (`tests/falsification_adversarial.rs`'s "per-lens isolation is not
+/// observable through the public API").
+///
+/// This function reuses [`compute_pi_kq_for_kq`] -- the exact private
+/// kernel `allocate_in` already calls once per `(k, q_idx)` pair before
+/// discarding the individual results into the blend -- rather than
+/// reimplementing the escort math against [`crate::escort::escort_distribution`].
+/// That means a single-lens result returned here and the LAMBDA-blended
+/// `pi_combined` `allocate` returns can never silently drift apart: they
+/// are, by construction, the same underlying computation viewed two ways
+/// (`sum_{k,q} lambda[k][q] * allocate_single_lens(..., k, q, ...) ==`
+/// `allocate(...)`'s `pi_combined`, before `mu`/`costs`/`eta` pricing is
+/// applied on top).
+///
+/// # What this deliberately omits
+///
+/// No `t`, `last_switch_t`, `prev_mode`, `tau_d`, `mu`, `costs`, `zeta`, or
+/// `eta` parameters. Those govern `allocate`'s LAMBDA-blend-specific
+/// learning-rate update and dwell-time mode-switching machinery
+/// (`dom_mode`/`prev_mode` hysteresis) -- concepts with no defined meaning
+/// for a single, stateless per-lens query: a lens-selector call either
+/// returns lens `(k, q)`'s answer or it doesn't, there is no accumulated
+/// mode to protect from thrashing between successive calls.
+///
+/// # Errors
+///
+/// Refuses (never panics) on an out-of-range `measure`/`lens_idx`, a
+/// `q` magnitude beyond [`crate::cascade::MAX_LENS_MAGNITUDE`], or a
+/// cyclic `parent` -- see [`LensSelectionRefusal`].
+pub fn allocate_single_lens(
+    states: &[PackedSemanticState; N],
+    lenses: &[LensSpec; Q],
+    measure: usize,
+    lens_idx: usize,
+    parent: &[i32; N],
+    weights: &[[NonNegativeFixed; 2 * Q]; N],
+) -> Result<[NonNegativeFixed; N], LensSelectionRefusal> {
+    if measure >= K {
+        return Err(LensSelectionRefusal::MeasureIndexOutOfRange { measure });
+    }
+    if lens_idx >= Q {
+        return Err(LensSelectionRefusal::LensIndexOutOfRange { lens_idx });
+    }
+    let q = lenses[lens_idx].q;
+    // Same bound, same check idiom as `escort::escort_distribution` (escort.rs)
+    // -- unconditionally enforced, unlike `allocate_in`'s separate `q in
+    // [-2, 2]` admission policy (see `LensSelectionRefusal::QMagnitudeExceeded`'s
+    // doc comment).
+    if q.to_bits().unsigned_abs() > crate::cascade::MAX_LENS_MAGNITUDE << 16 {
+        return Err(LensSelectionRefusal::QMagnitudeExceeded { q });
+    }
+    if check_hierarchy_acyclic(parent).is_err() {
+        return Err(LensSelectionRefusal::Cyclic);
+    }
+
+    let region = &FeasibleRegion::CURRENT;
+    let m_min = region.m_min;
+    let m_max = region.m_max;
+
+    let mut is_leaf = [true; N];
+    unroll_8_static!(i, {
+        unroll_8_static!(j, {
+            let is_match = parent[j & 7] == i as i32;
+            is_leaf[i & 7] &= !is_match;
+        });
+    });
+
+    #[allow(non_snake_case)]
+    let P = ancestor_doubling_table(parent);
+    #[allow(non_snake_case)]
+    let P_bb = core::hint::black_box(P);
+
+    let mut is_descendant = [[false; N]; N];
+    unroll_8_static!(i, {
+        unroll_8_static!(j, {
+            let mut matched = const_eq_u32(j as u32, i as u32);
+            unroll_8_static!(level, {
+                matched |= const_eq_u32(P_bb[level][j] as u32, i as u32);
+            });
+            is_descendant[i][j] = matched != 0;
+        });
+    });
+    let is_descendant = core::hint::black_box(is_descendant);
+
+    let mut is_subtree_leaf = [[false; N]; N];
+    unroll_8_static!(i, {
+        unroll_8_static!(k, {
+            is_subtree_leaf[i & 7][k & 7] = is_leaf[k & 7] & is_descendant[i & 7][k & 7];
+        });
+    });
+
+    // Same per-measure mass derivation `allocate_in` uses (allocator/mod.rs's
+    // `node_masses` block) -- transcribed here rather than factored into a
+    // shared helper for this change, since `allocate_in`'s version is
+    // entangled with its own MWU weight-update state; kept byte-identical in
+    // formula so the two can never compute different masses for the same
+    // `states`.
+    let mut node_masses = [[NonNegativeFixed::ZERO; N]; K];
+    unroll_8_static!(i, {
+        let state = &states[i & 7];
+        let f_recomp = state.factors[FACTOR_RECOMPUTATION_COST];
+        let f_verify = state.factors[FACTOR_VERIFICATION_COST];
+        let f_stand = state.factors[FACTOR_STANDING];
+        let f_access = state.factors[FACTOR_ACCESS_FREQUENCY];
+        let f_search = state.factors[FACTOR_SEARCH_DEMAND];
+        let f_retrieve = state.factors[FACTOR_RETRIEVAL_DEMAND];
+        let f_sched = state.factors[FACTOR_SCHEDULING_DEMAND];
+        let f_bval = state.factors[FACTOR_BUSINESS_VALUE];
+        let f_conseq = state.factors[FACTOR_DOWNSTREAM_CONSEQUENCE];
+
+        let m_cache = (f_recomp * NonNegativeFixed::from_num(5) + f_verify) * f_access * f_stand;
+        let m_search = (f_bval + f_conseq) * f_search * f_stand;
+        let m_retrieval = f_bval * f_retrieve;
+        let m_sched = f_bval * f_sched;
+
+        node_masses[MEASURE_CACHE][i & 7] = m_cache;
+        node_masses[MEASURE_RETRIEVAL][i & 7] = m_retrieval;
+        node_masses[MEASURE_SCHEDULING][i & 7] = m_sched;
+        node_masses[MEASURE_SEARCH][i & 7] = m_search;
+    });
+    unroll_4_static!(k, {
+        unroll_8_static!(i, {
+            node_masses[k & 3][i & 7] = clip(node_masses[k & 3][i & 7], m_min, m_max);
+        });
+    });
+
+    Ok(compute_pi_kq_for_kq(
+        measure,
+        lens_idx,
+        q,
+        parent,
+        &is_leaf,
+        &is_subtree_leaf,
+        &node_masses,
+        weights,
+    ))
 }
 
 /// ```compile_fail

@@ -92,6 +92,7 @@
 #[cfg(feature = "std")]
 extern crate std;
 
+pub mod allocation_receipt;
 pub mod allocator;
 /// Arbitrary-shape multifractal cascade with a lens per level. Requires
 /// `alloc`: unlike [`allocator`], it sizes to the tree rather than to a fixed
@@ -120,13 +121,23 @@ pub mod stability_theorem;
 
 pub use allocator::{check_hierarchy_acyclic, HierarchyRefusal, StabilityRefusal};
 
-// INTEGRATION NOTE (v26.7.24): Recovery-only authority modules (CertifiedLearning,
-// CertifiedSelectionOnly, AdmittedControlState, CertificateReceipt, EnvelopeReceipt,
-// OutcomeReceipt, AdaptiveUpdate) are defined in allocator.rs but intentionally NOT
-// exported publicly. This fence preserves production behavior while recovery's authority
-// chain is validated. Exports will be added in a future PR after formal Hoare-logic
-// verification. Recovery's new typed refusals (CMCA_LEARNING_FROZEN, etc.) will be
-// added to StabilityRefusal as new enum variants once dependency closure is proven.
+// INTEGRATION NOTE (v26.7.24, re-fenced explicitly per CMCA-102 Branch B):
+// Recovery-only authority modules (CertifiedLearning, CertifiedSelectionOnly,
+// AdmittedControlState, CertificateReceipt, EnvelopeReceipt, OutcomeReceipt,
+// AdaptiveUpdate) are defined in allocator.rs and deliberately NOT re-exported from
+// this crate root. This top-level comment is now a pointer, not the fence itself:
+// each of the 7 types carries its own `#[doc(hidden)]` attribute and doc comment at
+// its definition site in allocator.rs, naming CMCA-102 and the unblocking condition
+// (a Hoare-logic proof of the authority chain's dependency closure, per phd_gates.md
+// / SAFETY.md conventions) directly on the gate. The types remain `pub` -- not
+// `pub(crate)` -- because this crate's own integration-test suite
+// (crates/bcinr-cmca/tests/*.rs) already depends on reaching them via
+// `bcinr_cmca::allocator::*` as an external crate; `pub(crate)` would break that
+// suite today. `#[doc(hidden)]` keeps them out of the crate's public-facing rustdoc
+// listing (see CMCA-102's `cargo doc` acceptance criterion) without changing
+// reachability or behavior. Recovery's new typed refusals (CMCA_LEARNING_FROZEN,
+// etc.) will be added to StabilityRefusal as new enum variants once dependency
+// closure is proven.
 
 /// A branchless mock/dummy function utilized in tests and contract validation.
 ///
