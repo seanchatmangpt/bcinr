@@ -80,8 +80,4 @@ fn allocator_output_is_an_eight_lane_q16_16_mass_vector() {
         mfw_mass.iter().any(|mass| *mass > 0),
         "Q16.16 -> u8 quantization must preserve material allocation"
     );
-    assert!(
-        mfw_mass.iter().all(|mass| *mass <= u8::MAX),
-        "the MFW boundary is fixed to u8 mass"
-    );
 }
