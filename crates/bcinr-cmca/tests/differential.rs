@@ -266,6 +266,71 @@ fn cmca_107_single_child_node_kappa_is_always_zero_gates_weight_update() {
     );
 }
 
+// CMCA-117 regression: `masses_tied`'s threshold must reject the exact case the
+// ticket described as miscalibrated -- two masses `1e-6` apart, well past the old
+// flat `1e-9` threshold (so the old code called them "not tied") but 15x *finer*
+// than the Q16.16 grid's `2^-16` resolution (so they round to bit-identical
+// `to_fixed()` outputs and are legitimately on a rounding knife-edge, not a
+// well-posed comparison). This test would have caught the root cause directly: it
+// does not exercise `allocate()` at all, it exercises the classifier's own
+// discrimination against the grid it is supposed to be calibrated to.
+#[test]
+fn cmca_117_masses_tied_threshold_is_derived_from_the_q16_16_grid_not_an_arbitrary_epsilon() {
+    let tied_mass_epsilon =
+        2.0_f64.powi(-(bcinr_cmca::generated_profile::Q16_16_FRACTIONAL_BITS as i32));
+
+    // The Q16.16 grid's own resolution: exactly one ULP, 1/65536.
+    assert!(
+        (tied_mass_epsilon - 1.0 / 65536.0).abs() < 1e-15,
+        "tied_mass_epsilon ({tied_mass_epsilon}) drifted from the Q16.16 grid \
+         resolution (1/65536) -- masses_tied is no longer calibrated to the \
+         representation it classifies"
+    );
+
+    let masses_tied = |vals: &[f64]| -> bool {
+        if vals.len() < 2 {
+            return false;
+        }
+        let hi = vals.iter().cloned().fold(f64::MIN, f64::max);
+        let lo = vals.iter().cloned().fold(f64::MAX, f64::min);
+        (hi - lo).abs() <= tied_mass_epsilon
+    };
+
+    // The ticket's own example: 1e-6 apart -- 1000x the old 1e-9 threshold, but
+    // 15x finer than the ~1.5259e-5 Q16.16 resolution. Both masses round to the
+    // identical Q16.16 bit pattern, so this pair MUST be classified tied.
+    let a: f64 = 0.123_456_0;
+    let b: f64 = 0.123_457_0;
+    assert!(
+        (a - b).abs() < 1e-6 + 1e-12,
+        "test setup: expected the fixture pair to differ by ~1e-6"
+    );
+    assert_eq!(
+        to_fixed(a).val,
+        to_fixed(b).val,
+        "test setup: {a} and {b} must round to \
+        the same Q16.16 bit pattern for this regression to be meaningful"
+    );
+    assert!(
+        masses_tied(&[a, b]),
+        "masses {a} and {b} differ by {} (finer than the Q16.16 grid resolution {tied_mass_epsilon}, \
+         so they round to the identical fixed-point value) but masses_tied did not flag them as \
+         tied -- the CMCA-117 root cause (an ungrounded 1e-9 threshold) has regressed",
+        (a - b).abs()
+    );
+
+    // A pair well outside grid resolution (10 ULPs apart) must NOT be flagged --
+    // otherwise the classifier would be too loose to ever apply the tight
+    // DIFFERENTIAL_TOLERANCE comparison to genuinely well-posed cases.
+    let c = 0.5;
+    let d = 0.5 + 10.0 * tied_mass_epsilon;
+    assert!(
+        !masses_tied(&[c, d]),
+        "masses {c} and {d} are 10 Q16.16 ULPs apart (not a rounding knife-edge) but \
+         masses_tied flagged them as tied -- the threshold is too loose"
+    );
+}
+
 proptest! {
     #![proptest_config(proptest::prelude::ProptestConfig::with_cases(std::env::var("PROPTEST_CASES").unwrap_or("1".into()).parse().unwrap()))]
     #[test]
@@ -491,29 +556,50 @@ proptest! {
             let spread = hi - lo;
             spread.is_finite().then_some(spread)
         };
-        // A sibling group whose *raw* masses are tied (within float noise of
-        // one another -- most commonly every mass in the group pinned to
-        // the CMCA-C clamp floor 0.0001 by an all-zero input field) is a
-        // second, distinct way to fall outside a well-posed comparison: the
-        // escort weights for a tied group are uniform (or exactly on a
-        // decision boundary such as the dwell-lock mode-switch gate at
-        // t=0), so which sibling "wins" an infinitesimally-close discrete
-        // decision is legitimately sensitive to the last bit of Q16.16
-        // rounding vs. f64 rounding -- not a precision defect, but not a
-        // spread-exceeds-16 case either. This crate's own
-        // `differential.proptest-regressions` recorded exactly this
-        // failure mode (all-zero `factors`/`bvals`/`conseqs`, spread == 0)
-        // before this change; measurement confirmed those inputs still
+        // A sibling group whose *raw* masses are tied (within the Q16.16
+        // grid's own resolution of one another -- most commonly every mass
+        // in the group pinned to the CMCA-C clamp floor 0.0001 by an
+        // all-zero input field) is a second, distinct way to fall outside a
+        // well-posed comparison: the escort weights for a tied group are
+        // uniform (or exactly on a decision boundary such as the
+        // dwell-lock mode-switch gate at t=0), so which sibling "wins" an
+        // infinitesimally-close discrete decision is legitimately sensitive
+        // to the last bit of Q16.16 rounding vs. f64 rounding -- not a
+        // precision defect, but not a spread-exceeds-16 case either. This
+        // crate's own `differential.proptest-regressions` recorded exactly
+        // this failure mode (all-zero `factors`/`bvals`/`conseqs`, spread ==
+        // 0) before this change; measurement confirmed those inputs still
         // disagree by O(0.5), well past any modest-headroom bound, so they
         // are excluded from the tight comparison the same way a
         // large-spread case is.
+        //
+        // CMCA-117: the threshold below used to be a flat `1e-9`,
+        // justified only as "float noise" with no tie to the fixed-point
+        // grid the rest of this classifier reasons about (compare
+        // `ESCORT_DYNAMIC_RANGE_LIMIT`'s own doc comment, which derives its
+        // bound from the same Q16.16 representable-region argument). Masses
+        // differing by e.g. `1e-6` -- 1000x `1e-9`, but 15x *finer* than the
+        // Q16.16 grid's `2^-16` (~1.5259e-5) resolution -- round to
+        // bit-identical `to_fixed()` outputs while `1e-9` left them
+        // classified as "not tied," so they got the tight
+        // `DIFFERENTIAL_TOLERANCE` check applied to a case that is, by the
+        // fixed-point representation's own arithmetic, on a rounding
+        // knife-edge. The threshold is now derived directly from that grid:
+        // one full Q16.16 ULP (`2^-Q16_16_FRACTIONAL_BITS`), the same unit
+        // `ESCORT_DYNAMIC_RANGE_LIMIT`'s doc comment uses for "more than
+        // 2^-16 below the maximum underflows" -- any pair of masses closer
+        // together than one ULP can legitimately round to the same (or an
+        // adjacent, tie-broken) fixed-point representation, which is
+        // exactly the condition this classifier exists to catch.
+        let tied_mass_epsilon =
+            2.0_f64.powi(-(bcinr_cmca::generated_profile::Q16_16_FRACTIONAL_BITS as i32));
         let masses_tied = |vals: &[f64]| -> bool {
             if vals.len() < 2 {
                 return false;
             }
             let hi = vals.iter().cloned().fold(f64::MIN, f64::max);
             let lo = vals.iter().cloned().fold(f64::MAX, f64::min);
-            (hi - lo).abs() <= 1e-9
+            (hi - lo).abs() <= tied_mass_epsilon
         };
         let mut case_max_spread = 0.0f64;
         let mut case_has_tied_group = false;
@@ -553,6 +639,43 @@ proptest! {
                 }
             }
         }
+        // CMCA-117: CMCA-107.md anticipated a possible third `inside_envelope`
+        // condition ("near a decision boundary") and named two independent
+        // candidate sources -- the MWU divergence-guard admission threshold
+        // (`kappa > epsilon_kappa` in `compute_kappa`/`allocate_in`) and the
+        // dwell-time mode-switch gate (`can_switch` in the same function) --
+        // that were never independently checked. Direct inspection of both
+        // paths rules one in and the other out:
+        //   - The dwell-time gate is NOT an independent divergence source.
+        //     `can_switch = t.wrapping_sub(last_switch_t) >= tau_d` is
+        //     computed identically, on identical `u32` inputs, in both the
+        //     fixed-point path (`allocator/mod.rs`'s `allocate_in`) and the
+        //     f64 oracle (`reference.rs:130`) -- there is no floating-point
+        //     or fixed-point rounding anywhere in that comparison for it to
+        //     disagree over. `switch_wanted = dom_mode != prev_mode` CAN
+        //     differ between paths, but only because `dom_mode` is derived
+        //     from `root_weights`, which have already diverged for some
+        //     other reason (kappa, below) -- the dwell gate amplifies an
+        //     existing divergence, it does not originate one.
+        //   - The kappa admission threshold IS a genuine, independent
+        //     source: `compute_kappa`'s fixed-point and f64 evaluations of
+        //     the same $\kappa_v$ formula can disagree by enough to flip
+        //     `kappa > epsilon_kappa` for inputs a hair apart, so one path
+        //     updates a node's MWU weights on a given call and the other
+        //     does not -- a discrete, unbounded-relative-to-input-magnitude
+        //     output difference (exactly CMCA-107's signature). This is
+        //     already the mechanism `DIFFERENTIAL_TOLERANCE`'s doc comment
+        //     names as the empirical driver of the measured bound, for both
+        //     the "inside" and "outside" spread/tied-mass buckets alike
+        //     (0.3309 vs. 0.3211 -- statistically indistinguishable).
+        // Because the kappa-boundary source doesn't correlate with the
+        // spread/tied-mass geometry this classifier already tests (it's a
+        // property of a *value* landing near a threshold, not of a sibling
+        // *set*'s shape), no third `inside_envelope` condition is added:
+        // there is nothing cheap to compute here that would usefully split
+        // "near a kappa boundary" from "not," and the existing
+        // `DIFFERENTIAL_TOLERANCE` bound already measures across (and
+        // therefore already covers) the kappa-driven population.
         let inside_envelope = case_max_spread
             <= bcinr_cmca::generated_profile::ESCORT_DYNAMIC_RANGE_LIMIT as f64
             && !case_has_tied_group;

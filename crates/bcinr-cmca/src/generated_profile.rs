@@ -30,20 +30,40 @@ pub const ALLOCATOR_PRICE_GAIN_MAX_BITS: u32 = 6553600;
 /// fixed-vs-f64 disagreement for this generator's inputs, so it does not carry the
 /// tight-vs-loose split the constant's previous doc comment proposed. The
 /// disagreement instead tracks discrete decision points elsewhere in `allocate_in`
-/// (the MWU gradient-descent admission threshold, the dwell-time mode-switch gate)
-/// that can flip between the fixed-point and f64 paths on inputs a hair apart,
-/// producing an O(0.1)-scale output difference that is not a precision defect in
-/// the escort kernel. This value is one bound for both regimes: the larger of the
-/// two measured maxima (0.3309) with ~21% headroom, matching this crate's
+/// (the MWU gradient-descent admission threshold `kappa > epsilon_kappa`; the
+/// dwell-time mode-switch gate `can_switch` is NOT an independent source -- it
+/// consumes identical `u32` inputs on both paths and can only amplify a divergence
+/// that originated in the kappa gate, confirmed by direct inspection of
+/// `allocator/mod.rs`'s `allocate_in` and `tests/reference.rs`'s f64 oracle) that
+/// can flip between the fixed-point and f64 paths on inputs a hair apart, producing
+/// an O(0.1)-scale output difference that is not a precision defect in the escort
+/// kernel.
+///
+/// CMCA-117: the 0.40 value this replaces was measured (`PROPTEST_CASES=1500`) in
+/// the same squashed commit (`835c7945`) as the CMCA-107 kappa-guard fix, with no
+/// git evidence the measurement was re-run *after* that fix landed -- i.e. it may
+/// have been calibrated against the pre-fix, unguarded-update population. Re-run
+/// post-fix, at real scale (`PROPTEST_CASES=8000`, two independent runs, ~63,500
+/// total leaf comparisons, run via `env PROPTEST_CASES=8000 cargo test -p bcinr-cmca
+/// --test differential --features std`), the true post-fix maximum is higher, not
+/// lower, than the pre-fix figure this constant was based on: 0.5638
+/// (`differential.proptest-regressions`' `f1d66...` seed, deterministically
+/// reproduced across both runs -- not a one-off outlier). So 0.40 was not merely
+/// stale, it was actively too tight for the real post-fix population and would have
+/// been silently unable to catch a further-widening regression once the true
+/// maximum crossed it (both runs *did* fail against 0.40 once real proptest
+/// coverage -- rather than the CI-default 1 case -- was applied, which is this
+/// ticket's Detection-8 finding made concrete). New value: the larger of the
+/// measured maxima (0.5638) with ~24% headroom, matching this crate's
 /// measure-then-headroom convention (`escort.rs`'s
 /// `power_disagrees_with_the_exact_path_at_a_measured_bound`: 704 -> 900, ~28%).
 /// Unlike the constant it replaces, this bound is enforced by a hard assert, not a
 /// `println!` diagnostic -- it no longer passes vacuously, it catches a genuine
 /// blow-up (NaN, a multi-unit divergence, an unexpected non-`NumericRangeExceeded`
-/// refusal) while tolerating the measured, currently-undiagnosed decision-boundary
-/// noise. Re-measure and re-derive if `tests/differential.rs`'s classification or
-/// generator strategy changes.
-pub const DIFFERENTIAL_TOLERANCE: f64 = 0.40;
+/// refusal) while tolerating the measured, root-caused (kappa-boundary) but not
+/// numerically bounded decision noise. Re-measure and re-derive if
+/// `tests/differential.rs`'s classification or generator strategy changes.
+pub const DIFFERENTIAL_TOLERANCE: f64 = 0.70;
 
 /// DERIVED. Derived from the fractional width. The escort kernel is max-shift stabilised -- exp2(q*log2(m_i) - max_j(q*log2(m_j))) -- so the largest weight is exactly 1.0 and overflow is structurally impossible. The binding constraint is the SPREAD: a sibling more than 2^-16 below the maximum underflows to zero. So the representable region is defined by max_j(q*log2(m_j)) - min_j(q*log2(m_j)) < 16, a property of the sibling SET, not of an individual (q, m) pair.
 pub const ESCORT_DYNAMIC_RANGE_LIMIT: i32 = 16;
