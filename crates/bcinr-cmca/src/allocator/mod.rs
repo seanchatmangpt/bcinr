@@ -389,6 +389,15 @@ pub enum StabilityRefusal {
     ExploreFloorOutsideEnvelope,
 }
 
+impl core::fmt::Display for StabilityRefusal {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Debug::fmt(self, f)
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for StabilityRefusal {}
+
 impl StabilityRefusal {
     /// Parses a raw `u32` value into a `StabilityRefusal` branchlessly.
     ///
@@ -2486,6 +2495,15 @@ pub enum LensSelectionRefusal {
     /// permits) -- the same witness [`check_hierarchy_acyclic`] checks.
     Cyclic,
 }
+
+impl core::fmt::Display for LensSelectionRefusal {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Debug::fmt(self, f)
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for LensSelectionRefusal {}
 
 /// Returns exactly one lens's allocation vector `pi_kq[measure][lens_idx]`,
 /// bypassing the LAMBDA-weighted blend across all `K x Q` measure/lens pairs

@@ -84,6 +84,15 @@ pub enum AllocationRefusal {
     Cyclic,
 }
 
+impl core::fmt::Display for AllocationRefusal {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Debug::fmt(self, f)
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for AllocationRefusal {}
+
 /// A sealed audit-trail receipt for one candidate's per-`(measure, lens)` allocation
 /// share. Opaque outside this module except through its accessors -- the only production
 /// constructor is [`seal_allocation_receipt`].

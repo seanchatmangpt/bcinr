@@ -57,6 +57,15 @@ pub enum CertificationRefusal {
     RoundIdentityMismatch,
 }
 
+impl core::fmt::Display for CertificationRefusal {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Debug::fmt(self, f)
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for CertificationRefusal {}
+
 /// Seals a certificate for a [`StabilityCandidate`], verifying:
 ///
 /// 1. the domination witness `G d <= (1 - delta) d` recomputed from the candidate's own `g`

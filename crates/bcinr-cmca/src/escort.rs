@@ -144,6 +144,15 @@ pub enum EscortRefusal {
     DegenerateNormalization,
 }
 
+impl core::fmt::Display for EscortRefusal {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Debug::fmt(self, f)
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for EscortRefusal {}
+
 /// `q`'s integer value, if `q` has no fractional part -- `None` for
 /// genuinely fractional `q`. Q16.16: the low 16 bits are the fractional
 /// part, so "no fractional part" is exactly "those bits are zero."
