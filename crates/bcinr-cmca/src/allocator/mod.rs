@@ -2404,12 +2404,44 @@ pub enum LensSelectionRefusal {
 /// kernel `allocate_in` already calls once per `(k, q_idx)` pair before
 /// discarding the individual results into the blend -- rather than
 /// reimplementing the escort math against [`crate::escort::escort_distribution`].
-/// That means a single-lens result returned here and the LAMBDA-blended
-/// `pi_combined` `allocate` returns can never silently drift apart: they
-/// are, by construction, the same underlying computation viewed two ways
-/// (`sum_{k,q} lambda[k][q] * allocate_single_lens(..., k, q, ...) ==`
-/// `allocate(...)`'s `pi_combined`, before `mu`/`costs`/`eta` pricing is
-/// applied on top).
+///
+/// # The blend identity -- and its precondition (CMCA-111)
+///
+/// `allocate_in` mutates its `weights: &mut` parameter in place: on a
+/// successful (non-refusing) call it overwrites `weights` with
+/// `local_weights`, the post-MWU-update state `compute_pi_kq_for_kq` was
+/// actually evaluated against to build `pi_combined` (see `allocate_in`'s
+/// weight-update block above and its final `weights[v][e] = select(...)`
+/// write-back). This function, by contrast, applies no MWU update of its
+/// own (see "What this deliberately omits" below) -- it evaluates
+/// `compute_pi_kq_for_kq` against exactly the `weights` slice the caller
+/// hands it, whatever state that happens to be in.
+///
+/// Consequently:
+///
+/// ```text
+/// sum_{k,q} lambda[k][q] * allocate_single_lens(..., k, q, parent, weights) ==
+///     pi_combined   (allocate(...)'s internal, pre-mu/costs/eta value)
+/// ```
+///
+/// holds **only** when `weights` is the *same array, read after* a
+/// successful `allocate`/`allocate_in` call made with matching
+/// `states`/`lenses`/`parent` -- i.e. the post-MWU-update snapshot that
+/// call left behind via its `&mut weights` write-back. It does **not**
+/// hold for an independently-held `weights` snapshot taken *before* such a
+/// call (e.g. the caller's original weights, or a cloned copy): whenever
+/// that call's payoffs are non-zero and its divergence guard admits an
+/// update (`kappa_v > epsilon_kappa`), `local_weights` diverges from the
+/// pre-call `weights`, and `pi_combined` was built from the former, not
+/// the latter. With all-zero payoffs the MWU multiplicative step is a
+/// no-op (`exp(beta*0) == 1`), so pre- and post-call weights coincide up
+/// to a scale-invariant renormalization -- which is why this identity can
+/// look unconditional under degenerate all-zero-payoff testing, and does
+/// not hold in general. See
+/// `tests/single_lens_allocation.rs`'s
+/// `blend_identity_requires_the_post_mwu_update_weights_snapshot` for a
+/// non-degenerate (non-zero, differentiated payoffs) demonstration of both
+/// the pre-call divergence and the post-call reconstruction.
 ///
 /// # What this deliberately omits
 ///

@@ -44,7 +44,7 @@ what `allocate_in` actually does to `weights` versus what
 
 ## Acceptance Criteria
 
-- [ ] Decide the correct fix: either (a) narrow the doc comment's claim to
+- [x] Decide the correct fix: either (a) narrow the doc comment's claim to
       state the precondition explicitly (identity holds only when `weights`
       passed to `allocate_single_lens` is the post-MWU-update snapshot from
       an `allocate`/`allocate_in` call with matching inputs — and even then,
@@ -52,15 +52,35 @@ what `allocate_in` actually does to `weights` versus what
       nothing currently helps them do), or (b) give `allocate_single_lens`
       (or a new variant) a way to apply the same MWU update logic so the
       identity can hold for real, non-degenerate calls.
-- [ ] Add a regression test with **non-zero, differentiated payoffs** (not
+      **Resolved as (a):** `allocate_in` already mutates its `weights: &mut`
+      parameter in place, on success, to hold exactly the post-MWU-update
+      `local_weights` state `compute_pi_kq_for_kq` was evaluated against —
+      so the caller does not need a new reconciliation mechanism, only the
+      doc comment naming the precondition it was silently missing (read
+      `weights` *after* a successful matching `allocate`/`allocate_in`
+      call, not before). Rewrote `allocate_single_lens`'s doc comment
+      (`crates/bcinr-cmca/src/allocator/mod.rs`) to state this precisely,
+      including why the all-zero-payoffs test could not have caught it.
+- [x] Add a regression test with **non-zero, differentiated payoffs** (not
       the degenerate all-zero case) that actually exercises weight
       divergence between the two paths, and assert the corrected
       documented behavior (either the narrowed claim holds, or the new
       reconciliation mechanism works).
-- [ ] Update the doc comment's "core architectural claim" language
+      Added `blend_identity_requires_the_post_mwu_update_weights_snapshot`
+      (`tests/single_lens_allocation.rs`), using a depth-2 tree (a flat or
+      single-level tree cannot trigger `compute_kappa`'s divergence signal
+      at all — see the test's `depth_two_tree_parent` doc comment) and
+      non-zero, per-slot-differentiated payoffs. It asserts both halves:
+      the pre-call `weights` snapshot genuinely diverges from `allocate`'s
+      `pi_combined`, and the post-call snapshot reconstructs it within the
+      same measured tolerance as the existing all-zero-payoffs test.
+- [x] Update the doc comment's "core architectural claim" language
       (referenced in `tests/single_lens_allocation.rs:141-143`) to match
       whatever is actually true after the fix — no unconditional identity
       claim should ship without a test that can falsify it.
+      Done as part of the doc comment rewrite above; the unconditional
+      identity claim now carries its precondition and points at the new
+      regression test.
 
 ## Files likely touched
 
