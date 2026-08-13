@@ -43,19 +43,36 @@ either test in the file.
 
 ## Acceptance Criteria
 
-- [ ] Add a second phase to (or a new test alongside)
+- [x] Add a second phase to (or a new test alongside)
       `dwell_time_lock_holds_switch_until_tau_d_then_switches` that, after
       the first switch fires at `t=tau_d`, continues driving `t` with a
       payoff bias favoring a switch back, and asserts the second switch is
       likewise held until a full `tau_d` has elapsed from the *new*
       `last_switch_t` — proving the repeated-switching property the spec
-      actually states, not just a single instance.
-- [ ] Either extend the test tree to a three-level shape where node 1 also
+      actually states, not just a single instance. Done: extended the
+      existing test in place (`tests/dwell_time_hysteresis.rs`) with a
+      second phase that re-biases `payoffs[0][0]` after the first switch
+      lands at `t=tau_d`, drives `t` through `last_switch_t + tau_d`,
+      asserts the mode stays at 1 / `last_switch_t` stays at `tau_d` for
+      every round before the deadline, and asserts the second switch back
+      to mode 0 lands exactly at `t = last_switch_t + tau_d` with
+      `last_switch_t` updated to that new epoch.
+- [x] Either extend the test tree to a three-level shape where node 1 also
       has genuinely nonzero kappa (so its own weight update path gets
       exercised), or correct the doc comment to state precisely what's
       resolved (root-level kappa=0) versus what residual degeneracy remains
       (node 1) — don't leave the "resolves the issue" framing as broader
-      than what's true.
+      than what's true. Done: took the doc-comment-correction option (not
+      the tree-extension option — descoped, see below). The doc comment
+      now states the kappa=0 fix applies only at the root (the node the
+      assertions exercise) and explicitly names node 1's residual kappa=0
+      degeneracy as out of scope for this test.
+
+**Descoped:** the tree-extension alternative (three-level shape giving
+node 1 genuinely nonzero kappa) was not implemented — the doc-comment-only
+fix was accepted as satisfying the acceptance criterion's "either/or", per
+CMCA-121's own phrasing. Exercising node 1's MWU weight-update path remains
+open if a future ticket wants coverage of that codepath specifically.
 
 ## Files likely touched
 

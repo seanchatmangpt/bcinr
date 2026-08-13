@@ -54,14 +54,29 @@ fn get_proof() -> Option<AdaptiveUpdate<CertifiedLearning>> {
 /// makes `s_leaf(c) == s_meas(c)` for every child -- the guard would never
 /// admit a weight update no matter how skewed the payoffs are. With node 1
 /// internal, node 0's `subtree_leaves` (`{2, 3, 4, 5, 6, 7}`) differs from
-/// its direct children's own masses (`{1, 2}`), so kappa at the root is
-/// genuinely nonzero for this crate's real `OBJECT_REGISTRY` masses.
+/// its direct children's own masses (`{1, 2}`), so kappa at the *root* is
+/// genuinely nonzero for this crate's real `OBJECT_REGISTRY` masses. This
+/// resolves CMCA-107's kappa=0 degeneracy only at the root -- the node the
+/// assertions below actually exercise. It does **not** resolve the same
+/// degeneracy at node 1: node 1's own direct children (`{3, 4, 5, 6, 7}`)
+/// are all leaves, so `is_subtree_leaf[c] == {c}` for each and
+/// `kappa(1)` is identically zero for the whole run (CMCA-121), meaning
+/// node 1's own MWU weight update is dead code in this test. That residual
+/// degeneracy is out of scope here; this test only claims the root-level
+/// fix.
+///
 /// `payoffs[0][1]` (the "descend" slot of lens 0) is biased heavily
 /// relative to every other root slot, so after the first *admitted* update
 /// the dominant mode at the root wants to flip from 0 to 1 -- and the test
 /// watches the dwell-time lock hold that flip back until `tau_d` rounds
 /// have elapsed since the last switch, then take effect exactly on
-/// schedule.
+/// schedule. CMCA-121: the spec property this proves
+/// (`N_switch(0,T) <= N0 + T/tau_D`, `stability_proof_draft.md:101-106`,
+/// `ORIGINAL_REQUEST.md:1355`) is stated over a *sequence* of switches, so
+/// after the first switch lands the test re-arms with a payoff bias
+/// favoring a switch back to mode 0 and drives a second phase, proving the
+/// dwell-time lock is re-applied (measured from the *new* `last_switch_t`,
+/// not the original one) rather than only checked once.
 #[test]
 fn dwell_time_lock_holds_switch_until_tau_d_then_switches() {
     let tau_d = MODE_DWELL_ROUNDS_MIN; // 461 in the current profile
@@ -144,6 +159,76 @@ fn dwell_time_lock_holds_switch_until_tau_d_then_switches() {
     assert_eq!(
         last_switch_t, tau_d,
         "last_switch_t should record the epoch of the real switch"
+    );
+
+    // CMCA-121 phase 2: prove the dwell-time lock re-arms for a *second*
+    // switch, measured from the new `last_switch_t` (= tau_d), not the
+    // original one. A stale-baseline bug (e.g. `can_switch` computed
+    // against the t=0 epoch instead of the real last_switch_t) would only
+    // manifest here, not in phase 1. Re-bias payoffs to favor switching
+    // back to mode 0 (root slot 0 -- lens 0's "flat" slot in the (0, 1)
+    // pair): zero out the mode-1 bias and heavily weight slot 0 instead.
+    payoffs[0][1] = NonNegativeFixed::ZERO;
+    payoffs[0][0] = NonNegativeFixed::from_num(50);
+
+    let second_switch_deadline = last_switch_t + tau_d;
+    let mut switched_back_at = None;
+
+    for t in (tau_d + 1)..=second_switch_deadline {
+        let result = allocate(
+            &OBJECT_REGISTRY,
+            &LENS_REGISTRY,
+            &LAMBDA,
+            ETA,
+            &parent,
+            &mut weights,
+            &payoffs,
+            zeta,
+            NonNegativeFixed::ZERO,
+            &mu,
+            &costs,
+            t,
+            &mut last_switch_t,
+            &mut prev_mode,
+            tau_d,
+            CERTIFICATE_DIGEST,
+            proof.as_ref(),
+        )
+        .unwrap_or_else(|e| panic!("allocate refused at t={t}: {e:?}"));
+        let _ = result;
+
+        if prev_mode != 1 && switched_back_at.is_none() {
+            switched_back_at = Some(t);
+        }
+
+        if switched_back_at.is_none() {
+            // Hysteresis holds again: dwell time has not elapsed since the
+            // *second* switch epoch (last_switch_t=tau_d), so the mode must
+            // stay at 1 no matter how skewed the root weights already are
+            // toward slot 0.
+            assert_eq!(
+                prev_mode, 1,
+                "mode switched back at t={t}, before a full tau_d={tau_d} rounds since the new last_switch_t={tau_d} elapsed"
+            );
+            assert_eq!(
+                last_switch_t, tau_d,
+                "last_switch_t moved at t={t} without a real second switch"
+            );
+        }
+    }
+
+    assert_eq!(
+        switched_back_at,
+        Some(second_switch_deadline),
+        "expected the re-armed dwell-locked switch back to mode 0 to land exactly at t={second_switch_deadline} (= last_switch_t + tau_d), got {switched_back_at:?}"
+    );
+    assert_eq!(
+        prev_mode, 0,
+        "dominant mode should have switched back to slot 0 on the second transition"
+    );
+    assert_eq!(
+        last_switch_t, second_switch_deadline,
+        "last_switch_t should record the epoch of the second real switch, not the first"
     );
 }
 
