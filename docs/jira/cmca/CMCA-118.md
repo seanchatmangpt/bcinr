@@ -54,18 +54,35 @@ Found by adversarial review of the CMCA-105 generator fixes.
 
 ## Acceptance Criteria
 
-- [ ] Fix `parse_ttl`'s comment-stripping to be literal-aware (don't strip
+- [x] Fix `parse_ttl`'s comment-stripping to be literal-aware (don't strip
       `#` occurring inside a quoted string) — a minimal fix likely just needs
       to track whether the scan position is inside an open `"..."` before
-      treating `#` as a comment start.
-- [ ] Add a regression test (a `pytest` file, or a small Rust test invoking
+      treating `#` as a comment start. Done via a new `strip_ttl_comment`
+      helper that scans each line, tracks `in_string` across `"` boundaries
+      (honoring `\"` escapes), and only treats `#` as a comment start when
+      not inside a literal.
+- [x] Add a regression test (a `pytest` file, or a small Rust test invoking
       the generator as a subprocess) covering: a literal containing `#`, and
       at least the other "Unsupported Turtle construct" rejections already
       in the function, to lock in current correct behavior going forward.
+      Done: `crates/bcinr-cmca/tests/generator_ttl_comment_stripping.rs`
+      (Rust test shelling out to `generator.py` as a subprocess, matching
+      this crate's existing test convention since no Python test files or
+      pytest config exist). Covers: `#` inside a literal surviving intact,
+      a genuine trailing/whole-line comment still being stripped, the
+      multiline-literal and language-tag rejections still firing, and both
+      real `ontology/*.ttl` files still generating successfully. Manually
+      verified (outside the automated suite) that generated output for both
+      real ontology files is byte-identical before/after the fix except for
+      the expected `GENERATOR_SOURCE_DIGEST` line (which hashes
+      `generator.py` itself, and legitimately changes since the file
+      changed) — confirming no regression, since neither file currently
+      contains `#` inside a literal.
 - [ ] Given this is the sole parser for this crate's production numeric
       constants, consider whether `generator.py` deserves broader test
       coverage as its own follow-up (this ticket's minimum bar is the `#`
-      bug + a regression test for it, not a full test suite).
+      bug + a regression test for it, not a full test suite). Left
+      unchecked/out of scope for this ticket, as the AC text itself allows.
 
 ## Files likely touched
 
