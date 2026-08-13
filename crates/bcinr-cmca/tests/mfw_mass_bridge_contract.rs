@@ -35,7 +35,7 @@ fn q16_16_to_u8_mass(bits: u32) -> u8 {
 fn allocator_output_is_an_eight_lane_q16_16_mass_vector() {
     let parent = [-1; N];
     let mut weights = [[NonNegativeFixed::ONE; 2 * Q]; N];
-    let mut payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
+    let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
     let mu = [NonNegativeFixed::ZERO; N];
     let costs = [NonNegativeFixed::ZERO; N];
     let mut last_switch_t = 0;
@@ -48,7 +48,7 @@ fn allocator_output_is_an_eight_lane_q16_16_mass_vector() {
         ETA,
         &parent,
         &mut weights,
-        &mut payoffs,
+        &payoffs,
         NonNegativeFixed::ZERO,
         NonNegativeFixed::ZERO,
         &mu,
