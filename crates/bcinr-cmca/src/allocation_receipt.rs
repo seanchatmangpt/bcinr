@@ -11,7 +11,11 @@
 //!   candidate's per-`(measure, lens)` share -- the candidate's index, which measure and
 //!   lens produced the share, the lens's own `q` value, and a digest of the semantic
 //!   states / parent forest / MWU weights that fed the computation.
-//! - [`AllocationRefusal`] is a typed refusal enum, one variant per check.
+//! - [`AllocationRefusal`] is a typed refusal enum, one variant per check, including
+//!   [`AllocationRefusal::Cyclic`] for a cyclic `parent` (checked via
+//!   `check_hierarchy_acyclic`, mirroring `allocate_single_lens`'s
+//!   `LensSelectionRefusal::Cyclic`) -- sealing or verifying over a cyclic `parent` refuses
+//!   rather than silently recomputing over `ancestor_doubling_table`'s garbage topology.
 //! - [`verify_allocation_receipt`] independently RECOMPUTES the share from the bindings
 //!   plus the caller-supplied actual inputs -- by calling the crate's own topology
 //!   (`ancestor_doubling_table`) and per-lens kernel (`compute_pi_kq_for_kq`), the exact
@@ -25,13 +29,23 @@
 //! [`seal_allocation_receipt`] alongside (or any time after) a normal `allocate` call,
 //! using the exact `states`/`parent`/`weights` that call was given (for `weights`, the
 //! array as it stood *after* the call returned -- `allocate_in` computes each candidate's
-//! share from the post-MWU-update weights, not the pre-call ones). Anyone later holding
-//! just the receipt and the recorded inputs can call [`verify_allocation_receipt`] to
-//! confirm the share without needing the sealer's trust.
+//! share from the post-MWU-update weights, not the pre-call ones; this module cannot detect
+//! a caller passing the wrong snapshot, so that ordering remains a caller-discipline
+//! requirement, not a checked one). Anyone later holding just the receipt and the recorded
+//! inputs can call [`verify_allocation_receipt`] to independently recompute and cross-check
+//! the share against those inputs -- **not** a cryptographic tamper-evidence guarantee: the
+//! binding digest (`mix64`, below) is a 64-bit non-cryptographic splitmix64-style finalizer,
+//! the same kind of internal audit-trail checksum `certification::seal_certificate` uses,
+//! not a collision-resistant hash like `bcinr-powl`'s BLAKE3-backed `OcelCausalReceipt`. It
+//! is adequate to catch accidental/incidental input drift and to structure an audit trail,
+//! but a party who can freely choose both a receipt and its claimed inputs could construct a
+//! digest collision; treat this module as an audit aid, not a security boundary.
 
 #![allow(clippy::needless_range_loop)] // mirrors allocate_in's own index-parallel arrays
 
-use crate::allocator::{ancestor_doubling_table, clip, compute_pi_kq_for_kq};
+use crate::allocator::{
+    ancestor_doubling_table, check_hierarchy_acyclic, clip, compute_pi_kq_for_kq,
+};
 use crate::fixed::{NonNegativeFixed, SignedFixed};
 use crate::generated::consequence_mass::case_studies::{
     LensSpec, PackedSemanticState, FACTOR_ACCESS_FREQUENCY, FACTOR_BUSINESS_VALUE,
@@ -63,6 +77,11 @@ pub enum AllocationRefusal {
     LensQMismatch,
     InputsDigestMismatch,
     ShareMismatch,
+    /// `parent` describes a cyclic forest (per `check_hierarchy_acyclic`), the same
+    /// witness `allocate_single_lens` refuses on -- mirrors `LensSelectionRefusal::Cyclic`
+    /// (`allocator/mod.rs`). Sealing or verifying over a cyclic `parent` is refused rather
+    /// than silently computing a share from `ancestor_doubling_table`'s garbage topology.
+    Cyclic,
 }
 
 /// A sealed audit-trail receipt for one candidate's per-`(measure, lens)` allocation
@@ -105,6 +124,11 @@ fn mix64(a: u64, b: u64) -> u64 {
 
 /// Digests the three input clusters that determine every candidate's share:
 /// the semantic states, the parent forest, and the (post-update) MWU weights.
+///
+/// This is a 64-bit non-cryptographic checksum (`mix64` chaining, splitmix64-style), not a
+/// cryptographic hash -- it is sized and intended as an internal audit-trail integrity check
+/// (catching accidental input drift between seal and verify), not as a collision-resistant
+/// commitment a distrusting third party could rely on against a deliberate forger.
 fn inputs_digest(
     states: &[PackedSemanticState; N],
     parent: &[i32; N],
@@ -258,6 +282,9 @@ pub fn seal_allocation_receipt(
     if lens_index >= Q {
         return Err(AllocationRefusal::LensIndexOutOfRange);
     }
+    if check_hierarchy_acyclic(parent).is_err() {
+        return Err(AllocationRefusal::Cyclic);
+    }
 
     let share = recompute_share(
         candidate_id,
@@ -312,6 +339,9 @@ pub fn verify_allocation_receipt(
 
     if lenses[b.lens_index].q.val != b.lens_q {
         return Err(AllocationRefusal::LensQMismatch);
+    }
+    if check_hierarchy_acyclic(parent).is_err() {
+        return Err(AllocationRefusal::Cyclic);
     }
 
     if inputs_digest(states, parent, weights) != b.inputs_digest {
@@ -512,6 +542,79 @@ mod tests {
         assert_eq!(
             verify_allocation_receipt(&receipt, &states, &parent, &weights, &lenses, m_min, m_max),
             Err(AllocationRefusal::LensQMismatch)
+        );
+    }
+
+    #[test]
+    fn seal_refuses_cyclic_parent() {
+        let states = OBJECT_REGISTRY;
+        let weights = fresh_weights();
+        let lenses = LENS_REGISTRY;
+        let m_min = NonNegativeFixed::from_bits(ALLOCATOR_MASS_MIN_BITS);
+        let m_max = NonNegativeFixed::from_bits(ALLOCATOR_MASS_MAX_BITS);
+
+        // Two-node cycle: 0 -> 1 -> 0, no root. `ancestor_doubling_table` doesn't
+        // panic/hang on this (bounded 8-round doubling) -- it silently produces garbage
+        // topology, which sealing must refuse to build a receipt over.
+        let mut parent = star_parent();
+        parent[0] = 1;
+        parent[1] = 0;
+
+        assert_eq!(
+            seal_allocation_receipt(
+                3,
+                MEASURE_CACHE,
+                1,
+                &states,
+                &parent,
+                &weights,
+                &lenses,
+                m_min,
+                m_max,
+            ),
+            Err(AllocationRefusal::Cyclic)
+        );
+    }
+
+    #[test]
+    fn verify_refuses_cyclic_parent() {
+        let states = OBJECT_REGISTRY;
+        let parent = star_parent();
+        let weights = fresh_weights();
+        let lenses = LENS_REGISTRY;
+        let m_min = NonNegativeFixed::from_bits(ALLOCATOR_MASS_MIN_BITS);
+        let m_max = NonNegativeFixed::from_bits(ALLOCATOR_MASS_MAX_BITS);
+
+        let receipt = seal_allocation_receipt(
+            3,
+            MEASURE_CACHE,
+            1,
+            &states,
+            &parent,
+            &weights,
+            &lenses,
+            m_min,
+            m_max,
+        )
+        .expect("bounds are in range, acyclic parent");
+
+        // A verifier presented with a cyclic `parent` for the actual inputs must refuse,
+        // not recompute a "verifying" share over garbage topology.
+        let mut cyclic_parent = parent;
+        cyclic_parent[0] = 1;
+        cyclic_parent[1] = 0;
+
+        assert_eq!(
+            verify_allocation_receipt(
+                &receipt,
+                &states,
+                &cyclic_parent,
+                &weights,
+                &lenses,
+                m_min,
+                m_max
+            ),
+            Err(AllocationRefusal::Cyclic)
         );
     }
 

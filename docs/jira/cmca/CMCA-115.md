@@ -61,27 +61,43 @@ session.
 
 ## Acceptance Criteria
 
-- [ ] Add a cyclic-`parent` check to `seal_allocation_receipt` (and/or
+- [x] Add a cyclic-`parent` check to `seal_allocation_receipt` (and/or
       `verify_allocation_receipt`), refusing with a new
       `AllocationRefusal::Cyclic` variant (mirroring
       `LensSelectionRefusal::Cyclic` from `allocate_single_lens`) rather than
-      silently computing over garbage topology.
-- [ ] Add a regression test: a cyclic `parent` must refuse at seal time, not
-      produce a "verifying" receipt.
-- [ ] Decide whether `mix64` is acceptable for this module's actual use case
+      silently computing over garbage topology. Done in both functions, calling
+      `allocator::check_hierarchy_acyclic` before any topology recomputation.
+- [x] Add a regression test: a cyclic `parent` must refuse at seal time, not
+      produce a "verifying" receipt. Added
+      `allocation_receipt::tests::seal_refuses_cyclic_parent` and
+      `::verify_refuses_cyclic_parent` (two-node cycle `0 -> 1 -> 0`).
+- [x] Decide whether `mix64` is acceptable for this module's actual use case
       (an internal audit trail, not a security boundary) or whether it
       should be upgraded to BLAKE3 (matching `bcinr-powl`'s pattern, which
       this crate could plausibly depend on or vendor a subset of). Either
       way, correct the module's doc-comment language to match the real
       guarantee — "tamper-evident" and "without needing the sealer's trust"
       should not ship unqualified if the mechanism is a 64-bit non-cryptographic
-      checksum.
+      checksum. Decision: kept `mix64` (no BLAKE3 upgrade) — consistent with
+      `certification::seal_certificate`'s existing use of the same finalizer.
+      The module and `inputs_digest` doc comments now describe it explicitly
+      as a 64-bit non-cryptographic audit-trail checksum adequate for
+      catching accidental input drift, not a tamper-evidence/collision-
+      resistance guarantee, with the BLAKE3 (`bcinr-powl`) contrast named for
+      anyone who later wants a stronger commitment.
 - [ ] Consider adding a lightweight timing/provenance field (e.g. binding the
       receipt to the specific `allocate`/`allocate_in` call's `t`/`digest`
       parameters, if available) to at least narrow the unenforced-timing gap,
       or explicitly document it as a permanent, accepted caller-discipline
-      requirement if no cheap fix exists.
-- [ ] `cargo test -p bcinr-cmca --features std` full suite green.
+      requirement if no cheap fix exists. Left unchecked / out of scope for
+      this fix: `allocate_in` does not thread a `t`/monotonic-call digest
+      through to its per-`(measure,lens)` share computation, so there is no
+      existing value to bind a receipt to without changing `allocate`/
+      `allocate_in` itself — which the module's own header explicitly commits
+      to not doing. The module doc now states the pre/post-call `weights`
+      ordering explicitly as a documented, unenforced caller-discipline
+      requirement rather than leaving it implicit.
+- [x] `cargo test -p bcinr-cmca --features std` full suite green.
 
 ## Files likely touched
 
