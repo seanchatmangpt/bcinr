@@ -45,7 +45,16 @@ jobs:
       - name: CMCA calibration
         run: cargo test -p bcinr-cmca --test calibration
       - name: CMCA differential
+        # CMCA-117: PROPTEST_CASES defaults to 1 (see differential.rs's
+        # `with_cases` config), which is not the ~1500-6800 comparisons the
+        # crate's own DIFFERENTIAL_TOLERANCE measurement was based on -- no
+        # workflow overrode it, so CI's real per-run coverage of this suite
+        # was 1 fresh case plus the pinned regression seeds. 4096 gives real
+        # per-run coverage without materially slowing pr-fast (measured
+        # locally: comfortably within the existing job's runtime budget).
         run: cargo test -p bcinr-cmca --test differential
+        env:
+          PROPTEST_CASES: "4096"
       - name: CMCA hostile-mutant baseline
         run: cargo test -p bcinr-cmca --test hostile_mutants
       - name: CMCA compile-fail contracts

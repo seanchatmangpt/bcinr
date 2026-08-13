@@ -27,6 +27,48 @@
 //! * [`allocator`]: Linear bounds-checked and panic-free bump allocators.
 //! * [`observatory`]: The evaluation engine that computes calibration safety flags based on mathematical thresholds.
 //!
+//! ## `allocator::allocate` is fixed to this crate's own `N=8`/`K=4`/`Q=4` shape (CMCA-108)
+//!
+//! [`allocator::allocate`] and [`allocator::allocate_single_lens`] -- this crate's
+//! certified, branchless, allocation-free allocation path -- are compiled
+//! against this crate's own object/measure/lens counts (`N = 8`, `K = 4`,
+//! `Q = 4`, from `generated::consequence_mass::case_studies`), **not**
+//! generic over caller-chosen sizes. A caller can supply different factor
+//! *values* but not a different *shape* without this crate being
+//! regenerated against a different `ontology/*.ttl`. See
+//! [`allocator::allocate`]'s doc comment for why (the branchless kernel
+//! beneath it unrolls against the literal constants 8/4/4) and for
+//! [`cascade::consequence_mass`], the escape hatch for arbitrary tree
+//! shapes.
+//!
+//! ## Which entry point do I want? (CMCA-119)
+//!
+//! Five overlapping ways to get an allocation share out of this crate --
+//! this section is a navigation aid, not a restatement of each one's own
+//! doc comment (follow the links below for the real detail):
+//!
+//! * [`allocator::allocate`] -- **start here** for the common case: one
+//!   LAMBDA-weighted allocation vector across the whole `N`/`K`/`Q` object
+//!   registry, evaluated against `FeasibleRegion::CURRENT`. See
+//!   `examples/basic_allocation.rs` for a full runnable walkthrough.
+//! * [`allocator::allocate_in`] -- the same computation as `allocate`, but
+//!   over a caller-chosen [`allocator::FeasibleRegion`] instead of always
+//!   `CURRENT`; use this when evaluating a hypothetical/candidate region
+//!   rather than the live one.
+//! * [`allocator::allocate_single_lens`] -- returns exactly one lens's
+//!   allocation vector for one measure, bypassing the LAMBDA blend across
+//!   all `K x Q` pairs; use this to inspect "what would lens `q` alone
+//!   say" instead of the combined answer.
+//! * [`cascade::consequence_mass`] (requires `alloc`) -- the escape hatch
+//!   for tree shapes other than this crate's fixed `N = 8`/`K = 4`/`Q = 4`;
+//!   use this when the object/measure/lens counts aren't the ones this
+//!   crate was regenerated against.
+//! * [`escort::escort_distribution`] (requires `alloc`) -- the
+//!   fractional-exponent escort distribution `L_q(i) = p_i^q / SUM_j p_j^q`
+//!   built directly on [`allocator::power`]; use this when you need an
+//!   escort weighting over an arbitrary mass vector, independent of the
+//!   object-registry allocation machinery above.
+//!
 //! ## Example Usage
 //!
 //! ```rust

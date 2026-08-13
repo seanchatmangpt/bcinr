@@ -57,6 +57,15 @@ pub enum CertificationRefusal {
     RoundIdentityMismatch,
 }
 
+impl core::fmt::Display for CertificationRefusal {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Debug::fmt(self, f)
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for CertificationRefusal {}
+
 /// Seals a certificate for a [`StabilityCandidate`], verifying:
 ///
 /// 1. the domination witness `G d <= (1 - delta) d` recomputed from the candidate's own `g`
@@ -67,6 +76,7 @@ pub enum CertificationRefusal {
 /// does this function call `CertificateReceipt::admit_certificate`, the crate's existing
 /// sealed constructor (owned by `allocator.rs`; this module does not construct
 /// `CertificateReceipt` any other way).
+#[allow(deprecated)] // sole legitimate internal caller of the CMCA-114 authority-chain constructor, after full verification above
 pub fn seal_certificate(
     candidate: StabilityCandidate,
     actual: CertificateBindings,

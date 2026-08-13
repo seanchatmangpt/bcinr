@@ -62,29 +62,71 @@ Found by adversarial review of the CMCA-104 differential-tolerance fix.
 
 ## Acceptance Criteria
 
-- [ ] Re-derive `masses_tied`'s threshold from the Q16.16 grid resolution
+- [x] Re-derive `masses_tied`'s threshold from the Q16.16 grid resolution
       (or the same `2^-16`-scale reasoning `ESCORT_DYNAMIC_RANGE_LIMIT`
-      already uses), not an arbitrary `1e-9`.
-- [ ] Re-run the ~6800-comparison measurement (or equivalent) with
+      already uses), not an arbitrary `1e-9`. Done: threshold is now
+      `2^-Q16_16_FRACTIONAL_BITS` (one Q16.16 ULP), computed from the
+      already-public `Q16_16_FRACTIONAL_BITS` constant instead of a bare
+      literal. Regression test added
+      (`cmca_117_masses_tied_threshold_is_derived_from_the_q16_16_grid_not_an_arbitrary_epsilon`)
+      that fails if the threshold drifts from the grid or stops flagging
+      the ticket's own `1e-6`-apart example as tied.
+- [x] Re-run the ~6800-comparison measurement (or equivalent) with
       `PROPTEST_CASES` set high enough for real coverage, AFTER the CMCA-107
       fix, and re-derive `DIFFERENTIAL_TOLERANCE` from that fresh
       measurement — tighten it if the post-fix population's real maximum
-      disagreement is now much smaller than 0.33.
-- [ ] Investigate CMCA-107.md's two named-but-unchecked candidate boundary
+      disagreement is now much smaller than 0.33. Done, but the opposite of
+      the hypothesized direction: re-measured post-fix at real scale
+      (`PROPTEST_CASES=8000`, two independent runs, ~63,500 leaf
+      comparisons), the true post-fix maximum is 0.5638, *higher* than the
+      old 0.40 bound — both runs actually failed against 0.40 once real
+      coverage was applied (this ticket's Detection-8 finding, reproduced
+      live). `DIFFERENTIAL_TOLERANCE` raised to 0.70 (~24% headroom over the
+      measured max, matching this crate's own headroom convention); the
+      worst-case input is now a persisted seed in
+      `differential.proptest-regressions` so it re-runs on every future CI
+      invocation.
+- [x] Investigate CMCA-107.md's two named-but-unchecked candidate boundary
       sources (MWU gradient-descent admission threshold, dwell-time
       mode-switch gate) — rule them in or out as additional discrete-boundary
       divergence sources, and add a third `inside_envelope` condition if
-      warranted.
-- [ ] Set `PROPTEST_CASES` for the `differential` test in CI to a real,
+      warranted. Done: the kappa admission threshold (`kappa >
+      epsilon_kappa`) is confirmed IN as a genuine, independent
+      fixed-vs-f64 divergence source (already the mechanism
+      `DIFFERENTIAL_TOLERANCE`'s own rationale names). The dwell-time gate
+      is confirmed OUT by direct code inspection: `can_switch` is computed
+      identically, on identical `u32` inputs, in both `allocate_in` and the
+      f64 oracle (`reference.rs:130`), so it cannot itself disagree between
+      paths — it only amplifies a divergence that originated in kappa. No
+      third `inside_envelope` condition was added: the kappa-boundary
+      source doesn't correlate with the spread/tied-mass sibling-set
+      geometry the existing two conditions test, and is already covered by
+      the re-derived `DIFFERENTIAL_TOLERANCE` bound above. Findings recorded
+      in `tests/differential.rs`'s comment ahead of the `inside_envelope`
+      computation.
+- [x] Set `PROPTEST_CASES` for the `differential` test in CI to a real,
       meaningful value (matching this repo's own `PROPTEST_CASES=4096`
       precedent used elsewhere), so the tolerance this ticket derives is
       actually re-validated by every CI run, not just measured once
-      manually.
-- [ ] Correct the `differential.proptest-regressions` comment's "defect
+      manually. Done: `.github/workflows/ci.yml`'s "CMCA differential" step
+      now sets `PROPTEST_CASES=4096` (confirmed locally: ~14s, well within
+      the job's budget, and passes against the re-derived tolerance). Note:
+      grepping the current repo found no other workflow actually setting
+      `PROPTEST_CASES=4096` today (the "precedent" this criterion cited may
+      itself be stale/removed) — 4096 was chosen on its own merits as real
+      coverage at acceptable CI cost, not because a live precedent was
+      found.
+- [x] Correct the `differential.proptest-regressions` comment's "defect
       class... pinned" framing to be precise about what's actually verified
       (one reconstructed structural analog, not the original unrecoverable
       seed) — or strengthen the regression coverage until the stronger claim
-      is true.
+      is true. Reviewed: the current header comment already states this
+      precisely ("The original proptest-shrunk seed was never reproducible
+      ... instead of pinning an unrecoverable seed, the defect class is
+      pinned as a deterministic regression test"), so no further correction
+      was needed here. A new seed (re-deriving `DIFFERENTIAL_TOLERANCE`,
+      above) was appended to the same file by this ticket's own
+      measurement run.
 
 ## Files likely touched
 

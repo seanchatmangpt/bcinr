@@ -36,15 +36,25 @@ selection chain in `crates/bcinr-cmca/src/allocator/mod.rs` (search for
 
 ## Acceptance Criteria
 
-- [ ] Give `eta_err` its own dedicated `StabilityRefusal` variant (or at
+- [x] Give `eta_err` its own dedicated `StabilityRefusal` variant (or at
       minimum its own priority-chain branch reporting something other than
       `LearningRateOutsideEnvelope`), and add a dedicated branch for
       `price_err` instead of relying on the fallback.
-- [ ] Add a regression test: construct a case where both `eta_err` and
+      Done: added `StabilityRefusal::ExploreFloorOutsideEnvelope` and gave
+      both `price_err` and `eta_err` their own `err_val` priority-chain
+      branches (`price_err` checked ahead of `eta_err`, so a co-occurring
+      pricing fault reports as `PriceGainUnsafe`).
+- [x] Add a regression test: construct a case where both `eta_err` and
       `price_err` are true simultaneously, and assert the returned
       `StabilityRefusal` correctly identifies (or at minimum doesn't
       misidentify) the actual problem.
-- [ ] Resolve the `clip()`-on-`mu_actual` dead-code implication: either
+      Done: `eta_err_and_price_err_co_occurring_reports_price_gain_unsafe_not_learning_rate`
+      and `eta_err_alone_reports_its_own_dedicated_reason` in
+      `tests/hostile_mutants.rs`; updated the pre-existing
+      `allocate_in_refuses_eta_above_one_without_proof` in
+      `tests/runtime_semantic_classification.rs`, which asserted the old,
+      wrong `LearningRateOutsideEnvelope` reason.
+- [x] Resolve the `clip()`-on-`mu_actual` dead-code implication: either
       remove the now-redundant `clip()` call (the admission gate already
       enforces the invariant it existed to protect) or replace it with a
       `debug_assert!` making the defense-in-depth explicit, and separately
@@ -52,6 +62,13 @@ selection chain in `crates/bcinr-cmca/src/allocator/mod.rs` (search for
       now-broken coverage (a `#[cfg(test)]`-only or unit-level hook that can
       still observe `clip()`'s behavior directly, bypassing the admission
       gate) rather than leaving it as an unresolved comment.
+      Done: kept `clip()` as an explicit, documented defense-in-depth call
+      (comment explains it is unreachable-as-non-identity on any `Ok` path
+      post-CMCA-103) and added a `#[cfg(test)] mod clip_tests` in
+      `src/allocator/mod.rs` giving `clip()` real, direct unit coverage of
+      its clamp semantics, independent of the admission gate. Updated
+      `kill_mutant_5_consequence_truncation`'s comment to point at this new
+      coverage instead of leaving the gap as an open, unresolved note.
 
 ## Files likely touched
 

@@ -99,6 +99,7 @@ const FLAGS: [ObservatoryFlag; 8] = [
     ObservatoryFlag::RecertificationCandidate,
 ];
 
+#[allow(deprecated)]
 use crate::allocator::CertificateReceipt;
 
 /// Wraps a raw observatory flag code into a `Result` type branchlessly.
@@ -110,6 +111,7 @@ use crate::allocator::CertificateReceipt;
 ///
 /// Under the hood, this function maps the integer code into the static flag mapping
 /// array and uses a branchless array index selection based on the equality to `5`.
+#[allow(deprecated)] // return type legitimately carries the CMCA-114 authority-chain proof token
 pub fn wrap_observatory_result(
     flag_code: u32,
     digest: u64,
@@ -149,6 +151,7 @@ pub fn wrap_observatory_result(
 ///
 /// Checks are performed concurrently using bitwise masks. Prioritization is enforced using
 /// sequential branchless selections `const_select_u32`.
+#[allow(deprecated)] // return type legitimately carries the CMCA-114 authority-chain proof token
 pub fn evaluate_calibration(
     artifact: &MeasurementArtifact,
     epsilon_on: NonNegativeFixed,

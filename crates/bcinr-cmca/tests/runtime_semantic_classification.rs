@@ -300,18 +300,28 @@ fn escort_distribution_integer_path_matches_cascade_escort_weight_is_already_pro
     );
 }
 
-/// `DIVERGES`: the same `[0,1,3]`-shaped input at a negative lens takes
-/// two different code paths inside `escort_distribution` depending on
-/// whether the lens is an exact integer or genuinely fractional, and they
-/// disagree on whether a zero-mass sibling refuses the computation.
-/// Integer path: refuses (`ExactPathRefused`, wrapping cascade's
-/// `ZeroMassUnderNegativeLens`). Fractional path: `power`'s
-/// zero-base-negative-exponent branch silently saturates to `MAX` instead
-/// -- no refusal, the zero-mass sibling ends up dominating the normalized
-/// output. This is pinned as a permanent regression, not left as a
-/// module-doc claim someone could accidentally "fix" into agreement.
+/// (Previously `DIVERGES`, CMCA-109 fixed): the same `[0,1,3]`-shaped input
+/// at a negative lens takes two different code paths inside
+/// `escort_distribution` depending on whether the lens is an exact integer
+/// or genuinely fractional. Before CMCA-109, they disagreed on *how
+/// precisely* a zero-mass sibling's refusal was reported: the integer path
+/// named the exact cause (`ExactPathRefused` wrapping cascade's
+/// `ZeroMassUnderNegativeLens`), while the fractional path let `power`'s
+/// zero-base/negative-exponent branch silently saturate to `MAX` tagged
+/// "no fault," which only surfaced as a refusal indirectly (via the summed
+/// weights overflowing) and with no trace back to which element or why.
+///
+/// CMCA-109 fixed `power` to tag `0^(negative)` with
+/// `StabilityRefusal::UnsupportedDomain` instead of `err == u32::MAX`, so
+/// the fractional path now refuses immediately at the offending element via
+/// `EscortRefusal::NumericFault { index, .. }` -- still a different refusal
+/// *shape* than the integer path's `ExactPathRefused` (this module's own
+/// `EscortRefusal` doc explains why: `NumericFault`'s `error_code` is a
+/// generic numeric-fault channel, `ExactPathRefused` preserves the richer
+/// `CascadeRefusal` taxonomy), but no longer a loss of diagnostic
+/// precision -- both paths now name the exact zero-mass element.
 #[test]
-fn escort_distribution_fractional_negative_lens_diverges_from_integer_path() {
+fn escort_distribution_fractional_negative_lens_now_names_the_zero_mass_element() {
     let masses = [NonNegativeFixed::ZERO, mass(1.0), mass(3.0)];
 
     let integer_result = escort_distribution(&masses, q(-1.0));
@@ -326,28 +336,15 @@ fn escort_distribution_fractional_negative_lens_diverges_from_integer_path() {
         "integer negative lens over a zero-mass sibling must refuse: got {integer_result:?}"
     );
 
-    // Corrected from the initial prediction (fractional -> silent Ok):
-    // running this revealed power(0, -1.5) DOES saturate to MAX with no
-    // individual fault flagged, exactly as predicted, but summing that MAX
-    // with the other two (finite, nonzero) weights overflows
-    // NonNegativeFixed::saturating_add, which DOES set an error flag on the
-    // sum -- so escort_distribution's own `sum.err != u32::MAX` check
-    // catches it and refuses with DegenerateNormalization. Both paths
-    // refuse, but for DIFFERENT reasons: the integer path names the exact
-    // cause (ZeroMassUnderNegativeLens on the specific node); the
-    // fractional path only reports "the sum didn't work out," with no
-    // trace back to which element or why. That loss of diagnostic
-    // precision, not a false Ok, is the real divergence here.
     let fractional_result = escort_distribution(&masses, q(-1.5));
     assert!(
         matches!(
             fractional_result,
-            Err(EscortRefusal::DegenerateNormalization)
+            Err(EscortRefusal::NumericFault { index: 0, .. })
         ),
-        "DIVERGES (documented, not a bug to fix here): both paths refuse, but the \
-         fractional path collapses to a generic DegenerateNormalization instead of \
-         naming the zero-mass node the way the integer path's ExactPathRefused does. \
-         Got {fractional_result:?}"
+        "CMCA-109: the fractional path must now refuse at the zero-mass element (index 0) \
+         via NumericFault, not silently collapse to a generic DegenerateNormalization or -- \
+         worse -- succeed. Got {fractional_result:?}"
     );
 }
 
@@ -492,6 +489,105 @@ fn allocate_in_now_has_a_typed_refusal_for_the_former_degenerate_fallback_regime
         Err(StabilityRefusal::PriceGainUnsafe),
         "CMCA-103: this degenerate-but-not-cyclic input now has a typed refusal \
          (PriceGainUnsafe), not the prior silent-fallback-to-Ok -- got {result:?}"
+    );
+}
+
+// ---------------------------------------------------------------------
+// CMCA-110: `eta_err` only checked a lower bound (`ETA_G_MIN`); nothing
+// enforced an upper bound, so `eta > 1.0` reached the explore-floor blend
+// (`(NonNegativeFixed::ONE - eta_actual) * p_mu`) unconditionally, where
+// `saturating_sub` underflows, silently clamps to 0, and discards the
+// priced allocation for pure uniform explore with no refusal. Separately,
+// `numeric_has_err` (the fold of `pi_res[x].err` across all 8 nodes --
+// exactly where that underflow's fault flag lands) was bucketed into the
+// proof-gated `has_error` instead of the unconditional
+// `selection_critical_error`, so even a numeric fault from the
+// unconditionally-executing selection code was swallowed on the common
+// `proof=None` path. Both gaps are closed in `allocate_in`.
+// ---------------------------------------------------------------------
+
+/// CMCA-110 acceptance criterion 1 & 3: `eta > 1.0` with `proof=None` must
+/// now be refused, not silently accepted with a uniform-explore result that
+/// discarded the priced allocation via an unflagged underflow.
+#[test]
+fn allocate_in_refuses_eta_above_one_without_proof() {
+    let lambda = bcinr_cmca::generated::consequence_mass::case_studies::LAMBDA;
+    let mut weights = [[NonNegativeFixed::ONE; 2 * Q]; N];
+    let payoffs = [[NonNegativeFixed::ZERO; 2 * Q]; N];
+    let mut last_switch_t = 0;
+    let mut prev_mode = 0;
+    let parent = [-1; N];
+    let mu = [NonNegativeFixed::ZERO; N];
+    let costs = [NonNegativeFixed::ZERO; N];
+
+    // Just over 1.0 in Q16.16 -- the smallest out-of-domain value for a
+    // blend-mixing coefficient, and exactly the value the ticket's
+    // underflow analysis identifies as the first corrupting input.
+    let eta_over_one = NonNegativeFixed::from_bits(NonNegativeFixed::ONE.val + 1);
+
+    let result = allocate_in(
+        &FeasibleRegion::CURRENT,
+        &OBJECT_REGISTRY,
+        &LENS_REGISTRY,
+        &lambda,
+        eta_over_one,
+        &parent,
+        &mut weights,
+        &payoffs,
+        NonNegativeFixed::ZERO,
+        NonNegativeFixed::ZERO,
+        &mu,
+        &costs,
+        0,
+        &mut last_switch_t,
+        &mut prev_mode,
+        500,
+        CERTIFICATE_DIGEST,
+        None, // proof = None: the common path
+    );
+
+    assert!(
+        result.is_err(),
+        "CMCA-110: eta > 1.0 with proof=None must be refused, not silently degraded to an \
+         unflagged uniform-explore result -- got {result:?}"
+    );
+    assert_eq!(
+        result,
+        Err(StabilityRefusal::ExploreFloorOutsideEnvelope),
+        "CMCA-110: eta_err (now upper-bound-checked) must be the reason this refuses -- got \
+         {result:?}. CMCA-122 gave eta_err its own dedicated reason instead of folding it \
+         into LearningRateOutsideEnvelope."
+    );
+}
+
+/// CMCA-110 acceptance criterion 4: `numeric_has_err` is now folded into
+/// `selection_critical_error` (unconditional), not `has_error`
+/// (proof-gated). This is verified at the arithmetic layer the ticket's
+/// root-cause analysis names directly: the explore-floor blend's
+/// `NonNegativeFixed::ONE - eta_actual` subtraction, which is exactly what
+/// `pi_res[x].err`/`numeric_err`/`numeric_has_err` fold together in
+/// `allocate_in`. This is an independent check from the `eta_err`
+/// upper-bound gate above -- it confirms the *numeric* fault this
+/// out-of-range `eta` produces is itself real and would be a genuine
+/// second gate even if `eta_err` did not exist, not that the two fixes
+/// coincidentally cover the same case only because they share an input.
+#[test]
+fn eta_above_one_underflows_the_explore_floor_blend_subtraction() {
+    let eta_over_one = NonNegativeFixed::from_bits(NonNegativeFixed::ONE.val + 1);
+    let underflowed = NonNegativeFixed::ONE - eta_over_one;
+
+    assert_eq!(
+        underflowed.err,
+        StabilityRefusal::NumericRangeExceeded as u32,
+        "CMCA-110: `NonNegativeFixed::ONE - eta_actual` must fault as \
+         NumericRangeExceeded (not silently saturate to 0 unflagged) when eta > 1.0 -- this is \
+         the numeric fault `numeric_has_err` folds and must surface as a refusal on the \
+         proof=None path now that it is selection-critical"
+    );
+    assert_eq!(
+        underflowed.val, 0,
+        "CMCA-110: the underlying saturating_sub still clamps to 0 -- the fix is that the \
+         resulting err flag now reaches has_refusal, not that the clamp itself changed"
     );
 }
 

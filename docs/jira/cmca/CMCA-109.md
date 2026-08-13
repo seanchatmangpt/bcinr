@@ -49,7 +49,7 @@ it being fully in-domain for `escort_distribution`'s public contract.
 
 ## Acceptance Criteria
 
-- [ ] Decide the correct behavior for `base=0, exponent<0`: either refuse
+- [x] Decide the correct behavior for `base=0, exponent<0`: either refuse
       explicitly (set `err` to a real `StabilityRefusal`/fault code, matching
       how `cascade::escort_power` already handles the analogous
       `ZeroMassUnderNegativeLens` case for its exact-integer path — see
@@ -57,16 +57,37 @@ it being fully in-domain for `escort_distribution`'s public contract.
       to `MAX` and calling it "no fault" is the intended contract (if so,
       escort_distribution's callers need to know this explicitly, not
       discover it by reading `power`'s branchless internals).
-- [ ] Fix `power` (or wrap it at the `escort_distribution` call site) to match
-      the decided behavior.
-- [ ] Add a regression test to `power_error_bound.rs` (or a new focused test)
+      **Decided:** refuse explicitly. `power`'s `base=0, exponent<0` branch
+      now sets `err = StabilityRefusal::UnsupportedDomain as u32`, matching
+      the existing crate-wide convention `NonNegativeFixed::saturating_div`
+      (zero denominator) and `SignedFixed::log2` (zero input) already use for
+      this exact "undefined at zero" shape — see `fixed.rs`.
+- [x] Fix `power` (or wrap it at the `escort_distribution` call site) to match
+      the decided behavior. Fixed directly in `power`
+      (`crates/bcinr-cmca/src/allocator/mod.rs`); `escort_distribution`
+      needed no code change since it already checked `w.err != u32::MAX` and
+      now inherits the correct refusal automatically (its stale doc comment
+      describing the old saturating behavior was updated).
+- [x] Add a regression test to `power_error_bound.rs` (or a new focused test)
       covering `base=0` with negative, zero, and positive exponents —
       currently entirely unswept.
-- [ ] Add a regression test exercising `escort_distribution` with a real
+      Added `power_zero_base_negative_exponent_is_refused_not_saturated_ok`
+      and `power_zero_base_nonnegative_exponent_stays_ok` to
+      `crates/bcinr-cmca/tests/power_error_bound.rs`.
+- [x] Add a regression test exercising `escort_distribution` with a real
       zero-mass sibling under a negative `q`, asserting the crate's decided
       contract (refusal or documented saturation) rather than silently
       passing.
-- [ ] `cargo test -p bcinr-cmca --features std` stays green with the fix.
+      Added `zero_mass_under_fractional_negative_q_is_refused` to
+      `crates/bcinr-cmca/src/escort.rs`'s test module. Also updated
+      `runtime_semantic_classification.rs`'s
+      `escort_distribution_fractional_negative_lens_diverges_from_integer_path`
+      (renamed to `..._now_names_the_zero_mass_element`), which had pinned
+      the old bug's downstream symptom (collapse to a generic
+      `DegenerateNormalization`) as documented, permanent behavior — it now
+      asserts the fixed behavior (`EscortRefusal::NumericFault` naming the
+      zero-mass element).
+- [x] `cargo test -p bcinr-cmca --features std` stays green with the fix.
 
 ## Files likely touched
 

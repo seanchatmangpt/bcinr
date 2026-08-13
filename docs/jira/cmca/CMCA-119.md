@@ -37,20 +37,38 @@ integration).
 
 ## Acceptance Criteria
 
-- [ ] Add at least one real, runnable example (in `examples/` or a
+- [x] Add at least one real, runnable example (in `examples/` or a
       prominent doc-test) demonstrating a realistic end-to-end flow: build a
       tree/registry, call the appropriate entry point (pick one and justify
       the choice in the example's own comments), interpret the result, and
       (optionally) seal a receipt via `allocation_receipt`.
-- [ ] Add a short "which entry point do I want" section to `lib.rs`'s
+      Done: `crates/bcinr-cmca/examples/basic_allocation.rs`, calls
+      `allocate()` end-to-end on the crate's own case-study registry,
+      verified via `cargo run --example basic_allocation -p bcinr-cmca
+      --features std`. Does not additionally seal an `allocation_receipt`
+      (optional per this criterion) — descoped to keep the example focused
+      on the single allocation entry point.
+- [x] Add a short "which entry point do I want" section to `lib.rs`'s
       top-level module docs, pointing to the relevant module docs for detail
       rather than duplicating them — this is a navigation aid, not new
       prose.
-- [ ] Evaluate whether the crate's various `...Refusal` enums can reasonably
+      Done: `crates/bcinr-cmca/src/lib.rs`, "## Which entry point do I
+      want? (CMCA-119)" section covering all 5 entry points named in this
+      ticket, each linking out rather than restating.
+- [x] Evaluate whether the crate's various `...Refusal` enums can reasonably
       implement `std::error::Error`/`Display` (likely via a shared derive
       macro or a hand-written impl per enum) — if genuinely infeasible given
       the crate's `no_std` stance in some configurations, document why and
       what the recommended downstream handling pattern is instead.
+      Done: hand-written `impl core::fmt::Display` (delegating to `Debug`,
+      always available including `no_std`) plus `impl std::error::Error`
+      gated `#[cfg(feature = "std")]` for `StabilityRefusal`,
+      `LensSelectionRefusal`, `AllocationRefusal`, `CertificationRefusal`,
+      `EscortRefusal`. `HierarchyRefusal` and other `...Refusal` enums
+      mentioned in this ticket's Summary (`CascadeRefusal` in `cascade.rs`,
+      enums in `observatory.rs`/`proposal.rs`/`reference_escort.rs`) were
+      not touched — out of scope for the five enums this ticket's
+      Acceptance Criteria and "Files likely touched" section named.
 
 ## Files likely touched
 

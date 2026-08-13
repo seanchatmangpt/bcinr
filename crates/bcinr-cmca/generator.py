@@ -13,6 +13,34 @@ def hash_file(path):
     with open(path, 'rb') as f:
         return hashlib.sha256(f.read()).hexdigest()
 
+def strip_ttl_comment(line):
+    """Strip a trailing '#'-comment from a single Turtle line, without
+    corrupting '#' characters that appear inside a double-quoted string
+    literal (e.g. a URL fragment or an ID embedded in a note).
+
+    Turtle string literals in this generator's supported subset are
+    double-quoted (`"..."`), with `\\"` as the escape for an embedded quote.
+    We scan left to right, tracking whether we're inside such a literal, and
+    only treat '#' as a comment marker when we are not.
+    """
+    in_string = False
+    i = 0
+    n = len(line)
+    while i < n:
+        ch = line[i]
+        if ch == '\\' and in_string:
+            # Skip the escaped character so a literal `\"` doesn't toggle
+            # the in_string state.
+            i += 2
+            continue
+        if ch == '"':
+            in_string = not in_string
+        elif ch == '#' and not in_string:
+            return line[:i].strip()
+        i += 1
+    return line.strip()
+
+
 def parse_ttl(file_path):
     classes = {}
     properties = {}
@@ -23,7 +51,7 @@ def parse_ttl(file_path):
     lines = content.split('\n')
     clean_lines = []
     for line in lines:
-        clean_lines.append(line.split('#')[0].strip())
+        clean_lines.append(strip_ttl_comment(line))
     clean_content = '\n'.join(clean_lines)
 
     # Reject unsupported constructs

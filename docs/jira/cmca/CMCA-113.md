@@ -49,26 +49,65 @@ consequence.
 
 ## Acceptance Criteria
 
-- [ ] For each load-bearing constant in `stability_profile.rs`
+- [x] For each load-bearing constant in `stability_profile.rs`
       (`CERTIFICATE_DIGEST`, `MODE_DWELL_ROUNDS_MIN`, `GAIN_MATRIX`,
       `WEIGHT_VECTOR`, `CONTRACTION_MARGIN`, and any others found on review),
       document its real provenance: was it derived from a stated formula
       (like `RDF_INPUT_DIGEST`), chosen as a policy decision by a named
       owner (matching `generated_profile.rs`'s own `POLICY (owner: ...)`
       convention), or is it genuinely arbitrary and needs to be replaced
-      before production tuning begins?
-- [ ] For policy constants: add the same `POLICY (owner: ...)` doc-comment
+      before production tuning begins? Done: every field on
+      `StabilityProfile` now carries a doc comment stating one of `POLICY
+      (owner: bcinr-cmca::allocator)` (for `gain_matrix`/`weight_vector`/
+      `deterministic_margin`, which are jointly constrained by the
+      contraction inequality; `minimum_dwell_rounds`; `certificate_digest`)
+      or `ARBITRARY` (for `noise_second_moment_bounds`,
+      `certified_noise_radius`, `mode_jump_bound`,
+      `certified_switching_radius`, `total_homeostatic_radius`,
+      `temperature_ceiling`, `distinguishability_floor`, `floor_minimum` —
+      no formula or named-owner rationale could be found for these on
+      review; honestly marked rather than assigned an invented derivation).
+- [x] For policy constants: add the same `POLICY (owner: ...)` doc-comment
       convention `generated_profile.rs` already uses, so a future editor
-      knows who to consult before changing a value.
-- [ ] Decide whether `CERTIFICATE_DIGEST` in particular (an authorization
+      knows who to consult before changing a value. Done (see above); the
+      misleading "GENERATED STABILITY PROFILE" file header (this file is
+      hand-authored, per CMCA-105) was also corrected to stop implying
+      machine provenance it does not have.
+- [x] Decide whether `CERTIFICATE_DIGEST` in particular (an authorization
       gate, not just a numeric tuning knob) needs a real generation/rotation
       process before autofde-lab starts depending on it — a hardcoded,
       undocumented 32-byte "certificate" gating production allocation calls
       is a real operational risk if nobody currently knows how to correctly
-      change it.
-- [ ] If any of these should be under real ontology/generator coverage,
+      change it. Decision recorded in the doc comment on
+      `certificate_digest`: today it is a same-crate round-trip
+      self-consistency check, not caller-independent authorization (any
+      caller can import the exact constant `allocate_in` checks against, as
+      this crate's own doctest and `allocation_receipt.rs` tests already
+      do) — building a real, caller-independent authorization mechanism is
+      out of this ticket's scope and tracked under CMCA-114 (the sibling
+      finding that the surrounding "certified" proof chain is itself
+      unvalidated `Self { .. }` construction).
+- [x] If any of these should be under real ontology/generator coverage,
       scope that as a follow-up (may overlap with CMCA-105's own remaining
-      work).
+      work). Recorded: the `ARBITRARY`-marked constants above and
+      `CERTIFICATE_DIGEST`'s rotation process are the concrete follow-up
+      scope; both are named explicitly in their doc comments rather than
+      left implicit, so a future generator/ontology pass has a checklist.
+
+## What was actually verified, not just documented
+
+Documentation alone would not have addressed this ticket's real risk (FMEA:
+Detection=9 — "no test... would catch a 'reasonable-looking but wrong'
+edit"). `tests/stability_profile_invariants.rs` (new) adds a real regression
+test: it recomputes `allocate_in`'s diagonal-dominance/contraction
+inequality (`sum_j gain_matrix[i][j] * weight_vector[j] <=
+weight_vector[i] * (1 - deterministic_margin)`) directly against the live
+`GAIN_MATRIX`/`WEIGHT_VECTOR`/`CONTRACTION_MARGIN` constants using the same
+1e9-scaled fixed-point integer arithmetic the production code uses, so an
+edit that breaks the invariant now fails CI instead of shipping silently. It
+also exercises `CERTIFICATE_DIGEST`'s real, current behavior (round-trip
+match succeeds; a single flipped byte is refused) as a running assertion,
+not just a prose claim.
 
 ## Files likely touched
 

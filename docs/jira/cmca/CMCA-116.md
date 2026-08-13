@@ -37,7 +37,7 @@ unmitigated" is a real, open gap, not a closed ticket.
 
 ## Acceptance Criteria
 
-- [ ] Decide the actual closure: either (a) narrow `escort_distribution`'s
+- [x] Decide the actual closure: either (a) narrow `escort_distribution`'s
       admitted domain to a region with a tight, acceptable error bound
       (e.g. `|q| <= 4`, where error stays under ~8%) and refuse fractional
       `q` beyond it with a new typed refusal, or (b) add a
@@ -45,17 +45,34 @@ unmitigated" is a real, open gap, not a closed ticket.
       parallel "was this the exact integer path or the approximate
       fractional path, and roughly how much error" signal) so a caller can
       decide for themselves.
+      **Closed via (b)**: added `PathConfidence` (`Exact` /
+      `Approximate { max_relative_error_bps }`) and a new
+      `escort_distribution_with_confidence` entry point in
+      `crates/bcinr-cmca/src/escort.rs`. `max_relative_error_bps` is
+      bucketed from the already-measured, already-documented error sweep
+      (`|q| <= 0.25` -> 50bps, `<= 1` -> 150, `<= 2` -> 350, `<= 4` -> 760,
+      `<= 8` -> 1640, `<= 16` -> 3690), not re-derived.
 - [ ] If (a): update `MAX_LENS_MAGNITUDE`'s role for `escort_distribution`
       specifically (may need to diverge from `cascade`'s `MAX_LENS_MAGNITUDE`
       if the two truly need different bounds — document why, per the
       existing MAX_LENS_MAGNITUDE domain-doc precedent from earlier this
       session).
-- [ ] If (b): design the signal to not break existing callers
+      N/A — closure (b) was chosen; the domain was not narrowed.
+- [x] If (b): design the signal to not break existing callers
       (`escort_distribution`'s current `Result<Vec<NonNegativeFixed>,
       EscortRefusal>` signature) — likely an additive field or a new
       wrapper function.
-- [ ] Add a test proving a caller can distinguish (via whichever mechanism
+      Done: `escort_distribution`'s signature and behavior are unchanged
+      (it now delegates to `escort_distribution_with_confidence` and
+      discards the confidence value); the signal is exposed only through
+      the new, additive `escort_distribution_with_confidence` function.
+- [x] Add a test proving a caller can distinguish (via whichever mechanism
       is chosen) a high-error fractional-q call from a low-error one.
+      Done:
+      `escort::tests::caller_can_distinguish_high_error_fractional_q_from_low_error_fractional_q`
+      asserts `q=15.9`'s reported bound (3690bps) exceeds `q=0.1`'s
+      (50bps); `escort::tests::exact_integer_lens_reports_exact_confidence`
+      covers the `Exact` path.
 
 ## Files likely touched
 

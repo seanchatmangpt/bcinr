@@ -52,27 +52,38 @@ in `crates/bcinr-cmca/src/allocator/mod.rs`'s `allocate_in`.
 
 ## Acceptance Criteria
 
-- [ ] Add an `ETA_G_MAX` bound (or equivalent upper-bound check) to
+- [x] Add an `ETA_G_MAX` bound (or equivalent upper-bound check) to
       `eta_err`'s construction, so `eta > 1.0` (or whatever the correct
       ceiling is — derive it from the pricing/explore-floor math, don't
-      guess) is refused.
-- [ ] Fold `numeric_has_err` into the unconditional `selection_critical_error`
+      guess) is refused. Implemented as an inline `eta_g_max_q16 =
+      NonNegativeFixed::ONE.val` check in `allocate_in` (mod.rs:1505-1516,
+      1525-1526) rather than a new generated constant: the ceiling is
+      exactly `1.0`, derived directly from the explore-floor blend's
+      `NonNegativeFixed::ONE - eta_actual` subtraction that eta feeds
+      unconditionally, not an independently-tunable profile parameter.
+- [x] Fold `numeric_has_err` into the unconditional `selection_critical_error`
       bucket (or a correctly-scoped unconditional check), not the
       proof-gated `has_error` bucket — since it originates in code that
       already executes unconditionally per CMCA-103's own stated rule.
-- [ ] Add a regression test: `eta > 1.0` with `proof=None` must return
+      (mod.rs:1841, 1874)
+- [x] Add a regression test: `eta > 1.0` with `proof=None` must return
       `Err(...)`, not `Ok(...)` with a silently-corrupted uniform-explore
-      result.
-- [ ] Add a regression test proving `numeric_has_err` now surfaces as a
+      result. (`allocate_in_refuses_eta_above_one_without_proof`,
+      `tests/runtime_semantic_classification.rs`)
+- [x] Add a regression test proving `numeric_has_err` now surfaces as a
       refusal on `proof=None` for a case that triggers it (e.g. the
       eta-underflow case above, checked before and after the `eta_err` fix
       to confirm both layers are real, independent gates — not one fix
       accidentally making the other untestable).
-- [ ] Re-verify `jtbd_drift_refusal_routes_to_selection_only_without_state_drift`
+      (`eta_above_one_underflows_the_explore_floor_blend_subtraction`,
+      same file — verifies the `NonNegativeFixed::ONE - eta_actual`
+      subtraction itself faults `NumericRangeExceeded` independently of
+      the `eta_err` gate.)
+- [x] Re-verify `jtbd_drift_refusal_routes_to_selection_only_without_state_drift`
       and `case_studies.rs`'s equivalent case still pass unchanged (the
       degrade-to-certified-selection contract for the genuinely proof-gated
       flags must not regress).
-- [ ] `cargo test -p bcinr-cmca --features std` full suite green.
+- [x] `cargo test -p bcinr-cmca --features std` full suite green.
 
 ## Files likely touched
 
