@@ -123,7 +123,7 @@
 //! maximum plus headroom) and the sweep test's own `eprintln!` for the
 //! exact figure on any given run.
 
-use bcinr_cmca::allocator::power;
+use bcinr_cmca::allocator::{power, StabilityRefusal};
 use bcinr_cmca::fixed::{NonNegativeFixed, SignedFixed};
 
 fn to_f64(f: NonNegativeFixed) -> f64 {
@@ -484,4 +484,70 @@ fn bound_checker_detects_a_deliberately_degraded_approximation() {
         "sanity check failed: the real power() function itself violates the bound \
          ({real_max_rel_err:.6}), independent of the degraded closure above"
     );
+}
+
+/// CMCA-109 regression: `base = 0`, entirely unswept by
+/// `max_relative_error`'s `base_grid()` (module doc above: "always
+/// strictly positive," `base == 0` explicitly excluded). `0^(negative)`
+/// is `+infinity` -- undefined -- and must be refused (`err !=
+/// u32::MAX`) rather than silently reported as a valid saturated `MAX`
+/// value. `0^0` and `0^(positive)` are exact, in-domain, no-fault
+/// results and must keep reporting `err == u32::MAX`.
+#[test]
+fn power_zero_base_negative_exponent_is_refused_not_saturated_ok() {
+    let zero = NonNegativeFixed::ZERO;
+
+    for &q in &[-1.0f32, -0.5, -3.0, -16.0] {
+        let exponent = SignedFixed::from_bits((q * 65536.0).round() as i32);
+        let result = power(zero, exponent);
+        assert_ne!(
+            result.err,
+            u32::MAX,
+            "power(0, {q}) reported err == u32::MAX (\"no fault\") for an undefined \
+             0^(negative) input; val={:#x}",
+            result.val
+        );
+        assert_eq!(
+            result.err,
+            StabilityRefusal::UnsupportedDomain as u32,
+            "power(0, {q}) should refuse via StabilityRefusal::UnsupportedDomain \
+             (matching NonNegativeFixed::saturating_div's and SignedFixed::log2's zero-domain \
+             convention), got err={:#x}",
+            result.err
+        );
+    }
+}
+
+/// Companion to the negative-exponent regression above: `base = 0` at
+/// `exponent == 0` and `exponent > 0` are exact, well-defined results
+/// (`0^0 = 1` by this crate's convention, `0^(positive) = 0`) and must
+/// keep reporting no fault -- the CMCA-109 fix must not over-refuse.
+#[test]
+fn power_zero_base_nonnegative_exponent_stays_ok() {
+    let zero = NonNegativeFixed::ZERO;
+
+    let zero_exp = SignedFixed::from_bits(0);
+    let at_zero = power(zero, zero_exp);
+    assert_eq!(
+        at_zero.err,
+        u32::MAX,
+        "power(0, 0) should remain no-fault (0^0 == 1 by this crate's convention)"
+    );
+    assert_eq!(at_zero.val, NonNegativeFixed::ONE.val);
+
+    for &q in &[0.5f32, 1.0, 3.0, 16.0] {
+        let exponent = SignedFixed::from_bits((q * 65536.0).round() as i32);
+        let result = power(zero, exponent);
+        assert_eq!(
+            result.err,
+            u32::MAX,
+            "power(0, {q}) (positive exponent) should remain no-fault, got err={:#x}",
+            result.err
+        );
+        assert_eq!(
+            result.val, 0,
+            "power(0, {q}) (positive exponent) should be exactly 0, got {:#x}",
+            result.val
+        );
+    }
 }

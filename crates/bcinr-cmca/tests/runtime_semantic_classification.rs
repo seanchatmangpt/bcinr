@@ -300,18 +300,28 @@ fn escort_distribution_integer_path_matches_cascade_escort_weight_is_already_pro
     );
 }
 
-/// `DIVERGES`: the same `[0,1,3]`-shaped input at a negative lens takes
-/// two different code paths inside `escort_distribution` depending on
-/// whether the lens is an exact integer or genuinely fractional, and they
-/// disagree on whether a zero-mass sibling refuses the computation.
-/// Integer path: refuses (`ExactPathRefused`, wrapping cascade's
-/// `ZeroMassUnderNegativeLens`). Fractional path: `power`'s
-/// zero-base-negative-exponent branch silently saturates to `MAX` instead
-/// -- no refusal, the zero-mass sibling ends up dominating the normalized
-/// output. This is pinned as a permanent regression, not left as a
-/// module-doc claim someone could accidentally "fix" into agreement.
+/// (Previously `DIVERGES`, CMCA-109 fixed): the same `[0,1,3]`-shaped input
+/// at a negative lens takes two different code paths inside
+/// `escort_distribution` depending on whether the lens is an exact integer
+/// or genuinely fractional. Before CMCA-109, they disagreed on *how
+/// precisely* a zero-mass sibling's refusal was reported: the integer path
+/// named the exact cause (`ExactPathRefused` wrapping cascade's
+/// `ZeroMassUnderNegativeLens`), while the fractional path let `power`'s
+/// zero-base/negative-exponent branch silently saturate to `MAX` tagged
+/// "no fault," which only surfaced as a refusal indirectly (via the summed
+/// weights overflowing) and with no trace back to which element or why.
+///
+/// CMCA-109 fixed `power` to tag `0^(negative)` with
+/// `StabilityRefusal::UnsupportedDomain` instead of `err == u32::MAX`, so
+/// the fractional path now refuses immediately at the offending element via
+/// `EscortRefusal::NumericFault { index, .. }` -- still a different refusal
+/// *shape* than the integer path's `ExactPathRefused` (this module's own
+/// `EscortRefusal` doc explains why: `NumericFault`'s `error_code` is a
+/// generic numeric-fault channel, `ExactPathRefused` preserves the richer
+/// `CascadeRefusal` taxonomy), but no longer a loss of diagnostic
+/// precision -- both paths now name the exact zero-mass element.
 #[test]
-fn escort_distribution_fractional_negative_lens_diverges_from_integer_path() {
+fn escort_distribution_fractional_negative_lens_now_names_the_zero_mass_element() {
     let masses = [NonNegativeFixed::ZERO, mass(1.0), mass(3.0)];
 
     let integer_result = escort_distribution(&masses, q(-1.0));
@@ -326,28 +336,15 @@ fn escort_distribution_fractional_negative_lens_diverges_from_integer_path() {
         "integer negative lens over a zero-mass sibling must refuse: got {integer_result:?}"
     );
 
-    // Corrected from the initial prediction (fractional -> silent Ok):
-    // running this revealed power(0, -1.5) DOES saturate to MAX with no
-    // individual fault flagged, exactly as predicted, but summing that MAX
-    // with the other two (finite, nonzero) weights overflows
-    // NonNegativeFixed::saturating_add, which DOES set an error flag on the
-    // sum -- so escort_distribution's own `sum.err != u32::MAX` check
-    // catches it and refuses with DegenerateNormalization. Both paths
-    // refuse, but for DIFFERENT reasons: the integer path names the exact
-    // cause (ZeroMassUnderNegativeLens on the specific node); the
-    // fractional path only reports "the sum didn't work out," with no
-    // trace back to which element or why. That loss of diagnostic
-    // precision, not a false Ok, is the real divergence here.
     let fractional_result = escort_distribution(&masses, q(-1.5));
     assert!(
         matches!(
             fractional_result,
-            Err(EscortRefusal::DegenerateNormalization)
+            Err(EscortRefusal::NumericFault { index: 0, .. })
         ),
-        "DIVERGES (documented, not a bug to fix here): both paths refuse, but the \
-         fractional path collapses to a generic DegenerateNormalization instead of \
-         naming the zero-mass node the way the integer path's ExactPathRefused does. \
-         Got {fractional_result:?}"
+        "CMCA-109: the fractional path must now refuse at the zero-mass element (index 0) \
+         via NumericFault, not silently collapse to a generic DegenerateNormalization or -- \
+         worse -- succeed. Got {fractional_result:?}"
     );
 }
 

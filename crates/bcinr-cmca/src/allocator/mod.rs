@@ -1020,13 +1020,23 @@ pub fn power(base: NonNegativeFixed, exponent: SignedFixed) -> NonNegativeFixed 
         const_select_u32(exp_gt_zero, 0, u32::MAX),
     );
     // The zero-base branch is exact (no `exp2` approximation involved), so
-    // it reports no fault regardless of `pow_val.err`; the base != 0 branch
-    // must carry `pow_val.err` through rather than discarding it via
-    // `from_bits`, or `exp2`'s own overflow/underflow detection becomes
-    // unreachable dead code from every caller's perspective.
+    // it reports no fault regardless of `pow_val.err` -- *except* for
+    // `0^(negative)`, which is mathematically `+infinity`: undefined/
+    // degenerate, not a valid large number. That one sub-case must be
+    // refused via `StabilityRefusal::UnsupportedDomain` (the same
+    // discriminant `NonNegativeFixed::saturating_div`'s zero-denominator
+    // path and `SignedFixed::log2`'s zero-input path already use for this
+    // exact "undefined at zero" shape -- see `fixed.rs`), not silently
+    // tagged `err = u32::MAX` ("no fault"). See CMCA-109.
+    let exp_lt_zero = const_select_u32(exp_gt_zero | exp_eq_zero, 0, u32::MAX);
+    let zero_base_err = const_select_u32(
+        exp_lt_zero,
+        StabilityRefusal::UnsupportedDomain as u32,
+        u32::MAX,
+    );
     NonNegativeFixed {
         val: const_select_u32(base_is_zero, zero_res, pow_val.val),
-        err: const_select_u32(base_is_zero, u32::MAX, pow_val.err),
+        err: const_select_u32(base_is_zero, zero_base_err, pow_val.err),
     }
 }
 

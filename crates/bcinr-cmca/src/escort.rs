@@ -157,13 +157,13 @@ fn exact_integer_lens(q: SignedFixed) -> Option<i32> {
 /// `q == 0` yields the uniform distribution over `masses.len()` elements
 /// (`p_i^0 = 1` for every mass, including zero -- matches
 /// `cascade::escort_weight`'s convention for `lens == 0`). A zero mass under
-/// `q < 0` follows `power`'s own zero-base convention (saturating toward
-/// `NonNegativeFixed::MAX` for that element) rather than a dedicated
-/// refusal -- unlike `cascade::escort_weight`, which detects and refuses
-/// `ZeroMassUnderNegativeLens` explicitly. `power` has no channel to
-/// distinguish "correctly unbounded" from "saturated," which is part of the
-/// precision/exactness trade this module makes in exchange for supporting
-/// fractional `q` at all.
+/// `q < 0` is `0^(negative)`, mathematically `+infinity` -- undefined --
+/// so `power` tags it `err = StabilityRefusal::UnsupportedDomain` (see
+/// CMCA-109) rather than silently saturating to `NonNegativeFixed::MAX`
+/// tagged "no fault." That propagates here as `EscortRefusal::NumericFault`
+/// for the offending element, the same explicit-refusal shape
+/// `cascade::escort_weight` already gives this case via
+/// `CascadeRefusal::ZeroMassUnderNegativeLens` on its exact-integer path.
 ///
 /// # Examples
 ///
@@ -243,6 +243,7 @@ pub fn escort_distribution(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::allocator::StabilityRefusal;
 
     fn approx_eq(a: NonNegativeFixed, b: NonNegativeFixed, tol_bits: i64) -> bool {
         (a.to_bits() as i64 - b.to_bits() as i64).abs() < tol_bits
@@ -411,5 +412,38 @@ mod tests {
         let p = [mass(0.9), mass(1.0)];
         let at_bound = SignedFixed::from_num(MAX_LENS_MAGNITUDE as i32);
         assert!(escort_distribution(&p, at_bound).is_ok());
+    }
+
+    /// CMCA-109 regression: a real zero-mass sibling under a genuinely
+    /// fractional negative `q` (so this reaches `power`, not
+    /// `cascade::escort_weight`'s already-refusing exact-integer path) must
+    /// produce `EscortRefusal::NumericFault` for that element, not a
+    /// silently accepted result. Before the fix, `power(0, q<0)` reported
+    /// `err == u32::MAX` ("no fault") for a saturated `NonNegativeFixed::MAX`
+    /// value, so this call returned `Ok` with a bogus escort share instead
+    /// of refusing.
+    #[test]
+    fn zero_mass_under_fractional_negative_q_is_refused() {
+        let p = [mass(0.0), mass(1.0), mass(2.0)];
+        let negative_fractional_q = q(-2.5);
+        assert!(
+            exact_integer_lens(negative_fractional_q).is_none(),
+            "q(-2.5) must be genuinely fractional so this test exercises the `power` path, \
+             not cascade::escort_weight's already-refusing exact-integer path"
+        );
+        match escort_distribution(&p, negative_fractional_q) {
+            Err(EscortRefusal::NumericFault { index, error_code }) => {
+                assert_eq!(index, 0, "the zero mass is at index 0");
+                assert_eq!(
+                    error_code,
+                    StabilityRefusal::UnsupportedDomain as u32,
+                    "expected power's UnsupportedDomain refusal for 0^(negative)"
+                );
+            }
+            other => panic!(
+                "expected EscortRefusal::NumericFault for the zero-mass element under a \
+                 negative q, got {other:?}"
+            ),
+        }
     }
 }
