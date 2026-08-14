@@ -1,7 +1,22 @@
 # ggen-legacy Reconstitution of bcinr-cmca Code Generation — Review
 
-**Headline finding:** The patch's actual generation defect was reproduced by running it for
-real — `ggen sync run` executes and renders `generated.rs`, but that output diverges from the
+**Update (this round):** the two named bugs below were fixed in the scratch patch copy (not
+applied to this repo), plus a third real bug found only once the first two were fixed and the
+pipeline re-run. **`case_studies` profile: all real data now matches the tracked file exactly —
+`LAMBDA`, `LENS_REGISTRY`, `OBJECT_REGISTRY`, and `FACTOR_DOWNSTREAM_CONSEQUENCE` all byte-correct.
+The only remaining diff is missing inline value comments (cosmetic), not logic or data.** The
+official `equivalence_runner.py` verdict is still `FAIL` (exact byte comparison, so comments
+count), but the diff offset moved from byte 1479 (missing/empty data) to byte 3517 (first missing
+comment) and the byte count narrowed from 8019/12150 to 9566/12150 — real, measured progress, not
+a full PASS. The `generalization` profile was also attempted and found to have a **separate,
+larger, unfixed gap**: its ontology uses a structurally different RDF shape than `cmca-rdf.ttl`
+(object-reference `cmca:measure`/`cmca:lens` predicates, no `measureIndex`/`lensIndex` integer
+literals), which the patch's single query cannot serve as written — not attempted to fix this
+round. See §6 for the full re-verification detail. The original headline finding (below) is kept
+for history.
+
+**Original headline finding:** The patch's actual generation defect was reproduced by running it
+for real — `ggen sync run` executes and renders `generated.rs`, but that output diverges from the
 tracked file (`generated_bytes differ: legacy=12150 bytes, current=8019 bytes`) and would fail
 `rustc` outright, because `allocator/mod.rs` imports `FACTOR_DOWNSTREAM_CONSEQUENCE` at three
 call sites and the patch's SPARQL query never produces it. This is not currently sound to merge.
@@ -34,30 +49,38 @@ hashes matching its own claims.
   mined capabilities sit at `ggen:UNKNOWN` standing by design — archaeology alone never promotes
   standing in this repo's own methodology.
 
-## 2. What's fabricated
+## 2. A correction, not a fabrication — a stale local clone
 
-**Confirmed this round:** the commit `49c3a1eddf3d90560b9471573b6455dc240fe752`, which the
-pending bcinr-cmca patch claims pins its reconstitution to a specific ggen-legacy state, is not
-reachable and does not exist as a git object in the `~/ggen-legacy` checkout used for this
-review:
+**Initial finding this round** was that commit `49c3a1eddf3d90560b9471573b6455dc240fe752`, which
+the pending bcinr-cmca patch claims pins its reconstitution to a specific ggen-legacy state, did
+not exist as a git object in the `~/ggen-legacy` checkout used for this review:
 
 ```
 $ git cat-file -e 49c3a1eddf3d90560b9471573b6455dc240fe752
 NOT AN OBJECT IN THIS REPO
-$ git merge-base --is-ancestor 49c3a1eddf3d90560b9471573b6455dc240fe752 HEAD
-fatal: Not a valid commit name 49c3a1eddf3d90560b9471573b6455dc240fe752
 ```
 
-`git log --all | grep` for that SHA also returns zero hits across the whole ref history. This is
-a wrong or invented SHA relative to that repo — it does not pin anything checkable there. It is
-distinct from, and should not be conflated with, the real pinned kernel SHA
-`0f39227c102e0ac7519f0f27561356227a518653` used throughout ggen-legacy's own bootstrap/provenance
-files (see §1).
+**This was wrong, and corrected within the same session by actually checking rather than trusting
+the first negative result.** The local clone's `origin/main` was simply stale — behind the real
+remote by however many commits. A `git fetch origin` resolved it immediately:
 
-This mismatch does not block using ggen-legacy's tooling (the equivalence runner and the
-manifest schema are commit-independent per §1), but it does mean the patch's stated provenance
-claim about which ggen-legacy state it reconstitutes from cannot currently be verified, and the
-patch author should be asked to supply the correct SHA or drop the claim.
+```
+$ git fetch origin
+ * [new branch]      fix/merge-planning-workflow-into-single-ci -> origin/fix/merge-planning-workflow-into-single-ci
+   ef25025..49c3a1e  main       -> origin/main
+$ git cat-file -e 49c3a1eddf3d90560b9471573b6455dc240fe752 && echo EXISTS
+EXISTS
+```
+
+The SHA is real — it matches `main`'s real current HEAD on `seanchatmangpt/ggen-legacy` (also
+independently confirmed via the GitHub API earlier this session, before this repo was cloned
+locally at all). It is distinct from the separate, also-real pinned kernel SHA
+`0f39227c102e0ac7519f0f27561356227a518653` used throughout ggen-legacy's own bootstrap/provenance
+files (see §1) — the two pin different things (the verifier repo's own state vs. the `ggen`
+manufacturing kernel's state) and both check out. Nothing about the patch's provenance claim is
+false; the earlier finding in this section was a tooling-freshness error on this reviewer's part,
+left here (corrected) rather than silently deleted, since the original review was already
+committed and read.
 
 ## 3. What's stale — the patch-vs-current diff
 
@@ -184,9 +207,83 @@ delegating to `ggen`.
    (CMCA-118) — either delete it as moot under the new architecture, or rewrite it to assert on
    `ggen`'s TTL comment-handling behavior directly, so CMCA-118's underlying guarantee is not
    silently dropped.
-5. Get the patch's provenance SHA (`49c3a1eddf3d90560b9471573b6455dc240fe752`) corrected or
-   removed — it does not exist in `~/ggen-legacy` and currently makes an unverifiable claim about
-   what ggen-legacy state the patch reconstitutes from.
+5. ~~Get the patch's provenance SHA corrected or removed~~ — **not needed.** §2 (updated) found
+   the SHA is real; the original negative check was a stale local clone, not a real problem with
+   the patch.
 
 Until step 3 produces a real `[PASS]`, this reconstitution should be treated as blocked, not
 partial-credit-worthy.
+
+## 6. Re-verification (this round) — 3 bugs fixed, 1 remains, `generalization` untouched
+
+Steps 1-2 from §5's recommendation were carried out in the scratch patch copy only (nothing
+under `/Users/sac/bcinr` changed). A third bug was found only by re-running the pipeline after
+fixing the first two — confirming the value of actually running the tool over trusting a static
+read of the query.
+
+**Bug 1 (predicted in §5, confirmed and fixed):** `queries/consequence-mass.rq`'s lens clause
+changed from `cmca:exponent ?exponent` to `cmca:lensExponent ?exponent`, matching both real
+ontology files.
+
+**Bug 2 (predicted in §5, confirmed and fixed differently than first assumed):** the missing
+`FACTOR_DOWNSTREAM_CONSEQUENCE` const wasn't fixable by adding a `cmcag:FactorBinding` triple to
+`codegen-compat.ttl` as originally planned — the config subquery's `(COUNT(?factor) + 1) AS ?f`
+already reserves `downstreamConsequence`'s slot in `F`'s count via that `+1` (it's computed, not
+stored, so it was never meant to be a counted `FactorBinding`). Adding one would have made `F=11`
+instead of `10`. The real fix: a dedicated, non-counted `UNION` branch in `consequence-mass.rq`
+that emits the `"factor"`-kind row (`rust_name`, `legacy_iri`, `sort0=9`) as a synthesized
+constant, anchored on the one real triple every generation run always asserts
+(`?build_subject cmcag:rdfInputDigest ?build_digest_anchor`, from `cmcag:Build`) rather than an
+`a cmcag:BuildMetadata` type triple that — checked directly against `generator.py`'s own
+`meta` f-string — is never actually asserted anywhere.
+
+**Bug 3 (not predicted — found only by running the fixed query):** `LAMBDA` still rendered as
+empty arrays (`[]`) after fixing bugs 1 and 2. The query's lambda clause assumed a blank-node
+shape (`?measure cmca:lambda [ cmca:lens ?lens ; cmca:value ?v ]`) that doesn't exist in either
+real ontology file — confirmed via `grep -n "cmca:lambda\b"` returning zero hits. The real
+ontology represents lambda coefficients as flat `cmca:LambdaCoefficient` individuals
+(`cmca:Lambda_0_0 a cmca:LambdaCoefficient ; cmca:measureIndex ...; cmca:lensIndex ...;
+cmca:value ...`). Fixed by rewriting the clause to match that flat shape directly.
+
+**Real re-run result, `case_studies` profile**, using the exact same manifest shape §4 used
+(only the `--emit-dir` path changed):
+
+```
+[FAIL] cmca-consequence-mass-case-studies-v2 (PRESERVED): generated_bytes differ: legacy=12150 bytes, current=9566 bytes, first diff at offset 3517
+```
+
+Still FAIL by the exact-byte-comparison standard `equivalence_runner.py` enforces — but a diff
+with comments stripped from both files (`sed 's/[[:space:]]*\/\/.*$//'`) shows **zero remaining
+differences beyond incidental blank lines**: every `NonNegativeFixed`/`SignedFixed` bit value,
+every const name, `LAMBDA`, `LENS_REGISTRY`, and `OBJECT_REGISTRY` (including
+`FACTOR_DOWNSTREAM_CONSEQUENCE`'s actual values, e.g. `655360` = `10.00000` for `Artifact_A`,
+matching the tracked file exactly) are byte-identical once comments are removed. The entire
+remaining gap is the tracked file's inline `// accessFrequency: 0.50000`-style trailing value
+comments and `// LensExploitation (cmca:LensExploitation)`-style header comments, which the
+patch's `.tera` template never emits. This was not pursued further this round — it's a real,
+understood, narrowly-scoped cosmetic gap (byte-exact comment reproduction in Tera would need
+either custom formatting filters or projecting pre-formatted decimal strings through the SPARQL
+query), not a logic or data defect, and forcing it further risked chasing polish rather than
+reporting the actual state honestly.
+
+**`generalization` profile — a separate, larger, unfixed gap, not attempted this round:**
+`generalization.ttl` does not use `cmca:measureIndex`/`cmca:lensIndex` integer literals at all —
+its measures/lenses/lambda coefficients are expressed via object-reference predicates
+(`cmca:MeasureCache cmca:measure cmca:MeasureCache`, `cmca:Lambda_0_0 cmca:measure
+cmca:MeasureCache ; cmca:lens cmca:LensExploitation`), a structurally different RDF shape than
+`cmca-rdf.ttl`'s index-literal shape. Running the fixed query against it produced empty
+`MEASURE_*`/`LENS_*` consts, an empty `LAMBDA`, and an empty `LENS_REGISTRY` — the query, written
+against `cmca-rdf.ttl`'s schema, has no clause matching `generalization.ttl`'s schema at all. This
+is not the same bug as 1-3 above and is a materially larger fix (either normalizing
+`generalization.ttl` to the index-literal shape, or writing a schema-detecting/dual-pattern
+query) — correctly out of scope for this pass rather than silently folded into "the bugs are
+fixed."
+
+**Revised recommendation:** the `case_studies` profile is now real, verified, data-correct — the
+architecture is proven sound for it, gated only on a cosmetic comment-formatting gap. The
+`generalization` profile is not proven at all and needs its own, separate investigation before
+this reconstitution could be considered complete across both of the crate's declared profiles.
+Adoption into the real crate (replacing the committed `generator.py`, retiring CMCA-118's test
+target, wiring the CI rail) was explicitly out of scope for this round, same as before, and
+remains so — a data-correct `case_studies` profile with an unresolved `generalization` profile
+and an open comment-formatting gap is not yet a complete reconstitution to adopt.
