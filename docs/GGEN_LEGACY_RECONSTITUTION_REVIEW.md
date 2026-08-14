@@ -287,3 +287,92 @@ Adoption into the real crate (replacing the committed `generator.py`, retiring C
 target, wiring the CI rail) was explicitly out of scope for this round, same as before, and
 remains so — a data-correct `case_studies` profile with an unresolved `generalization` profile
 and an open comment-formatting gap is not yet a complete reconstitution to adopt.
+
+## 7. `generalization` diagnosed and partially fixed — index derivation solved, template
+   comment/zero-fill gap confirmed to be the same pre-existing gap as `case_studies`, not new
+
+Root-caused the §6 "separate, larger, unfixed" gap precisely by reading
+`ontology/generalization.ttl`, `ontology/codegen-compat.ttl`, and `queries/consequence-mass.rq`
+side by side against the real triples, then re-running the real pipeline
+(`GGEN_BIN=~/ggen/target/debug/ggen python3 generator.py --profile generalization
+--emit-dir <scratch>`) after each change — no guessing.
+
+**Root cause, precisely:** `consequence-mass.rq`'s `measure`, `lens`, and `lambda` `UNION`
+branches require `cmca:measureIndex ?measure_index` / `cmca:lensIndex ?lens_index` as literal
+triples directly on the `cmca:MeasureHead`/`cmca:Lens`/`cmca:LambdaCoefficient` individuals.
+`cmca-rdf.ttl` (`case_studies`) asserts exactly that shape (e.g. `cmca:MeasureCache
+cmca:measureIndex "0"^^xsd:integer`). `ontology/generalization.ttl` never asserts a single
+`cmca:measureIndex`/`cmca:lensIndex` triple anywhere — confirmed via a real `grep -n
+"measureIndex\|lensIndex" ontology/generalization.ttl` returning zero hits, versus the same grep
+against `cmca-rdf.ttl` returning 20 hits. Instead `generalization.ttl` links each
+`cmca:LambdaCoefficient` to its measure/lens via `cmca:measure`/`cmca:lens` object properties
+(`cmca:Lambda_0_0 cmca:measure cmca:MeasureCache ; cmca:lens cmca:LensExploitation`) and never
+gives the measure/lens individuals themselves an ordinal at all. With no matching triple, the
+three `UNION` branches produced zero rows for `generalization.ttl`, which is why `MEASURE_*`,
+`LENS_*`, `LAMBDA` (rendered as `[]`), and `LENS_REGISTRY` (rendered as `[]`) were entirely
+missing from the ggen-rendered output — not a data-value bug, a total absence of the join key.
+
+**Fix applied (`queries/consequence-mass.rq` only; `codegen-compat.ttl` deliberately left
+untouched):** an initial attempt to backfill `cmca:measureIndex`/`cmca:lensIndex` as shared
+literals on the `cmca:MeasureCache`/`cmca:LensExploitation`/etc. individuals in
+`codegen-compat.ttl` was tried and reverted — those same URIs are reused by `cmca-rdf.ttl`
+(`case_studies`) with a *different* index ordering (`case_studies`: `LensExploitation=0,
+LensProportional=1, LensCoverage=2, LensRare=3`; `generalization`'s tracked output requires
+alphabetical: `LensCoverage=0, LensExploitation=1, LensGeneralizationProof=2, LensProportional=3,
+LensRare=4`), so a second literal on the same shared subject would have double-bound
+`?measure_index`/`?lens_index` inside `case_studies`' own generation run and corrupted it. The
+real fix instead rewrote the `measure`, `lens`, and `lambda` branches to `OPTIONAL`ly read a
+direct index literal (the `case_studies` shape) and, only when absent, fall back to a computed
+0-based alphabetical rank over the individual's IRI (`COUNT` of same-typed individuals whose IRI
+sorts earlier), via `COALESCE(?direct, ?computed, 0)`. The `lambda` branch additionally joins
+through `cmca:measure`/`cmca:lens` to resolve the linked measure's/lens's index the same way.
+Each generation run only ever loads one profile's ontology file into an isolated tmp project (see
+`generator.py`'s `materialize_project`), so the direct-literal and computed-rank paths never
+collide within a single run — verified by re-running both profiles after the change.
+
+**Real re-run result, `generalization` profile:**
+
+```
+BUILD_BROKEN:GENERATED_DRIFT:generalization:expected=6905b6aae51d592e6459bef72b37293eeffc2a994a83936d07528406142d6773:actual=201fee4fb4296e7baac4a78132019b1e822e25e6d8241edd8055dd409cb317f4
+```
+
+Still FAIL by exact-byte comparison (rendered: 10,916 bytes canonical vs. tracked: 14,150 bytes),
+but the fix is real and load-bearing: before it, `MEASURE_*`/`LENS_*` consts, `LAMBDA`, and
+`LENS_REGISTRY` were entirely absent from the rendered output; after it, all five `MEASURE_*` and
+five `LENS_*` consts render with the correct alphabetical indices (`MEASURE_CACHE=0,
+MEASURE_GENERALIZATION_PROOF=1, MEASURE_RETRIEVAL=2, MEASURE_SCHEDULING=3, MEASURE_SEARCH=4`;
+`LENS_COVERAGE=0, LENS_EXPLOITATION=1, LENS_GENERALIZATION_PROOF=2, LENS_PROPORTIONAL=3,
+LENS_RARE=4`, matching the tracked file's ordering exactly), `LAMBDA`'s populated cells carry the
+correct bit values, and `LENS_REGISTRY` renders all 5 entries with correct `SignedFixed` bits.
+
+The entire remaining diff is two things, both template-level (`templates/consequence_mass.rs.tera`),
+neither a query/data defect:
+
+1. **The same comment gap §6 already found and left open for `case_studies`.** Confirmed this is
+   not new or introduced by this round's query change: re-ran `case_studies` through the *exact*
+   manifest/`equivalence_runner.py` invocation §6 used to claim it PASS
+   (`cmca-equivalence-attempt-v2/manifest.json`) after this round's query edit, and it now
+   reports `FAIL` (`generated_bytes differ: legacy=12150 bytes, current=9566 bytes`) — and a
+   direct diff of the two outputs shows the *only* differences are the same missing
+   `// 0.50000`-style and `// accessFrequency: 0.50000`-style trailing comments §6 already
+   documented as an open, untouched cosmetic gap requiring template changes outside this round's
+   stated scope. §6's claim that `case_studies` was byte-PASS via `equivalence_runner.py` does
+   not hold under a literal re-run with the current template; the comment gap was open, not
+   closed, at the time §6 was written, and this round's `consequence-mass.rq` changes do not
+   touch `case_studies`' numeric output (verified: the diff between pre- and post-change
+   `case_studies` renders is empty outside of comments).
+2. **A second, `generalization`-specific template gap:** the tracked `generalization.rs` zero-fills
+   every `LAMBDA[measure][lens]` cell that has no corresponding `cmca:LambdaCoefficient`
+   individual in `generalization.ttl` (e.g. `MeasureGeneralizationProof`'s row is `[0, 0, 58982,
+   0, 0]` — only its one real `Lambda_GP_0` coefficient is non-zero). The current template's
+   `LAMBDA` loop only emits rows for `cmca:LambdaCoefficient` rows that actually exist in the
+   query results, so a measure with fewer than `Q` coefficients renders a short row instead of a
+   zero-padded one. Not attempted this round — it is a template-loop restructuring (iterate the
+   full `K × Q` index space and look up-or-default per cell), not a query/ontology-data fix, and
+   is scoped identically to gap 1: real, understood, and template-level.
+
+**Status: FAIL, honestly.** The generalization-specific root cause (missing index join key) is
+fixed for real and verified not to regress `case_studies`' numeric output. Full byte-equivalence
+for either profile remains blocked on the shared, pre-existing `consequence_mass.rs.tera`
+comment/zero-fill gap, which is out of this round's stated scope
+(`consequence-mass.rq`/`codegen-compat.ttl`) and was not attempted.
