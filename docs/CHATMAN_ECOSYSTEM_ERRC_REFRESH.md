@@ -206,3 +206,143 @@ original doc's single-repo depth:
   real recomputed mass percentage, (c) a direct code-level (not doctrine-level) diff of bcinr-powl's
   and gymact's receipt implementations, and (d) a direct check of bcinr-cmca's consumer-side code
   for the claimed fixed-point API mismatch.
+
+## 6. Follow-up: the four §5 gaps, closed with real evidence
+
+Run as three independent, real investigations (not another full 8-repo sweep). All four gaps
+from §5 addressed; results below, including one new finding not in scope of the original ask.
+
+### 6.1 praxis — surveyed for the first time this session
+
+**Build: BLOCKED**, and worse than a compile error — `cargo check --workspace` and
+`cargo metadata` both fail at **manifest resolution**, before any code is even read, because
+`Cargo.toml`'s hardcoded local `path = "/Users/sac/..."` dependencies include one
+(`ggen-core` → `/Users/sac/ggen/crates/ggen-core`) that **does not exist** — `~/ggen`'s current
+crate layout has no `ggen-core` (it has `ggen-engine`, `ggen-cli`, `ggen-graph`, etc.). The whole
+praxis workspace is currently un-inspectable by any cargo tool on this machine.
+
+**Mass, corrected**: naive raw count 33,568 files → **5,858 corrected total / 1,027 hand-authored
+source files** (`.rs`/`.py`/`.js`/`.ts`/`.erl`), after excluding `.claude/worktrees` (empty here —
+unlike every other repo, praxis's inflation source is different), `target`, `node_modules`,
+`.venv`, and — the actual culprit — **`vendors/`, 24,262 files (72% of the naive count)**. The
+carried-forward 13,763 figure from the original 2026-08-12 doc is **~13x** the corrected
+hand-authored count and was already itself a partial undercount relative to today's naive total —
+both numbers were dominated by non-hand-authored vendor content, never a real code-mass signal.
+
+**Authority**: explicit self-denial, consistent with every other repo surveyed. `README.md:141`:
+*"Output is proposal (`O`), never authority (`O*`) — every candidate still passes `law`/`plan`
+admission (AR-9)."* `docs/VISION_2030_PRD.md:65`: *"No physical enforcement claims... Admission
+is software-binding, not physics-binding."* No `BRCE.DO` or "standing verdict" string found
+anywhere in the repo.
+
+**Redundancy**: real, direct — not conceptual — dependency edges: `Cargo.toml` hard-paths
+`bcinr-logic`/`bcinr-pddl` from `/Users/sac/bcinr` and (transitively, currently broken)
+`multifractal-workflow` from mfw. Praxis sits as a **consumer** at the top of the local dependency
+graph, not a duplicate-capability island — which is exactly why one missing path cascades into a
+full workspace failure. No evidence found of overlap with ggen-marketplace, ggen-legacy, gymact,
+or autofde-lab in praxis's own docs (checked one direction only — praxis's docs, not the other
+four repos' docs for praxis mentions).
+
+**Since 2026-08-06**: zero commits. The repo is frozen at the exact commit the original 13,763
+figure was drawn from — the number's inaccuracy is 100% a counting-methodology artifact, not
+stale-vs-current code.
+
+### 6.2 bcinr-powl vs. gymact BLAKE3 receipts — resolved, not just flagged
+
+Real code-level comparison (not doctrine): **same core idea (hash-chained receipts over BLAKE3),
+independently and differently engineered — not interoperably verifiable, and not equally rigorous.**
+
+| | bcinr-powl (`causal_receipt.rs`) | gymact (`evidence.py` + `sqlite_ledger.py`) |
+|---|---|---|
+| Canonicalization | Hand-packed fixed 99-byte LE buffer, no general spec — "canonical" means only "this exact Rust struct's field order," undocumented outside a comment | Real RFC 8785 JCS (`rfc8785.dumps`) applied uniformly to arbitrary payloads |
+| Chaining | `BLAKE3(chain_hash \|\| frame_bytes)`, streamed through one `Hasher`; redundantly also stores `prior_hash` per-frame | `BLAKE3(JCS({sequence, previous_digest, receipt_digest}))`, one-shot per record |
+| Persistence | None (in-memory only) | Two ledgers — in-memory and SQLite-WAL, durable |
+| Restart verification | None | On every SQLite ledger open, `verify()` re-walks and re-derives the *entire* chain from stored data before trusting it, refusing to serve a mismatched ledger |
+| Origin authentication | None | HMAC-SHA256 checkpoint signing over the JCS-canonical payload |
+
+**Direct answer to "is this real duplication or convergent-but-different":** genuinely different
+designs for different problems. bcinr's frames are fixed-size, `#[repr(C, align(64))]`,
+cache-line-sized structs for a manufacturing/execution trace where allocation-free streaming
+throughput matters (an explicit performance comment in the code confirms this design intent).
+gymact's records are variable-shape, durably persisted, externally-auditable evidence with
+crash-safety and signed checkpoints for third-party handoff. Forcing a shared verifier would mean
+rewriting one side to fit the other's shape — not a real reuse opportunity.
+
+**One concrete, low-cost, worth-doing action, asymmetric (bcinr side only)**: bcinr's canonical
+form is currently *implicit* — a byte layout documented only in a comment, with no version field
+and no compile-time signal if the struct's field order ever changes beyond a size assertion. That
+is exactly the fragility JCS-style canonicalization exists to prevent. The fix isn't "adopt JCS"
+(wrong tool for a fixed-size, allocation-free hot path) — it's turning the implicit layout into an
+**explicit, versioned wire-format spec**, so a receipt stays verifiable outside the exact Rust
+struct that produced it. Not done this round; a real, scoped, low-risk follow-up if bcinr's
+receipts are ever meant to be checked by anything other than the originating process.
+
+### 6.3 The mfw ↔ bcinr-cmca fixed-point mismatch — real, but backwards from how it was framed, plus a second independent instance found in bcinr itself
+
+**The blocker is real and currently live** — but the direction stated in this session's original
+task framing (mfw emits `from_bits`, consumer wants `from_value_bits`) is **wrong**. The actual
+state, verified by reading both sides directly:
+
+- `bcinr-cmca`'s `NonNegativeFixed`/`SignedFixed` (`crates/bcinr-cmca/src/fixed.rs`) expose
+  **only** `from_bits(bits: u32/i32)`. No `from_value_bits` exists anywhere in the type.
+- mfw's real, currently-committed generator (`~/mfw/tools/cmca-generator/generator.py`, all 4
+  emission sites) emits `NonNegativeFixed::from_value_bits(...)` / `SignedFixed::from_value_bits(...)`.
+- The live ticket that caused this, `~/mfw/docs/jira/v26.7.18/mfw-cmca-producer/task-fix-generator-fixed-point-api_v26.7.18_final_2026-07-17_AgentSwarm.md`
+  (`MFW-261718-002`, P0), asserted the *opposite* of what's actually in `fixed.rs` — it claimed
+  "the consumer fixed-point API only exposes `SignedFixed::from_value_bits()`" and directed the
+  generator to match that false premise. Its acceptance criteria reference
+  `bcinr-cmca/src/generated_artifact.rs`, **which does not exist anywhere in the bcinr tree** — so
+  the fix was applied and never actually verified against a real artifact.
+- **Net effect**: any freshly-generated artifact from mfw's real generator would fail to compile
+  against `bcinr-cmca` today, on an unresolved-method error, in the opposite direction the original
+  framing described. mfw's own `VERIFICATION_REPORT.md` claim of an 89/89 match used a regex for
+  `from_bits(` that would not match `from_value_bits(` — that report is stale relative to the
+  generator's current source, not evidence the mismatch is resolved.
+
+**Second, independent instance found in bcinr's own tree, not part of the original ask**:
+`crates/bcinr-cmca/src/proposal.rs` calls `SignedFixed::from_value_bits(...)` nine times in its
+own `#[cfg(test)]` module — the identical stale name, left over from before a real rename
+(`from_value_bits` → `from_bits`, commit `7197c91f`, "Closure Ticket C1: Repair fixed-point
+semantics") that never propagated to this file. **This does not currently break the build**,
+verified directly (`cargo test -p bcinr-cmca --features std --lib` passes clean) — because
+`proposal.rs`, despite being a real, tracked, doc-commented file ("Authority hop 1 of the C3
+chain," last touched 2026-07-29), is **never declared as a module anywhere** (`grep -rn "mod
+proposal"` across the whole crate returns nothing). It's orphaned dead code, silently excluded
+from compilation, which is the only reason its own stale API reference hasn't already surfaced as
+a build failure. Two separate, real problems worth their own follow-up, not addressed this round:
+(a) decide whether `proposal.rs` should be wired back into `lib.rs` (and if so, fix its
+`from_value_bits` calls first) or removed if superseded, and (b) mfw's generator needs to go back
+to emitting `from_bits` to match the real consumer API, with `MFW-261718-002` corrected or closed
+as based on a false premise.
+
+### 6.4 Portfolio mass — best-effort recomputation, with honest unit caveats
+
+Corrected counts are now available for 8 of the original doc's repos. They are **not
+directly comparable to each other** — some are ".rs files only" (bcinr 689, ggen 2,196), some are
+"hand-authored files across all languages" (mfw 1,233; gymact 327; praxis 1,027 or 5,858 total),
+and autofde-lab's 1,358 is Python-only (its real C++ solver core, `cpp/`, isn't counted). This
+recomputation uses each repo's most-inclusive corrected figure and states that choice per repo —
+treat the resulting percentage as directional, not authoritative, and do not cite it as more
+precise than the inputs allow:
+
+| Repo | Figure used | Basis |
+|---|---|---|
+| bcinr | 689 | `.rs` only |
+| mfw | 1,233 | all hand-authored types |
+| ggen | 2,196 | `.rs` only |
+| ggen-marketplace | 1,802 | corrected total |
+| ggen-legacy | 275 | all hand-authored types |
+| gymact | 327 | all hand-authored types |
+| autofde-lab | 1,358 | Python only (undercounts `cpp/`) |
+| praxis | 5,858 | corrected total, all types |
+| **Sum (8 repos)** | **≈ 13,738** | |
+
+`autofde-lab + praxis` share of this 8-repo corrected sum: **(1,358 + 5,858) / 13,738 ≈ 52.6%** —
+still the largest two repos, still a majority, but nowhere near the original doc's raw-count 75%
+claim, and using praxis's stricter hand-authored figure (1,027) instead: (1,358 + 1,027) / 8,907
+≈ 26.8% — a very different picture depending on which praxis number is used. **This spread itself
+is the honest finding**: the corrected percentage is somewhere between ~27% and ~53% depending on
+methodology choices this refresh cannot fully resolve, a real narrowing from "unverified 75%" but
+not a clean replacement number. This also only covers 8 of the original 11 repos — which 3 are
+missing was not re-established this round (the original doc's full repo list wasn't re-read for
+this recomputation).
