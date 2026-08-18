@@ -32,7 +32,7 @@ use bcinr_cmca::generated::stability_profile::CERTIFICATE_DIGEST;
 /// Frozen BCINR producer base inspected for this v26.9.1 seam closure.
 const BCINR_PRODUCER_BASE: &str = "d6fefefdb95df5dbbb520afe7b5a4df53aa6e27f";
 /// Exact MFW consumer candidate from draft PR #66.
-const MFW_CONSUMER_HEAD: &str = "2ecde02f9d7eaea50cfb4ea7876340c6463ac3a1";
+const MFW_CONSUMER_HEAD: &str = "a808821c6636535bc80f59f660b5b35906948c8e";
 /// MFW's public bridge constant for unsigned Q16.16 `1.0`.
 const MFW_Q16_ONE: u32 = 65_536;
 
