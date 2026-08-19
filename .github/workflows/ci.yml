@@ -30,10 +30,18 @@ jobs:
       # also collides with `ggen sync`, which emits compact output that rustfmt
       # then reformats -- the two can never both be satisfied.
       #
-      # No separate `cargo check`: Clippy runs the same type-check front-end
-      # over a superset of targets (--all-targets), so it is strictly subsumed.
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      # No separate `cargo check`: Clippy runs the same type-check front-end.
+      # Production-facing targets keep the CMCA-102/CMCA-114 deprecation fence
+      # at `-D warnings`. Integration tests deliberately reach the hidden
+      # authority-chain types as falsifiers (the allocator source documents this
+      # test-only reachability), so only test targets admit `deprecated`; every
+      # other warning remains denied. This prevents examples/binaries/libraries
+      # from manufacturing adaptive authority while keeping its hostile courts
+      # executable.
+      - name: Clippy production authority fence
+        run: cargo clippy --workspace --all-features --lib --bins --examples --benches -- -D warnings
+      - name: Clippy test authority courts
+        run: cargo clippy --workspace --all-features --tests -- -D warnings -A deprecated
       # `--features std`, NOT `--all-features`: bcinr-cmca's feature list is
       # alloc, std, and mutant_1..mutant_11 -- the latter are deliberate
       # compile-time sabotage switches meant to be enabled ONE AT A TIME (see
@@ -82,14 +90,13 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      # No `cargo fmt --check` gate: formatting is run by hand. Gating on it
-      # also collides with `ggen sync`, which emits compact output that rustfmt
-      # then reformats -- the two can never both be satisfied.
-      #
-      # No separate `cargo check`: Clippy runs the same type-check front-end
-      # over a superset of targets (--all-targets), so it is strictly subsumed.
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      # Same authority split as the PR rail: production targets must never use
+      # the withheld adaptive chain; explicit test courts may exercise it while
+      # retaining `-D warnings` for every lint except `deprecated`.
+      - name: Clippy production authority fence
+        run: cargo clippy --workspace --all-features --lib --bins --examples --benches -- -D warnings
+      - name: Clippy test authority courts
+        run: cargo clippy --workspace --all-features --tests -- -D warnings -A deprecated
       # Deliberately NOT --all-features: bcinr-cmca declares mutant_1..mutant_11,
       # compile-time sabotage switches whose purpose is to make tests fail (see
       # crates/bcinr-cmca/Cargo.toml). --all-features arms all eleven at once and

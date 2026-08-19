@@ -29,8 +29,8 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       - name: Validate vendored compatibility boundary
         run: cargo clippy -p encode_unicode --all-targets --all-features -- -D warnings
-      - name: Execute non-mutant CMCA baseline
-        run: cargo test -p bcinr-cmca --features std
+      - name: Execute non-mutant CMCA library baseline
+        run: cargo test -p bcinr-cmca --lib --features std
       - name: Execute CMCA to MFW mass bridge
         run: cargo test -p bcinr-cmca --features std --test mfw_mass_bridge_contract
       - name: Verify locked dependency graph
