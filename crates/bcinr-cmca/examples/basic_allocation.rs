@@ -21,33 +21,22 @@
 //! `Q = 4` shape from `generated::consequence_mass::case_studies` -- see
 //! `allocate`'s own doc comment (and CMCA-108) for why that shape is fixed
 //! rather than caller-generic.
+//!
+//! ## Authority boundary
+//!
+//! This first-integrator example deliberately uses `proof = None`. The
+//! adaptive-learning authority chain is withheld pending CMCA-102/CMCA-114
+//! Hoare-logic verification, so an example must not manufacture a trivial
+//! `AdaptiveUpdate` merely to make the allocator run. `None` exercises the
+//! allocator's certified-selection/non-adaptive path without widening that
+//! authority boundary.
 
-use bcinr_cmca::allocator::{
-    allocate, AdaptiveUpdate, AdmittedControlState, CertificateReceipt, CertifiedLearning,
-    EnvelopeReceipt, OutcomeReceipt, StabilityRefusal,
-};
+use bcinr_cmca::allocator::{allocate, StabilityRefusal};
 use bcinr_cmca::fixed::NonNegativeFixed;
 use bcinr_cmca::generated::consequence_mass::case_studies::{
     ETA, LAMBDA, LENS_REGISTRY, N, OBJECT_REGISTRY, Q,
 };
 use bcinr_cmca::generated::stability_profile::CERTIFICATE_DIGEST;
-
-/// A trivially-admitted proof of adaptive update, the same construction
-/// `tests/case_studies.rs` uses -- production callers would thread through
-/// a real, previously-certified `AdaptiveUpdate` instead.
-#[allow(deprecated)] // CMCA-102/CMCA-114: authority chain pending Hoare-logic verification;
-                     // example mirrors tests/case_studies.rs's trivial admission, not a production pattern.
-fn get_proof() -> Option<AdaptiveUpdate<CertifiedLearning>> {
-    AdaptiveUpdate::admit_adaptive_update(
-        AdmittedControlState::admit_control_state(0),
-        CertificateReceipt::admit_certificate(0),
-        EnvelopeReceipt::admit_envelope(0),
-        OutcomeReceipt::admit_outcome(0),
-        NonNegativeFixed::ZERO,
-        NonNegativeFixed::ONE,
-        CertifiedLearning::admit_learning(),
-    )
-}
 
 fn main() {
     // A flat forest: every object is its own root (no hierarchy).
@@ -76,7 +65,7 @@ fn main() {
         &mut prev_mode,
         500,
         CERTIFICATE_DIGEST,
-        get_proof().as_ref(),
+        None,
     );
 
     match result {
