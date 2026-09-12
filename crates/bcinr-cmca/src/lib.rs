@@ -26,6 +26,7 @@
 //! * [`fixed`]: Q16.16 fixed-point arithmetic implementation designed for $CC=1$ operations.
 //! * [`allocator`]: Linear bounds-checked and panic-free bump allocators.
 //! * [`observatory`]: The evaluation engine that computes calibration safety flags based on mathematical thresholds.
+//! * [`production`]: The executable production authority fence; BCINR owns CMCA computation/certification, never SELECT/CONSTRUCT/DO.
 //!
 //! ## `allocator::allocate` is fixed to this crate's own `N=8`/`K=4`/`Q=4` shape (CMCA-108)
 //!
@@ -60,7 +61,7 @@
 //!   all `K x Q` pairs; use this to inspect "what would lens `q` alone
 //!   say" instead of the combined answer.
 //! * [`cascade::consequence_mass`] (requires `alloc`) -- the escape hatch
-//!   for tree shapes other than this crate's fixed `N = 8`/`K = 4`/`Q = 4`;
+//!   for tree shapes other than this crate's fixed `N = 8`, `K = 4`, `Q = 4`;
 //!   use this when the object/measure/lens counts aren't the ones this
 //!   crate was regenerated against.
 //! * [`escort::escort_distribution`] (requires `alloc`) -- the
@@ -142,7 +143,7 @@ pub mod allocator;
 /// exist.
 #[cfg(feature = "alloc")]
 pub mod cascade;
-/// Fractional-exponent escort distribution (`L_q(i) = p_i^q / SUM_j p_j^q`)
+/// Fractional-exponent escort distribution (`L_q(i) = p_i^q / SUM_j p_i^q`)
 /// built on [`allocator::power`]. See the module docs for why this exists
 /// alongside [`cascade::escort_weight`], which only covers integer `q`.
 #[cfg(feature = "alloc")]
@@ -154,6 +155,7 @@ pub mod generated;
 pub mod generated_profile;
 pub mod lrc;
 pub mod observatory;
+pub mod production;
 /// Hand-transcribed exact-rational reference oracle for the CMCA escort
 /// distribution, mirroring `~/mfw`'s `MFW/CMCA/Semantics/Escort.lean`. Not a
 /// machine-checked bridge -- see the module docs for exact scope.
