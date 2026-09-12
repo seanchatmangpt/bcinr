@@ -26,6 +26,7 @@
 //! * [`fixed`]: Q16.16 fixed-point arithmetic implementation designed for $CC=1$ operations.
 //! * [`allocator`]: Linear bounds-checked and panic-free bump allocators.
 //! * [`observatory`]: The evaluation engine that computes calibration safety flags based on mathematical thresholds.
+//! * [`production`]: The executable production authority fence; BCINR owns CMCA computation/certification, never SELECT/CONSTRUCT/DO.
 //!
 //! ## `allocator::allocate` is fixed to this crate's own `N=8`/`K=4`/`Q=4` shape (CMCA-108)
 //!
@@ -154,6 +155,7 @@ pub mod generated;
 pub mod generated_profile;
 pub mod lrc;
 pub mod observatory;
+pub mod production;
 /// Hand-transcribed exact-rational reference oracle for the CMCA escort
 /// distribution, mirroring `~/mfw`'s `MFW/CMCA/Semantics/Escort.lean`. Not a
 /// machine-checked bridge -- see the module docs for exact scope.
