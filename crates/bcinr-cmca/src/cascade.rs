@@ -57,7 +57,13 @@ use crate::fixed::NonNegativeFixed;
 
 /// Largest `|q|` a lens may take. Bounds the repeated-multiplication loop in
 /// [`escort_weight`]; `2` (exploitation) through `-1` (rare) sit far inside it.
-pub const MAX_LENS_MAGNITUDE: u32 = 16;
+///
+/// Derived from [`crate::generated_profile::MAX_LENS_MAGNITUDE`] -- the
+/// ontology-declared policy constant -- rather than duplicated as a literal,
+/// so regenerating the profile from the graph cannot leave this copy stale.
+/// The allocator (always compiled; this module is `alloc`-gated) references
+/// the generated original directly.
+pub const MAX_LENS_MAGNITUDE: u32 = crate::generated_profile::MAX_LENS_MAGNITUDE;
 
 /// A tree of masses to cascade over. `parent[i]` is `None` for a root.
 ///

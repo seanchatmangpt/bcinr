@@ -38,6 +38,11 @@
 //! and asserts on its return value. Nothing writes a file, calls `ggen`,
 //! or mutates state the functions under test depend on.
 
+// Exercises `cascade`/`escort`/`reference_escort` (alloc-gated modules): without
+// the feature this target compiles to zero tests, keeping the default-feature
+// matrix green instead of failing to resolve gated imports.
+#![cfg(feature = "alloc")]
+
 use bcinr_cmca::cascade::{escort_weight, CascadeRefusal};
 use bcinr_cmca::fixed::NonNegativeFixed;
 

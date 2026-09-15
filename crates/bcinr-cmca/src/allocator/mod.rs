@@ -2484,8 +2484,9 @@ pub enum LensSelectionRefusal {
     /// `lens_idx` was not a valid index into the `Q` lenses (`0..Q`).
     LensIndexOutOfRange { lens_idx: usize },
     /// `lenses[lens_idx].q`'s magnitude exceeded
-    /// [`crate::cascade::MAX_LENS_MAGNITUDE`] -- the same, unconditionally
-    /// enforced bound [`crate::escort::escort_distribution`] checks. Not to
+    /// [`crate::generated_profile::MAX_LENS_MAGNITUDE`] -- the same,
+    /// unconditionally enforced bound [`crate::escort::escort_distribution`]
+    /// checks. Not to
     /// be confused with `allocate_in`'s separate, `proof`-conditional
     /// `q in [-2, 2]` admission policy (see
     /// `crate::generated_profile::MAX_LENS_MAGNITUDE`'s doc comment for why
@@ -2584,7 +2585,9 @@ impl std::error::Error for LensSelectionRefusal {}
 /// # Errors
 ///
 /// Refuses (never panics) on an out-of-range `measure`/`lens_idx`, a
-/// `q` magnitude beyond [`crate::cascade::MAX_LENS_MAGNITUDE`], or a
+/// `q` magnitude beyond [`crate::generated_profile::MAX_LENS_MAGNITUDE`]
+/// (which [`crate::cascade::MAX_LENS_MAGNITUDE`] re-derives for the
+/// `alloc`-gated tree-shaped path), or a
 /// cyclic `parent` -- see [`LensSelectionRefusal`].
 pub fn allocate_single_lens(
     states: &[PackedSemanticState; N],
@@ -2605,7 +2608,7 @@ pub fn allocate_single_lens(
     // -- unconditionally enforced, unlike `allocate_in`'s separate `q in
     // [-2, 2]` admission policy (see `LensSelectionRefusal::QMagnitudeExceeded`'s
     // doc comment).
-    if q.to_bits().unsigned_abs() > crate::cascade::MAX_LENS_MAGNITUDE << 16 {
+    if q.to_bits().unsigned_abs() > crate::generated_profile::MAX_LENS_MAGNITUDE << 16 {
         return Err(LensSelectionRefusal::QMagnitudeExceeded { q });
     }
     if check_hierarchy_acyclic(parent).is_err() {

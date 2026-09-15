@@ -29,6 +29,17 @@
 //!    `~/mfw`'s Lean crown is checkpoint E's question, not D's.
 //! 2. **Every one of these five surfaces has zero production callers
 //!    today.** None can honestly be classified `PRODUCTION` authority.
+// These tests deliberately exercise the `#[deprecated]` authority-chain types
+// (`AdaptiveUpdate`, `CertifiedLearning`, receipts, ...) that CMCA-102 fences
+// pending Hoare-logic verification. The crate's integration suite is the
+// documented exception allowed to construct them (see lib.rs's INTEGRATION
+// NOTE); this scoped allow keeps CI's `-D warnings` clippy gate green without
+// un-deprecating the types for production callers.
+#![allow(deprecated)]
+// Exercises `cascade`/`escort`/`reference_escort` (alloc-gated modules): without
+// the feature this target compiles to zero tests, keeping the default-feature
+// matrix green instead of failing to resolve gated imports.
+#![cfg(feature = "alloc")]
 
 use bcinr_cmca::allocator::{
     allocate_in, power, AdaptiveUpdate, AdmittedControlState, CertificateReceipt,

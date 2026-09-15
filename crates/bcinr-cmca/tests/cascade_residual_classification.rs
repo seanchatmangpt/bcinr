@@ -15,6 +15,11 @@
 //! human classification step. It is deliberately not yet a falsifier -- the
 //! permanent law tests come after real output is read.
 
+// Exercises `cascade`/`escort`/`reference_escort` (alloc-gated modules): without
+// the feature this target compiles to zero tests, keeping the default-feature
+// matrix green instead of failing to resolve gated imports.
+#![cfg(feature = "alloc")]
+
 use std::collections::BTreeMap;
 
 use bcinr_cmca::cascade::{consequence_mass_traced, AllocationTrace, CascadeTree};
