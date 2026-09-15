@@ -24,7 +24,13 @@
 //! (c) conserves total allocated capacity to ~1.0 in Q16.16 fixed point. The
 //! tests below check these three properties directly against the real
 //! allocation output, not merely that the call returned `Ok`.
-
+// These tests deliberately exercise the `#[deprecated]` authority-chain types
+// (`AdaptiveUpdate`, `CertifiedLearning`, receipts, ...) that CMCA-102 fences
+// pending Hoare-logic verification. The crate's integration suite is the
+// documented exception allowed to construct them (see lib.rs's INTEGRATION
+// NOTE); this scoped allow keeps CI's `-D warnings` clippy gate green without
+// un-deprecating the types for production callers.
+#![allow(deprecated)]
 #![allow(clippy::needless_range_loop)]
 
 use bcinr_cmca::allocator::{

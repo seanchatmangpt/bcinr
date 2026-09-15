@@ -17,7 +17,13 @@
 //! - No randomness source (allocation depends only on inputs)
 //! - BLAKE3 receipts (auditable, tamper-evident records)
 //! - Identical execution on any hardware, any CPU vendor
-
+// These tests deliberately exercise the `#[deprecated]` authority-chain types
+// (`AdaptiveUpdate`, `CertifiedLearning`, receipts, ...) that CMCA-102 fences
+// pending Hoare-logic verification. The crate's integration suite is the
+// documented exception allowed to construct them (see lib.rs's INTEGRATION
+// NOTE); this scoped allow keeps CI's `-D warnings` clippy gate green without
+// un-deprecating the types for production callers.
+#![allow(deprecated)]
 #![allow(clippy::needless_range_loop)]
 
 use bcinr_cmca::allocator::{

@@ -21,6 +21,13 @@
 //! `Q = 4` shape from `generated::consequence_mass::case_studies` -- see
 //! `allocate`'s own doc comment (and CMCA-108) for why that shape is fixed
 //! rather than caller-generic.
+// These tests deliberately exercise the `#[deprecated]` authority-chain types
+// (`AdaptiveUpdate`, `CertifiedLearning`, receipts, ...) that CMCA-102 fences
+// pending Hoare-logic verification. The crate's integration suite is the
+// documented exception allowed to construct them (see lib.rs's INTEGRATION
+// NOTE); this scoped allow keeps CI's `-D warnings` clippy gate green without
+// un-deprecating the types for production callers.
+#![allow(deprecated)]
 
 use bcinr_cmca::allocator::{
     allocate, AdaptiveUpdate, AdmittedControlState, CertificateReceipt, CertifiedLearning,
