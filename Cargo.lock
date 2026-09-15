@@ -98,6 +98,7 @@ version = "26.9.15"
 dependencies = [
  "bcinr-logic",
  "chicago-tdd-tools",
+ "divan",
  "proptest",
  "serde",
  "serde_json",

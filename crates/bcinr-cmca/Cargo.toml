@@ -25,6 +25,7 @@ serde_json = "1"
 chicago-tdd-tools = { version = "26.7.1", features = ["ocel-generation"] }
 trybuild = "1.0"
 proptest = "1.2.0"
+divan = "0.1"
 
 [features]
 default = []
@@ -41,5 +42,9 @@ mutant_8 = []
 mutant_9 = []
 mutant_10 = []
 mutant_11 = []
+[[bench]]
+name = "allocation_bench"
+harness = false
+
 [lib]
 crate-type = ["rlib"]
