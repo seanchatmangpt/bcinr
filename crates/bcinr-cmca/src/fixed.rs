@@ -154,7 +154,17 @@ impl NonNegativeFixed {
         let d = den_is_zero.select_u32(1, other.val);
 
         let lz = d.leading_zeros();
-        let d_norm = d << lz;
+        // `wrapping_shl`, not `<<`: the zero-divisor guard above makes
+        // `d >= 1` (hence `lz <= 31`) for every lawful input, so the two are
+        // bit-identical in production. But if that guard is ever corrupted
+        // (e.g. an inverted `const_eq_u32` mask under a hostile mutant), a
+        // `d == 0` divisor gives `lz == 32` and `d << lz` panics in debug
+        // builds -- turning the mutant's kill evidence into a panic path
+        // instead of the typed refusal the suite asserts. Masking the shift
+        // amount (as `log2` below already does for its normalization) keeps
+        // the corrupted path executing so the err-tag/refusal machinery can
+        // report it.
+        let d_norm = d.wrapping_shl(lz);
 
         let a_scale = 13021703673752174592u64;
         let b_coeff = 2021160080u64;
