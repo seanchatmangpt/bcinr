@@ -78,10 +78,7 @@ fn run() -> Result<Value, String> {
     let request: SoundnessRequest =
         serde_json::from_str(&input).map_err(|e| format!("invalid request JSON: {e}"))?;
 
-    let transitions = request
-        .transitions
-        .into_iter()
-        .map(|t| (t.id, t.name));
+    let transitions = request.transitions.into_iter().map(|t| (t.id, t.name));
 
     let mut pt = Vec::new();
     let mut tp = Vec::new();
