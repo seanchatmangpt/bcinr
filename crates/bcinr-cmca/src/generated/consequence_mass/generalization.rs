@@ -11,7 +11,7 @@ pub const GENERATOR_VERSION: &str = "v1.1.0";
 pub const RDF_INPUT_DIGEST: &str =
     "448195add75142b933b24d29950c22d4c2c92f82f23caf4f95368e7770b44152";
 pub const GENERATOR_SOURCE_DIGEST: &str =
-    "cb61ea09887e04455d2196aed50c027f18842f58db386e6b6d519988285a9b45";
+    "bf159da344a6d4a2091d150c5a8c4eab5478ca43dafd3c6501d699e8a4027fb6";
 pub const FACTOR_ACCESS_FREQUENCY: usize = 0;
 pub const FACTOR_ACCESS_FREQUENCY_IRI: &str = "cmca:accessFrequency";
 pub const FACTOR_BUSINESS_VALUE: usize = 1;
