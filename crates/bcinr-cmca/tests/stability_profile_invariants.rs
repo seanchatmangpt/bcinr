@@ -42,6 +42,7 @@ use bcinr_cmca::generated::consequence_mass::case_studies::{
 use bcinr_cmca::generated::stability_profile::{
     CERTIFICATE_DIGEST, CONTRACTION_MARGIN, GAIN_MATRIX, MODE_DWELL_ROUNDS_MIN, WEIGHT_VECTOR,
 };
+use bcinr_cmca::stability_theorem::{spectral_radius, stability_profile_is_consistent};
 
 /// Mirrors `allocate_in`'s `gd_ok` computation exactly (mod.rs ~1732-1745):
 /// for every row `i`, `sum_j gain_matrix[i][j] * weight_vector[j] / 1e9 <=
@@ -81,6 +82,62 @@ fn mode_dwell_rounds_min_is_a_positive_gate() {
     assert!(
         MODE_DWELL_ROUNDS_MIN > 0,
         "MODE_DWELL_ROUNDS_MIN must stay positive to gate anything"
+    );
+}
+
+/// `stability_theorem` (the crate's independent numeric verification of the
+/// Weighted Small-Gain *conclusion*) existed with zero callers -- its checks
+/// never executed anywhere in the crate, tests, or gates. This test executes
+/// `spectral_radius` against the live `GAIN_MATRIX` so the theorem's
+/// conclusion -- `rho(G) <= 1 - delta`, not just the per-row `gd_ok`
+/// hypothesis `allocate_in` enforces -- is verified on every test run.
+///
+/// For an entrywise non-negative matrix (guaranteed here by the
+/// `NonNegativeFixed` element type) the row inequality checked above
+/// mathematically implies this conclusion via the Collatz-Wielandt
+/// weighted-sup-norm bound, so this test cannot fail while the one above
+/// passes and the arithmetic holds. Its value is exactly that implication:
+/// it detects a future edit that breaks the derivation chain (e.g. a
+/// regenerated profile, or a broken `spectral_radius` implementation)
+/// rather than trusting the implication forever unexecuted.
+#[test]
+fn spectral_radius_conclusion_holds_for_the_live_profile() {
+    let rho = spectral_radius(&GAIN_MATRIX);
+    let delta = CONTRACTION_MARGIN.raw as f64 / 1_000_000_000.0;
+    assert!(
+        rho <= 1.0 - delta,
+        "Weighted Small-Gain conclusion violated for the live PROFILE: \
+         rho(G) = {rho:.9} > 1 - delta = {:.9}",
+        1.0 - delta
+    );
+}
+
+/// Executes `stability_profile_is_consistent` itself (the combined helper,
+/// previously dead) and characterizes what the declared dwell floor buys.
+///
+/// `chi_max` is not a profile field and has no derived value on record (see
+/// `stability_theorem::minimum_dwell_rounds`'s doc comment, which refuses to
+/// fabricate one). `100.0` here is not asserted to be *the* correct chi -- it
+/// is a round characterization figure: with `delta = 0.01`, the bound
+/// `tau_D > ln(chi)/(-ln(1-delta))` requires ~458.2 rounds at `chi_max = 100`,
+/// so the declared floor of 461 covers any mode-switch growth ratio up to
+/// ~103 with a few rounds of slack. If a future profile edit lowers
+/// `MODE_DWELL_ROUNDS_MIN` below what `chi_max = 100` requires, this test
+/// fails and forces the editor to confront the dwell floor's (currently
+/// underived) value explicitly.
+#[test]
+fn stability_theorem_helper_is_consistent_for_chi_max_100() {
+    let (gain_ok, dwell_ok) = stability_profile_is_consistent(100.0);
+    assert!(
+        gain_ok,
+        "stability_profile_is_consistent reports the gain half failing -- \
+         see spectral_radius_conclusion_holds_for_the_live_profile"
+    );
+    assert!(
+        dwell_ok,
+        "declared MODE_DWELL_ROUNDS_MIN = {MODE_DWELL_ROUNDS_MIN} no longer covers the \
+         dwell bound required at chi_max = 100 -- the floor was edited without \
+         re-deriving what growth ratio it must cover"
     );
 }
 
