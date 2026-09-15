@@ -12,7 +12,9 @@ extern crate core;
 use core::borrow::Borrow;
 use core::fmt;
 use core::ops::Not;
-use core::{u32, u64};
+// `use core::{u32, u64}` (the deprecated std::u32/std::u64 module
+// imports, denied by current nightly's -D warnings) was removed;
+// u32/u64 associated constants below resolve inherently without it.
 #[cfg(feature = "std")]
 use std::io::{Error as ioError, Read};
 
