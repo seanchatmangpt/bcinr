@@ -249,8 +249,8 @@ mod tests {
         let mut tape = PowlTapeLarge::new();
         tape.len = 512;
         // All ops independent (no predecessors, no successors)
-        for i in 0..512 {
-            tape.op_kind[i] = crate::tape::v2::OpKind::Activity;
+        for kind in tape.op_kind.iter_mut().take(512) {
+            *kind = crate::tape::v2::OpKind::Activity;
         }
         // Entry = all 512 ops eligible at once
         let mut state = WidePowlState::new([u64::MAX; 8]);

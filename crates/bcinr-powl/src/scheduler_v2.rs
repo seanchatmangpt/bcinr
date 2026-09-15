@@ -37,10 +37,10 @@ impl PowlV2RunState {
     /// Compute every unfinished operation whose predecessor set is complete.
     pub fn ready_mask(&self, tape: &PowlTape) -> u64 {
         let mut ready = 0u64;
-        for index in 0..tape.len as usize {
+        for (index, op) in tape.ops.iter().enumerate().take(tape.len as usize) {
             let bit = 1u64 << index;
             let unfinished = self.done_mask & bit == 0;
-            let predecessors_complete = tape.ops[index].pred_mask & !self.done_mask == 0;
+            let predecessors_complete = op.pred_mask & !self.done_mask == 0;
             if unfinished && predecessors_complete {
                 ready |= bit;
             }

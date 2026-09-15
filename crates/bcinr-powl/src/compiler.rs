@@ -332,8 +332,14 @@ fn compile_loop<'a>(
     wire(tape, body_seg.exits, redo_seg.entries);
 
     // Scan newly allocated slots for XorDispatch (forbidden inside loop body/redo).
-    for i in pre_len as usize..tape.len as usize {
-        if tape.ops[i].kind == OpKind::XorDispatch {
+    for (i, op) in tape
+        .ops
+        .iter()
+        .enumerate()
+        .take(tape.len as usize)
+        .skip(pre_len as usize)
+    {
+        if op.kind == OpKind::XorDispatch {
             let loop_body_entry = body_seg.entries.trailing_zeros() as u8;
             return Err(CompileError::XorInsideLoop {
                 xor_slot: i as u8,
@@ -574,9 +580,9 @@ pub fn bp_tcrv_validate_reachability(tape: &PowlTape) -> u64 {
 
     // Step 4: Construct mask of nodes requiring reachability.
     let mut must_be_reachable = 0u64;
-    for i in 0..64 {
+    for (i, op) in tape.ops.iter().enumerate().take(64) {
         let in_bounds = (i < tape_len) as u64;
-        let is_not_redo = (tape.ops[i].kind != OpKind::LoopRedo) as u64;
+        let is_not_redo = (op.kind != OpKind::LoopRedo) as u64;
         let active = in_bounds & is_not_redo;
         let mask = 0u64.wrapping_sub(active);
         must_be_reachable |= (1u64 << i) & mask;
@@ -1556,9 +1562,9 @@ mod tests {
         }
 
         let mut must_be_reachable = 0u64;
-        for i in 0..64 {
+        for (i, op) in tape.ops.iter().enumerate().take(64) {
             let in_bounds = (i < tape_len) as u64;
-            let is_not_redo = (tape.ops[i].kind != OpKind::LoopRedo) as u64;
+            let is_not_redo = (op.kind != OpKind::LoopRedo) as u64;
             let active = in_bounds & is_not_redo;
             let mask = 0u64.wrapping_sub(active);
             must_be_reachable |= (1u64 << i) & mask;
@@ -1599,9 +1605,9 @@ mod tests {
         }
 
         let mut must_be_reachable = 0u64;
-        for i in 0..64 {
+        for (i, op) in tape.ops.iter().enumerate().take(64) {
             let in_bounds = (i < tape_len) as u64;
-            let is_not_redo = (tape.ops[i].kind != OpKind::LoopRedo) as u64;
+            let is_not_redo = (op.kind != OpKind::LoopRedo) as u64;
             let active = in_bounds & is_not_redo;
             let mask = 0u64.wrapping_sub(active);
             must_be_reachable |= (1u64 << i) & mask;
@@ -1668,9 +1674,9 @@ mod tests {
             let len = rng.next_range(1, 64);
             tape.len = len as u8;
 
-            for i in 0..len {
+            for op in tape.ops.iter_mut().take(len) {
                 let kind_val = rng.next_range(0, 4);
-                tape.ops[i].kind = match kind_val {
+                op.kind = match kind_val {
                     0 => OpKind::Atom,
                     1 => OpKind::Silent,
                     2 => OpKind::XorDispatch,
@@ -1678,40 +1684,44 @@ mod tests {
                     _ => OpKind::LoopRedo,
                 };
                 if rng.next_range(0, 10) == 0 {
-                    tape.ops[i].kind = OpKind::LoopRedo;
+                    op.kind = OpKind::LoopRedo;
                 }
             }
 
-            for i in 0..len {
+            for (i, op) in tape.ops.iter_mut().enumerate().take(len) {
                 let mut succs = 0u64;
                 for j in (i + 1)..len {
                     if rng.next_range(0, 3) == 0 {
                         succs |= 1u64 << j;
                     }
                 }
-                tape.ops[i].succ_mask = succs;
+                op.succ_mask = succs;
             }
 
-            for i in 0..len {
-                if tape.ops[i].kind == OpKind::LoopRedo {
+            for (i, op) in tape.ops.iter_mut().enumerate().take(len) {
+                if op.kind == OpKind::LoopRedo {
                     let mut succs = 0u64;
                     for j in 0..i {
                         if rng.next_range(0, 3) == 0 {
                             succs |= 1u64 << j;
                         }
                     }
-                    tape.ops[i].succ_mask = succs;
+                    op.succ_mask = succs;
                 }
             }
 
-            for i in 0..len {
+            // Snapshot successor masks first: the broadcast pattern reads
+            // every op's succ_mask while writing each op's pred_mask, which
+            // cannot borrow the same array mutably and immutably at once.
+            let succ_snapshot: Vec<u64> = tape.ops.iter().take(len).map(|o| o.succ_mask).collect();
+            for (i, op) in tape.ops.iter_mut().enumerate().take(len) {
                 let mut preds = 0u64;
-                for j in 0..len {
-                    if (tape.ops[j].succ_mask & (1u64 << i)) != 0 {
+                for (j, &sm) in succ_snapshot.iter().enumerate() {
+                    if (sm & (1u64 << i)) != 0 {
                         preds |= 1u64 << j;
                     }
                 }
-                tape.ops[i].pred_mask = preds;
+                op.pred_mask = preds;
             }
 
             let mut entry_mask = 0u64;

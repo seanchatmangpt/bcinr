@@ -211,10 +211,10 @@ impl HasPowlTape for crate::tape::v2::PowlTape {
 
     fn content_hash(&self) -> [u8; 32] {
         let mut h = blake3::Hasher::new();
-        for i in 0..self.len as usize {
-            h.update(&self.ops[i].pred_mask.to_le_bytes());
-            h.update(&self.ops[i].succ_mask.to_le_bytes());
-            h.update(&[self.ops[i].op_kind as u8]);
+        for op in self.ops.iter().take(self.len as usize) {
+            h.update(&op.pred_mask.to_le_bytes());
+            h.update(&op.succ_mask.to_le_bytes());
+            h.update(&[op.op_kind as u8]);
         }
         *h.finalize().as_bytes()
     }
@@ -232,10 +232,10 @@ impl HasPowlTape for crate::tape::PowlTape {
 
     fn content_hash(&self) -> [u8; 32] {
         let mut h = blake3::Hasher::new();
-        for i in 0..self.len as usize {
-            h.update(&self.ops[i].pred_mask.to_le_bytes());
-            h.update(&self.ops[i].succ_mask.to_le_bytes());
-            h.update(&[self.ops[i].kind as u8]);
+        for op in self.ops.iter().take(self.len as usize) {
+            h.update(&op.pred_mask.to_le_bytes());
+            h.update(&op.succ_mask.to_le_bytes());
+            h.update(&[op.kind as u8]);
         }
         *h.finalize().as_bytes()
     }
@@ -899,8 +899,8 @@ impl<const KIND: TopologyKind> Receipt<KIND> {
     pub fn verify_topo_order(&self, tape_ops: &[crate::tape::Powl64Op]) -> bool {
         let count = self.event_count as usize;
         let mut step_of = [u8::MAX; 64];
-        for step in 0..count {
-            let op = self.topo_order[step] as usize;
+        for (step, &op_slot) in self.topo_order.iter().enumerate().take(count) {
+            let op = op_slot as usize;
             if op >= 64 || op >= tape_ops.len() {
                 return false;
             }
@@ -916,8 +916,8 @@ impl<const KIND: TopologyKind> Receipt<KIND> {
             }
         }
         // Rule 2: predecessor order
-        for step in 0..count {
-            let op_idx = self.topo_order[step] as usize;
+        for (step, &op_slot) in self.topo_order.iter().enumerate().take(count) {
+            let op_idx = op_slot as usize;
             if op_idx >= tape_ops.len() {
                 return false;
             }

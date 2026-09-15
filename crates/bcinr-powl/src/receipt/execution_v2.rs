@@ -255,8 +255,7 @@ pub fn digest_tape(tape: &PowlTape) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"bcinr:powl-v2:tape:v1");
     hasher.update(&[tape.len, tape.entry_op, tape.exit_op]);
-    for index in 0..tape.len as usize {
-        let op = &tape.ops[index];
+    for op in tape.ops.iter().take(tape.len as usize) {
         hasher.update(&op.pred_mask.to_le_bytes());
         hasher.update(&op.succ_mask.to_le_bytes());
         hasher.update(&op.ctrl.to_le_bytes());

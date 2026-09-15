@@ -240,10 +240,10 @@ impl ReadySet {
     /// Extract which ops are ready to fire from the state.
     pub fn from_state(tape: &PowlTape, state: &PowlRunState) -> Self {
         let mut indices = Vec::new();
-        for i in 0..tape.len as usize {
+        for (i, op) in tape.ops.iter().enumerate().take(tape.len as usize) {
             let bit = 1u64 << i;
             let unfinished = state.done_mask & bit == 0;
-            let predecessors_complete = tape.ops[i].pred_mask & !state.done_mask == 0;
+            let predecessors_complete = op.pred_mask & !state.done_mask == 0;
             if unfinished && predecessors_complete {
                 indices.push(i);
             }
@@ -300,11 +300,11 @@ pub fn run_with_reorder_injection(
         all_fired |= fs.0;
 
         // Verify all fired ops have satisfied predecessors
-        for i in 0..tape.len as usize {
+        for (i, op) in tape.ops.iter().enumerate().take(tape.len as usize) {
             let bit = 1u64 << i;
             if fs.0 & bit != 0 {
                 // Op i fired; check all predecessors are done
-                let missing_pred = tape.ops[i].pred_mask & !state.done_mask;
+                let missing_pred = op.pred_mask & !state.done_mask;
                 if missing_pred != 0 {
                     validity_violations.push((
                         ticks_executed,
