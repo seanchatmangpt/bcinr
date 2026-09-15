@@ -41,7 +41,7 @@ But here's the tricky part: **you change your mind about what matters**. Sometim
 **CMCA is a robot brain that picks which assignment to do**, and it does it in a way that:
 1. **Never wastes time** (O(1) constant time, always)
 2. **Never gets stuck** (oscillates between good choices)
-3. **Proves it picked right** (BLAKE3 receipt chain)
+3. **Proves it picked right** (verifiable receipt chain)
 4. **Works in your head** (no secret memory, all state visible)
 
 The magic: **it uses math to guarantee** that if you follow its picks, you'll make progress toward your goal, no matter which "pick strategy" (q-lens) you're using.
@@ -85,7 +85,7 @@ Think of CMCA as an air traffic controller deciding which airplane lands next:
 1. **Deterministic**: Same input → same output, always
 2. **Branchless**: Constant execution time (no "if this, then that" branches)
 3. **Optimal**: Picks the best candidate for the current strategy
-4. **Verifiable**: BLAKE3 receipt proves the pick was correct
+4. **Verifiable**: an audit receipt records the pick and lets anyone recompute it
 5. **Stable**: Won't oscillate between choices (dwell-time enforcement)
 
 ---
@@ -108,7 +108,7 @@ Transition:
      else if dwell_counter >= dwell_threshold:
        accept mode_change, reset dwell_counter = 0
   5. Update: done_mask ← done_mask | (1 << i*)
-  6. Seal: receipt ← BLAKE3(prev_receipt || s_t || i*)
+  6. Seal: receipt ← audit digest of the inputs (see Level 4's as-built caveat)
   7. Output: (selected_candidate = i*, new_state = s_{t+1})
 ```
 
@@ -268,19 +268,27 @@ This guarantees:
   3. No oscillation: monotonic decrease in state norm
 ```
 
-### Receipt Chain (Cryptographic Integrity)
+### Receipt Chain (Audit-Trail Integrity)
 
-CMCA uses **BLAKE3 rolling hashes** to bind each decision:
+> **As-built caveat (supersedes the cryptographic framing this section used to carry):**
+> the shipped allocation receipts (`src/allocation_receipt.rs`) bind each decision with a
+> 64-bit non-cryptographic splitmix64-style digest (`mix64`) — **not** BLAKE3, and **not a
+> security boundary**. The module's own documentation states a party who can freely choose
+> both a receipt and its claimed inputs could construct a digest collision. What the
+> mechanism does guarantee: verification *recomputes* the share from the recorded inputs
+> and refuses on mismatch, so a receipt claiming a share that the recorded inputs do not
+> produce fails verification. BLAKE3 does appear in this crate, but only in
+> `src/artifact.rs` (a dev-dependency) for generated-manifest integrity, and in
+> `bcinr-powl`'s `OcelCausalReceipt`.
 
 ```
-receipt_t = BLAKE3(receipt_{t-1} || state_t || decision_t)
+receipt_t = audit_digest(receipt inputs at t)
 
-Invariant: receipt_t = receipt_t' ⟹ state_t = state_t' AND decision_t = decision_t'
+Verification property: verify_allocation_receipt(receipt, inputs) recomputes the
+share from `inputs` and accepts only if it matches the receipt's recorded share.
 
-Tamper-evidence:
-  If adversary modifies decision_5, then receipt_5..receipt_N all change.
-  Original receipt chain is now distinct from mutated chain.
-  Replay impossible: altered chain has different hash.
+Tamper-evidence scope: accidental/incidental input drift and audit-trail structure.
+NOT adversary-resistant: see the caveat above.
 ```
 
 ### Q-Lens Strategies: Formal Definitions
@@ -342,14 +350,14 @@ Middle-ground between exploitation and coverage.
   (s.ready_mask ≠ 0 OR s.done_mask = ALL_BITS) AND
   (s.dwell_counter ≤ dwell_threshold) AND
   (s.mode ∈ {EXPLOIT, COVERAGE, RARE, PROPORTIONAL}) AND
-  (s.receipt_chain is BLAKE3-verifiable)
+  (s.receipt_chain is verifiable by recomputation)
 ```
 
 **Postcondition:**
 ```
 ∀s, s' ∈ CMCA_State such that s ⟹ s':
   (s'.done_mask = s.done_mask ∨ (∃i: s'.done_mask = s.done_mask | (1 << i))) AND
-  (s'.receipt_chain = BLAKE3(s.receipt_chain || s || i)) AND
+  (s'.receipt_chain recomputes from s' exactly) AND
   (s'.dwell_counter ≥ 0) AND
   (λ_max(G[s'.mode]) < 1.0 ⟹ ||s'||_2 ≤ (1-ρ)||s||_2)
 ```
@@ -410,21 +418,26 @@ Proof:
 Therefore: execution time is independent of candidate set size.
 ```
 
-### Tamper-Evidence: BLAKE3 Chain Binding
-
-**Theorem (Receipt Chain is Immutable):**
+### Tamper-Evidence: Audit-Trail Binding (checked property, not a theorem)
 
 ```
-For receipt chain R = [r_0, r_1, ..., r_T] where r_t = BLAKE3(r_{t-1} || s_t || d_t):
+For a receipt R binding inputs I to a recorded share s:
 
-If adversary mutates r_i for some i < T:
-  1. r_{i+1} must be recalculated (BLAKE3 is deterministic)
-  2. But r_{i+1} depends on BLAKE3(r_i || ...), so it changes
-  3. Cascading effect: r_j changes ∀j > i
-  4. Attacker cannot predict future r_j values (BLAKE3 pre-image resistance)
-  5. Therefore, original chain R and mutated chain R' are distinct
+verify_allocation_receipt(R, I) recomputes the share from I via the same
+kernel `allocate_in` uses, and accepts only on exact match.
 
-Conclusion: Modification is detected immediately by comparing chain hashes.
+Therefore:
+  1. A receipt claiming a share its recorded inputs do not produce is refused.
+  2. Accidental input drift (wrong weights snapshot, wrong parent forest,
+     edited state) changes the recomputation and is caught.
+
+Explicitly NOT covered:
+  - An adversary who can freely choose both R and I can construct a
+    64-bit mix64 digest collision (non-cryptographic finalizer).
+  - Passing the wrong *weights snapshot* (pre- vs post-MWU) is a caller-
+    discipline requirement, not a checked one.
+
+See `src/allocation_receipt.rs`'s module docs for the authoritative statement.
 ```
 
 ### Q-Lens Optimality (sketch)
@@ -518,32 +531,34 @@ Inv_1: done_mask ⊆ ALL_BITS (no spurious bits)
   Base: done_mask_0 = 0 ✓
   Step: done_mask_t | (1 << i) where i ∈ {0..63} ✓
 
-Inv_2: receipt_chain is BLAKE3-verifiable
-  Base: receipt_0 = BLAKE3(0 || state_0 || decision_0) ✓
-  Step: receipt_{t+1} = BLAKE3(receipt_t || ...) ✓
+Inv_2: receipt bindings are verifiable by recomputation
+  Base: receipt_0 binds state_0/decision_0, recomputes exactly ✓
+  Step: receipt_{t+1} binds the post-update state, recomputes exactly ✓
 
 Inv_3: ∀i ∈ done_mask: preconditions_satisfied(state, i)
   Base: done_mask_0 = 0 (vacuously true) ✓
   Step: (i ∈ admitted ∧ preconditions_satisfied) ⟹ i ∈ done_mask ✓
 ```
 
-#### 5. Bounded Model Checker Output
+#### 5. Bounded Model Checker Output (ILLUSTRATIVE — NOT EXECUTED)
+
+> **No bounded model checker, SMT solver, or model-checking harness exists in this
+> repository.** The block below is a sketch of what such output *would* look like; it is
+> not real tool output and must not be cited as verification evidence. This matches the
+> "🔄 PARTIAL" list in the Verification Status section, which correctly records bounded
+> model checking as *pending*. The contraction property it gestures at is actually
+> covered — for the live profile constants only — by the row-inequality test and the
+> independent spectral-radius test in `tests/stability_profile_invariants.rs`.
 
 ```
 Property: "No oscillation in mode selection"
 Domain: 64 candidates, 4 modes, 1000 ticks
-Status: VERIFIED
-Bound: depth = 1000 (all paths explored)
-Witnesses: 0 (no violations found)
-Time: 4.2 seconds
-Memory: 127 MB
+Status: NOT EXECUTED (no BMC harness in this repo)
 
 Property: "Contraction with ρ=0.1"
 Domain: Q16.16 fixed-point, [0, 65535]
-Status: VERIFIED (probabilistic)
-Samples: 10,000 random states
-Violations: 0
-Min Contraction: 0.099 (meets ρ=0.1 threshold)
+Status: NOT EXECUTED as a sweep; the live 5x5 profile is checked exactly
+        (row inequality at init + spectral radius ~0.980 <= 0.99 in tests)
 ```
 
 ---
@@ -560,14 +575,21 @@ crates/bcinr-cmca/
 │   └── generalization.ttl       # N=9, K=5, Q=5 fixture source
 ├── src/
 │   ├── lib.rs                   # crate root, MAPE-K framing doc-comment
-│   ├── allocator.rs             # Cascade allocation algorithm (branchless CC=1)
+│   ├── allocator/
+│   │   ├── mod.rs               # Cascade allocation algorithm (branchless CC=1 kernel)
+│   │   └── feasible_region.rs   # FeasibleRegion (m/c bounds) used by allocate/allocate_in
 │   ├── certification.rs         # Certificate validation (witness checking)
 │   ├── proposal.rs              # Mode proposal handling
-│   ├── artifact.rs              # Generated manifest + BLAKE3 verification
+│   ├── artifact.rs              # Generated manifest + BLAKE3 verification (dev-dep)
 │   ├── observatory.rs           # evaluate_calibration / calibration safety flags
 │   ├── fixed.rs                 # Q16.16 fixed-point arithmetic
+│   ├── escort.rs                # Fractional-q escort distribution (alloc feature)
+│   ├── cascade.rs               # Arbitrary-shape cascade (alloc feature)
+│   ├── reference_escort.rs      # Exact-rational hand-transcribed Lean oracle (alloc feature)
+│   ├── allocation_receipt.rs    # Audit-trail receipts (mix64 digest, NOT cryptographic)
 │   ├── lrc.rs
-│   ├── stability_theorem.rs     # Stability/eigenvalue theorem support
+│   ├── stability_theorem.rs     # Independent spectral-radius/dwell verification
+│   ├── generated_profile.rs     # ggen-synced policy constants (MAX_LENS_MAGNITUDE, ...)
 │   └── generated/
 │       ├── stability_profile.rs
 │       └── consequence_mass/
@@ -586,27 +608,30 @@ built; the tree above reflects the actual crate as of this writing.)
 
 ### Hot-Path Algorithm (Branchless)
 
-The real entry point is (`src/allocator.rs:1383`):
+The real entry points are `allocate` and `allocate_in` in `src/allocator/mod.rs`
+(`allocate` is a thin wrapper that always passes `FeasibleRegion::CURRENT`;
+`allocate_single_lens` in the same file exposes one lens without the LAMBDA blend):
 
 ```rust
-pub fn allocate(
+pub fn allocate_in(
     states: &[PackedSemanticState; N],
     lenses: &[LensSpec; Q],
     lambda: &[[NonNegativeFixed; K]; Q],
-    // ...additional cascade/forest parameters
+    // ...additional cascade/forest parameters (eta, parent, MWU weights,
+    // payoffs, zeta, epsilon_kappa, mu, costs, t, dwell state, digest, proof)
 ) -> /* allocation result */ {
     // Cascade allocation over the semantic-object forest: root weights
     // W_root(i) = exp2(q * log2(M_k,i) - A_max), propagated down N nodes
     // via `flow_step`, using branchless selection primitives
-    // `const_select_u32` / `const_select_bool` (allocator.rs:683, 763)
+    // `const_select_u32` / `const_select_bool` (also in `src/allocator/mod.rs`)
     // in place of conditional branches.
 }
 ```
 
 The illustrative pseudocode this section previously showed (`config.gain_matrix`,
 `select_max_branchless`, `dwell_counter`) does not correspond to any function in this crate —
-that framing belonged to a different, unbuilt design. See `allocator.rs` directly for the exact
-signature and cascade-propagation logic.
+that framing belonged to a different, unbuilt design. See `src/allocator/mod.rs` directly for
+the exact signature and cascade-propagation logic.
 
 **Properties:**
 - No `if`, `match`, loops in the hot path
@@ -620,24 +645,32 @@ signature and cascade-propagation logic.
 
 ## Verification Status
 
-### ✅ ALIVE (Proven Correct)
+> Standing labels follow the repository constitution's bounded vocabulary (`INVARIANT`,
+> `ALIVE`, `PROVEN`, ...). "PROVEN" is reserved for machine-checked or exhaustively
+> established theorems; nothing in this crate currently meets that bar, and no row below
+> claims it.
+
+### ✅ Verified within stated scope
 
 | Property | Method | Status |
 |----------|--------|--------|
-| Memory Safety | Rust forbid(unsafe_code) | ✅ PROVEN |
-| Branchless Execution | Object-code audit (arm64) | ✅ VERIFIED |
-| Determinism | Differential oracle testing | ✅ ALIVE |
-| Q16.16 Precision | ±1 ULP tolerance | ✅ PASS |
-| Stability (λ_max < 1) | Eigenvalue computation | ✅ CERTIFIED |
-| No Oscillation | Dwell-time + contraction | ✅ PROVEN |
-| Receipt Tamper-Evidence | BLAKE3 collision resistance | ✅ ASSURED |
-| Optimality | Thompson sampling analysis | ✅ PROVEN |
+| Memory Safety | Rust `#![deny(unsafe_code)]` | ✅ INVARIANT (lint-enforced) |
+| Branchless Execution | Object-code audit (arm64, v26.7.17 — re-run on hot-path changes) | ✅ ALIVE as of that audit |
+| Determinism | Differential proptest vs independent f64 oracle (`tests/differential.rs`) | ✅ ALIVE |
+| Q16.16 Precision, integer q | Bit-exact repeated multiplication (`cascade::escort_weight`) | ✅ EXACT |
+| Q16.16 Precision, fractional q | Measured empirical sweeps (`tests/power_error_bound.rs`): ~0.5% rel. err at \|q\|≤0.25 rising to ~36.9% at \|q\|=16; surfaced per-call via `PathConfidence` | ✅ ALIVE within measured envelope |
+| Stability (ρ(G) ≤ 1−δ) | Row inequality enforced at init (`gd_ok`) + independent spectral-radius test (`tests/stability_profile_invariants.rs`, ρ≈0.980 ≤ 0.99 for live constants) | ✅ ALIVE |
+| No Oscillation | Dwell-time gate + contraction check + case-study tests | ✅ ENFORCED + TESTED (not formally proven) |
+| Receipt Audit Trail | Recomputation-based verification, mix64 digest | ✅ ALIVE (audit aid; **not** tamper-evidence against adversaries) |
+| Mutant Resistance | Hostile mutants 1–11, each killed in isolated feature builds (`tests/hostile_mutants.rs`) | ✅ ALIVE |
 
 ### 🔄 PARTIAL (Awaiting Final Verification)
 
+- Q-lens optimality lemmas (Level 5 sketches only; no proof or test exists)
 - Authority chain policy evaluation (Horn logic engine - pending)
-- Bounded model checking (SMT solver - pending)
+- Bounded model checking (SMT solver - pending; the Level 6 "BMC output" block is illustrative, not executed)
 - Formal proof in Coq/Isabelle (interactive theorem prover - pending)
+- Machine-checked Lean correspondence (current link is a hand-transcribed oracle + differential tests; `~/mfw`'s Escort.lean is not bridged by FFI or codegen)
 
 ### 📋 SPECIFICATION (Formal Contracts)
 
@@ -655,14 +688,14 @@ signature and cascade-propagation logic.
 - **ELI5**: CMCA is a homework chooser that picks the right task, adapts its strategy, and proves it was right.
 - **Beginner**: CMCA is an allocation algorithm with stable mode-switching, cryptographic receipts, and deterministic execution.
 - **Intermediate**: CMCA uses discrete-time dynamics, gain matrices, Lyapunov stability, and dwell-time enforcement.
-- **Advanced**: CMCA is a timed automaton with Horn-logic policies, BLAKE3 tamper-evidence, and formal verification contracts.
+- **Advanced**: CMCA is a timed automaton with Horn-logic policies, recomputation-verifiable audit receipts, and formal verification contracts.
 - **PhD**: CMCA is refinement-verified system with temporal logic properties, bounded model checking, and constructed Lyapunov functions proving contraction.
 - **PhD+**: CMCA generates proof objects for automated verifiers (CTL/LTL, refinement theorems, invariant proofs, bounded model checking witnesses).
 
 **The Core Claim:** CMCA provides a mathematically rigorous, formally verifiable allocation mechanism that:
 1. **Works fast** (O(1) constant time, branchless)
 2. **Works right** (deterministic, optimal, stable)
-3. **Proves it works** (BLAKE3 receipts, formal contracts)
+3. **Proves it works** (recomputation-verifiable receipts, formal contracts)
 4. **Never flip-flops** (dwell-time enforcement, stability theorem)
 
 If any claim fails, the falsification adversarial test suite catches it.
@@ -673,7 +706,7 @@ If any claim fails, the falsification adversarial test suite catches it.
 
 - **Stability Theory**: Lyapunov functions, eigenvalue bounds, contraction mapping theorem
 - **Formal Methods**: Hoare logic, temporal logic (CTL/LTL), timed automata, refinement
-- **Cryptography**: BLAKE3 collision resistance, tamper-evident hashing
+- **Cryptography**: BLAKE3 (used for generated-manifest integrity in `artifact.rs` only; allocation receipts are non-cryptographic — see Level 4)
 - **Control Theory**: Gain matrices, mode selection, stochastic allocation
 - **Algorithms**: Thompson sampling, entropy-based exploration, inverse-frequency weighting
 
@@ -681,9 +714,9 @@ If any claim fails, the falsification adversarial test suite catches it.
 - Sutton & Barto, "Reinforcement Learning: An Introduction" (Q-lenses as exploration strategies)
 - Lynch, "Distributed Algorithms" (timed automata, safety/liveness properties)
 - Bertsekas & Tsitsiklis, "Parallel and Distributed Computation" (Lyapunov stability)
-- Bellare & Rogaway, "Introduction to Modern Cryptography" (BLAKE3 security model)
+- Bellare & Rogaway, "Introduction to Modern Cryptography" (hash security models — relevant to `artifact.rs`'s BLAKE3 use, not to allocation receipts)
 
 **Standards:**
 - IEEE Std 1850-2010 (PSL: Property Specification Language for temporal properties)
 - ISO/IEC 16999-1 (OCEL 2.0: Object-centric Event Log standard)
-- NIST FIPS 202 (SHA-3 / BLAKE3 cryptographic hashing)
+- NIST FIPS 202 (SHA-3 cryptographic hashing)
