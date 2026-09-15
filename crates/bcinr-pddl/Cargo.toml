@@ -1,6 +1,6 @@
 [package]
 name = "bcinr-pddl"
-version = "26.7.28"
+version = "26.9.15"
 edition = "2021"
 description = "PDDL 3.1 admission → planning → POWL projection → OCEL/BLAKE3 receipts"
 license = "MIT OR Apache-2.0"
@@ -24,14 +24,14 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = { version = "0.4", features = ["serde"] }
 # Shared multifractal planning IR. This edge is one-way.
-bcinr-mfw-ir = { path = "../bcinr-mfw-ir", version = "26.7.28" }
+bcinr-mfw-ir = { path = "../bcinr-mfw-ir", version = "26.9.15" }
 # Optional POWL execution/proof path.
-bcinr-powl = { path = "../bcinr-powl", version = "26.7.28", optional = true }
+bcinr-powl = { path = "../bcinr-powl", version = "26.9.15", optional = true }
 # CMCA allocation: BCINR-CMCA-G moves the process-to-priority mapping from
 # fixture code into a canonical production composition surface
 # (cmca_execution.rs), so this is a real (feature-gated) dependency, not a
 # dev-only one.
-bcinr-cmca = { path = "../bcinr-cmca", version = "26.7.28", features = ["alloc"], optional = true }
+bcinr-cmca = { path = "../bcinr-cmca", version = "26.9.15", features = ["alloc"], optional = true }
 
 [features]
 dhat-heap = []

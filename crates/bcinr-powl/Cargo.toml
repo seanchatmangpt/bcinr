@@ -1,6 +1,6 @@
 [package]
 name = "bcinr-powl"
-version = "26.7.28"
+version = "26.9.15"
 edition = "2021"
 description = "POWL 2.0 model, compiler, concurrency guards, executable scheduler, and cryptographic execution evidence"
 license = "MIT OR Apache-2.0"
@@ -13,13 +13,13 @@ keywords = ["workflow", "branchless", "petri", "conformance", "blake3"]
 categories = ["algorithms", "data-structures"]
 
 [dependencies]
-bcinr-logic = { version = "26.7.28", path = "../bcinr-logic" }
+bcinr-logic = { version = "26.9.15", path = "../bcinr-logic" }
 # Shared IR types/trait contracts for multifractal planning. This edge is one-way.
-bcinr-mfw-ir = { version = "26.7.28", path = "../bcinr-mfw-ir" }
+bcinr-mfw-ir = { version = "26.9.15", path = "../bcinr-mfw-ir" }
 # Multifractal consequence allocation over the POWL process hierarchy
 # (`crate::multifractal`). One-way: bcinr-cmca is `no_std` and knows nothing
 # about POWL, so the join lives here, on the side that already has the tree.
-bcinr-cmca = { version = "26.7.28", path = "../bcinr-cmca", features = ["alloc"] }
+bcinr-cmca = { version = "26.9.15", path = "../bcinr-cmca", features = ["alloc"] }
 blake3 = "1"
 wasm4pm-compat = "26.6.29"
 # Unconditional since 26.7.29: the folded-in `receipt` module (formerly the

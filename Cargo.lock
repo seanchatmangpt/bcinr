@@ -84,7 +84,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-cheat-scanner"
-version = "26.7.25"
+version = "26.9.15"
 dependencies = [
  "quote",
  "serde_json",
@@ -94,7 +94,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-cmca"
-version = "26.7.28"
+version = "26.9.15"
 dependencies = [
  "bcinr-logic",
  "chicago-tdd-tools",
@@ -106,7 +106,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-contract-gate"
-version = "26.7.25"
+version = "26.9.15"
 dependencies = [
  "quote",
  "syn",
@@ -115,7 +115,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-guarded"
-version = "26.7.25"
+version = "26.9.15"
 dependencies = [
  "bcinr-cmca",
  "bcinr-powl",
@@ -123,7 +123,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-logic"
-version = "26.7.28"
+version = "26.9.15"
 dependencies = [
  "criterion",
  "proptest",
@@ -131,14 +131,14 @@ dependencies = [
 
 [[package]]
 name = "bcinr-mfw-ir"
-version = "26.7.28"
+version = "26.9.15"
 dependencies = [
  "blake3",
 ]
 
 [[package]]
 name = "bcinr-pddl"
-version = "26.7.28"
+version = "26.9.15"
 dependencies = [
  "bcinr-cmca",
  "bcinr-mfw-ir",
@@ -156,7 +156,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-powl"
-version = "26.7.28"
+version = "26.9.15"
 dependencies = [
  "bcinr-cmca",
  "bcinr-logic",
@@ -174,7 +174,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-reporter"
-version = "26.7.25"
+version = "26.9.15"
 dependencies = [
  "prettytable-rs",
  "regex",
