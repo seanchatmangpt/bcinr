@@ -2,6 +2,14 @@
 name = "ggen"
 version = "0.1.0"
 edition = "2021"
+# NOT PUBLISHABLE, by operator decision (2026-09-15): the name `ggen` on
+# crates.io is this ecosystem's own separate ontology->code generator (18
+# published CalVer versions, latest 26.15.2) -- a different tool than this
+# repo's counterfactual/falsification test-case generator. Publishing this
+# crate under the same name would collide with (or pollute) that tool at a
+# downgraded, semantically different 0.1.0. Keep local, like
+# encode_unicode_patch; rename to bcinr-ggen if it ever needs publishing.
+publish = false
 license = "MIT OR Apache-2.0"
 description = "Generate counterfactual and falsification test cases to probe for algorithm invariant violations"
 repository = "https://github.com/seanchatmangpt/bcinr"
