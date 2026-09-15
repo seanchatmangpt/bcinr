@@ -5,7 +5,7 @@ edition = "2021"
 
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/seanchatmangpt/bcinr"
-description = "Deterministic branchless substrate for autonomic AGI."
+description = "AST gate enforcing the Radon Law (CC=1) on authoritative bcinr primitives: no data-dependent branches, no hidden panic paths, and a U64 branchless contract on every public function."
 readme = "../../README.md"
 [dependencies]
 syn = { version = "2.0", features = ["full", "visit", "extra-traits"] }

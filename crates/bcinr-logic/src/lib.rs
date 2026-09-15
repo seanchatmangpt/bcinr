@@ -1,3 +1,17 @@
+//! # bcinr-logic
+//!
+//! Academic-grade branchless algorithm library: SWAR/SIMD string and scanning
+//! primitives, numeric kernels, and combinatorial routines, all written under
+//! the BCINR Radon Law -- cyclomatic complexity 1, no data-dependent branches,
+//! no allocation on authoritative paths. This is the numeric substrate under
+//! the repository's PDDL 3.1 -> POWL 2.0 derivation: `bcinr-pddl`,
+//! `bcinr-powl`, and `bcinr-cmca` all build on it.
+//!
+//! Key modules: [`algorithms`] (the algorithm library proper, 300+ routines),
+//! [`abstractions`] (shared trait contracts), [`ct`] (constant-time
+//! primitives), [`simd`]/[`swar`] (bit-parallel mechanics), [`fix`]
+//! (fixed-point arithmetic).
+
 #![cfg_attr(not(test), no_std)]
 #![allow(unused_attributes, clippy::needless_range_loop)]
 #[cfg(any(feature = "alloc", test))]

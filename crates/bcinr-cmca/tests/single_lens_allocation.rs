@@ -341,13 +341,62 @@ fn blend_identity_requires_the_post_mwu_update_weights_snapshot() {
     )
     .unwrap();
 
-    // Confirm the MWU update actually fired -- otherwise this test would be
-    // just as degenerate as the all-zero-payoffs case it's meant to
-    // improve on.
-    assert_ne!(
-        pre_call_weights, post_call_weights,
-        "expected the MWU update to change local_weights for non-zero, \
-         differentiated payoffs -- test setup is degenerate if this fires"
+    // The MWU update's real contract (allocator's weight-update block),
+    // stated per (internal node v, lens q_idx) pair -- replacing the earlier
+    // "the weight arrays differ somewhere" assert_ne with the actual law.
+    // The update has TWO independently-gated steps:
+    //   1. multiplication W <- W * exp(beta * payoff), gated by
+    //      `is_updating` (has children AND learning admitted AND kappa
+    //      exceeds epsilon_kappa);
+    //   2. pair normalization flat/desc <- flat/sum, desc/sum, gated by
+    //      learning admission ALONE -- it fires even when kappa closed the
+    //      multiplicative step (observed: node 1, lens 0 normalizes equal
+    //      ONE/ONE pre-weights to exactly 0.5/0.5 with no differentiation).
+    // So every internal pair must land in exactly one of three shapes:
+    //   * untouched:          (ONE, ONE)            -- learning not admitted;
+    //   * kappa-gated:        (ONE/2, ONE/2) exact  -- normalized, not multiplied;
+    //   * fully updated:      sum == ONE (+- division error) AND desc > flat
+    //                          (desc's payoff is flat's + 1 in this fixture).
+    // Nodes 0, 1, 2 are the tree's internal nodes (see depth_two_tree_parent).
+    let one = NonNegativeFixed::ONE.to_bits();
+    let mut touched_pairs = 0usize;
+    let mut differentiated_pairs = 0usize;
+    for v in 0..3 {
+        for q_idx in 0..Q {
+            let flat = post_call_weights[v][2 * q_idx];
+            let desc = post_call_weights[v][2 * q_idx + 1];
+            if flat.to_bits() == one && desc.to_bits() == one {
+                continue; // untouched pair
+            }
+            touched_pairs += 1;
+            if flat.to_bits() == one / 2 && desc.to_bits() == one / 2 {
+                continue; // kappa-gated: normalization only, equal pre-weights
+            }
+            differentiated_pairs += 1;
+            let pair_sum = flat + desc;
+            assert!(
+                (pair_sum.to_bits() as i64 - one as i64).abs() <= 4,
+                "fully-updated pair (node {v}, lens {q_idx}) must normalize to \
+                 ONE, got sum {pair_sum:?}"
+            );
+            assert!(
+                desc.to_bits() > flat.to_bits(),
+                "fully-updated pair (node {v}, lens {q_idx}) must differentiate \
+                 by payoff: desc's payoff is flat's + 1 here, so desc share \
+                 ({desc:?}) must exceed flat share ({flat:?})"
+            );
+        }
+    }
+    assert!(
+        touched_pairs > 0,
+        "no (internal node, lens) pair was touched by the MWU update -- the \
+         fixture is degenerate (learning not admitted anywhere)"
+    );
+    assert!(
+        differentiated_pairs > 0,
+        "no pair took the multiplicative branch of the MWU update -- the \
+         kappa gate closed everywhere, making this fixture as degenerate as \
+         the all-zero-payoffs case it improves on"
     );
 
     let reconstruct = |weights: &[[NonNegativeFixed; 2 * Q]; N]| {

@@ -5,7 +5,7 @@ edition = "2021"
 
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/seanchatmangpt/bcinr"
-description = "Deterministic branchless substrate for autonomic AGI."
+description = "Audits benchmark coverage: every public bcinr-logic algorithm must have a benchmark call site in the workspace's benches; reports the uncovered list."
 readme = "../../README.md"
 categories = ["algorithms", "no-std"]
 keywords = ["branchless", "simd", "performance"]

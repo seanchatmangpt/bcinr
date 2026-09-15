@@ -5,7 +5,7 @@ edition = "2021"
 
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/seanchatmangpt/bcinr"
-description = "Deterministic branchless substrate for autonomic AGI."
+description = "Audits bcinr-logic substrate integrity: runs every module's integrity check, tabulates the pass/fail execution matrix, and reports U64-contract coverage."
 readme = "../../README.md"
 [dependencies]
 prettytable-rs = "0.10.0"
