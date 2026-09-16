@@ -1,0 +1,279 @@
+//! Canonical DME route-selection contract for Chatman Multifractal Cascade Allocation.
+//!
+//! This module is deliberately a selector, not an executor. It maps an admitted
+//! work package plus a finite policy/resource profile to one content-addressed
+//! route decision. It grants no authority and performs no consequence.
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum WorkStanding {
+    Admitted,
+    Candidate,
+    Refused,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum WorkKnowledge {
+    Known,
+    Unknown,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ConsequenceClass {
+    Observe,
+    Construct,
+    Change,
+    ExternalDo,
+    Unknown,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum RouteClass {
+    KnownDeterministic,
+    UnknownLocal,
+    UnknownIdleEstate,
+    UnknownFrontier,
+    Refused,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum AuthorityStanding {
+    None,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RouteCandidate {
+    pub route: RouteClass,
+    /// Abstract bounded cost units under the admitted policy profile.
+    pub cost_units: u64,
+    /// Whether a compatible capability is currently available.
+    pub capability_fit: bool,
+    /// Finite resource budget available to this route.
+    pub budget_units: u64,
+    /// Finite resource budget required by this route.
+    pub required_units: u64,
+    /// Whether the route can satisfy the evidence obligation of the work package.
+    pub evidence_fit: bool,
+    /// Whether this route is allowed to handle the consequence class. This is NOT authority.
+    pub consequence_fit: bool,
+}
+
+impl RouteCandidate {
+    pub fn lawful(&self) -> bool {
+        self.capability_fit
+            && self.evidence_fit
+            && self.consequence_fit
+            && self.required_units <= self.budget_units
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DmeRouteRequest {
+    pub request_id: String,
+    pub semantic_subject: String,
+    pub standing: WorkStanding,
+    pub knowledge: WorkKnowledge,
+    pub consequence: ConsequenceClass,
+    pub deadline_class: String,
+    pub evidence_obligation: String,
+    /// Explicitly admitted policy that permits frontier consideration after local/idle insufficiency.
+    pub frontier_escalation_admitted: bool,
+    pub routes: Vec<RouteCandidate>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RouteExplanation {
+    pub selected_cost_units: Option<u64>,
+    pub considered: Vec<RouteClass>,
+    pub refused: Vec<RouteClass>,
+    pub reason: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DmeRouteDecision {
+    pub request_id: String,
+    pub semantic_subject: String,
+    pub route: RouteClass,
+    pub authority: AuthorityStanding,
+    pub explanation: RouteExplanation,
+    /// BLAKE3 of the canonical JSON serialization of the decision body.
+    pub decision_digest: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DmeRouteRefusal {
+    RequestNotAdmitted,
+    InvalidSemanticSubject,
+    UnknownConsequenceClass,
+    KnownWithoutDeterministicRoute,
+    UnknownWithoutLawfulRoute,
+}
+
+impl core::fmt::Display for DmeRouteRefusal {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Debug::fmt(self, f)
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for DmeRouteRefusal {}
+
+fn route_rank(route: RouteClass) -> u8 {
+    match route {
+        RouteClass::KnownDeterministic => 0,
+        RouteClass::UnknownLocal => 1,
+        RouteClass::UnknownIdleEstate => 2,
+        RouteClass::UnknownFrontier => 3,
+        RouteClass::Refused => 4,
+    }
+}
+
+fn canonical_digest<T: Serialize>(value: &T) -> String {
+    let bytes = serde_json::to_vec(value).expect("DME route decision serialization is infallible");
+    blake3::hash(&bytes).to_hex().to_string()
+}
+
+#[derive(Serialize)]
+struct DecisionBody<'a> {
+    request_id: &'a str,
+    semantic_subject: &'a str,
+    route: RouteClass,
+    authority: AuthorityStanding,
+    explanation: &'a RouteExplanation,
+}
+
+fn seal(
+    request: &DmeRouteRequest,
+    route: RouteClass,
+    explanation: RouteExplanation,
+) -> DmeRouteDecision {
+    let authority = AuthorityStanding::None;
+    let body = DecisionBody {
+        request_id: &request.request_id,
+        semantic_subject: &request.semantic_subject,
+        route,
+        authority,
+        explanation: &explanation,
+    };
+    let decision_digest = canonical_digest(&body);
+    DmeRouteDecision {
+        request_id: request.request_id.clone(),
+        semantic_subject: request.semantic_subject.clone(),
+        route,
+        authority,
+        explanation,
+        decision_digest,
+    }
+}
+
+/// Select the least-cost lawful route for one admitted DME work package.
+///
+/// Laws enforced here:
+/// - non-admitted work is refused before optimization;
+/// - unknown consequence classes are refused;
+/// - KNOWN work can only select deterministic machinery;
+/// - UNKNOWN work never selects the deterministic route;
+/// - frontier is invisible unless an explicit escalation policy admits it;
+/// - every candidate must satisfy finite budget, capability, evidence, and consequence fit;
+/// - ties are deterministic by route rank;
+/// - the returned decision has authority `NONE` and is content addressed.
+pub fn select_dme_route(request: &DmeRouteRequest) -> Result<DmeRouteDecision, DmeRouteRefusal> {
+    if request.standing != WorkStanding::Admitted {
+        return Err(DmeRouteRefusal::RequestNotAdmitted);
+    }
+    if request.semantic_subject.trim().is_empty() {
+        return Err(DmeRouteRefusal::InvalidSemanticSubject);
+    }
+    if request.consequence == ConsequenceClass::Unknown {
+        return Err(DmeRouteRefusal::UnknownConsequenceClass);
+    }
+
+    let mut considered = request.routes.iter().map(|candidate| candidate.route).collect::<Vec<_>>();
+    considered.sort_by_key(|route| route_rank(*route));
+    considered.dedup();
+
+    match request.knowledge {
+        WorkKnowledge::Known => {
+            let selected = request
+                .routes
+                .iter()
+                .filter(|candidate| candidate.route == RouteClass::KnownDeterministic && candidate.lawful())
+                .min_by_key(|candidate| (candidate.cost_units, route_rank(candidate.route)));
+
+            let Some(selected) = selected else {
+                return Err(DmeRouteRefusal::KnownWithoutDeterministicRoute);
+            };
+
+            let refused = request
+                .routes
+                .iter()
+                .filter(|candidate| candidate.route != RouteClass::KnownDeterministic)
+                .map(|candidate| candidate.route)
+                .collect::<Vec<_>>();
+
+            Ok(seal(
+                request,
+                RouteClass::KnownDeterministic,
+                RouteExplanation {
+                    selected_cost_units: Some(selected.cost_units),
+                    considered,
+                    refused,
+                    reason: "KNOWN work selected admitted deterministic machinery; model routes are ineligible".into(),
+                },
+            ))
+        }
+        WorkKnowledge::Unknown => {
+            let selected = request
+                .routes
+                .iter()
+                .filter(|candidate| candidate.route != RouteClass::KnownDeterministic)
+                .filter(|candidate| candidate.route != RouteClass::Refused)
+                .filter(|candidate| {
+                    candidate.route != RouteClass::UnknownFrontier || request.frontier_escalation_admitted
+                })
+                .filter(|candidate| candidate.lawful())
+                .min_by_key(|candidate| (candidate.cost_units, route_rank(candidate.route)));
+
+            let Some(selected) = selected else {
+                return Err(DmeRouteRefusal::UnknownWithoutLawfulRoute);
+            };
+
+            let refused = request
+                .routes
+                .iter()
+                .filter(|candidate| {
+                    candidate.route == RouteClass::KnownDeterministic
+                        || !candidate.lawful()
+                        || (candidate.route == RouteClass::UnknownFrontier
+                            && !request.frontier_escalation_admitted)
+                })
+                .map(|candidate| candidate.route)
+                .collect::<Vec<_>>();
+
+            Ok(seal(
+                request,
+                selected.route,
+                RouteExplanation {
+                    selected_cost_units: Some(selected.cost_units),
+                    considered,
+                    refused,
+                    reason: "UNKNOWN work selected the least-cost lawful admitted route under finite resource/evidence bounds".into(),
+                },
+            ))
+        }
+    }
+}
+
+/// Verify that a decision is an unchanged selector result for the supplied request.
+pub fn verify_dme_route_decision(
+    request: &DmeRouteRequest,
+    decision: &DmeRouteDecision,
+) -> bool {
+    select_dme_route(request).map(|expected| expected == *decision).unwrap_or(false)
+}
