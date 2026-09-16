@@ -110,6 +110,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 
 use crate::allocator::power;
+use crate::allocator::StabilityRefusal;
 use crate::cascade::{self, CascadeRefusal, MAX_LENS_MAGNITUDE};
 use crate::fixed::{NonNegativeFixed, SignedFixed};
 
@@ -226,6 +227,48 @@ fn approximate_error_bound_bps(abs_q_bits: u32) -> u32 {
     }
 }
 
+/// `w / sum` for err-clean values, by one u64 floor division instead of
+/// [`NonNegativeFixed::saturating_div`]'s Newton-Raphson reciprocal chain.
+///
+/// # Bit-identity contract
+///
+/// `saturating_div(w, sum).val` is exactly `floor((w.val << 16) / sum.val)`
+/// -- the Newton estimate is corrected against the true remainder before it
+/// is returned, so the division is exact, not approximate -- and both paths
+/// saturate to `u32::MAX` carrying `StabilityRefusal::NumericRangeExceeded`
+/// when the true quotient exceeds `u32::MAX`. Measured, not assumed: 44.2M
+/// pairs (adversarial edges, 40M deterministic pseudo-random pairs, and
+/// divisors 1..=1024 swept exhaustively) compared value- and error-channel
+/// equal with zero mismatches (surface-lane probe, 2026-09-15), and pinned
+/// permanently by `saturating_div_is_exact_floor_division_guard` below, so a
+/// future change to `fixed.rs`'s correction that broke this identity would
+/// fail the suite rather than silently diverge this fast path.
+///
+/// # Preconditions (both established by the caller)
+///
+/// * `sum_bits >= 1`: division by zero is structurally unreachable -- the
+///   caller normalizes only after refusing `sum == 0` as
+///   `DegenerateNormalization` -- so this helper has no panic path.
+/// * `w_bits <= u32::MAX` by type, so `(w_bits as u64) << 16` cannot
+///   overflow u64 (48 bits used).
+///
+/// This is a slow-rail (`alloc`-gated) analysis path, outside the certified
+/// `allocator` call graph, so a hardware integer division is lawful here;
+/// like everything else in this module it is fixed-width, deterministic, and
+/// bit-identical on every platform (u64/u64 floor division is exactly
+/// specified, with no rounding).
+#[inline]
+fn exact_floor_share(w_bits: u32, sum_bits: u32) -> Result<NonNegativeFixed, u32> {
+    let q = ((w_bits as u64) << 16) / u64::from(sum_bits);
+    if q > u32::MAX as u64 {
+        // Same saturation + error discriminant saturating_div produces for
+        // the same inputs; the caller reports it as the identical
+        // `NumericFault` refusal.
+        return Err(StabilityRefusal::NumericRangeExceeded as u32);
+    }
+    Ok(NonNegativeFixed::from_bits(q as u32))
+}
+
 /// Compute the escort distribution `L_q(i) = p_i^q / SUM_j p_j^q` over
 /// `masses` at lens exponent `q`.
 ///
@@ -322,18 +365,28 @@ pub fn escort_distribution_with_confidence(
         return Err(EscortRefusal::DegenerateNormalization);
     }
 
-    let mut result = Vec::with_capacity(weighted.len());
-    for (index, w) in weighted.into_iter().enumerate() {
-        let share = w / sum;
-        if share.err != u32::MAX {
-            return Err(EscortRefusal::NumericFault {
-                index,
-                error_code: share.err,
-            });
+    // Normalize in place: each element of `weighted` (a local temporary, not
+    // persistent state -- a mid-loop refusal drops it unobserved) is replaced
+    // by its share, and `weighted` itself is returned. One allocation instead
+    // of two; the returned Vec has the identical length, contents, and order
+    // the separate-`result` version produced, so nothing observable changes.
+    let sum_bits = sum.to_bits();
+    for (index, w) in weighted.iter_mut().enumerate() {
+        // `*w` is err-clean (both weight paths above admit only err == u32::MAX
+        // values) and `sum_bits >= 1` (DegenerateNormalization already
+        // refused the zero denominator), which are `exact_floor_share`'s
+        // documented preconditions. Err carries the same
+        // `StabilityRefusal::NumericRangeExceeded` discriminant
+        // `w / sum` would have produced, so the observable refusal is
+        // identical, index and error code included.
+        match exact_floor_share(w.to_bits(), sum_bits) {
+            Ok(share) => *w = share,
+            Err(error_code) => {
+                return Err(EscortRefusal::NumericFault { index, error_code });
+            }
         }
-        result.push(share);
     }
-    Ok((result, confidence))
+    Ok((weighted, confidence))
 }
 
 #[cfg(test)]
@@ -598,5 +651,129 @@ mod tests {
         let p = [mass(1.0), mass(2.0), mass(3.0)];
         let (_values, confidence) = escort_distribution_with_confidence(&p, q(3.0)).unwrap();
         assert_eq!(confidence, PathConfidence::Exact);
+    }
+
+    /// Permanent guard for [`exact_floor_share`]: the normalize pass is
+    /// bit-identical to `w / sum` **iff** `NonNegativeFixed::saturating_div`
+    /// is exact floor division (with saturation + `NumericRangeExceeded`
+    /// above `u32::MAX`). If `fixed.rs`'s remainder correction is ever
+    /// weakened, this pin fails before the fast path can silently diverge
+    /// from `saturating_div`'s observable bits.
+    ///
+    /// This is a test about a *dependency's* contract, placed here (not in
+    /// `fixed.rs`) because this module is the only caller whose bit-identity
+    /// depends on it: the u64 fast path replaces `saturating_div` on the
+    /// normalize pass and must produce the same `val` for every clean input
+    /// pair and the same error discriminant in the saturation regime.
+    #[test]
+    fn saturating_div_is_exact_floor_division_guard() {
+        // Deterministic xorshift64*: no RNG dep, reproducible failures.
+        let mut state: u64 = 0x9E37_79B9_7F4A_7C15;
+        let mut next = || {
+            state ^= state >> 12;
+            state ^= state << 25;
+            state ^= state >> 27;
+            state.wrapping_mul(0x2545_F491_4F6C_DD1D)
+        };
+        let edges = [
+            0u32,
+            1,
+            2,
+            0xFFFF,
+            0x10000,
+            0x10001,
+            0x7FFF_FFFF,
+            0x8000_0000,
+            u32::MAX,
+        ];
+        let mut checked: u64 = 0;
+        // Adversarial edges, both operand orders.
+        for &n in &edges {
+            for &d in &edges {
+                if d == 0 {
+                    continue;
+                }
+                let a = NonNegativeFixed::from_bits(n);
+                let b = NonNegativeFixed::from_bits(d);
+                let q = a.saturating_div(b);
+                let exact = ((n as u64) << 16) / u64::from(d);
+                if exact <= u32::MAX as u64 {
+                    assert_eq!(
+                        q.to_bits(),
+                        exact as u32,
+                        "saturating_div({n:#x}, {d:#x}) is not exact floor division"
+                    );
+                    assert_eq!(q.err, u32::MAX, "clean pair must stay err-clean");
+                } else {
+                    assert_eq!(
+                        q.to_bits(),
+                        u32::MAX,
+                        "saturating_div({n:#x}, {d:#x}) must saturate like the fast path"
+                    );
+                    // Saturation must carry an error, not pass silently, and
+                    // it must be the same discriminant the fast path reports.
+                    assert_ne!(q.err, u32::MAX);
+                    assert_eq!(
+                        q.err,
+                        crate::allocator::StabilityRefusal::NumericRangeExceeded as u32
+                    );
+                }
+                checked += 1;
+            }
+        }
+        // Random sweep, small-divisor-biased (worst case for the Newton
+        // chain's correction): the high 32 bits of each draw become the
+        // numerator, the low 32 bits (forced nonzero) the denominator.
+        for _ in 0..1_000_000u64 {
+            let r = next();
+            let n = (r >> 32) as u32;
+            let d = (r as u32).max(1);
+            let a = NonNegativeFixed::from_bits(n);
+            let b = NonNegativeFixed::from_bits(d);
+            let q = a.saturating_div(b);
+            let exact = ((n as u64) << 16) / u64::from(d);
+            if exact <= u32::MAX as u64 {
+                assert_eq!(
+                    q.to_bits(),
+                    exact as u32,
+                    "saturating_div({n:#x}, {d:#x}) is not exact floor division"
+                );
+                assert_eq!(q.err, u32::MAX);
+            } else {
+                assert_eq!(q.to_bits(), u32::MAX);
+                assert_eq!(
+                    q.err,
+                    crate::allocator::StabilityRefusal::NumericRangeExceeded as u32
+                );
+            }
+            checked += 1;
+        }
+        // Small divisors exhaustively: 1..=4096 against random numerators.
+        for d in 1u32..=4096 {
+            for _ in 0..64 {
+                let n = (next() >> 32) as u32;
+                let q =
+                    NonNegativeFixed::from_bits(n).saturating_div(NonNegativeFixed::from_bits(d));
+                let exact = ((n as u64) << 16) / u64::from(d);
+                if exact <= u32::MAX as u64 {
+                    assert_eq!(
+                        q.to_bits(),
+                        exact as u32,
+                        "saturating_div({n:#x}, {d:#x}) is not exact floor division"
+                    );
+                    assert_eq!(q.err, u32::MAX);
+                } else {
+                    assert_eq!(q.to_bits(), u32::MAX);
+                    assert_eq!(
+                        q.err,
+                        crate::allocator::StabilityRefusal::NumericRangeExceeded as u32
+                    );
+                }
+                checked += 1;
+            }
+        }
+        // 1.003M+ pairs checked; the probe that justified the fast path
+        // swept 44.2M (see exact_floor_share's doc).
+        assert!(checked > 1_000_000, "sweep unexpectedly small: {checked}");
     }
 }

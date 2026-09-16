@@ -1184,6 +1184,26 @@ mod clip_tests {
 /// Divides the incoming flow into flat and descendant parts, distributing them
 /// branchlessly according to normalized leaf and child weights.
 ///
+/// # Inputs
+///
+/// `leaf_w_norm` / `child_w_norm` are the **pre-normalized** weight tables:
+/// `leaf_w_norm[v][x] == leaf_w[v][x].saturating_div(lw_denom_v)` and
+/// `child_w_norm[v][x] == child_w[v][x].saturating_div(cw_denom_v)`, where
+/// `lw_denom_v`/`cw_denom_v` are the zero-guarded `lw_sum[v]`/`cw_sum[v]`
+/// denominators this function historically computed itself. Those
+/// denominators -- and therefore every division they participate in -- depend
+/// only on the immutable per-`(k, q)` weight tables, none of which any
+/// `flow_step` invocation mutates (only `alloc_flow`/`flat_alloc` are
+/// written). [`compute_pi_kq_for_kq`] invokes this function eight times over
+/// the *same* tables, so the divisions were computed eight times over with
+/// bit-identical results; hoisting them into the caller (which computes each
+/// division exactly once, with the identical operands in the identical
+/// `saturating_div` call) is bit-identical by purity of `saturating_div`
+/// (no state, no environment) and by the fact that only the `.val` half of
+/// each division/multiplication result is ever consumed downstream
+/// (`from_bits` on the selected value resets `err` to "no fault", exactly as
+/// the in-loop division's `err` was already discarded per use).
+///
 /// # Complexity
 /// $O(N^2)$ operations, which is $O(1)$ since $N=8$.
 #[inline(never)]
@@ -1193,10 +1213,8 @@ fn flow_step(
     is_leaf: &[bool; N],
     is_subtree_leaf: &[[bool; N]; N],
     rho: &[NonNegativeFixed; N],
-    child_w: &[[NonNegativeFixed; N]; N],
-    cw_sum: &[NonNegativeFixed; N],
-    leaf_w: &[[NonNegativeFixed; N]; N],
-    lw_sum: &[NonNegativeFixed; N],
+    child_w_norm: &[[NonNegativeFixed; N]; N],
+    leaf_w_norm: &[[NonNegativeFixed; N]; N],
     alloc_flow: &mut [NonNegativeFixed; N],
     flat_alloc: &mut [NonNegativeFixed; N],
 ) {
@@ -1214,26 +1232,14 @@ fn flow_step(
             0,
         ));
 
-        #[allow(unused_variables)]
-        let l_cond = const_eq_u32(lw_sum[v & 7].val, 0);
-        #[cfg(feature = "mutant_3")]
-        let lw_denom = NonNegativeFixed::ONE.val;
-        #[cfg(not(feature = "mutant_3"))]
-        let lw_denom = const_select_u32(l_cond, NonNegativeFixed::ONE.val, lw_sum[v & 7].val);
-
-        let c_cond = const_eq_u32(cw_sum[v & 7].val, 0);
-        let cw_denom = const_select_u32(c_cond, NonNegativeFixed::ONE.val, cw_sum[v & 7].val);
-
         unroll_8_static!(x, {
             let is_sub = is_subtree_leaf[v & 7][x & 7] & has_children;
-            let flat_addition = flat_part
-                * leaf_w[v & 7][x & 7].saturating_div(NonNegativeFixed::from_bits(lw_denom));
+            let flat_addition = flat_part * leaf_w_norm[v & 7][x & 7];
             flat_alloc[x & 7] +=
                 NonNegativeFixed::from_bits(const_select_u32(is_sub as u32, flat_addition.val, 0));
 
             let is_child = (parent[x & 7] == v as i32) & has_children;
-            let flow_addition = desc_part
-                * child_w[v & 7][x & 7].saturating_div(NonNegativeFixed::from_bits(cw_denom));
+            let flow_addition = desc_part * child_w_norm[v & 7][x & 7];
             alloc_flow[x & 7] += NonNegativeFixed::from_bits(const_select_u32(
                 is_child as u32,
                 flow_addition.val,
@@ -1375,16 +1381,40 @@ pub(crate) fn compute_pi_kq_for_kq(
 
     let mut flat_alloc = [NonNegativeFixed::ZERO; N];
 
+    // Normalize the leaf/child weight tables once. These divisions are
+    // invariant across the eight `flow_step` invocations below (the tables
+    // are never mutated by `flow_step`), so this computes each division
+    // exactly once instead of eight times -- bit-identical by purity; see
+    // `flow_step`'s doc comment for the full argument.
+    let mut leaf_w_norm = [[NonNegativeFixed::ZERO; N]; N];
+    let mut child_w_norm = [[NonNegativeFixed::ZERO; N]; N];
+    unroll_8_static!(v, {
+        #[allow(unused_variables)]
+        let l_cond = const_eq_u32(lw_sum[v & 7].val, 0);
+        #[cfg(feature = "mutant_3")]
+        let lw_denom = NonNegativeFixed::ONE.val;
+        #[cfg(not(feature = "mutant_3"))]
+        let lw_denom = const_select_u32(l_cond, NonNegativeFixed::ONE.val, lw_sum[v & 7].val);
+
+        let c_cond = const_eq_u32(cw_sum[v & 7].val, 0);
+        let cw_denom = const_select_u32(c_cond, NonNegativeFixed::ONE.val, cw_sum[v & 7].val);
+
+        unroll_8_static!(x, {
+            leaf_w_norm[v & 7][x & 7] =
+                leaf_w[v & 7][x & 7].saturating_div(NonNegativeFixed::from_bits(lw_denom));
+            child_w_norm[v & 7][x & 7] =
+                child_w[v & 7][x & 7].saturating_div(NonNegativeFixed::from_bits(cw_denom));
+        });
+    });
+
     // Call flow_step 8 times sequentially to avoid stack frame nesting
     flow_step(
         parent,
         is_leaf,
         is_subtree_leaf,
         &rho,
-        &child_w,
-        &cw_sum,
-        &leaf_w,
-        &lw_sum,
+        &child_w_norm,
+        &leaf_w_norm,
         &mut alloc_flow,
         &mut flat_alloc,
     );
@@ -1393,10 +1423,8 @@ pub(crate) fn compute_pi_kq_for_kq(
         is_leaf,
         is_subtree_leaf,
         &rho,
-        &child_w,
-        &cw_sum,
-        &leaf_w,
-        &lw_sum,
+        &child_w_norm,
+        &leaf_w_norm,
         &mut alloc_flow,
         &mut flat_alloc,
     );
@@ -1405,10 +1433,8 @@ pub(crate) fn compute_pi_kq_for_kq(
         is_leaf,
         is_subtree_leaf,
         &rho,
-        &child_w,
-        &cw_sum,
-        &leaf_w,
-        &lw_sum,
+        &child_w_norm,
+        &leaf_w_norm,
         &mut alloc_flow,
         &mut flat_alloc,
     );
@@ -1417,10 +1443,8 @@ pub(crate) fn compute_pi_kq_for_kq(
         is_leaf,
         is_subtree_leaf,
         &rho,
-        &child_w,
-        &cw_sum,
-        &leaf_w,
-        &lw_sum,
+        &child_w_norm,
+        &leaf_w_norm,
         &mut alloc_flow,
         &mut flat_alloc,
     );
@@ -1429,10 +1453,8 @@ pub(crate) fn compute_pi_kq_for_kq(
         is_leaf,
         is_subtree_leaf,
         &rho,
-        &child_w,
-        &cw_sum,
-        &leaf_w,
-        &lw_sum,
+        &child_w_norm,
+        &leaf_w_norm,
         &mut alloc_flow,
         &mut flat_alloc,
     );
@@ -1441,10 +1463,8 @@ pub(crate) fn compute_pi_kq_for_kq(
         is_leaf,
         is_subtree_leaf,
         &rho,
-        &child_w,
-        &cw_sum,
-        &leaf_w,
-        &lw_sum,
+        &child_w_norm,
+        &leaf_w_norm,
         &mut alloc_flow,
         &mut flat_alloc,
     );
@@ -1453,10 +1473,8 @@ pub(crate) fn compute_pi_kq_for_kq(
         is_leaf,
         is_subtree_leaf,
         &rho,
-        &child_w,
-        &cw_sum,
-        &leaf_w,
-        &lw_sum,
+        &child_w_norm,
+        &leaf_w_norm,
         &mut alloc_flow,
         &mut flat_alloc,
     );
@@ -1465,10 +1483,8 @@ pub(crate) fn compute_pi_kq_for_kq(
         is_leaf,
         is_subtree_leaf,
         &rho,
-        &child_w,
-        &cw_sum,
-        &leaf_w,
-        &lw_sum,
+        &child_w_norm,
+        &leaf_w_norm,
         &mut alloc_flow,
         &mut flat_alloc,
     );
@@ -1532,6 +1548,35 @@ fn fixed_pow_per_node(
     mass_pow
 }
 
+/// Per-node subtree-leaf mass sums under a fixed lens exponent:
+/// `S[u] = sum_{x in leaves(u)} mass_pow[x]`, each entry a left-fold over
+/// `x = 0..7` of `select(is_subtree_leaf[u][x], mass_pow[x], 0)` starting
+/// from `ZERO` -- the identical fold [`compute_kappa`] historically
+/// performed nine times per `(v, q)` pair (`sum_leaf_den` once, plus
+/// `l_q_c` for all eight `c` slots, all folding the same `mass_pow` against
+/// the same immutable `is_subtree_leaf` table). Same operands, same order,
+/// same operation => bit-identical sums; see [`compute_kappa`].
+#[inline(never)]
+fn subtree_mass_sums(
+    mass_pow: &[NonNegativeFixed; N],
+    is_subtree_leaf: &[[bool; N]; N],
+) -> [NonNegativeFixed; N] {
+    let mut sums = [NonNegativeFixed::ZERO; N];
+    unroll_8_static!(u, {
+        let mut s = NonNegativeFixed::ZERO;
+        unroll_8_static!(x, {
+            let is_sub = is_subtree_leaf[u & 7][x & 7];
+            s += NonNegativeFixed::from_bits(const_select_u32(
+                is_sub as u32,
+                mass_pow[x & 7].val,
+                0,
+            ));
+        });
+        sums[u & 7] = s;
+    });
+    sums
+}
+
 /// Divergence guard $\kappa_v$ for internal node `v` under lens `q_val`,
 /// matching the module doc comment's
 /// $\kappa_v = \sum_{c \in \text{children}(v)} s_{\text{leaf}}(c) \cdot
@@ -1549,13 +1594,18 @@ fn fixed_pow_per_node(
 /// `node_masses[MEASURE_CACHE]` and `q_val` -- neither varies with `v` -- so
 /// callers looping over `v` for a fixed `q_idx` must compute it once
 /// (`fixed_pow_per_node(q_val, node_masses)`) and pass the same array in for
-/// every `v`, rather than recomputing it per call (CMCA-120).
+/// every `v`, rather than recomputing it per call (CMCA-120). Likewise,
+/// `subtree_mass_sum` (from [`subtree_mass_sums`]) is `v`-invariant for a
+/// fixed `q_idx` and must be computed once per `q_idx`, not per `(v, q_idx)`
+/// pair: its `sum_leaf_den`/`l_q_c` entries are consumed here exactly as the
+/// in-function folds they replace (same operands, same left-fold order over
+/// `x = 0..7`, same `saturating_add`), so the substitution is bit-identical.
 #[inline(never)]
 fn compute_kappa(
     v: usize,
     mass_pow: &[NonNegativeFixed; N],
+    subtree_mass_sum: &[NonNegativeFixed; N],
     parent: &[i32; N],
-    is_subtree_leaf: &[[bool; N]; N],
 ) -> SignedFixed {
     let mut sum_meas_den = NonNegativeFixed::ZERO;
     unroll_8_static!(c, {
@@ -1564,26 +1614,13 @@ fn compute_kappa(
             NonNegativeFixed::from_bits(const_select_u32(is_child as u32, mass_pow[c & 7].val, 0));
     });
 
-    let mut sum_leaf_den = NonNegativeFixed::ZERO;
-    unroll_8_static!(x, {
-        let is_sub = is_subtree_leaf[v & 7][x & 7];
-        sum_leaf_den +=
-            NonNegativeFixed::from_bits(const_select_u32(is_sub as u32, mass_pow[x & 7].val, 0));
-    });
+    let sum_leaf_den = subtree_mass_sum[v & 7];
 
     let mut kappa = SignedFixed::ZERO;
     unroll_8_static!(c, {
         let is_child = parent[c & 7] == v as i32;
 
-        let mut l_q_c = NonNegativeFixed::ZERO;
-        unroll_8_static!(x, {
-            let is_sub_c = is_subtree_leaf[c & 7][x & 7];
-            l_q_c += NonNegativeFixed::from_bits(const_select_u32(
-                is_sub_c as u32,
-                mass_pow[x & 7].val,
-                0,
-            ));
-        });
+        let l_q_c = subtree_mass_sum[c & 7];
 
         // `sum_meas_den == 0` means every direct child's mass_pow underflowed
         // to zero: `s_meas` for this child is a genuine `0/0`, not a real
@@ -1709,7 +1746,8 @@ mod kappa_saturation_tests {
         node_masses[MEASURE_CACHE][2] = to_fixed(10.0);
 
         let mass_pow = fixed_pow_per_node(q, &node_masses);
-        let kappa = compute_kappa(0, &mass_pow, &parent, &is_subtree_leaf);
+        let sums = subtree_mass_sums(&mass_pow, &is_subtree_leaf);
+        let kappa = compute_kappa(0, &mass_pow, &sums, &parent);
 
         // Fail-safe: no measurable direct children under v=0 means no
         // divergence signal, matching the f64 oracle's NaN-poisoned kappa
@@ -1751,7 +1789,8 @@ mod kappa_saturation_tests {
         node_masses[MEASURE_CACHE][4] = to_fixed(100.0);
 
         let mass_pow = fixed_pow_per_node(q, &node_masses);
-        let kappa = compute_kappa(0, &mass_pow, &parent, &is_subtree_leaf);
+        let sums = subtree_mass_sums(&mass_pow, &is_subtree_leaf);
+        let kappa = compute_kappa(0, &mass_pow, &sums, &parent);
         assert!(
             kappa.val != 0,
             "diverging subtree-leaf mass should produce a nonzero divergence signal"
@@ -1984,8 +2023,10 @@ pub fn allocate_in(
     // across the `v` loop below for a fixed `q_idx`. Compute it once per
     // `q_idx` here (4 arrays) instead of once per `(v, q_idx)` pair (32
     // times) -- an 8x reduction in `fixed_pow` calls with no behavior
-    // change.
+    // change. The per-`q_idx` subtree-leaf mass sums are the same kind of
+    // `v`-loop invariant (see `subtree_mass_sums`).
     let mut mass_pow_by_q = [[NonNegativeFixed::ZERO; N]; Q];
+    let mut subtree_sum_by_q = [[NonNegativeFixed::ZERO; N]; Q];
     unroll_4_static!(q_idx, {
         let mut q_val_mutated = SignedFixed::from_bits(lenses[q_idx & 3].q.val);
         #[cfg(feature = "mutant_2")]
@@ -1993,15 +2034,12 @@ pub fn allocate_in(
             q_val_mutated = SignedFixed::from_bits(0i32.wrapping_sub(q_val_mutated.val));
         }
         mass_pow_by_q[q_idx & 3] = fixed_pow_per_node(q_val_mutated, &node_masses);
+        subtree_sum_by_q[q_idx & 3] =
+            subtree_mass_sums(&mass_pow_by_q[q_idx & 3], &is_subtree_leaf);
     });
 
     unroll_8_static!(v, {
         let has_children = !is_leaf[v & 7];
-
-        let mut is_subtree_leaf_v = [false; N];
-        unroll_8_static!(x, {
-            is_subtree_leaf_v[x] = is_subtree_leaf[v & 7][x & 7];
-        });
 
         unroll_4_static!(q_idx, {
             let w_flat = local_weights[v & 7][(2 * q_idx) & 7];
@@ -2011,7 +2049,12 @@ pub fn allocate_in(
             // weights when the local divergence kappa_v exceeds
             // epsilon_kappa, matching the module doc comment's contract and
             // the f64 reference oracle's `update_active = kappa > epsilon_kappa`.
-            let kappa = compute_kappa(v, &mass_pow_by_q[q_idx & 3], parent, &is_subtree_leaf);
+            let kappa = compute_kappa(
+                v,
+                &mass_pow_by_q[q_idx & 3],
+                &subtree_sum_by_q[q_idx & 3],
+                parent,
+            );
             let kappa_exceeds = kappa.val > (epsilon_kappa.val as i32);
             let is_updating = has_children & update_allowed & kappa_exceeds;
             local_weights[v & 7][(2 * q_idx) & 7] = NonNegativeFixed::from_bits(const_select_u32(
@@ -2611,7 +2654,18 @@ pub fn allocate_single_lens(
     if q.to_bits().unsigned_abs() > crate::generated_profile::MAX_LENS_MAGNITUDE << 16 {
         return Err(LensSelectionRefusal::QMagnitudeExceeded { q });
     }
-    if check_hierarchy_acyclic(parent).is_err() {
+    #[allow(non_snake_case)]
+    let P = ancestor_doubling_table(parent);
+    // Same cycle witness `check_hierarchy_acyclic` exposes (and that this
+    // function previously recomputed by calling it -- `ancestor_doubling_table`
+    // is a pure function of `parent`, so building the table a second time
+    // reproduced these exact bits). Checking the witness on the already-built
+    // table is bit-identical and drops the duplicate table build.
+    let mut has_cycle = false;
+    unroll_8_static!(j, {
+        has_cycle |= P[7][j] != -1;
+    });
+    if has_cycle {
         return Err(LensSelectionRefusal::Cyclic);
     }
 
@@ -2627,8 +2681,6 @@ pub fn allocate_single_lens(
         });
     });
 
-    #[allow(non_snake_case)]
-    let P = ancestor_doubling_table(parent);
     #[allow(non_snake_case)]
     let P_bb = core::hint::black_box(P);
 

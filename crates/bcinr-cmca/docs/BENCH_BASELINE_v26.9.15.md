@@ -57,3 +57,51 @@ consistent, not anomalous.
 Any future optimization PR must reproduce this baseline first, state which
 row it moves, and re-run the object-code audit for changed authoritative
 symbols.
+
+---
+
+## Addendum — v26.9.15 optimization wave (same day, same machine, quiet-load)
+
+Four parallel lanes (profiler, fixed-arithmetic, kernel, surface) under one
+hard constraint: **bit-identical observable behavior**. Verdict per lane:
+
+- **Kernel (accepted)**: hoisted weight normalization out of the 8
+  `flow_step` calls (the divisions' operands are invariant across them;
+  LLVM cannot CSE across the `#[inline(never)]` boundary); hoisted
+  `compute_kappa`'s subtree mass sums to one fold per q; deduplicated the
+  ancestor-doubling table in `allocate_single_lens`. Bit-identity: a
+  20,000-input cross-build sweep (random forests, refusals, corrupt
+  digests, proof Some/None, post-call state) hashes identical
+  (digest `5c88039db6a307d7`); object code re-audited: 0 conditional
+  branches, 0 divides, 0 backedges in all changed kernel symbols.
+- **Surface (accepted)**: escort normalization now uses an exact u64 floor
+  division proven equal to `saturating_div` over 44.2M adversarial pairs,
+  pinned by a permanent guard test; cascade's negative-lens reciprocal
+  likewise. CLI output byte-identical over the 22-case tamper matrix.
+- **Fixed-arithmetic (truthful NO-CHANGE)**: the suspected i128 cost does
+  not exist on arm64 (LLVM lowers inline), and the u64 reformulation is
+  provably NOT bit-identical (exhaustive 2^31 NR-domain sweep: 70.8%
+  bit-diffs; the signed sign-extension is load-bearing). No change.
+- **Profiler**: stage-decomposition benchmarks added to this suite; also
+  established that the original 118.6 µs baseline was measured under
+  machine contention (the quiet-machine pre-change kernel was ~76 µs), so
+  the honest delta is the kernel lane's back-to-back same-window A/B
+  (119.5 → 73.7 µs) plus this table's same-instrument quiet rerun.
+
+### After (official Divan instrument, quiet machine)
+
+| Benchmark | Baseline | After | Δ |
+|---|---:|---:|---|
+| `allocate_kernel` | 118.6 µs* | **73.3 µs** | **−38% (1.62×)** |
+| `allocate_single_lens_query` | 10.62 µs | **6.29 µs** | **−41% (1.69×)** |
+| `escort_exact_integer_q` | 140 ns | **79 ns** | **−44%** |
+| `escort_fractional_q` | 159 ns | **104 ns** | **−35%** |
+| `power_fractional` | 9.2 ns | 9.2 ns | unchanged (no-change lane) |
+
+\* contended-load measurement; see calibration note above.
+
+Capacity: ~8,400 → **~13,600 allocation decisions/second/core**. Remaining
+known headroom (named, not taken): reciprocal-sharing across the normalize
+divisions requires a new fixed.rs API (cross-lane handoff, needs its own
+bit-identity proof); the ~11% select-discarded learning machinery is the
+branchless contract's price and is not removable without behavior change.

@@ -320,11 +320,28 @@ fn escort_power(
     if accumulated.to_bits() == 0 {
         return Err(CascadeRefusal::ZeroMassUnderNegativeLens { node, lens });
     }
-    admit_fixed(
-        NonNegativeFixed::ONE.saturating_div(accumulated),
-        NumericContext::EscortReciprocal { lens },
-        node,
-    )
+    // `ONE / accumulated` for err-clean values, by one u64 floor division
+    // instead of `saturating_div`'s Newton-Raphson chain. Bit-identical:
+    // `saturating_div` is exactly `floor((n << 16) / d)` with saturation +
+    // `StabilityRefusal::NumericRangeExceeded` above `u32::MAX` (measured
+    // over 44.2M adversarial/random pairs -- see `escort.rs`'s
+    // `exact_floor_share`, whose doc carries the sweep and the permanent
+    // guard test pinning it). Preconditions hold here: `accumulated` is
+    // err-clean (`admit_fixed` above) and nonzero (the check just above),
+    // so there is no panic path. `ONE.val == 65536`, so the numerator is
+    // `65536 << 16 == 2^32`, which fits u64 exactly; the only saturation
+    // case is `accumulated == 1` (`2^32 / 1 > u32::MAX`), which
+    // `saturating_div` would also report as `NumericRangeExceeded` through
+    // the same `EscortReciprocal` refusal this branch returns.
+    let reciprocal = (1u64 << 32) / u64::from(accumulated.to_bits());
+    if reciprocal > u32::MAX as u64 {
+        return Err(CascadeRefusal::NumericFault {
+            operation: NumericContext::EscortReciprocal { lens },
+            node,
+            error_code: crate::allocator::StabilityRefusal::NumericRangeExceeded as u32,
+        });
+    }
+    Ok(NonNegativeFixed::from_bits(reciprocal as u32))
 }
 
 /// `m^q` in Q16.16, by repeated multiplication -- no `powf`, no libm.
