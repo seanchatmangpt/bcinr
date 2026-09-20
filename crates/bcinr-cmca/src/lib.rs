@@ -141,9 +141,10 @@ pub mod dme_route;
 
 pub use allocator::{check_hierarchy_acyclic, HierarchyRefusal, StabilityRefusal};
 pub use dme_route::{
-    select_dme_route, verify_dme_route_decision, AuthorityStanding, ConsequenceClass,
-    DmeRouteDecision, DmeRouteRefusal, DmeRouteRequest, RouteCandidate, RouteClass,
-    RouteExplanation, WorkKnowledge, WorkStanding,
+    select_dme_route, select_gall_route, verify_dme_route_decision, verify_gall_route_decision,
+    AuthorityStanding, ConsequenceClass, DmeRouteDecision, DmeRouteRefusal, DmeRouteRequest,
+    GallRouteDecision, GallRouteRefusal, GallRouteRequest, GallWorkIdentity, RouteCandidate,
+    RouteClass, RouteExplanation, WorkKnowledge, WorkStanding,
 };
 
 // INTEGRATION NOTE (v26.7.24, re-fenced explicitly per CMCA-102 Branch B):
