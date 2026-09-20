@@ -1,6 +1,7 @@
 use bcinr_cmca::{
-    select_dme_route, verify_dme_route_decision, AuthorityStanding, ConsequenceClass,
-    DmeRouteRefusal, DmeRouteRequest, RouteCandidate, RouteClass, WorkKnowledge, WorkStanding,
+    select_dme_route, select_gall_route, verify_dme_route_decision, verify_gall_route_decision,
+    AuthorityStanding, ConsequenceClass, DmeRouteRefusal, DmeRouteRequest, GallRouteRefusal,
+    GallRouteRequest, GallWorkIdentity, RouteCandidate, RouteClass, WorkKnowledge, WorkStanding,
 };
 
 fn candidate(route: RouteClass, cost: u64, budget: u64, required: u64) -> RouteCandidate {
@@ -102,4 +103,49 @@ fn candidate_standing_is_not_optimized() {
     let mut req = request(WorkKnowledge::Unknown);
     req.standing = WorkStanding::Candidate;
     assert_eq!(select_dme_route(&req), Err(DmeRouteRefusal::RequestNotAdmitted));
+}
+
+
+fn gall_request() -> GallRouteRequest {
+    let work_order = "urn:gall:work-order:xaas:001".to_string();
+    let mut route_request = request(WorkKnowledge::Unknown);
+    route_request.semantic_subject = work_order.clone();
+
+    GallRouteRequest {
+        identity: GallWorkIdentity {
+            work_order_iri: work_order,
+            checkpoint_iri: "urn:gall:checkpoint:xaas:001".into(),
+            graph_digest: format!("sha256:{}", "a".repeat(64)),
+            repository_identity: "seanchatmangpt/xaas".into(),
+            base_sha: "b".repeat(40),
+        },
+        route_request,
+    }
+}
+
+#[test]
+fn gall_route_reuses_cmca_selector_and_binds_exact_subject() {
+    let req = gall_request();
+    let decision = select_gall_route(&req).unwrap();
+
+    assert_eq!(decision.route_decision.route, RouteClass::UnknownIdleEstate);
+    assert_eq!(decision.authority, AuthorityStanding::None);
+    assert_eq!(decision.identity.work_order_iri, req.identity.work_order_iri);
+    assert!(verify_gall_route_decision(&req, &decision));
+}
+
+#[test]
+fn moved_work_order_subject_is_refused_before_route_selection() {
+    let mut req = gall_request();
+    req.route_request.semantic_subject = "urn:gall:work-order:other".into();
+
+    assert_eq!(select_gall_route(&req), Err(GallRouteRefusal::SubjectMismatch));
+}
+
+#[test]
+fn branch_name_cannot_replace_exact_base_sha() {
+    let mut req = gall_request();
+    req.identity.base_sha = "main".into();
+
+    assert_eq!(select_gall_route(&req), Err(GallRouteRefusal::InvalidBaseSha));
 }
