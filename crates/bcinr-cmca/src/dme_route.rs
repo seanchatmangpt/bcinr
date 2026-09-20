@@ -83,6 +83,40 @@ pub enum DmeRouteRefusal {
     KnownWithoutDeterministicRoute,
     UnknownWithoutLawfulRoute,
 }
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GallWorkIdentity {
+    pub work_order_iri: String,
+    pub checkpoint_iri: String,
+    pub graph_digest: String,
+    pub repository_identity: String,
+    pub base_sha: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GallRouteRequest {
+    pub identity: GallWorkIdentity,
+    pub route_request: DmeRouteRequest,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GallRouteDecision {
+    pub identity: GallWorkIdentity,
+    pub route_decision: DmeRouteDecision,
+    pub authority: AuthorityStanding,
+    pub decision_digest: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum GallRouteRefusal {
+    InvalidWorkOrderIri,
+    InvalidCheckpointIri,
+    InvalidGraphDigest,
+    InvalidRepositoryIdentity,
+    InvalidBaseSha,
+    SubjectMismatch,
+    Route(DmeRouteRefusal),
+}
+
 impl core::fmt::Display for DmeRouteRefusal {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result { core::fmt::Debug::fmt(self, f) }
 }
@@ -160,3 +194,87 @@ pub fn select_dme_route(request: &DmeRouteRequest) -> Result<DmeRouteDecision, D
 pub fn verify_dme_route_decision(request: &DmeRouteRequest, decision: &DmeRouteDecision) -> bool {
     select_dme_route(request).map(|expected| expected == *decision).unwrap_or(false)
 }
+
+fn absolute_iri(value: &str) -> bool {
+    !value.is_empty() && value.contains(':')
+}
+
+fn sha256_digest(value: &str) -> bool {
+    let Some(("sha256", hex)) = value.split_once(':') else { return false; };
+    hex.len() == 64 && hex.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+fn git_sha(value: &str) -> bool {
+    value.len() == 40 && value.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+fn repo_identity(value: &str) -> bool {
+    let mut parts = value.split('/');
+    matches!(
+        (parts.next(), parts.next(), parts.next()),
+        (Some(owner), Some(repo), None) if !owner.is_empty() && !repo.is_empty()
+    )
+}
+
+/// Compose the existing bounded selector with exact GALL work-order identity.
+///
+/// This adds no new optimizer and no execution path. The inner CMCA decision
+/// remains authoritative for route selection; the outer receipt only binds
+/// that SELECT result to the exact semantic subject.
+pub fn select_gall_route(request: &GallRouteRequest) -> Result<GallRouteDecision, GallRouteRefusal> {
+    let id = &request.identity;
+
+    if !absolute_iri(&id.work_order_iri) {
+        return Err(GallRouteRefusal::InvalidWorkOrderIri);
+    }
+    if !absolute_iri(&id.checkpoint_iri) {
+        return Err(GallRouteRefusal::InvalidCheckpointIri);
+    }
+    if !sha256_digest(&id.graph_digest) {
+        return Err(GallRouteRefusal::InvalidGraphDigest);
+    }
+    if !repo_identity(&id.repository_identity) {
+        return Err(GallRouteRefusal::InvalidRepositoryIdentity);
+    }
+    if !git_sha(&id.base_sha) {
+        return Err(GallRouteRefusal::InvalidBaseSha);
+    }
+    if request.route_request.semantic_subject != id.work_order_iri {
+        return Err(GallRouteRefusal::SubjectMismatch);
+    }
+
+    let route_decision =
+        select_dme_route(&request.route_request).map_err(GallRouteRefusal::Route)?;
+    let authority = AuthorityStanding::None;
+
+    #[derive(Serialize)]
+    struct GallDecisionBody<'a> {
+        identity: &'a GallWorkIdentity,
+        route_decision: &'a DmeRouteDecision,
+        authority: AuthorityStanding,
+    }
+
+    let body = GallDecisionBody {
+        identity: id,
+        route_decision: &route_decision,
+        authority,
+    };
+    let decision_digest = canonical_digest(&body);
+
+    Ok(GallRouteDecision {
+        identity: id.clone(),
+        route_decision,
+        authority,
+        decision_digest,
+    })
+}
+
+pub fn verify_gall_route_decision(
+    request: &GallRouteRequest,
+    decision: &GallRouteDecision,
+) -> bool {
+    select_gall_route(request)
+        .map(|expected| expected == *decision)
+        .unwrap_or(false)
+}
+
