@@ -65,6 +65,8 @@ mod sexpr;
 #[cfg(feature = "mfw-planner")]
 pub mod task;
 #[cfg(feature = "mfw-planner")]
+pub mod wf_net_bridge_temporal;
+#[cfg(feature = "mfw-planner")]
 pub mod workflow_cmd;
 pub use capability::{
     admit_planning_task, AdmittedPlanningTask, CapabilityProfile, DefaultCapabilityProfile,
