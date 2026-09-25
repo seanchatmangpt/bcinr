@@ -86,10 +86,44 @@
 //!   realistically implies in this crate (paired with `:durative-actions`,
 //!   the classical `Pddl8GroundAction` has no numeric-effect field at all —
 //!   a structural, advertised STRIPS8 scope limit, not a silent gap).
-//! - [`PddlFeature::DurativeActions`] — `Exact`. `GroundTemporalProblem` is
-//!   the best-tested part of this crate (`tests/capacity.rs`,
-//!   `tests/proposer_substrate.rs`, `capability_router`, the DfCM crown
-//!   suite all exercise it).
+//! - [`PddlFeature::DurativeActions`] — `Approximate`, not `Exact`.
+//!   `GroundTemporalProblem` is the best-tested part of this crate
+//!   (`tests/capacity.rs`, `tests/proposer_substrate.rs`, `capability_router`,
+//!   the DfCM crown suite all exercise it), and the common case — constant
+//!   duration, `at start`/`over all` conditions, effects applied at the
+//!   correct start/end event — is genuinely correct. Three concrete gaps
+//!   keep this from `Exact`, all found by reading
+//!   `ground::GroundTemporalProblem::find_temporal_plan_with_fn_overrides`
+//!   and its helpers directly:
+//!   - **`at end` conditions are checked at the wrong time.** The
+//!     scheduling-time `applicable` check evaluates every entry in
+//!     `da.conditions` — including any wrapped `PddlCondition::Timed(AtEnd,
+//!     _)` — against the state *at the moment the action is scheduled*, not
+//!     the state when it actually completes; `eval_condition`'s `Timed` arm
+//!     even says so directly ("we evaluate the inner condition regardless of
+//!     timing"). `collect_over_all_conditions` explicitly skips `AtEnd`
+//!     ("not continuous"), and `apply_effect_at_end`'s completion handler
+//!     only applies effects — nothing re-checks an `at end` condition against
+//!     the state at completion. A condition that holds at start but goes
+//!     false before the action's actual end (or vice versa) is silently
+//!     misjudged.
+//!   - **Fluent-valued durations are silently wrong.** `resolve_duration`
+//!     computes a schema's `(min, max)` duration bounds by calling
+//!     `eval_numeric(expr, &HashMap::new())` — an always-empty fluent map,
+//!     at grounding time, before any initial numeric fluent value is even in
+//!     scope. A `:duration (= ?duration (speed))`-shaped fluent-valued
+//!     duration therefore always resolves to `0.0` (via `eval_numeric`'s
+//!     `FunctionTerm` arm's `unwrap_or(&0.0)`) regardless of `(speed)`'s
+//!     real value, instead of being rejected or evaluated correctly.
+//!   - **`duration_max` is computed but never enforced.** `ground_durative_schema`
+//!     stores both `duration_min`/`duration_max` on every `GroundDurativeAction`,
+//!     but `find_temporal_plan_with_fn_overrides` only ever reads
+//!     `da.duration_min` when scheduling (`let dur = da.duration_min;`) —
+//!     `duration_max` has no reader anywhere in this crate. A `(<= ?duration
+//!     n)`-shaped upper-bound-only constraint (`DurationConstraint::Lte`,
+//!     which `resolve_duration` resolves to `(0.0, n)`) silently executes
+//!     with duration `0.0` rather than any duration a caller might expect to
+//!     be chosen from the valid range.
 //! - [`PddlFeature::TimedInitialLiterals`] — `Exact`.
 //!   `tests/semantic_falsifier.rs`'s `test_til_schedule` passes and directly
 //!   checks TIL-driven makespan values.
@@ -239,7 +273,7 @@ impl CapabilityProfile for DefaultCapabilityProfile {
             PddlFeature::ConditionalEffects => Unsupported,
             PddlFeature::NumericFluents => Approximate,
             PddlFeature::NumericEffects => Exact,
-            PddlFeature::DurativeActions => Exact,
+            PddlFeature::DurativeActions => Approximate,
             PddlFeature::TimedInitialLiterals => Exact,
             PddlFeature::DerivedPredicates => Approximate,
             PddlFeature::TrajectoryConstraints => Unsupported,
