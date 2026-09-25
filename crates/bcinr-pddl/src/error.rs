@@ -64,6 +64,14 @@ pub enum Pddl8Error {
     /// (via `?`, see the `From` impl below) over hand-mapping to
     /// `NoAdmittedPlan`.
     PlanningFailed(bcinr_mfw_ir::PlannerFailure),
+    /// A domain's `:constraints` uses a trajectory-constraint kind
+    /// `ground::monitors::MonitorFactory` has no monitor for (currently
+    /// `HoldDuring`/`HoldAfter` — see that factory's `create_monitor`).
+    /// Refused at `GroundTemporalProblem::build` time rather than silently
+    /// admitted and then silently dropped by
+    /// `ground::trajectory_policy::TrajectoryPolicy::new`, which only skips
+    /// whatever `create_monitor` returns `None` for instead of refusing.
+    UnsupportedTrajectoryConstraint(String),
 }
 
 impl std::fmt::Display for Pddl8Error {
@@ -82,6 +90,9 @@ impl std::fmt::Display for Pddl8Error {
             Self::ReceiptIntegrity(s) => write!(f, "receipt integrity failure: {s}"),
             Self::InvalidCaseId(s) => write!(f, "invalid case_id: {s}"),
             Self::PlanningFailed(w) => write!(f, "planning stage did not find a value: {w}"),
+            Self::UnsupportedTrajectoryConstraint(s) => {
+                write!(f, "unsupported trajectory constraint: {s}")
+            }
         }
     }
 }
