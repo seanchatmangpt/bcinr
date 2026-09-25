@@ -1642,16 +1642,68 @@ fn instantiate(
     })
 }
 
+/// Strips `DERIVED_PARAM_TYPE_SENTINEL_PRED` guard conjuncts that
+/// `crate::parse::parse_derived` smuggled into a derived predicate's body to
+/// carry each parameter's declared type. `DerivedPredicate` (external crate)
+/// has no `typed_params` field the way `Pddl8ActionSchema` does, so the type
+/// can't travel as struct data — these guards are the only surviving record
+/// of it by the time grounding runs. Returns the recovered `var -> type` map
+/// and the body with the guards removed (so they never reach a
+/// `GroundDerivedPredicate` or `eval_condition`).
+fn extract_derived_param_types(body: &PddlCondition) -> (HashMap<String, String>, PddlCondition) {
+    let mut types = HashMap::new();
+    let cleaned = match body {
+        PddlCondition::And(parts) => {
+            let mut kept = Vec::with_capacity(parts.len());
+            for part in parts {
+                if let PddlCondition::Atom(a) = part {
+                    if a.pred == crate::parse::DERIVED_PARAM_TYPE_SENTINEL_PRED
+                        && a.args.len() == 2
+                    {
+                        types.insert(a.args[0].clone(), a.args[1].clone());
+                        continue;
+                    }
+                }
+                kept.push(part.clone());
+            }
+            if kept.len() == 1 {
+                kept.into_iter().next().unwrap()
+            } else {
+                PddlCondition::And(kept)
+            }
+        }
+        other => other.clone(),
+    };
+    (types, cleaned)
+}
+
 fn ground_derived_schema(
     dp: &DerivedPredicate,
     objects: &[(String, String)],
     type_index: &TypeIndex,
     out: &mut Vec<GroundDerivedPredicate>,
 ) -> Result<(), crate::error::Pddl8Error> {
+    // Per-parameter candidate lists, restricted to type-compatible objects
+    // when the derived predicate declares a type for that parameter — this
+    // is what shrinks grounding from |objects|^n to ∏ᵢ |objects_of_type(paramᵢ)|,
+    // mirroring `ground_schema`'s `typed_params`-based filtering for actions.
+    // A parameter with no recovered type falls back to "object" (matches
+    // every object), preserving exact behavior for untyped/legacy domains.
+    let (param_types, clean_body) = extract_derived_param_types(&dp.body);
+    let dp_owned = DerivedPredicate {
+        head: dp.head.clone(),
+        body: clean_body,
+    };
+    let dp = &dp_owned;
+
     let mut vars = Vec::new();
     for arg in &dp.head.args {
         if arg.starts_with('?') && !vars.iter().any(|(v, _)| v == arg) {
-            vars.push((arg.clone(), "object".to_string()));
+            let req_type = param_types
+                .get(arg)
+                .cloned()
+                .unwrap_or_else(|| "object".to_string());
+            vars.push((arg.clone(), req_type));
         }
     }
 
