@@ -62,6 +62,7 @@ pub mod schedule_analysis;
 pub mod search;
 mod semantic_features;
 mod sexpr;
+pub mod validate;
 #[cfg(feature = "mfw-planner")]
 pub mod task;
 #[cfg(feature = "mfw-planner")]
@@ -148,6 +149,7 @@ pub use wasm4pm_compat::pddl::{
 };
 
 pub use error::{Pddl8Error, PlannerOutcome};
+pub use validate::{validate_plan, PlanViolation};
 pub use execute::{
     compute_plan_chain, execute_tape, execute_temporal_plan_instrumented, SubstageNs,
 };
