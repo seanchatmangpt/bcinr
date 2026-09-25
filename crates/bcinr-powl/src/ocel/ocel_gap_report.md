@@ -1,3 +1,0 @@
-# OCEL Gap Report
-
-Status: SUPPORTED_WITH_TRANSCRIPT
