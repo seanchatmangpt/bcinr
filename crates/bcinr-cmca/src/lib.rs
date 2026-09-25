@@ -93,6 +93,7 @@ pub mod fixed;
 pub mod generated;
 pub mod lrc;
 pub mod observatory;
+pub mod stability_theorem;
 
 pub use allocator::StabilityRefusal;
 
