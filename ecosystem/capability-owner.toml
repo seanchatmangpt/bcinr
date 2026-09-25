@@ -1,0 +1,22 @@
+schema = "chatman.federated-capability-owner.v1"
+version = "26.9.1"
+repository = "seanchatmangpt/bcinr"
+owner_id = "repository:bcinr"
+control_plane_repository = "seanchatmangpt/chatman-ecosystem"
+control_plane_subject = "git:7430dfc9b3ca138e703430d25de7c6f48a8d6ade"
+base_sha = "b76dcb377b297cb8826a5256b55f8b57a6b76462"
+release_component = "bcinr"
+release_role = "cmca-kernel"
+release_dependencies = []
+allowed_authorities = ["persist_control_plane"]
+simulation_only = false
+do_mode = "none"
+ambient_do = false
+automatic_irreversible_do = false
+
+[[capability]]
+id = "capability:compute-bounded-cmca"
+relationship = "owner"
+standing = "CANDIDATE"
+broker_required = false
+receipt_required = true
