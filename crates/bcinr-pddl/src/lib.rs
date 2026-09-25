@@ -57,6 +57,7 @@ pub mod problem_builder;
 #[allow(clippy::needless_lifetimes)]
 pub mod production;
 pub mod production_capability;
+pub mod rdf_pddl;
 pub mod resource_ledger;
 pub mod schedule_analysis;
 pub mod search;
