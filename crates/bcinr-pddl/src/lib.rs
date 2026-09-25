@@ -25,6 +25,7 @@ pub mod alloc_counter;
 pub mod capability;
 pub mod capability_router;
 pub mod causal;
+pub mod causal_numeric;
 pub mod causal_v2;
 #[cfg(feature = "mfw-planner")]
 pub mod cognitive;
