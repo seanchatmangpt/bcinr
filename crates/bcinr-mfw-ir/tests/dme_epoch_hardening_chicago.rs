@@ -4,8 +4,8 @@
 //! assertions on returned epochs, digests and typed refusals. No test doubles.
 
 use bcinr_mfw_ir::{
-    advance_epoch, DescentMeter, Digest, DmeEpoch, EpochAdvance, EpochAuthority, EpochRefusal,
-    ReceiptFeedback,
+    advance_epoch, BoundHit, BoundKind, DescentMeter, Digest, DmeEpoch, EpochAdvance,
+    EpochAuthority, EpochRefusal, ReceiptFeedback, MAX_DME_EPOCH_DESCENT_BUDGET,
 };
 
 fn d(value: &str) -> Digest {
@@ -15,7 +15,7 @@ fn d(value: &str) -> Digest {
 fn feedback(parent: &DmeEpoch, receipt: &str, residuals: Vec<Digest>) -> ReceiptFeedback {
     ReceiptFeedback {
         receipt_digest: d(receipt),
-        observed_ontology_digest: parent.ontology_digest,
+        observed_ontology_digest: parent.ontology_digest(),
         residual_obligations: residuals,
         authority: EpochAuthority::None,
     }
@@ -34,7 +34,7 @@ fn successor(result: Result<EpochAdvance, EpochRefusal>) -> DmeEpoch {
 fn root_identity_is_independent_of_residual_order() {
     let a = DmeEpoch::root(d("o"), vec![d("a"), d("b"), d("c")]).unwrap();
     let b = DmeEpoch::root(d("o"), vec![d("c"), d("a"), d("b")]).unwrap();
-    assert_eq!(a.epoch_id, b.epoch_id);
+    assert_eq!(a.epoch_id(), b.epoch_id());
     assert_eq!(a, b);
 }
 
@@ -114,7 +114,7 @@ fn a_fresh_meter_cannot_re_mint_depth_for_a_deeper_epoch() {
         &feedback(&root, "r1", vec![d("a"), d("b")]),
         &mut meter,
     ));
-    assert_eq!(child.depth, 1);
+    assert_eq!(child.depth(), 1);
 
     let mut fresh = DescentMeter::new(8);
     assert_eq!(
@@ -128,8 +128,8 @@ fn a_fresh_meter_cannot_re_mint_depth_for_a_deeper_epoch() {
         &feedback(&child, "r2", vec![d("a")]),
         &mut meter,
     ));
-    assert_eq!(grandchild.depth, 2);
-    assert_eq!(grandchild.parent_epoch_id, Some(child.epoch_id));
+    assert_eq!(grandchild.depth(), 2);
+    assert_eq!(grandchild.parent_epoch_id(), Some(child.epoch_id()));
 }
 
 // ---- duplicate delivery / replay ------------------------------------------
@@ -160,7 +160,7 @@ fn receipt_identity_is_bound_into_successor_and_closure_identity() {
         &feedback(&root, "r2", vec![d("a")]),
         &mut DescentMeter::new(8),
     ));
-    assert_ne!(x.epoch_id, y.epoch_id);
+    assert_ne!(x.epoch_id(), y.epoch_id());
 
     let close = |receipt: &str| match advance_epoch(
         &root,
@@ -191,9 +191,9 @@ fn any_admitted_chain_closes_within_the_root_residual_count() {
     let mut meter = DescentMeter::new(n);
     let mut steps = 0usize;
     loop {
-        let keep = epoch.residual_obligations.len().saturating_sub(1);
+        let keep = epoch.residual_obligations().len().saturating_sub(1);
         let next: Vec<Digest> = epoch
-            .residual_obligations
+            .residual_obligations()
             .iter()
             .take(keep)
             .copied()
@@ -203,8 +203,8 @@ fn any_admitted_chain_closes_within_the_root_residual_count() {
         match advance_epoch(&epoch, &fb, &mut meter).unwrap() {
             EpochAdvance::Closed { .. } => break,
             EpochAdvance::Successor(child) => {
-                assert!(child.residual_obligations.len() < epoch.residual_obligations.len());
-                assert_eq!(child.depth, epoch.depth + 1);
+                assert!(child.residual_obligations().len() < epoch.residual_obligations().len());
+                assert_eq!(child.depth(), epoch.depth() + 1);
                 epoch = child;
             }
         }
@@ -212,4 +212,105 @@ fn any_admitted_chain_closes_within_the_root_residual_count() {
     }
     assert_eq!(steps, n);
     assert_eq!(meter.depth, n - 1);
+}
+
+// ---- hard ceilings (RFC closure item 3) ---------------------------------------
+
+/// Audit probe P4: a caller-chosen meter budget of 1_000_000 descended freely.
+#[test]
+fn a_caller_cannot_widen_the_bound_descent_budget() {
+    let root = DmeEpoch::root_with_budget(d("o"), vec![d("a"), d("b"), d("c")], 2).unwrap();
+    assert_eq!(root.descent_budget(), 2);
+    let mut wide = DescentMeter {
+        budget: 1_000_000,
+        depth: 0,
+    };
+    assert_eq!(
+        advance_epoch(&root, &feedback(&root, "r", vec![d("a")]), &mut wide),
+        Err(EpochRefusal::ForeignDescentBudget)
+    );
+    assert_eq!(wide.depth, 0, "refusal must not consume descent budget");
+    // One over the bound budget is also foreign; the bound budget itself is lawful.
+    assert_eq!(
+        advance_epoch(
+            &root,
+            &feedback(&root, "r", vec![d("a")]),
+            &mut DescentMeter::new(3)
+        ),
+        Err(EpochRefusal::ForeignDescentBudget)
+    );
+    let mut meter = DescentMeter::new(2);
+    let child = successor(advance_epoch(
+        &root,
+        &feedback(&root, "r1", vec![d("a"), d("b")]),
+        &mut meter,
+    ));
+    assert_eq!(child.descent_budget(), 2);
+    let grandchild = successor(advance_epoch(
+        &child,
+        &feedback(&child, "r2", vec![d("a")]),
+        &mut meter,
+    ));
+    assert_eq!(grandchild.depth(), 2);
+}
+
+#[test]
+fn root_budget_above_the_hard_ceiling_is_refused_with_a_witness() {
+    assert!(DmeEpoch::root_with_budget(d("o"), vec![d("a")], MAX_DME_EPOCH_DESCENT_BUDGET).is_ok());
+    assert_eq!(
+        DmeEpoch::root_with_budget(d("o"), vec![d("a")], MAX_DME_EPOCH_DESCENT_BUDGET + 1),
+        Err(EpochRefusal::DescentBudgetAboveCeiling(BoundHit {
+            kind: BoundKind::RecursiveDescent,
+            limit: MAX_DME_EPOCH_DESCENT_BUDGET as u64,
+            observed: MAX_DME_EPOCH_DESCENT_BUDGET as u64 + 1,
+        }))
+    );
+    assert_eq!(
+        DmeEpoch::root(d("o"), vec![d("a")])
+            .unwrap()
+            .descent_budget(),
+        MAX_DME_EPOCH_DESCENT_BUDGET
+    );
+}
+
+#[test]
+fn descent_budget_is_bound_into_epoch_identity() {
+    let a = DmeEpoch::root_with_budget(d("o"), vec![d("a"), d("b")], 2).unwrap();
+    let b = DmeEpoch::root_with_budget(d("o"), vec![d("a"), d("b")], 3).unwrap();
+    assert_ne!(a.epoch_id(), b.epoch_id());
+}
+
+/// RFC falsifier: "bound exhaustion is represented as success". Exhaustion is a typed
+/// refusal carrying the meter's limit and observed depth.
+#[test]
+fn exhaustion_is_a_typed_witness_not_success() {
+    let root = DmeEpoch::root_with_budget(d("o"), vec![d("a"), d("b"), d("c")], 1).unwrap();
+    let mut meter = DescentMeter::new(1);
+    let child = successor(advance_epoch(
+        &root,
+        &feedback(&root, "r1", vec![d("a"), d("b")]),
+        &mut meter,
+    ));
+    assert_eq!(
+        advance_epoch(&child, &feedback(&child, "r2", vec![d("a")]), &mut meter),
+        Err(EpochRefusal::DescentBoundHit(BoundHit {
+            kind: BoundKind::RecursiveDescent,
+            limit: 1,
+            observed: 1,
+        }))
+    );
+    assert_eq!(meter.depth, 1);
+}
+
+#[test]
+fn successor_records_its_source_receipt() {
+    let root = DmeEpoch::root(d("o"), vec![d("a"), d("b")]).unwrap();
+    assert_eq!(root.source_receipt(), None);
+    let child = successor(advance_epoch(
+        &root,
+        &feedback(&root, "r1", vec![d("a")]),
+        &mut DescentMeter::new(8),
+    ));
+    assert_eq!(child.source_receipt(), Some(d("r1")));
+    assert_eq!(child.authority(), EpochAuthority::None);
 }

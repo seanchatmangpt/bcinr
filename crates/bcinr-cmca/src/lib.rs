@@ -168,9 +168,10 @@ pub mod stability_theorem;
 
 pub use allocator::{check_hierarchy_acyclic, HierarchyRefusal, StabilityRefusal};
 pub use dme_route::{
-    select_dme_route, verify_dme_route_decision, AuthorityStanding, ConsequenceClass,
-    DmeRouteDecision, DmeRouteRefusal, DmeRouteRequest, RouteCandidate, RouteClass,
-    RouteExplanation, WorkKnowledge, WorkStanding,
+    classify_dme_work, select_dme_route, verify_dme_route_decision, AuthorityStanding,
+    ConsequenceClass, DmeExhaustionWitness, DmeRouteDecision, DmeRouteRefusal, DmeRouteRequest,
+    DmeWorkClass, DmeWorkClassification, RouteCandidate, RouteClass, RouteExplanation,
+    WorkKnowledge, WorkStanding,
 };
 
 // INTEGRATION NOTE (v26.7.24, re-fenced explicitly per CMCA-102 Branch B):

@@ -80,6 +80,7 @@ pub use contracts::{
 pub use digest::Digest;
 pub use dme_epoch::{
     advance_epoch, DmeEpoch, EpochAdvance, EpochAuthority, EpochRefusal, ReceiptFeedback,
+    MAX_DME_EPOCH_DESCENT_BUDGET,
 };
 pub use epoch::{DescentMeter, EpochBounds};
 pub use event_set::{EventSet, EventSetIter, EVENT_WORDS, MAX_EPOCH_EVENTS};

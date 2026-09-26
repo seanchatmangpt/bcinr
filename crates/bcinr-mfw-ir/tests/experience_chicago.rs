@@ -38,13 +38,15 @@ fn candidate_carries_no_authority_and_is_deterministic() {
     let a = candidate_from_execution(&evidence()).unwrap();
     let b = candidate_from_execution(&evidence()).unwrap();
     assert_eq!(a, b);
-    assert_eq!(a.authority, ExperienceAuthority::None);
-    assert_eq!(a.source_execution_receipt, d("exec-receipt"));
+    assert_eq!(a.authority(), ExperienceAuthority::None);
+    assert_eq!(a.source_execution_receipt(), d("exec-receipt"));
 }
 
 #[test]
 fn every_semantic_input_changes_candidate_identity() {
-    let base = candidate_from_execution(&evidence()).unwrap().candidate_id;
+    let base = candidate_from_execution(&evidence())
+        .unwrap()
+        .candidate_id();
     let mutations: [fn(&mut ExperienceEvidence); 4] = [
         |e| e.semantic_subject = d("subject-2"),
         |e| e.execution_receipt = d("exec-receipt-2"),
@@ -54,7 +56,7 @@ fn every_semantic_input_changes_candidate_identity() {
     for mutate in mutations {
         let mut ev = evidence();
         mutate(&mut ev);
-        assert_ne!(candidate_from_execution(&ev).unwrap().candidate_id, base);
+        assert_ne!(candidate_from_execution(&ev).unwrap().candidate_id(), base);
     }
 }
 
@@ -137,9 +139,9 @@ fn qualified_capability_is_bound_to_receipts_and_has_no_authority() {
         Some(d("verify")),
     )
     .unwrap();
-    assert_eq!(q.authority, ExperienceAuthority::None);
-    assert_eq!(q.promotion_candidate_id, c.candidate_id);
-    assert_ne!(q.capability_id, c.candidate_id);
+    assert_eq!(q.authority(), ExperienceAuthority::None);
+    assert_eq!(q.promotion_candidate_id(), c.candidate_id());
+    assert_ne!(q.capability_id(), c.candidate_id());
     let swapped = qualify_candidate(
         &c,
         d("ontology"),
@@ -149,7 +151,76 @@ fn qualified_capability_is_bound_to_receipts_and_has_no_authority() {
     )
     .unwrap();
     assert_ne!(
-        q.capability_id, swapped.capability_id,
+        q.capability_id(),
+        swapped.capability_id(),
         "receipt roles must be ordered"
     );
+}
+
+/// RFC falsifier: "compiled experience changes semantic identity without changing
+/// its digest". The capability identity binds the semantic subject, and the
+/// qualified capability carries it.
+#[test]
+fn capability_identity_changes_with_semantic_subject() {
+    let qualify = |subject: &str| {
+        let mut ev = evidence();
+        ev.semantic_subject = d(subject);
+        let c = candidate_from_execution(&ev).unwrap();
+        qualify_candidate(
+            &c,
+            d("ontology"),
+            d("manufacturer"),
+            Some(d("admit")),
+            Some(d("verify")),
+        )
+        .unwrap()
+    };
+    let a = qualify("subject");
+    let b = qualify("subject-2");
+    assert_eq!(a.semantic_subject(), d("subject"));
+    assert_eq!(b.semantic_subject(), d("subject-2"));
+    assert_ne!(a.capability_id(), b.capability_id());
+    assert_ne!(a.promotion_candidate_id(), b.promotion_candidate_id());
+    // every qualified field is the candidate's, never a caller's substitute
+    assert_eq!(a.ontology_digest(), d("ontology"));
+    assert_eq!(a.manufacturer_digest(), d("manufacturer"));
+    assert_eq!(a.admission_receipt(), d("admit"));
+    assert_eq!(a.verification_receipt(), d("verify"));
+}
+
+#[test]
+fn null_receipts_are_not_evidence() {
+    let c = candidate_from_execution(&evidence()).unwrap();
+    for (admit, verify) in [(Digest::ZERO, d("verify")), (d("admit"), Digest::ZERO)] {
+        assert_eq!(
+            qualify_candidate(
+                &c,
+                d("ontology"),
+                d("manufacturer"),
+                Some(admit),
+                Some(verify)
+            ),
+            Err(ExperienceRefusal::NullReceipt)
+        );
+    }
+}
+
+/// The only route to a candidate is `candidate_from_execution`; a failed execution
+/// therefore never reaches `qualify_candidate` (struct-literal construction outside
+/// the crate is a compile error, see the `compile_fail` doctest on
+/// `PromotionCandidate`).
+#[test]
+fn failed_execution_has_no_path_to_qualification() {
+    let mut ev = evidence();
+    ev.execution_succeeded = false;
+    let outcome = candidate_from_execution(&ev).and_then(|c| {
+        qualify_candidate(
+            &c,
+            d("ontology"),
+            d("manufacturer"),
+            Some(d("admit")),
+            Some(d("verify")),
+        )
+    });
+    assert_eq!(outcome, Err(ExperienceRefusal::ExecutionNotSuccessful));
 }

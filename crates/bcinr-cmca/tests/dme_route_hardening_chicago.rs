@@ -138,12 +138,14 @@ fn tampered_route_or_explanation_fails_verification() {
 /// Stale subject: a decision sealed for one request cannot be replayed against a
 /// request that differs in any semantic field, even when the selected route is the
 /// same. Before hardening the digest omitted these fields.
+type RequestMutation = Box<dyn Fn(&mut DmeRouteRequest)>;
+
 #[test]
 fn decision_is_bound_to_every_semantic_request_field() {
     let req = request(WorkKnowledge::Unknown);
     let sealed = select_dme_route(&req).unwrap();
 
-    let mutations: Vec<(&str, Box<dyn Fn(&mut DmeRouteRequest)>)> = vec![
+    let mutations: Vec<(&str, RequestMutation)> = vec![
         (
             "consequence",
             Box::new(|r| r.consequence = ConsequenceClass::ExternalDo),
@@ -243,17 +245,17 @@ fn refused_standing_is_refused_before_optimization() {
 fn empty_route_set_is_refused_for_both_knowledge_classes() {
     let mut known = request(WorkKnowledge::Known);
     known.routes.clear();
-    assert_eq!(
+    assert!(matches!(
         select_dme_route(&known),
-        Err(DmeRouteRefusal::KnownWithoutDeterministicRoute)
-    );
+        Err(DmeRouteRefusal::KnownWithoutDeterministicRoute(_))
+    ));
     let mut unknown = request(WorkKnowledge::Unknown);
     unknown.routes.clear();
     unknown.frontier_escalation_admitted = true;
-    assert_eq!(
+    assert!(matches!(
         select_dme_route(&unknown),
-        Err(DmeRouteRefusal::UnknownWithoutLawfulRoute)
-    );
+        Err(DmeRouteRefusal::UnknownWithoutLawfulRoute(_))
+    ));
 }
 
 #[test]
@@ -261,10 +263,10 @@ fn known_work_never_falls_back_to_a_model_route() {
     let mut req = request(WorkKnowledge::Known);
     req.frontier_escalation_admitted = true;
     req.routes[0].evidence_fit = false; // the only deterministic route is unlawful
-    assert_eq!(
+    assert!(matches!(
         select_dme_route(&req),
-        Err(DmeRouteRefusal::KnownWithoutDeterministicRoute)
-    );
+        Err(DmeRouteRefusal::KnownWithoutDeterministicRoute(_))
+    ));
 }
 
 #[test]
@@ -300,10 +302,10 @@ fn every_fit_flag_is_individually_load_bearing() {
             1 => req.routes[0].evidence_fit = false,
             _ => req.routes[0].consequence_fit = false,
         }
-        assert_eq!(
+        assert!(matches!(
             select_dme_route(&req),
-            Err(DmeRouteRefusal::UnknownWithoutLawfulRoute)
-        );
+            Err(DmeRouteRefusal::UnknownWithoutLawfulRoute(_))
+        ));
     }
 }
 
@@ -316,10 +318,10 @@ fn budget_boundary_is_inclusive_and_one_over_is_refused() {
         RouteClass::UnknownLocal
     );
     req.routes[0].required_units = 21;
-    assert_eq!(
+    assert!(matches!(
         select_dme_route(&req),
-        Err(DmeRouteRefusal::UnknownWithoutLawfulRoute)
-    );
+        Err(DmeRouteRefusal::UnknownWithoutLawfulRoute(_))
+    ));
     req.routes = vec![candidate(
         RouteClass::UnknownLocal,
         u64::MAX,
@@ -360,6 +362,7 @@ fn arb_route() -> impl Strategy<Value = RouteClass> {
         Just(RouteClass::KnownDeterministic),
         Just(RouteClass::UnknownLocal),
         Just(RouteClass::UnknownIdleEstate),
+        Just(RouteClass::UnknownDeferred),
         Just(RouteClass::UnknownFrontier),
         Just(RouteClass::Refused),
     ]

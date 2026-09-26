@@ -23,7 +23,7 @@ fn bench(c: &mut Criterion) {
         let root = DmeEpoch::root(d(u64::MAX), residuals.clone()).unwrap();
         let fb = ReceiptFeedback {
             receipt_digest: d(u64::MAX - 1),
-            observed_ontology_digest: root.ontology_digest,
+            observed_ontology_digest: root.ontology_digest(),
             residual_obligations: residuals[1..].iter().rev().copied().collect(),
             authority: EpochAuthority::None,
         };

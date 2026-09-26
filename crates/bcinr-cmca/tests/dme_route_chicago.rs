@@ -58,10 +58,10 @@ fn exhausted_local_budget_does_not_silently_spill_to_frontier() {
         .unwrap()
         .budget_units = 1;
     req.frontier_escalation_admitted = false;
-    assert_eq!(
+    assert!(matches!(
         select_dme_route(&req),
-        Err(DmeRouteRefusal::UnknownWithoutLawfulRoute)
-    );
+        Err(DmeRouteRefusal::UnknownWithoutLawfulRoute(_))
+    ));
 
     req.frontier_escalation_admitted = true;
     let decision = select_dme_route(&req).unwrap();
