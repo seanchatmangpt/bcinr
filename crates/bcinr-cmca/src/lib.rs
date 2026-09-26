@@ -26,6 +26,8 @@
 //! * [`fixed`]: Q16.16 fixed-point arithmetic implementation designed for $CC=1$ operations.
 //! * [`allocator`]: Linear bounds-checked and panic-free bump allocators.
 //! * [`observatory`]: The evaluation engine that computes calibration safety flags based on mathematical thresholds.
+//! * [`dme_route`]: Canonical content-addressed DME route selector. It performs SELECT only;
+//!   its decisions carry no authority and cannot execute consequences.
 //!
 //! ## `allocator::allocate` is fixed to this crate's own `N=8`/`K=4`/`Q=4` shape (CMCA-108)
 //!
@@ -142,6 +144,9 @@ pub mod allocator;
 /// exist.
 #[cfg(feature = "alloc")]
 pub mod cascade;
+/// DME route selection: deterministic SELECT over admitted bounded execution classes.
+/// This module grants no authority and contains no execution/DO surface.
+pub mod dme_route;
 /// Fractional-exponent escort distribution (`L_q(i) = p_i^q / SUM_j p_j^q`)
 /// built on [`allocator::power`]. See the module docs for why this exists
 /// alongside [`cascade::escort_weight`], which only covers integer `q`.
@@ -162,6 +167,12 @@ pub mod reference_escort;
 pub mod stability_theorem;
 
 pub use allocator::{check_hierarchy_acyclic, HierarchyRefusal, StabilityRefusal};
+pub use dme_route::{
+    classify_dme_work, select_dme_route, verify_dme_route_decision, AuthorityStanding,
+    ConsequenceClass, DmeExhaustionWitness, DmeRouteDecision, DmeRouteRefusal, DmeRouteRequest,
+    DmeWorkClass, DmeWorkClassification, RouteCandidate, RouteClass, RouteExplanation,
+    WorkKnowledge, WorkStanding,
+};
 
 // INTEGRATION NOTE (v26.7.24, re-fenced explicitly per CMCA-102 Branch B):
 // Recovery-only authority modules (CertifiedLearning, CertifiedSelectionOnly,

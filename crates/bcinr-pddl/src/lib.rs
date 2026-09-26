@@ -50,6 +50,9 @@ pub mod mfw;
 // tuple so admission does not introduce a second shadow AST.
 #[cfg(feature = "mfw-planner")]
 pub mod cmca_execution;
+/// DME allocator-facing interface over CostVector / q-lens / fair-rail / horizons.
+#[cfg(feature = "mfw-planner")]
+pub mod dme_allocator;
 #[allow(clippy::type_complexity)]
 pub mod parse;
 pub mod powl_bridge;

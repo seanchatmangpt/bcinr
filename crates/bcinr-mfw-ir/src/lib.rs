@@ -29,6 +29,13 @@
 //!   `ExecutableConcurrencyComplex`, the `ConcurrencyAnalyzer` trait).
 //! - [`projection`] — the POWL projection contract (witness types only;
 //!   `PowlModel` itself belongs to `bcinr-powl`).
+//! - [`dme_epoch`] — recursive DME epoch closure: receipted residual
+//!   obligations advance to a successor epoch only under set descent, fixed
+//!   ontology identity and an available `DescentMeter` step (A2A-2606).
+//! - [`experience`] — candidate-only machine-experience compile-back:
+//!   execution success yields a `PromotionCandidate`; qualification needs
+//!   independent admission and verification receipts (A2A-2612). Neither
+//!   carries authority.
 //!
 //! # Formal claim ceiling
 //!
@@ -45,8 +52,10 @@ pub mod causal;
 pub mod concurrency;
 pub mod contracts;
 pub mod digest;
+pub mod dme_epoch;
 pub mod epoch;
 pub mod event_set;
+pub mod experience;
 pub mod ids;
 pub mod outcome;
 pub mod projection;
@@ -69,8 +78,16 @@ pub use contracts::{
     LAW_OBSERVABLE_IFF_FIBER_CONSTANT, LAW_QLENS_RATIO, LAW_SPECTRUM_ESTIMATOR,
 };
 pub use digest::Digest;
+pub use dme_epoch::{
+    advance_epoch, DmeEpoch, EpochAdvance, EpochAuthority, EpochRefusal, ReceiptFeedback,
+    MAX_DME_EPOCH_DESCENT_BUDGET,
+};
 pub use epoch::{DescentMeter, EpochBounds};
 pub use event_set::{EventSet, EventSetIter, EVENT_WORDS, MAX_EPOCH_EVENTS};
+pub use experience::{
+    candidate_from_execution, qualify_candidate, ExperienceAuthority, ExperienceEvidence,
+    ExperienceRefusal, PromotionCandidate, QualifiedCapability,
+};
 pub use ids::{
     ActionOccurrenceId, ConsequenceHorizonId, MeasureProfileId, PlanningEpochId, PowlNodeId,
     SearchProfileId, SelectorProfileId, TransformationProfileId,
