@@ -41,14 +41,22 @@ fn known_task_selects_deterministic_even_when_frontier_is_available() {
     let decision = select_dme_route(&req).unwrap();
     assert_eq!(decision.route, RouteClass::KnownDeterministic);
     assert_eq!(decision.authority, AuthorityStanding::None);
-    assert!(decision.explanation.refused.contains(&RouteClass::UnknownFrontier));
+    assert!(decision
+        .explanation
+        .refused
+        .contains(&RouteClass::UnknownFrontier));
 }
 
 #[test]
 fn exhausted_local_budget_does_not_silently_spill_to_frontier() {
     let mut req = request(WorkKnowledge::Unknown);
-    req.routes.retain(|r| r.route != RouteClass::UnknownIdleEstate);
-    req.routes.iter_mut().find(|r| r.route == RouteClass::UnknownLocal).unwrap().budget_units = 1;
+    req.routes
+        .retain(|r| r.route != RouteClass::UnknownIdleEstate);
+    req.routes
+        .iter_mut()
+        .find(|r| r.route == RouteClass::UnknownLocal)
+        .unwrap()
+        .budget_units = 1;
     req.frontier_escalation_admitted = false;
     assert_eq!(
         select_dme_route(&req),
@@ -101,5 +109,8 @@ fn unknown_prefers_lower_cost_idle_estate_over_more_expensive_local() {
 fn candidate_standing_is_not_optimized() {
     let mut req = request(WorkKnowledge::Unknown);
     req.standing = WorkStanding::Candidate;
-    assert_eq!(select_dme_route(&req), Err(DmeRouteRefusal::RequestNotAdmitted));
+    assert_eq!(
+        select_dme_route(&req),
+        Err(DmeRouteRefusal::RequestNotAdmitted)
+    );
 }

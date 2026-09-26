@@ -97,7 +97,9 @@ name = "bcinr-cmca"
 version = "26.7.28"
 dependencies = [
  "bcinr-logic",
+ "blake3",
  "chicago-tdd-tools",
+ "criterion",
  "proptest",
  "serde",
  "serde_json",
@@ -134,6 +136,7 @@ name = "bcinr-mfw-ir"
 version = "26.7.28"
 dependencies = [
  "blake3",
+ "criterion",
 ]
 
 [[package]]

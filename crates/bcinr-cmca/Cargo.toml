@@ -25,6 +25,7 @@ blake3 = "1"
 chicago-tdd-tools = { version = "26.7.1", features = ["ocel-generation"] }
 trybuild = "1.0"
 proptest = "1.2.0"
+criterion = "0.5"
 
 [features]
 default = []
@@ -43,3 +44,8 @@ mutant_10 = []
 mutant_11 = []
 [lib]
 crate-type = ["rlib"]
+
+[[bench]]
+name = "dme_route"
+harness = false
+required-features = ["std"]

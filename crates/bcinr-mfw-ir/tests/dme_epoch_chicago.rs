@@ -3,7 +3,9 @@ use bcinr_mfw_ir::{
     ReceiptFeedback,
 };
 
-fn d(value: &str) -> Digest { Digest::hash(value.as_bytes()) }
+fn d(value: &str) -> Digest {
+    Digest::hash(value.as_bytes())
+}
 
 fn root() -> DmeEpoch {
     DmeEpoch::root(d("ontology-v1"), vec![d("a"), d("b"), d("c")]).unwrap()
@@ -20,7 +22,13 @@ fn closed_plan_emits_no_successor_epoch() {
     };
     let mut meter = DescentMeter::new(8);
     let result = advance_epoch(&parent, &feedback, &mut meter).unwrap();
-    assert!(matches!(result, EpochAdvance::Closed { authority: EpochAuthority::None, .. }));
+    assert!(matches!(
+        result,
+        EpochAdvance::Closed {
+            authority: EpochAuthority::None,
+            ..
+        }
+    ));
     assert_eq!(meter.depth, 0);
 }
 
@@ -34,7 +42,10 @@ fn non_descending_residual_loop_is_refused_before_recursion() {
         authority: EpochAuthority::None,
     };
     let mut meter = DescentMeter::new(8);
-    assert_eq!(advance_epoch(&parent, &feedback, &mut meter), Err(EpochRefusal::NonDescendingResidual));
+    assert_eq!(
+        advance_epoch(&parent, &feedback, &mut meter),
+        Err(EpochRefusal::NonDescendingResidual)
+    );
     assert_eq!(meter.depth, 0);
 }
 
@@ -48,7 +59,10 @@ fn child_cannot_change_parent_ontology_identity() {
         authority: EpochAuthority::None,
     };
     let mut meter = DescentMeter::new(8);
-    assert_eq!(advance_epoch(&parent, &feedback, &mut meter), Err(EpochRefusal::OntologyIdentityChanged));
+    assert_eq!(
+        advance_epoch(&parent, &feedback, &mut meter),
+        Err(EpochRefusal::OntologyIdentityChanged)
+    );
 }
 
 #[test]
@@ -62,7 +76,9 @@ fn receipt_feedback_changes_residuals_but_never_authority() {
     };
     let mut meter = DescentMeter::new(8);
     let result = advance_epoch(&parent, &feedback, &mut meter).unwrap();
-    let EpochAdvance::Successor(child) = result else { panic!("expected successor") };
+    let EpochAdvance::Successor(child) = result else {
+        panic!("expected successor")
+    };
     assert_eq!(child.parent_epoch_id, Some(parent.epoch_id));
     assert_eq!(child.authority, EpochAuthority::None);
     assert_eq!(child.residual_obligations.len(), 2);
@@ -95,5 +111,8 @@ fn descent_budget_refuses_child_manufacture() {
         authority: EpochAuthority::None,
     };
     let mut meter = DescentMeter::new(0);
-    assert_eq!(advance_epoch(&parent, &feedback, &mut meter), Err(EpochRefusal::DescentBoundHit));
+    assert_eq!(
+        advance_epoch(&parent, &feedback, &mut meter),
+        Err(EpochRefusal::DescentBoundHit)
+    );
 }

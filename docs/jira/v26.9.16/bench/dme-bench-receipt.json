@@ -1,0 +1,54 @@
+{
+  "schema": "bcinr/bench-receipt/v1",
+  "release": "v26.9.26",
+  "subject": {
+    "repo": "seanchatmangpt/bcinr",
+    "pr": 38,
+    "parent_head": "ff0b76473a6a4264746abaeea18790677810aa26",
+    "note": "numbers measured on the hardening tree committed on top of parent_head"
+  },
+  "authority": "NONE",
+  "host": {
+    "os": "Darwin 25.2.0 arm64",
+    "toolchain": "rustc 1.99.0-nightly (daf2e5e18 2026-07-13)",
+    "profile": "bench (opt-level 3, lto off, codegen-units 16)",
+    "load": "shared workstation under concurrent build load; numbers are criterion 95% CI [low mid high]"
+  },
+  "commands": [
+    "cargo bench -p bcinr-cmca --features std --bench dme_route -- --warm-up-time 1 --measurement-time 3",
+    "cargo bench -p bcinr-mfw-ir --bench dme_epoch -- --warm-up-time 1 --measurement-time 3"
+  ],
+  "criterion": {
+    "dme_route/select/4": ["5.3780 us", "6.1120 us", "7.0880 us"],
+    "dme_route/verify/4": ["5.6581 us", "6.2492 us", "6.8951 us"],
+    "dme_route/select/64": ["27.787 us", "28.783 us", "30.008 us"],
+    "dme_route/verify/64": ["25.167 us", "27.930 us", "31.581 us"],
+    "dme_route/select/1024": ["364.15 us", "386.92 us", "413.05 us"],
+    "dme_route/verify/1024": ["799.22 us", "894.10 us", "991.99 us"],
+    "dme_epoch/root/4": ["1.3532 us", "1.8259 us", "2.3773 us"],
+    "dme_epoch/advance/4": ["1.1311 us", "1.3822 us", "1.6474 us"],
+    "dme_epoch/root/64": ["9.5036 us", "12.483 us", "15.779 us"],
+    "dme_epoch/advance/64": ["11.739 us", "14.991 us", "18.667 us"],
+    "dme_epoch/root/512": ["57.687 us", "72.475 us", "88.522 us"],
+    "dme_epoch/advance/512": ["74.888 us", "95.337 us", "117.76 us"],
+    "dme_epoch/experience_candidate_and_qualify": ["2.3689 us", "3.0520 us", "3.8094 us"]
+  },
+  "baseline_before_hardening": {
+    "dme_epoch/advance/512": ["170.10 us", "186.19 us", "205.23 us"],
+    "cause": "Vec::contains set-descent membership (quadratic); replaced by sorted binary search"
+  },
+  "regression_bounds": {
+    "crates/bcinr-cmca/tests/dme_route_perf_regression.rs": {
+      "absolute": "best-of-15 select+verify n=1024 < 250 ms (debug)",
+      "scaling": "best(1024)/best(64) < 32",
+      "measured_debug": "n=64 1.39 ms, n=1024 18.8 ms, ratio 13.5 (3 runs)"
+    },
+    "crates/bcinr-mfw-ir/tests/dme_epoch_perf_regression.rs": {
+      "absolute": "best-of-15 advance n=512 < 100 ms (debug)",
+      "scaling": "best(512)/best(64) < 14",
+      "measured_debug": "ratio 7.9-9.6 (6 runs)",
+      "anti_vacuity": "reverting to Vec::contains measured ratio 18.5 and 19.7; the test FAILED both times"
+    }
+  },
+  "standing": "PARTIAL_ALIVE: measured locally on one host; not an exact-head CI receipt"
+}

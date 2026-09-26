@@ -3,6 +3,18 @@
 //! This module turns receipted residual obligations into the next bounded epoch
 //! only when a machine-checkable descent witness exists. Receipt feedback is
 //! observational; it cannot mint authority or silently change ontology identity.
+//!
+//! # Canonical identity and descent (hardening, v26.9.26)
+//!
+//! * Residual obligations are a *set*: they are stored and hashed in canonical
+//!   (sorted) order, so transport reordering of the same obligations cannot mint a
+//!   second epoch identity.
+//! * Descent is set descent, not only count descent: a successor's residuals must be
+//!   a strict subset of the parent's. Receipt feedback therefore cannot substitute
+//!   fresh obligations for discharged ones (`ResidualNotInParent`).
+//! * The caller's [`DescentMeter`] must be positioned at the parent's depth; a stale
+//!   or foreign meter cannot re-mint a lower depth for a deeper epoch
+//!   (`StaleDescentMeter`).
 
 use crate::{DescentMeter, Digest};
 
@@ -46,15 +58,20 @@ pub enum EpochRefusal {
     NonDescendingResidual,
     DescentBoundHit,
     DuplicateResidual,
+    /// Feedback names an obligation the parent epoch does not carry.
+    ResidualNotInParent,
+    /// The descent meter is not positioned at the parent epoch's depth.
+    StaleDescentMeter,
 }
 
-fn unique(values: &[Digest]) -> bool {
-    for (index, left) in values.iter().enumerate() {
-        if values[index + 1..].iter().any(|right| left == right) {
-            return false;
-        }
+/// Canonicalize a residual set: sorted; refuses duplicates.
+fn canonical_residuals(values: &[Digest]) -> Result<Vec<Digest>, EpochRefusal> {
+    let mut sorted = values.to_vec();
+    sorted.sort_unstable();
+    if sorted.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(EpochRefusal::DuplicateResidual);
     }
-    true
+    Ok(sorted)
 }
 
 fn epoch_digest(
@@ -77,10 +94,11 @@ fn epoch_digest(
 }
 
 impl DmeEpoch {
-    pub fn root(ontology_digest: Digest, residual_obligations: Vec<Digest>) -> Result<Self, EpochRefusal> {
-        if !unique(&residual_obligations) {
-            return Err(EpochRefusal::DuplicateResidual);
-        }
+    pub fn root(
+        ontology_digest: Digest,
+        residual_obligations: Vec<Digest>,
+    ) -> Result<Self, EpochRefusal> {
+        let residual_obligations = canonical_residuals(&residual_obligations)?;
         let epoch_id = epoch_digest(None, ontology_digest, &residual_obligations, 0, None);
         Ok(Self {
             epoch_id,
@@ -96,8 +114,9 @@ impl DmeEpoch {
 /// Advance one MFW epoch from typed receipt feedback.
 ///
 /// A closed residual set emits a closure witness and no successor. A successor
-/// requires the same ontology identity, a strictly smaller residual set, unique
-/// residual identities, and an available DescentMeter step.
+/// requires the same ontology identity, a residual set that is a strict subset of
+/// the parent's, unique residual identities, a meter positioned at the parent's
+/// depth, and an available DescentMeter step.
 pub fn advance_epoch(
     parent: &DmeEpoch,
     feedback: &ReceiptFeedback,
@@ -106,11 +125,9 @@ pub fn advance_epoch(
     if feedback.observed_ontology_digest != parent.ontology_digest {
         return Err(EpochRefusal::OntologyIdentityChanged);
     }
-    if !unique(&feedback.residual_obligations) {
-        return Err(EpochRefusal::DuplicateResidual);
-    }
+    let residuals = canonical_residuals(&feedback.residual_obligations)?;
 
-    if feedback.residual_obligations.is_empty() {
+    if residuals.is_empty() {
         let closure_digest = epoch_digest(
             Some(parent.epoch_id),
             parent.ontology_digest,
@@ -126,15 +143,28 @@ pub fn advance_epoch(
         });
     }
 
-    if feedback.residual_obligations.len() >= parent.residual_obligations.len() {
+    if residuals.len() >= parent.residual_obligations.len() {
         return Err(EpochRefusal::NonDescendingResidual);
+    }
+    // Set descent: O((n + m) log n) membership over a sorted view of the parent
+    // (parent fields are public, so its order is not trusted).
+    let mut parent_set = parent.residual_obligations.clone();
+    parent_set.sort_unstable();
+    if residuals
+        .iter()
+        .any(|residual| parent_set.binary_search(residual).is_err())
+    {
+        return Err(EpochRefusal::ResidualNotInParent);
+    }
+    if meter.depth != parent.depth {
+        return Err(EpochRefusal::StaleDescentMeter);
     }
 
     let depth = meter.descend().map_err(|_| EpochRefusal::DescentBoundHit)?;
     let epoch_id = epoch_digest(
         Some(parent.epoch_id),
         parent.ontology_digest,
-        &feedback.residual_obligations,
+        &residuals,
         depth,
         Some(feedback.receipt_digest),
     );
@@ -143,7 +173,7 @@ pub fn advance_epoch(
         epoch_id,
         parent_epoch_id: Some(parent.epoch_id),
         ontology_digest: parent.ontology_digest,
-        residual_obligations: feedback.residual_obligations.clone(),
+        residual_obligations: residuals,
         depth,
         authority: EpochAuthority::None,
     }))

@@ -48,10 +48,14 @@ pub enum ExperienceRefusal {
     MissingVerificationReceipt,
     OntologyIdentityChanged,
     ManufacturerIdentityChanged,
+    /// Admission and verification receipts are the same receipt, or one of them is
+    /// the source execution receipt: the evidence is not independent.
+    NonIndependentReceipts,
 }
 
-fn combine(parts: &[Digest]) -> Digest {
-    let mut bytes = Vec::with_capacity(parts.len() * 32);
+fn combine(domain: &[u8], parts: &[Digest]) -> Digest {
+    let mut bytes = Vec::with_capacity(domain.len() + parts.len() * 32);
+    bytes.extend_from_slice(domain);
     for part in parts {
         bytes.extend_from_slice(part.as_bytes());
     }
@@ -67,12 +71,15 @@ pub fn candidate_from_execution(
     if !evidence.execution_succeeded {
         return Err(ExperienceRefusal::ExecutionNotSuccessful);
     }
-    let candidate_id = combine(&[
-        evidence.semantic_subject,
-        evidence.execution_receipt,
-        evidence.ontology_digest,
-        evidence.manufacturer_digest,
-    ]);
+    let candidate_id = combine(
+        b"bcinr-mfw-ir/experience/candidate/v1",
+        &[
+            evidence.semantic_subject,
+            evidence.execution_receipt,
+            evidence.ontology_digest,
+            evidence.manufacturer_digest,
+        ],
+    );
     Ok(PromotionCandidate {
         candidate_id,
         semantic_subject: evidence.semantic_subject,
@@ -101,14 +108,24 @@ pub fn qualify_candidate(
         return Err(ExperienceRefusal::ManufacturerIdentityChanged);
     }
     let admission_receipt = admission_receipt.ok_or(ExperienceRefusal::MissingAdmissionReceipt)?;
-    let verification_receipt = verification_receipt.ok_or(ExperienceRefusal::MissingVerificationReceipt)?;
-    let capability_id = combine(&[
-        candidate.candidate_id,
-        admission_receipt,
-        verification_receipt,
-        candidate.ontology_digest,
-        candidate.manufacturer_digest,
-    ]);
+    let verification_receipt =
+        verification_receipt.ok_or(ExperienceRefusal::MissingVerificationReceipt)?;
+    if admission_receipt == verification_receipt
+        || admission_receipt == candidate.source_execution_receipt
+        || verification_receipt == candidate.source_execution_receipt
+    {
+        return Err(ExperienceRefusal::NonIndependentReceipts);
+    }
+    let capability_id = combine(
+        b"bcinr-mfw-ir/experience/capability/v1",
+        &[
+            candidate.candidate_id,
+            admission_receipt,
+            verification_receipt,
+            candidate.ontology_digest,
+            candidate.manufacturer_digest,
+        ],
+    );
     Ok(QualifiedCapability {
         capability_id,
         promotion_candidate_id: candidate.candidate_id,
