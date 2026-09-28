@@ -2605,7 +2605,7 @@ pub fn allocate_single_lens(
     // -- unconditionally enforced, unlike `allocate_in`'s separate `q in
     // [-2, 2]` admission policy (see `LensSelectionRefusal::QMagnitudeExceeded`'s
     // doc comment).
-    if q.to_bits().unsigned_abs() > crate::cascade::MAX_LENS_MAGNITUDE << 16 {
+    if q.to_bits().unsigned_abs() > crate::generated_profile::MAX_LENS_MAGNITUDE << 16 {
         return Err(LensSelectionRefusal::QMagnitudeExceeded { q });
     }
     if check_hierarchy_acyclic(parent).is_err() {

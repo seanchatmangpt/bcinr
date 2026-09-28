@@ -1,6 +1,6 @@
 [package]
 name = "bcinr-cmca"
-version = "26.7.28"
+version = "26.9.28"
 edition = "2021"
 description = "CMCA-RDF deterministic substrate crate"
 license = "MIT OR Apache-2.0"
@@ -16,7 +16,7 @@ readme = "../../README.md"
 publish = false
 
 [dependencies]
-bcinr-logic = { path = "../bcinr-logic", version = "26.7.28" }
+bcinr-logic = { path = "../bcinr-logic", version = "26.9.28" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

@@ -18,6 +18,9 @@
 //! - BLAKE3 receipts (auditable, tamper-evident records)
 //! - Identical execution on any hardware, any CPU vendor
 
+// Exercises the CMCA-102/CMCA-114 authority chain on purpose: the deprecation marks
+// it as unverified for production use, not as unavailable to a determinism demo.
+#![allow(deprecated)]
 #![allow(clippy::needless_range_loop)]
 
 use bcinr_cmca::allocator::{

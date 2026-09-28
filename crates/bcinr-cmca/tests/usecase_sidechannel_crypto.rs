@@ -20,6 +20,9 @@
 //! - No power draw variations that leak information
 //! - Deterministic Q16.16 fixed-point (no IEEE 754 non-determinism)
 
+// Exercises the CMCA-102/CMCA-114 authority chain on purpose: the deprecation marks
+// it as unverified for production use, not as unavailable to tests.
+#![allow(deprecated)]
 #![allow(clippy::needless_range_loop)]
 
 use bcinr_cmca::allocator::{

@@ -1,6 +1,6 @@
 # CLAUDE.md — bcinr Development Guide
 
-**bcinr** (BranchlessCInRust v26.7.25) is a performance-first systems library with branchless algorithms, PDDL planning, POWL workflows, and cryptographic receipts. All primitives are O(1)/O(log n), deterministic, and side-channel resilient.
+**bcinr** (BranchlessCInRust v26.9.28) is a performance-first systems library with branchless algorithms, PDDL planning, POWL workflows, and cryptographic receipts. All primitives are O(1)/O(log n), deterministic, and side-channel resilient.
 
 ## Workspace Structure
 
@@ -92,7 +92,7 @@ cargo make deny   # License + supply chain
 
 ---
 
-**Last Updated:** 2026-07-25 | **Version:** 26.7.25  
+**Last Updated:** 2026-09-28 | **Version:** 26.9.28  
 **Toolchain:** nightly (minimal profile) with MSRV 1.70  
 **MCP Tools:** 23 (PDDL:7 + POWL:5 + core:3 + algo:6 + receipt:1 + xcrp:1)  
 **Test Status:** 18/18 integration tests ✓  

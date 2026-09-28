@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [26.9.28] - 2026-09-28
+
+A hardening and consolidation release. No new algorithms; the requirements it
+was cut against are recorded in `docs/releases/v26.9.28.md`.
+
+### Fixed
+
+- **`bcinr-cmca` did not compile with default features.** `allocator::select_lens`
+  referenced `crate::cascade::MAX_LENS_MAGNITUDE`, but `cascade` is gated behind
+  the `alloc` feature. Workspace builds hid this through feature unification
+  (`bcinr-powl` and `bcinr-pddl` enable `alloc`), so it only failed when the
+  crate was built on its own, and it broke the `compile_fail_tests` trybuild run.
+  The constant now comes from the ungated `generated_profile`, its source of truth.
+
+### Changed
+
+- All workspace crates and tools are versioned `26.9.28` (they had drifted across
+  `26.7.25` and `26.7.28`), and internal path dependencies pin `26.9.28`.
+- `cargo clippy --workspace --all-targets -- -D warnings` and
+  `cargo fmt --all -- --check` are clean (both were failing). Index loops in
+  `bcinr-powl` are now iterator loops with identical behavior; test targets that
+  deliberately exercise the deprecated CMCA-102/CMCA-114 authority chain carry an
+  explicit `#![allow(deprecated)]`.
+- Removed unused dependencies: `serde` and `serde_json` from `bcinr-reporter`,
+  `rand` from `ggen`.
+
 ### Removed — BREAKING
 
 - **`bcinr-powl-receipt` has been folded into `bcinr-powl` and no longer exists
@@ -23,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   # Cargo.toml
   - bcinr-powl-receipt = "26.7.28"
   - bcinr-powl = "26.7.28"
-  + bcinr-powl = "26.7.29"
+  + bcinr-powl = "26.9.28"
   ```
 
   `bcinr-powl-receipt` `26.7.28` remains on crates.io and is not yanked, but it
