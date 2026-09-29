@@ -1,0 +1,13 @@
+{
+  "contract": "sa2a/replan-envelope/v1",
+  "subject": "subject-20",
+  "effect_id": "effect-20",
+  "replay_id": "replay-20",
+  "authority": "none",
+  "resource": {
+    "cpu": 20,
+    "memory": 40,
+    "io": 60
+  },
+  "expected": "admit"
+}
