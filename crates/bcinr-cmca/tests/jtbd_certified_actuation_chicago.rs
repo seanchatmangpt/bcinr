@@ -8,6 +8,9 @@
 //! No mock, stub, or spy is used. Assertions are made against public outcomes
 //! and the allocator's persistent mutable state.
 
+// Exercises the CMCA-102/CMCA-114 authority chain on purpose: the deprecation marks
+// it as unverified for production use, not as unavailable to tests.
+#![allow(deprecated)]
 #![cfg(not(any(
     feature = "mutant_1",
     feature = "mutant_2",

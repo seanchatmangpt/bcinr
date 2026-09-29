@@ -24,6 +24,9 @@
 //! If any test here passes when it should fail, CMCA is proven incorrect at
 //! that point.
 
+// Exercises the CMCA-102/CMCA-114 authority chain on purpose: the deprecation marks
+// it as unverified for production use, not as unavailable to tests.
+#![allow(deprecated)]
 #![allow(clippy::needless_range_loop)]
 
 use bcinr_cmca::allocator::{

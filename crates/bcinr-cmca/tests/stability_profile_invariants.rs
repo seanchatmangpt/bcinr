@@ -23,6 +23,9 @@
 //! not protect against (see the doc comment on `certificate_digest` for why
 //! that is a same-crate self-check, not caller-independent authorization).
 
+// Exercises the CMCA-102/CMCA-114 authority chain on purpose: the deprecation marks
+// it as unverified for production use, not as unavailable to tests.
+#![allow(deprecated)]
 #![cfg(not(any(
     feature = "mutant_1",
     feature = "mutant_2",
@@ -77,6 +80,7 @@ fn gain_matrix_weight_vector_margin_satisfy_the_contraction_inequality() {
 /// gating anything (`tau_d < 0` is impossible for a `u32`, so a `0` value
 /// would make `dwell_err` permanently `false`).
 #[test]
+#[allow(clippy::assertions_on_constants)] // guarding a generated constant is the point
 fn mode_dwell_rounds_min_is_a_positive_gate() {
     assert!(
         MODE_DWELL_ROUNDS_MIN > 0,

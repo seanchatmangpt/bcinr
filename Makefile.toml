@@ -49,6 +49,11 @@ description = "Admission gate for the semantic graph: SHACL-validate every ontol
 # `bc:definedBy` against the `bc:NumberedResult` declarations in `bcinr.ttl`,
 # which no per-file shape can see. Two admission layers, different reach:
 # shapes for intra-file structure, gates for anything relational.
+#
+# REQUIRES an external `ggen` binary on PATH (the ggen CLI that provides
+# `graph validate` and `sync`). It is NOT tools/ggen, which is the in-tree
+# counterfactual test generator (see `[tasks.ggen]`) and has no subcommands.
+# Without it, `check` (and `profile-drift-check`) fail at this step.
 workspace = false
 command = "ggen"
 args = [
@@ -185,24 +190,9 @@ script = [
     "rm -rf target/criterion"
 ]
 
-[tasks.lint-anti-llm]
-category = "Lint"
-description = "Scan bcinr-mcp for LLM-generated stubs, hedge comments, and unverified claims"
-workspace = false
-command = "cargo"
-# `--bin anti-llm-cheat-lsp` is required, not optional: that crate's own
-# Cargo.toml now defines two binaries (`anti-llm-cheat-lsp` via src/main.rs,
-# `gen_receipts` via src/bin/gen_receipts.rs) with no `default-run` key set,
-# so a bare `cargo run` refuses to pick one ("could not determine which
-# binary to run") -- confirmed live before this fix. Disambiguating here,
-# in this repo's own Makefile.toml, avoids touching the external
-# anti-llm-cheat-lsp repo at all.
-args = ["run", "--manifest-path", "/Users/sac/anti-llm-cheat-lsp/Cargo.toml", "--quiet", "--bin", "anti-llm-cheat-lsp", "--", "scan", "--dir", "crates/bcinr-mcp/src"]
-
-# Wire anti-llm scan into clippy so CI always catches stub code in the MCP layer.
 [tasks.clippy]
 category = "Lint"
-description = "Run clippy with strict pedantic lints (+ anti-LLM stub scan)"
+description = "Run clippy with strict pedantic lints"
 # workspace = false: see [tasks.check]'s comment for why -- without this,
 # cargo-make's per-member descent ran a bare `cargo clippy` (RUSTFLAGS
 # still carries -D warnings via [env], since that propagates as process
@@ -214,7 +204,6 @@ description = "Run clippy with strict pedantic lints (+ anti-LLM stub scan)"
 # clippy was never actually run against bcinr-mfw-ir, bcinr-pddl,
 # bcinr-powl or bcinr-mcp in this invocation either.
 workspace = false
-dependencies = ["lint-anti-llm"]
 command = "cargo"
 args = ["clippy", "--workspace", "--all-targets", "--all-features", "--", "-D", "warnings"]
 
@@ -239,78 +228,6 @@ workspace = false
 command = "cargo"
 args = ["run", "--manifest-path", "tools/ggen/Cargo.toml", "--release", "--quiet"]
 
-# ---------------------------------------------------------------------------
-# GGEN Chess Factory — manufacturing cell tasks (TTL -> ggen -> Rust).
-# Edit ontology/chess.ttl, never hand-edit generated source.
-# ---------------------------------------------------------------------------
-
-[tasks.chess-factory-sync]
-category = "Factory"
-description = "Manufacture chess-factory stations from law (ggen sync over chess.ttl)"
-workspace = false
-cwd = "crates/chess-factory"
-command = "/Users/sac/.local/bin/ggen"
-args = ["sync"]
-
-[tasks.factory-build]
-category = "Factory"
-description = "Build the chess-factory crate (lib + bins) with all features"
-workspace = false
-command = "cargo"
-args = ["build", "-p", "chess-factory", "--all-features"]
-# The factory cell is self-contained: do not inherit the workspace-wide
-# `-D warnings` (sibling bcinr-logic carries pre-existing dead-code lint debt
-# in its SIMD fallbacks; that is out of this manufacturing cell's scope).
-env = { RUSTFLAGS = "" }
-dependencies = ["chess-factory-sync"]
-
-[tasks.factory-verify]
-category = "Factory"
-description = "CC=1 contract gate over the generated stations + motifs"
-workspace = false
-command = "cargo"
-args = [
-    "run", "--manifest-path", "tools/bcinr-contract-gate/Cargo.toml",
-    "--release", "--quiet", "--",
-    "crates/chess-factory/src/stations",
-]
-env = { RUSTFLAGS = "" }
-dependencies = ["factory-build"]
-
-[tasks.factory-bench]
-category = "Factory"
-description = "Smoke benchmark: one sanity_random cell, emits the Elo curve"
-workspace = false
-command = "cargo"
-args = [
-    "run", "-p", "chess-factory", "--bin", "bcinr_benchmark",
-    "--all-features", "--",
-    "--opponent", "sanity_random", "--budget", "t100us", "--games", "2",
-]
-env = { RUSTFLAGS = "" }
-dependencies = ["factory-build"]
-
-[tasks.factory-kaizen]
-category = "Factory"
-description = "Emit one DemoteStationWeight Kaizen recommendation from the curve"
-workspace = false
-command = "cargo"
-args = ["run", "-p", "chess-factory", "--bin", "bcinr_kaizen", "--all-features"]
-env = { RUSTFLAGS = "" }
-dependencies = ["factory-bench"]
-
-[tasks.factory]
-category = "Factory"
-description = "Full factory chain: sync -> build -> contract-gate -> smoke bench -> kaizen"
-workspace = false
-dependencies = [
-    "chess-factory-sync",
-    "factory-build",
-    "factory-verify",
-    "factory-bench",
-    "factory-kaizen",
-]
-
 [tasks.perf-branch-gate]
 category = "Verification"
 description = "Gate: branch mispredictions < 0.1% of retired instructions (Linux perf stat)"
@@ -320,8 +237,8 @@ script_runner = "bash"
 script = [
     "set -euo pipefail",
     "echo 'Building benchmark binary...'",
-    "cargo build --release -p bcinr-powl --bench scheduler_bench 2>/dev/null || cargo build --release -p bcinr-powl 2>/dev/null",
-    "BENCH_BIN=$(find target/release -name 'scheduler_bench' -type f | head -1)",
+    "cargo build --release -p bcinr-powl --bench phase3_scheduler 2>/dev/null || cargo build --release -p bcinr-powl 2>/dev/null",
+    "BENCH_BIN=$(find target/release -name 'phase3_scheduler-*' -type f -perm -u+x ! -name '*.d' | head -1)",
     "if [ -z \"$BENCH_BIN\" ]; then echo 'ERROR: bench binary not found'; exit 1; fi",
     "PERF_OUT=$(perf stat -e instructions,branch-misses -- \"$BENCH_BIN\" --bench 2>&1 || true)",
     "echo \"$PERF_OUT\"",
@@ -337,7 +254,7 @@ script = [
 [tasks.ci]
 category = "CI"
 description = "Comprehensive CI pipeline"
-dependencies = ["fmt", "check", "clippy", "scan-cheats", "contract-gate", "factory-verify", "test", "audit", "deny"]
+dependencies = ["fmt", "check", "clippy", "scan-cheats", "contract-gate", "test", "audit", "deny"]
 
 [tasks.default]
 alias = "ci"
@@ -347,15 +264,28 @@ category = "Test"
 description = "Verify mutant detection via compile-time injection"
 workspace = false
 script = [
-    "cargo test -p bcinr-cmca --features mutant_1",
-    "cargo test -p bcinr-cmca --features mutant_2",
-    "cargo test -p bcinr-cmca --features mutant_3",
-    "cargo test -p bcinr-cmca --features mutant_4",
-    "cargo test -p bcinr-cmca --features mutant_5",
-    "cargo test -p bcinr-cmca --features mutant_6",
-    "cargo test -p bcinr-cmca --features mutant_7",
-    "cargo test -p bcinr-cmca --features mutant_8",
-    "cargo test -p bcinr-cmca --features mutant_9",
-    "cargo test -p bcinr-cmca --features mutant_10",
-    "cargo test -p bcinr-cmca --features mutant_11",
+    "cargo test -p bcinr-cmca --features mutant_1,std",
+    "cargo test -p bcinr-cmca --features mutant_2,std",
+    "cargo test -p bcinr-cmca --features mutant_3,std",
+    "cargo test -p bcinr-cmca --features mutant_4,std",
+    "cargo test -p bcinr-cmca --features mutant_5,std",
+    "cargo test -p bcinr-cmca --features mutant_6,std",
+    "cargo test -p bcinr-cmca --features mutant_7,std",
+    "cargo test -p bcinr-cmca --features mutant_8,std",
+    "cargo test -p bcinr-cmca --features mutant_9,std",
+    "cargo test -p bcinr-cmca --features mutant_10,std",
+    "cargo test -p bcinr-cmca --features mutant_11,std",
+]
+
+[tasks.publish-dry-run]
+category = "Release"
+description = "Package and verify every publishable crate in dependency order (no upload)"
+workspace = false
+command = "cargo"
+# Tools are excluded: they ship as binaries from this repo, not as crates.io libraries.
+args = [
+    "publish", "--dry-run", "--workspace",
+    "--exclude", "bcinr-contract-gate", "--exclude", "bcinr-reporter",
+    "--exclude", "bcinr-bench-auditor", "--exclude", "bcinr-cheat-scanner",
+    "--exclude", "rust_audit", "--exclude", "ggen",
 ]

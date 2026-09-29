@@ -10,5 +10,4 @@ categories = ["development-tools::testing"]
 readme = "../../README.md"
 
 [dependencies]
-rand = { version = "0.8", features = ["small_rng"] }
 walkdir = "2.4"

@@ -1,53 +1,38 @@
 # CLAUDE.md — bcinr Development Guide
 
-**bcinr** (BranchlessCInRust v26.7.25) is a performance-first systems library with branchless algorithms, PDDL planning, POWL workflows, and cryptographic receipts. All primitives are O(1)/O(log n), deterministic, and side-channel resilient.
+**bcinr** (BranchlessCInRust v26.9.28) is a performance-first systems library with branchless algorithms, PDDL planning, POWL workflows, and cryptographic receipts. All primitives are O(1)/O(log n), deterministic, and side-channel resilient.
 
 ## Workspace Structure
 
 ```
 bcinr/
-├── bcinr-logic/         # Core algorithms (300+ branchless implementations)
-├── bcinr-api/           # Additional API layer
-├── bcinr-mcp/           # MCP server: 23 tools (PDDL, POWL, algorithms, receipts)
-├── bcinr-pddl/          # PDDL 3.1 planner
-├── bcinr-pddl-lsp/      # PDDL language server
-├── bcinr-powl/          # POWL runtime + receipt verification (BLAKE3)
-│                       #   `receipt::` — folded in from bcinr-powl-receipt
-├── tools/               # Utility tools
-├── bcinr-bench/         # Benchmarks (Criterion)
-└── docs/                # Diátaxis documentation
+├── crates/
+│   ├── bcinr-logic/     # Core algorithms (300+ branchless implementations), no_std
+│   ├── bcinr-cmca/      # CMCA numeric allocation engine
+│   ├── bcinr-pddl/      # PDDL 3.1 planner + causal independence
+│   ├── bcinr-powl/      # POWL runtime + receipt verification (BLAKE3)
+│   │                    #   `receipt::` — folded in from bcinr-powl-receipt
+│   ├── bcinr-mfw-ir/    # MFW intermediate representation
+│   └── bcinr-guarded/   # Guarded execution
+├── tools/               # Reporter, contract gate, bench auditor, cheat scanner, ggen
+└── docs/                # Diátaxis documentation, release records (docs/releases/)
 ```
+
+`bcinr-mcp`, `bcinr-api`, `bcinr-ffi`, `bcinr-bench` and `bcinr-pddl-lsp` were removed
+from the workspace (see the comment in the root `Cargo.toml`); the MCP tool tables that
+used to live here described `bcinr-mcp` and are gone with it.
 
 ## Core Principles
 
 - **Deterministic:** All paths O(1/log n), branchless (no branch misprediction)
-- **Memory-safe:** `#![forbid(unsafe_code)]` in algorithms; only 3 justified unsafe blocks
+- **Memory-safe:** `#![forbid(unsafe_code)]` in algorithms; only 4 files with justified unsafe
 - **Zero-dependency:** `no_std` compatible
 - **Cryptographic:** BLAKE3 receipts, Prolog8 admission gates
 
-## bcinr-mcp: Model Context Protocol Server
+## Architecture
 
-**23 tools** exposing entire bcinr ecosystem for Claude Code.
-
-| Group | Count | Tools |
-|-------|-------|-------|
-| PDDL | 7 | `pddl_parse_domain`, `pddl_parse_problem`, `pddl_plan`, `pddl_admit_domain`, `manufacture_world` (+2) |
-| POWL | 5 | `powl_compile_sequence`, `powl_compile_choice`, `powl_admit_context`, `powl_capability_check`, `powl_plan_to_tape` |
-| Core | 3 | `bcinr_library_info`, `bcinr_mask_ops`, `bcinr_powl_info` |
-| Algorithms | 6 | `utf8_validate`, `bitset_operations`, `dfa_info`, `scan_patterns`, `reduce_sequence`, `simd_string_info` |
-| Receipts | 1 | `receipt_inspect` |
-| Cross-crate | 1 | `system_capabilities` |
-
-**Binary:** `/Users/sac/bcinr/target/debug/bcinr-mcp` (registered in `~/.claude/settings.json`)
-
-**Tests:** `crates/bcinr-mcp/tests/integration_tests.rs` (18 dynamic tests, no hardcoded counts, 100% pass)
-
-**Architecture:** Vision 2030 BRCE loop:
-```
-PDDL → Prolog8 gate → BFS plan → POWL tape → O(1) context → 
-Branchless execute (UTF-8, bitset, DFA, scan, reduce, SIMD) → 
-BLAKE3 receipt → receipt_inspect ✓
-```
+Derivation path: PDDL 3.1 domain → causal independence proof → POWL 2.0 decomposition
+checked against the source net's language → branchless execution → BLAKE3 receipt.
 
 ## Code Quality Standards
 
@@ -55,10 +40,11 @@ BLAKE3 receipt → receipt_inspect ✓
 
 **Documentation:** Public APIs require `/// examples`. Comments explain WHY (not WHAT). Inline code is self-documenting.
 
-**Unsafe Code Policy:** `#![forbid(unsafe_code)]` enforced in algorithms. Only 3 justified unsafe blocks with Hoare-logic proofs:
+**Unsafe Code Policy:** `#![forbid(unsafe_code)]` enforced in algorithms. Only 4 files contain justified unsafe, with Hoare-logic proofs:
 - `mem.rs` — Memory arena bounds
 - `autonomic/packed_key_table.rs` — Type-safe byte reinterpretation
 - `patterns/deterministic_mpmc.rs` — Lock-free MPMC with CAS
+- `simd_dispatch.rs` — SIMD intrinsic wrappers and call blocks (~44 unsafe fns/blocks, SAFETY.md section 5)
 
 See `crates/bcinr-logic/src/SAFETY.md` for full audit.
 
@@ -67,13 +53,15 @@ See `crates/bcinr-logic/src/SAFETY.md` for full audit.
 **Conventional commits:** `type(scope): description`
 - `feat(mask)`, `fix(algorithms)`, `refactor(simd)`, `bench(bitset)`, `docs(PDDL)`, `test(...)`
 
-**Before merge:** ✅ `make check` ✅ `make test` ✅ `make clippy` ✅ `make fmt`
+**Before merge:** `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`
 
 ## Common Tasks
 
-**Add algorithm:** Create `crates/bcinr-logic/src/algorithms/new.rs`, write branchless implementation, add unit test in module, add benchmark in `bcinr-bench/`, document with examples, verify formally if safety-critical. Then: `make check && make test && make clippy && make fmt && git commit -m "feat(algorithms): ..."`
+**Add algorithm:** Create `crates/bcinr-logic/src/algorithms/new.rs`, write branchless implementation, add unit test in module, add a Criterion benchmark under `crates/bcinr-logic/benches/` (registered as a `[[bench]]` with `harness = false`; `bcinr-bench` no longer exists), document with examples, verify formally if safety-critical. Then: `make check && make test && make clippy && make fmt && git commit -m "feat(algorithms): ..."`
 
 **Optimize algorithm:** Profile → identify bottleneck → implement → benchmark → commit with % improvement.
+
+**External `ggen` CLI:** `make check` (via `graph-validate`) and `profile-drift-check` need an external `ggen` binary on PATH providing `graph validate` / `sync`. It is not `tools/ggen` (the in-tree counterfactual test generator, no subcommands).
 
 **Run specific test:** `cargo test -p bcinr-logic name -- --nocapture`
 
@@ -92,8 +80,7 @@ cargo make deny   # License + supply chain
 
 ---
 
-**Last Updated:** 2026-07-25 | **Version:** 26.7.25  
+**Last Updated:** 2026-09-28 | **Version:** 26.9.28  
 **Toolchain:** nightly (minimal profile) with MSRV 1.70  
-**MCP Tools:** 23 (PDDL:7 + POWL:5 + core:3 + algo:6 + receipt:1 + xcrp:1)  
-**Test Status:** 18/18 integration tests ✓  
-**Unsafe Code:** 3 blocks (all proven safe, see SAFETY.md)
+**Test Status:** `cargo test --workspace` green as of v26.9.28  
+**Unsafe Code:** 4 files (all proven safe, see SAFETY.md)

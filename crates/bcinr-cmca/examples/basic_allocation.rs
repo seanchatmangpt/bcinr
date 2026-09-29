@@ -22,6 +22,8 @@
 //! `allocate`'s own doc comment (and CMCA-108) for why that shape is fixed
 //! rather than caller-generic.
 
+// CMCA-102/CMCA-114: the deprecated authority chain is the subject of this example.
+#[allow(deprecated)]
 use bcinr_cmca::allocator::{
     allocate, AdaptiveUpdate, AdmittedControlState, CertificateReceipt, CertifiedLearning,
     EnvelopeReceipt, OutcomeReceipt, StabilityRefusal,

@@ -332,8 +332,12 @@ fn compile_loop<'a>(
     wire(tape, body_seg.exits, redo_seg.entries);
 
     // Scan newly allocated slots for XorDispatch (forbidden inside loop body/redo).
-    for i in pre_len as usize..tape.len as usize {
-        if tape.ops[i].kind == OpKind::XorDispatch {
+    for (i, op) in tape.ops[..tape.len as usize]
+        .iter()
+        .enumerate()
+        .skip(pre_len as usize)
+    {
+        if op.kind == OpKind::XorDispatch {
             let loop_body_entry = body_seg.entries.trailing_zeros() as u8;
             return Err(CompileError::XorInsideLoop {
                 xor_slot: i as u8,
@@ -574,9 +578,9 @@ pub fn bp_tcrv_validate_reachability(tape: &PowlTape) -> u64 {
 
     // Step 4: Construct mask of nodes requiring reachability.
     let mut must_be_reachable = 0u64;
-    for i in 0..64 {
+    for (i, op) in tape.ops.iter().enumerate().take(64) {
         let in_bounds = (i < tape_len) as u64;
-        let is_not_redo = (tape.ops[i].kind != OpKind::LoopRedo) as u64;
+        let is_not_redo = (op.kind != OpKind::LoopRedo) as u64;
         let active = in_bounds & is_not_redo;
         let mask = 0u64.wrapping_sub(active);
         must_be_reachable |= (1u64 << i) & mask;
@@ -1308,6 +1312,7 @@ pub mod v2 {
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
+#[allow(clippy::needless_range_loop)] // tests index tape slots by their slot id
 mod tests {
     use super::*;
 

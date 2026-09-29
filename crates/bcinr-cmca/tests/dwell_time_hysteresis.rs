@@ -15,6 +15,9 @@
 //! `last_switch_t` returned in the `&mut` output parameters and the real
 //! `pi_res` allocation vector, never on call counts or mock interactions.
 
+// Exercises the CMCA-102/CMCA-114 authority chain on purpose: the deprecation marks
+// it as unverified for production use, not as unavailable to tests.
+#![allow(deprecated)]
 #![cfg(not(any(
     feature = "mutant_1",
     feature = "mutant_2",

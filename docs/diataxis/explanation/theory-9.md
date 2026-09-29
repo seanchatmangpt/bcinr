@@ -76,6 +76,6 @@ arena-backed or fixed-size structures; some conveniences simply are not
 available in the core and live in the higher facade crates instead. This is
 a real ergonomic tax. The trade is intentional: the core pays in convenience
 to buy *determinism, a minimal trusted computing base, and portability*, and
-the layered workspace (`bcinr-core`, `crates/bcinr-api`) exists precisely so
+the layered workspace (`crates/bcinr-logic` for the `no_std` kernels, the higher-level crates layered on top) exists precisely so
 that applications which *can* use `std` get ergonomics without forcing those
 costs back down into the verified substrate.

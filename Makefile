@@ -1,9 +1,6 @@
 # bcinr Makefile (Delegates to cargo-make)
 
-.PHONY: all check build test test-lib bench bench-report clippy fmt clean
-
-all:
-	cargo make all
+.PHONY: check build test bench bench-report clippy fmt clean
 
 check:
 	cargo make check
@@ -13,9 +10,6 @@ build:
 
 test:
 	cargo make test
-
-test-lib:
-	cargo make test-lib
 
 bench:
 	cargo make bench
