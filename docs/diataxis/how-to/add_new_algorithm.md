@@ -120,8 +120,10 @@ All three must pass before proceeding.
 
 ## Step 4: Add a benchmark
 
-Open `bcinr-bench/benches/bcinr_bench.rs` (or create a dedicated bench file
-for your algorithm family if it has many variants):
+Create a bench file in `crates/bcinr-logic/benches/` (for example
+`your_algorithm_name.rs`) and register it as a `[[bench]]` with
+`harness = false` and `required-features = ["bench"]` in
+`crates/bcinr-logic/Cargo.toml`:
 
 ```rust
 use bcinr_logic::algorithms::your_algorithm_name::your_function;
@@ -140,8 +142,7 @@ criterion_main!(benches);
 Run it to establish a baseline:
 
 ```bash
-cd bcinr-bench
-cargo bench --bench bcinr_bench -- your_function
+cargo bench -p bcinr-logic --features bench --bench your_algorithm_name -- your_function
 ```
 
 ## Step 5: Run the full workspace check

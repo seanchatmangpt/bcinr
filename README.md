@@ -92,7 +92,7 @@ conformance theory, and Fortune 5 strategic framing:
 
 ```bash
 make check    # compile all targets
-make test     # full test suite (928 tests)
+make test     # full test suite
 make clippy   # zero-warning lint
 make bench    # Criterion benchmarks
 ```

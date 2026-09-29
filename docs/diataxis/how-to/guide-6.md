@@ -2,14 +2,14 @@
 
 **Goal:** Measure the latency of a primitive with statistical rigor and inspect the result, so you can spot regressions and confirm low timing variance.
 
-**Prerequisites:** The benchmark crate is [`bcinr-bench`](../../../bcinr-bench/). Benchmarks use Criterion with `harness = false`. `jq` is optional, for the text report. Latency is reported by [Criterion](https://bheisler.github.io/criterion.rs/book/), which warms up and samples each function many times.
+**Prerequisites:** The standalone `bcinr-bench` crate was removed from the workspace; benches now live in each crate's `benches/` directory (for example [`bcinr-powl`](../../../crates/bcinr-powl/benches/) and [`bcinr-pddl`](../../../crates/bcinr-pddl/benches/)). `bcinr-logic` has no bench files yet, so put new ones in `crates/bcinr-logic/benches/` and enable its `bench` feature. Benchmarks use Criterion with `harness = false`. `jq` is optional, for the text report. Latency is reported by [Criterion](https://bheisler.github.io/criterion.rs/book/), which warms up and samples each function many times.
 
 ## Steps
 
-1. Add a benchmark function to an existing bench file (for example [`bcinr-bench/benches/bcinr_bench.rs`](../../../bcinr-bench/benches/bcinr_bench.rs)). Reach into the library through the `bcinr_core::logic` facade, matching the existing benches:
+1. Add a benchmark function to a bench file in `crates/bcinr-logic/benches/` (create it if it does not exist yet). Import the kernel from `bcinr_logic`:
 
    ```rust
-   use bcinr_core::logic::mask::min_u32;
+   use bcinr_logic::mask::min_u32;
    use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
    fn bench_min(c: &mut Criterion) {
@@ -28,14 +28,14 @@
    criterion_main!(benches);
    ```
 
-   If you instead create a *new* `benches/<name>.rs` file, add a matching `[[bench]]` entry with `harness = false` to [`bcinr-bench/Cargo.toml`](../../../bcinr-bench/Cargo.toml).
+   If you instead create a *new* `benches/<name>.rs` file, add a matching `[[bench]]` entry with `harness = false` and `required-features = ["bench"]` to [`crates/bcinr-logic/Cargo.toml`](../../../crates/bcinr-logic/Cargo.toml).
 
 3. Run the whole bench suite, or just one harness, or filter to one function inside it:
 
    ```bash
    cargo make bench                                   # all benches (cargo bench --all-features)
-   cargo bench -p bcinr-bench --bench bcinr_bench     # one harness
-   cargo bench -p bcinr-bench --bench bcinr_bench -- min_u32   # one function
+   cargo bench -p bcinr-logic --features bench --bench <name>     # one harness
+   cargo bench -p bcinr-logic --features bench --bench <name> -- min_u32   # one function
    ```
 
 4. Read the result. The terminal prints the estimated time and any change vs. the last run. For full detail open the generated HTML, or produce the text table:

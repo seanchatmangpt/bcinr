@@ -11,7 +11,7 @@ this tutorial takes you from zero to a statistically rigorous measurement.
 A Criterion benchmark for the `mask::select_u32` kernel from
 [Tutorial 1](./tutorial-1.md), measured across best/typical/worst inputs to show
 that the timing does not depend on the data. You will mirror the exact harness
-style used in `bcinr-bench/benches/`.
+style used by the crates' `benches/` directories (for example `crates/bcinr-powl/benches/`).
 
 **Prerequisites:** [Tutorial 1](./tutorial-1.md). Having read
 [Tutorial 9](./tutorial-9.md) helps — never benchmark a kernel you have not first
@@ -19,10 +19,10 @@ proven correct.
 
 ## Step 1: Understand the harness conventions
 
-Open `bcinr-bench/benches/bcinr_bench.rs`. Two conventions matter:
+Open any existing bench, such as `crates/bcinr-powl/benches/receipt_bench.rs`. Two conventions matter:
 
 ```rust
-use bcinr_core::logic::mask::select_u32;          // import the kernel
+use bcinr_logic::mask::select_u32;                 // import the kernel
 use criterion::{criterion_group, criterion_main, Criterion};
 
 fn bench_mask(c: &mut Criterion) {
@@ -35,7 +35,7 @@ criterion_group!(benches, bench_mask);
 criterion_main!(benches);
 ```
 
-And in `bcinr-bench/Cargo.toml`, every bench file is registered with the Criterion
+And in the crate's `Cargo.toml`, every bench file is registered with the Criterion
 harness disabled (Criterion provides its own `main`):
 
 ```toml
@@ -49,8 +49,7 @@ harness = false
 `select_u32(0xFFFFFFFF, 10, 20)` has constant arguments — without help the
 compiler would fold it to `10` at compile time and you would measure nothing.
 `criterion::black_box` hides values from the optimizer so the kernel actually
-runs. You can see this pattern throughout `patterns_bench.rs` and
-`algorithms_1_100.rs`:
+runs. You can see this pattern throughout the existing bench files:
 
 ```rust
 use criterion::black_box;
@@ -60,10 +59,10 @@ b.iter(|| select_u32(black_box(0xFFFFFFFF), black_box(10), black_box(20)))
 
 ## Step 3: Write the benchmark
 
-Create `bcinr-bench/benches/select_latency.rs`:
+Create `crates/bcinr-logic/benches/select_latency.rs`:
 
 ```rust
-use bcinr_core::logic::mask::select_u32;
+use bcinr_logic::mask::select_u32;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn bench_select(c: &mut Criterion) {
@@ -92,12 +91,13 @@ differently for the taken vs not-taken branch. A branchless one should not.
 
 ## Step 4: Register the bench target
 
-Add this to `bcinr-bench/Cargo.toml` under the existing `[[bench]]` entries:
+Add this to `crates/bcinr-logic/Cargo.toml` (it has no `[[bench]]` entries yet):
 
 ```toml
 [[bench]]
 name = "select_latency"
 harness = false
+required-features = ["bench"]
 ```
 
 The `name` must match the file stem (`select_latency.rs`).
@@ -105,8 +105,7 @@ The `name` must match the file stem (`select_latency.rs`).
 ## Step 5: Run the benchmark
 
 ```bash
-cd bcinr-bench
-cargo bench --bench select_latency
+cargo bench -p bcinr-logic --features bench --bench select_latency
 ```
 
 Expected output (numbers vary by machine; the *shape* is what matters):
@@ -126,8 +125,8 @@ kernel should behave.
 Criterion writes a full statistical report with plots:
 
 ```bash
-xdg-open ../target/criterion/report/index.html   # Linux
-# open ../target/criterion/report/index.html     # macOS
+xdg-open target/criterion/report/index.html   # Linux
+# open target/criterion/report/index.html     # macOS
 ```
 
 The report shows the probability density of each measurement. For a branchless
@@ -141,12 +140,12 @@ make a change, then compare:
 
 ```bash
 # record a baseline
-cargo bench --bench select_latency -- --save-baseline before
+cargo bench -p bcinr-logic --features bench --bench select_latency -- --save-baseline before
 
 # ...edit the kernel...
 
 # measure against it
-cargo bench --bench select_latency -- --baseline before
+cargo bench -p bcinr-logic --features bench --bench select_latency -- --baseline before
 ```
 
 Criterion prints `change: [...]` with a verdict like `No change in performance`
@@ -154,7 +153,7 @@ or `Performance has regressed`, so a slowdown shows up in CI before it ships.
 
 ## What you learned
 
-- bcinr benchmarks are Criterion files in `bcinr-bench/benches/`, registered with
+- bcinr benchmarks are Criterion files in each crate's `benches/` directory, registered with
   `harness = false` and a matching `[[bench]]` `name`.
 - `criterion::black_box` is mandatory — without it the optimizer constant-folds
   your kernel away.

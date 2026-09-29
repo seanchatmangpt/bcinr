@@ -21,7 +21,7 @@ bcinr-mfw-ir = { version = "26.9.28", path = "../bcinr-mfw-ir" }
 # about POWL, so the join lives here, on the side that already has the tree.
 bcinr-cmca = { version = "26.9.28", path = "../bcinr-cmca", features = ["alloc"] }
 blake3 = "1"
-wasm4pm-compat = "26.6.29"
+wasm4pm-compat = { version = "26.6.29", optional = true }
 # Unconditional since 26.7.29: the folded-in `receipt` module (formerly the
 # `bcinr-powl-receipt` crate) derives Serialize/Deserialize on
 # `receipt::execution_v2::PowlV2ExecutionReceipt` and returns
@@ -44,7 +44,7 @@ default = []
 # `bcinr-powl-receipt` fold-in. `std` still gates the wasm4pm-compat OCEL
 # conversion and JSON output in `ocel.rs`, and the time/entropy seeding in
 # `typestate.rs`.
-std = []
+std = ["dep:wasm4pm-compat"]
 nightly = []
 testing = []
 

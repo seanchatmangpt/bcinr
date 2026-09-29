@@ -1073,7 +1073,7 @@ impl AdaptiveUpdate<CertifiedLearning> {
 /// # Complexity
 /// $O(1)$ constant time, branchless.
 ///
-/// Made `pub` (was `pub(crate)`) so [`crate::escort`] can build a
+/// Made `pub` (was `pub(crate)`) so `crate::escort` can build a
 /// fractional-exponent escort distribution on top of it -- see that
 /// module's docs for why `cascade::escort_weight`'s exact, integer-only
 /// repeated multiplication isn't sufficient for every caller.
@@ -2333,9 +2333,9 @@ pub fn allocate_in(
 ///
 /// If your data does not have exactly 8 objects / 4 measures / 4 lenses,
 /// this function is not callable for your shape. Use
-/// [`crate::cascade::consequence_mass`] instead: it takes a tree of
+/// `crate::cascade::consequence_mass` instead: it takes a tree of
 /// **any** shape and a lens per level (trading the branchless/$O(1)$
-/// guarantee for that generality -- see the [`crate::cascade`] module docs
+/// guarantee for that generality -- see the `crate::cascade` module docs
 /// for the full tradeoff).
 ///
 /// # Mathematical Behavior
@@ -2475,7 +2475,7 @@ pub fn allocate(
 /// Why [`allocate_single_lens`] refused to produce a single-lens allocation.
 ///
 /// A typed, non-panicking refusal, matching the crate's established
-/// one-variant-per-check convention (mirrors [`crate::certification::CertificationRefusal`]'s
+/// one-variant-per-check convention (mirrors `CertificationRefusal`'s
 /// shape).
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum LensSelectionRefusal {
@@ -2484,8 +2484,8 @@ pub enum LensSelectionRefusal {
     /// `lens_idx` was not a valid index into the `Q` lenses (`0..Q`).
     LensIndexOutOfRange { lens_idx: usize },
     /// `lenses[lens_idx].q`'s magnitude exceeded
-    /// [`crate::cascade::MAX_LENS_MAGNITUDE`] -- the same, unconditionally
-    /// enforced bound [`crate::escort::escort_distribution`] checks. Not to
+    /// `crate::cascade::MAX_LENS_MAGNITUDE` -- the same, unconditionally
+    /// enforced bound `crate::escort::escort_distribution` checks. Not to
     /// be confused with `allocate_in`'s separate, `proof`-conditional
     /// `q in [-2, 2]` admission policy (see
     /// `crate::generated_profile::MAX_LENS_MAGNITUDE`'s doc comment for why
@@ -2513,7 +2513,7 @@ impl std::error::Error for LensSelectionRefusal {}
 ///
 /// Like [`allocate`], this function is bound to this crate's own compiled-in
 /// `N`/`K`/`Q` (8/4/4) -- see [`allocate`]'s "Fixed shape" section for why,
-/// and for the escape hatch ([`crate::cascade::consequence_mass`]) for
+/// and for the escape hatch (`crate::cascade::consequence_mass`) for
 /// other shapes.
 ///
 /// # Why this exists
@@ -2528,10 +2528,10 @@ impl std::error::Error for LensSelectionRefusal {}
 /// (`tests/falsification_adversarial.rs`'s "per-lens isolation is not
 /// observable through the public API").
 ///
-/// This function reuses [`compute_pi_kq_for_kq`] -- the exact private
+/// This function reuses `compute_pi_kq_for_kq` -- the exact private
 /// kernel `allocate_in` already calls once per `(k, q_idx)` pair before
 /// discarding the individual results into the blend -- rather than
-/// reimplementing the escort math against [`crate::escort::escort_distribution`].
+/// reimplementing the escort math against `crate::escort::escort_distribution`.
 ///
 /// # The blend identity -- and its precondition (CMCA-111)
 ///
@@ -2584,7 +2584,7 @@ impl std::error::Error for LensSelectionRefusal {}
 /// # Errors
 ///
 /// Refuses (never panics) on an out-of-range `measure`/`lens_idx`, a
-/// `q` magnitude beyond [`crate::cascade::MAX_LENS_MAGNITUDE`], or a
+/// `q` magnitude beyond `crate::cascade::MAX_LENS_MAGNITUDE`, or a
 /// cyclic `parent` -- see [`LensSelectionRefusal`].
 pub fn allocate_single_lens(
     states: &[PackedSemanticState; N],

@@ -25,7 +25,7 @@ used to live here described `bcinr-mcp` and are gone with it.
 ## Core Principles
 
 - **Deterministic:** All paths O(1/log n), branchless (no branch misprediction)
-- **Memory-safe:** `#![forbid(unsafe_code)]` in algorithms; only 3 justified unsafe blocks
+- **Memory-safe:** `#![forbid(unsafe_code)]` in algorithms; only 4 files with justified unsafe
 - **Zero-dependency:** `no_std` compatible
 - **Cryptographic:** BLAKE3 receipts, Prolog8 admission gates
 
@@ -40,10 +40,11 @@ checked against the source net's language → branchless execution → BLAKE3 re
 
 **Documentation:** Public APIs require `/// examples`. Comments explain WHY (not WHAT). Inline code is self-documenting.
 
-**Unsafe Code Policy:** `#![forbid(unsafe_code)]` enforced in algorithms. Only 3 justified unsafe blocks with Hoare-logic proofs:
+**Unsafe Code Policy:** `#![forbid(unsafe_code)]` enforced in algorithms. Only 4 files contain justified unsafe, with Hoare-logic proofs:
 - `mem.rs` — Memory arena bounds
 - `autonomic/packed_key_table.rs` — Type-safe byte reinterpretation
 - `patterns/deterministic_mpmc.rs` — Lock-free MPMC with CAS
+- `simd_dispatch.rs` — SIMD intrinsic wrappers and call blocks (~44 unsafe fns/blocks, SAFETY.md section 5)
 
 See `crates/bcinr-logic/src/SAFETY.md` for full audit.
 
@@ -56,9 +57,11 @@ See `crates/bcinr-logic/src/SAFETY.md` for full audit.
 
 ## Common Tasks
 
-**Add algorithm:** Create `crates/bcinr-logic/src/algorithms/new.rs`, write branchless implementation, add unit test in module, add benchmark in `bcinr-bench/`, document with examples, verify formally if safety-critical. Then: `make check && make test && make clippy && make fmt && git commit -m "feat(algorithms): ..."`
+**Add algorithm:** Create `crates/bcinr-logic/src/algorithms/new.rs`, write branchless implementation, add unit test in module, add a Criterion benchmark under `crates/bcinr-logic/benches/` (registered as a `[[bench]]` with `harness = false`; `bcinr-bench` no longer exists), document with examples, verify formally if safety-critical. Then: `make check && make test && make clippy && make fmt && git commit -m "feat(algorithms): ..."`
 
 **Optimize algorithm:** Profile → identify bottleneck → implement → benchmark → commit with % improvement.
+
+**External `ggen` CLI:** `make check` (via `graph-validate`) and `profile-drift-check` need an external `ggen` binary on PATH providing `graph validate` / `sync`. It is not `tools/ggen` (the in-tree counterfactual test generator, no subcommands).
 
 **Run specific test:** `cargo test -p bcinr-logic name -- --nocapture`
 
@@ -80,4 +83,4 @@ cargo make deny   # License + supply chain
 **Last Updated:** 2026-09-28 | **Version:** 26.9.28  
 **Toolchain:** nightly (minimal profile) with MSRV 1.70  
 **Test Status:** `cargo test --workspace` green as of v26.9.28  
-**Unsafe Code:** 3 blocks (all proven safe, see SAFETY.md)
+**Unsafe Code:** 4 files (all proven safe, see SAFETY.md)

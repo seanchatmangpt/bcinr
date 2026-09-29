@@ -88,8 +88,8 @@
 //! high-error call from a low-error one. Rather than narrowing the admitted
 //! domain (which would refuse calls that work fine today), this measured
 //! bucketed error data is now exposed as a runtime-checkable
-//! [`PathConfidence`] via the additive
-//! [`escort_distribution_with_confidence`] entry point, so a caller can
+//! [`escort::PathConfidence`] via the additive
+//! [`escort::escort_distribution_with_confidence`] entry point, so a caller can
 //! decide for itself whether a given call's error bound is acceptable --
 //! without changing `escort_distribution`'s existing `Ok`/`Err` signature
 //! or behavior for any existing caller.

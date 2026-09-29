@@ -42,3 +42,36 @@ mutant_10 = []
 mutant_11 = []
 [lib]
 crate-type = ["rlib"]
+
+# These tests import `cascade` / `escort` / `reference_escort`, which are
+# `alloc`-gated in lib.rs. Declared with `required-features` rather than an
+# inner `#![cfg(feature = "alloc")]` so a default build reports the target as
+# skipped instead of passing as an empty binary.
+
+[[test]]
+name = "cascade_residual_classification"
+required-features = ["alloc"]
+
+[[test]]
+name = "cmca_h1_refusal_correspondence"
+required-features = ["alloc"]
+
+[[test]]
+name = "cmca_h_lean_correspondence"
+required-features = ["alloc"]
+
+[[test]]
+name = "lean_correspondence"
+required-features = ["alloc"]
+
+[[test]]
+name = "lean_correspondence_h"
+required-features = ["alloc"]
+
+[[test]]
+name = "power_error_bound"
+required-features = ["alloc"]
+
+[[test]]
+name = "runtime_semantic_classification"
+required-features = ["alloc"]
