@@ -154,6 +154,8 @@ pub mod generated;
 pub mod generated_profile;
 pub mod lrc;
 pub mod observatory;
+/// Authority-free SA2A resource-allocation consumer boundary.
+pub mod sa2a;
 /// Hand-transcribed exact-rational reference oracle for the CMCA escort
 /// distribution, mirroring `~/mfw`'s `MFW/CMCA/Semantics/Escort.lean`. Not a
 /// machine-checked bridge -- see the module docs for exact scope.
