@@ -13,4 +13,4 @@ pub mod resource_envelope;
 
 pub use admission::{admit, Refusal};
 pub use contract::{Envelope, RecoveryDecision, CONTRACT};
-pub use resource_envelope::{Allocation, ResourceEnvelope};
+pub use resource_envelope::{Allocation, BudgetLedger, BudgetReceipt, ResourceEnvelope};
