@@ -32,6 +32,10 @@ was cut against are recorded in `docs/releases/v26.9.28.md`.
   explicit `#![allow(deprecated)]`.
 - Removed unused dependencies: `serde` and `serde_json` from `bcinr-reporter`,
   `rand` from `ggen`.
+- `bcinr-cmca` and `bcinr-guarded` are now publishable (`publish = false` removed), so
+  `bcinr-powl` and `bcinr-pddl` resolve their `bcinr-cmca` dependency from crates.io. The
+  CMCA-102/CMCA-114 authority chain stays `#[deprecated]`. The vendored
+  `encode_unicode` patch is marked `publish = false`.
 
 ### Removed — BREAKING
 

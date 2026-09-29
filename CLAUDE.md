@@ -8,12 +8,12 @@
 bcinr/
 ├── crates/
 │   ├── bcinr-logic/     # Core algorithms (300+ branchless implementations), no_std
-│   ├── bcinr-cmca/      # CMCA numeric allocation engine (publish = false)
+│   ├── bcinr-cmca/      # CMCA numeric allocation engine
 │   ├── bcinr-pddl/      # PDDL 3.1 planner + causal independence
 │   ├── bcinr-powl/      # POWL runtime + receipt verification (BLAKE3)
 │   │                    #   `receipt::` — folded in from bcinr-powl-receipt
 │   ├── bcinr-mfw-ir/    # MFW intermediate representation
-│   └── bcinr-guarded/   # Guarded execution (publish = false)
+│   └── bcinr-guarded/   # Guarded execution
 ├── tools/               # Reporter, contract gate, bench auditor, cheat scanner, ggen
 └── docs/                # Diátaxis documentation, release records (docs/releases/)
 ```

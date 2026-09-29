@@ -276,3 +276,16 @@ script = [
     "cargo test -p bcinr-cmca --features mutant_10,std",
     "cargo test -p bcinr-cmca --features mutant_11,std",
 ]
+
+[tasks.publish-dry-run]
+category = "Release"
+description = "Package and verify every publishable crate in dependency order (no upload)"
+workspace = false
+command = "cargo"
+# Tools are excluded: they ship as binaries from this repo, not as crates.io libraries.
+args = [
+    "publish", "--dry-run", "--workspace",
+    "--exclude", "bcinr-contract-gate", "--exclude", "bcinr-reporter",
+    "--exclude", "bcinr-bench-auditor", "--exclude", "bcinr-cheat-scanner",
+    "--exclude", "rust_audit", "--exclude", "ggen",
+]

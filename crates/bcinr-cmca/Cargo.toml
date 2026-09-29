@@ -9,11 +9,11 @@ repository = "https://github.com/seanchatmangpt/bcinr"
 keywords = ["cmca", "rdf", "deterministic", "algorithms"]
 categories = ["algorithms"]
 readme = "../../README.md"
-# Workspace-internal: depends on bcinr-logic by exact path+version, and
-# currently contains unexported/unverified code (see lib.rs's "INTEGRATION
-# NOTE (v26.7.24)" on the allocator authority subsystem, pending formal
-# Hoare-logic verification) not meant for external consumption yet.
-publish = false
+# Published so bcinr-powl / bcinr-pddl (mfw-planner) can resolve it from
+# crates.io. The allocator authority subsystem (CMCA-102 / CMCA-114, see
+# lib.rs "INTEGRATION NOTE (v26.7.24)") stays #[deprecated] pending
+# Hoare-logic verification; that status ships with the crate.
+publish = true
 
 [dependencies]
 bcinr-logic = { path = "../bcinr-logic", version = "26.9.28" }
