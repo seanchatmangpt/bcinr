@@ -57,7 +57,7 @@ See `crates/bcinr-logic/src/SAFETY.md` for full audit.
 
 ## Common Tasks
 
-**Add algorithm:** Create `crates/bcinr-logic/src/algorithms/new.rs`, write branchless implementation, add unit test in module, add a Criterion benchmark under `crates/bcinr-logic/benches/` (registered as a `[[bench]]` with `harness = false`; `bcinr-bench` no longer exists), document with examples, verify formally if safety-critical. Then: `make check && make test && make clippy && make fmt && git commit -m "feat(algorithms): ..."`
+**Add algorithm:** Create `crates/bcinr-logic/src/algorithms/new.rs`, write branchless implementation, add unit test in module, add a benchmark (`bcinr-bench` no longer exists and `bcinr-logic` has no `benches/` directory yet, so create one and register it as a `[[bench]]` in `crates/bcinr-logic/Cargo.toml`; existing benches live in `bcinr-powl` and `bcinr-pddl`), document with examples, verify formally if safety-critical. Then: `make check && make test && make clippy && make fmt && git commit -m "feat(algorithms): ..."`
 
 **Optimize algorithm:** Profile → identify bottleneck → implement → benchmark → commit with % improvement.
 
