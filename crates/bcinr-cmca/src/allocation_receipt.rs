@@ -120,13 +120,24 @@ impl AllocationReceipt {
     }
 }
 
+/// Golden-ratio increment γ = 2^64/φ, the splitmix64 seeding constant
+/// (Steele/Lea/Flood, FastSplittablePrng) -- `a ^ γ·b` decorrelates the two
+/// chained inputs before the fmix64 finalizer below.
+const MIX64_GAMMA: u64 = 0x9E37_79B9_7F4A_7C15;
+/// murmur3 `fmix64` finalizer multiplier k1 (Appleby, SMHasher): distributes
+/// high bits after the first `x >> 33` shift.
+const MIX64_FMUX_K1: u64 = 0xFF51_AFD7_ED55_8CCD;
+/// murmur3 `fmix64` finalizer multiplier k2 (Appleby, SMHasher): second-stage
+/// avalanche after the second `x >> 33` shift.
+const MIX64_FMUX_K2: u64 = 0xC4CE_B9FE_1A85_EC53;
+
 #[inline(always)]
 fn mix64(a: u64, b: u64) -> u64 {
-    let mut x = a ^ b.wrapping_mul(0x9E3779B97F4A7C15);
+    let mut x = a ^ b.wrapping_mul(MIX64_GAMMA);
     x ^= x >> 33;
-    x = x.wrapping_mul(0xFF51AFD7ED558CCD);
+    x = x.wrapping_mul(MIX64_FMUX_K1);
     x ^= x >> 33;
-    x = x.wrapping_mul(0xC4CEB9FE1A85EC53);
+    x = x.wrapping_mul(MIX64_FMUX_K2);
     x ^= x >> 33;
     x
 }
@@ -143,7 +154,13 @@ fn inputs_digest(
     parent: &[i32; N],
     weights: &[[NonNegativeFixed; 2 * Q]; N],
 ) -> u64 {
-    let mut d = 0x1234_5678_9abc_def0u64;
+    /// Arbitrary fixed chaining seed for the `mix64` fold. Any nonzero
+    /// constant works; this one is distinguished-pattern filler (0x1234...),
+    /// recorded here so nobody mistakes silence for derivation. Changing it
+    /// changes every `inputs_digest` and therefore every sealed
+    /// [`AllocationReceipt`] binding -- it is part of the replay identity.
+    const INPUTS_DIGEST_SEED: u64 = 0x1234_5678_9abc_def0;
+    let mut d = INPUTS_DIGEST_SEED;
     for state in states.iter() {
         for factor in state.factors.iter() {
             d = mix64(d, factor.val as u64);

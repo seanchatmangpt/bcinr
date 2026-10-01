@@ -166,6 +166,17 @@ impl NonNegativeFixed {
         // report it.
         let d_norm = d.wrapping_shl(lz);
 
+        // Fixed-point reciprocal seed pair for the error-form Newton–Raphson
+        // iteration below (error scale 2^94: `e_k = 2^94 - d_norm·x_k`,
+        // `x_{k+1} = x_k + (x_k·(e_k >> 32)) >> 62`). The closed-form
+        // derivation of this particular `(a_scale, b_coeff)` pair over the
+        // normalized divisor range `d_norm ∈ [2^63, 2^64)` is NOT recorded
+        // in-tree (flagged per the `generated/stability_profile.rs`
+        // CMCA-113 convention: named, not derived). Its correctness envelope
+        // is witnessed mechanically by `tests/power_error_bound.rs` and the
+        // f64 differential oracle in `tests/reference.rs`; three iterations
+        // converge to the exact floor quotient (with the `rem`-based
+        // correction below) for every divisor reached by that suite.
         let a_scale = 13021703673752174592u64;
         let b_coeff = 2021160080u64;
         let x0 = a_scale.wrapping_sub(b_coeff.wrapping_mul(d_norm as u64));
@@ -349,6 +360,14 @@ impl SignedFixed {
         let fp = x.wrapping_sub(ip.wrapping_shl(16));
 
         let y = fp as u32;
+        // Q16.16 Taylor-family coefficients of `2^f` for `f ∈ [0, 1)`:
+        // Horner over `(ln2)^k / k!` -- 630 ≈ ln2^4/4!·2^16, 3637 ≈
+        // ln2^3/3!·2^16, 15763 ≈ ln2^2/2·2^16, 45506 ≈ ln2·2^16 -- each
+        // a few ULP off its pure Taylor rounding (45426/15743/3638/630
+        // lowest-order-last), an empirical adjustment that minimizes the
+        // measured max relative error of the composed kernel. Envelope
+        // witnessed by `tests/power_error_bound.rs` and the f64 differential
+        // oracle in `tests/reference.rs`.
         let res1 = (y.wrapping_mul(630)) >> 16;
         let res2 = (y.wrapping_mul(3637u32.wrapping_add(res1))) >> 16;
         let res3 = (y.wrapping_mul(15763u32.wrapping_add(res2))) >> 16;
@@ -385,6 +404,16 @@ impl SignedFixed {
     #[inline(always)]
     pub fn exp(self) -> NonNegativeFixed {
         let x = self.val;
+        // `exp(x) = 2^(x·log2 e)`; 94548 is Q16.16 log2(e) biased +3 ULP over
+        // the nearest rounding (94545): measured over x ∈ [-15, 15]·2^16 the
+        // biased coefficient halves the composed max relative error
+        // (5.46e-4 vs 1.01e-3) by compensating the floor in the `>> 16`
+        // shift below. Measured max rel err here is the kernel's declared
+        // envelope; see `tests/power_error_bound.rs`.
+        // Note: the product fits i32 only for |x| < 2^47/94548 ≈ 1.489e9
+        // Q16.16 (≈ 22717.0 real); beyond that the `as i32` recast wraps
+        // silently -- in-domain (`allocate_in`'s beta·payoff weights) values
+        // stay far inside it.
         let z = (((x as i64).wrapping_mul(94548)) >> 16) as i32;
         SignedFixed {
             val: z,
