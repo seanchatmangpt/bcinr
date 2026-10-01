@@ -1,6 +1,6 @@
 [package]
 name = "bcinr-powl"
-version = "26.9.15"
+version = "26.9.28"
 edition = "2021"
 description = "POWL 2.0 model, compiler, concurrency guards, executable scheduler, and cryptographic execution evidence"
 license = "MIT OR Apache-2.0"
@@ -13,15 +13,15 @@ keywords = ["workflow", "branchless", "petri", "conformance", "blake3"]
 categories = ["algorithms", "data-structures"]
 
 [dependencies]
-bcinr-logic = { version = "26.9.15", path = "../bcinr-logic" }
+bcinr-logic = { version = "26.9.28", path = "../bcinr-logic" }
 # Shared IR types/trait contracts for multifractal planning. This edge is one-way.
-bcinr-mfw-ir = { version = "26.9.15", path = "../bcinr-mfw-ir" }
+bcinr-mfw-ir = { version = "26.9.28", path = "../bcinr-mfw-ir" }
 # Multifractal consequence allocation over the POWL process hierarchy
 # (`crate::multifractal`). One-way: bcinr-cmca is `no_std` and knows nothing
 # about POWL, so the join lives here, on the side that already has the tree.
-bcinr-cmca = { version = "26.9.15", path = "../bcinr-cmca", features = ["alloc"] }
+bcinr-cmca = { version = "26.9.28", path = "../bcinr-cmca", features = ["alloc"] }
 blake3 = "1"
-wasm4pm-compat = "26.6.29"
+wasm4pm-compat = { version = "26.6.29", optional = true }
 # Unconditional since 26.7.29: the folded-in `receipt` module (formerly the
 # `bcinr-powl-receipt` crate) derives Serialize/Deserialize on
 # `receipt::execution_v2::PowlV2ExecutionReceipt` and returns
@@ -44,7 +44,7 @@ default = []
 # `bcinr-powl-receipt` fold-in. `std` still gates the wasm4pm-compat OCEL
 # conversion and JSON output in `ocel.rs`, and the time/entropy seeding in
 # `typestate.rs`.
-std = []
+std = ["dep:wasm4pm-compat"]
 nightly = []
 testing = []
 

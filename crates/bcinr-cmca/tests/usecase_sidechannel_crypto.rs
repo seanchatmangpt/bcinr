@@ -19,12 +19,9 @@
 //! - No cache misses dependent on data values
 //! - No power draw variations that leak information
 //! - Deterministic Q16.16 fixed-point (no IEEE 754 non-determinism)
-// These tests deliberately exercise the `#[deprecated]` authority-chain types
-// (`AdaptiveUpdate`, `CertifiedLearning`, receipts, ...) that CMCA-102 fences
-// pending Hoare-logic verification. The crate's integration suite is the
-// documented exception allowed to construct them (see lib.rs's INTEGRATION
-// NOTE); this scoped allow keeps CI's `-D warnings` clippy gate green without
-// un-deprecating the types for production callers.
+
+// Exercises the CMCA-102/CMCA-114 authority chain on purpose: the deprecation marks
+// it as unverified for production use, not as unavailable to tests.
 #![allow(deprecated)]
 #![allow(clippy::needless_range_loop)]
 

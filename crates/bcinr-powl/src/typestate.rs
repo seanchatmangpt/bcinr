@@ -211,7 +211,7 @@ impl HasPowlTape for crate::tape::v2::PowlTape {
 
     fn content_hash(&self) -> [u8; 32] {
         let mut h = blake3::Hasher::new();
-        for op in self.ops.iter().take(self.len as usize) {
+        for op in &self.ops[..self.len as usize] {
             h.update(&op.pred_mask.to_le_bytes());
             h.update(&op.succ_mask.to_le_bytes());
             h.update(&[op.op_kind as u8]);
@@ -232,7 +232,7 @@ impl HasPowlTape for crate::tape::PowlTape {
 
     fn content_hash(&self) -> [u8; 32] {
         let mut h = blake3::Hasher::new();
-        for op in self.ops.iter().take(self.len as usize) {
+        for op in &self.ops[..self.len as usize] {
             h.update(&op.pred_mask.to_le_bytes());
             h.update(&op.succ_mask.to_le_bytes());
             h.update(&[op.kind as u8]);
@@ -899,8 +899,8 @@ impl<const KIND: TopologyKind> Receipt<KIND> {
     pub fn verify_topo_order(&self, tape_ops: &[crate::tape::Powl64Op]) -> bool {
         let count = self.event_count as usize;
         let mut step_of = [u8::MAX; 64];
-        for (step, &op_slot) in self.topo_order.iter().enumerate().take(count) {
-            let op = op_slot as usize;
+        for (step, &op) in self.topo_order[..count].iter().enumerate() {
+            let op = op as usize;
             if op >= 64 || op >= tape_ops.len() {
                 return false;
             }
@@ -916,8 +916,8 @@ impl<const KIND: TopologyKind> Receipt<KIND> {
             }
         }
         // Rule 2: predecessor order
-        for (step, &op_slot) in self.topo_order.iter().enumerate().take(count) {
-            let op_idx = op_slot as usize;
+        for (step, &op) in self.topo_order[..count].iter().enumerate() {
+            let op_idx = op as usize;
             if op_idx >= tape_ops.len() {
                 return false;
             }

@@ -5,56 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [26.9.15] - 2026-09-15
+## [Unreleased]
 
-### Published (prepared — dry-run verified, not yet uploaded)
+## [26.9.28] - 2026-09-28
 
-- **Publish set expanded to every workspace member** except the vendored
-  `encode_unicode` patch overlay, whose package name IS the upstream
-  crates.io crate — it is consumed via `[patch.crates-io]` and can never be
-  uploaded under this ownership.
-- `publish = false` removed from `bcinr-cmca`, `bcinr-guarded`,
-  `bcinr-reporter`, and `bcinr-contract-gate` (operator release decision,
-  2026-09-15). The CMCA authority chain remains fenced in-code via
-  `#[deprecated]` + `#[doc(hidden)]` on the seven authority types
-  (CMCA-102/CMCA-114, pending Hoare-logic verification); the manifest fence
-  on the whole crate is gone, the compile-time warning on that subsystem is
-  not.
-- `bcinr-guarded`'s path-only dependencies (`bcinr-powl`, `bcinr-cmca`)
-  gained version requirements — without them the crate was unpublishable by
-  construction — and a `readme` field.
-- `bcinr-cheat-scanner`'s `test_scanner` target moved from the repository
-  root `tests/` into the package at `tools/bcinr-cheat-scanner/tests/`; a
-  target path outside the package root cannot be packaged.
-- Unchanged members keep their versions: `bcinr-bench-auditor` (26.7.25),
-  `ggen`/`rust_audit` (0.1.0), `encode_unicode` (1.0.1, mirrors upstream).
-- `cargo publish --dry-run` passes for all twelve (leaves outright;
-  dependents via CLI-only `--config patch.'crates-io'.'<dep>'.path=...`
-  forced resolution, the same verification used for 26.7.28).
+A hardening and consolidation release. No new algorithms; the requirements it
+was cut against are recorded in `docs/releases/v26.9.28.md`.
 
-### Fixed — CMCA (shipped from `fix/cmca-default-build-and-gates`)
+### Fixed
 
-- Default-feature and mutant-only builds repaired: the allocator's
-  `MAX_LENS_MAGNITUDE` reference now resolves through the always-compiled
-  `generated_profile` constant (the alloc-gated `cascade` copy is derived
-  from it), and integration tests importing `alloc`-gated modules compile
-  to zero tests without the feature instead of failing to resolve.
-- `saturating_div`'s normalization shift hardened to `wrapping_shl`:
-  mutant_7's inverted equality mask can no longer turn the kill evidence
-  into a debug-build panic (`0u32 << 32`) before the typed refusal asserts.
-  Release arm64 disassembly re-audited: 0 conditional branches, 0 divides.
-- The dormant `stability_theorem` verifier (independent power-iteration
-  spectral radius + average-dwell-time bound) is now executed by
-  `stability_profile_invariants` tests against the live profile constants.
-- `generator_ttl_comment_stripping`'s temp-dir race fixed (pid + atomic
-  sequence + nanos; was ~1-in-6 flaky from clock-nanos collisions).
-- Workspace clippy gate (`-D warnings`) unblocked via scoped, documented
-  `#![allow(deprecated)]` in the test files that intentionally construct
-  the deprecated authority-chain types.
-- Docs corrected: allocation-receipt BLAKE3 overclaims replaced with the
-  as-built mix64 audit-aid capability; the illustrative "BMC VERIFIED"
-  block marked NOT EXECUTED; `docs/cmca-rdf/CURRENT_STATUS.md` marked a
-  historical snapshot of the v26.7.17 baseline.
+- **`bcinr-cmca` did not compile with default features.** `allocator::select_lens`
+  referenced `crate::cascade::MAX_LENS_MAGNITUDE`, but `cascade` is gated behind
+  the `alloc` feature. Workspace builds hid this through feature unification
+  (`bcinr-powl` and `bcinr-pddl` enable `alloc`), so it only failed when the
+  crate was built on its own, and it broke the `compile_fail_tests` trybuild run.
+  The constant now comes from the ungated `generated_profile`, its source of truth.
+
+### Changed
+
+- All workspace crates and tools are versioned `26.9.28` (they had drifted across
+  `26.7.25` and `26.7.28`), and internal path dependencies pin `26.9.28`.
+- `cargo clippy --workspace --all-targets -- -D warnings` and
+  `cargo fmt --all -- --check` are clean (both were failing). Index loops in
+  `bcinr-powl` are now iterator loops with identical behavior; test targets that
+  deliberately exercise the deprecated CMCA-102/CMCA-114 authority chain carry an
+  explicit `#![allow(deprecated)]`.
+- Removed unused dependencies: `serde` and `serde_json` from `bcinr-reporter`,
+  `rand` from `ggen`.
+- `bcinr-cmca` and `bcinr-guarded` are now publishable (`publish = false` removed), so
+  `bcinr-powl` and `bcinr-pddl` resolve their `bcinr-cmca` dependency from crates.io. The
+  CMCA-102/CMCA-114 authority chain stays `#[deprecated]`. The vendored
+  `encode_unicode` patch is marked `publish = false`.
 
 ### Removed — BREAKING
 
@@ -72,7 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   # Cargo.toml
   - bcinr-powl-receipt = "26.7.28"
   - bcinr-powl = "26.7.28"
-  + bcinr-powl = "26.9.15"
+  + bcinr-powl = "26.9.28"
   ```
 
   `bcinr-powl-receipt` `26.7.28` remains on crates.io and is not yanked, but it

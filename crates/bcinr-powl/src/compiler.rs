@@ -332,11 +332,9 @@ fn compile_loop<'a>(
     wire(tape, body_seg.exits, redo_seg.entries);
 
     // Scan newly allocated slots for XorDispatch (forbidden inside loop body/redo).
-    for (i, op) in tape
-        .ops
+    for (i, op) in tape.ops[..tape.len as usize]
         .iter()
         .enumerate()
-        .take(tape.len as usize)
         .skip(pre_len as usize)
     {
         if op.kind == OpKind::XorDispatch {
@@ -1314,6 +1312,7 @@ pub mod v2 {
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
+#[allow(clippy::needless_range_loop)] // tests index tape slots by their slot id
 mod tests {
     use super::*;
 
@@ -1562,9 +1561,9 @@ mod tests {
         }
 
         let mut must_be_reachable = 0u64;
-        for (i, op) in tape.ops.iter().enumerate().take(64) {
+        for i in 0..64 {
             let in_bounds = (i < tape_len) as u64;
-            let is_not_redo = (op.kind != OpKind::LoopRedo) as u64;
+            let is_not_redo = (tape.ops[i].kind != OpKind::LoopRedo) as u64;
             let active = in_bounds & is_not_redo;
             let mask = 0u64.wrapping_sub(active);
             must_be_reachable |= (1u64 << i) & mask;
@@ -1605,9 +1604,9 @@ mod tests {
         }
 
         let mut must_be_reachable = 0u64;
-        for (i, op) in tape.ops.iter().enumerate().take(64) {
+        for i in 0..64 {
             let in_bounds = (i < tape_len) as u64;
-            let is_not_redo = (op.kind != OpKind::LoopRedo) as u64;
+            let is_not_redo = (tape.ops[i].kind != OpKind::LoopRedo) as u64;
             let active = in_bounds & is_not_redo;
             let mask = 0u64.wrapping_sub(active);
             must_be_reachable |= (1u64 << i) & mask;
@@ -1674,9 +1673,9 @@ mod tests {
             let len = rng.next_range(1, 64);
             tape.len = len as u8;
 
-            for op in tape.ops.iter_mut().take(len) {
+            for i in 0..len {
                 let kind_val = rng.next_range(0, 4);
-                op.kind = match kind_val {
+                tape.ops[i].kind = match kind_val {
                     0 => OpKind::Atom,
                     1 => OpKind::Silent,
                     2 => OpKind::XorDispatch,
@@ -1684,44 +1683,40 @@ mod tests {
                     _ => OpKind::LoopRedo,
                 };
                 if rng.next_range(0, 10) == 0 {
-                    op.kind = OpKind::LoopRedo;
+                    tape.ops[i].kind = OpKind::LoopRedo;
                 }
             }
 
-            for (i, op) in tape.ops.iter_mut().enumerate().take(len) {
+            for i in 0..len {
                 let mut succs = 0u64;
                 for j in (i + 1)..len {
                     if rng.next_range(0, 3) == 0 {
                         succs |= 1u64 << j;
                     }
                 }
-                op.succ_mask = succs;
+                tape.ops[i].succ_mask = succs;
             }
 
-            for (i, op) in tape.ops.iter_mut().enumerate().take(len) {
-                if op.kind == OpKind::LoopRedo {
+            for i in 0..len {
+                if tape.ops[i].kind == OpKind::LoopRedo {
                     let mut succs = 0u64;
                     for j in 0..i {
                         if rng.next_range(0, 3) == 0 {
                             succs |= 1u64 << j;
                         }
                     }
-                    op.succ_mask = succs;
+                    tape.ops[i].succ_mask = succs;
                 }
             }
 
-            // Snapshot successor masks first: the broadcast pattern reads
-            // every op's succ_mask while writing each op's pred_mask, which
-            // cannot borrow the same array mutably and immutably at once.
-            let succ_snapshot: Vec<u64> = tape.ops.iter().take(len).map(|o| o.succ_mask).collect();
-            for (i, op) in tape.ops.iter_mut().enumerate().take(len) {
+            for i in 0..len {
                 let mut preds = 0u64;
-                for (j, &sm) in succ_snapshot.iter().enumerate() {
-                    if (sm & (1u64 << i)) != 0 {
+                for j in 0..len {
+                    if (tape.ops[j].succ_mask & (1u64 << i)) != 0 {
                         preds |= 1u64 << j;
                     }
                 }
-                op.pred_mask = preds;
+                tape.ops[i].pred_mask = preds;
             }
 
             let mut entry_mask = 0u64;

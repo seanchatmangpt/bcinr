@@ -1017,8 +1017,6 @@ cargo make scan-cheats
 cargo make contract-gate
 cargo make ci
 cargo make test-mutants
-cargo make audit-object-code
-cargo make verify-generated
 ```
 
 Before reporting results, prove each task’s jurisdiction includes the changed files.

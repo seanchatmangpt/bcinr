@@ -29,6 +29,8 @@
 // un-deprecating the types for production callers.
 #![allow(deprecated)]
 
+// CMCA-102/CMCA-114: the deprecated authority chain is the subject of this example.
+#[allow(deprecated)]
 use bcinr_cmca::allocator::{
     allocate, AdaptiveUpdate, AdmittedControlState, CertificateReceipt, CertifiedLearning,
     EnvelopeReceipt, OutcomeReceipt, StabilityRefusal,

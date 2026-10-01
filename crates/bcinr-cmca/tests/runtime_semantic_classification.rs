@@ -1,3 +1,6 @@
+// Exercises the CMCA-102/CMCA-114 authority chain on purpose: the deprecation marks
+// it as unverified for production use, not as unavailable to tests.
+#![allow(deprecated)]
 //! BCINR-CMCA-D: classifies, without changing, the mathematical operation
 //! each of `bcinr-cmca`'s five numeric runtime surfaces actually realizes.
 //!

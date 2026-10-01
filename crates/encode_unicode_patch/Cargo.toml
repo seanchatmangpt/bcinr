@@ -13,6 +13,8 @@
 edition = "2021"
 name = "encode_unicode"
 version = "1.0.1"
+# Vendored third-party patch (path override in the workspace root); never publish under the upstream name.
+publish = false
 authors = ["Torbjørn Birch Moltu <t.b.moltu@lyse.net>"]
 description = """
 UTF-8 and UTF-16 character types, iterators and related methods for char, u8 and u16.

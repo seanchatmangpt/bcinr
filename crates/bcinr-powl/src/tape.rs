@@ -396,7 +396,7 @@ pub mod v2 {
         pub fn ready_mask(&self) -> u64 {
             let mut mask: u64 = 0;
             let n = self.len as usize;
-            for (i, op) in self.ops.iter().enumerate().take(n) {
+            for (i, op) in self.ops[..n].iter().enumerate() {
                 let ready = eq_mask_u64(op.pred_mask, 0);
                 mask |= ((ready >> 63) & 1) << i;
             }
