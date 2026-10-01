@@ -125,6 +125,9 @@ pub mod allocation_receipt;
 pub mod allocator;
 #[cfg(feature = "alloc")]
 pub mod cascade;
+/// DME route selection: deterministic SELECT over admitted bounded execution classes.
+/// This module grants no authority and contains no execution/DO surface.
+pub mod dme_route;
 /// Fractional-exponent escort distribution (`L_q(i) = p_i^q / SUM_j p_j^q`)
 /// built on [`allocator::power`]. See the module docs for why this exists
 /// alongside `cascade::escort_weight`, which only covers integer `q`.
@@ -135,19 +138,18 @@ pub mod generated;
 pub mod generated_profile;
 pub mod lrc;
 pub mod observatory;
-/// Authority-free SA2A resource-allocation consumer boundary.
-pub mod sa2a;
 /// Hand-transcribed exact-rational reference oracle for the CMCA escort
 /// distribution, mirroring `~/mfw`'s `MFW/CMCA/Semantics/Escort.lean`. Not a
 /// machine-checked bridge -- see the module docs for exact scope.
 #[cfg(feature = "alloc")]
 pub mod reference_escort;
+/// Authority-free SA2A resource-allocation consumer boundary.
+pub mod sa2a;
 pub mod stability_theorem;
-/// DME route selection: deterministic SELECT over admitted bounded execution classes.
-/// This module grants no authority and contains no execution/DO surface.
-pub mod dme_route;
 
-pub use allocator::{check_hierarchy_acyclic, HierarchyRefusal, StabilityRefusal};
+pub use allocator::{
+    check_hierarchy_acyclic, HierarchyRefusal, LensSelectionRefusal, StabilityRefusal,
+};
 pub use dme_route::{
     select_dme_route, select_gall_route, verify_dme_route_decision, verify_gall_route_decision,
     AuthorityStanding, ConsequenceClass, DmeRouteDecision, DmeRouteRefusal, DmeRouteRequest,

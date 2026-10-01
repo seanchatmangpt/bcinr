@@ -38,7 +38,6 @@
 // documented exception allowed to construct them (see lib.rs's INTEGRATION
 // NOTE); this scoped allow keeps CI's `-D warnings` clippy gate green without
 // un-deprecating the types for production callers.
-#![allow(deprecated)]
 // Exercises `cascade`/`escort`/`reference_escort` (alloc-gated modules): without
 // the feature this target compiles to zero tests, keeping the default-feature
 // matrix green instead of failing to resolve gated imports.
