@@ -99,10 +99,7 @@ pub struct ForecastMatrix<const R: usize, const H: usize> {
 }
 
 impl<const R: usize, const H: usize> ForecastMatrix<R, H> {
-    pub fn validate(
-        &self,
-        registry: &ResourceAxisRegistry<R>,
-    ) -> Result<(), ForecastModelRefusal> {
+    pub fn validate(&self, registry: &ResourceAxisRegistry<R>) -> Result<(), ForecastModelRefusal> {
         registry.validate()?;
         ForecastHorizonSet {
             horizons: self.horizons,
@@ -119,16 +116,10 @@ impl<const R: usize, const H: usize> ForecastMatrix<R, H> {
             while horizon < H {
                 let cell = self.cells[axis][horizon];
                 if cell.lower > cell.expected {
-                    return Err(ForecastModelRefusal::LowerExceedsExpected {
-                        axis,
-                        horizon,
-                    });
+                    return Err(ForecastModelRefusal::LowerExceedsExpected { axis, horizon });
                 }
                 if cell.expected > cell.upper {
-                    return Err(ForecastModelRefusal::ExpectedExceedsUpper {
-                        axis,
-                        horizon,
-                    });
+                    return Err(ForecastModelRefusal::ExpectedExceedsUpper { axis, horizon });
                 }
                 if cell.confidence_ppm > CONFIDENCE_PPM_ONE {
                     return Err(ForecastModelRefusal::InvalidConfidence {

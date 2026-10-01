@@ -13,12 +13,14 @@ pub struct Allocation {
 }
 
 impl ResourceEnvelope {
-    pub const ZERO: Self = Self { cpu: 0, memory: 0, io: 0 };
+    pub const ZERO: Self = Self {
+        cpu: 0,
+        memory: 0,
+        io: 0,
+    };
 
     pub const fn admits(&self, allocation: &Allocation) -> bool {
-        allocation.cpu <= self.cpu
-            && allocation.memory <= self.memory
-            && allocation.io <= self.io
+        allocation.cpu <= self.cpu && allocation.memory <= self.memory && allocation.io <= self.io
     }
 
     /// Existing subtraction semantics: return the residual envelope after a

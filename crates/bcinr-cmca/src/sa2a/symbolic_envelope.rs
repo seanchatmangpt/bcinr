@@ -117,10 +117,7 @@ impl<const V: usize> SymbolicFamily<V> {
     }
 
     /// Materialize and independently validate a solver-proposed witness.
-    pub fn concretize(
-        &self,
-        witness: &SymbolicWitness<V>,
-    ) -> Result<Allocation, SymbolicRefusal> {
+    pub fn concretize(&self, witness: &SymbolicWitness<V>) -> Result<Allocation, SymbolicRefusal> {
         if witness.family_id != self.family_id {
             return Err(SymbolicRefusal::FamilyIdMismatch {
                 expected: self.family_id,
@@ -216,15 +213,25 @@ pub struct SymbolicWitness<const V: usize> {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SymbolicRefusal {
-    FamilyIdMismatch { expected: u64, actual: u64 },
-    InvalidDomain { index: usize },
-    ValueOutOfDomain { index: usize, value: u64 },
+    FamilyIdMismatch {
+        expected: u64,
+        actual: u64,
+    },
+    InvalidDomain {
+        index: usize,
+    },
+    ValueOutOfDomain {
+        index: usize,
+        value: u64,
+    },
     ArithmeticOverflow,
     EnvelopeExceeded {
         requested: Allocation,
         envelope: ResourceEnvelope,
     },
-    InvalidLifetime { index: usize },
+    InvalidLifetime {
+        index: usize,
+    },
 }
 
 impl core::fmt::Display for SymbolicRefusal {

@@ -112,11 +112,7 @@ impl AdmittedPredictiveConsequenceEnvelope {
                 memory: observed.memory.abs_diff(self.envelope.expected.memory),
                 io: observed.io.abs_diff(self.envelope.expected.io),
             },
-            within_interval: inside_interval(
-                observed,
-                self.envelope.lower,
-                self.envelope.upper,
-            ),
+            within_interval: inside_interval(observed, self.envelope.lower, self.envelope.upper),
         }
     }
 }
@@ -250,7 +246,6 @@ fn component_pressure_ppm(demand: u64, capacity: u64) -> u32 {
     let ratio = scaled / (capacity as u128);
     core::cmp::min(ratio, PRESSURE_PPM_ONE as u128) as u32
 }
-
 
 const fn inside_interval(observed: Allocation, lower: Allocation, upper: Allocation) -> bool {
     observed.cpu >= lower.cpu

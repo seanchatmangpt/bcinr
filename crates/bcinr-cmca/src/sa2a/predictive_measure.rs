@@ -96,9 +96,7 @@ pub fn admit_predictive_measure(
     Ok(AdmittedPredictiveMeasure { artifact })
 }
 
-pub fn predictive_envelope_digest(
-    forecast: &AdmittedPredictiveConsequenceEnvelope,
-) -> u64 {
+pub fn predictive_envelope_digest(forecast: &AdmittedPredictiveConsequenceEnvelope) -> u64 {
     let envelope = forecast.envelope();
     let mut digest = mix64(envelope.subject_id, envelope.horizon_start);
     digest = mix64(digest, envelope.horizon_end);
