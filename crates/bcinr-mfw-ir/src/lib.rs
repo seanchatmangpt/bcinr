@@ -13,6 +13,7 @@ pub mod digest;
 pub mod dme_epoch;
 pub mod epoch;
 pub mod event_set;
+pub mod experience;
 pub mod ids;
 pub mod outcome;
 pub mod projection;
@@ -40,6 +41,10 @@ pub use dme_epoch::{
 };
 pub use epoch::{DescentMeter, EpochBounds};
 pub use event_set::{EventSet, EventSetIter, EVENT_WORDS, MAX_EPOCH_EVENTS};
+pub use experience::{
+    candidate_from_execution, qualify_candidate, ExperienceAuthority, ExperienceEvidence,
+    ExperienceRefusal, PromotionCandidate, QualifiedCapability,
+};
 pub use ids::{
     ActionOccurrenceId, ConsequenceHorizonId, MeasureProfileId, PlanningEpochId, PowlNodeId,
     SearchProfileId, SelectorProfileId, TransformationProfileId,
