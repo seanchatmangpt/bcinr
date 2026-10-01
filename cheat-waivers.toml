@@ -1,0 +1,21 @@
+# cheat-waivers.toml — admitted scanner suppression artifact.
+#
+# AGENTS.md §17: "No baseline suppression may be added without a separately
+# admitted waiver artifact." This file is that artifact for bcinr-cheat-scanner.
+#
+# Semantics (enforced by the scanner):
+#   - A waiver suppresses exactly one (rule, path) pair; the suppressed finding
+#     prints as "WAIVED[CHEAT-xxx] ..." and never silently disappears.
+#   - A waiver entry that matches no current finding is itself a finding
+#     (CHEAT[WAIVER-STALE]): a suppression with no witnessed firing carries no
+#     bits and must be removed.
+#   - Fail-closed: a missing or unparsable file yields zero waivers.
+#
+# Admission log (append-only):
+#   2026-10-01 coordinator integration wave — initial admission below.
+
+[[waiver]]
+rule = "CHEAT-006"
+path = "crates/encode_unicode_patch/src/errors.rs"
+reason = "vendored upstream encode_unicode error boilerplate (Apache/MIT, copyright 2016-2022 Torbjorn Birch Moltu); the flagged control-flow tokens live inside upstream's description!/error macros as shipped, not inserted to evade the scanner — restructuring upstream semantics in a vendored patch would diverge the patch from its upstream contract"
+admitted_by = "coordinator integration wave 2026-10-01 (10-lane benchmark/harden/fix wave, release/26.9.15)"

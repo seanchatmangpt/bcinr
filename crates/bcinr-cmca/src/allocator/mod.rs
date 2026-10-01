@@ -2119,8 +2119,6 @@ pub fn allocate_in(
     let mut pi_res = [NonNegativeFixed::ZERO; N];
     let mut priced_sum = NonNegativeFixed::ZERO;
     unroll_8_static!(x, {
-        #[cfg(feature = "mutant_5")]
-        let mu_actual = mu[x & 7];
         // CMCA-122: since CMCA-103, `price_err` (mu[x] > mu_max) refuses
         // *unconditionally* before this computation's result can be
         // observed on any `Ok` path (see `selection_critical_error` below),
@@ -2130,6 +2128,20 @@ pub fn allocate_in(
         // `Ok` path, but cheap and branchless -- rather than removed
         // outright. `clip`'s own clamping behavior is unit-tested directly
         // in `clip_tests` below, independent of this admission gate.
+        //
+        // Mutant_5 slot, retired and re-armed 2026-10-01 (ledger:
+        // tests/mutant_kill_survivors.rs): the original mutation here
+        // dropped the defensive `clip` and SURVIVED by construction -- the
+        // clip is provably non-identity only on already-refused paths
+        // (CMCA-122), so no admitted-input test can kill it. The slot now
+        // injects `mu_actual = mu_max`: the priced softmax reads the region
+        // price CEILING where the admitted price vector `mu` is
+        // contractual (p = pi_combined * exp(-mu*costs)). Unlike the clip
+        // drop, that corruption is observable on `Ok` paths (any fixture
+        // with mu != mu_max pricing), and `mu_max` is in scope here as the
+        // same clamp bound the defensive clip uses.
+        #[cfg(feature = "mutant_5")]
+        let mu_actual = mu_max;
         #[cfg(not(feature = "mutant_5"))]
         let mu_actual = clip(mu[x & 7], NonNegativeFixed::ZERO, mu_max);
 
@@ -2149,8 +2161,15 @@ pub fn allocate_in(
         nl += is_leaf[i & 7] as u32;
     });
     unroll_8_static!(x, {
+        // Second mutant_5 site (2026-10-01 retirement + re-arm, ledger:
+        // tests/mutant_kill_survivors.rs): same substitution as the
+        // `priced_sum` loop above -- the mutant prices `p_mu` from the
+        // region ceiling `mu_max` instead of the admitted `mu`, keeping the
+        // denominator and numerator of the softmax consistently (not
+        // incoherently) corrupted so the observable divergence is the price
+        // law itself.
         #[cfg(feature = "mutant_5")]
-        let mu_actual = mu[x & 7];
+        let mu_actual = mu_max;
         #[cfg(not(feature = "mutant_5"))]
         let mu_actual = clip(mu[x & 7], NonNegativeFixed::ZERO, mu_max);
 
