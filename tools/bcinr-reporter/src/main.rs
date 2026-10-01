@@ -2,7 +2,6 @@ use prettytable::{row, Table};
 use regex::Regex;
 use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
 use std::process::Command;
 
 fn module_has_u64_contract(module: &str) -> bool {
@@ -11,8 +10,15 @@ fn module_has_u64_contract(module: &str) -> bool {
         format!("crates/bcinr-logic/src/abstractions/{}.rs", module),
     ];
     for c in &candidates {
-        if Path::new(c).exists() {
-            if let Ok(_s) = fs::read_to_string(c) {}
+        // The original read the file and discarded the contents, returning
+        // false unconditionally: the U64 Contract column carried zero bits
+        // (measured 0/350 on a tree where contract-gate counts real
+        // contracts). Inspect the content using the same markers
+        // contract-gate's has_contract_in_attrs accepts.
+        if let Ok(s) = fs::read_to_string(c) {
+            return s.contains("Branchless Contract")
+                || s.contains("BRANCHLESS CONTRACT")
+                || s.contains("u64_contract!");
         }
     }
     false

@@ -195,16 +195,43 @@ fn is_checked(f: &FunctionInfo, reachable: &BTreeSet<String>, arg_specified: boo
     reachable.contains(&f.name)
 }
 
+fn workspace_crate_dirs() -> Vec<PathBuf> {
+    // Default jurisdiction is derived, never hardcoded: every crates/*
+    // directory carrying a Cargo.toml is scanned (the previous hardcoded pair
+    // [bcinr-logic, bcinr-cmca] silently dropped bcinr-powl, bcinr-pddl,
+    // bcinr-guarded, bcinr-mfw-ir and encode_unicode_patch when crates were
+    // added to the workspace). Manifest presence, not workspace membership,
+    // decides jurisdiction -- a gate must not go blind on a crate just
+    // because a manifest edit excluded it from members. An empty result is
+    // refused fail-closed in main. (No cargo-metadata dependency: Cargo.lock
+    // is outside this tool's write ownership.)
+    let mut dirs = Vec::new();
+    if let Ok(entries) = fs::read_dir("crates") {
+        for e in entries.flatten() {
+            if e.path().join("Cargo.toml").is_file() {
+                dirs.push(e.path());
+            }
+        }
+    }
+    dirs.sort();
+    dirs
+}
+
 fn main() {
     let arg = std::env::args().nth(1);
-    // If no path is specified, scan both crates/bcinr-logic and crates/bcinr-cmca to build the full call graph!
+    // With no path argument, build the full call graph over every workspace
+    // member crate under crates/.
     let scan_dirs = match &arg {
         Some(p) => vec![PathBuf::from(p)],
-        None => vec![
-            PathBuf::from("crates/bcinr-logic"),
-            PathBuf::from("crates/bcinr-cmca"),
-        ],
+        None => workspace_crate_dirs(),
     };
+
+    if scan_dirs.is_empty() {
+        eprintln!(
+            "REFUSED_NO_JURISDICTION: no scan roots derivable (cargo metadata unavailable, no crates/*/Cargo.toml found). A green gate with empty jurisdiction is not evidence."
+        );
+        std::process::exit(2);
+    }
 
     let mut visitor = CallGraphVisitor {
         current_path: PathBuf::new(),
@@ -212,9 +239,12 @@ fn main() {
         file_doc_has_contract: false,
     };
 
-    for src_dir in &scan_dirs {
+    let mut inspected: Vec<(PathBuf, usize)> = scan_dirs.iter().map(|d| (d.clone(), 0)).collect();
+
+    for (src_dir, count) in inspected.iter_mut() {
         for entry in WalkDir::new(src_dir).into_iter().filter_map(|e| e.ok()) {
             if entry.path().extension().is_some_and(|ext| ext == "rs") {
+                *count += 1;
                 let path = entry.path();
                 let content = match fs::read_to_string(path) {
                     Ok(c) => c,
@@ -227,6 +257,23 @@ fn main() {
                 }
             }
         }
+    }
+
+    // Jurisdiction evidence accompanies every outcome (green or red).
+    let total_files: usize = inspected.iter().map(|(_, c)| c).sum();
+    for (dir, count) in &inspected {
+        eprintln!(
+            "jurisdiction: {} — {} file(s) inspected",
+            dir.display(),
+            count
+        );
+    }
+    if total_files == 0 {
+        eprintln!(
+            "REFUSED_EMPTY_JURISDICTION: 0 .rs files inspected across {} root(s); refusing to emit a green gate.",
+            inspected.len()
+        );
+        std::process::exit(2);
     }
 
     // Build the reachability graph from AUTHORITATIVE_ROOTS
