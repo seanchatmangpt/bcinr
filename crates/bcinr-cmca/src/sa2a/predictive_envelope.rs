@@ -108,9 +108,9 @@ impl AdmittedPredictiveConsequenceEnvelope {
             provenance_digest: self.envelope.provenance_digest,
             observed,
             absolute_error: Allocation {
-                cpu: abs_diff(observed.cpu, self.envelope.expected.cpu),
-                memory: abs_diff(observed.memory, self.envelope.expected.memory),
-                io: abs_diff(observed.io, self.envelope.expected.io),
+                cpu: observed.cpu.abs_diff(self.envelope.expected.cpu),
+                memory: observed.memory.abs_diff(self.envelope.expected.memory),
+                io: observed.io.abs_diff(self.envelope.expected.io),
             },
             within_interval: inside_interval(
                 observed,
@@ -251,13 +251,6 @@ fn component_pressure_ppm(demand: u64, capacity: u64) -> u32 {
     core::cmp::min(ratio, PRESSURE_PPM_ONE as u128) as u32
 }
 
-const fn abs_diff(left: u64, right: u64) -> u64 {
-    if left >= right {
-        left - right
-    } else {
-        right - left
-    }
-}
 
 const fn inside_interval(observed: Allocation, lower: Allocation, upper: Allocation) -> bool {
     observed.cpu >= lower.cpu
