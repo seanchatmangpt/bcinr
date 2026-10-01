@@ -25,6 +25,7 @@ blake3 = "1"
 chicago-tdd-tools = { version = "26.7.1", features = ["ocel-generation"] }
 trybuild = "1.0"
 proptest = "1.2.0"
+divan = "0.1"
 
 [features]
 default = []
@@ -75,4 +76,13 @@ required-features = ["alloc"]
 
 [[test]]
 name = "runtime_semantic_classification"
+required-features = ["alloc"]
+
+[[bench]]
+name = "allocation_bench"
+harness = false
+
+[[bench]]
+name = "cascade_bench"
+harness = false
 required-features = ["alloc"]

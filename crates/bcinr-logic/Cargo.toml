@@ -15,8 +15,13 @@ criterion = { version = "0.5", optional = true }
 
 [dev-dependencies]
 proptest = "1.2.0"
+divan = "0.1"
 
 [features]
 bench = ["alloc", "dep:criterion"]
 alloc = []
 std = ["alloc"]
+
+[[bench]]
+name = "logic_kernels_bench"
+harness = false

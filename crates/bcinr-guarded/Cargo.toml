@@ -9,3 +9,10 @@ repository = "https://github.com/seanchatmangpt/bcinr"
 [dependencies]
 bcinr-powl = { path = "../bcinr-powl", version = "26.9.28" }
 bcinr-cmca = { path = "../bcinr-cmca", version = "26.9.28", features = ["alloc"] }
+
+[dev-dependencies]
+divan = "0.1"
+
+[[bench]]
+name = "guarded_classify_bench"
+harness = false
