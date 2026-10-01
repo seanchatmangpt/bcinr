@@ -42,14 +42,22 @@ fn known_task_selects_deterministic_even_when_frontier_is_available() {
     let decision = select_dme_route(&req).unwrap();
     assert_eq!(decision.route, RouteClass::KnownDeterministic);
     assert_eq!(decision.authority, AuthorityStanding::None);
-    assert!(decision.explanation.refused.contains(&RouteClass::UnknownFrontier));
+    assert!(decision
+        .explanation
+        .refused
+        .contains(&RouteClass::UnknownFrontier));
 }
 
 #[test]
 fn exhausted_local_budget_does_not_silently_spill_to_frontier() {
     let mut req = request(WorkKnowledge::Unknown);
-    req.routes.retain(|r| r.route != RouteClass::UnknownIdleEstate);
-    req.routes.iter_mut().find(|r| r.route == RouteClass::UnknownLocal).unwrap().budget_units = 1;
+    req.routes
+        .retain(|r| r.route != RouteClass::UnknownIdleEstate);
+    req.routes
+        .iter_mut()
+        .find(|r| r.route == RouteClass::UnknownLocal)
+        .unwrap()
+        .budget_units = 1;
     req.frontier_escalation_admitted = false;
     assert_eq!(
         select_dme_route(&req),
@@ -102,9 +110,11 @@ fn unknown_prefers_lower_cost_idle_estate_over_more_expensive_local() {
 fn candidate_standing_is_not_optimized() {
     let mut req = request(WorkKnowledge::Unknown);
     req.standing = WorkStanding::Candidate;
-    assert_eq!(select_dme_route(&req), Err(DmeRouteRefusal::RequestNotAdmitted));
+    assert_eq!(
+        select_dme_route(&req),
+        Err(DmeRouteRefusal::RequestNotAdmitted)
+    );
 }
-
 
 fn gall_request() -> GallRouteRequest {
     let work_order = "urn:gall:work-order:xaas:001".to_string();
@@ -130,7 +140,10 @@ fn gall_route_reuses_cmca_selector_and_binds_exact_subject() {
 
     assert_eq!(decision.route_decision.route, RouteClass::UnknownIdleEstate);
     assert_eq!(decision.authority, AuthorityStanding::None);
-    assert_eq!(decision.identity.work_order_iri, req.identity.work_order_iri);
+    assert_eq!(
+        decision.identity.work_order_iri,
+        req.identity.work_order_iri
+    );
     assert!(verify_gall_route_decision(&req, &decision));
 }
 
@@ -139,7 +152,10 @@ fn moved_work_order_subject_is_refused_before_route_selection() {
     let mut req = gall_request();
     req.route_request.semantic_subject = "urn:gall:work-order:other".into();
 
-    assert_eq!(select_gall_route(&req), Err(GallRouteRefusal::SubjectMismatch));
+    assert_eq!(
+        select_gall_route(&req),
+        Err(GallRouteRefusal::SubjectMismatch)
+    );
 }
 
 #[test]
@@ -147,5 +163,8 @@ fn branch_name_cannot_replace_exact_base_sha() {
     let mut req = gall_request();
     req.identity.base_sha = "main".into();
 
-    assert_eq!(select_gall_route(&req), Err(GallRouteRefusal::InvalidBaseSha));
+    assert_eq!(
+        select_gall_route(&req),
+        Err(GallRouteRefusal::InvalidBaseSha)
+    );
 }

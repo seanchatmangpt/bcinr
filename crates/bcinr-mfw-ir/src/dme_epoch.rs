@@ -77,7 +77,10 @@ fn epoch_digest(
 }
 
 impl DmeEpoch {
-    pub fn root(ontology_digest: Digest, residual_obligations: Vec<Digest>) -> Result<Self, EpochRefusal> {
+    pub fn root(
+        ontology_digest: Digest,
+        residual_obligations: Vec<Digest>,
+    ) -> Result<Self, EpochRefusal> {
         if !unique(&residual_obligations) {
             return Err(EpochRefusal::DuplicateResidual);
         }

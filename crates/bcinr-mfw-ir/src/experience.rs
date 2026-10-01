@@ -101,7 +101,8 @@ pub fn qualify_candidate(
         return Err(ExperienceRefusal::ManufacturerIdentityChanged);
     }
     let admission_receipt = admission_receipt.ok_or(ExperienceRefusal::MissingAdmissionReceipt)?;
-    let verification_receipt = verification_receipt.ok_or(ExperienceRefusal::MissingVerificationReceipt)?;
+    let verification_receipt =
+        verification_receipt.ok_or(ExperienceRefusal::MissingVerificationReceipt)?;
     let capability_id = combine(&[
         candidate.candidate_id,
         admission_receipt,

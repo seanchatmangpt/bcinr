@@ -5,28 +5,52 @@
 //! route decision. It grants no authority and performs no consequence.
 
 extern crate alloc;
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum WorkStanding { Admitted, Candidate, Refused }
+pub enum WorkStanding {
+    Admitted,
+    Candidate,
+    Refused,
+}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum WorkKnowledge { Known, Unknown }
+pub enum WorkKnowledge {
+    Known,
+    Unknown,
+}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum ConsequenceClass { Observe, Construct, Change, ExternalDo, Unknown }
+pub enum ConsequenceClass {
+    Observe,
+    Construct,
+    Change,
+    ExternalDo,
+    Unknown,
+}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum RouteClass { KnownDeterministic, UnknownLocal, UnknownIdleEstate, UnknownFrontier, Refused }
+pub enum RouteClass {
+    KnownDeterministic,
+    UnknownLocal,
+    UnknownIdleEstate,
+    UnknownFrontier,
+    Refused,
+}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum AuthorityStanding { None }
+pub enum AuthorityStanding {
+    None,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RouteCandidate {
@@ -40,7 +64,10 @@ pub struct RouteCandidate {
 }
 impl RouteCandidate {
     pub fn lawful(&self) -> bool {
-        self.capability_fit && self.evidence_fit && self.consequence_fit && self.required_units <= self.budget_units
+        self.capability_fit
+            && self.evidence_fit
+            && self.consequence_fit
+            && self.required_units <= self.budget_units
     }
 }
 
@@ -118,7 +145,9 @@ pub enum GallRouteRefusal {
 }
 
 impl core::fmt::Display for DmeRouteRefusal {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result { core::fmt::Debug::fmt(self, f) }
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Debug::fmt(self, f)
+    }
 }
 #[cfg(feature = "std")]
 impl std::error::Error for DmeRouteRefusal {}
@@ -144,18 +173,41 @@ struct DecisionBody<'a> {
     authority: AuthorityStanding,
     explanation: &'a RouteExplanation,
 }
-fn seal(request: &DmeRouteRequest, route: RouteClass, explanation: RouteExplanation) -> DmeRouteDecision {
+fn seal(
+    request: &DmeRouteRequest,
+    route: RouteClass,
+    explanation: RouteExplanation,
+) -> DmeRouteDecision {
     let authority = AuthorityStanding::None;
-    let body = DecisionBody { request_id: &request.request_id, semantic_subject: &request.semantic_subject, route, authority, explanation: &explanation };
+    let body = DecisionBody {
+        request_id: &request.request_id,
+        semantic_subject: &request.semantic_subject,
+        route,
+        authority,
+        explanation: &explanation,
+    };
     let decision_digest = canonical_digest(&body);
-    DmeRouteDecision { request_id: request.request_id.clone(), semantic_subject: request.semantic_subject.clone(), route, authority, explanation, decision_digest }
+    DmeRouteDecision {
+        request_id: request.request_id.clone(),
+        semantic_subject: request.semantic_subject.clone(),
+        route,
+        authority,
+        explanation,
+        decision_digest,
+    }
 }
 
 /// SELECT the least-cost lawful route. This function grants no authority and performs no DO.
 pub fn select_dme_route(request: &DmeRouteRequest) -> Result<DmeRouteDecision, DmeRouteRefusal> {
-    if request.standing != WorkStanding::Admitted { return Err(DmeRouteRefusal::RequestNotAdmitted); }
-    if request.semantic_subject.trim().is_empty() { return Err(DmeRouteRefusal::InvalidSemanticSubject); }
-    if request.consequence == ConsequenceClass::Unknown { return Err(DmeRouteRefusal::UnknownConsequenceClass); }
+    if request.standing != WorkStanding::Admitted {
+        return Err(DmeRouteRefusal::RequestNotAdmitted);
+    }
+    if request.semantic_subject.trim().is_empty() {
+        return Err(DmeRouteRefusal::InvalidSemanticSubject);
+    }
+    if request.consequence == ConsequenceClass::Unknown {
+        return Err(DmeRouteRefusal::UnknownConsequenceClass);
+    }
 
     let mut considered = request.routes.iter().map(|c| c.route).collect::<Vec<_>>();
     considered.sort_by_key(|route| route_rank(*route));
@@ -163,26 +215,47 @@ pub fn select_dme_route(request: &DmeRouteRequest) -> Result<DmeRouteDecision, D
 
     match request.knowledge {
         WorkKnowledge::Known => {
-            let selected = request.routes.iter()
+            let selected = request
+                .routes
+                .iter()
                 .filter(|c| c.route == RouteClass::KnownDeterministic && c.lawful())
                 .min_by_key(|c| (c.cost_units, route_rank(c.route)))
                 .ok_or(DmeRouteRefusal::KnownWithoutDeterministicRoute)?;
-            let refused = request.routes.iter().filter(|c| c.route != RouteClass::KnownDeterministic).map(|c| c.route).collect();
+            let refused = request
+                .routes
+                .iter()
+                .filter(|c| c.route != RouteClass::KnownDeterministic)
+                .map(|c| c.route)
+                .collect();
             Ok(seal(request, RouteClass::KnownDeterministic, RouteExplanation {
                 selected_cost_units: Some(selected.cost_units), considered, refused,
                 reason: "KNOWN work selected admitted deterministic machinery; model routes are ineligible".into(),
             }))
         }
         WorkKnowledge::Unknown => {
-            let selected = request.routes.iter()
-                .filter(|c| c.route != RouteClass::KnownDeterministic && c.route != RouteClass::Refused)
-                .filter(|c| c.route != RouteClass::UnknownFrontier || request.frontier_escalation_admitted)
+            let selected = request
+                .routes
+                .iter()
+                .filter(|c| {
+                    c.route != RouteClass::KnownDeterministic && c.route != RouteClass::Refused
+                })
+                .filter(|c| {
+                    c.route != RouteClass::UnknownFrontier || request.frontier_escalation_admitted
+                })
                 .filter(|c| c.lawful())
                 .min_by_key(|c| (c.cost_units, route_rank(c.route)))
                 .ok_or(DmeRouteRefusal::UnknownWithoutLawfulRoute)?;
-            let refused = request.routes.iter()
-                .filter(|c| c.route == RouteClass::KnownDeterministic || !c.lawful() || (c.route == RouteClass::UnknownFrontier && !request.frontier_escalation_admitted))
-                .map(|c| c.route).collect();
+            let refused = request
+                .routes
+                .iter()
+                .filter(|c| {
+                    c.route == RouteClass::KnownDeterministic
+                        || !c.lawful()
+                        || (c.route == RouteClass::UnknownFrontier
+                            && !request.frontier_escalation_admitted)
+                })
+                .map(|c| c.route)
+                .collect();
             Ok(seal(request, selected.route, RouteExplanation {
                 selected_cost_units: Some(selected.cost_units), considered, refused,
                 reason: "UNKNOWN work selected the least-cost lawful admitted route under finite resource/evidence bounds".into(),
@@ -192,7 +265,9 @@ pub fn select_dme_route(request: &DmeRouteRequest) -> Result<DmeRouteDecision, D
 }
 
 pub fn verify_dme_route_decision(request: &DmeRouteRequest, decision: &DmeRouteDecision) -> bool {
-    select_dme_route(request).map(|expected| expected == *decision).unwrap_or(false)
+    select_dme_route(request)
+        .map(|expected| expected == *decision)
+        .unwrap_or(false)
 }
 
 fn absolute_iri(value: &str) -> bool {
@@ -200,7 +275,9 @@ fn absolute_iri(value: &str) -> bool {
 }
 
 fn sha256_digest(value: &str) -> bool {
-    let Some(("sha256", hex)) = value.split_once(':') else { return false; };
+    let Some(("sha256", hex)) = value.split_once(':') else {
+        return false;
+    };
     hex.len() == 64 && hex.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
@@ -221,7 +298,9 @@ fn repo_identity(value: &str) -> bool {
 /// This adds no new optimizer and no execution path. The inner CMCA decision
 /// remains authoritative for route selection; the outer receipt only binds
 /// that SELECT result to the exact semantic subject.
-pub fn select_gall_route(request: &GallRouteRequest) -> Result<GallRouteDecision, GallRouteRefusal> {
+pub fn select_gall_route(
+    request: &GallRouteRequest,
+) -> Result<GallRouteDecision, GallRouteRefusal> {
     let id = &request.identity;
 
     if !absolute_iri(&id.work_order_iri) {
@@ -277,4 +356,3 @@ pub fn verify_gall_route_decision(
         .map(|expected| expected == *decision)
         .unwrap_or(false)
 }
-
