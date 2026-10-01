@@ -6,6 +6,7 @@ pub mod contract;
 pub mod interop;
 pub mod ocel;
 pub mod prepared_effect_ref;
+pub mod predictive_envelope;
 pub mod receipt;
 pub mod recovery;
 pub mod replay;
@@ -14,6 +15,11 @@ pub mod symbolic_envelope;
 
 pub use admission::{admit, Refusal};
 pub use contract::{Envelope, RecoveryDecision, CONTRACT};
+pub use predictive_envelope::{
+    admit_predictive_envelope, AdmittedPredictiveConsequenceEnvelope, ForecastReceipt,
+    PredictiveAdmission, PredictiveConsequenceEnvelope, PredictivePressure, PredictiveRefusal,
+    PressureVector, ResourceAxis, PRESSURE_PPM_ONE,
+};
 pub use resource_envelope::{Allocation, ResourceEnvelope};
 pub use symbolic_envelope::{
     peak_reusable_usage, pipeline_latency, AffineResourceExpr, PipelineKnobs, SymbolDomain,
