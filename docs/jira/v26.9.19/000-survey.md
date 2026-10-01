@@ -1,0 +1,17 @@
+# bcinr: v26.9.19 GitHub survey receipt
+
+- Date: 2026-09-19 (v26.9.19 gh survey wave)
+- GitHub repo: seanchatmangpt/bcinr
+- Local path: `/Users/sac/bcinr`
+- Default branch: main | Archived: false | Last push: 2026-09-16T21:26:59Z
+- Open PRs: 6
+  - #38 v26.9.16/rfc-closure v26.9.16: close bounded CMCA/MFW planning and compile-back;#37 prod/ppcx-kernel-boundary-20260911 feat(cmca): codify PPCX production kernel boundary;#36 agent/substitutable-transform-contract-v1 feat(interop): add substitutable protocol transform;#35 agent/v2030-1-1-prd-ard-20260819 docs: align bcinr with Chatman Ecosystem v2030.1.1;#34 integration/all-relevant-20260819 merge: consolidate relevant BCINR branches;#29 agent/v26.9.1-mfw-cmca-contract-crown test(cmca): crown the v26.9.1 MFW allocation seam
+- Unmerged origin branches without open PR: agent/close-doc-wip-v26.9.1 agent/close-v26-7-26-release-gaps agent/cmca-chicago-jtbd-rebased-v26.7.25 agent/cmca-divan-execution-benchmarks agent/finish-bcinr-lsp agent/finish-v26-7-28-powl2-multifractal agent/finish-v26-7-28-powl2-multifractal-rebased agent/powl-chicago-verifier-base agent/repair-post-integration-verification-ci agent/v26.7.28-production-admission agent/v26.7.28-temporal-swarm brand/forward-deployment-os-2026-08 claude/busy-hypatia-6pm6sw claude/cool-gauss-36yn2a claude/upbeat-cori-19p23x feat/dfcm-federated-capabilities-v26.9.1 feat/wasm4games-dx-pass ggen-embedded-workflow-pack-demo release/26.9.15 worktree-agent-a01b65eb8db9a1fc5 worktree-agent-a1236d07a8bbc9df1 worktree-agent-a15141a52731a5ce7 worktree-agent-a4205f3cab90034ca worktree-agent-a456b476e8fcc9be7 worktree-agent-a54ecc88ccca0c882 worktree-agent-a5bdcb1c3092aca1b worktree-agent-a647b4c21e646e8fa worktree-agent-a7756da7a17f8220e worktree-agent-aa3c392170d4a4202 worktree-agent-aa3d7bb5637043a93 worktree-agent-aa4ca0295c58ac0c7 worktree-agent-aac6916671c3c0c61 worktree-agent-aaefa73e275e75ff9 worktree-agent-ab0353a2665eeba79 worktree-agent-abd50f3805189c899 worktree-agent-ac289efcb919ccf97 worktree-agent-ac349c9c34dfe9f99 worktree-agent-ac806fdc8b762da63 worktree-agent-acfa4bab518e367e8 worktree-agent-ad265efd96198863e worktree-agent-ad274c05de8c33768 worktree-agent-ade29b9b0dfda012e worktree-agent-ade851230d89529e0 worktree-agent-af79100b80d58f103
+- Local branches ahead of upstream: none
+- Local-only branches with unique commits: feat/powl-soundness-cli:12 fix/cmca-default-build-and-gates:18 release/26.9.15:29 worktree-agent-a35524c0b2b9abab5:1 worktree-agent-a6b032296ba2ae68a:1 worktree-agent-a6b981ed93db6f2f7:1 worktree-agent-a845a6849d18abdb1:1 worktree-agent-a875087e672a4e9c6:1 worktree-agent-af87fa2b5ef70e76b:1 worktree-agent-af9a0dece9b6fe715:1 worktree-wf_4cd5308c-d0c-11:1 worktree-wf_4ce5f45e-ffa-11:1 worktree-wf_6a91582b-76a-11:1 worktree-wf_8b12adec-fa3-11:1 worktree-wf_9f98ef46-896-11:1 worktree-wf_a428da11-384-11:1 worktree-wf_a832af34-59b-11:1 worktree-wf_cc44edaf-f57-11:1 worktree-wf_edb42221-a80-11:1 worktree-wf_ef15e8d3-5b1-10:2 worktree-wf_ef15e8d3-5b1-6:2 worktree-wf_ef15e8d3-5b1-7:2 worktree-wf_ef15e8d3-5b1-8:2 worktree-wf_f9963199-dc7-1:1 worktree-wf_f9963199-dc7-2:1 worktree-wf_f9963199-dc7-3:1 worktree-wf_f9963199-dc7-4:1
+- Uncommitted changes at survey time: T0/U0 path(s)
+- Network: OK
+
+Method: gh api repos/<repo> + gh pr list (open, limit 50) + git fetch --all --prune + ls-remote + branch -r --no-merged (origin only) + for-each-ref upstream tracks.
+
+3 work-item ticket(s) written alongside this receipt.
