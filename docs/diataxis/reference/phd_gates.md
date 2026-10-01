@@ -192,7 +192,7 @@ The **equivalence test** is the executable proof that the PhD Gate holds.
 cargo test --lib --all-features
 
 # Benchmark to verify latency claims (O(1) constant time)
-cargo bench --bench bcinr_bench -- algorithm_name
+cargo bench -p bcinr-logic --features bench --bench logic_kernels_bench
 
 # Security audit (unsafe blocks, supply chain)
 cargo audit && cargo deny check

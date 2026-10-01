@@ -2,7 +2,7 @@
 
 **Goal:** Measure the latency of a primitive with statistical rigor and inspect the result, so you can spot regressions and confirm low timing variance.
 
-**Prerequisites:** The standalone `bcinr-bench` crate was removed from the workspace; benches now live in each crate's `benches/` directory (for example [`bcinr-powl`](../../../crates/bcinr-powl/benches/) and [`bcinr-pddl`](../../../crates/bcinr-pddl/benches/)). `bcinr-logic` has no bench files yet, so put new ones in `crates/bcinr-logic/benches/` and enable its `bench` feature. Benchmarks use Criterion with `harness = false`. `jq` is optional, for the text report. Latency is reported by [Criterion](https://bheisler.github.io/criterion.rs/book/), which warms up and samples each function many times.
+**Prerequisites:** The standalone `bcinr-bench` crate was removed from the workspace; benches now live in each crate's `benches/` directory (for example [`bcinr-powl`](../../../crates/bcinr-powl/benches/) and [`bcinr-pddl`](../../../crates/bcinr-pddl/benches/)). `bcinr-logic` keeps its benches in `crates/bcinr-logic/benches/` (`logic_kernels_bench.rs`), gated behind its `bench` feature. Benchmarks use Criterion with `harness = false`. `jq` is optional, for the text report. Latency is reported by [Criterion](https://bheisler.github.io/criterion.rs/book/), which warms up and samples each function many times.
 
 ## Steps
 
@@ -33,7 +33,7 @@
 3. Run the whole bench suite, or just one harness, or filter to one function inside it:
 
    ```bash
-   cargo make bench                                   # all benches (cargo bench --all-features)
+   cargo make bench                                   # default-member benches (cargo bench --all-features; workspace default-members = bcinr-logic)
    cargo bench -p bcinr-logic --features bench --bench <name>     # one harness
    cargo bench -p bcinr-logic --features bench --bench <name> -- min_u32   # one function
    ```
