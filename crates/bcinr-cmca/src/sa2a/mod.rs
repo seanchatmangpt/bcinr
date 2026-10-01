@@ -43,7 +43,7 @@ pub use predictive_model::{
     ForecastModelRefusal, Predictor, PredictorArtifact, ResourceAxisId, ResourceAxisRegistry,
     ResourceVector, TraceSample, TraceWindow, CONFIDENCE_PPM_ONE,
 };
-pub use resource_envelope::{Allocation, ResourceEnvelope};
+pub use resource_envelope::{Allocation, BudgetLedger, BudgetReceipt, ResourceEnvelope};
 pub use reservation::{
     admit_reservation_proposal, AdmittedReservationProposal, ReservationAdmission,
     ReservationProposal, ReservationRefusal,
