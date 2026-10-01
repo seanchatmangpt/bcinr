@@ -296,7 +296,12 @@ pub mod v2 {
             let needed = 2 + label_len;
             let used = self.len as usize;
             if used + needed > 1024 {
-                debug_assert!(false, "LabelSlab out of space");
+                // Documented sentinel contract (see doc comment): callers
+                // convert this into a typed refusal
+                // (`CompileErrorV2::LabelSlabFull` / `Powl2Error::LabelSlabFull`).
+                // No debug_assert here — it would make the sentinel path
+                // unobservable in dev builds and turn a documented,
+                // typed-refusal outcome into a panic.
                 return u16::MAX;
             }
 
