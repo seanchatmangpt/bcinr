@@ -14,7 +14,7 @@
 //! 4. Compatibility attacks (4): unknown receipt version, incompatible semantic version,
 //!    old receipt replayed under changed semantics, unsupported capability
 
-use bcinr_powl::ocel::OcelLog;
+use bcinr_powl::ocel::{OcelError, OcelLog};
 
 // ─── ADMISSION ATTACKS (9 mutants) ──────────────────────────────────────────
 // These tests verify that OCEL conformance checks reject invalid numeric bounds
@@ -109,9 +109,15 @@ fn admission_attack_05_log_overflow() {
         if i < 512 {
             let _ = log.record_op_fired(run_id, i % 64, i, 1);
         } else {
-            // 513th record should fail with Overflow
+            // 513th record must refuse with the exact typed variant
+            // (non-vacuity: guards src/ocel.rs:191 Overflow; a mutant that
+            // silently wraps capacity or returns a different error fails this)
             let result = log.record_op_fired(run_id, 63, 512, 1);
-            assert!(result.is_err(), "513th event should overflow");
+            assert_eq!(
+                result,
+                Err(OcelError::Overflow),
+                "513th event should overflow with the exact typed refusal"
+            );
         }
     }
 
