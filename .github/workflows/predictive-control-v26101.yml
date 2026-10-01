@@ -1,0 +1,126 @@
+name: BCINR v26.10.1 Predictive Control Validation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "crates/bcinr-cmca/src/sa2a/**"
+      - "crates/bcinr-cmca/tests/predictive_*"
+      - ".github/workflows/predictive-control-v26101.yml"
+  push:
+    branches:
+      - main
+      - test/v26101-predictive-actions-validation
+    paths:
+      - "crates/bcinr-cmca/src/sa2a/**"
+      - "crates/bcinr-cmca/tests/predictive_*"
+      - ".github/workflows/predictive-control-v26101.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: predictive-control-v26101-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile-boundaries:
+    name: Compile boundaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - name: no_std library compiles
+        run: cargo check -p bcinr-cmca --no-default-features
+
+      - name: std library compiles
+        run: cargo check -p bcinr-cmca --features std
+
+      - name: Predictive control Clippy court
+        run: cargo clippy -p bcinr-cmca --all-targets --features std -- -D warnings
+
+  capability-contracts:
+    name: Predictive capability Chicago courts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Base predictive-envelope courts
+        run: cargo test -p bcinr-cmca --test predictive_envelope_chicago -- --nocapture
+
+      - name: Multi-axis and multi-horizon forecast identity
+        run: cargo test -p bcinr-cmca --test predictive_control_v26101_chicago chicago_sap_map_horizons_axes_and_trace_identity_are_first_class -- --exact
+
+      - name: Deterministic model/input/runtime replay
+        run: cargo test -p bcinr-cmca --test predictive_control_v26101_chicago chicago_same_model_input_and_runtime_replay_exactly -- --exact
+
+      - name: Observation digest binding
+        run: cargo test -p bcinr-cmca --test predictive_control_v26101_chicago chicago_trace_digest_changes_when_observation_changes -- --exact
+
+      - name: Forecast accuracy, interval, and shock standing
+        run: cargo test -p bcinr-cmca --test predictive_control_v26101_chicago chicago_forecast_standing_separates_average_error_interval_coverage_and_shocks -- --exact
+
+      - name: Shadow local/global optimizer
+        run: cargo test -p bcinr-cmca --test predictive_control_v26101_chicago chicago_shadow_optimizer_has_local_global_pressure_without_model_admission -- --exact
+
+      - name: Event-horizon shadow-only fencing
+        run: cargo test -p bcinr-cmca --test predictive_control_v26101_chicago chicago_event_horizon_only_marks_shadow_candidates_and_preserves_cmca_family -- --exact
+
+      - name: Predictive measure admission
+        run: cargo test -p bcinr-cmca --test predictive_control_v26101_chicago chicago_predictive_measure_binds_forecast_and_empirical_standing_without_allocating -- --exact
+
+      - name: Reservation cannot manufacture capacity
+        run: cargo test -p bcinr-cmca --test predictive_control_v26101_chicago chicago_reservation_proposal_cannot_manufacture_capacity_or_do_work -- --exact
+
+      - name: Counterfactual replay is non-actuating
+        run: cargo test -p bcinr-cmca --test predictive_control_v26101_chicago chicago_counterfactual_replay_compares_without_actuation -- --exact
+
+  authority-falsifiers:
+    name: Authority negative courts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Forecast overload cannot enlarge actual budget
+        run: cargo test -p bcinr-cmca --test predictive_envelope_chicago chicago_forecast_can_predict_overload_without_manufacturing_budget -- --exact
+
+      - name: Forecast identity/confidence/bounds refuse drift
+        run: cargo test -p bcinr-cmca --test predictive_envelope_chicago chicago_predictive_admission_refuses_identity_confidence_and_interval_drift -- --exact
+
+      - name: Invalid horizon/confidence refuse
+        run: cargo test -p bcinr-cmca --test predictive_envelope_chicago chicago_predictive_admission_refuses_invalid_horizon_and_confidence_domain -- --exact
+
+      - name: Forecast receipts falsify bad intervals
+        run: cargo test -p bcinr-cmca --test predictive_envelope_chicago chicago_forecast_receipt_falsifies_interval_and_records_absolute_error -- --exact
+
+      - name: Predictive boundary replay remains deterministic
+        run: cargo test -p bcinr-cmca --test predictive_envelope_chicago chicago_predictive_boundary_is_deterministic_under_replay -- --exact
+
+      - name: Full v26.10.1 predictive suite
+        run: cargo test -p bcinr-cmca --test predictive_control_v26101_chicago -- --nocapture
+
+      - name: Emit validation receipt
+        if: success()
+        shell: bash
+        run: |
+          {
+            echo "## BCINR v26.10.1 predictive-control validation"
+            echo
+            echo "- exact SHA: \`${GITHUB_SHA}\`"
+            echo "- base predictive-envelope courts: GREEN"
+            echo "- v26.10.1 capability courts: GREEN"
+            echo "- authority-negative courts: GREEN"
+            echo "- no capacity manufacture: GREEN"
+            echo "- shadow-only event horizon: GREEN"
+            echo "- deterministic replay: GREEN"
+            echo "- counterfactual replay is non-actuating: GREEN"
+          } >> "${GITHUB_STEP_SUMMARY}"
