@@ -15,16 +15,16 @@ Grounds the dissertation Ch9 latency claims with measured hardware-counter ticks
 
 | kernel | median ticks | p50 ticks | p99 ticks | median ns | p99 ns |
 |---|---:|---:|---:|---:|---:|
-| `emit_no_objects` | 8.46875 | 8.46875 | 73.5625 | 8.47 | 73.56 |
-| `emit_8_objects` | 7.8125 | 7.8125 | 70.578125 | 7.81 | 70.58 |
-| `emit_sla_breach` | 8.46875 | 8.46875 | 71.625 | 8.47 | 71.63 |
-| `chain_1_frame_blake3` | 344.6875 | 344.6875 | 348.96875 | 344.69 | 348.97 |
-| `chain_100_frames_rolling` | 26227 | 26227 | 28417 | 26227.00 | 28417.00 |
-| `conformance_check_pass` | 0.386474609375 | 0.386474609375 | 0.390869140625 | 0.39 | 0.39 |
-| `conformance_check_fail` | 0.386474609375 | 0.386474609375 | 0.390869140625 | 0.39 | 0.39 |
-| `replay_10_frames` | 11.71875 | 11.71875 | 12.375 | 11.72 | 12.38 |
-| `replay_64_frames_max` | 64.34375 | 64.34375 | 65.65625 | 64.34 | 65.66 |
-| `denial_to_fired_mask` | 0.38671875 | 0.38671875 | 0.396728515625 | 0.39 | 0.40 |
+| `emit_no_objects` | 7.8125 | 7.8125 | 68.359375 | 7.81 | 68.36 |
+| `emit_8_objects` | 7.15625 | 7.15625 | 65.109375 | 7.16 | 65.11 |
+| `emit_sla_breach` | 7.8125 | 7.8125 | 67.0625 | 7.81 | 67.06 |
+| `chain_1_frame_blake3` | 243.109375 | 243.109375 | 245.453125 | 243.11 | 245.45 |
+| `chain_100_frames_rolling` | 24875 | 24875 | 25042 | 24875.00 | 25042.00 |
+| `conformance_check_pass` | 0.35595703125 | 0.35595703125 | 0.3662109375 | 0.36 | 0.37 |
+| `conformance_check_fail` | 0.35595703125 | 0.35595703125 | 0.3662109375 | 0.36 | 0.37 |
+| `replay_10_frames` | 11.0625 | 11.0625 | 11.71875 | 11.06 | 11.72 |
+| `replay_64_frames_max` | 61.1875 | 61.1875 | 66.40625 | 61.19 | 66.41 |
+| `denial_to_fired_mask` | 0.386474609375 | 0.386474609375 | 0.396728515625 | 0.39 | 0.40 |
 
 Stated targets (from `receipt_bench.rs`): emit < 10 ns; BLAKE3 chain < 500 ns/frame measured envelope (amended 26.10.08 — the original < 15 ns/frame budget was physically unreachable: each frame hashes 131 bytes = 3 serial BLAKE3 block compressions, and hash compute is ~100% of per-frame cost. Falsifier: a rerun with `chain_1_frame_blake3` median < 250 ns/frame reopens the optimization lane); conformance check < 2 ns; replay < 20 ns/frame; denial mask ~ 1 ns.
 <!-- END AUTO -->
@@ -71,3 +71,25 @@ runs this session), and the 100-frame kernel trended ~25–30% *worse*.
 the committed tick table re-regenerated on the reverted code. The 26.10.08
 budget amendment stands; the <250 ns/frame falsifier remains unmet. (This
 subsection is hand-maintained; the harness regenerates only the table.)
+
+### Variant 3 — genesis pre-hash folded into the first frame (26.10.09, KEPT)
+
+Third and final untried variant in the lane: `genesis()` no longer computes
+`BLAKE3(0^32)` eagerly; `chain_hash` starts as 32 raw zero bytes and the
+first `chain()` hashes `0^32 || frame` in a single `update(131)` (one BLAKE3
+compression saved per receipt: the two-call `update(32)+update(99)` boundary
+is also gone on every frame). Semantics note: the pre-chain `chain_hash`
+value and `chain_hash(0)` change (no external consumer hardcodes them;
+verified by workspace grep). Same host/config harness.
+
+| kernel | baseline median (HEAD code, this session) | variant median |
+|---|---:|---:|
+| `chain_1_frame_blake3` | 345.33 ns | 227.22 / 227.88 / 243.11 ns |
+| `chain_100_frames_rolling` | 26225 ns | 23226 / 24892 / 24875 ns |
+
+`chain_1_frame_blake3` is **~30–34% faster** (passes the >20% keep gate; the
+227–243 ns band also dips under the 250 ns/frame falsifier for the first
+time). The 100-frame rolling chain is ~5–11% faster. `cargo test -p
+bcinr-powl`: 331 unit + 56 doc tests, 0 failed. **Kept**; committed tick
+table regenerated on this code. (This subsection is hand-maintained; the
+harness regenerates only the table.)
