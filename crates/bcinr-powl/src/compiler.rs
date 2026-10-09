@@ -739,6 +739,15 @@ pub mod v2 {
         /// (`>= model.nodes.len()`) — the nonface cannot be re-keyed into
         /// tape-slot space.
         UnmappedConcurrencySlot(usize),
+        /// Cumulative unique activity-label bytes exceeded the tape's
+        /// 1024-byte `LabelSlab` capacity. [`LabelSlab::intern`]
+        /// (`crate::tape::v2::LabelSlab::intern`) signals this with the
+        /// documented `u16::MAX` sentinel; storing that sentinel into the
+        /// public `node_labels` map would hand callers a corrupt offset
+        /// that panics `LabelSlab::get` out of bounds — so the compiler
+        /// refuses here with a typed error instead (mirrors
+        /// `Powl2Error::LabelSlabFull` in `crate::powl2`).
+        LabelSlabFull,
     }
 
     /// The result of compiling a `PowlModel`: the existing v2 `PowlTape`
@@ -871,6 +880,9 @@ pub mod v2 {
                 PowlNode::Activity(a) => {
                     op.op_kind = V2OpKind::Activity;
                     let offset = tape.label_slab.intern(&a.label);
+                    if offset == u16::MAX {
+                        return Err(CompileErrorV2::LabelSlabFull);
+                    }
                     node_labels.insert(a.id, offset);
                 }
                 PowlNode::Silent(_) => {
@@ -1302,6 +1314,34 @@ pub mod v2 {
             assert!(
                 compiled.guards.admits(&ac),
                 "positions {{0,2}} were never forbidden"
+            );
+        }
+
+        /// A 64-activity model whose unique labels exceed the tape's
+        /// 1024-byte `LabelSlab` (64 × (2 + 20) = 1408 bytes) must be
+        /// refused with a typed error — never the raw `u16::MAX` intern
+        /// sentinel stored into the public `node_labels` map, which would
+        /// panic `LabelSlab::get` out of bounds downstream.
+        #[test]
+        fn label_slab_overflow_is_typed_refusal_not_sentinel() {
+            let nodes: Vec<PowlNode> = (0..64u64)
+                .map(|i| activity(i, &format!("{:020}", i), i as u32))
+                .collect();
+            let model = PowlModel {
+                nodes,
+                order: StrictPartialOrder::default(),
+                concurrency: ExecutableConcurrencyComplex {
+                    event_count: 64,
+                    minimal_nonfaces: vec![],
+                    conflict_witnesses: BTreeMap::new(),
+                    digest: Digest::hash(b"slab-overflow"),
+                },
+                provenance: BTreeMap::new(),
+            };
+            // TEMP BEFORE-PROBE (Lane 3): current behavior on slab-full input.
+            assert_eq!(
+                compile_powl_v2(&model).unwrap_err(),
+                CompileErrorV2::LabelSlabFull
             );
         }
     }

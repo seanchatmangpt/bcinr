@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process;
 use syn::visit::{self, Visit};
 use syn::{BinOp, Expr, ImplItemFn, ItemFn};
@@ -514,12 +514,27 @@ fn scan_file_text_rules(src: &str, path: &Path, findings: &mut Vec<String>) {
     }
 
     // CHEAT-009: MUTANT_THEATER
+    // §16 targets detection ONLY by inequality: a counterfactual test whose
+    // sole assertion surface is assert_ne!. A file that asserts exact typed
+    // variants (assert_eq! on Enum::Variant / Err(Path::..)) and uses
+    // assert_ne! only as a secondary contrast witnessing that the typed
+    // assertions discriminate is the anti-vacuity pattern, not theater.
+    // Line comments are stripped first: naming the pattern in prose is not
+    // using it.
     if is_test && src.contains("mutant") {
-        // If a mutant test uses assert_ne! on baseline without verifying typed refusal
-        if src.contains("assert_ne!")
-            && !src.contains("Err(StabilityRefusal::")
-            && !src.contains("Err(ObservatoryFlag::")
-        {
+        let code: String = src
+            .lines()
+            .map(|l| match l.find("//") {
+                Some(i) => &l[..i],
+                None => l,
+            })
+            .collect::<Vec<&str>>()
+            .join("\n");
+        let uses_inequality_detection = code.contains("assert_ne!(");
+        let has_typed_surface = window_contains(&code, "assert_eq!", "::", 120)
+            || window_contains(&code, "Err(", "::", 80)
+            || window_contains(&code, "Ok(", "::", 80);
+        if uses_inequality_detection && !has_typed_surface {
             findings.push(format!(
                 "CHEAT[CHEAT-009]: {} — mutant theater: test uses weak assert_ne instead of asserting a typed refusal",
                 path.display()
@@ -551,23 +566,76 @@ fn scan_file_text_rules(src: &str, path: &Path, findings: &mut Vec<String>) {
     }
 }
 
-fn check_gate_jurisdiction_theater(findings: &mut Vec<String>) {
-    // CHEAT-010: GATE_JURISDICTION_THEATER
-    // Check if bcinr-cheat-scanner search roots omit either crates/bcinr-logic or crates/bcinr-cmca.
-    let scanner_src = match fs::read_to_string("tools/bcinr-cheat-scanner/src/main.rs") {
-        Ok(s) => s,
-        Err(_) => return,
-    };
-    if !scanner_src.contains("crates/bcinr-logic") || !scanner_src.contains("crates/bcinr-cmca") {
-        findings.push("CHEAT[CHEAT-010]: tools/bcinr-cheat-scanner/src/main.rs — scanner ignores logic or cmca crates".to_string());
+fn workspace_crate_roots() -> Vec<PathBuf> {
+    // Jurisdiction is derived, never hardcoded (CHEAT-010 remediation): every
+    // workspace member crate under crates/ is in scope. Falls back to
+    // enumerating crates/*/Cargo.toml when cargo metadata is unavailable.
+    // An empty return is refused fail-closed in main: a green gate with empty
+    // jurisdiction is not evidence.
+    let mut roots = Vec::new();
+    let metadata = std::process::Command::new("cargo")
+        .args(["metadata", "--no-deps", "--format-version", "1"])
+        .output();
+    if let Ok(out) = metadata {
+        if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&out.stdout) {
+            if let Some(packages) = json["packages"].as_array() {
+                for pkg in packages {
+                    if let Some(mp) = pkg["manifest_path"].as_str() {
+                        let manifest = PathBuf::from(mp);
+                        if let Some(crate_dir) = manifest.parent() {
+                            if crate_dir.parent().is_some_and(|p| p.ends_with("crates")) {
+                                roots.push(crate_dir.to_path_buf());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if roots.is_empty() {
+        if let Ok(entries) = fs::read_dir("crates") {
+            for e in entries.flatten() {
+                if e.path().join("Cargo.toml").is_file() {
+                    roots.push(e.path());
+                }
+            }
+        }
+    }
+    roots.sort();
+    roots
+}
+
+fn check_gate_jurisdiction_theater(roots: &[PathBuf], findings: &mut Vec<String>) {
+    // CHEAT-010: GATE_JURISDICTION_THEATER. Unlike the previous string-grep
+    // self-check (which could never fire while the two root strings existed
+    // anywhere in this file), this check is falsifiable: any crates/* crate
+    // directory with a Cargo.toml that the derived roots omit is a finding.
+    let root_names: Vec<&str> = roots
+        .iter()
+        .filter_map(|r| r.file_name().and_then(|n| n.to_str()))
+        .collect();
+    if let Ok(entries) = fs::read_dir("crates") {
+        for e in entries.flatten() {
+            let p = e.path();
+            if let Some(name) = p.file_name().and_then(|n| n.to_str()) {
+                if p.join("Cargo.toml").is_file() && !root_names.contains(&name) {
+                    findings.push(format!(
+                        "CHEAT[CHEAT-010]: {} — crate directory present but absent from scanner roots",
+                        p.display()
+                    ));
+                }
+            }
+        }
     }
 }
 
 fn scan_dependencies(_findings: &mut Vec<String>) {
-    // CHEAT-014: REACHABLE_DEPENDENCY_BRANCH
+    // CHEAT-014: REACHABLE_DEPENDENCY_BRANCH. This scanner performs metadata
+    // discovery only; the rule's declared object-code layer (branch audits of
+    // transitive dependency symbols) is NOT implemented here. Reported honestly
+    // on every run from main() so the gap cannot hide behind a green exit.
     let output = std::process::Command::new("cargo")
         .args(["metadata", "--format-version", "1"])
-        .current_dir("/Users/sac/bcinr")
         .output();
     if let Ok(out) = output {
         let json: serde_json::Value = match serde_json::from_slice(&out.stdout) {
@@ -606,20 +674,34 @@ fn scan_dependencies(_findings: &mut Vec<String>) {
 
 fn main() {
     let _rules = get_rules();
-    let roots = ["crates/bcinr-logic", "crates/bcinr-cmca"];
+    let roots = workspace_crate_roots();
     let mut findings = Vec::new();
     let mut total_files = 0;
 
-    check_gate_jurisdiction_theater(&mut findings);
-    scan_dependencies(&mut findings);
+    check_gate_jurisdiction_theater(&roots, &mut findings);
 
-    for root in &roots {
+    if roots.is_empty() {
+        eprintln!(
+            "REFUSED_NO_JURISDICTION: no scan roots derivable (cargo metadata unavailable, no crates/*/Cargo.toml found). A green gate with empty jurisdiction is not evidence."
+        );
+        process::exit(2);
+    }
+
+    scan_dependencies(&mut findings);
+    eprintln!(
+        "NOTE: CHEAT-014 (reachable dependency branch, object-code layer) is not implemented by this scanner; dependency discovery only."
+    );
+
+    let mut per_root: Vec<(PathBuf, usize)> = roots.iter().map(|r| (r.clone(), 0)).collect();
+
+    for (root, count) in per_root.iter_mut() {
         for entry in WalkDir::new(root)
             .into_iter()
             .filter_map(|e| e.ok())
             .filter(|e| e.path().extension().is_some_and(|ext| ext == "rs"))
         {
             let path = entry.path();
+            *count += 1;
             total_files += 1;
             match fs::read_to_string(path) {
                 Ok(src) => {
@@ -651,19 +733,180 @@ fn main() {
         }
     }
 
-    if !findings.is_empty() {
-        for f in &findings {
+    // Jurisdiction evidence accompanies every outcome (green or red): which
+    // roots were inspected and how many files each contributed.
+    for (root, count) in &per_root {
+        eprintln!(
+            "jurisdiction: {} — {} file(s) inspected",
+            root.display(),
+            count
+        );
+    }
+
+    if total_files == 0 {
+        eprintln!(
+            "REFUSED_EMPTY_JURISDICTION: 0 .rs files inspected across {} root(s); refusing to emit a green gate.",
+            per_root.len()
+        );
+        process::exit(2);
+    }
+
+    // AGENTS.md §17: no baseline suppression without a separately admitted
+    // waiver artifact. `cheat-waivers.toml` in the repo root is that artifact;
+    // waived findings print distinctly and never vanish, and a waiver that no
+    // longer matches any finding is itself a finding (anti-vacuity: a probe
+    // with no witnessed firing carries no bits).
+    let waivers = load_waivers();
+    let mut waived_out: Vec<(String, &Waiver)> = Vec::new();
+    let mut blocking: Vec<String> = Vec::new();
+    let mut matched: Vec<bool> = vec![false; waivers.len()];
+    for f in findings {
+        let hit = waivers.iter().enumerate().find(|(i, w)| {
+            !matched[*i] && f.contains(&format!("CHEAT[{}]:", w.rule)) && f.contains(&w.path)
+        });
+        match hit {
+            Some((i, w)) => {
+                matched[i] = true;
+                waived_out.push((f, w));
+            }
+            None => blocking.push(f),
+        }
+    }
+    for (i, w) in waivers.iter().enumerate() {
+        if !matched[i] {
+            blocking.push(format!(
+                "CHEAT[WAIVER-STALE]: {} — waiver for rule {} matches no current finding; remove the entry (a suppression with no witnessed firing carries no bits)",
+                w.path, w.rule
+            ));
+        }
+    }
+    for (f, w) in &waived_out {
+        eprintln!("WAIVED{} — waiver: {} ({})", f, w.admitted_by, w.reason);
+    }
+
+    if !blocking.is_empty() {
+        for f in &blocking {
             eprintln!("{}", f);
         }
         eprintln!(
-            "\n{} cheat finding(s). Fix before committing.",
-            findings.len()
+            "\n{} cheat finding(s). Fix before committing. ({} waived by admitted artifact)",
+            blocking.len(),
+            waived_out.len()
         );
         process::exit(1);
     }
 
-    println!(
-        "OK: no cheat patterns detected across {} algorithm files.",
-        total_files
-    );
+    if waived_out.is_empty() {
+        println!(
+            "OK: no cheat patterns detected across {} algorithm files.",
+            total_files
+        );
+    } else {
+        println!(
+            "OK: no unwaived cheat patterns across {} algorithm files ({} waived by admitted artifact).",
+            total_files,
+            waived_out.len()
+        );
+    }
+}
+
+/// One admitted suppression from `cheat-waivers.toml` (repo root, CWD).
+struct Waiver {
+    rule: String,
+    path: String,
+    reason: String,
+    admitted_by: String,
+}
+
+/// Minimal line-based parser for the waiver artifact — no new dependencies.
+/// Fail-closed: an unparsable or missing file yields zero waivers, and a
+/// malformed non-empty file is reported on stderr.
+fn load_waivers() -> Vec<Waiver> {
+    let Ok(raw) = fs::read_to_string("cheat-waivers.toml") else {
+        return Vec::new();
+    };
+    let mut waivers = Vec::new();
+    let mut current: Option<PartialWaiver> = None;
+    for (lineno, line) in raw.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if line == "[[waiver]]" {
+            if let Some(c) = current.take() {
+                if let Some(w) = c.finish(lineno) {
+                    waivers.push(w);
+                }
+            }
+            current = Some(PartialWaiver::default());
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            eprintln!(
+                "WAIVER-WARN: cheat-waivers.toml:{} — not key = \"value\"",
+                lineno + 1
+            );
+            continue;
+        };
+        let value = value.trim().trim_matches('"').to_string();
+        if let Some(c) = current.as_mut() {
+            match key.trim() {
+                "rule" => c.rule = Some(value),
+                "path" => c.path = Some(value),
+                "reason" => c.reason = Some(value),
+                "admitted_by" => c.admitted_by = Some(value),
+                _ => {}
+            }
+        }
+    }
+    if let Some(c) = current.take() {
+        if let Some(w) = c.finish(raw.lines().count()) {
+            waivers.push(w);
+        }
+    }
+    waivers
+}
+
+#[derive(Default)]
+struct PartialWaiver {
+    rule: Option<String>,
+    path: Option<String>,
+    reason: Option<String>,
+    admitted_by: Option<String>,
+}
+
+impl PartialWaiver {
+    fn finish(self, lineno: usize) -> Option<Waiver> {
+        match (self.rule, self.path, self.reason, self.admitted_by) {
+            (Some(rule), Some(path), Some(reason), Some(admitted_by)) => Some(Waiver {
+                rule,
+                path,
+                reason,
+                admitted_by,
+            }),
+            _ => {
+                eprintln!(
+                    "WAIVER-WARN: cheat-waivers.toml — incomplete [[waiver]] block near line {} (needs rule, path, reason, admitted_by); entry ignored",
+                    lineno
+                );
+                None
+            }
+        }
+    }
+}
+
+/// True when `sub` occurs within `max_gap` bytes after any occurrence of
+/// `needle` — used to detect an exact-variant assertion surface
+/// (`assert_eq!(x, Enum::Variant ..)`, `Err(Path::Variant)`) near a pattern.
+fn window_contains(hay: &str, needle: &str, sub: &str, max_gap: usize) -> bool {
+    let mut from = 0;
+    while let Some(rel) = hay[from..].find(needle) {
+        let start = from + rel + needle.len();
+        let end = (start + max_gap).min(hay.len());
+        if hay[start..end].contains(sub) {
+            return true;
+        }
+        from = start;
+    }
+    false
 }

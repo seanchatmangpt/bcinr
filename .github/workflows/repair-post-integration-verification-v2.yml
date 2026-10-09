@@ -33,12 +33,17 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Apply bounded source and CI repair
-        run: python3 scripts/repair_post_integration_verification.py
-      - name: Repair hostile-mutant and E2E admission
-        run: python3 scripts/repair_cmca_all_features_composition.py
-      - name: Install strict MCP stdio transport
-        run: python3 scripts/repair_mcp_transport.py
+      # Steps removed 2026-10-01 (gate lane, release/26.9.15): the repair
+      # scripts this workflow was built around no longer exist in the tree
+      # (scripts/repair_post_integration_verification.py,
+      # scripts/repair_cmca_all_features_composition.py,
+      # scripts/repair_mcp_transport.py,
+      # scripts/finalize_post_integration_verification.sh -- all absent,
+      # verified `ls scripts/`), and their subjects were removed from scope:
+      # crates/bcinr-mcp is no longer a workspace member or on disk (see the
+      # scope comment in Cargo.toml), and the root package ships no
+      # tests/e2e_main.rs (`cargo test -p bcinr --test e2e_main` cannot
+      # resolve). What remains is the verification core over live members.
       - name: Normalize repaired Rust sources
         id: normalize
         shell: bash
@@ -105,10 +110,6 @@ jobs:
         run: 'cargo test -p bcinr-powl --all-features receipt::'
       - name: POWL receipt execution v2
         run: cargo test -p bcinr-powl --all-features receipt::execution_v2
-      - name: Strict MCP malformed JSON contract
-        run: cargo test -p bcinr-mcp --test adversarial malformed_json_rejected -- --nocapture
-      - name: Broad bcinr E2E
-        run: cargo test -p bcinr --test e2e_main
       - name: Full workspace
         run: cargo test --workspace --all-targets --no-fail-fast
       - name: Post-E2E formatting
@@ -117,5 +118,6 @@ jobs:
         run: git diff --exit-code -- crates/bcinr-logic/src/algorithms/mod.rs
       - name: Post-E2E fixture cleanup
         run: test -z "$(find crates/bcinr-logic/src/algorithms -maxdepth 1 -type f -name 'temp_*' -print -quit)"
-      - name: Publish final repaired tree and receipt
-        run: bash scripts/finalize_post_integration_verification.sh
+      # "Publish final repaired tree" step removed 2026-10-01: its script
+      # (scripts/finalize_post_integration_verification.sh) no longer exists;
+      # this workflow now verifies the agent branch head only.

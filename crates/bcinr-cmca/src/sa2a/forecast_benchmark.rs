@@ -1,8 +1,6 @@
 //! Heterogeneous forecast benchmark and counterfactual replay receipts.
 
-use super::forecast_standing::{
-    evaluate_forecast, ForecastCalibrationReceipt, ShockPolicy,
-};
+use super::forecast_standing::{evaluate_forecast, ForecastCalibrationReceipt, ShockPolicy};
 use super::predictive_model::{ForecastMatrix, ResourceVector};
 use super::resource_envelope::Allocation;
 

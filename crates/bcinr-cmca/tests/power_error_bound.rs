@@ -123,6 +123,11 @@
 //! maximum plus headroom) and the sweep test's own `eprintln!` for the
 //! exact figure on any given run.
 
+// Exercises `cascade`/`escort`/`reference_escort` (alloc-gated modules): without
+// the feature this target compiles to zero tests, keeping the default-feature
+// matrix green instead of failing to resolve gated imports.
+#![cfg(feature = "alloc")]
+
 use bcinr_cmca::allocator::{power, StabilityRefusal};
 use bcinr_cmca::fixed::{NonNegativeFixed, SignedFixed};
 

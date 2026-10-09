@@ -17,7 +17,7 @@ quote = "1.0"
 
 [[test]]
 name = "test_scanner"
-path = "../../tests/test_scanner.rs"
+path = "tests/test_scanner.rs"
 
 
 

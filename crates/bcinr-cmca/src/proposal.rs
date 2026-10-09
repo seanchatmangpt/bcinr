@@ -13,6 +13,29 @@
 //! calls [`ModeProposal::propose`] (a `pub(crate)` constructor reachable only from within
 //! this crate) but does not itself hold or expose a way to fabricate a proposal-shaped
 //! value from arbitrary bytes.
+//!
+//! # Currently dead / uncompiled — not declared in `lib.rs`
+//!
+//! This module is **not** wired into the crate (`grep -rn "mod proposal" src/lib.rs`
+//! returns nothing) and does not currently compile as part of `bcinr-cmca`. Evidence:
+//!
+//! - It imports `crate::observatory::ObservatoryFlagSet`, a bitset type that existed in an
+//!   earlier revision of `observatory.rs` (commit `077e08a8`, "numeric fault-set and
+//!   authority-chain closure for v26.7.17") but was later removed in favor of the single
+//!   `ObservatoryFlag` enum this crate uses today. `ObservatoryFlagSet` no longer exists
+//!   anywhere in this crate.
+//! - It calls `SignedFixed::value_bits()`, a method that does not exist on
+//!   `crate::fixed::SignedFixed` (which exposes `to_bits()`/`from_bits()` instead, per the
+//!   `from_value_bits` -> `from_bits` rename in commit `7197c91f`, "Closure Ticket C1:
+//!   Repair fixed-point semantics").
+//!
+//! `certification.rs`'s `use crate::proposal::mix64;` is *not* evidence this module is
+//! live: `certification.rs` is itself undeclared in `lib.rs` and does not compile as part
+//! of the crate either. Both files are orphaned code referencing orphaned code, left behind
+//! by a real API refactor (the `ObservatoryFlagSet` removal) that this file never absorbed.
+//! A future reader who wants to revive this authority hop must first reconcile its flag-set
+//! API against the current `ObservatoryFlag` enum, not just re-add a `pub mod proposal;`
+//! line to `lib.rs`.
 
 use crate::fixed::SignedFixed;
 use crate::observatory::ObservatoryFlagSet;
@@ -239,13 +262,13 @@ mod tests {
     }
 
     fn base_proposal() -> ModeProposal {
-        ModeProposal::test_fixture(SignedFixed::from_value_bits(10), 1, 2, 3, clean_flags())
+        ModeProposal::test_fixture(SignedFixed::from_bits(10), 1, 2, 3, clean_flags())
     }
 
     #[test]
     fn admits_when_every_binding_matches() {
         let p = base_proposal();
-        let admitted = admit_proposal(p, 3, 2, SignedFixed::from_value_bits(100));
+        let admitted = admit_proposal(p, 3, 2, SignedFixed::from_bits(100));
         assert!(admitted.is_ok());
     }
 
@@ -254,7 +277,7 @@ mod tests {
         let mut p = base_proposal();
         p.proposal_digest ^= 1; // simulate corruption in transit
         assert_eq!(
-            admit_proposal(p, 3, 2, SignedFixed::from_value_bits(100)),
+            admit_proposal(p, 3, 2, SignedFixed::from_bits(100)),
             Err(ProposalRefusal::ProposalDigestMismatch)
         );
     }
@@ -263,7 +286,7 @@ mod tests {
     fn refuses_on_round_mismatch() {
         let p = base_proposal();
         assert_eq!(
-            admit_proposal(p, 999, 2, SignedFixed::from_value_bits(100)),
+            admit_proposal(p, 999, 2, SignedFixed::from_bits(100)),
             Err(ProposalRefusal::RoundIdentityMismatch)
         );
     }
@@ -272,7 +295,7 @@ mod tests {
     fn refuses_on_current_mode_digest_mismatch() {
         let p = base_proposal();
         assert_eq!(
-            admit_proposal(p, 3, 999, SignedFixed::from_value_bits(100)),
+            admit_proposal(p, 3, 999, SignedFixed::from_bits(100)),
             Err(ProposalRefusal::CurrentModeDigestMismatch)
         );
     }
@@ -281,7 +304,7 @@ mod tests {
     fn refuses_on_unsupported_delta() {
         let p = base_proposal();
         assert_eq!(
-            admit_proposal(p, 3, 2, SignedFixed::from_value_bits(1)),
+            admit_proposal(p, 3, 2, SignedFixed::from_bits(1)),
             Err(ProposalRefusal::UnsupportedDelta)
         );
     }
@@ -289,9 +312,9 @@ mod tests {
     #[test]
     fn refuses_on_blocked_telemetry_standing() {
         let bad_flags = ObservatoryFlagSet::EMPTY.insert(ObservatoryFlag::Drifting);
-        let p = ModeProposal::test_fixture(SignedFixed::from_value_bits(10), 1, 2, 3, bad_flags);
+        let p = ModeProposal::test_fixture(SignedFixed::from_bits(10), 1, 2, 3, bad_flags);
         assert_eq!(
-            admit_proposal(p, 3, 2, SignedFixed::from_value_bits(100)),
+            admit_proposal(p, 3, 2, SignedFixed::from_bits(100)),
             Err(ProposalRefusal::TelemetryStandingBlocked)
         );
     }
@@ -301,7 +324,7 @@ mod tests {
         // Compile-time property: AdmittedProposal has no public constructor other than
         // `admit_proposal`. This test documents the property by using only the public API.
         let p = base_proposal();
-        let admitted = admit_proposal(p, 3, 2, SignedFixed::from_value_bits(100)).unwrap();
+        let admitted = admit_proposal(p, 3, 2, SignedFixed::from_bits(100)).unwrap();
         assert_eq!(admitted.proposal().round_identity(), 3);
     }
 }

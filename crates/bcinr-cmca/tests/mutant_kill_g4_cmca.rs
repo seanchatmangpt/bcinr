@@ -10,6 +10,7 @@
 use bcinr_cmca::generated::stability_profile::{
     CONTRACTION_MARGIN, GAIN_MATRIX, MODE_DWELL_ROUNDS_MIN, WEIGHT_VECTOR,
 };
+use bcinr_cmca::stability_theorem::minimum_dwell_rounds;
 
 /// Oracle 0: Baseline — verify CMCA stability oracle passes
 #[test]
@@ -131,17 +132,30 @@ fn mutant_3_dwell_time_minus_one_is_caught() {
     let original_dwell = MODE_DWELL_ROUNDS_MIN;
     let mutated_dwell = original_dwell - 1;
 
-    // The mutant dwell time is measurably different
-    assert_ne!(
-        mutated_dwell, original_dwell,
-        "mutation must change dwell time"
-    );
-
-    // The oracle would check this against the certified profile
-    // If a different dwell time is admitted, it breaks the stability contract
-    // Verify the original is the constant we expect
+    // Pin the shipped profile value (regression lock).
     assert_eq!(original_dwell, 461, "baseline dwell time must be 461");
     assert_eq!(mutated_dwell, 460, "mutated dwell time must be 460");
+
+    // The real oracle: the average-dwell-time bound
+    // tau_D > ln(chi_max) / -ln(1 - delta), computed by
+    // `stability_theorem::minimum_dwell_rounds`. For the characterized
+    // mode-switch growth ratio chi_max = 102 (inside the declared floor's
+    // coverage; ln(102)/-ln(0.99) ~= 460.2), the declared floor of 461
+    // satisfies the bound and the mutant floor of 460 does not. The
+    // mutation is caught by the stability contract itself, not by the
+    // tautology "x - 1 != x" this test used to assert.
+    let required = minimum_dwell_rounds(CONTRACTION_MARGIN, 102.0);
+    assert!(
+        required <= original_dwell as f64,
+        "declared dwell floor {original_dwell} must cover chi_max = 102 \
+         (bound requires {required:.2} rounds)"
+    );
+    assert!(
+        required > mutated_dwell as f64,
+        "mutant dwell floor {mutated_dwell} breaks the dwell bound for \
+         chi_max = 102 (bound requires {required:.2} rounds) -- the \
+         stability oracle must reject the mutation"
+    );
 }
 
 /// Oracle summary: CMCA oracle catches all three mutations

@@ -146,8 +146,7 @@ fn chicago_symbolic_membership_matches_small_exhaustive_court() {
                 family_id: 9,
                 values: [left, right],
             };
-            let expected =
-                family.domains[0].contains(left) && family.domains[1].contains(right);
+            let expected = family.domains[0].contains(left) && family.domains[1].contains(right);
             assert_eq!(
                 family.admit_in(&envelope, &witness).is_ok(),
                 expected,

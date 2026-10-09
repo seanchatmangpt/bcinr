@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::fs;
+use std::path::{Path, PathBuf};
 use syn::visit::Visit;
 use syn::{Attribute, Ident, ItemFn, ItemMod, LitStr, Visibility};
 use walkdir::WalkDir;
@@ -105,9 +106,14 @@ impl<'ast> Visit<'ast> for BenchVisitor {
 fn main() {
     let mut logic_fns = HashSet::new();
 
-    // Limit bcinr-bench-auditor check directory to only crates/bcinr-logic/src/algorithms
-    for entry in WalkDir::new("crates/bcinr-logic/src/algorithms") {
-        let entry = entry.unwrap();
+    // Limit bcinr-bench-auditor check directory to only crates/bcinr-logic/src/algorithms.
+    // filter_map(Result::ok): a missing or unreadable tree yields no entries
+    // instead of panicking -- the original `entry.unwrap()` turned "run from
+    // the wrong directory" into a process abort.
+    for entry in WalkDir::new("crates/bcinr-logic/src/algorithms")
+        .into_iter()
+        .filter_map(Result::ok)
+    {
         if entry.path().extension().and_then(|s| s.to_str()) == Some("rs") {
             let content = match fs::read_to_string(entry.path()) {
                 Ok(c) => c,
@@ -121,20 +127,48 @@ fn main() {
         }
     }
 
-    let mut bench_idents = HashSet::new();
-    for entry in WalkDir::new("bcinr-bench/benches") {
-        let entry = entry.unwrap();
-        if entry.path().extension().and_then(|s| s.to_str()) == Some("rs") {
-            let content = match fs::read_to_string(entry.path()) {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
-            if let Ok(file) = syn::parse_file(&content) {
-                let mut visitor = BenchVisitor::default();
-                visitor.visit_file(&file);
-                bench_idents.extend(visitor.idents);
+    // Discover benchmark sources anywhere in the workspace. The original
+    // hardcoded "bcinr-bench/benches" died with that crate's removal and
+    // panicked on the missing directory; discovery keeps the audit usable
+    // wherever benches live now (e.g. crates/bcinr-powl/benches).
+    let mut bench_roots: Vec<PathBuf> = Vec::new();
+    for group in ["crates", "tools"] {
+        if let Ok(entries) = fs::read_dir(group) {
+            for dir in entries.flatten() {
+                let benches = dir.path().join("benches");
+                if benches.is_dir() {
+                    bench_roots.push(benches);
+                }
             }
         }
+    }
+    if Path::new("benches").is_dir() {
+        bench_roots.push(PathBuf::from("benches"));
+    }
+
+    let mut bench_idents = HashSet::new();
+    for root in &bench_roots {
+        for entry in WalkDir::new(root).into_iter().filter_map(Result::ok) {
+            if entry.path().extension().and_then(|s| s.to_str()) == Some("rs") {
+                let content = match fs::read_to_string(entry.path()) {
+                    Ok(c) => c,
+                    Err(_) => continue,
+                };
+                if let Ok(file) = syn::parse_file(&content) {
+                    let mut visitor = BenchVisitor::default();
+                    visitor.visit_file(&file);
+                    bench_idents.extend(visitor.idents);
+                }
+            }
+        }
+    }
+
+    if bench_idents.is_empty() {
+        eprintln!(
+            "FAILED: no benchmark sources found under crates/*/benches, \
+             tools/*/benches, or benches -- coverage cannot be audited."
+        );
+        std::process::exit(1);
     }
 
     let mut missing = Vec::new();

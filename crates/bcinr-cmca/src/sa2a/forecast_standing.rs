@@ -63,9 +63,7 @@ pub fn evaluate_forecast<const R: usize, const H: usize>(
 
             let actual_shock =
                 observed.abs_diff(baseline.values[axis]) > shock_policy.thresholds.values[axis];
-            let predicted_shock = cell
-                .expected
-                .abs_diff(baseline.values[axis])
+            let predicted_shock = cell.expected.abs_diff(baseline.values[axis])
                 > shock_policy.thresholds.values[axis];
 
             if actual_shock && !predicted_shock {

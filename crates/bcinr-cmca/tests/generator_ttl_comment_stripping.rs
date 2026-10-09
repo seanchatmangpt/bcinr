@@ -45,12 +45,24 @@ fn run_generator(ttl_contents: &str) -> (bool, String, String) {
 
 /// Minimal, unique temp dir under the crate's target dir so parallel test
 /// runs don't collide.
+///
+/// Uniqueness is `pid + atomic-sequence + nanos`. The previous `pid + nanos`
+/// scheme raced: `SystemTime` nanos can repeat within the same clock tick
+/// across threads, so two parallel tests could land the same dir, and the
+/// second `input.ttl` write won the race to the first test's `python3`
+/// invocation -- observed as `unsupported_language_tag_is_still_rejected`
+/// intermittently failing with the *multiline-literal* rejection message.
+/// The atomic sequence makes within-process collisions impossible; the pid
+/// guards cross-process; the nanos are retained only as extra entropy.
 fn tempfile_dir() -> PathBuf {
+    static TEMP_DIR_SEQ: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     let base = crate_root().join("target").join("cmca118-test-tmp");
     fs::create_dir_all(&base).expect("create tmp base");
+    let seq = TEMP_DIR_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let unique = base.join(format!(
-        "{}-{}",
+        "{}-{}-{}",
         std::process::id(),
+        seq,
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()

@@ -1027,3 +1027,125 @@ fn temporal_intervals_overlap(
 fn canonical_temporal_action(step: &wasm4pm_compat::pddl::TemporalPlanStep) -> String {
     format!("{}({})", step.action_name, step.args.join(","))
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Tests for `validate_plan` -- previously zero, despite this being a real,
+// independently-derived checker with real logic. Confirmed before this pass:
+// `validate_plan`/`validate_plan_numeric` are `pub use`-exported from
+// `lib.rs` but have no caller anywhere in the tree and no test anywhere
+// under `bcinr-pddl/tests/` -- these tests prove the real logic actually
+// catches genuine violations. They do NOT wire a production caller for the
+// checker (that is a separate, unaddressed gap -- named, not silently
+// implied as fixed by adding tests).
+// ─────────────────────────────────────────────────────────────────────────
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wasm4pm_compat::pddl::{Pddl8Atom, Pddl8GroundAction};
+
+    /// A trivial, real "move a robot from room A to room B" domain/problem/
+    /// plan, hand-built via struct literals (no PDDL text parsing needed --
+    /// `validate_plan` only reads `problem.objects`/`init_atoms`/`goal` and
+    /// `domain.types`, per its own real implementation above).
+    fn robot_atom(pred: &str, room: &str) -> Pddl8GroundAtom {
+        Pddl8GroundAtom {
+            pred: pred.to_string(),
+            args: vec![room.to_string()],
+        }
+    }
+
+    fn move_action(from: &str, to: &str) -> Pddl8GroundAction {
+        Pddl8GroundAction {
+            schema_name: "move".to_string(),
+            label: format!("move({from},{to})"),
+            preconditions: vec![robot_atom("at", from)],
+            add_effects: vec![robot_atom("at", to)],
+            del_effects: vec![robot_atom("at", from)],
+        }
+    }
+
+    fn robot_problem(goal_room: &str) -> Pddl31Problem {
+        Pddl31Problem {
+            name: "robot-test".to_string(),
+            domain: "robot".to_string(),
+            objects: vec![],
+            init_atoms: vec![Pddl8Atom {
+                pred: "at".to_string(),
+                args: vec!["roomA".to_string()],
+            }],
+            init_fn_values: vec![],
+            timed_inits: vec![],
+            goal: PddlCondition::Atom(Pddl8Atom {
+                pred: "at".to_string(),
+                args: vec![goal_room.to_string()],
+            }),
+            preferences: vec![],
+            metric: None,
+        }
+    }
+
+    fn tape_of(actions: Vec<Pddl8GroundAction>) -> Pddl8Tape {
+        Pddl8Tape::from_plan(actions)
+    }
+
+    #[test]
+    fn validate_plan_accepts_a_real_valid_plan_that_reaches_the_goal() {
+        let domain = Pddl31Domain::default();
+        let problem = robot_problem("roomB");
+        let tape = tape_of(vec![move_action("roomA", "roomB")]);
+
+        assert_eq!(validate_plan(&domain, &problem, &tape), Ok(()));
+    }
+
+    #[test]
+    fn validate_plan_rejects_a_precondition_violated_by_the_real_initial_state() {
+        // The plan's first (only) step requires the robot to already be in
+        // roomB, but the real initial state only has it in roomA -- a
+        // genuine, constructible precondition violation.
+        let domain = Pddl31Domain::default();
+        let problem = robot_problem("roomC");
+        let tape = tape_of(vec![move_action("roomB", "roomC")]);
+
+        let result = validate_plan(&domain, &problem, &tape);
+        assert_eq!(
+            result,
+            Err(PlanViolation::PreconditionUnsatisfied {
+                step: 0,
+                action: "move(roomB,roomC)".to_string(),
+                atom: "at(roomB)".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn validate_plan_rejects_a_plan_that_does_not_reach_the_real_goal() {
+        // A real, valid single step (roomA -> roomB), but the goal asks for
+        // roomC -- the plan never gets there.
+        let domain = Pddl31Domain::default();
+        let problem = robot_problem("roomC");
+        let tape = tape_of(vec![move_action("roomA", "roomB")]);
+
+        assert_eq!(
+            validate_plan(&domain, &problem, &tape),
+            Err(PlanViolation::GoalNotReached)
+        );
+    }
+
+    #[test]
+    fn validate_plan_rejects_the_same_ground_action_firing_twice() {
+        // Two real tape ops with the identical label -- a genuine, real
+        // "no ground action may repeat" violation, not a hypothetical one.
+        let domain = Pddl31Domain::default();
+        let problem = robot_problem("roomA");
+        let repeated = move_action("roomA", "roomA");
+        let tape = tape_of(vec![repeated.clone(), repeated]);
+
+        assert_eq!(
+            validate_plan(&domain, &problem, &tape),
+            Err(PlanViolation::ActionRepeated {
+                label: "move(roomA,roomA)".to_string(),
+                count: 2,
+            })
+        );
+    }
+}

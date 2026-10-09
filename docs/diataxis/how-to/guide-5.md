@@ -2,7 +2,7 @@
 
 **Goal:** Get a fast inner feedback loop by running just the `bcinr-logic` unit tests, skipping the slow workspace-wide build of benchmarks, integration targets, and the other crates.
 
-**Prerequisites:** A working checkout. The full suite (`cargo make test`) compiles every target in every crate with `--all-features --all-targets`, which is thorough but slow during development.
+**Prerequisites:** A working checkout. The full suite (`cargo make test`) compiles every target in every crate with `--all-targets`, which is thorough but slow during development.
 
 ## Steps
 
@@ -15,8 +15,8 @@
 2. To run one module or one test by substring, pass a filter. To see `println!`/`dbg!` output, add `-- --nocapture`:
 
    ```bash
-   cargo test -p bcinr-logic --lib mask::         # everything under mask.rs
-   cargo test -p bcinr-logic test_select_u32 -- --nocapture
+   cargo test -p bcinr-logic --lib mask::              # everything under mask.rs
+   cargo test -p bcinr-logic test_mask_equivalence_and_boundaries -- --nocapture
    ```
 
 3. To make failures deterministic and readable, run single-threaded:
@@ -34,7 +34,7 @@
 5. When you are ready to validate everything before pushing, switch back to the full workspace run, which also builds benches and integration targets:
 
    ```bash
-   cargo make test   # cargo test --workspace --all-features --all-targets
+   cargo make test   # cargo test --workspace --all-targets --no-fail-fast
    ```
 
 ## Verify it worked

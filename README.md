@@ -73,6 +73,7 @@ Three compounding performance levers, all implemented and benchmarked:
 - **[How-To Guides](docs/diataxis/how-to/)** — side-channel hardening, WCET bounding
 - **[Explanations](docs/diataxis/explanation/)** — Branchless Calculus, architectural design
 - **[References](docs/diataxis/reference/)** — full API catalog and specifications
+- **[SA2A Boundary](docs/sa2a.md)** — `bcinr_cmca::sa2a` types and conservation invariants
 - **[Anti-Patterns](docs/diataxis/explanation/anti-patterns.md)** — structural hazards to avoid
 
 [Full Documentation Index](docs/diataxis/INDEX.md)

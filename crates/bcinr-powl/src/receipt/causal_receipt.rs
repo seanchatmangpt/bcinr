@@ -151,7 +151,8 @@ impl OcelCausalFrame {
 /// ```text
 /// chain_hash(t+1) = BLAKE3(chain_hash(t) || frame_bytes(t+1))
 /// ```
-/// The genesis hash is BLAKE3 of 32 zero bytes.
+/// The genesis prior is 32 raw zero bytes, folded into the first frame's
+/// hash (no separate genesis pre-hash).
 pub struct OcelCausalReceipt {
     /// Current rolling hash (advances with each [`OcelCausalReceipt::chain`] call).
     pub chain_hash: [u8; 32],
@@ -166,12 +167,13 @@ pub struct OcelCausalReceipt {
 impl OcelCausalReceipt {
     /// Create a genesis receipt for the given `run_id`.
     ///
-    /// The initial `chain_hash` is BLAKE3 of 32 zero bytes, matching the
-    /// `unibit-causality` genesis convention.
+    /// The initial `chain_hash` is 32 raw zero bytes — the genesis pre-hash
+    /// (`BLAKE3(0^32)`) is folded into the first frame's update instead of
+    /// computed eagerly, so the first chain step hashes `0^32 || frame` in
+    /// one `update(131)` rather than `BLAKE3(0^32)` + a two-call fold.
     pub fn genesis(run_id: [u8; 32]) -> Self {
-        let chain_hash: [u8; 32] = *blake3::hash(&[0u8; 32]).as_bytes();
         Self {
-            chain_hash,
+            chain_hash: [0u8; 32],
             frame_count: 0,
             run_id,
             replay_ptr: 0,
@@ -185,11 +187,15 @@ impl OcelCausalReceipt {
     /// `replay_ptr` to the new frame index.
     pub fn chain(&mut self, frame: &OcelCausalFrame) {
         let frame_bytes = frame.to_hash_bytes();
-        // Streaming update: feed prior_hash then frame_bytes in one Hasher pass.
-        // Avoids a 131-byte stack copy and a second Hasher construction vs one-shot.
+        // Single update over the concatenated 131-byte input
+        // prior_hash[32] || frame[99]. For the first frame the genesis
+        // pre-hash (one block compression) is skipped entirely: the raw
+        // zero prior folds in here instead of being hashed eagerly.
+        let mut buf = [0u8; 131];
+        buf[..32].copy_from_slice(&self.chain_hash);
+        buf[32..].copy_from_slice(&frame_bytes);
         let mut h = blake3::Hasher::new();
-        h.update(&self.chain_hash);
-        h.update(&frame_bytes);
+        h.update(&buf);
         self.chain_hash = *h.finalize().as_bytes();
         self.frame_count += 1;
         self.replay_ptr = self.frame_count - 1;

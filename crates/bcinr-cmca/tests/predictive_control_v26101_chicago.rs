@@ -22,7 +22,10 @@ impl Predictor<2, 2, 3> for DemoPredictor {
             axes: [ResourceAxisId(1), ResourceAxisId(2)],
             horizons: [
                 ForecastHorizon { start: 30, end: 60 },
-                ForecastHorizon { start: 60, end: 120 },
+                ForecastHorizon {
+                    start: 60,
+                    end: 120,
+                },
             ],
         }
     }
@@ -162,24 +165,16 @@ fn chicago_forecast_standing_separates_average_error_interval_coverage_and_shock
     let predictor = DemoPredictor;
     let matrix = predictor.predict(&trace()).unwrap();
     let actual = [
-        ResourceVector {
-            values: [40, 160],
-        },
-        ResourceVector {
-            values: [80, 220],
-        },
+        ResourceVector { values: [40, 160] },
+        ResourceVector { values: [80, 220] },
     ];
     let scenario = BenchmarkScenario {
         class: CorpusClass::Synthetic,
         corpus_digest: 123,
-        baseline: ResourceVector {
-            values: [30, 140],
-        },
+        baseline: ResourceVector { values: [30, 140] },
         actual,
         shock_policy: ShockPolicy {
-            thresholds: ResourceVector {
-                values: [25, 30],
-            },
+            thresholds: ResourceVector { values: [25, 30] },
         },
     };
 

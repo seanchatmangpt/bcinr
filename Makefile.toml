@@ -124,13 +124,22 @@ description = "Run all workspace tests"
 # task immediately after the first member ("Project: bcinr") and every
 # later member -- including every MFW retrofit crate -- was never reached,
 # regardless of --no-fail-fast being present in this task's own (unused)
-# `args`. `workspace = false` makes this one real `cargo test --workspace
-# --all-features --all-targets --no-fail-fast` invocation from the root,
-# which both reaches every member AND keeps running past bcinr's own
-# unrelated e2e.rs failures.
+# `args`. `workspace = false` makes this one real `cargo test` invocation
+# from the root, which both reaches every member AND keeps running past
+# individual crate failures.
+#
+# NO `--all-features`: bcinr-cmca declares mutant_1..mutant_11, compile-time
+# sabotage switches meant to be enabled ONE AT A TIME (see
+# crates/bcinr-cmca/Cargo.toml and the same documented decision in
+# .github/workflows/ci.yml main-linux). With --all-features all eleven arm
+# at once and cmca lib tests fail BY DESIGN -- measured live 2026-10-01:
+# `cargo test -p bcinr-cmca --all-features --lib` = 58 passed, 5 FAILED
+# (escort::tests::* expected-value assertions, e.g. saturating_div taking
+# the mutant saturate path). A gate that can never be green is defective,
+# so this task now mirrors the CI production rail exactly.
 workspace = false
 command = "cargo"
-args = ["test", "--workspace", "--all-features", "--all-targets", "--no-fail-fast"]
+args = ["test", "--workspace", "--all-targets", "--no-fail-fast"]
 
 [tasks.bench]
 category = "Performance"
@@ -167,12 +176,23 @@ args = ["fmt", "--all", "--", "--check"]
 [tasks.audit]
 category = "Security"
 description = "Run cargo audit for vulnerabilities"
+# workspace = false: see [tasks.check]. cargo audit is already workspace-wide
+# from the root; without this flag cargo-make descends into every member
+# directory, and members with no local Makefile.toml fall back to core tasks,
+# which have no "audit" -- the gate dies with "Task audit not found" (404)
+# before scanning anything (observed live via `cargo make ci` on
+# release/26.9.15, 2026-10-01).
+workspace = false
 command = "cargo"
 args = ["audit"]
 
 [tasks.deny]
 category = "Security"
 description = "Check licenses and supply chain"
+# workspace = false: see [tasks.audit] / [tasks.check] -- cargo deny check is
+# already workspace-wide from the root; per-member descent without member
+# Makefiles turns this into "Task deny not found" (404).
+workspace = false
 command = "cargo"
 args = ["deny", "check"]
 
@@ -254,6 +274,14 @@ script = [
 [tasks.ci]
 category = "CI"
 description = "Comprehensive CI pipeline"
+# workspace = false: see [tasks.check]. `ci` is a pure dependencies task; the
+# default workspace descent tried to resolve a task named "ci" inside each
+# member directory (first member: bcinr-logic, which has no Makefile.toml and
+# no core "ci" task) and died with "Task "ci" not found" (exit 404) BEFORE any
+# dependency step ran (observed live: `cargo make ci` on release/26.9.15,
+# 2026-10-01). With this flag the root flow runs once and every dependency
+# already carries its own workspace = false.
+workspace = false
 dependencies = ["fmt", "check", "clippy", "scan-cheats", "contract-gate", "test", "audit", "deny"]
 
 [tasks.default]
@@ -261,21 +289,9 @@ alias = "ci"
 
 [tasks.test-mutants]
 category = "Test"
-description = "Verify mutant detection via compile-time injection"
+description = "Mutation kill gate (AGENTS.md section 19): every mutant_N must compile AND fail the suite; a surviving mutant blocks feature work"
 workspace = false
-script = [
-    "cargo test -p bcinr-cmca --features mutant_1,std",
-    "cargo test -p bcinr-cmca --features mutant_2,std",
-    "cargo test -p bcinr-cmca --features mutant_3,std",
-    "cargo test -p bcinr-cmca --features mutant_4,std",
-    "cargo test -p bcinr-cmca --features mutant_5,std",
-    "cargo test -p bcinr-cmca --features mutant_6,std",
-    "cargo test -p bcinr-cmca --features mutant_7,std",
-    "cargo test -p bcinr-cmca --features mutant_8,std",
-    "cargo test -p bcinr-cmca --features mutant_9,std",
-    "cargo test -p bcinr-cmca --features mutant_10,std",
-    "cargo test -p bcinr-cmca --features mutant_11,std",
-]
+script = ["python3 tools/mutant_gate.py"]
 
 [tasks.publish-dry-run]
 category = "Release"

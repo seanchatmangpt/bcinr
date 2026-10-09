@@ -8,9 +8,12 @@ on:
     branches: [main]
     paths:
       - 'crates/bcinr-cmca/src/generated/**'
-      - 'crates/bcinr-cmca/generated-artifact/**'
-      - 'crates/bcinr-cmca/quarantine/**'
       - 'scripts/gates/**'
+    # Removed 2026-10-01 (gate lane, release/26.9.15): 'crates/bcinr-cmca/generated-artifact/**'
+    # and 'crates/bcinr-cmca/quarantine/**' -- neither directory exists in the
+    # tree (verified: `ls -d` fails on both). Dead trigger paths never match,
+    # so removal changes nothing today; dropped so the filter cannot pretend
+    # to guard artifacts that are no longer produced.
 
 concurrency:
   group: exhaustive-${{ github.ref }}

@@ -1,5 +1,15 @@
 # CMCA-RDF Subsystem: Final Standing Report
 
+> **⚠️ HISTORICAL SNAPSHOT — DO NOT CITE AS CURRENT STANDING.**
+> This report certifies the state of the **v26.7.17** crate at baseline commit
+> `49a7342b` (2026-07-25, 19 tests). The crate is now v26.7.28 with a suite of
+> ~240 tests across feature configurations, and several statements below no
+> longer hold as written -- notably the refusal-enum taxonomy (see
+> `docs/contracts/CMCA_CONTRACT.md`'s own "design target" notice) and the
+> "19 tests" count. Current evidence lives in the crate's own tests and
+> `docs/CMCA_EXPLANATION.md`'s Verification Status section. This file is kept,
+> unmodified below this banner, as the audit record of that baseline.
+
 ## 1. Executive Summary
 
 This report certifies the successful final integration and verification of the **CMCA-RDF (Chatman Multifractal Consequence Allocation, RDF-projected)** decision surface on the **BCINR (Branchless C in Rust)** deterministic systems substrate. ("Constrained Multi-measure Co-allocation for Resource Decision Fields" was this report's earlier, unreconciled expansion — see `../CMCA_EXPLANATION.md` for the canonical name.)

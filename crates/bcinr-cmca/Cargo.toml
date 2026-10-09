@@ -19,11 +19,13 @@ publish = true
 bcinr-logic = { path = "../bcinr-logic", version = "26.9.28" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+blake3 = "1"
 
 [dev-dependencies]
 chicago-tdd-tools = { version = "26.7.1", features = ["ocel-generation"] }
 trybuild = "1.0"
 proptest = "1.2.0"
+divan = "0.1"
 
 [features]
 default = []
@@ -74,4 +76,13 @@ required-features = ["alloc"]
 
 [[test]]
 name = "runtime_semantic_classification"
+required-features = ["alloc"]
+
+[[bench]]
+name = "allocation_bench"
+harness = false
+
+[[bench]]
+name = "cascade_bench"
+harness = false
 required-features = ["alloc"]

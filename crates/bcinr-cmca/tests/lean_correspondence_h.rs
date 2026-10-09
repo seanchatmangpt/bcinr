@@ -42,6 +42,11 @@
 //! mutates state the functions under test depend on. No Lean build/run is
 //! performed anywhere in this file.
 
+// Exercises `cascade`/`escort`/`reference_escort` (alloc-gated modules): without
+// the feature this target compiles to zero tests, keeping the default-feature
+// matrix green instead of failing to resolve gated imports.
+#![cfg(feature = "alloc")]
+
 use bcinr_cmca::cascade::escort_weight;
 use bcinr_cmca::fixed::NonNegativeFixed;
 

@@ -538,7 +538,9 @@ pub fn execute_temporal_plan_instrumented(
     validate_case_id(case_id)?;
 
     let mut steps = plan.steps.clone();
-    steps.sort_by(|a, b| a.start_time.partial_cmp(&b.start_time).unwrap());
+    // total_cmp: total order on all f64, so a non-finite start_time (PDDL
+    // numeric overflow) sorts deterministically instead of panicking.
+    steps.sort_by(|a, b| a.start_time.total_cmp(&b.start_time));
 
     let mut substage = SubstageNs::default();
 
@@ -828,7 +830,9 @@ pub fn execute_temporal_plan(
 
     // Sort steps by start_time
     let mut steps = plan.steps.clone();
-    steps.sort_by(|a, b| a.start_time.partial_cmp(&b.start_time).unwrap());
+    // total_cmp: total order on all f64, so a non-finite start_time (PDDL
+    // numeric overflow) sorts deterministically instead of panicking.
+    steps.sort_by(|a, b| a.start_time.total_cmp(&b.start_time));
 
     // Initialize Prolog8 admission gate — mirrors execute_tape lines 121-133.
     let mut ctx = Ctx::new();

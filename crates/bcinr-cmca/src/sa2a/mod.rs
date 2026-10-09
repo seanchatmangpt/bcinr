@@ -7,14 +7,14 @@ pub mod forecast_benchmark;
 pub mod forecast_standing;
 pub mod interop;
 pub mod ocel;
-pub mod prepared_effect_ref;
 pub mod predictive_envelope;
 pub mod predictive_measure;
 pub mod predictive_model;
+pub mod prepared_effect_ref;
 pub mod receipt;
 pub mod recovery;
-pub mod reservation;
 pub mod replay;
+pub mod reservation;
 pub mod resource_envelope;
 pub mod shadow_optimizer;
 pub mod symbolic_envelope;
@@ -43,11 +43,11 @@ pub use predictive_model::{
     ForecastModelRefusal, Predictor, PredictorArtifact, ResourceAxisId, ResourceAxisRegistry,
     ResourceVector, TraceSample, TraceWindow, CONFIDENCE_PPM_ONE,
 };
-pub use resource_envelope::{Allocation, ResourceEnvelope};
 pub use reservation::{
     admit_reservation_proposal, AdmittedReservationProposal, ReservationAdmission,
     ReservationProposal, ReservationRefusal,
 };
+pub use resource_envelope::{Allocation, BudgetLedger, BudgetReceipt, ResourceEnvelope};
 pub use shadow_optimizer::{
     analyze_population, attraction_proposal, optimization_receipt, shadow_rejuvenation_mask,
     OptimizationReceipt, PopulationAnalysis, ShadowCandidate, ShadowOptimizerRefusal,

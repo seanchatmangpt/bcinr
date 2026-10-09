@@ -27,16 +27,9 @@ pub struct PopulationAnalysis<const K: usize> {
 pub enum ShadowOptimizerRefusal {
     NoCandidates,
     NoClusters,
-    ClusterOutOfRange {
-        candidate_id: u64,
-        cluster: usize,
-    },
-    MissingClusterChampion {
-        cluster: usize,
-    },
-    CandidateNotFound {
-        candidate_id: u64,
-    },
+    ClusterOutOfRange { candidate_id: u64, cluster: usize },
+    MissingClusterChampion { cluster: usize },
+    CandidateNotFound { candidate_id: u64 },
     InvalidProbabilityPpm,
 }
 
@@ -178,10 +171,8 @@ pub fn attraction_proposal<const C: usize, const K: usize, const D: usize>(
     let local = candidates[local_index];
     let global = candidates[global_index];
 
-    let local_scale =
-        (local_attraction_ppm as i128) * (local_draw_ppm as i128);
-    let global_scale =
-        (global_attraction_ppm as i128) * (global_draw_ppm as i128);
+    let local_scale = (local_attraction_ppm as i128) * (local_draw_ppm as i128);
+    let global_scale = (global_attraction_ppm as i128) * (global_draw_ppm as i128);
     let denominator = 1_000_000i128 * 1_000_000i128;
 
     let mut proposed = [0i64; D];
@@ -189,13 +180,15 @@ pub fn attraction_proposal<const C: usize, const K: usize, const D: usize>(
     while dimension < D {
         let current = candidate.position[dimension] as i128;
         let local_delta =
-            (local.position[dimension] as i128 - current).saturating_mul(local_scale)
-                / denominator;
-        let global_delta =
-            (global.position[dimension] as i128 - current).saturating_mul(global_scale)
-                / denominator;
-        proposed[dimension] =
-            saturating_i128_to_i64(current.saturating_add(local_delta).saturating_add(global_delta));
+            (local.position[dimension] as i128 - current).saturating_mul(local_scale) / denominator;
+        let global_delta = (global.position[dimension] as i128 - current)
+            .saturating_mul(global_scale)
+            / denominator;
+        proposed[dimension] = saturating_i128_to_i64(
+            current
+                .saturating_add(local_delta)
+                .saturating_add(global_delta),
+        );
         dimension += 1;
     }
 
@@ -339,8 +332,7 @@ const fn better(
     incumbent_fitness: u64,
     incumbent_id: u64,
 ) -> bool {
-    fitness < incumbent_fitness
-        || (fitness == incumbent_fitness && candidate_id < incumbent_id)
+    fitness < incumbent_fitness || (fitness == incumbent_fitness && candidate_id < incumbent_id)
 }
 
 fn saturating_u128_to_u64(value: u128) -> u64 {

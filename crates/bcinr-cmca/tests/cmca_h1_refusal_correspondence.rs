@@ -52,6 +52,11 @@
 //! granularity and is closed here with exact identity, not merely "both
 //! refused."
 
+// Exercises `cascade`/`escort`/`reference_escort` (alloc-gated modules): without
+// the feature this target compiles to zero tests, keeping the default-feature
+// matrix green instead of failing to resolve gated imports.
+#![cfg(feature = "alloc")]
+
 use bcinr_cmca::cascade::CascadeRefusal;
 use bcinr_cmca::escort::{escort_distribution, EscortRefusal};
 use bcinr_cmca::fixed::{NonNegativeFixed, SignedFixed};

@@ -17,7 +17,11 @@ use crate::utf8_iterators::*;
 extern crate core;
 use core::borrow::Borrow;
 use core::ops::{Index, Not, RangeFull};
-use core::{char, u32};
+// `use core::{char, u32}` removed: the std::char/std::u32 module
+// imports are denied deprecations on current nightly. The `char::`
+// call sites below are associated-function calls on the primitive
+// type (extension trait in scope), which resolve identically
+// without the module import.
 #[cfg(feature = "ascii")]
 extern crate ascii;
 #[cfg(feature = "ascii")]
