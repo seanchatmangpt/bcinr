@@ -14,16 +14,16 @@ Grounds the dissertation Ch9 latency claims with measured hardware-counter ticks
 
 | kernel | median ticks | p50 ticks | p99 ticks | median ns | p99 ns |
 |---|---:|---:|---:|---:|---:|
-| `emit_no_objects` | 7.8125 | 7.8125 | 67.71875 | 7.81 | 67.72 |
-| `emit_8_objects` | 7.171875 | 7.171875 | 67.328125 | 7.17 | 67.33 |
-| `emit_sla_breach` | 7.8125 | 7.8125 | 69.015625 | 7.81 | 69.02 |
-| `chain_1_frame_blake3` | 322.546875 | 322.546875 | 369.140625 | 322.55 | 369.14 |
-| `chain_100_frames_rolling` | 24434 | 24434 | 29226 | 24434.00 | 29226.00 |
-| `conformance_check_pass` | 0.356201171875 | 0.356201171875 | 0.44775390625 | 0.36 | 0.45 |
-| `conformance_check_fail` | 0.35595703125 | 0.35595703125 | 0.44775390625 | 0.36 | 0.45 |
-| `replay_10_frames` | 11.0625 | 11.0625 | 13.671875 | 11.06 | 13.67 |
-| `replay_64_frames_max` | 59.90625 | 59.90625 | 75.53125 | 59.91 | 75.53 |
-| `denial_to_fired_mask` | 0.3662109375 | 0.3662109375 | 0.370361328125 | 0.37 | 0.37 |
+| `emit_no_objects` | 9.125 | 9.125 | 78.125 | 9.12 | 78.12 |
+| `emit_8_objects` | 7.8125 | 7.8125 | 75.515625 | 7.81 | 75.52 |
+| `emit_sla_breach` | 8.46875 | 8.46875 | 71.609375 | 8.47 | 71.61 |
+| `chain_1_frame_blake3` | 371.359375 | 371.359375 | 377.234375 | 371.36 | 377.23 |
+| `chain_100_frames_rolling` | 28268 | 28268 | 28517 | 28268.00 | 28517.00 |
+| `conformance_check_pass` | 0.4169921875 | 0.4169921875 | 0.42138671875 | 0.42 | 0.42 |
+| `conformance_check_fail` | 0.4169921875 | 0.4169921875 | 0.42138671875 | 0.42 | 0.42 |
+| `replay_10_frames` | 13.015625 | 13.015625 | 13.296875 | 13.02 | 13.30 |
+| `replay_64_frames_max` | 69.03125 | 69.03125 | 70.875 | 69.03 | 70.88 |
+| `denial_to_fired_mask` | 0.4169921875 | 0.4169921875 | 0.42724609375 | 0.42 | 0.43 |
 
 Stated targets (from `receipt_bench.rs`): emit < 10 ns; BLAKE3 chain < 500 ns/frame measured envelope (amended 26.10.08 — the original < 15 ns/frame budget was physically unreachable: each frame hashes 131 bytes = 3 serial BLAKE3 block compressions, and hash compute is ~100% of per-frame cost. Falsifier: a rerun with `chain_1_frame_blake3` median < 250 ns/frame reopens the optimization lane); conformance check < 2 ns; replay < 20 ns/frame; denial mask ~ 1 ns.
 
@@ -45,3 +45,27 @@ input itself and cannot be amortized; only the trivial `Hasher::new()` IV
 store was saved. The 26.10.08 amendment stands; the <250 ns/frame falsifier
 remains unmet. (This section is hand-maintained; `cargo bench --bench rdtsc`
 regenerates only the table above.)
+
+### Follow-up: reset-free reuse via update-after-finalize (26.10.09)
+
+Second attempt at the same lane: one persistent `Hasher` in
+`OcelCausalReceipt`, per frame `update(frame_bytes)` then `finalize()` to a
+snapshot, **never resetting** — supported in blake3 1.8.5 (`finalize(&self)`
+is non-consuming, verified against the vendored source). Note this variant
+changes the chain function: `chain_hash(t)` becomes the running
+`BLAKE3(genesis || frame_0 || ... || frame_t)` instead of the per-frame fold
+`BLAKE3(chain_hash(t-1) || frame_t)` (still deterministic and causal since
+each frame embeds `prior_hash`). Same host/config harness.
+
+| kernel | baseline median (same code) | variant median |
+|---|---:|---:|
+| `chain_1_frame_blake3` | 322.55 ns | 350.53 / 350.25 ns |
+| `chain_100_frames_rolling` | 24393 ns | 31226 / 31185 ns |
+
+No improvement: the 1-frame kernel medians sit inside the session's observed
+baseline noise band (identical baseline code re-measured 322–373 ns across
+runs this session), and the 100-frame kernel trended ~25–30% *worse*.
+**Reverted** (<20% gate); working tree restored to the HEAD chain fold and
+the committed tick table re-regenerated on the reverted code. The 26.10.08
+budget amendment stands; the <250 ns/frame falsifier remains unmet. (This
+subsection is hand-maintained; the harness regenerates only the table.)
