@@ -15,16 +15,16 @@ Grounds the dissertation Ch9 latency claims with measured hardware-counter ticks
 
 | kernel | median ticks | p50 ticks | p99 ticks | median ns | p99 ns |
 |---|---:|---:|---:|---:|---:|
-| `emit_no_objects` | 7.8125 | 7.8125 | 68.359375 | 7.81 | 68.36 |
-| `emit_8_objects` | 7.15625 | 7.15625 | 65.109375 | 7.16 | 65.11 |
-| `emit_sla_breach` | 7.8125 | 7.8125 | 67.0625 | 7.81 | 67.06 |
-| `chain_1_frame_blake3` | 243.109375 | 243.109375 | 245.453125 | 243.11 | 245.45 |
-| `chain_100_frames_rolling` | 24875 | 24875 | 25042 | 24875.00 | 25042.00 |
-| `conformance_check_pass` | 0.35595703125 | 0.35595703125 | 0.3662109375 | 0.36 | 0.37 |
-| `conformance_check_fail` | 0.35595703125 | 0.35595703125 | 0.3662109375 | 0.36 | 0.37 |
-| `replay_10_frames` | 11.0625 | 11.0625 | 11.71875 | 11.06 | 11.72 |
-| `replay_64_frames_max` | 61.1875 | 61.1875 | 66.40625 | 61.19 | 66.41 |
-| `denial_to_fired_mask` | 0.386474609375 | 0.386474609375 | 0.396728515625 | 0.39 | 0.40 |
+| `emit_no_objects` | 10.421875 | 10.421875 | 89.84375 | 10.42 | 89.84 |
+| `emit_8_objects` | 9.109375 | 9.109375 | 85.9375 | 9.11 | 85.94 |
+| `emit_sla_breach` | 10.421875 | 10.421875 | 90.484375 | 10.42 | 90.48 |
+| `chain_1_frame_blake3` | 294.5625 | 294.5625 | 508.75 | 294.56 | 508.75 |
+| `chain_100_frames_rolling` | 30017 | 30017 | 49285 | 30017.00 | 49285.00 |
+| `conformance_check_pass` | 0.406982421875 | 0.406982421875 | 0.411376953125 | 0.41 | 0.41 |
+| `conformance_check_fail` | 0.4169921875 | 0.4169921875 | 0.468017578125 | 0.42 | 0.47 |
+| `replay_10_frames` | 14.328125 | 14.328125 | 14.984375 | 14.33 | 14.98 |
+| `replay_64_frames_max` | 76.8125 | 76.8125 | 78.6875 | 76.81 | 78.69 |
+| `denial_to_fired_mask` | 0.417236328125 | 0.417236328125 | 0.42724609375 | 0.42 | 0.43 |
 
 Stated targets (from `receipt_bench.rs`): emit < 10 ns; BLAKE3 chain < 250 ns/frame measured envelope (re-amended down 26.10.09 after the genesis pre-hash, commit f46ddc77 — Variant 3 — dropped `chain_1_frame_blake3` into the 227–243 ns band, firing the previous < 250 ns/frame reopen falsifier; the 26.10.08 < 500 ns/frame amendment and the original < 15 ns/frame budget are preserved in `benchmarks/rdtsc_results.md`); conformance check < 2 ns; replay < 20 ns/frame; denial mask ~ 1 ns.
 <!-- END AUTO -->
@@ -134,4 +134,32 @@ now closed permanently: the three negatives (Hasher reuse, running-fold,
 two-call update) plus the kept Variant 3 exhaust the remaining structural
 forms; the < 250 ns/frame budget (26.10.09 amendment, receipted table:
 243.11 ns) stands as this host's measured envelope. (This subsection is
+hand-maintained; the harness regenerates only the table.)
+
+## Variant 5 — full genesis hoist in the rolling kernel (26.10.09, REVERTED — within noise)
+
+Probe [118] (rdtsc lane follow-up): hoist `genesis()` fully out of the
+rolling kernel — base receipt built once outside the timed region, each
+sample copies the 80-byte receipt (needed a transient
+`#[derive(Clone, Copy)]` on `OcelCausalReceipt`) so the timed work is
+exactly 100x [BLAKE3 update(131) + finalize] on the chain only. Since
+Variant 3 (f46ddc77), `genesis()` is already just a zeroing struct
+literal — the per-iteration genesis *hash* no longer exists — so the
+only removable cost was the literal construction itself.
+
+Measured on current HEAD (8f6726df chain code, same run, interleaved
+table order):
+
+| kernel | before (committed rolling kernel, same run) | after (genesis fully hoisted) |
+|---|---:|---:|
+| `chain_100_frames_rolling` | 29893 ticks (29893.01 ns) | 29933 ticks (29933.01 ns) |
+
+Delta = +0.13% (hoisted marginally slower), far inside run-to-run
+spread (earlier same-session baseline runs read 31351 / 30017 ticks, a
+~4% swing). Consistent with an earlier probe against the pre-8f6726df
+two-call chain code: 31351 vs 31309 ticks, also within noise.
+**Reverted** per the within-noise rule: probe kernel and the derive are
+back at HEAD 8f6726df; only this note is kept. Post-revert
+regeneration of the auto table read `chain_100_frames_rolling` median
+(see tick table above — regenerated on HEAD code). (This section is
 hand-maintained; the harness regenerates only the table.)
