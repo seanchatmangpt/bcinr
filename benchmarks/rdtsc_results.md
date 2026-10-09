@@ -107,3 +107,31 @@ p99 245.45 ns). The amendment history — original < 15 ns/frame, 26.10.08
 < 500 ns/frame — is preserved above and in the harness footer
 (`crates/bcinr-powl/benches/receipt_bench.rs`, `benches/rdtsc.rs`). (This
 section is hand-maintained; the harness regenerates only the table.)
+
+### Follow-up 2: two-call update, 131-byte buffer removed (26.10.09, REJECTED)
+
+Variant 4 of the lane, the remaining structural form: `chain()` no longer
+assembles the 131-byte buffer and feeds the hash in two streaming updates
+(`update(prior[32])` then `update(frame[99])` — identical output, BLAKE3's
+update being a streaming fold); the genesis prior (raw zero bytes, stored
+once at genesis) is fed straight from the field with zero per-iteration
+genesis work. Same host/config harness. Interleaved A/B/A/B comparison to
+neutralize this session's thermal drift (concurrent lanes compiling on the
+same host):
+
+| kernel | A: HEAD, run 1 (cold) | A: HEAD, runs 3 and 5 (warm) | B: variant, runs 3 and 4 (warm) |
+|---|---:|---:|---:|
+| `chain_1_frame_blake3` | 263.67 ns | 293.23 / 292.97 ns | 317.33 / 317.05 ns |
+| `chain_100_frames_rolling` | 26893 ns | 30018 / 30017 ns | 31476 / 31351 ns |
+
+At steady state the variant is ~8% SLOWER on the 1-frame chain and ~5%
+slower on the 100-frame rolling chain — direction consistent across two A
+runs and two B runs, far below the >20% keep gate. The 131-byte memcpy is
+cheaper than the second `update()` call boundary. **Reverted** (below the
+keep gate, negative direction); `cargo test -p bcinr-powl`: 46 suites, 0
+failed on the variant code before the revert. The chain optimization lane is
+now closed permanently: the three negatives (Hasher reuse, running-fold,
+two-call update) plus the kept Variant 3 exhaust the remaining structural
+forms; the < 250 ns/frame budget (26.10.09 amendment, receipted table:
+243.11 ns) stands as this host's measured envelope. (This subsection is
+hand-maintained; the harness regenerates only the table.)
