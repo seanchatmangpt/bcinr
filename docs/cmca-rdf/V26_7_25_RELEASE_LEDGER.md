@@ -69,7 +69,7 @@ Counterfactual mutants constructed from load-bearing laws of fixed-point arithme
 **Owner**: Sean Chatman  
 **Verifier**: Integration test harness + receipt replay  
 **Standing**: ALIVE ✓  
-**Evidence**: [RECEIPT_REPLAY_REPORT.md](../RECEIPT_REPLAY_REPORT.md)
+**Evidence**: [RECEIPT_REPLAY_REPORT.md](../../RECEIPT_REPLAY_REPORT.md)
 
 Complete pipeline from PDDL domain definition through POWL v2 execution to cryptographic receipt generation and deterministic replay. All 11 integration tests pass (100% success rate). Receipt replay is byte-exact deterministic (BLAKE3 chaining).
 
