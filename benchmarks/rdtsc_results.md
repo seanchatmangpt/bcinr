@@ -45,22 +45,3 @@ input itself and cannot be amortized; only the trivial `Hasher::new()` IV
 store was saved. The 26.10.08 amendment stands; the <250 ns/frame falsifier
 remains unmet. (This section is hand-maintained; `cargo bench --bench rdtsc`
 regenerates only the table above.)
-
-## Negative result — incremental chain hasher (26.10.09)
-
-Attempted single-pass `blake3::Hasher` reuse across chain frames (persistent
-`Hasher` in `OcelCausalReceipt`, `reset()` + update + finalize per frame) to
-amortize per-frame `Hasher::new()`. Same host/config rdtsc harness.
-
-| kernel | before median | after median |
-|---|---:|---:|
-| `chain_1_frame_blake3` | 322.55 ns | 324.88 ns |
-| `chain_100_frames_rolling` | 24393 ns | 23851 ns |
-
-Both deltas are inside run-to-run noise (session baselines ranged 322–373 ns
-for `chain_1_frame_blake3`). **Reverted** — below the 20% gate. The three
-serial 64-byte BLAKE3 block compressions over the 131-byte frame input are
-the hash itself and cannot be amortized; only the trivial `Hasher::new()` IV
-store was saved. The 26.10.08 amendment stands; the <250 ns/frame falsifier
-remains unmet. (This section is hand-maintained; `cargo bench --bench rdtsc`
-regenerates only the tick table above.)
