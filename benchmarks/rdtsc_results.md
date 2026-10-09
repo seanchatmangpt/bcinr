@@ -163,3 +163,32 @@ back at HEAD 8f6726df; only this note is kept. Post-revert
 regeneration of the auto table read `chain_100_frames_rolling` median
 (see tick table above — regenerated on HEAD code). (This section is
 hand-maintained; the harness regenerates only the table.)
+
+### Follow-up 3: clean re-measurement of Follow-up 2 — negative confirmed (26.10.09)
+
+Lane-118 re-measurement of the Follow-up 2 two-call streaming variant,
+requested because Follow-up 2 was measured interleaved under concurrent
+lane compile load. The machine never went quiet for this probe: the
+concurrent doc-hdit fan-out kept 24-37 processes at 100% CPU for the full
+2-hour wait window (load 15-114, peaking past 100); the measurement below
+was taken interleaved A/B/A/B x3 at load 55-57, with both binaries built
+before the series (no compilation between runs; byte-identical rebuilds
+verified with `cmp` against /tmp snapshots). Load inflation is bounded by
+the same-run HEAD control: A reads 29851-30018 ns rolling here vs the
+quiet receipted 24875 ns (1.20x), and deflating B by the same factor
+(31308/1.20 ~= 26090 ns) still leaves it ~5% slower than quiet A.
+
+| kernel | A: HEAD, runs 1-3 (load 55-57) | B: variant, runs 1-3 (load 55-57) |
+|---|---|---|
+| `chain_1_frame_blake3` | 293.25 / 394.16 / 293.23 ns | 316.69 / 285.81 / 286.09 ns |
+| `chain_100_frames_rolling` | 29934 / 30018 / 29851 ns | 31226 / 31309 / 31308 ns |
+
+Direction unchanged from Follow-up 2: the variant is ~4.5% SLOWER on the
+100-frame rolling chain, consistent across all three interleaved rounds
+with per-binary medians tight to ~0.03%; the 1-frame kernel is mixed
+(A ~293 ns steady, B 286-317 ns). The re-measurement does NOT contradict
+the Follow-up 2 negative — it confirms it. **Variant stays reverted**
+(below the >20% keep gate, negative direction); committed tick table
+unchanged (receipted quiet run, 243.11 ns / 24875 ns). The chain lane
+remains closed. (This subsection is hand-maintained; the harness
+regenerates only the table.)
