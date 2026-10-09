@@ -8,15 +8,17 @@
 //! Stated targets, carried over from the Criterion version:
 //!
 //! - `OcelEmitArena::emit` — < 10 ns
-//! - BLAKE3 causal receipt chain — < 500 ns/frame measured envelope (amended
-//!   26.10.08; the original < 15 ns/frame budget was physically unreachable:
-//!   each frame hashes 131 bytes = 3 serial 64-byte BLAKE3 block
-//!   compressions, and profiling shows that hash compute is ~100% of
-//!   per-frame cost — serialization, allocation, and `Hasher` construction
-//!   are noise. See `benchmarks/rdtsc_results.md` for the measured table.
-//!   Falsifier: a harness rerun with `chain_1_frame_blake3` median
-//!   < 250 ns/frame on this host would falsify the block-compression-latency
-//!   explanation and reopen the optimization lane.)
+//! - BLAKE3 causal receipt chain — < 250 ns/frame measured envelope
+//!   (re-amended down 26.10.09; the 26.10.08 < 500 ns/frame amendment was
+//!   itself stale once the genesis pre-hash landed — commit f46ddc77,
+//!   "Variant 3" — dropping `chain_1_frame_blake3` to a 227–243 ns band,
+//!   which fired the < 250 ns/frame reopen falsifier. The original
+//!   < 15 ns/frame budget remains physically unreachable: each frame
+//!   hashes 131 bytes = 3 serial 64-byte BLAKE3 block compressions, and
+//!   profiling shows that hash compute is ~100% of per-frame cost —
+//!   serialization, allocation, and `Hasher` construction are noise.
+//!   See `benchmarks/rdtsc_results.md` for the measured table and the
+//!   amendment history.)
 //! - `ConformancePredicate::check` — < 2 ns (branchless)
 //! - `PowlReplayVerifier` — < 20 ns/frame
 //! - `DenialPolarity::to_fired_mask` — ~1 ns (branchless)

@@ -26,7 +26,7 @@ Grounds the dissertation Ch9 latency claims with measured hardware-counter ticks
 | `replay_64_frames_max` | 61.1875 | 61.1875 | 66.40625 | 61.19 | 66.41 |
 | `denial_to_fired_mask` | 0.386474609375 | 0.386474609375 | 0.396728515625 | 0.39 | 0.40 |
 
-Stated targets (from `receipt_bench.rs`): emit < 10 ns; BLAKE3 chain < 500 ns/frame measured envelope (amended 26.10.08 — the original < 15 ns/frame budget was physically unreachable: each frame hashes 131 bytes = 3 serial BLAKE3 block compressions, and hash compute is ~100% of per-frame cost. Falsifier: a rerun with `chain_1_frame_blake3` median < 250 ns/frame reopens the optimization lane); conformance check < 2 ns; replay < 20 ns/frame; denial mask ~ 1 ns.
+Stated targets (from `receipt_bench.rs`): emit < 10 ns; BLAKE3 chain < 250 ns/frame measured envelope (re-amended down 26.10.09 after the genesis pre-hash, commit f46ddc77 — Variant 3 — dropped `chain_1_frame_blake3` into the 227–243 ns band, firing the previous < 250 ns/frame reopen falsifier; the 26.10.08 < 500 ns/frame amendment and the original < 15 ns/frame budget are preserved in `benchmarks/rdtsc_results.md`); conformance check < 2 ns; replay < 20 ns/frame; denial mask ~ 1 ns.
 <!-- END AUTO -->
 
 ## Negative result — incremental chain hasher (26.10.09)
@@ -93,3 +93,17 @@ time). The 100-frame rolling chain is ~5–11% faster. `cargo test -p
 bcinr-powl`: 331 unit + 56 doc tests, 0 failed. **Kept**; committed tick
 table regenerated on this code. (This subsection is hand-maintained; the
 harness regenerates only the table.)
+
+## Budget re-amendment down — < 500 → < 250 ns/frame (26.10.09)
+
+The 26.10.08 amendment (< 15 → < 500 ns/frame) is stale by its own clause:
+the Variant 3 optimization (commit f46ddc77, genesis pre-hash folded into the
+first frame, kept 26.10.09 above) dropped `chain_1_frame_blake3` into a
+227–243 ns band on this host, firing the "< 250 ns/frame median reopens the
+optimization lane" falsifier that the 26.10.08 amendment carried. The chain
+budget is therefore re-amended **down** to the newly measured envelope:
+**< 250 ns/frame** (consistent with the current tick table: median 243.11 ns,
+p99 245.45 ns). The amendment history — original < 15 ns/frame, 26.10.08
+< 500 ns/frame — is preserved above and in the harness footer
+(`crates/bcinr-powl/benches/receipt_bench.rs`, `benches/rdtsc.rs`). (This
+section is hand-maintained; the harness regenerates only the table.)

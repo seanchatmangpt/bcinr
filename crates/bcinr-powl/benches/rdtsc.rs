@@ -377,11 +377,12 @@ fn main() {
     writeln!(md).unwrap();
     writeln!(
         md,
-        "Stated targets (from `receipt_bench.rs`): emit < 10 ns; BLAKE3 chain < 500 ns/frame \
-         measured envelope (amended 26.10.08 — the original < 15 ns/frame budget was \
-         physically unreachable: each frame hashes 131 bytes = 3 serial BLAKE3 block \
-         compressions, and hash compute is ~100% of per-frame cost. Falsifier: a rerun \
-         with `chain_1_frame_blake3` median < 250 ns/frame reopens the optimization lane); \
+        "Stated targets (from `receipt_bench.rs`): emit < 10 ns; BLAKE3 chain < 250 ns/frame \
+         measured envelope (re-amended down 26.10.09 after the genesis pre-hash, commit \
+         f46ddc77 — Variant 3 — dropped `chain_1_frame_blake3` into the 227–243 ns band, \
+         firing the previous < 250 ns/frame reopen falsifier; the 26.10.08 < 500 ns/frame \
+         amendment and the original < 15 ns/frame budget are preserved in \
+         `benchmarks/rdtsc_results.md`); \
          conformance check < 2 ns; replay < 20 ns/frame; denial mask ~ 1 ns."
     )
     .unwrap();
