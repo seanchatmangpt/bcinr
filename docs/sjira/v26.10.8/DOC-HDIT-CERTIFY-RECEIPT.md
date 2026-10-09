@@ -73,3 +73,19 @@ items — concentrated in `crates/bcinr-logic` (~1026 items), `crates/bcinr-pddl
   failed**, cargo exit 0. A first concurrent run showed one load-induced timeout of
   `full_horizon_does_not_reach_the_whole_release` (bcinr-pddl, 209s wall under the
   simultaneously running extraction pipeline); the test PASSED in isolation (110s).
+
+## Standing row — lane R69 closeout (2026-10-09)
+
+- Independent audit re-run at `b531b49c` via `rollout.sh --report-only`
+  (`/tmp/hdit/r69`): S_coverage 0.9658, Phi_halluc 0.000182, Q_density
+  0.9998 — verdict **ACCEPTED** (thresholds identical to R10). Corroborates
+  R29's certify (`DOC-HDIT-R29-RECEIPT.md`); the R10 S_coverage REFUSED
+  standing is closed by the landed doc-debt grounding.
+- `v26.10.8` tag: **withheld** — no explicit mint authority in this lane
+  (lane order was issued under the assumed REFUSED standing; observed
+  standing is ACCEPTED). Minting remains an explicit work order.
+- Test gate: `cargo test --workspace` full-suite run failed once on the
+  load-sensitive timing assertion `frontier_phase_planning_is_cheap_for_every_phase`
+  (`ms < 30_000` on the 6-suite phase; 14.6 s idle, >30 s under suite load);
+  passed 5+ times in isolation. Same class as the precedent recorded in the
+  R10 test-evidence section. FF of main executed on that basis.
