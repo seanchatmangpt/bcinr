@@ -45,8 +45,8 @@
 - `popcount_u64/u32(x)`: Bit population count.
 - `leading_zeros_u64/u32(x)`, `trailing_zeros_u64/u32(x)`: Bit position.
 - `reverse_bits_u64/u32(x)`: Bit reversal.
-- `saturating_add/sub/mul_i64(a, b)`: Signed saturation.
-- `select_u32/u64(mask, a, b)`: Branchless multiplexer.
+- `saturating_add(a, b)`, `saturating_sub(a, b)`, `saturating_mul(a, b)`: Signed saturation.
+- `select_u32(mask, a, b)`, `select_u64(mask, a, b)`: Branchless multiplexer.
 - `eq_mask_u32(a, b)`, `is_zero_mask_u32(x)`: Mask generation.
 - `min/max_u32(a, b)`: Branchless extremum.
 - `abs_i32(x)`: Branchless magnitude.

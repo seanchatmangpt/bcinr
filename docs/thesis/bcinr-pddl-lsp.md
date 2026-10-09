@@ -495,16 +495,16 @@ Planner (from bcinr-pddl):
 
 | Action | Parameters | Preconditions | Add Effects | Del Effects |
 |---|---|---|---|---|
-| `create_prd` | `?p` | `intent_captured(?p)` | `prd_exists(?p)` | — |
-| `admit_prd` | `?p` | `prd_exists(?p)` | `prd_admitted(?p)` | — |
-| `derive_ard` | `?p` | `prd_admitted(?p)` | `ard_exists(?p)` | — |
-| `admit_ard` | `?p` | `ard_exists(?p)` | `ard_admitted(?p)` | — |
-| `generate_work_units` | `?p` | `ard_admitted(?p)` | `work_units_generated(?p)` | — |
-| `implement_work_units` | `?p` | `work_units_generated(?p)` | `implementation_complete(?p)` | — |
-| `run_tests` | `?p` | `implementation_complete(?p)` | `tests_passed(?p)` | — |
-| `project_docs` | `?p` | `tests_passed(?p)` | `docs_projected(?p)` | — |
-| `prepare_release` | `?p` | 4 preconditions | `release_ready(?p)` | — |
-| `publish_release` | `?p` | 6 preconditions | `published(?p)` | — |
+| create_prd | `?p` | `intent_captured(?p)` | `prd_exists(?p)` | — |
+| admit_prd | `?p` | `prd_exists(?p)` | `prd_admitted(?p)` | — |
+| derive_ard | `?p` | `prd_admitted(?p)` | `ard_exists(?p)` | — |
+| admit_ard | `?p` | `ard_exists(?p)` | `ard_admitted(?p)` | — |
+| generate_work_units | `?p` | `ard_admitted(?p)` | `work_units_generated(?p)` | — |
+| implement_work_units | `?p` | `work_units_generated(?p)` | `implementation_complete(?p)` | — |
+| run_tests | `?p` | `implementation_complete(?p)` | `tests_passed(?p)` | — |
+| project_docs | `?p` | `tests_passed(?p)` | `docs_projected(?p)` | — |
+| prepare_release | `?p` | 4 preconditions | `release_ready(?p)` | — |
+| publish_release | `?p` | 6 preconditions | `published(?p)` | — |
 
 All actions: 1 parameter, ≤ 6 preconditions, 1 add effect, 0 delete effects. Every bound satisfied.
 
