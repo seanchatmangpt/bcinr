@@ -39,6 +39,10 @@ Q_density 0.9998 — thresholds identical to R10, verdict ACCEPTED).
   to origin; zero-citation sweep basis). Resolves the R69 standing-row
   note ("tag withheld — minting remains an explicit work order").
 
+## Re-certification scope
+
+Re-certification triggers on a non-empty `git diff --stat 349afd7b..HEAD -- crates/` (code/claim-surface change); docs-only commits are grandfathered.
+
 ## Threshold-falsifier disclosure
 
 - `cargo test --workspace` contains load-sensitive timing assertions
