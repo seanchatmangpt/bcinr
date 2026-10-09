@@ -64,3 +64,9 @@ Re-run `rollout.sh --report-only` at `349afd7b` with the pinned extractor;
 if certify REFUSES (or S_coverage < 0.90 with fresh extraction), this
 standing is refuted and the inventories must be regenerated per the R29
 receipt recipe.
+
+## Branch plane
+
+Single-plane repo: main == bench/rdtsc-tick-tables == tag subject, all at
+6d3439ad446d7087fdab2896f388db0a04998dc4 (2026-10-09). The certify receipt
+lives on bench/rdtsc-tick-tables; main was fast-forwarded to it.
