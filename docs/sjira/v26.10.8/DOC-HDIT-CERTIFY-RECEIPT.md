@@ -9,6 +9,8 @@ Thresholds were NOT relaxed. This is the honest certification record for the lan
 - Binary: `/Users/sac/ggen-marketplace/packs/rust-doc-hdit-pack/target/release/doc-hdit`
 - Extractor pin: `ggen-marketplace/scripts/gen_doc_surface.py` sha256 `4c862576ab63595f9cd0417b35341af3ec1001f49450e79bf2e4c291a4a4246f` (verified with `shasum -a 256` before the runs)
 
+> superseded-by f51d81ac4f7e4119dff950327237effee4968f4aa9aba52c7d62c5362f441fa9 as-of 2026-10-09 (R34); pin retained as historical subject identity — REFUSED receipt, no live-standing claim.
+
 ## Commands + exits
 
 ```sh
@@ -40,7 +42,7 @@ and is discarded; run 2 is the recorded result.
    workspace per root `Cargo.toml`). The extractor mints `has_param` claims from table-cell
    code spans; the names are now unbackticked (design names, not symbol references).
 2. `docs/diataxis/reference/api-catalog.md` — 2 phantom `mentions` claims. Slash-shorthand
-   `saturating_add/sub/mul_i64(a, b)` and `select_u32/u64(mask, a, b)` defeated exact-match
+   saturating_add/sub/mul_i64(a, b) (slash shorthand, quoted verbatim) and select_u32/u64(mask, a, b) (slash shorthand, quoted verbatim) defeated exact-match
    grounding; expanded to the real identifiers (`saturating_add(a, b)`, `saturating_sub(a, b)`,
    `saturating_mul(a, b)`, `select_u32(mask, a, b)`, `select_u64(mask, a, b)`) — all five
    verified present in `crates/bcinr-cmca/src/fixed.rs` / `crates/bcinr-logic`.
