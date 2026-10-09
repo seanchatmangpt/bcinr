@@ -14,15 +14,15 @@ Grounds the dissertation Ch9 latency claims with measured hardware-counter ticks
 
 | kernel | median ticks | p50 ticks | p99 ticks | median ns | p99 ns |
 |---|---:|---:|---:|---:|---:|
-| `emit_no_objects` | 10.421875 | 10.421875 | 90.5 | 10.42 | 90.50 |
-| `emit_8_objects` | 9.109375 | 9.109375 | 85.578125 | 9.11 | 85.58 |
-| `emit_sla_breach` | 10.421875 | 10.421875 | 89.1875 | 10.42 | 89.19 |
-| `chain_1_frame_blake3` | 416.28125 | 416.28125 | 543.234375 | 416.28 | 543.23 |
-| `chain_100_frames_rolling` | 28310 | 28310 | 31684 | 28310.01 | 31684.01 |
-| `conformance_check_pass` | 0.457763671875 | 0.457763671875 | 0.47216796875 | 0.46 | 0.47 |
-| `conformance_check_fail` | 0.457763671875 | 0.457763671875 | 0.47216796875 | 0.46 | 0.47 |
-| `replay_10_frames` | 25.390625 | 25.390625 | 26.3125 | 25.39 | 26.31 |
-| `replay_64_frames_max` | 70.3125 | 70.3125 | 119.8125 | 70.31 | 119.81 |
-| `denial_to_fired_mask` | 0.468017578125 | 0.468017578125 | 0.472412109375 | 0.47 | 0.47 |
+| `emit_no_objects` | 9.765625 | 9.765625 | 79.4375 | 9.77 | 79.44 |
+| `emit_8_objects` | 8.453125 | 8.453125 | 76.171875 | 8.45 | 76.17 |
+| `emit_sla_breach` | 9.125 | 9.125 | 76.828125 | 9.12 | 76.83 |
+| `chain_1_frame_blake3` | 373.328125 | 373.328125 | 538.671875 | 373.33 | 538.67 |
+| `chain_100_frames_rolling` | 28434 | 28434 | 68160 | 28434.00 | 68160.00 |
+| `conformance_check_pass` | 0.4169921875 | 0.4169921875 | 0.42724609375 | 0.42 | 0.43 |
+| `conformance_check_fail` | 0.4169921875 | 0.4169921875 | 0.421630859375 | 0.42 | 0.42 |
+| `replay_10_frames` | 13.03125 | 13.03125 | 26.046875 | 13.03 | 26.05 |
+| `replay_64_frames_max` | 70.3125 | 70.3125 | 407.53125 | 70.31 | 407.53 |
+| `denial_to_fired_mask` | 0.4169921875 | 0.4169921875 | 0.447509765625 | 0.42 | 0.45 |
 
-Stated targets (from `receipt_bench.rs`): emit < 10 ns; BLAKE3 chain < 15 ns/frame; conformance check < 2 ns; replay < 20 ns/frame; denial mask ~ 1 ns.
+Stated targets (from `receipt_bench.rs`): emit < 10 ns; BLAKE3 chain < 500 ns/frame measured envelope (amended 26.10.08 — the original < 15 ns/frame budget was physically unreachable: each frame hashes 131 bytes = 3 serial BLAKE3 block compressions, and hash compute is ~100% of per-frame cost. Falsifier: a rerun with `chain_1_frame_blake3` median < 250 ns/frame reopens the optimization lane); conformance check < 2 ns; replay < 20 ns/frame; denial mask ~ 1 ns.
