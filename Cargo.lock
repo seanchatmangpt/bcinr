@@ -76,7 +76,7 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "bcinr-bench-auditor"
-version = "26.9.28"
+version = "26.10.11"
 dependencies = [
  "syn",
  "walkdir",
@@ -84,7 +84,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-cheat-scanner"
-version = "26.9.28"
+version = "26.10.11"
 dependencies = [
  "quote",
  "serde_json",
@@ -94,7 +94,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-cmca"
-version = "26.9.28"
+version = "26.10.11"
 dependencies = [
  "bcinr-logic",
  "blake3",
@@ -108,7 +108,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-contract-gate"
-version = "26.9.28"
+version = "26.10.11"
 dependencies = [
  "quote",
  "syn",
@@ -117,7 +117,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-guarded"
-version = "26.9.28"
+version = "26.10.11"
 dependencies = [
  "bcinr-cmca",
  "bcinr-powl",
@@ -126,7 +126,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-logic"
-version = "26.9.28"
+version = "26.10.11"
 dependencies = [
  "criterion",
  "divan",
@@ -135,7 +135,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-mfw-ir"
-version = "26.9.28"
+version = "26.10.11"
 dependencies = [
  "blake3",
  "divan",
@@ -143,7 +143,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-pddl"
-version = "26.9.28"
+version = "26.10.11"
 dependencies = [
  "bcinr-cmca",
  "bcinr-mfw-ir",
@@ -161,7 +161,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-powl"
-version = "26.9.28"
+version = "26.10.11"
 dependencies = [
  "bcinr-cmca",
  "bcinr-logic",
@@ -179,7 +179,7 @@ dependencies = [
 
 [[package]]
 name = "bcinr-reporter"
-version = "26.9.28"
+version = "26.10.11"
 dependencies = [
  "prettytable-rs",
  "regex",
